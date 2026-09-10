@@ -20,7 +20,7 @@ import {
   type TestFireTemplateDraft,
   type TriggerTemplateDefaults,
 } from "@langwatch/automation-contract";
-import type { AutomationTestFirePort } from "../ports/automation-test-fire.port.ts";
+import type { AutomationTestFire } from "../ports/automation-test-fire.port.ts";
 
 const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;
 const SLACK_TEMPLATE_TYPE_SET: ReadonlySet<string> = new Set(SLACK_TEMPLATE_TYPES);
@@ -38,12 +38,12 @@ type TestFireContext = {
 export class AutomationTemplateService {
   private constructor(
     private readonly baseHost: string,
-    private readonly delivery: AutomationTestFirePort,
+    private readonly delivery: AutomationTestFire,
   ) {}
 
   static create(input: {
     baseHost: string;
-    delivery: AutomationTestFirePort;
+    delivery: AutomationTestFire;
   }): AutomationTemplateService {
     return new AutomationTemplateService(input.baseHost, input.delivery);
   }

@@ -4,7 +4,7 @@ import type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
@@ -58,7 +58,7 @@ export interface LangyConversationWorkerCapability<
  * so unlike the ClickHouse-gated pipelines there is no configuration under
  * which the graph is meaningless.
  */
-export class LangyConversationWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class LangyConversationWorkerFeatureInstaller implements WorkerFeatureInstaller {
   /**
    * The registration is captured as a closure, and that is what erases the
    * event union.

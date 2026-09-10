@@ -5,7 +5,7 @@ import {
 } from "@langwatch/observability/metrics/testing";
 import { describe, expect, it } from "vitest";
 import {
-  AutomationClockPort,
+  AutomationClock,
   AutomationEmailCapService,
   AutomationPersistCapService,
   AutomationTraceRecordUnavailableError,
@@ -17,12 +17,12 @@ import { PlanNextStepService } from "@langwatch/entitlement-server";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import {
   WorkerAutomationNextStepAdapter,
-  WorkerAutomationOrganizationPricingPort,
+  WorkerAutomationOrganizationPricing,
 } from "../../features/automation/automation-next-step.adapter.ts";
 import { WorkerAutomationNotificationDeliveryAdapter } from "../../features/automation/automation-notification-delivery.adapter.ts";
 import {
   createWorkerAutomationSettlement,
-  WorkerAutomationSettlementAbsenceReportPort,
+  WorkerAutomationSettlementAbsenceReport,
 } from "../worker-automation-settlement.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import { type Instant, Temporal } from "@langwatch/time";
@@ -125,7 +125,7 @@ function recordingLogger() {
   } as never;
 }
 
-class RecordingAbsence extends WorkerAutomationSettlementAbsenceReportPort {
+class RecordingAbsence extends WorkerAutomationSettlementAbsenceReport {
   withoutTraceRecordRead(): void {
     RECORDED.absences.push("traceRecordRead");
   }
@@ -149,7 +149,7 @@ class RecordingAbsence extends WorkerAutomationSettlementAbsenceReportPort {
   }
 }
 
-class FrozenClock extends AutomationClockPort {
+class FrozenClock extends AutomationClock {
   now(): Instant {
     return Temporal.Instant.from("2026-01-02T03:04:05.000Z");
   }
@@ -236,7 +236,7 @@ function prismaDouble(trigger: TriggerRow) {
 }
 
 /** The organization row a quote is read from, standing where Prisma stands. */
-class StubOrganizationPricing extends WorkerAutomationOrganizationPricingPort {
+class StubOrganizationPricing extends WorkerAutomationOrganizationPricing {
   async pricingFor(): Promise<{ pricingModel: null; currency: "USD" }> {
     return { pricingModel: null, currency: "USD" };
   }

@@ -18,8 +18,8 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type {
-  PersonalVirtualKeyIssuerPort,
-} from "../ports/personal-usage.port.ts";
+  PersonalVirtualKeyIssuer,
+} from "../app/governance.infrastructure.ts";
 import { PersonalVirtualKeyRepository } from "../repositories/directory/personal-virtual-key.repository.ts";
 
 const DEFAULT_PERSONAL_KEY_LABEL = "default";
@@ -42,7 +42,7 @@ type RoutingPolicyReader = {
 export class DefaultGovernancePersonalVirtualKeyService {
   private constructor(
     private readonly repository: PersonalVirtualKeyRepository,
-    private readonly issuer: PersonalVirtualKeyIssuerPort,
+    private readonly issuer: PersonalVirtualKeyIssuer,
     private readonly organizations: OrganizationService,
     private readonly policies: RoutingPolicyReader,
     private readonly gatewayBaseUrl: string,
@@ -50,7 +50,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
 
   static create(options: {
     repository: PersonalVirtualKeyRepository;
-    issuer: PersonalVirtualKeyIssuerPort;
+    issuer: PersonalVirtualKeyIssuer;
     organizations: OrganizationService;
     policies: RoutingPolicyReader;
     gatewayBaseUrl: string;

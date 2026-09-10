@@ -1,14 +1,14 @@
 import {
   OtelPiiAnalysisMetricsAdapter,
   OtlpSpanPiiRedactionService,
-  type DataPrivacyResolutionPort,
-  type PiiAnalysisMetricsPort,
-  type PiiAnalysisPort,
+  type DataPrivacyResolution,
+  type PiiAnalysisMetrics,
+  type PiiAnalysis,
 } from "@langwatch/data-privacy-server";
 import type { TenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpResource, OtlpSpan, PIIRedactionLevel } from "@langwatch/trace-contract";
-import { TraceSpanPiiRedactionPort } from "@langwatch/trace-server";
+import { TraceSpanPiiRedaction } from "@langwatch/trace-server";
 import { WorkerPiiAnalysisAdapter } from "../platform/infrastructure/worker-pii-analysis.adapter.ts";
 import type { WorkerTracePrivacyConfig } from "../platform/config/worker.config.ts";
 
@@ -16,7 +16,7 @@ import type { WorkerTracePrivacyConfig } from "../platform/config/worker.config.
  * The PII redaction this process would scrub an incoming span with.
  *
  * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `RecordSpanCommand`'s adapters and still redacts every span it ingests — so
+ * `EventingRecordSpanAdapter`'s adapters and still redacts every span it ingests — so
  * nothing in this process redacts anything yet. What has to be true today is
  * that this composition root CAN build the whole path from what it already
  * holds: the four privacy variables it now reads, the scoped data-privacy
@@ -24,15 +24,15 @@ import type { WorkerTracePrivacyConfig } from "../platform/config/worker.config.
  *
  * The graph it builds, top to bottom:
  *
- *     TraceSpanPiiRedactionPort            (trace-server declares it)
+ *     TraceSpanPiiRedaction            (trace-server declares it)
  *       └─ OtlpSpanPiiRedactionService     (data-privacy-server owns it)
- *            ├─ DataPrivacyResolutionPort  resolves the scope's policy
+ *            ├─ DataPrivacyResolution  resolves the scope's policy
  *            ├─ @langwatch/redaction       the native secrets + PII floor
- *            └─ PiiAnalysisPort            names + locations, out of process
+ *            └─ PiiAnalysis            names + locations, out of process
  *                 └─ WorkerPiiAnalysisAdapter   Presidio, Google DLP fallback
  *
  * WHAT IS DELIBERATELY NOT HERE. The service's log and metric halves were not
- * harvested: `LogRedactionPort` and `MetricRedactionPort` belong to the log
+ * harvested: `LogRedaction` and `MetricRedactionPort` belong to the log
  * and metric conversions, and the trace conversion reaches this graph through
  * `redact` alone. When those convert, they compose the same service and the
  * same transport rather than a second copy of either.
@@ -46,9 +46,9 @@ export function createWorkerTracePrivacy(options: {
    * content drop takes one: redaction reads a policy and never writes one, and
    * writing is what puts an `OrganizationService` behind the service.
    */
-  dataPrivacy: DataPrivacyResolutionPort;
+  dataPrivacy: DataPrivacyResolution;
   featureFlags: FeatureFlagApi;
-  metrics?: PiiAnalysisMetricsPort;
+  metrics?: PiiAnalysisMetrics;
 }): WorkerTracePrivacy {
   const transport = WorkerPiiAnalysisAdapter.create({
     config: options.config,
@@ -78,12 +78,12 @@ export const WORKER_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 /** One process-owned privacy graph, and the transport it has to give back. */
 export class WorkerTracePrivacy {
   constructor(
-    readonly transport: PiiAnalysisPort,
+    readonly transport: PiiAnalysis,
     readonly redaction: OtlpSpanPiiRedactionService,
   ) {}
 
-  /** The narrow port `RecordSpanCommand` names, over this graph. */
-  spanRedactionPort(): TraceSpanPiiRedactionPort {
+  /** The narrow port `EventingRecordSpanAdapter` names, over this graph. */
+  spanRedactionPort(): TraceSpanPiiRedaction {
     return new WorkerTraceSpanPiiRedactionAdapter(this.redaction);
   }
 
@@ -100,7 +100,7 @@ export class WorkerTracePrivacy {
  * not become one — a service that extended one feature's port could not answer
  * the other two features' ports for the same policy.
  */
-class WorkerTraceSpanPiiRedactionAdapter extends TraceSpanPiiRedactionPort {
+class WorkerTraceSpanPiiRedactionAdapter extends TraceSpanPiiRedaction {
   constructor(private readonly service: OtlpSpanPiiRedactionService) {
     super();
   }

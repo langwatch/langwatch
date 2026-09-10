@@ -18,7 +18,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 
 import { PrismaGatewayAdapter } from "../../../adapters/prisma.gateway.adapter.ts";
 import { PrismaGatewayInternalStoreAdapter } from "../../../adapters/postgres.gateway-internal-store.adapter.ts";
-import type { GatewayModelProviderCredentialsPort } from "../../../ports/gateway-model-provider-credentials.port.ts";
+import type { GatewayModelProviderCredentials } from "../../../app/gateway.infrastructure.ts";
 import { GatewayConfigMaterialiserService } from "../../../services/gateway-config-materialisation.service.ts";
 import { TestProjectApi } from "../../../__tests__/support/test-project-api.ts";
 import { VirtualKeyService } from "../../../services/virtual-key.service.ts";
@@ -67,7 +67,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const EXPIRES_AT = nowInstant().add({ milliseconds: 7 * DAY_MS });
 
 /** Stored provider keys arrive already decrypted in these fixtures. */
-const credentials: GatewayModelProviderCredentialsPort = {
+const credentials: GatewayModelProviderCredentials = {
   readCustomKeys: (stored: unknown) => stored as Record<string, unknown>,
 };
 

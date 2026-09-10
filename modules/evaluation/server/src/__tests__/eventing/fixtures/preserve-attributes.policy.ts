@@ -1,6 +1,6 @@
-import { EvaluationAnalyticsAttributePolicy } from "../../../ports/evaluation.port.ts";
+import { EvaluationAnalyticsAttributePolicy } from "../../../app/evaluation.infrastructure.ts";
 
-export class PreserveEvaluationAnalyticsAttributes extends EvaluationAnalyticsAttributePolicy {
+export class PreserveEvaluationAnalyticsAttributes implements EvaluationAnalyticsAttributePolicy {
   trim(attributes: Record<string, string>): Record<string, string> {
     return { ...attributes };
   }

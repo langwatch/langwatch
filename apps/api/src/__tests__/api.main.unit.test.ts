@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiRuntimeBootstrap,
-  ApiRuntimeCompositionPort,
-  ApiRuntimeProcessPort,
+  ApiRuntimeComposition,
+  ApiRuntimeProcess,
   type ApiRuntimeCompositionOptions,
 } from "../api.main.ts";
 import type { ApiShutdownSignal, ApiSignalHost } from "../api.signal-handlers.ts";
 
-class TestProcess extends ApiRuntimeProcessPort {
+class TestProcess extends ApiRuntimeProcess {
   readonly start = vi.fn<() => Promise<undefined>>(async () => void 0);
   readonly close = vi.fn<() => Promise<undefined>>(async () => void 0);
 }
 
-class TestComposition extends ApiRuntimeCompositionPort {
+class TestComposition extends ApiRuntimeComposition {
   readonly compose = vi.fn<(options: ApiRuntimeCompositionOptions) => Promise<TestProcess>>(
     async (_options) => this.process,
   );

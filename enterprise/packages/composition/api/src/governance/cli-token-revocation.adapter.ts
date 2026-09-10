@@ -3,7 +3,7 @@
 import { createLogger } from "@langwatch/observability";
 import {
   CliTokenStorePort,
-  GovernanceDiagnosticsPort,
+  GovernanceDiagnostics,
 } from "@langwatch/enterprise-governance-server";
 import type { Cluster, Redis } from "ioredis";
 
@@ -32,7 +32,7 @@ export class RedisCliTokenStoreAdapter extends CliTokenStorePort {
   }
 }
 
-export class AppCliTokenDiagnostics extends GovernanceDiagnosticsPort {
+export class AppCliTokenDiagnostics extends GovernanceDiagnostics {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }

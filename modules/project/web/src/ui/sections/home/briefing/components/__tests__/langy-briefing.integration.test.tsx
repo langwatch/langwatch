@@ -6,14 +6,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   ProjectHomeHostProvider,
-  ProjectHomeHostPort,
+  ProjectHomeHost,
   type ProjectHomeProject,
 } from "../../../../../../model/project-home-host.ts";
 import type { BriefingData, BriefingReceipt } from "../../types.ts";
 import { LangyBriefing } from "../langy-briefing.tsx";
 
 /** Only `navigate` is exercised — internal Trace Explorer links route through it. */
-class StubProjectHomeHost extends ProjectHomeHostPort {
+class StubProjectHomeHost extends ProjectHomeHost {
   project(): ProjectHomeProject | undefined {
     return { id: "project-1", name: "My Project", slug: "acme" };
   }

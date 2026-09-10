@@ -16,7 +16,7 @@ import {
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
 } from "../../app/github.app.ts";
-import { GithubRedisPort } from "../../repositories/redis/github-redis.connection.ts";
+import { GithubRedis } from "../../repositories/redis/github-redis.connection.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
   type GithubPullRequestRow,
@@ -45,7 +45,7 @@ type GetPullRequestInput = {
   number: number;
 };
 
-class TestRedis extends GithubRedisPort {
+class TestRedis extends GithubRedis {
   readonly store = new Map<string, string>();
 
   tryGet(key: string): Promise<string | null> {
@@ -184,7 +184,7 @@ function serviceWith({
 }: {
   stored: GithubPullRequestRow | null;
   getPullRequest: (input: GetPullRequestInput) => Promise<GithubPullRequestSummary>;
-  redis?: GithubRedisPort | null;
+  redis?: GithubRedis | null;
   find?: (input: { prNumber: number }) => Promise<GithubPullRequestRow | null>;
 }) {
   const repository = new TestPullRequestRepository(find ?? (() => Promise.resolve(stored)));

@@ -1,8 +1,8 @@
-import { NoopCodingAgentReadMetricsPort } from "../../adapters/coding-agent-read-metrics.adapter.ts";
-import type { CodingAgentReadMetricsPort } from "../../ports/coding-agent-read-metrics.port.ts";
-import { SystemCodingAgentClockAdapter } from "../../adapters/coding-agent-clock.adapter.ts";
-import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
-import type { CodingAgentClockPort } from "../../ports/coding-agent-clock.port.ts";
+import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
+import type { CodingAgentReadMetrics } from "../../app/coding-agent.infrastructure.ts";
+import { SystemCodingAgentClockAdapter } from "../../services/coding-agent-clock.service.ts";
+import type { CodingAgentClickHouse } from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentClock } from "../../app/coding-agent.infrastructure.ts";
 import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
 import { CodingAgentSessionClickHouseRepository } from "./clickhouse.coding-agent-session.repository.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "./clickhouse.coding-agent-session-event.repository.ts";
@@ -11,7 +11,7 @@ import { SessionMetricSeriesClickHouseRepository } from "./clickhouse.session-me
 
 /** What a process hands the ClickHouse tier. */
 export type ClickHouseCodingAgentInfrastructure = Readonly<{
-  clickhouse: CodingAgentClickHousePort;
+  clickhouse: CodingAgentClickHouse;
   defaultRetentionDays: number;
 }>;
 
@@ -34,7 +34,7 @@ export class ClickHouseCodingAgentRepositories {
    */
   static createWith(
     options: ClickHouseCodingAgentInfrastructure &
-      Readonly<{ metrics?: CodingAgentReadMetricsPort; clock?: CodingAgentClockPort }>,
+      Readonly<{ metrics?: CodingAgentReadMetrics; clock?: CodingAgentClock }>,
   ): CodingAgentRepositories {
     const storage = {
       clickHouse: options.clickhouse,
@@ -44,7 +44,7 @@ export class ClickHouseCodingAgentRepositories {
     return {
       sessions: CodingAgentSessionClickHouseRepository.create({
         ...storage,
-        metrics: options.metrics ?? NoopCodingAgentReadMetricsPort.create(),
+        metrics: options.metrics ?? NoopCodingAgentReadMetrics.create(),
         clock: options.clock ?? SystemCodingAgentClockAdapter.create(),
       }),
       traceSessions: CodingAgentTraceSessionClickHouseRepository.create(storage),

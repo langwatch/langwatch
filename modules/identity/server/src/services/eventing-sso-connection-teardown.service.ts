@@ -1,7 +1,7 @@
 import { newSsoConnectionCommandId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 import { createLogger } from "@langwatch/observability";
-import type { ConnectionTeardownPort } from "../processes/connection-teardown.process.ts";
+import type { ConnectionTeardown } from "../processes/connection-teardown.process.ts";
 
 const logger = createLogger("langwatch:identity:sso-connection-teardown");
 
@@ -13,7 +13,7 @@ const logger = createLogger("langwatch:identity:sso-connection-teardown");
  * `revoked` lets a process that has a directory report what it retired and a
  * process that has none say so by name.
  */
-export abstract class SsoConnectionDirectoryRevocationPort {
+export abstract class SsoConnectionDirectoryRevocation {
   abstract revokeTokensForConnection(input: {
     organizationId: string;
     connectionId: string;
@@ -39,17 +39,17 @@ export abstract class SsoConnectionDirectoryRevocationPort {
  * retry as itself, and the guard's state check is what makes a duplicate
  * harmless.
  */
-export class EventingSsoConnectionTeardownAdapter implements ConnectionTeardownPort {
+export class EventingSsoConnectionTeardownAdapter implements ConnectionTeardown {
   static create(options: {
     connections: () => Pick<SsoConnectionService, "completeTeardown">;
-    directory: SsoConnectionDirectoryRevocationPort;
+    directory: SsoConnectionDirectoryRevocation;
   }): EventingSsoConnectionTeardownAdapter {
     return new EventingSsoConnectionTeardownAdapter(options.connections, options.directory);
   }
 
   private constructor(
     private readonly connections: () => Pick<SsoConnectionService, "completeTeardown">,
-    private readonly directory: SsoConnectionDirectoryRevocationPort,
+    private readonly directory: SsoConnectionDirectoryRevocation,
   ) {}
 
   async completeTeardown({
@@ -119,7 +119,7 @@ export class EventingSsoConnectionTeardownAdapter implements ConnectionTeardownP
  * just moved to TORN_DOWN — so what is actually lost is the row deletion, not
  * the security property.
  */
-export class UnrevokedSsoConnectionDirectory extends SsoConnectionDirectoryRevocationPort {
+export class UnrevokedSsoConnectionDirectory extends SsoConnectionDirectoryRevocation {
   static create(): UnrevokedSsoConnectionDirectory {
     return new UnrevokedSsoConnectionDirectory();
   }

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { AutomationClock } from "../app/automation.infrastructure.ts";
 import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository.ts";
 import { AutomationTraceTriggerCatalogueService } from "../services/automation-trace-trigger-catalogue.service.ts";
 
@@ -16,7 +16,7 @@ export class PostgresAutomationTraceTriggerCatalogueAdapter {
   static create(input: {
     /** The one database client the composing process opened. */
     prisma: AutomationTraceTriggerCatalogueDatabase;
-    clock: AutomationClockPort;
+    clock: AutomationClock;
   }): AutomationTraceTriggerCatalogueService {
     return AutomationTraceTriggerCatalogueService.create({
       triggers: PrismaTriggerRepository.create(input.prisma, input.clock),

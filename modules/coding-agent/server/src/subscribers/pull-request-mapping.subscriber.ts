@@ -1,5 +1,5 @@
 import { throttledWindow, type SubscriberSpec, type TriggerContext } from "@langwatch/eventing";
-import type { CodingAgentPullRequestMappingPort } from "../ports/coding-agent-pull-request-mapping.port.ts";
+import type { CodingAgentPullRequestMapping } from "../app/coding-agent.infrastructure.ts";
 import { createLogger } from "@langwatch/observability";
 import type { CodingAgentSessionState } from "../projections/coding-agent-session.projection.ts";
 import type { CodingAgentProcessingEvent } from "@langwatch/coding-agent-contract";
@@ -49,7 +49,7 @@ export function shouldMapPullRequests(
     repositoryName?: string | null;
     gitBranch?: string | null;
   },
-  github: CodingAgentPullRequestMappingPort,
+  github: CodingAgentPullRequestMapping,
 ): boolean {
   if (!github.canMapRepositoryHost(input.repositoryHost ?? "")) return false;
   return Boolean(
@@ -144,7 +144,7 @@ export function pullRequestMappingGroupKey({
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 export function createPullRequestMappingHandler(
-  github: CodingAgentPullRequestMappingPort,
+  github: CodingAgentPullRequestMapping,
 ): (
   event: CodingAgentProcessingEvent,
   context: TriggerContext<CodingAgentSessionState>,
@@ -189,7 +189,7 @@ export function createPullRequestMappingHandler(
 
 /** The production fold subscriber, shared by composition and policy tests. */
 export function createPullRequestMappingSubscriber(
-  github: CodingAgentPullRequestMappingPort,
+  github: CodingAgentPullRequestMapping,
 ): SubscriberSpec<CodingAgentProcessingEvent> & {
   fold: "codingAgentSession";
   map?: never;

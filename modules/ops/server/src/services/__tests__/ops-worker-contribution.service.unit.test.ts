@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { UsageStatsErrorReporterPort, UsageStatsTelemetryClientPort } from "../../index.ts";
+import { UsageStatsErrorReporter, UsageStatsTelemetryClient } from "../../index.ts";
 import {
   type UsageStatsCollector,
   type UsageStatsOrganization,
@@ -72,11 +72,11 @@ function usageStatsReport(overrides: Partial<UsageStatsReport> = {}): UsageStats
   };
 }
 
-class TelemetryStub implements UsageStatsTelemetryClientPort {
+class TelemetryStub implements UsageStatsTelemetryClient {
   readonly send = vi.fn(async () => void 0);
 }
 
-class ErrorReporterStub implements UsageStatsErrorReporterPort {
+class ErrorReporterStub implements UsageStatsErrorReporter {
   readonly capture = vi.fn(async () => void 0);
 }
 

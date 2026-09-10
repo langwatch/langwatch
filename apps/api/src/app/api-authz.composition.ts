@@ -12,7 +12,7 @@ import type { ApiAuthzConfig } from "../platform/config/api.config.ts";
 import type { ApiEventingInfrastructure } from "../platform/infrastructure/api-eventing.infrastructure.ts";
 
 /** Reports the composition decision a missing collaborator would otherwise hide. */
-export abstract class ApiAuthzAbsenceReportPort {
+export abstract class ApiAuthzAbsenceReport {
   abstract absent(reason: "no-database" | "no-eventing"): void;
 }
 
@@ -50,7 +50,7 @@ export type ApiAuthzCompositionOptions = {
  *    routing metadata a command carries is stamped from the pipeline and
  *    command names at send time, so a command produced here is routed by the
  *    consumer's registry exactly as one produced there is.
- *  - The counters, handed in as an `AuthzMetricsPort` over this process's own
+ *  - The counters, handed in as an `AuthzMetrics` over this process's own
  *    registry, so both tiers write one series described one way. It is the
  *    PORT rather than the registry that crosses now: the feature builds the
  *    cutover reporter and the revocation telemetry over whatever it is given,
@@ -75,7 +75,7 @@ export class ApiAuthzComposition {
     options: Omit<ApiAuthzCompositionOptions, "database" | "eventing"> & {
       database: PrismaConnection | undefined;
       eventing: ApiEventingInfrastructure | undefined;
-      report?: ApiAuthzAbsenceReportPort;
+      report?: ApiAuthzAbsenceReport;
     },
   ): ApiAuthzComposition | undefined {
     if (!options.database) {
@@ -99,7 +99,7 @@ export class ApiAuthzComposition {
 
     const built = PostgresAuthzAdapter.create({
       // The typed client satisfies the feature's structural database port on
-      // its own terms: `PostgresAuthzDatabasePort` describes eighteen delegates in
+      // its own terms: `PostgresAuthzDatabase` describes eighteen delegates in
       // `unknown` arguments so no generated type crosses into the package, and
       // a guarded `PrismaClient` is assignable to every one of them. No
       // assertion sits at this seam, and none should — an assertion here would

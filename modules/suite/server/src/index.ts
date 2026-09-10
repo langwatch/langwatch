@@ -1,4 +1,4 @@
-export { SuiteRuntimePort, type SuiteEventingCapabilities } from "./repositories/suite-eventing.repository.ts";
+export { SuiteRuntime, type SuiteEventingCapabilities } from "./repositories/suite-eventing.repository.ts";
 export {
   ClickhouseSuiteEventingRepository as ClickHouseSuiteEventingAdapter,
   type ClickHouseSuiteEventingAdapterOptions,
@@ -8,11 +8,11 @@ export {
   type ClickHouseSuiteRunProcessingAdapterOptions,
 } from "./repositories/redis/redis.suite-run-processing.repository.ts";
 export {
-  SuiteExecutionPort,
-  SuiteRunCommandsPort,
-  SuiteRunIdPort,
+  type SuiteExecution,
+  type SuiteRunCommands,
+  type SuiteRunId,
   type QueueSimulationRunCommandData,
-} from "./ports/suite-execution.port.ts";
+} from "./app/suite.app.ts";
 export { SuiteExecutionService } from "./services/suite-execution.service.ts";
 export {
   SuiteRunModelsService,

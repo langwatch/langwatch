@@ -5,7 +5,7 @@ export {
   type SsoConnectionLedgerPort,
   type SsoConnectionLedgerOperator,
   type SsoConnectionTeardownRequest,
-  type SsoGateLoggerPort,
+  type SsoGateLogger,
 } from "./app/sso.infrastructure.ts";
 export { SsoProviderMountInspector } from "./services/sso-gate.service.ts";
 export {

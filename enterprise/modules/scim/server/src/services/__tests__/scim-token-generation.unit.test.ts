@@ -11,7 +11,7 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import { ScimService } from "../scim.service.ts";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { ScimRepositoryPort } from "../../repositories/scim.repository.ts";
+import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
@@ -33,7 +33,7 @@ class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
   }
 }
 
-function service(repo: ScimRepositoryPort): ScimService {
+function service(repo: ScimRepository): ScimService {
   return ScimService.create({
     prisma: repo,
     writer: new GrantsFake(),

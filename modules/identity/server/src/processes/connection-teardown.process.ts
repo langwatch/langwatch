@@ -41,7 +41,7 @@ export type ConnectionTeardownIntents = {
  * still decides whether — it re-reads the folded deadline, so a wake that
  * fires early (a lagged queue, a replayed job) cannot complete anything.
  */
-export interface ConnectionTeardownPort {
+export interface ConnectionTeardown {
   completeTeardown(args: {
     connectionId: string;
     organizationId: string;

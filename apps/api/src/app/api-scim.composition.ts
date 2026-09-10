@@ -3,7 +3,7 @@
  * `/api/scim/v2/**` routes, the `/api/scim-tokens` management family and the
  * Auth0 intake from. One installation, four declared doors.
  */
-import type { AppRestManagementAuditPort } from "@langwatch/api/rest";
+import type { AppRestManagementAudit } from "@langwatch/api/rest";
 import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
@@ -20,7 +20,7 @@ import {
   PrismaScimSyncProjectionRepository,
   ScimSyncGuardsService,
   ScimSyncLedgerWriterAdapter,
-  type IdentityEventingPort,
+  type IdentityEventing,
 } from "@langwatch/identity-server";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -69,9 +69,9 @@ export type ApiScimCompositionOptions = Readonly<{
   /**
    * The event stack the directory-sync history is appended and staged through.
    */
-  eventing: IdentityEventingPort | undefined;
+  eventing: IdentityEventing | undefined;
   /** Where minting and revoking a token are recorded, as the process writes it. */
-  managementAudit: AppRestManagementAuditPort;
+  managementAudit: AppRestManagementAudit;
   /** D08's `SCIM_V2_GRANTS`: whether a deactivation revokes grants first. */
   provenOffboarding: boolean;
   /** The shared secret Auth0 presents, where this deployment configured one. */

@@ -6,7 +6,7 @@
  * same model differently from the cloud one. The run asks for a number and
  * takes `undefined` for "no known rate", which is what it already did.
  */
-export abstract class ExperimentModelCostPort {
+export abstract class ExperimentModelCost {
   abstract findTokenPrice(input: {
     projectId: string;
     model: string;

@@ -17,13 +17,13 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
 
-import { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
-import { GovernanceEncryptionPort } from "../app/governance.infrastructure.ts";
-import {
-  IngestionSourceEntitlementsPort,
-  IngestionSourceLifecyclePort,
-} from "../ports/ingestion-source.port.ts";
-import { TestProjectApi } from "../ports/__tests__/support/test-project-api.ts";
+import type { GovernanceDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import { GovernanceEncryptor } from "../app/governance.infrastructure.ts";
+import type {
+  IngestionSourceEntitlements,
+  IngestionSourceLifecycleChannel,
+} from "../app/governance.infrastructure.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import {
@@ -49,7 +49,7 @@ const prisma = connection?.client as PrismaClient;
 
 // A real, reversible cipher (AES-256-GCM) — not an identity or base64 fake —
 // so the stored ciphertext actually looks nothing like the plaintext.
-class AesEncryption implements GovernanceEncryptionPort {
+class AesEncryption implements GovernanceEncryptor {
   private readonly key = randomBytes(32);
 
   encrypt(plaintext: string): string {
@@ -70,15 +70,15 @@ class AesEncryption implements GovernanceEncryptionPort {
   }
 }
 
-class NoopEntitlements extends IngestionSourceEntitlementsPort {
+class NoopEntitlements implements IngestionSourceEntitlements {
   async hasEnterprisePlan(): Promise<boolean> {
     return true;
   }
 }
-class NoopLifecycle extends IngestionSourceLifecyclePort {
+class NoopLifecycle implements IngestionSourceLifecycleChannel {
   async sync(): Promise<void> {}
 }
-class NoopDiagnostics extends GovernanceDiagnosticsPort {
+class NoopDiagnostics implements GovernanceDiagnosticsSink {
   warn(): void {}
 }
 

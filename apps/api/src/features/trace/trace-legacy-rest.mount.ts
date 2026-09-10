@@ -23,8 +23,8 @@ import { fromZodError } from "zod-validation-error";
 import { z } from "zod";
 
 import { API_TRACE_LIST_INPUT } from "../../app/api-trace-read-stack.composition.ts";
-import type { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
-import type { ApiHandlerManagedCredentialPort } from "../../app-rest/api-rest.runtime.ts";
+import type { ApiTraceReadStack } from "./trace-read-stack.port.ts";
+import type { ApiHandlerManagedCredential } from "../../app-rest/api-rest.runtime.ts";
 
 /**
  * The deprecated `/api/trace/search` body. The same vocabulary, parsed STRICTLY — that
@@ -62,9 +62,9 @@ export type ApiTraceLegacyRestCollaborators = Readonly<{
   /** The one share ledger a project's links live in. */
   shares: () => ShareApi;
   /** The read stack, for the API key's redactions. */
-  reads: ApiTraceReadStackPort;
+  reads: ApiTraceReadStack;
   /** The process's one handler-managed credential resolution. */
-  credential: ApiHandlerManagedCredentialPort;
+  credential: ApiHandlerManagedCredential;
 }>;
 
 /** `/api/trace/*` and `/api/thread/:id`, bound to this process's graph. */

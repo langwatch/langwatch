@@ -31,7 +31,7 @@ const SPAN_COUNT = 40;
 const BASE_MS = 1_760_000_000_000;
 
 /** The persistence boundary, answering reads from whatever was written. */
-class MemoryProjectionPort extends TraceSummaryProjectionRepository {
+class MemoryProjection extends TraceSummaryProjectionRepository {
   readonly written: TraceSummaryProjectionEntry[] = [];
 
   async upsert(entry: TraceSummaryProjectionEntry): Promise<void> {
@@ -50,11 +50,11 @@ class MemoryProjectionPort extends TraceSummaryProjectionRepository {
 }
 
 describe("trace summary fold coalescing", () => {
-  let storage: MemoryProjectionPort;
+  let storage: MemoryProjection;
   let store: TraceSummaryStore;
 
   beforeEach(() => {
-    storage = new MemoryProjectionPort();
+    storage = new MemoryProjection();
     store = TraceSummaryStore.create({ storage, defaultRetentionDays: 90 });
   });
 

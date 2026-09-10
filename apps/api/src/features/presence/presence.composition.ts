@@ -7,7 +7,7 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   type BroadcastAdapter,
-  PresenceDiagnosticsPort,
+  PresenceDiagnostics,
   presenceServer,
   type PresenceInfrastructure,
 } from "@langwatch/presence-server";
@@ -63,14 +63,12 @@ export async function installApiPresence(options: {
 }
 
 /** Presence diagnostics on this process's structured logger. */
-class ApiPresenceDiagnostics extends PresenceDiagnosticsPort {
+class ApiPresenceDiagnostics implements PresenceDiagnostics {
   static create(logger: Pick<Logger, "warn">): ApiPresenceDiagnostics {
     return new ApiPresenceDiagnostics(logger);
   }
 
-  private constructor(private readonly logger: Pick<Logger, "warn">) {
-    super();
-  }
+  private constructor(private readonly logger: Pick<Logger, "warn">) {}
 
   warn(message: string, context: Record<string, unknown>): void {
     this.logger.warn(context, message);

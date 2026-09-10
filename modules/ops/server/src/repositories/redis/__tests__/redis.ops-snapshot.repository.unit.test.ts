@@ -4,7 +4,7 @@ import {
   SNAPSHOT_LEASE_KEY,
   RedisOpsSnapshotRepository,
 } from "../redis.ops-snapshot.repository.ts";
-import { OpsSnapshotRedisPort } from "../../../app/ops.app.ts";
+import { OpsSnapshotRedis } from "../../../app/ops.app.ts";
 import {
   type LiveSnapshot,
   tryParseDetailSnapshot,
@@ -17,7 +17,7 @@ import {
  * real GET/SET-NX/EVAL semantics for the lease. The lease's whole job is who
  * wins a race, so a mock that always says yes would test nothing.
  */
-class FakeRedis implements OpsSnapshotRedisPort {
+class FakeRedis implements OpsSnapshotRedis {
   private store = new Map<string, string>();
   public evalCalls = 0;
 

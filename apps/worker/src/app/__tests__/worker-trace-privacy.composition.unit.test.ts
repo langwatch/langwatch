@@ -19,7 +19,7 @@ import {
  * Spec: modules/data-privacy/specs/span-pii-redaction.feature
  *
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so the application
- * still owns `RecordSpanCommand`'s adapters and nothing in this process
+ * still owns `EventingRecordSpanAdapter`'s adapters and nothing in this process
  * redacts a span. What has to be true today is that this composition root can
  * build the whole path — Trace's narrow port, the redaction service, the
  * native engines and the analysis transport — out of the four privacy
@@ -27,9 +27,9 @@ import {
  * already holds, and that a span carrying personal data comes out of it
  * scrubbed.
  *
- * It is driven through `TraceSpanPiiRedactionPort`, the port the conversion
+ * It is driven through `TraceSpanPiiRedaction`, the port the conversion
  * will actually call, rather than through the service underneath it: a graph
- * that redacts correctly but cannot be handed to `RecordSpanCommand` would
+ * that redacts correctly but cannot be handed to `EventingRecordSpanAdapter` would
  * pass a service-level test and still be unusable here.
  */
 

@@ -77,11 +77,10 @@ describe("given a feature whose server declares transports", () => {
         .build();
       const rest = recordingRestHost();
 
-      const runtime = await createApp({ name: "test" })
-        .withInfrastructure({})
+      const runtime = await createApp({ role: "api", infrastructure: {} })
         .withTransports({ rest })
-        .withModule(server)
-        .boot({ role: "api" });
+        .withModules([server])
+        .boot();
 
       expect(runtime.transports.rest).toHaveLength(1);
       expect(rest.mounted[0]?.declaration).toEqual({ family: "dataset" });
@@ -93,11 +92,10 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueTrpc)
         .build();
 
-      const runtime = await createApp({ name: "test" })
-        .withInfrastructure({})
+      const runtime = await createApp({ role: "api", infrastructure: {} })
         .withTransports({ trpc: recordingTrpcHost() })
-        .withModule(server)
-        .boot({ role: "api" });
+        .withModules([server])
+        .boot();
 
       const mounted = runtime.transports.trpc.dataset;
 
@@ -110,31 +108,27 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueTrpc)
         .build();
 
-      const runtime = await createApp({ name: "test" })
-        .withInfrastructure({})
+      const runtime = await createApp({ role: "api", infrastructure: {} })
         .withTransports({ trpc: recordingTrpcHost() })
-        .withModule(server)
-        .boot({ role: "api" });
+        .withModules([server])
+        .boot();
 
       expect(Object.keys(runtime.transports.trpc)).toEqual(["dataset"]);
     });
 
-    it("passes the install's facts and error boundary to the mount", async () => {
+    it("mounts with no install-side options", async () => {
+      const rest = recordingRestHost();
       const server = defineModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest)
         .build();
-      const rest = recordingRestHost();
-      const onError = () => new Response(null, { status: 500 });
-      const fact = { fact: { name: "callerEmail" } };
 
-      await createApp({ name: "test" })
-        .withInfrastructure({})
+      await createApp({ role: "api", infrastructure: {} })
         .withTransports({ rest })
-        .withModule(server, { facts: [fact], rest: { onError } })
-        .boot({ role: "api" });
+        .withModules([server])
+        .boot();
 
-      expect(rest.mounted[0]?.options).toEqual({ onError, facts: [fact] });
+      expect(rest.mounted[0]?.options).toEqual({});
     });
   });
 
@@ -146,11 +140,10 @@ describe("given a feature whose server declares transports", () => {
         .build();
 
       await expect(
-        createApp({ name: "test" })
-          .withInfrastructure({})
+        createApp({ role: "api", infrastructure: {} })
           .withTransports({ rest: recordingRestHost() })
-          .withModule(server)
-          .boot({ role: "api" }),
+          .withModules([server])
+          .boot(),
       ).rejects.toThrow(MissingTransportHostError);
     });
   });
@@ -175,12 +168,10 @@ describe("given a feature whose server declares transports", () => {
         .build();
 
       await expect(
-        createApp({ name: "test" })
-          .withInfrastructure({})
+        createApp({ role: "api", infrastructure: {} })
           .withTransports({ trpc: recordingTrpcHost() })
-          .withModule(dataset)
-          .withModule(monitor)
-          .boot({ role: "api" }),
+          .withModules([dataset, monitor])
+          .boot(),
       ).rejects.toThrow(DuplicateTransportNamespaceError);
     });
   });
@@ -193,11 +184,10 @@ describe("given a feature whose server declares transports", () => {
         .build();
       const rest = recordingRestHost();
 
-      const runtime = await createApp({ name: "test" })
-        .withInfrastructure({})
+      const runtime = await createApp({ role: "worker", infrastructure: {} })
         .withTransports({ rest })
-        .withModule(server)
-        .boot({ role: "worker" });
+        .withModules([server])
+        .boot();
 
       expect(runtime.transports).toEqual({ rest: [], trpc: {} });
       expect(rest.mounted).toHaveLength(0);

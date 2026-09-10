@@ -1,4 +1,4 @@
-import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
 import { PrismaGatewayBudgetRepository } from "../repositories/prisma/prisma.gateway-budget.repository.ts";
 import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service.ts";
 
@@ -23,7 +23,7 @@ export class GatewayEndUserCapsAdapter {
 
   static create(options: {
     database: BudgetDatabase;
-    spend: GatewayBudgetSpendPort;
+    spend: GatewayBudgetSpend;
   }): GatewayEndUserCapsService {
     return GatewayEndUserCapsService.create({
       budgets: PrismaGatewayBudgetRepository.create(options.database, options.spend),

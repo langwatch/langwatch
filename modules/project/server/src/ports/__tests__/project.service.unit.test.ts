@@ -20,7 +20,7 @@ import {
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ProjectCredentialsPort } from "../project.port.ts";
+import { ProjectCredentials } from "../project.port.ts";
 import type { ProjectRepository } from "../../repositories/project.repository.ts";
 import { ProjectService } from "../../services/project.service.ts";
 
@@ -321,7 +321,7 @@ class StubOrganizationService extends OrganizationServiceContract {
   }
 }
 
-class FixedCredentials extends ProjectCredentialsPort {
+class FixedCredentials extends ProjectCredentials {
   generateProjectId(): string {
     return "governance-project";
   }

@@ -23,9 +23,9 @@ import {
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 import { TestProjectApi } from "./test-project-api.ts";
-import { CodingAgentBillingPolicyPort } from "../../ports/coding-agent-billing.port.ts";
-import { CodingAgentClockPort } from "../../ports/coding-agent-clock.port.ts";
-import { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
+import { CodingAgentBillingPolicy } from "../../app/coding-agent.infrastructure.ts";
+import { CodingAgentClock } from "../../app/coding-agent.infrastructure.ts";
+import { CodingAgentClickHouse } from "../../app/coding-agent.infrastructure.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../../repositories/coding-agent-trace-session.repository.ts";
@@ -39,14 +39,13 @@ export const TEST_NOW_MS = CODING_AGENT_TEST_NOW_MS;
 type ClickHouseRequest = { url: string; body: string };
 
 /** A typed local ClickHouse wire fixture for package runtime-adapter tests. */
-export class TestClickHouseEndpoint extends CodingAgentClickHousePort {
+export class TestClickHouseEndpoint implements CodingAgentClickHouse {
   private constructor(
     private readonly server: Server,
     private readonly client: ClickHouseClient,
     readonly requests: ClickHouseRequest[],
     readonly queryRows: Array<Array<Record<string, unknown>>>,
   ) {
-    super();
   }
 
   static async create(): Promise<TestClickHouseEndpoint> {
@@ -191,9 +190,8 @@ export function sessionEventRecord(
   });
 }
 
-export class TestClock extends CodingAgentClockPort {
+export class TestClock implements CodingAgentClock {
   constructor(private value = TEST_NOW_MS) {
-    super();
   }
 
   nowMs(): number {
@@ -453,7 +451,7 @@ export class TestEvents extends CodingAgentSessionEventRepository {
   }
 }
 
-export class TestBillingPolicy extends CodingAgentBillingPolicyPort {
+export class TestBillingPolicy implements CodingAgentBillingPolicy {
   nonBillableAgents = new Set<string>();
 
   async isSourceNonBillable(input: {

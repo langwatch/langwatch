@@ -11,7 +11,7 @@ import type { Protections } from "@langwatch/trace-contract";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceService } from "../../read/trace-legacy-read.service.ts";
+import type { TraceLegacyReadService } from "../../read/trace-legacy-read.service.ts";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
 import type { GetAllTracesForProjectOptions } from "@langwatch/trace-contract";
 import { TraceExportService } from "../trace-export.service.ts";
@@ -39,7 +39,7 @@ function buildExportRequest(overrides?: Partial<ExportRequest>): ExportRequest {
  * called with, then returns a single-batch result so the export loop terminates.
  */
 function buildOptionsCapturingTraceService(): {
-  traceService: TraceService;
+  traceService: TraceLegacyReadService;
   optionsSeen: GetAllTracesForProjectOptions[];
 } {
   const optionsSeen: GetAllTracesForProjectOptions[] = [];
@@ -74,7 +74,7 @@ function buildOptionsCapturingTraceService(): {
         } as TracesForProjectResult;
       },
     ),
-  } as unknown as TraceService;
+  } as unknown as TraceLegacyReadService;
   return { traceService, optionsSeen };
 }
 

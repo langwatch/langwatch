@@ -32,7 +32,7 @@ import {
   type ScenarioTestSuite,
   type ScenarioApi,
 } from "@langwatch/scenario-contract";
-import type { SuiteExecutionPort } from "../ports/suite-execution.port.ts";
+import type { SuiteExecution } from "../app/suite.app.ts";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import type { SuiteRepository } from "../repositories/suite.repository.ts";
 import type { SuiteRunReadRepository } from "../repositories/suite-run.repository.ts";
@@ -46,7 +46,7 @@ export type SuiteServiceOptions = {
   scenarios: ScenarioApi;
   agents: AgentApi;
   prompts: PromptApi;
-  execution: SuiteExecutionPort;
+  execution: SuiteExecution;
   runRepository: SuiteRunReadRepository;
   /**
    * Which connected agents have a process attached, so a target that names an

@@ -20,7 +20,7 @@ import { applyAuthentication } from "./http-auth.adapter.ts";
 import type { HttpAgentData, RunParameterValues } from "@langwatch/scenario-contract";
 import { ScenarioSecretReferenceAdapter } from "./scenario-secret-reference.adapter.ts";
 import type { ScenarioHttp } from "../app/scenario.app.ts";
-import { SerializedAgentPort } from "../ports/serialized-agent.port.ts";
+import { SerializedAgent } from "../ports/serialized-agent.port.ts";
 
 /**
  * Truncate a response body for log inclusion. Long bodies are useless in
@@ -131,7 +131,7 @@ function pickUpstreamRequestId(headers: { get(name: string): string | null }): s
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
  * No database access required.
  */
-export class SerializedHttpAgentAdapter extends SerializedAgentPort {
+export class SerializedHttpAgentAdapter extends SerializedAgent {
   static create(options: {
     config: HttpAgentData;
     logger?: Logger;

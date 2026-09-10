@@ -11,7 +11,7 @@ import type { SubscriptionNotificationPayload } from "@langwatch/enterprise-bill
  * unwritten retention default is not a reason to make Stripe retry a payment
  * it already took.
  */
-export abstract class BillingWebhookHostPort {
+export abstract class BillingWebhookHost {
   abstract sendSlackSubscriptionEvent(payload: SubscriptionNotificationPayload): Promise<void>;
 
   abstract sendSlackBillingThresholdFailureAlert(input: {
@@ -31,7 +31,7 @@ export abstract class BillingWebhookHostPort {
 }
 
 /** A host that alerts nowhere and writes no retention default. */
-export class SilentBillingWebhookHost extends BillingWebhookHostPort {
+export class SilentBillingWebhookHost extends BillingWebhookHost {
   async sendSlackSubscriptionEvent(): Promise<void> {}
   async sendSlackBillingThresholdFailureAlert(): Promise<void> {}
   async listOrganizationRetentionRules(): Promise<

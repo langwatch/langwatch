@@ -11,8 +11,8 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   UiCapabilityUnavailableError,
-  UiFeedbackPort,
-  UiSessionPort,
+  UiFeedback,
+  UiSession,
   useUiCapabilities,
 } from "@langwatch/ui-host/capabilities";
 import { useActiveScope, usePermissions, useSession } from "@langwatch/ui-host/session";
@@ -93,7 +93,7 @@ const signedOut: UiAuthClient = {
   signOut: refusesToSignOut,
 };
 
-class StubSession extends UiSessionPort {
+class StubSession extends UiSession {
   currentUser() {
     return { id: "installed-user", name: null, email: null, image: null };
   }
@@ -115,7 +115,7 @@ class StubSession extends UiSessionPort {
   }
 }
 
-class SilentFeedback extends UiFeedbackPort {
+class SilentFeedback extends UiFeedback {
   succeeded(): void {}
   failed(): void {}
 }
@@ -152,8 +152,8 @@ function renderSession({
   transport: UiFeatureApiTransport;
   authClient?: UiAuthClient;
   page: ReactNode;
-  installed?: UiSessionPort;
-  feedback?: UiFeedbackPort;
+  installed?: UiSession;
+  feedback?: UiFeedback;
   live?: boolean;
 }) {
   const Shell = createUiFeatureShell({

@@ -29,11 +29,11 @@ import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import type {
-  BetterAuthAnnouncementsPort,
-  BetterAuthFederationPort,
-  BetterAuthIdentityCeremoniesPort,
-  BetterAuthPendingInvitePort,
-  BetterAuthStoragePort,
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+  BetterAuthIdentityCeremonies,
+  BetterAuthPendingInvite,
+  BetterAuthStorage,
 } from "./better-auth.collaborators.ts";
 import {
   afterAccountCreate,
@@ -45,8 +45,8 @@ import {
   beforeUserCreate,
   type BetterAuthHookCollaborators,
 } from "./better-auth-hooks.api.ts";
-import { passkeySignUpRegistration, type SignUpVerificationPort } from "./passkey-sign-up.api.ts";
-import { runSignInRouterShadow, type SignInRouterShadowPort } from "./sign-in-router-shadow.api.ts";
+import { passkeySignUpRegistration, type SignUpVerification } from "./passkey-sign-up.api.ts";
+import { runSignInRouterShadow, type SignInRouterShadow } from "./sign-in-router-shadow.api.ts";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -137,10 +137,10 @@ export const createAuthOptions = ({
 }: {
   repo: BetterAuthHooksRepository;
   deployment: BetterAuthDeploymentConfiguration;
-  storage: BetterAuthStoragePort;
-  federation: BetterAuthFederationPort;
-  identity: BetterAuthIdentityCeremoniesPort;
-  shadow: SignInRouterShadowPort;
+  storage: BetterAuthStorage;
+  federation: BetterAuthFederation;
+  identity: BetterAuthIdentityCeremonies;
+  shadow: SignInRouterShadow;
   hooks: BetterAuthHookCollaborators;
 }): BetterAuthOptions & {
   // `emailAndPassword` is optional on `BetterAuthOptions` but this factory
@@ -523,14 +523,14 @@ export type BetterAuthTransportOptions = Readonly<{
   auth: AuthApi;
   /** The persistence boundary every database hook reads and writes through. */
   database: BetterAuthHooksRepository;
-  /** The instance's storage engine — see {@link BetterAuthStoragePort}. */
-  storage: BetterAuthStoragePort;
+  /** The instance's storage engine — see {@link BetterAuthStorage}. */
+  storage: BetterAuthStorage;
   deployment: BetterAuthDeploymentConfiguration;
-  federation: BetterAuthFederationPort;
-  identity: BetterAuthIdentityCeremoniesPort;
-  invites: BetterAuthPendingInvitePort;
-  announcements: BetterAuthAnnouncementsPort;
-  shadow: SignInRouterShadowPort;
+  federation: BetterAuthFederation;
+  identity: BetterAuthIdentityCeremonies;
+  invites: BetterAuthPendingInvite;
+  announcements: BetterAuthAnnouncements;
+  shadow: SignInRouterShadow;
   /** The grant ledger an SSO auto-join writes its membership through. */
   authzGrants: BetterAuthHookCollaborators["authzGrants"];
   /**
@@ -539,7 +539,7 @@ export type BetterAuthTransportOptions = Readonly<{
   sendResetPassword: (input: { email: string; token: string }) => Promise<void>;
   /** The process's Redis, or null to keep sessions in the database alone. */
   redis: RedisConnection | null;
-  signUpVerification: SignUpVerificationPort;
+  signUpVerification: SignUpVerification;
   users: UserApi;
 }>;
 

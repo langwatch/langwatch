@@ -1,33 +1,33 @@
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
-import { StoredObjectProjectDestinationResolverPort } from "./stored-object-storage-runtime.service.ts";
+import { StoredObjectProjectDestinationResolver } from "./stored-object-storage-runtime.service.ts";
 
 export type StoredObjectStorageSelection = Readonly<{
   backend: "azure" | "s3" | "file";
   globalS3Bucket?: string;
   localFilesystemRoot: string;
-  azure?: StoredObjectAzureDestinationPort;
+  azure?: StoredObjectAzureDestination;
 }>;
 
-export abstract class StoredObjectAzureDestinationPort {
+export abstract class StoredObjectAzureDestination {
   abstract resolve(): Readonly<{ accountName: string; container: string }>;
 }
 
-export abstract class StoredObjectProjectS3ConfigPort {
+export abstract class StoredObjectProjectS3Config {
   abstract tryGet(projectId: string): Promise<Readonly<{ bucket: string }> | null>;
 }
 
 /** Pure BYOC-first destination policy; environment parsing stays at roots. */
-export class StoredObjectDestinationPolicyAdapter extends StoredObjectProjectDestinationResolverPort {
+export class StoredObjectDestinationPolicyAdapter extends StoredObjectProjectDestinationResolver {
   static create(options: {
     selection: StoredObjectStorageSelection;
-    projects: StoredObjectProjectS3ConfigPort;
+    projects: StoredObjectProjectS3Config;
   }): StoredObjectDestinationPolicyAdapter {
     return new StoredObjectDestinationPolicyAdapter(options.selection, options.projects);
   }
 
   private constructor(
     private readonly selection: StoredObjectStorageSelection,
-    private readonly projects: StoredObjectProjectS3ConfigPort,
+    private readonly projects: StoredObjectProjectS3Config,
   ) {
     super();
   }

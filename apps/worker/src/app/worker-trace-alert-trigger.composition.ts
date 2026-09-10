@@ -8,14 +8,14 @@ import {
   NOTIFY_TRIGGER_ACTIONS,
 } from "@langwatch/automation-contract";
 import {
-  AutomationTraceTriggerCataloguePort,
-  type AutomationTriggerMatchRecorderPort,
+  AutomationTraceTriggerCatalogue,
+  type AutomationTriggerMatchRecorder,
 } from "@langwatch/automation-server";
 import type { TriggerContext } from "@langwatch/eventing";
 import {
   OtelTraceAlertMetricsAdapter,
   TraceAlertOriginGuardPort,
-  TraceAlertTriggerMatchPort,
+  TraceAlertTriggerMatch,
   TraceAlertTriggerMatchSubscriber,
   TraceAlertTriggerPort,
   type GovernanceTraceEvent,
@@ -40,10 +40,10 @@ import { passesTraceOriginGuards } from "@langwatch/trace-server";
  *       └─ TraceAlertTriggerMatchSubscriber   (enterprise governance owns it)
  *            ├─ TraceAlertOriginGuardPort     packaged `passesTraceOriginGuards`
  *            ├─ TraceAlertTriggerPort         the project's trace automations
- *            │    └─ AutomationTraceTriggerCataloguePort   one cached read
- *            ├─ TraceAlertTriggerMatchPort    one durable match
+ *            │    └─ AutomationTraceTriggerCatalogue   one cached read
+ *            ├─ TraceAlertTriggerMatch    one durable match
  *            │    └─ the installer's `recordTriggerMatch` proxy
- *            └─ TraceAlertMetricsPort         the fleet's match counter
+ *            └─ TraceAlertMetrics         the fleet's match counter
  *
  * THREE BLOCKERS ARE CLEARED HERE, and each was a different kind. The catalogue
  * read was `AutomationService`, whose constructor asks for twelve collaborators
@@ -62,8 +62,8 @@ import { passesTraceOriginGuards } from "@langwatch/trace-server";
  * every single trace.
  */
 export function createWorkerTraceAlertTriggerHandler(options: {
-  triggers: AutomationTraceTriggerCataloguePort;
-  matches: AutomationTriggerMatchRecorderPort;
+  triggers: AutomationTraceTriggerCatalogue;
+  matches: AutomationTriggerMatchRecorder;
 }): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
   const subscriber = TraceAlertTriggerMatchSubscriber.create({
     triggers: new WorkerTraceAlertTriggerAdapter(options.triggers),
@@ -84,7 +84,7 @@ export function createWorkerTraceAlertTriggerHandler(options: {
  * far from here.
  */
 class WorkerTraceAlertTriggerAdapter extends TraceAlertTriggerPort {
-  constructor(private readonly catalogue: AutomationTraceTriggerCataloguePort) {
+  constructor(private readonly catalogue: AutomationTraceTriggerCatalogue) {
     super();
   }
 
@@ -118,8 +118,8 @@ class WorkerTraceAlertTriggerAdapter extends TraceAlertTriggerPort {
  * so nothing unvalidated enters here; what is restored is the type the value
  * never stopped having.
  */
-class WorkerTraceAlertTriggerMatchAdapter extends TraceAlertTriggerMatchPort {
-  constructor(private readonly matches: AutomationTriggerMatchRecorderPort) {
+class WorkerTraceAlertTriggerMatchAdapter extends TraceAlertTriggerMatch {
+  constructor(private readonly matches: AutomationTriggerMatchRecorder) {
     super();
   }
 

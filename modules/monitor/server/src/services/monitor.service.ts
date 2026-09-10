@@ -23,12 +23,12 @@ import {
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
-import type { MonitorEvaluatorPort } from "../ports/monitor-evaluator.port.ts";
+import type { MonitorEvaluator } from "../app/monitor.app.ts";
 import type { MonitorRepository } from "../repositories/monitor.repository.ts";
 
 export type MonitorServiceOptions = {
   repository: MonitorRepository;
-  evaluators: MonitorEvaluatorPort;
+  evaluators: MonitorEvaluator;
   generateId: () => string;
 };
 

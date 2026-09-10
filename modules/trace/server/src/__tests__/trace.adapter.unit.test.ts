@@ -1,7 +1,7 @@
 import {
   TraceQueryFieldValuesRepository,
   TracePayloadReaderRepository,
-  TraceFullIoPort,
+  TraceFullIo,
   TraceSummaryReaderRepository,
 } from "../index.ts";
 // From the port that defines them: an in-package test does not need the
@@ -32,7 +32,7 @@ class EmptyPayloads extends TracePayloadReaderRepository {
   }
 }
 
-class EmptyFullIo implements TraceFullIoPort {
+class EmptyFullIo implements TraceFullIo {
   recompute() {
     return { input: null, output: null };
   }

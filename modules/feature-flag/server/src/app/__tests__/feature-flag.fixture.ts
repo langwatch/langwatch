@@ -16,7 +16,7 @@ import { MemoryFeatureFlagRepositories } from "../../repositories/memory/memory.
 import { MemoryFeatureFlagRepository } from "../../repositories/memory/memory.feature-flag.repository.ts";
 import { FeatureFlagService } from "../../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../../services/organization-created-at-cache.service.ts";
-import { CachedFeatureFlagRowAdapter } from "../../adapters/cached.feature-flag-row.adapter.ts";
+import { CachedFeatureFlagRowAdapter } from "../../services/cached-feature-flag-row.service.ts";
 import { FeatureFlagApp, type FeatureFlagCache, type FeatureFlagCacheSlot } from "../feature-flag.app.ts";
 
 /** Shared cache tier held in process, for tests that need no Redis. */

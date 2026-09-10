@@ -2,7 +2,7 @@ import type { CodingAgentSessionMetricSeriesRecord } from "@langwatch/coding-age
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
+import type { CodingAgentClickHouse } from "../../app/coding-agent.infrastructure.ts";
 import {
   clickHouseMomentOf,
   type ClickHouseMoment,
@@ -42,14 +42,14 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
     clickHouse,
     defaultTraceRetentionDays,
   }: {
-    clickHouse: CodingAgentClickHousePort;
+    clickHouse: CodingAgentClickHouse;
     defaultTraceRetentionDays: number;
   }): SessionMetricSeriesClickHouseRepository {
     return new SessionMetricSeriesClickHouseRepository(clickHouse, defaultTraceRetentionDays);
   }
 
   private constructor(
-    private readonly clickHouse: CodingAgentClickHousePort,
+    private readonly clickHouse: CodingAgentClickHouse,
     private readonly defaultTraceRetentionDays: number,
   ) {}
 

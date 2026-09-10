@@ -1,7 +1,7 @@
 import { AnalyticsService } from "@langwatch/analytics-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { EvaluationAnalyticsAttributePolicy } from "../ports/evaluation.port.ts";
+import { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.infrastructure.ts";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   EvaluationAnalyticsFoldProjection,
@@ -21,7 +21,7 @@ import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attribut
 
 const TENANT = "proj-eval-watermark";
 
-class PassthroughAttributePolicy extends EvaluationAnalyticsAttributePolicy {
+class PassthroughAttributePolicy implements EvaluationAnalyticsAttributePolicy {
   trim(attributes: Record<string, string>): Record<string, string> {
     return attributes;
   }

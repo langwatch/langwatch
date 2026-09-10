@@ -42,7 +42,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceHttpClient } from "../app/governance.infrastructure.ts";
 import { AdminUsageReportAdapter } from "./admin-usage-report.service.ts";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import type {
@@ -202,9 +202,9 @@ const pageSchema = z.object({
 export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdminPullConfig> {
   readonly id: string = ANTHROPIC_ADMIN_ADAPTER_ID;
 
-  private constructor(private readonly http: GovernanceHttpPort) {}
+  private constructor(private readonly http: GovernanceHttpClient) {}
 
-  static create(http: GovernanceHttpPort): AnthropicAdminPullerAdapter {
+  static create(http: GovernanceHttpClient): AnthropicAdminPullerAdapter {
     return new AnthropicAdminPullerAdapter(http);
   }
 

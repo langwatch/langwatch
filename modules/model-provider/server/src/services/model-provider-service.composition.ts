@@ -8,9 +8,9 @@ import {
   ModelProviderCredentialCodec,
   CodexTokenRefresher,
   ModelProviderConnectionRateLimiter,
-  ModelTranslationPort,
+  ModelTranslation,
   type ModelProviderIdService,
-} from "../ports/model-provider.port.ts";
+} from "../app/model-provider.infrastructure.ts";
 import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
@@ -22,7 +22,7 @@ export interface PostgresModelProviderAdapterOptions {
   projects: ProjectApi;
   organizations: OrganizationApi;
   catalog: ModelProviderCatalog;
-  translation: ModelTranslationPort;
+  translation: ModelTranslation;
   ids: ModelProviderIdService;
   authorization: AuthzApi;
   credentials: ModelProviderCredentialCodec;

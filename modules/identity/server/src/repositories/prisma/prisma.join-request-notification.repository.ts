@@ -2,7 +2,7 @@ import {
   PrismaJoinRequestAudienceRepository,
   type PrismaJoinRequestAudienceDatabase,
 } from "./prisma.join-request-audience.repository.ts";
-import type { JoinRequestMailPort } from "../../app/identity.infrastructure.ts";
+import type { JoinRequestMail } from "../../app/identity.infrastructure.ts";
 import { JoinRequestNotificationService } from "../../services/join-request-notification.service.ts";
 
 /** Every model a join-request notification reads, and no other. */
@@ -12,7 +12,7 @@ export type PostgresJoinRequestNotificationOptions = {
   /** The composition root's own typed client, handed down with no cast. */
   database: JoinRequestNotificationDatabase;
   /** How the two wake-driven mails are rendered and sent. */
-  mail: JoinRequestMailPort;
+  mail: JoinRequestMail;
 };
 
 /**

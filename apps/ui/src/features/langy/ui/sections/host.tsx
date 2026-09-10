@@ -126,7 +126,7 @@ export function LangyHost({ children }: { children: ReactNode }) {
 
   /**
    * The by-path dispatcher, handed over as the vanilla client Langy expects:
-   * `UiRpcPort` is the shell's one seam onto the transport for a caller
+   * `UiRpc` is the shell's one seam onto the transport for a caller
    * (`langyChatTransport`) that cannot hold a hook.
    */
   useEffect(() => {

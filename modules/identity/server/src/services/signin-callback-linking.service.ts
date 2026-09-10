@@ -44,7 +44,7 @@ export interface CallbackUserMatch {
 /**
  * The user-level reads and writes a callback needs BEFORE the ADR-116 storage
  */
-export interface SignInCallbackDirectoryPort {
+export interface SignInCallbackDirectory {
   findUserByProviderSubject(input: {
     connectionId: string | null;
     provider: IdentifierProvider;
@@ -97,7 +97,7 @@ export type CallbackLinkOutcome =
   | { kind: "provisioned"; userId: string; linked: true };
 
 export interface SignInCallbackLinkingDeps {
-  directory: SignInCallbackDirectoryPort;
+  directory: SignInCallbackDirectory;
   proposals: IdentityLinkProposalWrites;
   audit: SignInCallbackAudit;
   clock: IdentityCeremonyClock;
@@ -110,7 +110,7 @@ export class SignInCallbackLinkingService {
     return new SignInCallbackLinkingService(deps);
   }
 
-  private readonly directory: SignInCallbackDirectoryPort;
+  private readonly directory: SignInCallbackDirectory;
   private readonly proposals: IdentityLinkProposalWrites;
   private readonly audit: SignInCallbackAudit;
   private readonly clock: IdentityCeremonyClock;

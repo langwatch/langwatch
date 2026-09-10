@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { WorkerMain, type WorkerMainProcessPort } from "../worker.main.ts";
+import { WorkerMain, type WorkerMainProcess } from "../worker.main.ts";
 import type {
   WorkerShutdownSignal,
   WorkerSignalSource,
@@ -27,7 +27,7 @@ class Signals implements WorkerSignalSource {
   }
 }
 
-class WorkerStub implements WorkerMainProcessPort {
+class WorkerStub implements WorkerMainProcess {
   readonly logger = { info: vi.fn(), error: vi.fn() };
   readonly start = vi.fn<() => Promise<void>>(async () => void 0);
   readonly close = vi.fn<() => Promise<void>>(async () => void 0);

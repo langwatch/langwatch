@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ApiRawRequestSurfacePort } from "../../api-http.listener.ts";
+import { ApiRawRequestSurface } from "../../api-http.listener.ts";
 import {
   ApiStaticSurface,
   CompositeApiRawSurface,
@@ -133,7 +133,7 @@ describe("given a deployment stages the bundle somewhere", () => {
   });
 });
 
-class StubSurface extends ApiRawRequestSurfacePort {
+class StubSurface extends ApiRawRequestSurface {
   readonly served: string[] = [];
 
   constructor(

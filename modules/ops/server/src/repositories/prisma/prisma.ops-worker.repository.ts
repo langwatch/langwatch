@@ -2,16 +2,16 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { AnomalyHardTierAlertPort } from "../../app/ops.app.ts";
+import type { AnomalyHardTierAlert } from "../../app/ops.app.ts";
 import {
-  OpsWorkerPort,
+  OpsWorker,
   type OpsWorkerHandle,
   type UsageStatsWorkerConfig,
 } from "../../app/ops.app.ts";
 import type {
-  UsageStatsClickHouseClientResolverPort,
-  UsageStatsErrorReporterPort,
-  UsageStatsTelemetryClientPort,
+  UsageStatsClickHouseClientResolver,
+  UsageStatsErrorReporter,
+  UsageStatsTelemetryClient,
   UsageStatsWorkerDatabase,
 } from "../../app/ops.app.ts";
 import { ClickHouseUsageStatsRepository } from "../clickhouse/clickhouse.usage-stats.repository.ts";
@@ -41,7 +41,7 @@ export interface OpsWorkerAdapterOptions {
   anomaly: {
     redis: IORedis | Cluster | undefined;
     featureFlags: FeatureFlagApi;
-    hardTierAlerts: AnomalyHardTierAlertPort;
+    hardTierAlerts: AnomalyHardTierAlert;
   };
   /** The connection the queue counters live on; absent leaves the fleet with no writer. */
   queueMetrics: {
@@ -49,16 +49,16 @@ export interface OpsWorkerAdapterOptions {
   };
   usageStats: {
     database: UsageStatsWorkerDatabase;
-    clickhouse: UsageStatsClickHouseClientResolverPort;
+    clickhouse: UsageStatsClickHouseClientResolver;
     config: UsageStatsWorkerConfig;
-    telemetry: UsageStatsTelemetryClientPort;
-    errors: UsageStatsErrorReporterPort;
+    telemetry: UsageStatsTelemetryClient;
+    errors: UsageStatsErrorReporter;
     builderChartKind: string;
   };
 }
 
 /** Composes the complete Ops worker graph from injected infrastructure. */
-export class PrismaOpsWorkerRepository implements OpsWorkerPort {
+export class PrismaOpsWorkerRepository implements OpsWorker {
   private constructor(private readonly options: OpsWorkerAdapterOptions) {
   }
 

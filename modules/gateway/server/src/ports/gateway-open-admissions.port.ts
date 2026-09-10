@@ -41,6 +41,6 @@ export interface OpenAdmissionQuery {
 }
 
 /** Reads the admissions a sweep may settle, from one store or from many. */
-export abstract class GatewayOpenAdmissionsPort {
+export abstract class GatewayOpenAdmissions {
   abstract findOpenAdmissions(params: OpenAdmissionQuery): Promise<OpenAdmission[]>;
 }

@@ -57,7 +57,7 @@ export {
   generateKillSwitchKey,
   isComponentKilled,
   killSwitchDescriptorsFor,
-  KillSwitchPort,
+  KillSwitch,
 } from "./kill-switch/index.ts";
 export type { EventSourcingOptions } from "./eventSourcing.ts";
 // Runtime

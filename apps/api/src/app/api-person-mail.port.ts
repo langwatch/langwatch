@@ -1,9 +1,9 @@
 /**
  * Every message a person-shaped surface sends, as it asks for one.
  */
-import { JoinRequestNotificationMailPort } from "@langwatch/identity-server";
+import { JoinRequestNotificationMail } from "@langwatch/identity-server";
 
-export abstract class ApiPersonMailPort extends JoinRequestNotificationMailPort {
+export abstract class ApiPersonMail extends JoinRequestNotificationMail {
   /** The sign-up confirmation link. Asking twice sends twice. */
   abstract sendSignUpVerificationLink(input: {
     email: string;

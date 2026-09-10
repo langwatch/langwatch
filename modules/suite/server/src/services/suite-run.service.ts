@@ -41,7 +41,7 @@ import {
   type ScenarioTestSuite,
 } from "@langwatch/scenario-contract";
 import { ConnectedTargetService } from "./connected-target.service.ts";
-import type { SuiteExecutionPort } from "../ports/suite-execution.port.ts";
+import type { SuiteExecution } from "../app/suite.app.ts";
 import type { SuiteServiceOptions } from "./suite.service.ts";
 import {
   defaultSuiteId,
@@ -249,7 +249,7 @@ export class SuiteRunService {
     >;
     scenarioResolution: { active: string[]; archived: string[] };
     targetResolution: { archived: { referenceId: string }[] };
-    scenarioConfigs: Parameters<SuiteExecutionPort["execute"]>[0]["scenarioConfigs"];
+    scenarioConfigs: Parameters<SuiteExecution["execute"]>[0]["scenarioConfigs"];
     activeTargets: SuiteTarget[];
   }): Promise<SuiteRunResult> {
     return this.options.execution.execute({

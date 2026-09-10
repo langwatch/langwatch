@@ -22,7 +22,7 @@ describe("given the canonical analytics REST family", () => {
         namespace: "analytics",
         addressing: "dated",
         v1Twin: true,
-        credential: "projectKey",
+        credential: "project",
       });
     });
   });

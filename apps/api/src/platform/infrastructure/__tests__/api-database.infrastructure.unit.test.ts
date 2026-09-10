@@ -34,7 +34,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import {
-  ApiDatabaseAbsenceReportPort,
+  ApiDatabaseAbsenceReport,
   ApiDatabaseInfrastructure,
 } from "../api-database.infrastructure.ts";
 
@@ -53,7 +53,7 @@ function fakeConnection(): ConnectionParts {
   return { connection, client, pool };
 }
 
-class RecordedAbsence extends ApiDatabaseAbsenceReportPort {
+class RecordedAbsence extends ApiDatabaseAbsenceReport {
   calls = 0;
 
   absent(): void {

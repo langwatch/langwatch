@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { UiNavigationPort } from "@langwatch/ui-host/capabilities";
+import type { UiNavigation } from "@langwatch/ui-host/capabilities";
 import {
   createRouterUiNavigation,
   useRouterUiNavigation,
@@ -44,7 +44,7 @@ describe("given the navigation capability over a router", () => {
 describe("given a screen rendered inside the application's router", () => {
   describe("when it asks for the navigation capability", () => {
     it("moves the router the page is actually mounted in", () => {
-      let navigation: UiNavigationPort | undefined;
+      let navigation: UiNavigation | undefined;
 
       function Page() {
         navigation = useRouterUiNavigation();

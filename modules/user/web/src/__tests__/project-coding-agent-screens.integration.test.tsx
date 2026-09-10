@@ -23,7 +23,7 @@ vi.mock("@langwatch/coding-agent-web/surfaces/activity", () => ({
     return <div data-testid="pull-requests-table" />;
   },
   CodingAgentActivityHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  CodingAgentActivityHostPort: class {},
+  CodingAgentActivityHost: class {},
   codingAgentApi: {},
 }));
 

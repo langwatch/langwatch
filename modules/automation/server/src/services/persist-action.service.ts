@@ -8,13 +8,13 @@ import {
 import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
+import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
 import {
-  AutomationDatasetMapperPort,
-  AutomationPersistActionWriterPort,
+  AutomationDatasetMapper,
+  AutomationPersistActionWriter,
 } from "../ports/automation-persist-action.port.ts";
-import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port.ts";
-import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port.ts";
+import type { AutomationSettlementLedger } from "../ports/automation-settlement-ledger.port.ts";
+import type { AutomationSettlementTraceReader } from "../ports/automation-settlement-read.port.ts";
 
 /** The project read this path makes: an existence check, and nothing else. */
 type PersistActionProject = { id: string; name: string; slug: string };
@@ -34,19 +34,19 @@ function sanitizeRecord(record: Record<string, string | number>): Record<string,
  * project/trace services and named write/mapping ports. */
 export class AutomationPersistActionService {
   private constructor(
-    private readonly automation: AutomationSettlementLedgerPort,
+    private readonly automation: AutomationSettlementLedger,
     private readonly projects: AutomationProjectIdentityPort,
-    private readonly traces: AutomationSettlementTraceReaderPort,
-    private readonly mapper: AutomationDatasetMapperPort,
-    private readonly writer: AutomationPersistActionWriterPort,
+    private readonly traces: AutomationSettlementTraceReader,
+    private readonly mapper: AutomationDatasetMapper,
+    private readonly writer: AutomationPersistActionWriter,
   ) {}
 
   static create(input: {
-    automation: AutomationSettlementLedgerPort;
+    automation: AutomationSettlementLedger;
     projects: AutomationProjectIdentityPort;
-    traces: AutomationSettlementTraceReaderPort;
-    mapper: AutomationDatasetMapperPort;
-    writer: AutomationPersistActionWriterPort;
+    traces: AutomationSettlementTraceReader;
+    mapper: AutomationDatasetMapper;
+    writer: AutomationPersistActionWriter;
   }): AutomationPersistActionService {
     return new AutomationPersistActionService(
       input.automation,

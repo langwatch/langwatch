@@ -61,10 +61,10 @@ import { MemoryRouter } from "react-router";
 import {
   BrowserUiDocumentTitle,
   UiCapabilityContextProvider,
-  UiFeedbackPort,
-  UiNavigationPort,
-  UiRoutePort,
-  UiSessionPort,
+  UiFeedback,
+  UiNavigation,
+  UiRoute,
+  UiSession,
   type UiActiveScope,
   type UiActor,
   type UiCapabilities,
@@ -73,25 +73,25 @@ import {
 } from "@langwatch/ui-host/capabilities";
 import { githubFeature } from "../src/features/github";
 
-class SilentNavigation extends UiNavigationPort {
+class SilentNavigation extends UiNavigation {
   navigate(): void {}
   replace(): void {}
   back(): void {}
 }
 
-class SilentRoute extends UiRoutePort {
+class SilentRoute extends UiRoute {
   reading() {
     return { params: {}, query: {} };
   }
   setQuery(): void {}
 }
 
-class SilentFeedback extends UiFeedbackPort {
+class SilentFeedback extends UiFeedback {
   succeeded(_: UiSuccessNotice): void {}
   failed(_: UiFailureNotice): void {}
 }
 
-class AnsweringSession extends UiSessionPort {
+class AnsweringSession extends UiSession {
   constructor(private readonly permissions: readonly string[]) {
     super();
   }
@@ -117,7 +117,7 @@ class AnsweringSession extends UiSessionPort {
   }
 }
 
-function capabilities(session: UiSessionPort): UiCapabilities {
+function capabilities(session: UiSession): UiCapabilities {
   return {
     documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
     feedback: new SilentFeedback(),

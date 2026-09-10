@@ -9,12 +9,12 @@ import { z } from "zod";
 import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
 import { gatewayRoutingPolicySelect } from "../../ports/gateway-virtual-key.port.ts";
 import {
-  GatewayVirtualKeysPort,
+  GatewayVirtualKeys,
   type CreateGatewayVirtualKeyInput,
   type SetGatewayVirtualKeyDisabledInput,
   type UpdateGatewayVirtualKeyInput,
 } from "../../ports/gateway-virtual-key.port.ts";
-import type { GatewayPersistenceTransaction } from "../../ports/gateway-change-events.port.ts";
+import type { GatewayPersistenceTransaction } from "../../app/gateway.infrastructure.ts";
 
 const wirePages = GatewayWirePaginationAdapter.create();
 /**
@@ -25,7 +25,7 @@ export type ScopeInput = GatewayVirtualKeyScope;
 export type CreateVirtualKeyData = CreateGatewayVirtualKeyInput;
 export type SetVirtualKeyDisabledData = SetGatewayVirtualKeyDisabledInput;
 
-export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
+export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
   static create(database: PrismaClient): PrismaGatewayVirtualKeyRepository {
     return new PrismaGatewayVirtualKeyRepository(database);
   }

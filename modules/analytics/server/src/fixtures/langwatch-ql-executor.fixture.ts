@@ -5,10 +5,10 @@
 import {
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
-  LangWatchQLExecutorPort,
+  LangWatchQLExecutor,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 
-export class RecordingLangWatchQLExecutor extends LangWatchQLExecutorPort {
+export class RecordingLangWatchQLExecutor extends LangWatchQLExecutor {
   readonly calls: LangWatchQLExecutionRequest[] = [];
 
   constructor(private readonly result: Partial<LangWatchQLExecutionResult> = {}) {

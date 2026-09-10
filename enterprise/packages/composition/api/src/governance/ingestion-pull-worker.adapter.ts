@@ -6,19 +6,19 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
-import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
+import type { GovernanceInternalProject } from "@langwatch/project-server";
 import {
   BuiltInPullerRegistryService,
-  GovernanceHttpPort,
-  GovernanceObjectStoragePort,
+  GovernanceHttp,
+  GovernanceObjectStorage,
   GovernanceOcsfEventSinkPort,
   IngestionCredentialsService,
-  IngestionPullDiagnosticsPort,
-  type IngestionPullSourcePort,
+  IngestionPullDiagnostics,
+  type IngestionPullSource,
   IngestionPullWorkerService,
-  PulledUsageEntitlementPort,
+  PulledUsageEntitlement,
   PulledUsagePricingService,
-  PulledUsageRatePort,
+  PulledUsageRate,
   PulledUsageRecordService,
   type GovernanceOcsfEventInput,
   type GovernanceHttpResponse,
@@ -40,7 +40,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { AppGovernanceOcsfEventsAdapter } from "./governance-ocsf-events.clickhouse.repository.ts";
 import {
-  AppGovernanceEncryptionPort,
+  AppGovernanceEncryption,
   type GovernanceEncryption,
 } from "./governance-infrastructure.adapter.ts";
 
@@ -98,13 +98,13 @@ export abstract class GovernanceIngestionPullHost {
   abstract readonly encryption: GovernanceEncryption;
 }
 
-class AppGovernanceHttpPort extends GovernanceHttpPort {
+class AppGovernanceHttp extends GovernanceHttp {
   private constructor(private readonly host: GovernanceIngestionPullHost) {
     super();
   }
 
-  static create(host: GovernanceIngestionPullHost): AppGovernanceHttpPort {
-    return new AppGovernanceHttpPort(host);
+  static create(host: GovernanceIngestionPullHost): AppGovernanceHttp {
+    return new AppGovernanceHttp(host);
   }
 
   async fetch(url: string, init: GovernanceHttpRequest) {
@@ -112,13 +112,13 @@ class AppGovernanceHttpPort extends GovernanceHttpPort {
   }
 }
 
-export class AppGovernanceObjectStoragePort extends GovernanceObjectStoragePort {
+export class AppGovernanceObjectStorage extends GovernanceObjectStorage {
   private constructor(private readonly host: GovernanceIngestionPullHost) {
     super();
   }
 
-  static create(host: GovernanceIngestionPullHost): AppGovernanceObjectStoragePort {
-    return new AppGovernanceObjectStoragePort(host);
+  static create(host: GovernanceIngestionPullHost): AppGovernanceObjectStorage {
+    return new AppGovernanceObjectStorage(host);
   }
 
   async list(input: GovernanceObjectStorageListInput): Promise<string[]> {
@@ -217,15 +217,15 @@ function defaultS3Host(region: string): string {
   return `s3.${region}${suffix}`;
 }
 
-class AppGovernanceOcsfEventSinkPort extends GovernanceOcsfEventSinkPort {
+class AppGovernanceOcsfEventSink extends GovernanceOcsfEventSinkPort {
   private constructor(private readonly events: AppGovernanceOcsfEventsAdapter | undefined) {
     super();
   }
 
   static create(
     events: AppGovernanceOcsfEventsAdapter | undefined,
-  ): AppGovernanceOcsfEventSinkPort {
-    return new AppGovernanceOcsfEventSinkPort(events);
+  ): AppGovernanceOcsfEventSink {
+    return new AppGovernanceOcsfEventSink(events);
   }
 
   insertEvent(input: GovernanceOcsfEventInput): Promise<void> {
@@ -238,13 +238,13 @@ class AppGovernanceOcsfEventSinkPort extends GovernanceOcsfEventSinkPort {
   }
 }
 
-class AppPulledUsageEntitlementPort extends PulledUsageEntitlementPort {
+class AppPulledUsageEntitlement extends PulledUsageEntitlement {
   private constructor(private readonly host: GovernanceIngestionPullHost) {
     super();
   }
 
-  static create(host: GovernanceIngestionPullHost): AppPulledUsageEntitlementPort {
-    return new AppPulledUsageEntitlementPort(host);
+  static create(host: GovernanceIngestionPullHost): AppPulledUsageEntitlement {
+    return new AppPulledUsageEntitlement(host);
   }
 
   isEnabled(organizationId: string): Promise<boolean> {
@@ -252,13 +252,13 @@ class AppPulledUsageEntitlementPort extends PulledUsageEntitlementPort {
   }
 }
 
-class AppPulledUsageRatePort extends PulledUsageRatePort {
+class AppPulledUsageRate extends PulledUsageRate {
   private constructor(private readonly host: GovernanceIngestionPullHost) {
     super();
   }
 
-  static create(host: GovernanceIngestionPullHost): AppPulledUsageRatePort {
-    return new AppPulledUsageRatePort(host);
+  static create(host: GovernanceIngestionPullHost): AppPulledUsageRate {
+    return new AppPulledUsageRate(host);
   }
 
   rate(input: PulledUsageRateInput) {
@@ -266,13 +266,13 @@ class AppPulledUsageRatePort extends PulledUsageRatePort {
   }
 }
 
-class AppIngestionPullDiagnosticsPort extends IngestionPullDiagnosticsPort {
+class AppIngestionPullDiagnostics extends IngestionPullDiagnostics {
   private constructor(private readonly host: GovernanceIngestionPullHost) {
     super();
   }
 
-  static create(host: GovernanceIngestionPullHost): AppIngestionPullDiagnosticsPort {
-    return new AppIngestionPullDiagnosticsPort(host);
+  static create(host: GovernanceIngestionPullHost): AppIngestionPullDiagnostics {
+    return new AppIngestionPullDiagnostics(host);
   }
 
   private readonly logger = createLogger("langwatch:governance:pull-worker");
@@ -296,16 +296,16 @@ class AppIngestionPullDiagnosticsPort extends IngestionPullDiagnosticsPort {
 
 export class AppIngestionPullWorkerAdapter {
   private constructor(
-    private readonly sources: IngestionPullSourcePort,
+    private readonly sources: IngestionPullSource,
     private readonly host: GovernanceIngestionPullHost,
-    private readonly projects: GovernanceInternalProjectPort,
+    private readonly projects: GovernanceInternalProject,
     private readonly events: AppGovernanceOcsfEventsAdapter | undefined,
   ) {}
 
   static create(options: {
-    sources: IngestionPullSourcePort;
+    sources: IngestionPullSource;
     host: GovernanceIngestionPullHost;
-    projects: GovernanceInternalProjectPort;
+    projects: GovernanceInternalProject;
     events: AppGovernanceOcsfEventsAdapter | undefined;
   }): AppIngestionPullWorkerAdapter {
     return new AppIngestionPullWorkerAdapter(
@@ -317,9 +317,9 @@ export class AppIngestionPullWorkerAdapter {
   }
 
   build(): IngestionPullWorkerService {
-    const diagnostics = AppIngestionPullDiagnosticsPort.create(this.host);
-    const http = AppGovernanceHttpPort.create(this.host);
-    const objects = AppGovernanceObjectStoragePort.create(this.host);
+    const diagnostics = AppIngestionPullDiagnostics.create(this.host);
+    const http = AppGovernanceHttp.create(this.host);
+    const objects = AppGovernanceObjectStorage.create(this.host);
     const pullers = PullerRegistryService.create();
     pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
     pullers.register(S3PollingPullerAdapter.create({ objects, diagnostics }));
@@ -332,16 +332,16 @@ export class AppIngestionPullWorkerAdapter {
     pullers.register(DatabricksGeniePullerAdapter.create(http));
     const registry = BuiltInPullerRegistryService.create(pullers).build();
     const credentials = IngestionCredentialsService.create(
-      AppGovernanceEncryptionPort.create(this.host.encryption),
+      AppGovernanceEncryption.create(this.host.encryption),
     );
-    const pricing = PulledUsagePricingService.create(AppPulledUsageRatePort.create(this.host));
+    const pricing = PulledUsagePricingService.create(AppPulledUsageRate.create(this.host));
     return IngestionPullWorkerService.create({
       sources: this.sources,
       registry,
       credentials,
       projects: this.projects,
-      sink: AppGovernanceOcsfEventSinkPort.create(this.events),
-      usageEntitlement: AppPulledUsageEntitlementPort.create(this.host),
+      sink: AppGovernanceOcsfEventSink.create(this.events),
+      usageEntitlement: AppPulledUsageEntitlement.create(this.host),
       usageRecords: PulledUsageRecordService.create(pricing),
       diagnostics,
     });

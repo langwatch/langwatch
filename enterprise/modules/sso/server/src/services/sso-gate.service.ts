@@ -4,7 +4,7 @@ import type {
   LicensingApi,
   PlatformLicenseInspection,
 } from "@langwatch/enterprise-licensing-contract";
-import type { SsoGateLoggerPort } from "../app/sso.infrastructure.ts";
+import type { SsoGateLogger } from "../app/sso.infrastructure.ts";
 
 export abstract class SsoProviderMountInspector {
   abstract isMounted(configuration: SsoConfiguration): boolean;
@@ -13,7 +13,7 @@ export abstract class SsoProviderMountInspector {
 export interface SsoGateServiceOptions {
   configuration: SsoConfiguration;
   licensing: LicensingApi;
-  logger: SsoGateLoggerPort;
+  logger: SsoGateLogger;
   providerMountInspector: SsoProviderMountInspector;
   evaluationTimeoutMs?: number | undefined;
 }
@@ -34,7 +34,7 @@ export class SsoGateService {
   private constructor(
     private readonly configuration: SsoConfiguration,
     private readonly licensing: LicensingApi,
-    private readonly logger: SsoGateLoggerPort,
+    private readonly logger: SsoGateLogger,
     private readonly providerMountInspector: SsoProviderMountInspector,
     private readonly evaluationTimeoutMs: number,
   ) {}

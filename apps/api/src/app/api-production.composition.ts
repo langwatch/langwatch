@@ -5,7 +5,7 @@ import { LocalFeatureApis, type BootedRuntime } from "@langwatch/runtime-composi
 import { AgentApi } from "@langwatch/agent-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import type { GroupQueueStoragePort } from "@langwatch/group-queue";
+import type { GroupQueueStorage } from "@langwatch/group-queue";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
@@ -22,7 +22,7 @@ import {
   verifyInstanceAdminKey,
 } from "@langwatch/organization-server";
 import type { SecretApi } from "@langwatch/secret-contract";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { Hono } from "hono";
 import { register } from "prom-client";
 import {
@@ -31,9 +31,9 @@ import {
   AuthzApiAuthorizationAdapter,
 } from "../api-request.policy.ts";
 import {
-  ApiFeatureDrainPort,
+  ApiFeatureDrain,
   ApiProcess,
-  ApiProcessGraphPort,
+  ApiProcessGraph,
   closeApiProcessResources,
 } from "../api.process.ts";
 import { ApiHttpListener } from "../api-http.listener.ts";
@@ -43,24 +43,24 @@ import {
 } from "../app-static/app-static.surface.ts";
 import { tryCreateHostedMcpSurface } from "../features/mcp/hosted-mcp.mount.ts";
 import {
-  ApiMetricsPort,
+  ApiMetrics,
   ApiProcessLifecycleRoutes,
-  ApiReadinessPort,
+  ApiReadiness,
 } from "../api-process.lifecycle.ts";
 import {
-  ApiDatabaseAbsenceReportPort,
+  ApiDatabaseAbsenceReport,
   ApiDatabaseInfrastructure,
 } from "../platform/infrastructure/api-database.infrastructure.ts";
 import {
-  ApiQueueAbsenceReportPort,
+  ApiQueueAbsenceReport,
   ApiQueueInfrastructure,
 } from "../platform/infrastructure/api-queue.infrastructure.ts";
 import {
-  ApiEventingAbsenceReportPort,
+  ApiEventingAbsenceReport,
   ApiEventingInfrastructure,
 } from "../platform/infrastructure/api-eventing.infrastructure.ts";
 import {
-  ApiClickHouseAbsenceReportPort,
+  ApiClickHouseAbsenceReport,
   ApiClickHouseInfrastructure,
 } from "../platform/infrastructure/api-clickhouse.infrastructure.ts";
 import { PostgresBillingAdapter } from "@langwatch/enterprise-billing-server";
@@ -89,7 +89,7 @@ import { installApiUser, refusingUserFeature } from "../features/user/user.compo
 import { installApiPresence } from "../features/presence/presence.composition.ts";
 import { BroadcastAdapter } from "@langwatch/presence-server";
 import { composeApiKeyFeature } from "../features/api-key/api-key.composition.ts";
-import type { ApiPersonMailPort } from "./api-person-mail.port.ts";
+import type { ApiPersonMail } from "./api-person-mail.port.ts";
 import { ApiEventingIdentityAdapter } from "./api-identity-eventing.adapter.ts";
 import {
   composeApiIdentityPipelines,
@@ -118,7 +118,7 @@ import {
   LoggedApiTraceAbsence,
   refusingTraceFeature,
 } from "../features/trace/trace.composition.ts";
-import type { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port.ts";
+import type { ApiTraceReadStack } from "../features/trace/trace-read-stack.port.ts";
 import { installApiShare } from "../features/share/share.composition.ts";
 import { installApiTopic } from "../features/topic/topic.composition.ts";
 import {
@@ -131,7 +131,7 @@ import {
   PrismaUsageMembershipRepository,
   type EntitlementServiceOptions,
   type UsageService,
-  type UsageWarningPort,
+  type UsageWarning,
 } from "@langwatch/entitlement-server";
 
 import {
@@ -158,7 +158,7 @@ import {
   ApiOrganizationSeatLicense,
   installApiOrganization,
   refusingOrganizationFeature,
-  type ApiOrganizationInvitePort,
+  type ApiOrganizationInvite,
 } from "../features/organization/organization.composition.ts";
 import {
   installApiProject,
@@ -175,13 +175,13 @@ import { installApiWebhook, type ComposedWebhookFeature } from "../features/webh
 import {
   composeEnterpriseFeature,
   refusingEnterpriseFeature,
-  type ApiEnterpriseApplicationPort,
-  type ApiSeatAllowancePort,
+  type ApiEnterpriseApplication,
+  type ApiSeatAllowance,
 } from "../features/enterprise/enterprise.composition.ts";
 import { ApiEnterpriseSeatAllowance } from "../features/enterprise/enterprise-seat-allowance.ts";
 import {
   ApiTraceReadViewerProtections,
-  type ApiViewerProtectionsPort,
+  type ApiViewerProtections,
 } from "../features/trace/trace-viewer-protections.ts";
 import {
   composeApiOrganizationInvites,
@@ -194,7 +194,7 @@ import {
 } from "../features/gateway/gateway.composition.ts";
 import { composeEnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition.ts";
 import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure.ts";
-import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition.ts";
+import type { ApiGatewayIdempotency } from "./api-gateway.composition.ts";
 import {
   composeApiIdempotency,
   type ApiIdempotencyComposition,
@@ -236,14 +236,14 @@ import {
 import {
   composeIntegrationsChecksFeature,
   refusingIntegrationsChecksFeature,
-  type ApiSimulationEvidencePort,
+  type ApiSimulationEvidence,
 } from "../features/project/integrations-checks.composition.ts";
 import { composeHomeFeature, refusingHomeFeature } from "../features/project/home.composition.ts";
 import { PostgresModelProviderEvidenceAdapter } from "@langwatch/model-provider-server";
 import type { ComposedHomeFeature } from "../features/project/home.composition.types.ts";
 import type { ComposedIntegrationsChecksFeature } from "../features/project/integrations-checks.composition.types.ts";
 import { ApiScenarioSimulationEvidence } from "../features/project/scenario-simulation-evidence.ts";
-import { TraceSpanIngestPort } from "@langwatch/trace-server";
+import { TraceSpanIngest } from "@langwatch/trace-server";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
   ApiTrpcFeaturesComposition,
@@ -273,31 +273,31 @@ import {
 import { tryCreateApiMailComposition, type ApiMailComposition } from "./api-mail.composition.ts";
 import { ApiComposedPasswordResetMail } from "./api-better-auth.composition.ts";
 import { ApiComposedPersonMail } from "./api-person-mail.composition.ts";
-import { ApiAuthzAbsenceReportPort, ApiAuthzComposition } from "./api-authz.composition.ts";
-import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "./api-tenancy.composition.ts";
+import { ApiAuthzAbsenceReport, ApiAuthzComposition } from "./api-authz.composition.ts";
+import { ApiTenancyAbsenceReport, ApiTenancyComposition } from "./api-tenancy.composition.ts";
 import {
-  ApiMetricsAbsenceReportPort,
+  ApiMetricsAbsenceReport,
   ApiMetricsInfrastructure,
 } from "../platform/infrastructure/api-metrics.infrastructure.ts";
 import {
-  ApiSecretEncryptionAbsenceReportPort,
+  ApiSecretEncryptionAbsenceReport,
   ApiSecretEncryptionInfrastructure,
 } from "../platform/infrastructure/api-secret-encryption.infrastructure.ts";
 import {
-  ApiRuntimeCompositionPort,
-  ApiRuntimeProcessPort,
+  ApiRuntimeComposition,
+  ApiRuntimeProcess,
   type ApiRuntimeCompositionOptions,
 } from "../api.main.ts";
 import { installApiSecret } from "../features/secret/secret.composition.ts";
 import type { ComposedSecretFeature } from "../features/secret/secret.composition.types.ts";
 import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security.ts";
-import type { AppRestManagementAuditPort, RestCredentialPrincipal } from "@langwatch/api/rest";
+import type { AppRestManagementAudit, RestCredentialPrincipal } from "@langwatch/api/rest";
 import { ApiRateLimitInfrastructure } from "../platform/infrastructure/api-rate-limit.infrastructure.ts";
 import {
-  ApiAuthAbsenceReportPort,
+  ApiAuthAbsenceReport,
   ApiAuthComposition,
-  ApiAuthSessionCompositionPort,
-  ApiBrowserSessionTransportPort,
+  ApiAuthSessionComposition,
+  ApiBrowserSessionTransport,
   AuthSessionApiAuthenticationAdapter,
 } from "./api-auth.composition.ts";
 import { createApiUserAvatarObjectReader } from "../features/user/user-avatar-objects.adapter.ts";
@@ -366,7 +366,7 @@ import { composeApiGovernanceCliRest } from "../features/enterprise/governance-c
 import { composeApiGovernanceIngestRest } from "../features/enterprise/governance-ingest-rest.mount.ts";
 import { installApiScim, LoggedApiScimAbsence } from "./api-scim.composition.ts";
 import { composeApiAudit, LoggedApiAuditAbsence } from "./api-audit.composition.ts";
-import type { PlatformOperatorPort } from "@langwatch/identity-server";
+import type { PlatformOperator } from "@langwatch/identity-server";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import { RedisNlpLambdaArnCache } from "./nlp-lambda-arn-cache.ts";
 import {
@@ -377,7 +377,7 @@ import type { AuthCliDeviceFlowApi, AuthDoorApi } from "@langwatch/auth-server";
 import type {
   GovernanceCliRestPorts,
   GovernanceIngestRestPorts,
-  GovernanceIngestTraceCollectionPort,
+  GovernanceIngestTraceCollection,
 } from "@langwatch/enterprise-governance-server";
 import type { GithubInstallApi } from "@langwatch/github-server";
 import type { FilesRateLimiter } from "@langwatch/stored-object-server";
@@ -452,22 +452,22 @@ export type ApiProductionCompositionOptions = {
    * A host's already-composed Auth service and Better Auth transport, when it has them as a
    * pair.
    */
-  auth?: ApiAuthSessionCompositionPort;
+  auth?: ApiAuthSessionComposition;
   /**
    * The deployment's Better Auth request boundary, for a host that supplies only that. This is
    * the collaborator the API package cannot build — see {@link ApiAuthComposition} — and the
    * one entry on `API_UNAVAILABLE_PRODUCT_ADAPTERS`.
    */
-  browserSessions?: ApiBrowserSessionTransportPort;
+  browserSessions?: ApiBrowserSessionTransport;
   audit?: ApiAuditPort;
-  readiness?: ApiReadinessPort;
+  readiness?: ApiReadiness;
   /**
    * A host's already-composed metrics transport, when it has one. Optional since this process
    * can build its own: see {@link resolveApiMetrics} for which wins.
    */
-  metrics?: ApiMetricsPort;
-  featureDrain?: ApiFeatureDrainPort;
-  queueStorage?: GroupQueueStoragePort;
+  metrics?: ApiMetrics;
+  featureDrain?: ApiFeatureDrain;
+  queueStorage?: GroupQueueStorage;
   /**
    * A host's already-composed model gateway, when it has one. Optional since this process now
    * composes its own — see {@link ApiProductionComposition.resolveModelProviders} and
@@ -484,17 +484,17 @@ export type ApiProductionCompositionOptions = {
    * port rather than the gateway, and for a structural reason: rendering a LangWatch message is
    * react-email, and this process must not pull a React renderer onto its import graph.
    */
-  mail?: ApiPersonMailPort;
+  mail?: ApiPersonMail;
   /**
    * Whether a project has run any simulation, for the setup checklist.
    */
-  simulations?: ApiSimulationEvidencePort;
+  simulations?: ApiSimulationEvidence;
   /**
    * The ClickHouse trace READ stack, for the five trace surfaces. The largest thing the
    * observability half cannot build: the ten readers the trace application is composed from,
    * plus the redaction and display passes every read is carried through.
    */
-  traceReads?: ApiTraceReadStackPort;
+  traceReads?: ApiTraceReadStack;
   /**
    * The optimization studio's outbound event dispatch, and the agent test's own
    * trace write. Absent, both refuse.
@@ -504,7 +504,7 @@ export type ApiProductionCompositionOptions = {
    * The approaching-limit mail, over the deployment's own gateway. Absent, the
    * send refuses rather than reporting a message it never delivered.
    */
-  usage?: UsageWarningPort;
+  usage?: UsageWarning;
   /** Which plan an organization is on. Absent, the plan read refuses. */
   plans?: PlanProvider;
   /**
@@ -512,22 +512,22 @@ export type ApiProductionCompositionOptions = {
    * and applies invitations through. Absent, all twelve refuse by name — an
    * empty invite list would tell an administrator nobody had been invited.
    */
-  organizationInvites?: ApiOrganizationInvitePort;
+  organizationInvites?: ApiOrganizationInvite;
   /**
    * The caller's read-time redactions for one project, as `codingAgents.sessionsList` and
    * `project.getFieldRedactionStatus` ask them. The same resolution `traceReads` answers;
    * absent, both refuse rather than guessing what a reader may see.
    */
-  viewerProtections?: ApiViewerProtectionsPort;
+  viewerProtections?: ApiViewerProtections;
   /**
    * The Enterprise application the licence, licence-enforcement, SCIM-token, single sign-on and
    * fifteen governance surfaces read.
    */
-  enterprise?: ApiEnterpriseApplicationPort;
+  enterprise?: ApiEnterpriseApplication;
   /**
    * The receipt ledger the three keyed gateway REST creates dispatch through.
    */
-  gatewayIdempotency?: ApiGatewayIdempotencyPort;
+  gatewayIdempotency?: ApiGatewayIdempotency;
 };
 
 /** The credential pair every product transport on this process is built from. */
@@ -537,7 +537,7 @@ type ApiResolvedTenancy = Readonly<{
 }>;
 
 /** The concrete composition port for the migrated API transports. */
-export class ApiProductionComposition extends ApiRuntimeCompositionPort {
+export class ApiProductionComposition extends ApiRuntimeComposition {
   static create(options: ApiProductionCompositionOptions): ApiProductionComposition {
     // Checked here rather than at compose, because it is a fact about the
     // options and not about the deployment: it can be answered before a socket
@@ -560,8 +560,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The Enterprise application members this process composed over its own graph, or none.
    * An injected application wins — see {@link resolveEnterprise}.
    */
-  private composedEnterpriseApplication: ApiEnterpriseApplicationPort | undefined;
-  private composedPlatformOperators: PlatformOperatorPort | undefined;
+  private composedEnterpriseApplication: ApiEnterpriseApplication | undefined;
+  private composedPlatformOperators: PlatformOperator | undefined;
   private composedFeaturePorts: ApiOwnedRestFeaturePorts | undefined;
   private composedDatabase: ApiDatabaseInfrastructure | undefined;
   private composedEventing: ApiEventingInfrastructure | undefined;
@@ -653,7 +653,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedEvaluation: ComposedEvaluationFeature | undefined;
   private composedTrace!: ComposedTraceFeature;
   /** The seat gate `licenseEnforcement.*` answers from; see {@link optionalPorts}. */
-  private composedSeatAllowances: ApiSeatAllowancePort | undefined;
+  private composedSeatAllowances: ApiSeatAllowance | undefined;
   /**
    * The share ledger, or none. There is no refusing twin: a process that opened
    * no database mounts neither share namespace.
@@ -763,7 +763,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * The stored-secret cipher this process composed, or none.
    */
-  private composedEncryption: SecretEncryptionPort | undefined;
+  private composedEncryption: SecretEncryption | undefined;
   private composedGithub: GithubApi | undefined;
   private composedModelProviders: ModelProviderApi | undefined;
   /** The gateway's options, kept so the module install reads the same list. */
@@ -861,7 +861,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * product service below is built from it; then AuthZ, because both doors authorize through it
    * and neither can be built before it exists; then the transports.
    */
-  async compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
+  async compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcess> {
     const queueInfrastructure = this.composeQueue(options);
     this.composedDatabase = composeApiDatabase(options);
     // Booted whether or not a host injected its own trail: the operator and
@@ -1636,10 +1636,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * answers from its own graph — `undefined` where the graph it stands on is genuinely absent.
    */
   optionalPorts(): Readonly<{
-    viewerProtections: ApiViewerProtectionsPort | undefined;
-    simulations: ApiSimulationEvidencePort | undefined;
-    personMail: ApiPersonMailPort | undefined;
-    seatAllowances: ApiSeatAllowancePort | undefined;
+    viewerProtections: ApiViewerProtections | undefined;
+    simulations: ApiSimulationEvidence | undefined;
+    personMail: ApiPersonMail | undefined;
+    seatAllowances: ApiSeatAllowance | undefined;
   }> {
     return {
       viewerProtections: this.resolveViewerProtections(),
@@ -1669,7 +1669,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
   /** Installs the feature only where this process holds both a connection and a cipher. */
   private async resolveSecretApp(
-    encryption: SecretEncryptionPort | undefined,
+    encryption: SecretEncryption | undefined,
   ): Promise<ComposedSecretFeature | undefined> {
     const database = this.composedDatabase;
     if (!database || !encryption) return undefined;
@@ -2470,7 +2470,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private async resolveTenancy(
     options: ApiRuntimeCompositionOptions,
-    encryption: SecretEncryptionPort | undefined,
+    encryption: SecretEncryption | undefined,
   ): Promise<ApiResolvedTenancy | undefined> {
     const { apiKeys, organizations } = this.options;
     // `create` has already refused a half-supplied pair, so one present means
@@ -2527,7 +2527,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     options: ApiRuntimeCompositionOptions,
     tenancy: ApiResolvedTenancy,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
-  ): Promise<ApiAuthSessionCompositionPort | undefined> {
+  ): Promise<ApiAuthSessionComposition | undefined> {
     if (this.options.auth) return this.options.auth;
     if (!this.composedDatabase) return undefined;
 
@@ -2950,7 +2950,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The Activity Monitor's receivers' collaborators, or none.
    */
   private composeGovernanceIngestRest(
-    traceCollection: GovernanceIngestTraceCollectionPort | undefined,
+    traceCollection: GovernanceIngestTraceCollection | undefined,
   ): GovernanceIngestRestPorts | undefined {
     return composeApiGovernanceIngestRest({
       governance: this.resolveEnterprise()?.governance,
@@ -3020,7 +3020,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * states all of it, and a partial injection silently backed by our own graph would leave
    * nobody able to say which member answered.
    */
-  private resolveEnterprise(): ApiEnterpriseApplicationPort | undefined {
+  private resolveEnterprise(): ApiEnterpriseApplication | undefined {
     return this.options.enterprise ?? this.composedEnterpriseApplication;
   }
 
@@ -3065,7 +3065,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /** Who this deployment counts as a platform operator, by address, composed once. */
-  private platformOperators(options: ApiRuntimeCompositionOptions): PlatformOperatorPort {
+  private platformOperators(options: ApiRuntimeCompositionOptions): PlatformOperator {
     this.composedPlatformOperators ??= (() => {
       const access = AdminAccessService.create({
         adminEmails: this.personDeployment(options).adminEmails ?? "",
@@ -3080,7 +3080,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * audit sink. The port names the action, not the URL, so the action is what
    * lands in `path` — it is the stable identifier of what was done.
    */
-  private composeManagementAudit(): AppRestManagementAuditPort {
+  private composeManagementAudit(): AppRestManagementAudit {
     const audit = this.resolveAudit();
     const logger = createLogger("langwatch:api:management-audit");
     return (entry) => {
@@ -3332,7 +3332,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     options: ApiRuntimeCompositionOptions,
     authz: AuthzService,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
-    encryption: SecretEncryptionPort | undefined,
+    encryption: SecretEncryption | undefined,
   ): Promise<ComposedScenarioFeature> {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
@@ -3411,7 +3411,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composeTrace(
     options: ApiRuntimeCompositionOptions,
     authz: AuthzService,
-    encryption: SecretEncryptionPort | undefined,
+    encryption: SecretEncryption | undefined,
   ): ComposedTraceFeature {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
@@ -3564,7 +3564,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private async composeTenantFeatures(
     options: ApiRuntimeCompositionOptions,
-    encryption: SecretEncryptionPort | undefined,
+    encryption: SecretEncryption | undefined,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
     infrastructure: ApiTrpcInfrastructure | undefined,
   ): Promise<void> {
@@ -4150,7 +4150,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * simulation reads. Absent only where the scenario half did not compose, and the checklist
    * then reports the step as not started — which is what it already did.
    */
-  private resolveSimulationEvidence(): ApiSimulationEvidencePort | undefined {
+  private resolveSimulationEvidence(): ApiSimulationEvidence | undefined {
     if (this.options.simulations) return this.options.simulations;
     const simulations = this.composedScenario?.simulations;
     return simulations ? ApiScenarioSimulationEvidence.create(simulations) : undefined;
@@ -4161,7 +4161,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * mail graph. Absent exactly where the deployment named no BASE_HOST, and then each surface
    * carries on without its message rather than refusing the write it belongs to.
    */
-  private resolvePersonMail(): ApiPersonMailPort | undefined {
+  private resolvePersonMail(): ApiPersonMail | undefined {
     if (this.options.mail) return this.options.mail;
     return this.composedMail ? ApiComposedPersonMail.create(this.composedMail) : undefined;
   }
@@ -4171,7 +4171,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * stack. Absent only where the process composed no read stack, and then the two surfaces that
    * ask refuse by name rather than guessing what a reader may see.
    */
-  private resolveViewerProtections(): ApiViewerProtectionsPort | undefined {
+  private resolveViewerProtections(): ApiViewerProtections | undefined {
     if (this.options.viewerProtections) return this.options.viewerProtections;
     const reads = this.composedTrace?.traceReads;
     return reads ? ApiTraceReadViewerProtections.create(reads) : undefined;
@@ -4227,7 +4227,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private resolveModelProviders(
     options: ApiRuntimeCompositionOptions,
-    encryption: SecretEncryptionPort | undefined,
+    encryption: SecretEncryption | undefined,
   ): ModelProviderApi | undefined {
     if (this.options.modelProviders) return this.options.modelProviders;
     // Memoized: two halves ask for it — the execution half for the studio's
@@ -4289,7 +4289,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private async composeExecutionFeatures(
     options: ApiRuntimeCompositionOptions,
     agents: AgentApi | undefined,
-    encryption: SecretEncryptionPort | undefined,
+    encryption: SecretEncryption | undefined,
     tenancy: ApiResolvedTenancy,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
     infrastructure: ApiTrpcInfrastructure | undefined,
@@ -4546,8 +4546,8 @@ function composeApiSecretEncryption(
  */
 function resolveApiMetrics(input: {
   options: ApiRuntimeCompositionOptions;
-  injected: ApiMetricsPort | undefined;
-}): ApiMetricsPort | undefined {
+  injected: ApiMetrics | undefined;
+}): ApiMetrics | undefined {
   if (input.injected) return input.injected;
 
   const logger = createLogger(input.options.config.serviceName);
@@ -4559,7 +4559,7 @@ function resolveApiMetrics(input: {
 }
 
 /** Names the absent credential once, at boot, rather than leaving it to be inferred. */
-export class LoggedApiMetricsAbsence extends ApiMetricsAbsenceReportPort {
+export class LoggedApiMetricsAbsence extends ApiMetricsAbsenceReport {
   static create(logger: Pick<Logger, "info">): LoggedApiMetricsAbsence {
     return new LoggedApiMetricsAbsence(logger);
   }
@@ -4577,7 +4577,7 @@ export class LoggedApiMetricsAbsence extends ApiMetricsAbsenceReportPort {
 }
 
 /** Names the absent key once, at boot, rather than leaving it to be inferred. */
-export class LoggedApiSecretEncryptionAbsence extends ApiSecretEncryptionAbsenceReportPort {
+export class LoggedApiSecretEncryptionAbsence extends ApiSecretEncryptionAbsenceReport {
   static create(logger: Pick<Logger, "info">): LoggedApiSecretEncryptionAbsence {
     return new LoggedApiSecretEncryptionAbsence(logger);
   }
@@ -4595,7 +4595,7 @@ export class LoggedApiSecretEncryptionAbsence extends ApiSecretEncryptionAbsence
 }
 
 /** Names the absent database once, at boot, rather than leaving it to be inferred. */
-export class LoggedApiDatabaseAbsence extends ApiDatabaseAbsenceReportPort {
+export class LoggedApiDatabaseAbsence extends ApiDatabaseAbsenceReport {
   static create(logger: Pick<Logger, "info">): LoggedApiDatabaseAbsence {
     return new LoggedApiDatabaseAbsence(logger);
   }
@@ -4613,7 +4613,7 @@ export class LoggedApiDatabaseAbsence extends ApiDatabaseAbsenceReportPort {
 }
 
 /** Names the absent analytics store once, at boot, with what it costs. */
-export class LoggedApiClickHouseAbsence extends ApiClickHouseAbsenceReportPort {
+export class LoggedApiClickHouseAbsence extends ApiClickHouseAbsenceReport {
   static create(logger: Pick<Logger, "info">): LoggedApiClickHouseAbsence {
     return new LoggedApiClickHouseAbsence(logger);
   }
@@ -4662,7 +4662,7 @@ export class LoggedApiExecutionAbsence {
 }
 
 /** Names the absent dispatch once, at boot, rather than leaving it to be inferred. */
-export class LoggedApiEventingAbsence extends ApiEventingAbsenceReportPort {
+export class LoggedApiEventingAbsence extends ApiEventingAbsenceReport {
   static create(logger: Pick<Logger, "info">): LoggedApiEventingAbsence {
     return new LoggedApiEventingAbsence(logger);
   }
@@ -4702,7 +4702,7 @@ export class LoggedApiGatewaySpendPipelineAbsence extends ApiGatewaySpendPipelin
 }
 
 /** Names the absent AuthZ once, at boot, rather than leaving it to be inferred. */
-export class LoggedApiAuthzAbsence extends ApiAuthzAbsenceReportPort {
+export class LoggedApiAuthzAbsence extends ApiAuthzAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedApiAuthzAbsence {
     return new LoggedApiAuthzAbsence(logger);
   }
@@ -4720,7 +4720,7 @@ export class LoggedApiAuthzAbsence extends ApiAuthzAbsenceReportPort {
 }
 
 /** Names the absent Auth graph once, at boot, rather than leaving it inferred. */
-export class LoggedApiAuthAbsence extends ApiAuthAbsenceReportPort {
+export class LoggedApiAuthAbsence extends ApiAuthAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedApiAuthAbsence {
     return new LoggedApiAuthAbsence(logger);
   }
@@ -4740,7 +4740,7 @@ export class LoggedApiAuthAbsence extends ApiAuthAbsenceReportPort {
 }
 
 /** Names the absent credential services once, at boot, rather than leaving them inferred. */
-export class LoggedApiTenancyAbsence extends ApiTenancyAbsenceReportPort {
+export class LoggedApiTenancyAbsence extends ApiTenancyAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedApiTenancyAbsence {
     return new LoggedApiTenancyAbsence(logger);
   }
@@ -4758,7 +4758,7 @@ export class LoggedApiTenancyAbsence extends ApiTenancyAbsenceReportPort {
 }
 
 /** Names the absent Redis once, at boot, rather than leaving it to be inferred. */
-export class LoggedApiQueueAbsence extends ApiQueueAbsenceReportPort {
+export class LoggedApiQueueAbsence extends ApiQueueAbsenceReport {
   static create(logger: Pick<Logger, "info">): LoggedApiQueueAbsence {
     return new LoggedApiQueueAbsence(logger);
   }
@@ -4807,10 +4807,10 @@ export class LoggedApiExperimentRunAbsence extends ApiExperimentRunAbsenceReport
  */
 function composeApiLifecycleProcess(input: {
   options: ApiRuntimeCompositionOptions;
-  metrics: ApiMetricsPort | undefined;
-  readiness: ApiReadinessPort | undefined;
-  featureDrain: ApiFeatureDrainPort | undefined;
-}): ApiRuntimeProcessPort {
+  metrics: ApiMetrics | undefined;
+  readiness: ApiReadiness | undefined;
+  featureDrain: ApiFeatureDrain | undefined;
+}): ApiRuntimeProcess {
   const routes = ApiProcessLifecycleRoutes.create(input.metrics ? { metrics: input.metrics } : {});
   const observability = createProcessObservability(input.options.observability);
   return ApiLifecycleOnlyProcess.create({
@@ -4833,13 +4833,13 @@ function composeApiLifecycleProcess(input: {
  * readiness-before-listen order and the shared finalization order so a deployment's shutdown
  * behaviour does not change when the product transports are added.
  */
-class ApiLifecycleOnlyProcess extends ApiRuntimeProcessPort {
+class ApiLifecycleOnlyProcess extends ApiRuntimeProcess {
   static create(options: {
     listener: ApiHttpListener;
     observability: ProcessObservability;
-    graph: ApiProcessGraphPort;
-    readiness: ApiReadinessPort | undefined;
-    featureDrain: ApiFeatureDrainPort | undefined;
+    graph: ApiProcessGraph;
+    readiness: ApiReadiness | undefined;
+    featureDrain: ApiFeatureDrain | undefined;
   }): ApiLifecycleOnlyProcess {
     return new ApiLifecycleOnlyProcess(options);
   }
@@ -4850,9 +4850,9 @@ class ApiLifecycleOnlyProcess extends ApiRuntimeProcessPort {
     private readonly options: {
       listener: ApiHttpListener;
       observability: ProcessObservability;
-      graph: ApiProcessGraphPort;
-      readiness: ApiReadinessPort | undefined;
-      featureDrain: ApiFeatureDrainPort | undefined;
+      graph: ApiProcessGraph;
+      readiness: ApiReadiness | undefined;
+      featureDrain: ApiFeatureDrain | undefined;
     },
   ) {
     super();
@@ -4875,7 +4875,7 @@ class ApiLifecycleOnlyProcess extends ApiRuntimeProcessPort {
 }
 
 /** The real listener/process whose close sequence owns graph and telemetry shutdown. */
-class ApiProductionProcess extends ApiRuntimeProcessPort {
+class ApiProductionProcess extends ApiRuntimeProcess {
   static create(
     process: ApiProcess,
     agents: BootedRuntime<AgentInfrastructure> | undefined,
@@ -4904,7 +4904,7 @@ class ApiProductionProcess extends ApiRuntimeProcessPort {
  * The reserved-metadata amendment's span write, over the process's own `trace_processing`
  * registration.
  */
-class ApiTraceSpanIngestAdapter extends TraceSpanIngestPort {
+class ApiTraceSpanIngestAdapter extends TraceSpanIngest {
   static create(commands: ApiTraceProducerCommands): ApiTraceSpanIngestAdapter {
     return new ApiTraceSpanIngestAdapter(commands);
   }

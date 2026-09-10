@@ -34,10 +34,10 @@ import { fromDate } from "@langwatch/time";
 
 import { SuiteApp } from "../../app/suite.app.ts";
 import {
-  SuiteRunCommandsPort,
-  SuiteRunIdPort,
+  SuiteRunCommands,
+  SuiteRunId,
   type QueueSimulationRunCommandData,
-} from "../../ports/suite-execution.port.ts";
+} from "../../app/suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import { suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
@@ -371,7 +371,7 @@ function memoryAgentApi(world: SuiteWorld): AgentApi {
 }
 
 /** The two Eventing commands a run dispatches, recorded rather than queued. */
-class RecordingCommands extends SuiteRunCommandsPort {
+class RecordingCommands implements SuiteRunCommands {
   readonly started: StartSuiteRunCommandData[] = [];
   readonly queued: QueueSimulationRunCommandData[] = [];
 
@@ -384,7 +384,7 @@ class RecordingCommands extends SuiteRunCommandsPort {
   }
 }
 
-class SequentialRunIds extends SuiteRunIdPort {
+class SequentialRunIds implements SuiteRunId {
   private count = 0;
 
   next(): string {
@@ -465,7 +465,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
   });
   const mount = (onError: RestErrorHandler): RestMountOptions<SuiteApi> => ({
     app: () => app,
-    credential: "projectKey",
+    credential: "project",
     onError,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({

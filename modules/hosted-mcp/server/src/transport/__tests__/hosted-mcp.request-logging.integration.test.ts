@@ -38,14 +38,14 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 
 import {
   createMcpHandler,
-  McpApiKeyCipherPort,
-  McpClientAddressPort,
-  McpProjectLookupPort,
-  McpSessionGrantPort,
+  McpApiKeyCipher,
+  McpClientAddress,
+  McpProjectLookup,
+  McpSessionGrant,
   type McpHandler,
 } from "../../index.ts";
 
-class LoggingProjectLookup extends McpProjectLookupPort {
+class LoggingProjectLookup extends McpProjectLookup {
   tryFindLiveProjectByApiKey({
     apiKey,
   }: {
@@ -57,13 +57,13 @@ class LoggingProjectLookup extends McpProjectLookupPort {
   }
 }
 
-class AlwaysGranted extends McpSessionGrantPort {
+class AlwaysGranted extends McpSessionGrant {
   stillGranted(): Promise<boolean> {
     return Promise.resolve(true);
   }
 }
 
-class PassThroughCipher extends McpApiKeyCipherPort {
+class PassThroughCipher extends McpApiKeyCipher {
   encrypt(text: string): string {
     return text;
   }
@@ -72,7 +72,7 @@ class PassThroughCipher extends McpApiKeyCipherPort {
   }
 }
 
-class LoopbackAddress extends McpClientAddressPort {
+class LoopbackAddress extends McpClientAddress {
   clientIp(request: IncomingMessage): string {
     return request.socket.remoteAddress ?? "127.0.0.1";
   }

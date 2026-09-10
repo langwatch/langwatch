@@ -7,9 +7,9 @@ import {
   buildInviteAcceptUrl,
   InviteService,
   InviteSendThrottleService,
-  OrganizationInviteRateLimitPort,
-  OrganizationInviteSeatCensusPort,
-  type OrganizationInviteMailPort,
+  OrganizationInviteRateLimit,
+  OrganizationInviteSeatCensus,
+  type OrganizationInviteMail,
   type OrganizationRestInviteService,
   type OrganizationTrpcPorts,
 } from "@langwatch/organization-server";
@@ -24,12 +24,12 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RoleApi } from "@langwatch/role-contract";
-import type { ApiOrganizationInvitePort } from "../features/organization/organization.composition.ts";
+import type { ApiOrganizationInvite } from "../features/organization/organization.composition.ts";
 
 /**
  * The seat census, over the SAME reading the usage panel shows.
  */
-class ApiInviteSeatCensus extends OrganizationInviteSeatCensusPort {
+class ApiInviteSeatCensus extends OrganizationInviteSeatCensus {
   constructor(private readonly memberships: PrismaUsageMembershipRepository) {
     super();
   }
@@ -48,7 +48,7 @@ class ApiInviteSeatCensus extends OrganizationInviteSeatCensusPort {
 }
 
 /** The process's ONE fixed-window counter, as the invitation throttle spends it. */
-class ApiInviteRateLimit extends OrganizationInviteRateLimitPort {
+class ApiInviteRateLimit extends OrganizationInviteRateLimit {
   constructor(
     private readonly consume: (
       input: Readonly<{ key: string; windowSeconds: number; max: number }>,
@@ -127,7 +127,7 @@ export type ApiOrganizationInvitesOptions = Readonly<{
    */
   joinRequests?: ApiOrganizationInviteJoinRequests | undefined;
   /** The mail gateway, where a host composed one. */
-  mail?: OrganizationInviteMailPort | undefined;
+  mail?: OrganizationInviteMail | undefined;
   /** The identity app, for the acceptor's own verified addresses. */
   identity: IdentityApi;
 }>;
@@ -137,7 +137,7 @@ export type ApiOrganizationInvitesOptions = Readonly<{
  */
 export type ApiOrganizationInvites = Readonly<{
   /** The eleven ports `organization.*` reads the invitation half through. */
-  trpc: ApiOrganizationInvitePort;
+  trpc: ApiOrganizationInvite;
   /** The three operations `/api/organization`'s invitation routes make. */
   rest: OrganizationRestInviteService;
   /** The acceptance link, from the SAME base host the listing embeds. */

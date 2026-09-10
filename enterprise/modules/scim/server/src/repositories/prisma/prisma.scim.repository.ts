@@ -6,7 +6,7 @@ import {
 } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import {
-  ScimRepositoryPort,
+  ScimRepository,
   type ScimGrantBindingScope,
   type ScimGroupMembershipRecord,
   type ScimGroupRecord,
@@ -88,7 +88,7 @@ function isScimDatabase(value: object): value is ScimDatabase {
 }
 
 /** Strict generated-Prisma implementation of the SCIM persistence port. */
-export class PrismaScimRepository extends ScimRepositoryPort {
+export class PrismaScimRepository extends ScimRepository {
   private constructor(private readonly prisma: ScimDatabase) {
     super();
   }

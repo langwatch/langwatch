@@ -9,7 +9,7 @@ export { PrismaGovernanceDirectoryRepository } from "./repositories/prisma/prism
 export { PrismaOrganizationSupportContactRepository } from "./repositories/prisma/prisma.organization-support-contact.repository.ts";
 
 export {
-  GovernanceDirectoryPort,
+  GovernanceDirectory,
   type GovernanceDirectoryProject,
   type GovernanceMembershipStatus,
 } from "./repositories/directory/governance-directory.repository.ts";
@@ -51,41 +51,22 @@ export {
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
 export * from "./services/governance-events.service.ts";
-export type { GatewaySpendUsage, GatewaySpendAttribution, GatewaySpendAdmittedData, GatewaySpendOutcomeData, GatewaySpendFailedData, GatewaySpendSettledData, GatewaySpendProcessingEvent, GatewayBudgetScope, GatewayBudgetWindow, GatewayBudgetDefinition, GatewayResolvedBudget, GatewayBudgetDebitRow, GatewayBudgetCrossingCandidate, GatewayDebitPort } from "./app/governance.infrastructure.ts";
-export * from "./ports/governance-budget-overview.port.ts";
-export type { GovernanceEventingPort } from "./app/governance.infrastructure.ts";
-export * from "./ports/ingestion-source-activity.port.ts";
+export * from "./app/governance.infrastructure.ts";
 export * from "./repositories/audit/admin-workspace-view-audit.repository.ts";
 export * from "./repositories/ai-tool-catalog.repository.ts";
-export type { CliBudgetOverview, CliBudgetOverviewPort, CliAdminContactPort } from "./app/governance.infrastructure.ts";
-export type { CliTokenStorePort } from "./app/governance.infrastructure.ts";
 export * from "./repositories/policy/anomaly-rule.repository.ts";
 export * from "./repositories/directory/department.repository.ts";
-export type { AnomalyAlertHttpResponse, AnomalyAlertHttpPort } from "./app/governance.infrastructure.ts";
-export * from "./ports/governance-diagnostics.port.ts";
-export type { GovernanceEncryptionPort } from "./app/governance.infrastructure.ts";
-export type { GovernanceHttpResponse, GovernanceHttpPort } from "./app/governance.infrastructure.ts";
-export * from "./ports/governance-object-storage.port.ts";
-export * from "./ports/governance-signal.port.ts";
+export * from "./services/governance-diagnostics.service.ts";
 export * from "./repositories/audit/governance-setup-state.repository.ts";
-export * from "./ports/governance-webhook.port.ts";
-export * from "./ports/ingestion-pull.port.ts";
-export * from "./ports/ingestion-pull-lifecycle.port.ts";
-export * from "./ports/ingestion-pull-worker.port.ts";
-export * from "./ports/ingestion-source.port.ts";
+export * from "./app/governance.infrastructure.ts";
+export * from "./repositories/ingestion-pull-lifecycle.repository.ts";
+export * from "./services/ingestion-pull-diagnostics.service.ts";
+export * from "./repositories/ingestion-source.repository.ts";
 export * from "./repositories/ingestion-template.repository.ts";
-export type { GovernanceOcsfEventsReaderPort, AdminWorkspaceViewOcsfPort, GovernanceSetupActivityPort } from "./app/governance.infrastructure.ts";
-export * from "./ports/ingestion-source-key.port.ts";
-export * from "./ports/personal-usage.port.ts";
 export * from "./repositories/directory/personal-virtual-key.repository.ts";
-export * from "./ports/pulled-usage-ledger.port.ts";
-export * from "./ports/pulled-usage-rate.port.ts";
-export * from "./ports/quarantine-fill.port.ts";
 export * from "./repositories/policy/routing-policy.repository.ts";
 export * from "./repositories/policy/session-policy.repository.ts";
-export * from "./ports/spend-spike-anomaly.port.ts";
 export * from "./repositories/policy/spend-spike-anomaly.repository.ts";
-export * from "./ports/governance-subscriber.port.ts";
 export {
   AUTOMATION_MATCH_RECORDS_METRIC_DESCRIPTION,
   AUTOMATION_MATCH_RECORDS_METRIC_NAME,
@@ -166,11 +147,11 @@ export { createGovernanceRestApp } from "./transport/api-rest/governance.api.ts"
 // device token; the services underneath are the console's own.
 export {
   createGovernanceCliRestApp,
-  type GovernanceCliAccessTokenPort,
-  type GovernanceCliBudgetPort,
+  type GovernanceCliAccessToken as GovernanceCliAccessTokenPort,
+  type GovernanceCliBudgetReader as GovernanceCliBudget,
   type GovernanceCliCaller,
   type GovernanceCliPersonalWorkspace,
-  type GovernanceCliRestPorts,
+  type GovernanceCliRestDependencies as GovernanceCliRestPorts,
 } from "./transport/api-rest/governance-cli.api.ts";
 
 // The Activity Monitor's push-mode receivers. A signal whose collection this
@@ -178,18 +159,17 @@ export {
 // rather than a 500 from a receiver that pretends to serve it.
 export {
   createGovernanceIngestRestApp,
-  type GovernanceIngestLogCollectionPort,
-  type GovernanceIngestMetricCollectionPort,
+  type GovernanceIngestLogCollectionChannel as GovernanceIngestLogCollection,
+  type GovernanceIngestMetricCollectionChannel as GovernanceIngestMetricCollection,
   type GovernanceIngestRestPorts,
-  type GovernanceIngestSpendPort,
-  type GovernanceIngestTraceCollectionPort,
+  type GovernanceIngestSpend,
+  type GovernanceIngestTraceCollection,
 } from "./transport/api-rest/governance-ingest.api.ts";
-export { GovernanceProjectPort } from "./ports/governance-project.port.ts";
 export {
-  GovernanceIngestRateLimitPort,
+  GovernanceIngestRateLimiter,
   INGEST_RATE_LIMIT_MAX_REQUESTS,
   INGEST_RATE_LIMIT_WINDOW_SECONDS,
-} from "./ports/governance-ingest-rate-limit.port.ts";
+} from "./services/governance-ingest-rate-limit.service.ts";
 export { OrganizationSupportContactService } from "./services/organization-support-contact.service.ts";
 
 /**
@@ -198,7 +178,7 @@ export { OrganizationSupportContactService } from "./services/organization-suppo
  * process that has both registers these through the endpoint's session-tool seam.
  */
 export {
-  GovernanceMcpPermissionProbePort,
+  GovernanceMcpPermissionProbe,
   registerGovernanceMcpTools,
   type GovernanceMcpContext,
 } from "./transport/api-mcp/governance-tools.api.ts";

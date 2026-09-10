@@ -22,7 +22,7 @@ import type { TracesV2TrpcPorts } from "@langwatch/trace-server/api-trpc/traces-
  * The ClickHouse trace READ stack, which never left `platform/app` and went with
  * it when the monolith was deleted.
  */
-export abstract class ApiTraceReadStackPort {
+export abstract class ApiTraceReadStack {
   /** The ten readers `TraceApp` is composed from. */
   abstract readers(): TraceAppDependencies["traces"];
   abstract viewer(): TraceViewerService;

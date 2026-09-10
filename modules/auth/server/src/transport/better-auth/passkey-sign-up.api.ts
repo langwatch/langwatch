@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
-import type { BetterAuthAnnouncementsPort } from "./better-auth.collaborators.ts";
+import type { BetterAuthAnnouncements } from "./better-auth.collaborators.ts";
 
 /** Everything the passkey ceremony asks of the user directory. */
 export type PasskeySignUpDirectory = Pick<UserApi, "findByEmail" | "createPasskeyUser">;
@@ -16,7 +16,7 @@ export type PasskeySignUpDirectory = Pick<UserApi, "findByEmail" | "createPasske
  * that composes better-auth owns the identity services and their wiring: a
  * consumer that names the one method it calls needs nothing else.
  */
-export interface SignUpVerificationPort {
+export interface SignUpVerification {
   requestVerification(input: { email: string }): Promise<void>;
 }
 
@@ -177,9 +177,9 @@ function createAfterVerification({
   users,
   verification,
 }: {
-  announcements: BetterAuthAnnouncementsPort;
+  announcements: BetterAuthAnnouncements;
   users: PasskeySignUpDirectory;
-  verification: SignUpVerificationPort;
+  verification: SignUpVerification;
 }) {
   return async function afterVerification({
     context,
@@ -230,10 +230,10 @@ function createAfterVerification({
  * the plugin is the only thing deciding whether any of it exists.
  */
 export function passkeySignUpRegistration(options: {
-  announcements: BetterAuthAnnouncementsPort;
+  announcements: BetterAuthAnnouncements;
   handleSecret: string;
   users: PasskeySignUpDirectory;
-  verification: SignUpVerificationPort;
+  verification: SignUpVerification;
 }) {
   return {
     requireSession: false,

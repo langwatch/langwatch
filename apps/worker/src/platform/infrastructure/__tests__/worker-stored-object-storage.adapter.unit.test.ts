@@ -25,15 +25,15 @@ vi.mock("@aws-sdk/client-s3", () => ({
   },
 }));
 
-import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import { describe, expect, it, vi } from "vitest";
 import {
-  WorkerAzureStorageFactoryPort,
-  WorkerProjectS3SourcePort,
+  WorkerAzureStorageFactory,
+  WorkerProjectS3Source,
   WorkerStoredObjectStorageRuntimeFactory,
 } from "../worker-stored-object-storage.adapter.ts";
 
-class ProjectSource extends WorkerProjectS3SourcePort {
+class ProjectSource extends WorkerProjectS3Source {
   constructor(
     private readonly target: {
       bucket: string;
@@ -49,7 +49,7 @@ class ProjectSource extends WorkerProjectS3SourcePort {
   }
 }
 
-class AzureFactory extends WorkerAzureStorageFactoryPort {
+class AzureFactory extends WorkerAzureStorageFactory {
   destinationCalls = 0;
   driverCalls = 0;
 
@@ -71,7 +71,7 @@ class AzureFactory extends WorkerAzureStorageFactoryPort {
   }
 }
 
-class RecordingProxy extends OutboundProxyResolverPort {
+class RecordingProxy extends OutboundProxyResolver {
   tryResolveForHost(hostname: string): string | undefined {
     resolver.hosts.push(hostname);
     return undefined;

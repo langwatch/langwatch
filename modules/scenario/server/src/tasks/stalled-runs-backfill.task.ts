@@ -4,7 +4,7 @@ import { Task } from "@langwatch/task";
 import {
   BACKFILL_STALE_THRESHOLD_MS,
   type SimulationStalledRun,
-} from "#adapters/simulation-eventing.adapter";
+} from "#repositories/clickhouse/clickhouse.simulation-eventing.repository";
 
 export type StalledRunFinder = {
   findStalledRuns(input: { now: number; thresholdMs: number }): Promise<SimulationStalledRun[]>;

@@ -1,4 +1,4 @@
-export { UiShellPort } from "./behavior/ui-runtime.port";
+export { UiShell } from "./behavior/ui-runtime.port";
 export { UiRuntime, type UiRuntimeOptions } from "./behavior/ui.runtime";
 export {
   UiApplicationShell,
@@ -24,10 +24,10 @@ export {
   resolveUiCapabilities,
   UiCapabilityContextProvider,
   UiCapabilityUnavailableError,
-  UiDocumentTitlePort,
-  UiFeedbackPort,
-  UiNavigationPort,
-  UiSessionPort,
+  UiDocumentTitle,
+  UiFeedback,
+  UiNavigation,
+  UiSession,
   useUiCapabilities,
   type UiActiveScope,
   type UiActor,

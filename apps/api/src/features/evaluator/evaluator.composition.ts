@@ -13,7 +13,7 @@ import { createApp } from "@langwatch/runtime-composition";
 import { nowInstant, toDate } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
-import type { WorkflowApp, WorkflowNlpRuntimePort, WorkflowService,} from "@langwatch/workflow-server";
+import type { WorkflowApp, WorkflowNlpRuntime, WorkflowService,} from "@langwatch/workflow-server";
 import { nanoid } from "nanoid";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
@@ -29,7 +29,7 @@ export type EvaluatorPeers = Readonly<{
    */
   workflows: WorkflowService;
   /** Where a code evaluator executes. */
-  nlpRuntime: WorkflowNlpRuntimePort;
+  nlpRuntime: WorkflowNlpRuntime;
   /**
    * The workflow application a WORKFLOW evaluator's graph is replicated
    * through. The studio DSL, its dataset references and its version history

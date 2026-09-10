@@ -22,7 +22,7 @@ vi.mock("../src/behavior/ui-departure", () => ({
 }));
 
 import {
-  UiFeedbackPort,
+  UiFeedback,
   useUiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
@@ -58,7 +58,7 @@ const signedInAsJane: UiAuthClient = {
   signOut: refusesToSignOut,
 };
 
-class RecordingFeedback extends UiFeedbackPort {
+class RecordingFeedback extends UiFeedback {
   readonly failures: UiFailureNotice[] = [];
 
   succeeded(_notice: UiSuccessNotice): void {
@@ -101,7 +101,7 @@ function renderSession({
 }: {
   path: string;
   authClient: UiAuthClient;
-  feedback: UiFeedbackPort;
+  feedback: UiFeedback;
   page: ReactNode;
 }) {
   const Shell = createUiFeatureShell({

@@ -2,13 +2,13 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
-import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
-import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port.ts";
-import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port.ts";
+import type { AutomationClock } from "../app/automation.infrastructure.ts";
+import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
+import type { AutomationSettlementLedger } from "../ports/automation-settlement-ledger.port.ts";
+import type { AutomationSettlementTraceReader } from "../ports/automation-settlement-read.port.ts";
 import type {
-  AutomationSettlementMatchConfirmationPort,
-  AutomationSettlementObservabilityPort,
+  AutomationSettlementMatchConfirmation,
+  AutomationSettlementObservability,
 } from "../ports/automation-settlement.port.ts";
 import type { AutomationPersistActionService } from "./persist-action.service.ts";
 
@@ -17,13 +17,13 @@ const CONFIRM_CONCURRENCY = 4;
 const CLAIM_RETRY_DELAYS_MS = [200, 500];
 
 type PersistenceComposition = {
-  automation: AutomationSettlementLedgerPort;
+  automation: AutomationSettlementLedger;
   projects: AutomationProjectIdentityPort;
-  traces: AutomationSettlementTraceReaderPort;
-  confirmation: AutomationSettlementMatchConfirmationPort;
+  traces: AutomationSettlementTraceReader;
+  confirmation: AutomationSettlementMatchConfirmation;
   persistActions: AutomationPersistActionService;
-  clock: AutomationClockPort;
-  observability: AutomationSettlementObservabilityPort;
+  clock: AutomationClock;
+  observability: AutomationSettlementObservability;
 };
 
 type PersistPage = {

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ScimService } from "../scim.service.ts";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
-import type { ScimRepositoryPort } from "../../repositories/scim.repository.ts";
+import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 import type { ScimSyncLifecycle } from "../../app/scim.infrastructure.ts";
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
@@ -12,7 +12,7 @@ import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 
-function repository(overrides: Record<string, unknown> = {}): ScimRepositoryPort {
+function repository(overrides: Record<string, unknown> = {}): ScimRepository {
   return {
     findOrganizationBySsoDomain: vi.fn(),
     createToken: vi.fn(async () => ({ id: "token_1" })),
@@ -44,7 +44,7 @@ function repository(overrides: Record<string, unknown> = {}): ScimRepositoryPort
     groupSlugExists: vi.fn(async () => false),
     listRoleBindings: vi.fn(async () => []),
     ...overrides,
-  } as ScimRepositoryPort;
+  } as ScimRepository;
 }
 
 class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
@@ -66,7 +66,7 @@ class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
 }
 
 function service(
-  repo: ScimRepositoryPort,
+  repo: ScimRepository,
   enterprise = true,
   lifecycle: ScimSyncLifecycle = new QuietScimSyncLifecycle(),
 ): ScimService {

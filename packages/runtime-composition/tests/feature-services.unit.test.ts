@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/application.ts";
 import { moduleApi } from "../src/module-api-token.ts";
-import { defineModule, type FeatureSetup } from "../src/feature-installer.ts";
+import {
+  defineModule,
+  type FeatureSetup,
+  type ServerRole,
+} from "../src/feature-installer.ts";
 import { ResourceScope, type ResourceOwnership } from "../src/resource-scope.ts";
 
 interface ProjectApi {
@@ -65,8 +69,8 @@ class ProjectApp implements ProjectApi {
 }
 
 const project = defineModule("project").withApp(ProjectApp).build();
-function graph(infrastructure: Infrastructure) {
-  return createApp({ name: "lifecycle" }).withInfrastructure(infrastructure).withModule(project);
+function graph(infrastructure: Infrastructure, role: ServerRole = "api") {
+  return createApp({ role, infrastructure }).withModules([project]);
 }
 
 describe("feature-owned runtime services", () => {
@@ -75,7 +79,7 @@ describe("feature-owned runtime services", () => {
     async (role) => {
       const events: string[] = [];
       let callApi = () => "not installed";
-      const runtime = await graph({ events })
+      const runtime = await graph({ events }, role)
         .withService({
           name: "host",
           start: () => {
@@ -85,7 +89,7 @@ describe("feature-owned runtime services", () => {
             events.push(`host:stop:${callApi()}`);
           },
         })
-        .boot({ role });
+        .boot();
       callApi = () => runtime.module(project).provided.name();
 
       expect(events).toEqual([]);
@@ -110,7 +114,7 @@ describe("feature-owned runtime services", () => {
     const events: string[] = [];
     const failure = new Error("factory failed");
 
-    await expect(graph({ events, bootFailure: failure }).boot({ role: "api" })).rejects.toBe(
+    await expect(graph({ events, bootFailure: failure }).boot()).rejects.toBe(
       failure,
     );
     expect(events).toEqual(["connection:close"]);
@@ -123,7 +127,7 @@ describe("feature-owned runtime services", () => {
     const hostStop = vi.fn<() => void>();
     const runtime = await graph({ events, startFailure: failure })
       .withService({ name: "host", start: hostStart, stop: hostStop })
-      .boot({ role: "api" });
+      .boot();
 
     await expect(runtime.start()).rejects.toBe(failure);
     await runtime.stop();
@@ -145,7 +149,7 @@ describe("feature-owned runtime services", () => {
           events.push("host:stop");
         },
       })
-      .boot({ role: "api" });
+      .boot();
 
     await expect(runtime.start()).rejects.toBe(failure);
     expect(events).toEqual([
@@ -160,7 +164,7 @@ describe("feature-owned runtime services", () => {
 
   it("closes allocations without stopping inert services when stopped before start", async () => {
     const events: string[] = [];
-    const runtime = await graph({ events }).boot({ role: "api" });
+    const runtime = await graph({ events }).boot();
 
     await runtime.stop();
     await expect(runtime.start()).rejects.toThrow("stopped runtime");
@@ -173,7 +177,7 @@ describe("feature-owned runtime services", () => {
     const waiting = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const runtime = await graph({ events, starting: () => waiting }).boot({ role: "api" });
+    const runtime = await graph({ events, starting: () => waiting }).boot();
     const starting = runtime.start();
     const stopping = runtime.stop();
     await Promise.resolve();
@@ -192,9 +196,10 @@ describe("feature-owned runtime services", () => {
 
   it("still closes allocations if a service stop throws and never retries that stop", async () => {
     const events: string[] = [];
-    const runtime = await graph({ events, stopFailure: new Error("unsubscribe failed") }).boot({
-      role: "api",
-    });
+    const runtime = await graph({
+      events,
+      stopFailure: new Error("unsubscribe failed"),
+    }).boot();
     await runtime.start();
     const stopping = runtime.stop();
 
@@ -217,7 +222,7 @@ describe("feature-owned runtime services", () => {
       capture: (resources) => {
         ownership = resources;
       },
-    }).boot({ role: "api" });
+    }).boot();
 
     expect(() =>
       ownership.ownService({

@@ -2,11 +2,8 @@ import { LANGY_SESSION_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-c
 import type { AuthzService } from "@langwatch/authz-contract";
 import { langyCandidatePermissions, type LangyCredentialSession } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port.ts";
-import {
-  LangySessionKeyPort,
-  LangySessionKeyScopeError,
-} from "../ports/langy-turn-runtime.port.ts";
+import { LangySessionKey, type LangySessionKeyMetrics } from "../app/langy.infrastructure.ts";
+import { LangySessionKeyScopeError } from "./langy-session-key-scope.error.ts";
 import type { LangySessionKeyRepository } from "../repositories/langy-session-key.repository.ts";
 import { LangySessionKeyReapService } from "./langy-session-key-reap.service.ts";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -23,12 +20,12 @@ export const LANGY_CANDIDATE_PERMISSIONS = Object.freeze(langyCandidatePermissio
 
 export type LangySessionKeyRevocation = "revoked" | "already_revoked" | "not_found" | "refused";
 
-export class LangySessionKeyService extends LangySessionKeyPort {
+export class LangySessionKeyService extends LangySessionKey {
   private constructor(
     private readonly repository: LangySessionKeyRepository,
     private readonly apiKeys: ApiKeyApi,
     private readonly authz: AuthzService,
-    private readonly metrics: LangySessionKeyMetricsPort,
+    private readonly metrics: LangySessionKeyMetrics,
   ) {
     super();
   }
@@ -37,7 +34,7 @@ export class LangySessionKeyService extends LangySessionKeyPort {
     repository: LangySessionKeyRepository;
     apiKeys: ApiKeyApi;
     authz: AuthzService;
-    metrics: LangySessionKeyMetricsPort;
+    metrics: LangySessionKeyMetrics;
   }): LangySessionKeyService {
     return new LangySessionKeyService(input.repository, input.apiKeys, input.authz, input.metrics);
   }

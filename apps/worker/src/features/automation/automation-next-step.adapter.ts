@@ -25,7 +25,7 @@ const ACCOUNT_TEAM_CONTACT_URL = "https://langwatch.ai/contact";
  * and a graph that took the whole aggregate to read two columns would couple
  * automation's mail to every future change in it.
  */
-export abstract class WorkerAutomationOrganizationPricingPort {
+export abstract class WorkerAutomationOrganizationPricing {
   abstract pricingFor(input: { organizationId: string }): Promise<{
     pricingModel: PricingModel | null;
     currency: "USD" | "EUR";
@@ -36,7 +36,7 @@ export class WorkerAutomationNextStepAdapter {
   static create(options: {
     projects: Pick<ProjectApi, "getOrganizationId">;
     plans: Pick<PlanProvider, "getActivePlan">;
-    organizations: WorkerAutomationOrganizationPricingPort;
+    organizations: WorkerAutomationOrganizationPricing;
     nextStep: PlanNextStepService;
     baseHost: string;
     logger?: Logger;
@@ -51,7 +51,7 @@ export class WorkerAutomationNextStepAdapter {
     private readonly options: {
       projects: Pick<ProjectApi, "getOrganizationId">;
       plans: Pick<PlanProvider, "getActivePlan">;
-      organizations: WorkerAutomationOrganizationPricingPort;
+      organizations: WorkerAutomationOrganizationPricing;
       nextStep: PlanNextStepService;
       baseHost: string;
     },

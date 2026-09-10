@@ -1,7 +1,7 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
 import type { TopicClusteringRunCompletedEventData } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
-import type { TopicClusteringProcessingEvent } from "../../adapters/eventing.topic-events.adapter.ts";
+import type { TopicClusteringProcessingEvent } from "../../services/topic-events.service.ts";
 import {
   type TopicClusteringRunStatusData,
   TopicClusteringRunStatusFoldProjection,

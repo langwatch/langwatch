@@ -14,11 +14,11 @@ import WebSocket from "ws";
 import { ConnectedAgentRuntimeService } from "../../services/connected-agent-runtime.service.ts";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import type { ConnectedAgentCredentials } from "../../services/connected-agent-credential.service.ts";
-import type { ConnectUpgradeRouterPort, UpgradeHandler } from "@langwatch/api";
+import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
 import { CONNECT_PATH } from "../agent-connect.ws.ts";
 import { ConnectGatewayFixture } from "./agent-connect-gateway.fixture.ts";
 
-function createUpgradeRouter(server: Server): ConnectUpgradeRouterPort {
+function createUpgradeRouter(server: Server): ConnectUpgradeRouter {
   const handlers = new Map<string, UpgradeHandler>();
   server.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     const pathname = new URL(request.url ?? "/", "http://localhost").pathname;

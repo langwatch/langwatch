@@ -24,10 +24,10 @@ import {
   type LangyBackendRunResult,
   type LangyBackendSaveResult,
   type LangyBackendStateRead,
-  LangyUiActionBackendPort,
+  LangyUiActionBackend,
   type LangyUiActionDefinition,
 } from "@langwatch/langy-server";
-import { LangyUiActionRestCatalogPort } from "@langwatch/langy-server";
+import { LangyUiActionRestCatalog } from "@langwatch/langy-server";
 
 import type { ApiExperimentRun } from "../../app/api-experiment-run.composition.ts";
 
@@ -44,7 +44,7 @@ export type ApiLangyWorkbenchPeer = Readonly<{
  * evaluations workbench — and its manifest is a framework-free contract module,
  * so the catalogue is the manifest read through the port's own shape.
  */
-export class ApiWorkbenchUiActionCatalog extends LangyUiActionRestCatalogPort {
+export class ApiWorkbenchUiActionCatalog extends LangyUiActionRestCatalog {
   static create(): ApiWorkbenchUiActionCatalog {
     return new ApiWorkbenchUiActionCatalog();
   }
@@ -76,7 +76,7 @@ function kindsOf(): readonly Readonly<{
  * The away fallback's saved document: the experiment the dispatch named, read,
  * rewritten and run through the same seams the CI run door uses.
  */
-export class ApiWorkbenchUiActionBackend extends LangyUiActionBackendPort {
+export class ApiWorkbenchUiActionBackend extends LangyUiActionBackend {
   static create(peer: ApiLangyWorkbenchPeer): ApiWorkbenchUiActionBackend {
     return new ApiWorkbenchUiActionBackend(peer);
   }

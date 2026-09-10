@@ -30,7 +30,7 @@ import {
   WAREHOUSE_COST_SETTLING_LAG_MS,
 } from "../../rules/warehouse-cost.rules.ts";
 import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
-import { FetchHttpPort } from "../../__tests__/support/puller-test-ports.ts";
+import { FetchHttp } from "../../__tests__/support/puller-test-ports.ts";
 
 const SPACE_ID = "space-1";
 const CONVERSATION_ID = "conv-1";
@@ -260,7 +260,7 @@ async function pull({ warehouseId, deadlineMs }: { warehouseId?: string; deadlin
 }
 
 function makePuller(options?: { maxRequests?: number }): DatabricksGeniePullerAdapter {
-  return DatabricksGeniePullerAdapter.create(new FetchHttpPort(), options);
+  return DatabricksGeniePullerAdapter.create(new FetchHttp(), options);
 }
 
 /** The `pulled_usage` hint on the one message the fixture serves. */

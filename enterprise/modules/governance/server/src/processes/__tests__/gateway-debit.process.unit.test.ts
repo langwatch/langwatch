@@ -25,14 +25,14 @@ import {
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-  GatewayDebitPort,
+  GatewayBudgetLedger,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,
   type GatewaySpendProcessingEvent,
 } from "../../app/governance.infrastructure.ts";
 
-class StubGatewayDebitPort implements GatewayDebitPort {
+class StubGatewayDebit implements GatewayBudgetLedger {
   resolve(): Promise<GatewayResolvedBudget[]> {
     return Promise.resolve([]);
   }
@@ -112,7 +112,7 @@ const outcomeData = (overrides: Record<string, unknown> = {}) => ({
 });
 
 function definition(): ProcessDefinition<GatewayDebitsState> {
-  const service = GatewayDebitProcess.create(new StubGatewayDebitPort());
+  const service = GatewayDebitProcess.create(new StubGatewayDebit());
   return buildProcessDefinition(
     buildProcessManager<GatewaySpendProcessingEvent>({
       name: GATEWAY_DEBITS_PROCESS_NAME,

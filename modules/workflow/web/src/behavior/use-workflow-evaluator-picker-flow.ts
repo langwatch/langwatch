@@ -16,7 +16,7 @@ export type EvaluatorPickerCallbacks = {
   onClose: () => void;
 };
 
-export type EvaluatorPickerPort = {
+export type EvaluatorPicker = {
   register: (callbacks: EvaluatorPickerCallbacks) => void;
   registerCreation: (onSave: (evaluator: SavedEvaluator) => EvaluatorSaveResult) => void;
   openList: () => void;
@@ -107,7 +107,7 @@ function fieldsFromSavedEvaluator(saved: SavedEvaluator): { inputs: Field[]; out
 }
 
 /** Workflow-owned state transition for selecting an evaluator after a canvas drop. */
-export function useWorkflowEvaluatorPickerFlow(port: EvaluatorPickerPort) {
+export function useWorkflowEvaluatorPickerFlow(port: EvaluatorPicker) {
   const { setNode, deleteNode, setSelectedNode } = useWorkflowStore((state) => ({
     setNode: state.setNode,
     deleteNode: state.deleteNode,

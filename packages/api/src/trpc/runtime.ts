@@ -53,11 +53,11 @@ import {
   SCOPE_INPUT_FIELDS,
   sharedGrantTiers,
   type AccessDeclaration,
-  type AccessDenialPort,
+  type AccessDenial,
   type ApiEntitlement,
   type AuthorizePort,
   type Caller,
-  type EntitlementsPort,
+  type Entitlements,
   type PublicRouteAccess,
 } from "../access/access.ts";
 import type { TrpcContract, TrpcContractMember } from "../contract/trpc-contract.ts";
@@ -836,9 +836,9 @@ export type TrpcRuntimePorts<TContext> = Readonly<{
   /** Resolves the authorization decisions for one request. */
   authorization: Readonly<{ forRequest(ctx: TContext): AuthorizePort }>;
   /** The two refusals whose concrete error class is the process's to choose. */
-  denials: AccessDenialPort;
+  denials: AccessDenial;
   /** What the process reads a tenant's entitlements from, for a procedure that asks. */
-  entitlements?: EntitlementsPort;
+  entitlements?: Entitlements;
   audit: Readonly<{
     record(entry: TrpcRuntimeAuditEntry): Promise<void>;
     /** The owner says WHAT is sensitive; the path only redacts. */
@@ -1636,7 +1636,7 @@ const MAX_CAUSE_DEPTH = 3;
  * causes this package does not own. Answers null when the cause is not one of
  * them — which is what the legacy formatter already put on the wire.
  */
-export interface TrpcErrorCausePayloadPort {
+export interface TrpcErrorCausePayload {
   payloadFor(cause: unknown): unknown;
 }
 
@@ -1662,7 +1662,7 @@ function isInheritedFromCause(message: string, cause: unknown): boolean {
 
 export function createTrpcErrorFormatter(
   ports: Readonly<{
-    causePayload: TrpcErrorCausePayloadPort;
+    causePayload: TrpcErrorCausePayload;
     traceIds: TrpcFailureTraceIds;
   }>,
 ) {

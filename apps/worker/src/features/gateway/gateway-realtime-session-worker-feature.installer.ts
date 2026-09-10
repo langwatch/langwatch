@@ -1,12 +1,12 @@
 import type { GatewayRealtimeSessionReconciliationService } from "@langwatch/gateway-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 
 /**
  * Worker registration for the brokered voice-session reconciler. A loop rather than a pipeline: it
  * claims no routing key on the shared queue, because the thing it reacts to is the ABSENCE of an
  * event — a call that ended without its post-call webhook arriving.
  */
-export class GatewayRealtimeSessionWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class GatewayRealtimeSessionWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     poller: GatewayRealtimeSessionReconciliationService;
   }): GatewayRealtimeSessionWorkerFeatureInstaller {

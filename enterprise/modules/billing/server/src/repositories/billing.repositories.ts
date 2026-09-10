@@ -2,12 +2,12 @@
 
 import type { BillingCheckpointPort } from "../ports/billing-checkpoint.port.ts";
 import type { BillingReportOrganizationPort } from "../ports/billing-report-organization.port.ts";
-import type { BillingOrganizationPort } from "../ports/organization.port.ts";
-import type { OrganizationPricingPort } from "../ports/organization-pricing.port.ts";
+import type { BillingOrganization } from "../ports/organization.port.ts";
+import type { OrganizationPricing } from "../ports/organization-pricing.port.ts";
 import type { SubscriptionRepository } from "./subscription.repository.ts";
-import type { BillingTenantOrganizationPort } from "../ports/tenant-organization.port.ts";
-import type { BillingWebhookOrganizationPort } from "./billing-webhook-organization.repository.ts";
-import type { BillingWebhookSubscriptionPort } from "./billing-webhook-subscription.repository.ts";
+import type { BillingTenantOrganization } from "../ports/tenant-organization.port.ts";
+import type { BillingWebhookOrganization } from "./billing-webhook-organization.repository.ts";
+import type { BillingWebhookSubscription } from "./billing-webhook-subscription.repository.ts";
 import type { DuplicateSubscriptionsReportRepository } from "./duplicate-subscriptions-report.repository.ts";
 import type { NurturingProfileRepository } from "./nurturing-profile.repository.ts";
 
@@ -23,11 +23,11 @@ export interface BillingRepositories {
   readonly checkpoints: BillingCheckpointPort;
   readonly duplicateSubscriptionsReports: DuplicateSubscriptionsReportRepository;
   readonly nurturingProfiles: NurturingProfileRepository;
-  readonly organizations: BillingOrganizationPort;
-  readonly organizationPricing: OrganizationPricingPort;
+  readonly organizations: BillingOrganization;
+  readonly organizationPricing: OrganizationPricing;
   readonly reportOrganizations: BillingReportOrganizationPort;
   readonly subscriptions: SubscriptionRepository;
-  readonly tenantOrganizations: BillingTenantOrganizationPort;
-  readonly webhookOrganizations: BillingWebhookOrganizationPort;
-  readonly webhookSubscriptions: BillingWebhookSubscriptionPort;
+  readonly tenantOrganizations: BillingTenantOrganization;
+  readonly webhookOrganizations: BillingWebhookOrganization;
+  readonly webhookSubscriptions: BillingWebhookSubscription;
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.service.ts";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
+import { GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
 
 const options = { cursor: null, credentials: { token: "admin-key" } };
 const usageConfig = {
@@ -73,16 +73,16 @@ function response(body: unknown, status = 200): GovernanceHttpResponse {
   };
 }
 
-class FakeHttp implements GovernanceHttpPort {
+class FakeHttp implements GovernanceHttpClient {
   readonly calls: Array<{
     url: string;
-    init: Parameters<GovernanceHttpPort["fetch"]>[1];
+    init: Parameters<GovernanceHttpClient["fetch"]>[1];
   }> = [];
   readonly responses: Array<GovernanceHttpResponse | Error> = [];
 
   async fetch(
     url: string,
-    init: Parameters<GovernanceHttpPort["fetch"]>[1],
+    init: Parameters<GovernanceHttpClient["fetch"]>[1],
   ): Promise<GovernanceHttpResponse> {
     this.calls.push({ url, init });
     const next = this.responses.shift();

@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-  CodingAgentCallerScopeDirectoryPort,
-  CodingAgentScopePermissionsPort,
+  CodingAgentCallerScopeDirectory,
+  CodingAgentScopePermissions,
   type CodingAgentScopeProject,
-} from "../../ports/coding-agent-caller-scope.port.ts";
+} from "../../app/coding-agent.infrastructure.ts";
 import { CodingAgentCallerScopeService } from "../coding-agent-caller-scope.service.ts";
 
 const caller = { kind: "user", userId: "user-1" } as const;
 
-class FakeDirectory extends CodingAgentCallerScopeDirectoryPort {
+class FakeDirectory implements CodingAgentCallerScopeDirectory {
   projects: CodingAgentScopeProject[] = [];
   ownerNames = new Map<string, string>();
   listPersonalTeamOwnerNamesCalls: readonly string[][] = [];
@@ -23,7 +23,7 @@ class FakeDirectory extends CodingAgentCallerScopeDirectoryPort {
   }
 }
 
-class AllowAllPermissions extends CodingAgentScopePermissionsPort {
+class AllowAllPermissions implements CodingAgentScopePermissions {
   projectCuts(input: { projects: readonly CodingAgentScopeProject[] }) {
     const ids = new Set(input.projects.map((project) => project.id));
     return Promise.resolve(new Map([["traces:view", ids] as const, ["cost:view", ids] as const]));

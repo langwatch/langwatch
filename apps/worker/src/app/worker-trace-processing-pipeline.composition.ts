@@ -27,15 +27,15 @@ import {
   ORIGIN_GATE_DELAY_MS,
   PROJECT_METADATA_WINDOW_MS,
   ProjectMetadataSync,
-  RecordSpanCommand,
+  EventingRecordSpanAdapter,
   SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
   SIMULATION_METRICS_SYNC_DELAY_MS,
   SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
   TRACE_UPDATE_BROADCAST_WINDOW_MS,
-  type TraceDeferredOriginSchedulerPort,
+  type TraceDeferredOriginScheduler,
   TraceIoExtractionAdapter,
   TraceMediaReferenceAdapter,
-  TraceProcessingPipelinePort,
+  TraceProcessingPipeline,
   TraceSpanNormalizationAdapter,
   type TraceSummarySubscriber,
   TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
@@ -56,20 +56,20 @@ import {
   createSpanStorageBroadcastHandler,
   createTraceUpdateBroadcastHandler,
   resolveSpanCommandShardCount,
-  TraceTenantBroadcastPort,
-  type TraceEvaluationLoopMetricsPort,
-  type TraceProductAnalyticsPort,
-  type TraceSpanSpoolPort,
+  TraceTenantBroadcast,
+  type TraceEvaluationLoopMetrics,
+  type TraceProductAnalytics,
+  type TraceSpanSpool,
 } from "@langwatch/trace-server";
 import {
   createGraphTriggerActivityHandler,
-  type AutomationGraphActivityPort,
-  type AutomationTraceTriggerCataloguePort,
-  type AutomationTriggerMatchRecorderPort,
+  type AutomationGraphActivity,
+  type AutomationTraceTriggerCatalogue,
+  type AutomationTriggerMatchRecorder,
 } from "@langwatch/automation-server";
 import {
   createCodingAgentSpanFactsDispatchSubscriber,
-  type CodingAgentTraceProcessingPort,
+  type CodingAgentTraceProcessing,
 } from "@langwatch/coding-agent-server";
 import type {
   ExecuteEvaluationCommandData,
@@ -135,7 +135,7 @@ export type WorkerTraceProcessingCommands = Readonly<{
   /** Coding agent's bounded span facts (ADR-056/069). */
   contributeSpanFacts: (data: ContributeSpanFactsData) => Promise<void>;
   /** Automation's durable trigger match, behind its own late-bound recorder. */
-  triggerMatches: AutomationTriggerMatchRecorderPort;
+  triggerMatches: AutomationTriggerMatchRecorder;
 }>;
 
 /** The projection and rollup writers, owned by the root that opens ClickHouse. */
@@ -157,17 +157,17 @@ export type WorkerTraceProcessingCompositionOptions = Readonly<{
   stores: WorkerTraceProcessingStores;
   commands: WorkerTraceProcessingCommands;
   /** The project's trace automations, for `reactor:triggerMatch`. */
-  traceTriggers: AutomationTraceTriggerCataloguePort;
+  traceTriggers: AutomationTraceTriggerCatalogue;
   /** The graph-alert vertical, absent on a deployment that can send no mail. */
-  graphActivity?: AutomationGraphActivityPort;
+  graphActivity?: AutomationGraphActivity;
   /** The one product-usage sink, for `first_trace_integrated`. */
-  productAnalytics: TraceProductAnalyticsPort;
+  productAnalytics: TraceProductAnalytics;
   /** The tenant pub/sub bridge; absent disables the two broadcast subscribers. */
-  broadcast?: TraceTenantBroadcastPort;
+  broadcast?: TraceTenantBroadcast;
   /** The ADR-022 claim check, for a span whose payload travelled out of band. */
-  spool?: TraceSpanSpoolPort;
+  spool?: TraceSpanSpool;
   /** `subscriber:codingAgentSpanFactsDispatch`'s normalization and span read. */
-  codingAgentTraces: CodingAgentTraceProcessingPort;
+  codingAgentTraces: CodingAgentTraceProcessing;
   /** `reactor:trackedEventSync`'s builder, plus the late bind to `recordSpan`. */
   trackedEvents: WorkerTrackedEventComposition;
   /** EE governance rollups, composed as full subscriber specs by the caller so
@@ -175,7 +175,7 @@ export type WorkerTraceProcessingCompositionOptions = Readonly<{
   governanceKpisSync?: SubscriberSpec<TraceProcessingEvent> & { fold: "traceSummary" };
   governanceOcsfEventsSync?: SubscriberSpec<TraceProcessingEvent> & { fold: "traceSummary" };
   /** Where the evaluation-trigger loop guard reports itself. */
-  evaluationLoopMetrics?: TraceEvaluationLoopMetricsPort;
+  evaluationLoopMetrics?: TraceEvaluationLoopMetrics;
   logger?: Logger;
 }>;
 
@@ -185,7 +185,7 @@ export type WorkerTraceProcessingCompositionOptions = Readonly<{
  * deferred-origin scheduler, which only exists at `build` time.
  */
 export interface WorkerTraceProcessingPipelineDeps {
-  recordSpanCommand: RecordSpanCommand;
+  recordSpanCommand: EventingRecordSpanAdapter;
   traceCanonicalisation: TraceCanonicalisationService;
   spanAppendStore: AppendStore<NormalizedSpan>;
   traceAnalyticsRollupAppendStore: EventingTracePipelineAdapterOptions["rollupStore"];
@@ -239,7 +239,7 @@ export type WorkerTraceProcessingPipelineOptions = Omit<
   "originGateHandler"
 >;
 
-export class WorkerTraceProcessingPipeline extends TraceProcessingPipelinePort {
+export class WorkerTraceProcessingPipeline extends TraceProcessingPipeline {
   static create(options: WorkerTraceProcessingCompositionOptions): WorkerTraceProcessingPipeline {
     return new WorkerTraceProcessingPipeline(composeWorkerTraceProcessingDeps(options));
   }
@@ -248,7 +248,7 @@ export class WorkerTraceProcessingPipeline extends TraceProcessingPipelinePort {
     super();
   }
 
-  build(options: { deferredOrigins: TraceDeferredOriginSchedulerPort }) {
+  build(options: { deferredOrigins: TraceDeferredOriginScheduler }) {
     return createWorkerTraceProcessingPipeline({
       ...this.deps,
       originGateHandler: TraceDeferredOriginEventingAdapter.createOriginGateHandler(
@@ -346,7 +346,7 @@ function composeWorkerTraceProcessingDeps(
 /**
  * The publisher a process with no Redis hands the two broadcast subscribers.
  */
-class WorkerInertTraceBroadcast extends TraceTenantBroadcastPort {
+class WorkerInertTraceBroadcast extends TraceTenantBroadcast {
   async broadcastToTenant(): Promise<void> {}
 }
 

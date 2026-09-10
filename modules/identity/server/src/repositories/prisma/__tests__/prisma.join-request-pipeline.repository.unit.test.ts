@@ -1,4 +1,4 @@
-import { JoinRequestMailPort } from "../../../app/identity.infrastructure.ts";
+import { JoinRequestMail } from "../../../app/identity.infrastructure.ts";
 import { createTenantId, type EventSourcing, type StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -15,7 +15,7 @@ const ORGANIZATION = "organization_acme";
 const REQUEST = "joinreq_1";
 const REQUESTER = "user_ada";
 
-class SilentMail implements JoinRequestMailPort {
+class SilentMail implements JoinRequestMail {
   async sendStillWaiting(): Promise<void> {}
   async sendExpired(): Promise<void> {}
 }

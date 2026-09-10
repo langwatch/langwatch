@@ -23,11 +23,11 @@ import {
   CONTRIBUTE_LOG_FACTS_COMMAND_TYPE,
   type ContributeLogFactsCommandData,
 } from "@langwatch/coding-agent-contract";
-import { EventingContributeLogFactsAdapter } from "../../adapters/eventing.contribute-log-facts.adapter.ts";
+import { EventingContributeLogFactsAdapter } from "../../services/contribute-log-facts.service.ts";
 import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
 import { CodingAgentSessionLogProjection } from "../coding-agent-session-log.projection.ts";
 import { CodingAgentSessionStateProjection } from "../coding-agent-session-state.projection.ts";
-import { buildTestCodingAgentProcessingPipeline } from "../../adapters/__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { buildTestCodingAgentProcessingPipeline } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 
 const TENANT_ID = "tenant-coding-agent-coalescing";
 const SESSION_ID = "session-abc";

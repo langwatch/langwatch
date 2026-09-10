@@ -13,8 +13,8 @@ import { CodingAgentApp } from "#app/coding-agent.app";
 import type { CodingAgentSessionService } from "#services/coding-agent.service";
 import type { CodingAgentAuditPort, CodingAgentViewerVisibilityPort } from "../../app/coding-agent.app.ts";
 import {
-  CodingAgentCallerScopeDirectoryPort,
-  CodingAgentScopePermissionsPort,
+  CodingAgentCallerScopeDirectory,
+  CodingAgentScopePermissions,
   type CodingAgentScopeCaller,
 } from "#ports/coding-agent-caller-scope.port";
 import {
@@ -123,7 +123,7 @@ function mount({
     return USAGE;
   });
 
-  class ScopeDirectory extends CodingAgentCallerScopeDirectoryPort {
+  class ScopeDirectory implements CodingAgentCallerScopeDirectory {
     listOrganizationProjects() {
       return Promise.resolve(
         [...new Set([...reach.key, ...reach.holder])].map((id) => ({
@@ -141,7 +141,7 @@ function mount({
     }
   }
 
-  class ScopePermissions extends CodingAgentScopePermissionsPort {
+  class ScopePermissions implements CodingAgentScopePermissions {
     projectCuts(input: { caller: CodingAgentScopeCaller }) {
       callers.push(input.caller);
       const allowed = new Set(input.caller.kind === "apiKey" ? reach.key : reach.holder);
@@ -200,7 +200,7 @@ function mount({
 
   const hono = runtime.mount(codingAgentRollupRest.router(), {
     app: () => app,
-    credential: "projectKey",
+    credential: "project",
     onError: renderHandled,
     facts: [
       bindRestMiddleware(codingAgentRestCaller, () => ({

@@ -5,7 +5,7 @@ vi.mock("../../webhook/http-destination.ts", () => ({ sendHttpDestination: vi.fn
 
 import { InMemoryWebhookDispatchRateLimiterAdapter } from "../../adapters/in-memory.webhook-dispatch-rate-limiter.adapter.ts";
 import {
-  WebhookDispatchRateLimiterPort,
+  WebhookDispatchRateLimiter,
   type WebhookDispatchRateLimitResult,
 } from "../../ports/webhook-dispatch-rate-limiter.port.ts";
 import { sendHttpDestination } from "../../webhook/http-destination.ts";
@@ -24,7 +24,7 @@ import { WebhookEgressService } from "../webhook-egress.service.ts";
 const mockedSend = vi.mocked(sendHttpDestination);
 
 /** Answers whatever it is told, and remembers what it was asked. */
-class ScriptedRateLimiter extends WebhookDispatchRateLimiterPort {
+class ScriptedRateLimiter extends WebhookDispatchRateLimiter {
   readonly calls: Array<{ key: string; windowSeconds: number; max: number }> = [];
 
   constructor(private readonly answer: WebhookDispatchRateLimitResult) {
@@ -44,7 +44,7 @@ class ScriptedRateLimiter extends WebhookDispatchRateLimiterPort {
 const allowing = () =>
   new ScriptedRateLimiter({ allowed: true, remaining: 10, resetAt: Date.now() + 3_600_000 });
 
-function serviceWith(rateLimiter: WebhookDispatchRateLimiterPort, now?: () => number) {
+function serviceWith(rateLimiter: WebhookDispatchRateLimiter, now?: () => number) {
   return WebhookEgressService.create({
     rateLimiter,
     tls: { rejectUnauthorized: true },

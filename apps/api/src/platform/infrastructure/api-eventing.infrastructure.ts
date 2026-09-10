@@ -2,13 +2,13 @@ import {
   createEventingGroupQueueFactory,
   EventSourcing,
   EventStoreProducerOnly,
-  type KillSwitchPort,
+  type KillSwitch,
 } from "@langwatch/eventing";
 import type { GroupQueueDependencies } from "@langwatch/group-queue";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 
 /** Reports the composition decision an absent queue would otherwise hide. */
-export abstract class ApiEventingAbsenceReportPort {
+export abstract class ApiEventingAbsenceReport {
   abstract absent(): void;
 }
 
@@ -35,7 +35,7 @@ export type ApiEventingInfrastructureOptions = {
    * leaves every command running, which is what a process with no flag store
    * can honestly answer.
    */
-  killSwitch?: KillSwitchPort;
+  killSwitch?: KillSwitch;
 };
 
 /**
@@ -84,7 +84,7 @@ export class ApiEventingInfrastructure {
   static tryCreate(
     options: Omit<ApiEventingInfrastructureOptions, "queue"> & {
       queue: ApiEventingQueue | undefined;
-      report?: ApiEventingAbsenceReportPort;
+      report?: ApiEventingAbsenceReport;
     },
   ): ApiEventingInfrastructure | undefined {
     if (!options.queue) {

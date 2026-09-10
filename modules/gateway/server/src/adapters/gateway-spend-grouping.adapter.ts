@@ -3,7 +3,7 @@
  * can safely walk.
  */
 
-import { GatewaySettlementPolicyPort } from "../ports/gateway-settlement-policy.port.ts";
+import { GatewaySettlementPolicy } from "../app/gateway.infrastructure.ts";
 
 import { GatewaySpendGroupByUnstableError } from "@langwatch/gateway-contract";
 import { type SpendBucket, type SpendGroupByKey } from "../ports/gateway-spend-events.port.ts";
@@ -89,7 +89,7 @@ export class GatewaySpendGroupingAdapter {
   }: {
     toMs: number;
     nowMs: number;
-    settlementPolicy: GatewaySettlementPolicyPort;
+    settlementPolicy: GatewaySettlementPolicy;
   }): boolean {
     return toMs <= nowMs - settlementPolicy.graceMs();
   }
@@ -111,7 +111,7 @@ export class GatewaySpendGroupingAdapter {
     toMs: number;
     nowMs: number;
     allowUnstable: boolean;
-    settlementPolicy: GatewaySettlementPolicyPort;
+    settlementPolicy: GatewaySettlementPolicy;
   }): void {
     if (allowUnstable) return;
     if (this.windowHasSettled({ toMs, nowMs, settlementPolicy })) return;

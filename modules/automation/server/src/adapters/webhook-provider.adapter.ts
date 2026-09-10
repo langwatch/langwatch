@@ -6,7 +6,7 @@ import {
 } from "@langwatch/automation-contract";
 import { z } from "zod";
 import {
-  AutomationWebhookProviderPort,
+  AutomationWebhookProvider,
   type AutomationWebhookStoredParams,
 } from "../ports/automation-provider.port.ts";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -35,7 +35,7 @@ export type WebhookStoredActionParams = AutomationWebhookStoredParams;
 
 /** Owns webhook secret persistence and redaction. Crypto is process
  * configuration and is bound once when the adapter is composed. */
-export class WebhookProviderAdapter extends AutomationWebhookProviderPort {
+export class WebhookProviderAdapter extends AutomationWebhookProvider {
   private constructor(private readonly crypto: AutomationWebhookSecretCrypto) {
     super();
   }

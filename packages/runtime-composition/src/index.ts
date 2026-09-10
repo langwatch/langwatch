@@ -1,8 +1,8 @@
 export {
   ApplicationBuilder,
+  type ApplicationOptions,
   BootedRuntime,
   createApp,
-  type FeatureInstallOptions,
   type InstalledFeature,
   type RuntimeService,
 } from "./application.ts";
@@ -59,6 +59,7 @@ export {
   type FeatureWorkerArguments,
   type InstallableServerFeature,
   type InstalledFeatureState,
+  type ModuleContributions,
   serverFeature,
   ServerFeatureAssembly,
   ServerFeatureBuilder,

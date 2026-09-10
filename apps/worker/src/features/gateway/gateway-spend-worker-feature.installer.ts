@@ -1,9 +1,9 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import {
-  GatewaySpendConfirmationPort,
+  GatewaySpendConfirmation,
   type ConfirmSpendCommandData,
 } from "@langwatch/gateway-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
@@ -29,7 +29,7 @@ export interface GatewaySpendWorkerCapability<TSettleSpend = unknown> {
  * because the spend table has no Postgres fallback, and always immediately after Governance events,
  * whose commands its debit adapter delivers into.
  */
-export class GatewaySpendWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class GatewaySpendWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: GatewaySpendWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -48,7 +48,7 @@ export class GatewaySpendWorkerFeatureInstaller implements WorkerFeatureInstalle
    * voice reconciler confirms a settled call through it, and the reconciler is composed before any
    * pipeline is registered.
    */
-  readonly spendConfirmation: GatewaySpendConfirmationPort = new DeferredGatewaySpendConfirmation(
+  readonly spendConfirmation: GatewaySpendConfirmation = new DeferredGatewaySpendConfirmation(
     this.confirmSpend.fn,
   );
 
@@ -80,7 +80,7 @@ export class GatewaySpendWorkerFeatureInstaller implements WorkerFeatureInstalle
 }
 
 /** The pipeline's `confirmSpend`, behind the port a voice settlement asks for. */
-class DeferredGatewaySpendConfirmation extends GatewaySpendConfirmationPort {
+class DeferredGatewaySpendConfirmation extends GatewaySpendConfirmation {
   constructor(private readonly send: CommandDispatcher<ConfirmSpendCommandData>) {
     super();
   }

@@ -20,7 +20,7 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { LangyTurnInProgressError } from "@langwatch/langy-contract";
-import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
 import {} from "./langy-local-session-text.rules.ts";
 import { workspaceNudgeSchema } from "../rules/langy-local-call-record.rules.ts";
@@ -29,7 +29,7 @@ import { LangyWaitExpiredError } from "@langwatch/langy-contract";
 import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
 import type {
   ConnectedWorkspace,
-  LangyLocalPresencePort,
+  LangyLocalPresence,
 } from "../repositories/langy-local-presence.repository.ts";
 import {
   type LocalControlRefusedCode,
@@ -118,7 +118,7 @@ export type ControlSkipGate = (args: {
 }) => Promise<{ allowed: boolean }>;
 
 /** The live edge the core writes the folder's comings and goings to. */
-export type ControlBuffer = Pick<LangyTokenBufferPort, "appendLocalWorkspace">;
+export type ControlBuffer = Pick<LangyTokenBuffer, "appendLocalWorkspace">;
 
 /** The one turn call the core makes, as a type, so a test needs no worker. */
 export interface ControlTurnStarter {

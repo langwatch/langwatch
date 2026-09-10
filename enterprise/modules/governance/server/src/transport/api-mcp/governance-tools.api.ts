@@ -29,7 +29,7 @@
 import { type ZodRawShape, z } from "zod";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceDirectoryPort } from "../../repositories/directory/governance-directory.repository.ts";
+import type { GovernanceDirectory } from "../../repositories/directory/governance-directory.repository.ts";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently
@@ -55,7 +55,7 @@ type McpServerLike = {
  * AuthZ graph, and a tool surface that reached for a global one would be
  * asking a different engine than the request path beside it.
  */
-export abstract class GovernanceMcpPermissionProbePort {
+export abstract class GovernanceMcpPermissionProbe {
   abstract holdsOrganizationPermission(input: {
     userId: string;
     organizationId: string;
@@ -69,10 +69,10 @@ const FORBIDDEN_PREFIX = "FORBIDDEN: ";
 const NEEDS_OAUTH_PREFIX = "AUTH_REQUIRED: ";
 
 export interface GovernanceMcpContext {
-  directory: GovernanceDirectoryPort;
+  directory: GovernanceDirectory;
   governance: GovernanceApi;
   /** The organization permission decision this surface is judged by. */
-  permissions: GovernanceMcpPermissionProbePort;
+  permissions: GovernanceMcpPermissionProbe;
   /** Project apiKey from the MCP session (used to derive organizationId). */
   apiKey: string;
   /**

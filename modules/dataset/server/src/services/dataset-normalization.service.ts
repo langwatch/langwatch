@@ -1,12 +1,11 @@
-import { DatasetNormalizeQueuePort } from "../ports/dataset.port.ts";
 import {
-  DatasetNormalizationWorkerPort,
+  DatasetNormalizationWorker,
   datasetNormalizePayloadSchema,
   type DatasetNormalizePayload,
   type DatasetNormalizationSender,
 } from "@langwatch/dataset-contract";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
-import type { DatasetNormalizePort } from "../ports/dataset-normalize.port.ts";
+import { DatasetNormalizeQueue, type DatasetNormalize } from "../app/dataset.app.ts";
 import { UploadNotPendingError } from "@langwatch/dataset-contract";
 
 /**
@@ -15,22 +14,19 @@ import { UploadNotPendingError } from "@langwatch/dataset-contract";
  * registers the durable sender that invokes the package-owned handler.
  */
 export class DatasetNormalizationService
-  extends DatasetNormalizeQueuePort
-  implements DatasetNormalizationWorkerPort
+  implements DatasetNormalizeQueue, DatasetNormalizationWorker
 {
   private readonly inlineChains = new Map<string, Promise<void>>();
   private sender: DatasetNormalizationSender | null = null;
 
   private constructor(
     private readonly datasets: DatasetContentRepository,
-    private readonly normalize: DatasetNormalizePort,
-  ) {
-    super();
-  }
+    private readonly normalize: DatasetNormalize,
+  ) {}
 
   static create(options: {
     datasets: DatasetContentRepository;
-    normalize: DatasetNormalizePort;
+    normalize: DatasetNormalize;
   }): DatasetNormalizationService {
     return new DatasetNormalizationService(options.datasets, options.normalize);
   }

@@ -22,15 +22,15 @@ import { z } from "zod";
 
 import type { LangyApp } from "#app/langy.app";
 import {
-  LangyUiActionCatalogPort,
+  LangyUiActionCatalog,
   type LangyUiActionDefinition,
-} from "#ports/langy-ui-action-catalog.port";
+} from "#app/langy.infrastructure";
 import {
   LangyUiActionService,
   type UiActionBackendRunner,
   type UiActionRedis,
 } from "#services/langy-ui-action.service";
-import { LANGY_UI_ACTIONS_FLAG } from "#ports/langy-turn-runtime.port";
+import { LANGY_UI_ACTIONS_FLAG } from "#app/langy.infrastructure";
 import {
   resolveLangyRestCaller,
   type LangyRestCredentialPorts,
@@ -51,7 +51,7 @@ const uiActionAuth = handlerManagedAuth({
 /**
  * The catalogue this DOOR needs, which is one method wider than the service's.
  */
-export abstract class LangyUiActionRestCatalogPort extends LangyUiActionCatalogPort {
+export abstract class LangyUiActionRestCatalog implements LangyUiActionCatalog {
   /** Every kind this process serves, in no particular order. */
   abstract list(): readonly Readonly<{
     kind: string;
@@ -71,7 +71,7 @@ export type LangyUiActionsRestPorts = LangyRestCredentialPorts &
      */
     redis: () => UiActionRedis;
     /** Which kinds exist, and what each one's payload must look like. */
-    actions: () => LangyUiActionRestCatalogPort;
+    actions: () => LangyUiActionRestCatalog;
     /**
      * Runs an action server-side when the page is away, where this process can. Absent means an
      * away page is a refusal rather than a silent backend run — the honest answer for a process

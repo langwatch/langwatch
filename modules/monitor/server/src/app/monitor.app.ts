@@ -44,8 +44,6 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { ZodError } from "zod";
 
-import type { MonitorEvaluatorPort } from "../ports/monitor-evaluator.port.ts";
-import type { MonitorPerformancePort } from "../ports/monitor-performance.port.ts";
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
 import { MonitorCatalogService } from "../services/monitor-catalog.service.ts";
 import { MonitorService } from "../services/monitor.service.ts";
@@ -79,9 +77,9 @@ export interface MonitorReplicationReader {
 /** Technical ports the process supplies. Peer features arrive as API tokens. */
 export interface MonitorAppInfrastructure {
   /** The evaluator a monitor runs, until `EvaluatorApi` publishes a lookup by id. */
-  evaluators: MonitorEvaluatorPort;
+  evaluators: MonitorEvaluator;
   /** The online-evaluation results the seven-day trend is folded from. */
-  performance: MonitorPerformancePort;
+  performance: MonitorPerformance;
   /** Copying an evaluator, and its workflow, into another project. */
   replication: MonitorReplicationReader;
   /** Mints the id a new monitor row is written under. */
@@ -102,9 +100,9 @@ export class MonitorApp implements MonitorApi {
   #monitors: MonitorService;
   #catalogue: MonitorCatalogService;
   #permissions: AuthzApi;
-  #performance: MonitorPerformancePort;
+  #performance: MonitorPerformance;
   #replication: MonitorReplicationReader;
-  #evaluators: MonitorEvaluatorPort;
+  #evaluators: MonitorEvaluator;
 
   private constructor(
     repositories: MonitorRepositories,
@@ -387,4 +385,34 @@ export class MonitorApp implements MonitorApi {
         .catch(() => undefined);
     }
   }
+}
+
+/**
+ * The evaluator behind a monitor, as this feature reads it.
+ *
+ * A PORT rather than the `EvaluatorApi` peer token, and only until that token
+ * grows the read: a monitor may only name an evaluator its own project holds,
+ * and `EvaluatorApi` publishes `getAll`, `create`, `update` and `archive` but
+ * no lookup by id. The process supplies its own canonical evaluator service
+ * here, so the check is the same one it always was.
+ *
+ * @see modules/evaluator/contract/src/evaluator.api.ts
+ */
+export interface MonitorEvaluator {
+  /** Refuses by the evaluator feature's own error when the project has none. */
+  getById(input: Readonly<{ id: string; projectId: string }>): Promise<unknown>;
+  /** Rolls a copied evaluator back when the replicated monitor cannot be written. */
+  archive(input: Readonly<{ id: string; projectId: string }>): Promise<unknown>;
+}
+
+
+export interface MonitorPerformance {
+  getMonitorPerformance(
+    query: MonitorPerformanceQuery,
+  ): Promise<OnlineEvaluationPerformance[]>;
+
+  /** The start of the window the trend compares against. */
+  previousPeriodStartMs(
+    range: Readonly<{ projectId: string; startMs: number; endMs: number }>,
+  ): number;
 }

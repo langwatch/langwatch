@@ -54,7 +54,7 @@ export type LocalTaskExecution = Readonly<{
   args: readonly string[];
 }>;
 
-export abstract class LocalTaskExecutorPort {
+export abstract class LocalTaskExecutor {
   abstract execute(input: LocalTaskExecution): Promise<void>;
 }
 
@@ -67,7 +67,7 @@ export interface LocalTaskExecutableHost {
 export type LocalTaskExecutableOptions = Readonly<{
   source: Readonly<Record<string, unknown>>;
   args: readonly string[];
-  executor: LocalTaskExecutorPort;
+  executor: LocalTaskExecutor;
   observability?: Omit<ProcessObservabilityOptions, "serviceName" | "loggerName">;
 }>;
 
@@ -105,7 +105,7 @@ export class LocalTaskExecutable {
 
 export async function runLocalTaskEntrypoint(options: {
   source: Readonly<Record<string, unknown>>;
-  executor: LocalTaskExecutorPort;
+  executor: LocalTaskExecutor;
   host?: LocalTaskExecutableHost;
 }): Promise<void> {
   const host = options.host ?? nodeTaskExecutableHost();

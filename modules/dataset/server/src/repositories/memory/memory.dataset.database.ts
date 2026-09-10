@@ -1,7 +1,7 @@
 import type { DatasetRecord } from "@langwatch/dataset-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import type { DatasetRow } from "../../ports/dataset.port.ts";
+import type { DatasetRow } from "../dataset.repository.ts";
 
 /** A stored batch-evaluation row, as the memory twin keeps it. */
 export type MemoryBatchEvaluation = {

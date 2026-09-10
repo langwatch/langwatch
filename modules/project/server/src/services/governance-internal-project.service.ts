@@ -5,7 +5,7 @@ import {
   type InternalProjectQuery,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import type { ProjectCredentialsPort } from "../ports/project.port.ts";
+import type { ProjectCredentials } from "../ports/project.port.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
 /**
@@ -17,7 +17,7 @@ import type { ProjectRepository } from "../repositories/project.repository.ts";
  * satisfies it structurally, so the application's own composition is
  * unchanged.
  */
-export abstract class ProjectOldestTeamPort {
+export abstract class ProjectOldestTeam {
   abstract getOldestTeamId(input: { organizationId: string }): Promise<string>;
 }
 
@@ -29,7 +29,7 @@ export abstract class ProjectOldestTeamPort {
  * composing a capability that additionally wants an LWQL key map, a
  * stored-object runtime and a diagnostics sink.
  */
-export abstract class GovernanceInternalProjectPort {
+export abstract class GovernanceInternalProject {
   abstract tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
 
   abstract ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
@@ -46,11 +46,11 @@ export abstract class GovernanceInternalProjectPort {
  * give one organization two internal projects and split its pulled usage
  * across both.
  */
-export class GovernanceInternalProjectService extends GovernanceInternalProjectPort {
+export class GovernanceInternalProjectService extends GovernanceInternalProject {
   static create(options: {
     repository: ProjectRepository;
-    credentials: ProjectCredentialsPort;
-    teams: ProjectOldestTeamPort;
+    credentials: ProjectCredentials;
+    teams: ProjectOldestTeam;
   }): GovernanceInternalProjectService {
     return new GovernanceInternalProjectService(
       options.repository,
@@ -61,8 +61,8 @@ export class GovernanceInternalProjectService extends GovernanceInternalProjectP
 
   private constructor(
     private readonly repository: ProjectRepository,
-    private readonly credentials: ProjectCredentialsPort,
-    private readonly teams: ProjectOldestTeamPort,
+    private readonly credentials: ProjectCredentials,
+    private readonly teams: ProjectOldestTeam,
   ) {
     super();
   }

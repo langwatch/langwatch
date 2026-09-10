@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  ScimGrantRepositoryPort,
+  ScimGrantRepository,
   type ScimGrantBindingScope,
   type ScimRoleBindingRecord,
 } from "../../repositories/scim.repository.ts";
@@ -12,7 +12,7 @@ import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 const organizationId = "org_1";
 const userId = "user_1";
 
-class GrantRepositoryFake extends ScimGrantRepositoryPort {
+class GrantRepositoryFake extends ScimGrantRepository {
   readonly listRoleBindings = vi.fn<
     (scope: ScimGrantBindingScope) => Promise<ScimRoleBindingRecord[]>
   >(async () => []);

@@ -12,9 +12,9 @@ import { mintS3StoredObjectUri } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
 import {
-  StoredObjectAzureDestinationPort,
+  StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
-  StoredObjectProjectS3ConfigPort,
+  StoredObjectProjectS3Config,
   type StoredObjectStorageSelection,
 } from "../stored-object-destination-policy.service.ts";
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
@@ -23,13 +23,13 @@ import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-reg
 const INCOMPLETE_AZURE = "Azure Blob is configured with sharedKey auth and no account key";
 
 /** The deployment's leftover Azure settings: present, and not valid. */
-class IncompleteAzureDestination extends StoredObjectAzureDestinationPort {
+class IncompleteAzureDestination extends StoredObjectAzureDestination {
   resolve(): never {
     throw new Error(INCOMPLETE_AZURE);
   }
 }
 
-class StubProjectS3Config extends StoredObjectProjectS3ConfigPort {
+class StubProjectS3Config extends StoredObjectProjectS3Config {
   constructor(private readonly bucket: string | null) {
     super();
   }

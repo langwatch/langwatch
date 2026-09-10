@@ -1,11 +1,11 @@
 import { createRoot, type Root } from "react-dom/client";
-import type { UiShellPort } from "./ui-runtime.port";
+import type { UiShell } from "./ui-runtime.port";
 
-export { UiShellPort } from "./ui-runtime.port";
+export { UiShell } from "./ui-runtime.port";
 
 export type UiRuntimeOptions = {
   document: Document;
-  shell: UiShellPort;
+  shell: UiShell;
   rootElementId?: string;
 };
 
@@ -19,7 +19,7 @@ export class UiRuntime {
 
   private constructor(
     private readonly document: Document,
-    private readonly shell: UiShellPort,
+    private readonly shell: UiShell,
     private readonly rootElementId: string,
   ) {}
 

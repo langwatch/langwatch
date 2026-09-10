@@ -3,10 +3,10 @@
  */
 import type {
   GovernanceIngestRestPorts,
-  GovernanceIngestTraceCollectionPort,
+  GovernanceIngestTraceCollection,
 } from "@langwatch/enterprise-governance-server";
 import {
-  GovernanceIngestRateLimitPort,
+  GovernanceIngestRateLimit,
   PrismaGovernanceDirectoryRepository,
 } from "@langwatch/enterprise-governance-server";
 import {
@@ -15,11 +15,11 @@ import {
 } from "@langwatch/enterprise-governance-server";
 import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
+import type { GovernanceInternalProject } from "@langwatch/project-server";
 import { nowInstant } from "@langwatch/time";
 
 /** The process's ONE fixed-window counter, as the ingest throttle. */
-export class ApiGovernanceIngestRateLimit extends GovernanceIngestRateLimitPort {
+export class ApiGovernanceIngestRateLimit extends GovernanceIngestRateLimit {
   static create(
     consume: (input: {
       key: string;
@@ -63,13 +63,13 @@ export type ApiGovernanceIngestRestOptions = Readonly<{
   /** The Enterprise governance capability, where the deployment composed one. */
   governance: GovernanceApi | undefined;
   /** The internal governance project mint; `ProjectApi` satisfies it. */
-  projects: Pick<GovernanceInternalProjectPort, "ensureInternal"> | undefined;
+  projects: Pick<GovernanceInternalProject, "ensureInternal"> | undefined;
   /**
    * The trace collection the OTLP receiver composed, or none. Taken rather than built: it
    * carries this process's single `trace_processing` producer registration, and a second
    * one would describe the same event stream twice.
    */
-  traceCollection: GovernanceIngestTraceCollectionPort | undefined;
+  traceCollection: GovernanceIngestTraceCollection | undefined;
   /** The process's one guarded connection, or none. */
   prisma: PrismaClient | undefined;
   /** The process's ONE fixed-window counter. */

@@ -1,5 +1,5 @@
 import type { JoinRequestPipeline } from "@langwatch/identity-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** Join requests' worker-facing capability: the built pipeline definition. */
@@ -33,7 +33,7 @@ export interface JoinRequestWorkerCapability {
  * interstitial renders, and no panel appears. Whoever makes the worker
  * composition the live one drops the legacy registration in the same change.
  */
-export class JoinRequestWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class JoinRequestWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: JoinRequestWorkerCapability;
     eventing: WorkerEventingRuntime;

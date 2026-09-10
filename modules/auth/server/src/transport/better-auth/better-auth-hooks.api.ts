@@ -10,9 +10,9 @@ import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type {
-  BetterAuthAnnouncementsPort,
-  BetterAuthFederationPort,
-  BetterAuthPendingInvitePort,
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+  BetterAuthPendingInvite,
 } from "./better-auth.collaborators.ts";
 
 /**
@@ -24,9 +24,9 @@ const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
  * The collaborators every hook in this file reaches, handed in together.
  */
 export type BetterAuthHookCollaborators = Readonly<{
-  federation: BetterAuthFederationPort;
-  invites: BetterAuthPendingInvitePort;
-  announcements: BetterAuthAnnouncementsPort;
+  federation: BetterAuthFederation;
+  invites: BetterAuthPendingInvite;
+  announcements: BetterAuthAnnouncements;
   /** The grant ledger an auto-joined membership is written through. */
   authzGrants: AuthzGrantsService;
 }>;
@@ -94,7 +94,7 @@ const announceSsoAutoJoin = ({
   org,
   inviteId,
 }: {
-  announcements: BetterAuthAnnouncementsPort;
+  announcements: BetterAuthAnnouncements;
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
   inviteId: string | null;
@@ -247,7 +247,7 @@ export const tryBeforeAccountCreate = async ({
     providerId: string;
     accountId: string;
   };
-  federation: BetterAuthFederationPort;
+  federation: BetterAuthFederation;
 }): Promise<void> => {
   const user = await repo.tryFindUserForHooks({ userId: account.userId });
   if (!user?.email) return;
@@ -453,7 +453,7 @@ export const afterSessionCreate = async ({
   repo: BetterAuthHooksRepository;
   userId: string;
   isImpersonationSession?: boolean;
-  announcements: BetterAuthAnnouncementsPort;
+  announcements: BetterAuthAnnouncements;
 }): Promise<void> => {
   // lastLoginAt is only updated for "real" sessions — not admin impersonation.
   if (!isImpersonationSession) {

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { AutomationTriggerMatchRecorderPort } from "@langwatch/automation-server";
+import { AutomationTriggerMatchRecorder } from "@langwatch/automation-server";
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
-import { CodingAgentTraceProcessingPort } from "@langwatch/coding-agent-server";
+import { CodingAgentTraceProcessing } from "@langwatch/coding-agent-server";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
@@ -54,13 +54,13 @@ const RECORDED: {
   broadcasts: [],
 };
 
-class RecordingTriggerMatches extends AutomationTriggerMatchRecorderPort {
+class RecordingTriggerMatches extends AutomationTriggerMatchRecorder {
   async send(input: unknown): Promise<void> {
     RECORDED.triggerMatches.push(input);
   }
 }
 
-class NoCodingAgentTraces extends CodingAgentTraceProcessingPort {
+class NoCodingAgentTraces extends CodingAgentTraceProcessing {
   normalizeSpan(): never {
     throw new Error("not reached in this test");
   }

@@ -16,7 +16,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import { IdentityEventingPort } from "../app/identity.infrastructure.ts";
+import { IdentityEventing } from "../app/identity.infrastructure.ts";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
 import type { JoinRequestEvent } from "../projections/join-request-state.projection.ts";
@@ -49,7 +49,7 @@ export interface JoinRequestLedgerWriterDeps {
    * the pipeline handle is resolved when a ceremony actually commits, which is what lets a ledger
    * composed before the process finished wiring its eventing still stage.
    */
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
   /** A test hands the sender in directly rather than composing a port for it. */
   stagedSender?: (name: string) => Promise<JoinRequestStagedSender | null>;
   convergence?: { timeoutMs: number; pollMs: number };

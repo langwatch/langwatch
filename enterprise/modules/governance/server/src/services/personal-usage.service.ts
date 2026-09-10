@@ -8,20 +8,20 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type {
   IngestionPrincipalSummaryRow,
-  PersonalUsageReaderPort,
-} from "../ports/personal-usage.port.ts";
+  PersonalUsageReader,
+} from "../app/governance.infrastructure.ts";
 import { Temporal } from "@langwatch/time";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
 export class DefaultGovernancePersonalUsageService {
   private constructor(
-    private readonly reader: PersonalUsageReaderPort | undefined,
+    private readonly reader: PersonalUsageReader | undefined,
     private readonly clock: () => number,
   ) {}
 
   static create(options: {
-    reader?: PersonalUsageReaderPort;
+    reader?: PersonalUsageReader;
     clock?: () => number;
   }): DefaultGovernancePersonalUsageService {
     return new DefaultGovernancePersonalUsageService(options.reader, options.clock ?? Date.now);

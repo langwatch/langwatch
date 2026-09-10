@@ -30,7 +30,7 @@ import {
   useNavigationModeStore,
 } from "../../behavior/navigation-mode.store.ts";
 import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries.ts";
-import { useNavigationHost, type NavigationHostPort } from "../../model/navigation-host.ts";
+import { useNavigationHost, type NavigationHost } from "../../model/navigation-host.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { UserAvatar } from "../elements/user-avatar.tsx";
 
@@ -176,7 +176,7 @@ function PersonalWorkspaceEntries({
   host,
 }: {
   entries: ReturnType<typeof usePersonalWorkspaceEntries>["entries"];
-  host: NavigationHostPort;
+  host: NavigationHost;
 }) {
   if (entries.length === 0) return null;
 

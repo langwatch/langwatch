@@ -2,8 +2,8 @@ import { RedisCachedFoldStore, type FoldProjectionStore } from "@langwatch/event
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import {
   AppGatewayDebitAdapter,
-  AppGatewayGovernancePort,
-  GovernanceSignalDeliveryPort,
+  AppGatewayGovernance,
+  GovernanceSignalDelivery,
 } from "@langwatch/enterprise-api";
 import { AppGovernanceWebhookAdapter } from "@langwatch/enterprise-api/governance/governance-webhook.adapter";
 import type {
@@ -42,7 +42,7 @@ import {
 import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
 import { WEBHOOK_DELIVERY_PROCESS_NAME } from "@langwatch/webhook-server";
 import { GATEWAY_DEBITS_PROCESS_NAME } from "@langwatch/enterprise-governance-server";
-import type { WebhookDispatchRateLimiterPort, WebhookEgressService } from "@langwatch/egress";
+import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatch/egress";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -63,7 +63,7 @@ export type WorkerGatewaySpendDatabase = GatewayBudgetResolutionDatabase &
  * silent in production (a stalled settlement, an undeliverable SQS
  * endpoint, an unreadable entitlement). The first two are CONDITIONAL on which substrates the graph was handed, not on what this package can build.
  */
-export abstract class WorkerGatewaySpendAbsenceReportPort {
+export abstract class WorkerGatewaySpendAbsenceReport {
   /** No all-instance ClickHouse directory: open admissions are never swept. */
   abstract withoutSpendSettlement(): void;
 
@@ -106,7 +106,7 @@ export type WorkerGatewaySpendCompositionInput = Readonly<{
    * reads it off the egress service, but a queue send never passes through
    * that sender, so it's handed the same counter directly to stay capped.
    */
-  dispatchRateLimiter?: WebhookDispatchRateLimiterPort;
+  dispatchRateLimiter?: WebhookDispatchRateLimiter;
   /**
    * Which plan an organization is on, for the live-delivery gate (webhook
    * endpoints are a paid entitlement). Absent exactly when this graph
@@ -118,7 +118,7 @@ export type WorkerGatewaySpendCompositionInput = Readonly<{
     recordVkLifecycle: (data: GovernanceVkLifecycleData) => Promise<void>;
     recordBudgetCrossing: (data: GovernanceBudgetCrossingData) => Promise<void>;
   };
-  absence?: WorkerGatewaySpendAbsenceReportPort;
+  absence?: WorkerGatewaySpendAbsenceReport;
   logger?: Logger;
 }>;
 
@@ -159,7 +159,7 @@ export function createWorkerGatewaySpend(
     gatewayDebits: {
       name: GATEWAY_DEBITS_PROCESS_NAME,
       applier: AppGatewayDebitAdapter.create(
-        AppGatewayGovernancePort.create(
+        AppGatewayGovernance.create(
           options.database as unknown as PrismaClient,
           GatewayBudgetLedgerAdapter.create(options.resolveClickHouseClient as never),
           PostgresGatewayBudgetResolutionAdapter.create({ database: options.database }),
@@ -409,7 +409,7 @@ class UnconfiguredWebhookSecrets implements WebhookSecret {
  * commands: the debit process resolves budgets/writes debits/reports
  * crossings into the pipeline registered immediately before this one, so a graph mounting spend without governance fails at boot, not silently.
  */
-class WorkerGovernanceSignalDelivery extends GovernanceSignalDeliveryPort {
+class WorkerGovernanceSignalDelivery extends GovernanceSignalDelivery {
   constructor(
     private readonly commands: {
       recordVkLifecycle: (data: GovernanceVkLifecycleData) => Promise<void>;

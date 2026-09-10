@@ -8,7 +8,7 @@ import {
   PulledUsageLedgerIntent,
   writePulledUsageSchema,
 } from "../intents/pulled-usage-ledger.intent.ts";
-import { PulledUsageLedgerPort } from "../ports/pulled-usage-ledger.port.ts";
+import { PulledUsageLedgerRepository } from "../app/governance.infrastructure.ts";
 
 export const PULLED_USAGE_LEDGER_PROCESS_NAME = "pulledUsageLedger" as const;
 
@@ -17,7 +17,7 @@ type PulledUsageEvent = PulledUsageObservedEvent & Event;
 export class PulledUsageLedgerProcess {
   private constructor(private readonly intent: PulledUsageLedgerIntent) {}
 
-  static create(ledger: PulledUsageLedgerPort): PulledUsageLedgerProcess {
+  static create(ledger: PulledUsageLedgerRepository): PulledUsageLedgerProcess {
     return new PulledUsageLedgerProcess(PulledUsageLedgerIntent.create(ledger));
   }
 

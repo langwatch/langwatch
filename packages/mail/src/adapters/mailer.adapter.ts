@@ -7,10 +7,10 @@ import { resolveEmailProviderName } from "../providers/index.ts";
 import type {
   EmailContent,
   EmailProviderName,
-  EmailProviderPort,
+  EmailProvider,
   MailerConfiguration,
 } from "../providers/types.ts";
-import { EmailDeliveryPort } from "../providers/types.ts";
+import { EmailDelivery } from "../providers/types.ts";
 import type { OutboundProxyConfig } from "@langwatch/egress";
 
 const logger = createLogger("langwatch:mailer:runtime");
@@ -19,7 +19,7 @@ const logger = createLogger("langwatch:mailer:runtime");
  * One mail delivery graph per executable. Provider choice and credentials are
  * immutable after boot; transport pools are retained until orderly shutdown.
  */
-export class MailerAdapter extends EmailDeliveryPort {
+export class MailerAdapter extends EmailDelivery {
   static create(input: {
     configuration: MailerConfiguration;
     aws: SesAwsClientConfiguration;
@@ -28,7 +28,7 @@ export class MailerAdapter extends EmailDeliveryPort {
     return new MailerAdapter(input.configuration, input.aws, input.outboundProxy);
   }
 
-  private provider: EmailProviderPort | undefined;
+  private provider: EmailProvider | undefined;
 
   private closePromise: Promise<void> | undefined;
 
@@ -59,7 +59,7 @@ export class MailerAdapter extends EmailDeliveryPort {
     return this.closePromise;
   }
 
-  private resolveProvider(): EmailProviderPort | undefined {
+  private resolveProvider(): EmailProvider | undefined {
     if (this.provider) return this.provider;
 
     const providerName = resolveEmailProviderName(this.configuration);
@@ -69,7 +69,7 @@ export class MailerAdapter extends EmailDeliveryPort {
     return this.provider;
   }
 
-  private createProvider(name: EmailProviderName): EmailProviderPort {
+  private createProvider(name: EmailProviderName): EmailProvider {
     switch (name) {
       case "ses":
         return SesEmailProvider.create({ configuration: this.configuration.ses, aws: this.aws });

@@ -7,7 +7,7 @@ export interface TopicClusteringProviderConfig {
   readonly enabled: boolean;
 }
 
-export abstract class TopicClusteringModelsPort<
+export abstract class TopicClusteringModels<
   ProviderConfig extends TopicClusteringProviderConfig = TopicClusteringProviderConfig,
 > {
   abstract resolveClusteringModel(projectId: string): Promise<{ model: string }>;

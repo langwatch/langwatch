@@ -25,7 +25,7 @@ import {
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { SuiteExecutionPort } from "../../ports/suite-execution.port.ts";
+import { SuiteExecution } from "../../app/suite.app.ts";
 import { SuiteRepository } from "../suite.repository.ts";
 import { MemorySuiteRunRepository } from "../memory/memory.suite-run.repository.ts";
 import { SuiteService, type SuiteServiceOptions } from "../../services/suite.service.ts";
@@ -85,13 +85,13 @@ function repository(overrides: Partial<SuiteRepository> = {}): SuiteRepository {
   } as SuiteRepository;
 }
 
-class UnusedExecutionPort extends SuiteExecutionPort {
+class UnusedExecution implements SuiteExecution {
   async execute(): Promise<SuiteRunResult> {
     throw new Error("This test does not execute a suite run");
   }
 }
 
-class CapturingExecutionPort extends SuiteExecutionPort {
+class CapturingExecution implements SuiteExecution {
   readonly execute = vi.fn(async (input) => ({
     batchRunId: "batch_1",
     setId: "suite:set_1",
@@ -110,7 +110,7 @@ function serviceOptions(
     scenarios: mockScenarioService({ findTestSuite: vi.fn().mockResolvedValue(null) }),
     agents: createApiFixture<AgentApi>(),
     prompts: createApiFixture<PromptApi>(),
-    execution: new UnusedExecutionPort(),
+    execution: new UnusedExecution(),
     runRepository: MemorySuiteRunRepository.create(),
     ...overrides,
   };
@@ -223,7 +223,7 @@ describe("SuiteService", () => {
       skippedArchived: { scenarios: ["scenario_archived"], targets: ["agent_archived"] },
       items: [],
     });
-    class ExecutionPort extends SuiteExecutionPort {
+    class Execution implements SuiteExecution {
       execute = execute;
     }
     const service = SuiteService.create({
@@ -265,7 +265,7 @@ describe("SuiteService", () => {
         getExistingIds: vi.fn().mockResolvedValue(["prompt_active"]),
         getNamesByIds: vi.fn(),
       }),
-      execution: new ExecutionPort(),
+      execution: new Execution(),
       runRepository: MemorySuiteRunRepository.create(),
     });
 
@@ -292,7 +292,7 @@ describe("SuiteService", () => {
   /** @scenario "Suite run fails when all scenarios are archived" */
   it("refuses a run before execution when every scenario is archived", async () => {
     const execute = vi.fn();
-    class ExecutionPort extends SuiteExecutionPort {
+    class Execution implements SuiteExecution {
       execute = execute;
     }
     const service = SuiteService.create({
@@ -306,7 +306,7 @@ describe("SuiteService", () => {
       }),
       agents: mockAgentService({ getReferenceStates: vi.fn(), getNamesByIds: vi.fn() }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
-      execution: new ExecutionPort(),
+      execution: new Execution(),
       runRepository: MemorySuiteRunRepository.create(),
     });
 
@@ -349,7 +349,7 @@ describe("SuiteService", () => {
   });
 
   it("refuses a test suite run when every filed scenario is archived", async () => {
-    const execution = new CapturingExecutionPort();
+    const execution = new CapturingExecution();
     const scenarios = mockScenarioService({
       getTestSuiteRunDefinition: vi.fn().mockResolvedValue({
         testSuite: suite({ kind: "test_suite", scenarioIds: [] }),
@@ -400,7 +400,7 @@ describe("SuiteService", () => {
     "resolves $scope.mode scope membership at run time",
     async ({ scope, membership }) => {
       const resolveDynamicRunMembership = vi.fn().mockResolvedValue(membership);
-      const execution = new CapturingExecutionPort();
+      const execution = new CapturingExecution();
       const scenarios = mockScenarioService({
         getReferenceStates: vi
           .fn()
@@ -453,7 +453,7 @@ describe("SuiteService", () => {
 
   /** @scenario "A dynamic scope that covers nothing is refused" */
   it("refuses a dynamic scope that resolves to no scenarios", async () => {
-    const execution = new CapturingExecutionPort();
+    const execution = new CapturingExecution();
     const service = SuiteService.create({
       ...serviceOptions(
         repository({
@@ -494,7 +494,7 @@ describe("SuiteService", () => {
   /** @scenario "Job count reflects only active scenarios and targets" */
   /** @scenario "Suite run succeeds when prompt config is org-scoped" */
   it("batches target checks, filters archived references, and preserves the run idempotency key", async () => {
-    const execution = new CapturingExecutionPort();
+    const execution = new CapturingExecution();
     const agents = mockAgentService({
       getReferenceStates: vi.fn().mockResolvedValue([
         { id: "agent_active", archivedAt: null },
@@ -581,7 +581,7 @@ describe("SuiteService", () => {
 
   /** @scenario "A connected agent unseen for thirty days is refused as a run target" */
   it("skips a connected agent target unseen for thirty one days the way an archived one is skipped", async () => {
-    const execution = new CapturingExecutionPort();
+    const execution = new CapturingExecution();
     const thirtyOneDaysAgo = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
     const agents = mockAgentService({
       getReferenceStates: vi.fn().mockResolvedValue([
@@ -628,7 +628,7 @@ describe("SuiteService", () => {
   /** @scenario "Suite run fails when HTTP target agent does not exist" */
   /** @scenario "Deleted scenarios still cause validation errors" */
   it("rejects missing scenario and target references before execution", async () => {
-    const execution = new CapturingExecutionPort();
+    const execution = new CapturingExecution();
     const scenarios = mockScenarioService({
       getReferenceStates: vi.fn().mockResolvedValue([]),
       getRunConfigs: vi.fn(),
@@ -653,7 +653,7 @@ describe("SuiteService", () => {
     ).rejects.toBeInstanceOf(InvalidScenarioReferencesError);
     expect(execution.execute).not.toHaveBeenCalled();
 
-    const targetExecution = new CapturingExecutionPort();
+    const targetExecution = new CapturingExecution();
     const targetService = SuiteService.create({
       repository: repository({
         findById: vi.fn().mockResolvedValue(
@@ -691,7 +691,7 @@ describe("SuiteService", () => {
   /** @scenario "Suite run fails when prompt config is soft-deleted" */
   /** @scenario "Suite run fails when prompt config belongs to another organization" */
   it("rejects a prompt target the project's own prompt lookup does not resolve", async () => {
-    const execution = new CapturingExecutionPort();
+    const execution = new CapturingExecution();
     const service = SuiteService.create({
       repository: repository({
         findById: vi.fn().mockResolvedValue(
@@ -729,7 +729,7 @@ describe("SuiteService", () => {
 
   /** @scenario "Suite run fails when all targets are archived" */
   it("rejects when every target is archived", async () => {
-    const execution = new CapturingExecutionPort();
+    const execution = new CapturingExecution();
     const service = SuiteService.create({
       repository: repository({
         findById: vi.fn().mockResolvedValue(
@@ -766,7 +766,7 @@ describe("SuiteService", () => {
   });
 
   it("refreshes and runs the managed all-cases suite", async () => {
-    const execution = new CapturingExecutionPort();
+    const execution = new CapturingExecution();
     const managed = suite({
       id: "suite_all_cases",
       name: "All test cases",
@@ -867,7 +867,7 @@ describe("SuiteService", () => {
   });
 
   it("runs a test suite through ScenarioService membership and reports archived cases", async () => {
-    const execution = new CapturingExecutionPort();
+    const execution = new CapturingExecution();
     const testSuite = suite({
       id: "suite_test_suite",
       kind: "test_suite",
@@ -1165,7 +1165,7 @@ describe("SuiteService", () => {
   describe("given a plan scoped to a hand-picked list of scenarios", () => {
     /** @scenario "A plan scoped to a hand-picked list runs exactly that list" */
     it("runs exactly the held scenarios and never resolves membership dynamically", async () => {
-      const execution = new CapturingExecutionPort();
+      const execution = new CapturingExecution();
       const resolveDynamicRunMembership = vi.fn();
       const service = SuiteService.create({
         repository: repository({
@@ -1224,7 +1224,7 @@ describe("SuiteService", () => {
         ),
       });
       const buildService = () => {
-        const execution = new CapturingExecutionPort();
+        const execution = new CapturingExecution();
         const service = SuiteService.create({
           repository: repository({
             findById: vi.fn().mockResolvedValue(
@@ -1283,7 +1283,7 @@ describe("SuiteService", () => {
         ),
       });
       const buildService = () => {
-        const execution = new CapturingExecutionPort();
+        const execution = new CapturingExecution();
         const service = SuiteService.create({
           repository: repository({
             findById: vi.fn().mockResolvedValue(
@@ -1329,7 +1329,7 @@ describe("SuiteService", () => {
 
     /** @scenario "Archived scenarios are left out of a dynamic scope" */
     it("excludes an archived scenario the dynamic scope still names", async () => {
-      const execution = new CapturingExecutionPort();
+      const execution = new CapturingExecution();
       const service = SuiteService.create({
         repository: repository({
           findById: vi.fn().mockResolvedValue(
@@ -1406,7 +1406,7 @@ describe("SuiteService", () => {
   describe("given a run plan scoped over several test suites", () => {
     /** @scenario "A run plan can span the scenarios of several test suites" */
     it("schedules the scenarios of every named test suite and touches no test suite row", async () => {
-      const execution = new CapturingExecutionPort();
+      const execution = new CapturingExecution();
       const resolveDynamicRunMembership = vi
         .fn()
         .mockResolvedValue([

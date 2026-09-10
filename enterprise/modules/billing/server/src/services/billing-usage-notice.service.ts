@@ -10,7 +10,7 @@ import type {
 } from "@langwatch/enterprise-billing-contract";
 import {
   NullBillingErrorReporter,
-  type BillingErrorReporterPort,
+  type BillingErrorReporter,
 } from "../ports/error-reporter.port.ts";
 import {
   NullUsageLimitEmailAdapter,
@@ -89,7 +89,7 @@ type NotificationServiceOptions = {
   };
   createSlackWebhook?: (url: string) => Pick<IncomingWebhook, "send">;
   fetchFn?: typeof fetch;
-  errorReporter?: BillingErrorReporterPort;
+  errorReporter?: BillingErrorReporter;
   usageLimitEmail?: UsageLimitEmailPort;
 };
 
@@ -105,7 +105,7 @@ export class NotificationService {
   private readonly config: NotificationServiceOptions["config"];
   private readonly createSlackWebhook: (url: string) => Pick<IncomingWebhook, "send">;
   private readonly fetchFn: typeof fetch;
-  private readonly errorReporter: BillingErrorReporterPort;
+  private readonly errorReporter: BillingErrorReporter;
   private readonly usageLimitEmail: UsageLimitEmailPort;
 
   private constructor(options: NotificationServiceOptions) {

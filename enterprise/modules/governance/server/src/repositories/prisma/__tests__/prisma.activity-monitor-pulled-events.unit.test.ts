@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const query = vi.fn();
 
-import { GovernanceClickHouseResolverPort } from "../../../ports/ingestion-source-activity.port.ts";
+import { GovernanceClickHouseResolver } from "../../../app/governance.infrastructure.ts";
 import { PrismaActivityMonitorRepository } from "../prisma.ingestion-source-activity.repository.ts";
 
-class FakeClickHouseResolver extends GovernanceClickHouseResolverPort {
+class FakeClickHouseResolver implements GovernanceClickHouseResolver {
   async tryResolve() {
     return { query };
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
 import {
-  ManagedProviderConfigurationPort,
+  ManagedProviderConfiguration,
   ManagedProviderCredentialsPort,
   type ManagedProviderCredentials,
 } from "@langwatch/enterprise-managed-provider-server";
@@ -62,7 +62,7 @@ describe("EnterpriseWorkerComposition", () => {
   });
 });
 
-class TestConfiguration extends ManagedProviderConfigurationPort {
+class TestConfiguration extends ManagedProviderConfiguration {
   static create(): TestConfiguration {
     return new TestConfiguration();
   }

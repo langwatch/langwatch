@@ -23,7 +23,7 @@ import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createDashboardTestAnalytics } from "../../../app/__tests__/dashboard.fixture.ts";
-import { WorkbenchAccessPort } from "../../../ports/workbench-access.port.ts";
+import { WorkbenchAccess } from "../../../app/dashboard.infrastructure.ts";
 import { PrismaDashboardRepository } from "../prisma.dashboard.repository.ts";
 import { DashboardService } from "../../../services/dashboard.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../../../services/saved-workbench-chart-policy.service.ts";
@@ -35,7 +35,7 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-class WorkbenchOn extends WorkbenchAccessPort {
+class WorkbenchOn implements WorkbenchAccess {
   async isWorkbenchEnabled(): Promise<boolean> {
     return true;
   }

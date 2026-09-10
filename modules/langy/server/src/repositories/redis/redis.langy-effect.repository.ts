@@ -1,12 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import { LangyDispatchRejectedError } from "@langwatch/langy-contract";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
-import type { LangyEffectPorts, LangyTitleGenerator } from "../../ports/langy-effect.port.ts";
+import type { LangyEffectPorts, LangyTitleGenerator } from "../../app/langy.infrastructure.ts";
 import { LangyTurnDispatchRetry } from "@langwatch/langy-contract";
-import type { LangyWorkerPort } from "../../ports/langy-turn-runtime.port.ts";
+import type { LangyWorker } from "../../app/langy.infrastructure.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
 import type { LangyTurnHandoff } from "../langy-live-turn.repository.ts";
-import type { LangyFailTurnCommandPort } from "../../subscribers/langy-conversation.subscriber.ts";
+import type { LangyFailTurnCommand } from "../../subscribers/langy-conversation.subscriber.ts";
 
 const logger = createLogger("langwatch:langy:process-effects");
 
@@ -17,7 +17,7 @@ const logger = createLogger("langwatch:langy:process-effects");
 
 export interface CreateLangyEffectPortsOptions {
   handoffStore: Pick<LangyTurnHandoffRedisRepository, "read" | "stash" | "isStopped">;
-  worker: LangyWorkerPort;
+  worker: LangyWorker;
   mintSessionKey: (args: {
     userId: string;
     projectId: string;
@@ -25,7 +25,7 @@ export interface CreateLangyEffectPortsOptions {
   }) => Promise<{ token: string; apiKeyId: string }>;
   revokeSessionKey: (args: { apiKeyId: string; projectId: string }) => Promise<void>;
   /** Terminalizes a permanently rejected turn — same port liveness uses. */
-  failTurn: LangyFailTurnCommandPort;
+  failTurn: LangyFailTurnCommand;
   /** Client-visible error frame for the stream tail. Best-effort. */
   markError: (params: {
     conversationId: string;

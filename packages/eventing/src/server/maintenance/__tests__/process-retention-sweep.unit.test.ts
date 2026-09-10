@@ -15,10 +15,10 @@ import {
   type ProcessRetentionSweepDeps,
   runProcessRetentionSweep,
 } from "../process-retention-sweep.intent.ts";
-import { ProcessRetentionMetricsPort, type RetentionFamily } from "../retention-metrics.port.ts";
+import { ProcessRetentionMetrics, type RetentionFamily } from "../retention-metrics.port.ts";
 
 /** Records what the sweep reported, family by family, as the counters do. */
-class RecordingRetentionMetrics extends ProcessRetentionMetricsPort {
+class RecordingRetentionMetrics extends ProcessRetentionMetrics {
   readonly sweptRows: Record<RetentionFamily, number> = {
     dispatched_outbox: 0,
     dead_outbox: 0,

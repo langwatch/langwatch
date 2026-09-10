@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import type { GatewayClickHouseClient } from "../ports/gateway-clickhouse.port.ts";
+import type { GatewayClickHouseClient } from "../app/gateway.infrastructure.ts";
 import {
-  GatewayOpenAdmissionsPort,
+  GatewayOpenAdmissions,
   type OpenAdmission,
   type OpenAdmissionQuery,
 } from "../ports/gateway-open-admissions.port.ts";
@@ -33,7 +33,7 @@ export type GatewayClickHouseInstanceResolver = () => Promise<GatewayClickHouseI
  * failure, so it applies at the instance level too: the reachable instances
  * settle, the unreachable one is reported and retried next sweep.
  */
-export class ClickHouseGatewayOpenAdmissionsAdapter extends GatewayOpenAdmissionsPort {
+export class ClickHouseGatewayOpenAdmissionsAdapter extends GatewayOpenAdmissions {
   static create(
     resolveInstances: GatewayClickHouseInstanceResolver,
   ): ClickHouseGatewayOpenAdmissionsAdapter {

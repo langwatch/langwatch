@@ -17,7 +17,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { PiiAnalysisPort } from "../ports/pii-analysis.port.ts";
+import type { PiiAnalysis } from "./data-privacy.infrastructure.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
@@ -87,7 +87,7 @@ export type DataPrivacyInfrastructure = Readonly<{
     | Readonly<{ redaction: OtlpSpanPiiRedactionService | null }>
     | Readonly<{
         pii: Readonly<{
-          transport: PiiAnalysisPort;
+          transport: PiiAnalysis;
           isLangevalsConfigured: boolean;
           isProduction: boolean;
           nativePolicyEnforced: boolean;

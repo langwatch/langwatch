@@ -37,9 +37,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 import {
   ActivityMonitorRepository,
-  type GovernanceClickHouseClientPort,
-  type GovernanceClickHouseResolverPort,
-} from "../../ports/ingestion-source-activity.port.ts";
+  type GovernanceClickHouseClient,
+  type GovernanceClickHouseResolver,
+} from "../../app/governance.infrastructure.ts";
 import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 
 const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
@@ -294,7 +294,7 @@ type WindowCountRow = {
 
 /** Window bounds shared by the three per-source health count queries. */
 type WindowCountArgs = {
-  ch: GovernanceClickHouseClientPort;
+  ch: GovernanceClickHouseClient;
   tenantId: string;
   sourceId: string;
   since24h: number;
@@ -336,17 +336,17 @@ export type ActivityMonitorDatabase = Pick<
   "anomalyAlert" | "department" | "ingestionSource" | "organizationUser" | "project"
 >;
 
-export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
+export class PrismaActivityMonitorRepository implements ActivityMonitorRepository {
   private constructor(
     private readonly prisma: ActivityMonitorDatabase,
-    private readonly clickhouse: GovernanceClickHouseResolverPort,
+    private readonly clickhouse: GovernanceClickHouseResolver,
   ) {
     super();
   }
 
   static create(options: {
     prisma: ActivityMonitorDatabase;
-    clickhouse: GovernanceClickHouseResolverPort;
+    clickhouse: GovernanceClickHouseResolver;
   }): PrismaActivityMonitorRepository {
     return new PrismaActivityMonitorRepository(options.prisma, options.clickhouse);
   }
@@ -370,7 +370,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
 
   private async tryGetClickhouse(
     organizationId: string,
-  ): Promise<GovernanceClickHouseClientPort | null> {
+  ): Promise<GovernanceClickHouseClient | null> {
     return this.clickhouse.tryResolve(organizationId);
   }
 
@@ -1151,7 +1151,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
    * Splitting them keeps each query readable and lets them run concurrently.
    */
   private async countTracedEventsBySource(args: {
-    ch: GovernanceClickHouseClientPort;
+    ch: GovernanceClickHouseClient;
     tenantId: string;
     sourceIds: string[];
     since: number;
@@ -1187,7 +1187,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
   }
 
   private async countLoggedEventsBySource(args: {
-    ch: GovernanceClickHouseClientPort;
+    ch: GovernanceClickHouseClient;
     tenantId: string;
     sourceIds: string[];
     since: number;
@@ -1216,7 +1216,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
   }
 
   private async countPulledEventsBySource(args: {
-    ch: GovernanceClickHouseClientPort;
+    ch: GovernanceClickHouseClient;
     tenantId: string;
     sourceIds: string[];
     since: number;
@@ -1296,7 +1296,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
    * halves stay readable — the caller runs them concurrently and merges.
    */
   private async pushedEventsForSource(args: {
-    ch: GovernanceClickHouseClientPort;
+    ch: GovernanceClickHouseClient;
     tenantId: string;
     sourceId: string;
     beforeMs: number;
@@ -1351,7 +1351,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
    * `governance_ocsf_events` under the synthetic `pull:` trace id.
    */
   private async pulledEventsForSource(args: {
-    ch: GovernanceClickHouseClientPort;
+    ch: GovernanceClickHouseClient;
     tenantId: string;
     sourceId: string;
     beforeMs: number;

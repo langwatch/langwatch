@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { EmailJoinRequestNotifierAdapter } from "../join-request-notifier.service.ts";
-import { JoinRequestNotificationMailPort } from "../../app/identity.infrastructure.ts";
+import { JoinRequestNotificationMail } from "../../app/identity.infrastructure.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature
@@ -9,16 +9,16 @@ import { JoinRequestNotificationMailPort } from "../../app/identity.infrastructu
 
 function recordingMail() {
   const sendRequestArrived = vi.fn(
-    async (_: Parameters<JoinRequestNotificationMailPort["sendRequestArrived"]>[0]) => undefined,
+    async (_: Parameters<JoinRequestNotificationMail["sendRequestArrived"]>[0]) => undefined,
   );
   const sendRequestExpired = vi.fn(
-    async (_: Parameters<JoinRequestNotificationMailPort["sendRequestExpired"]>[0]) => undefined,
+    async (_: Parameters<JoinRequestNotificationMail["sendRequestExpired"]>[0]) => undefined,
   );
   const sendJoinedAutomatically = vi.fn(
-    async (_: Parameters<JoinRequestNotificationMailPort["sendJoinedAutomatically"]>[0]) =>
+    async (_: Parameters<JoinRequestNotificationMail["sendJoinedAutomatically"]>[0]) =>
       undefined,
   );
-  class RecordingMail implements JoinRequestNotificationMailPort {
+  class RecordingMail implements JoinRequestNotificationMail {
     sendRequestArrived = sendRequestArrived;
     async sendRequestStillWaiting(): Promise<unknown> {
       return undefined;

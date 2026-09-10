@@ -3,7 +3,7 @@ import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import type { DatasetRepository } from "../dataset.repository.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
-import { DatasetUploadPort } from "../../ports/dataset.port.ts";
+import { DatasetUpload } from "../../app/dataset.app.ts";
 
 const row = (): Dataset =>
   datasetSchema.parse({
@@ -50,7 +50,7 @@ class Records implements DatasetRecordRepository {
 
 describe("DatasetService upload boundary", () => {
   it("delegates upload operations to the injected upload port", async () => {
-    const uploads = new (class extends DatasetUploadPort {
+    const uploads = new (class implements DatasetUpload {
       uploadToExistingDataset = vi.fn(async () => ({
         datasetId: "d1",
         recordsCreated: 2,

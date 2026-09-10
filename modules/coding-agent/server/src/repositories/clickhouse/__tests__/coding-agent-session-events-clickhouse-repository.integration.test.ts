@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CodingAgentSessionEventRecord } from "@langwatch/coding-agent-contract";
-import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port.ts";
+import { CodingAgentClickHouse } from "../../../app/coding-agent.infrastructure.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 import {
   createTestClickHouseClient,
@@ -20,9 +20,8 @@ const integration = describe.skipIf(clickHouseUrl === null);
 let ch: ClickHouseClient;
 let repository: CodingAgentSessionEventsClickHouseRepository;
 
-class SingleClickHousePort extends CodingAgentClickHousePort {
+class SingleClickHouse implements CodingAgentClickHouse {
   constructor(private readonly client: ClickHouseClient) {
-    super();
   }
 
   async resolve() {
@@ -92,7 +91,7 @@ beforeAll(async () => {
   if (!clickHouseUrl) return;
   ch = createTestClickHouseClient(clickHouseUrl);
   repository = CodingAgentSessionEventsClickHouseRepository.create({
-    clickHouse: new SingleClickHousePort(ch),
+    clickHouse: new SingleClickHouse(ch),
     defaultTraceRetentionDays: 30,
   });
 }, 120_000);

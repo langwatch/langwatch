@@ -1,4 +1,4 @@
-export { AuthDirectoryPort, type AuthDirectoryProject } from "./transport/auth-directory.ts";
+export { AuthDirectory, type AuthDirectoryProject } from "./transport/auth-directory.ts";
 export { BetterAuthHooksRepository } from "./repositories/better-auth-hooks.repository.ts";
 export { PrismaBetterAuthHooksRepository } from "./repositories/prisma/prisma.better-auth-hooks.repository.ts";
 export { PrismaAuthDirectoryRepository } from "./repositories/prisma/prisma.auth-directory.repository.ts";
@@ -21,11 +21,11 @@ export {
 } from "./services/signup-verification.service.ts";
 export { PrismaSignUpAccountDirectoryRepository } from "./repositories/prisma/prisma.signup-account-directory.repository.ts";
 export {
-  BetterAuthAnnouncementsPort,
-  BetterAuthFederationPort,
-  BetterAuthIdentityCeremoniesPort,
-  BetterAuthPendingInvitePort,
-  BetterAuthStoragePort,
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+  BetterAuthIdentityCeremonies,
+  BetterAuthPendingInvite,
+  BetterAuthStorage,
   type BetterAuthAccountRow,
   type PendingOrganizationInvite,
 } from "./transport/better-auth/better-auth.collaborators.ts";
@@ -56,12 +56,12 @@ export {
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
   type PasskeySignUpDirectory,
-  type SignUpVerificationPort,
+  type SignUpVerification,
 } from "./transport/better-auth/passkey-sign-up.api.ts";
 export {
   isSignInInitiationPath,
   runSignInRouterShadow,
-  SignInRouterShadowPort,
+  SignInRouterShadow,
   type ShadowRun,
   type SignInRouterMode,
 } from "./transport/better-auth/sign-in-router-shadow.api.ts";

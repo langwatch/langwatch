@@ -27,9 +27,9 @@ import type {
   WriteInviteInput,
 } from "../../../repositories/organization-invite.repository.ts";
 import {
-  OrganizationInviteMailPort,
-  OrganizationInviteSeatCensusPort,
-  type OrganizationInviteRateLimitPort,
+  OrganizationInviteMail,
+  OrganizationInviteSeatCensus,
+  type OrganizationInviteRateLimit,
 } from "../../../app/organization.infrastructure.ts";
 import { InviteSendThrottleService } from "../../invite-send-throttle.service.ts";
 import type { InviteServiceDependencies } from "../../../rules/invite-contracts.rules.ts";
@@ -425,7 +425,7 @@ export class FakeRoleService implements Pick<RoleApi, "filterAssignableRoles"> {
 }
 
 /** A per-key sliding window, close enough to the real limiter to test the throttle honestly. */
-export class FakeInviteRateLimitPort implements OrganizationInviteRateLimitPort {
+export class FakeInviteRateLimit implements OrganizationInviteRateLimit {
   private readonly sends = new Map<string, number[]>();
 
   async limit({
@@ -511,7 +511,7 @@ export function makeInvite(overrides: Partial<OrganizationInvite> = {}): Organiz
 }
 
 /** No seats port composed: every organization is unlimited unless a test overrides it. */
-export class FakeSeatCensusPort implements OrganizationInviteSeatCensusPort {
+export class FakeSeatCensus implements OrganizationInviteSeatCensus {
   constructor(
     private readonly fullMembers = 0,
     private readonly liteMembers = 0,
@@ -549,16 +549,16 @@ export function makePlanProvider(plan: Partial<Plan> = {}): PlanProvider {
 }
 
 /** Records every invite email this fake was asked to send, never actually sending anything. */
-export class FakeInviteMailPort implements OrganizationInviteMailPort {
+export class FakeInviteMail implements OrganizationInviteMail {
   readonly sentInvites: Array<{ email: string; acceptInviteUrl: string }> = [];
   readonly sentReRequests: Array<{ adminEmail: string; invitedEmail: string }> = [];
 
-  async sendInvite(input: Parameters<OrganizationInviteMailPort["sendInvite"]>[0]): Promise<void> {
+  async sendInvite(input: Parameters<OrganizationInviteMail["sendInvite"]>[0]): Promise<void> {
     this.sentInvites.push({ email: input.email, acceptInviteUrl: input.acceptInviteUrl });
   }
 
   async sendInviteReRequest(
-    input: Parameters<OrganizationInviteMailPort["sendInviteReRequest"]>[0],
+    input: Parameters<OrganizationInviteMail["sendInviteReRequest"]>[0],
   ): Promise<void> {
     this.sentReRequests.push({ adminEmail: input.adminEmail, invitedEmail: input.invitedEmail });
   }
@@ -573,11 +573,11 @@ export function makeInviteDeps(
 ): InviteServiceDependencies {
   return {
     invites: new FakeOrganizationInviteRepository(),
-    seats: new FakeSeatCensusPort(),
+    seats: new FakeSeatCensus(),
     plans: makePlanProvider(),
     grants: new FakeAuthzGrantsService(),
     roles: new FakeRoleService(),
-    throttle: InviteSendThrottleService.create(new FakeInviteRateLimitPort()),
+    throttle: InviteSendThrottleService.create(new FakeInviteRateLimit()),
     baseHost: "https://app.langwatch.ai",
     ...overrides,
   };

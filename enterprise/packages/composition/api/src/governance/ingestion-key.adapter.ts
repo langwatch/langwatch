@@ -90,13 +90,13 @@ export class AppIngestionKeyRepository extends IngestionKeyRepository {
   }
 }
 
-export class AppIngestionKeyIssuerPort extends IngestionKeyIssuerPort {
+export class AppIngestionKeyIssuer extends IngestionKeyIssuerPort {
   private constructor(private readonly apiKeys: ApiKeyApi) {
     super();
   }
 
-  static create(apiKeys: ApiKeyApi): AppIngestionKeyIssuerPort {
-    return new AppIngestionKeyIssuerPort(apiKeys);
+  static create(apiKeys: ApiKeyApi): AppIngestionKeyIssuer {
+    return new AppIngestionKeyIssuer(apiKeys);
   }
 
   async create(input: IngestionKeyCreateInput): Promise<{ token: string; apiKey: { id: string } }> {
@@ -125,6 +125,6 @@ export class AppIngestionKeyAdapter {
   }
 
   issuer(): IngestionKeyIssuerPort {
-    return AppIngestionKeyIssuerPort.create(this.apiKeys);
+    return AppIngestionKeyIssuer.create(this.apiKeys);
   }
 }

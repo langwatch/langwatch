@@ -35,7 +35,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { TestProjectApi } from "./support/test-project-api.ts";
 import { testProjectWithTeam } from "./support/project-fixtures.ts";
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
 import { composeApiModelProviders } from "../api-model-provider.composition.ts";
 
@@ -76,14 +76,14 @@ function providerRow(customKeys: unknown) {
  * test is that the gateway was given the deployment's cipher at all — a
  * credential written with one and read with another decrypts to nothing.
  */
-function testCipher(): SecretEncryptionPort {
+function testCipher(): SecretEncryption {
   return {
     encrypt: (value: string) => `enc:${value}`,
     decrypt: (value: string) => {
       if (!value.startsWith("enc:")) throw new Error("Invalid encrypted string format");
       return value.slice("enc:".length);
     },
-  } as SecretEncryptionPort;
+  } as SecretEncryption;
 }
 
 function testProjects(): ProjectApi {

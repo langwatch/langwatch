@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { PulledUsageRatePort } from "../../ports/pulled-usage-rate.port.ts";
+import { PulledUsageRateReader } from "../../app/governance.infrastructure.ts";
 import {
   PulledUsagePricingService,
   type PulledUsagePriceInput,
@@ -23,8 +23,8 @@ const QUANTITIES = {
 };
 
 /** A price table that knows exactly one model, so an unknown one prices at zero. */
-class TestRates extends PulledUsageRatePort {
-  rate(input: Parameters<PulledUsageRatePort["rate"]>[0]): {
+class TestRates implements PulledUsageRateReader {
+  rate(input: Parameters<PulledUsageRateReader["rate"]>[0]): {
     costNanoUsd: number;
     rateVersion: string;
   } {

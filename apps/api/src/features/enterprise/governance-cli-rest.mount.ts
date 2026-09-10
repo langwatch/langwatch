@@ -39,7 +39,7 @@ import {
 } from "@langwatch/enterprise-governance-server";
 import type {
   GovernanceCliAccessTokenPort,
-  GovernanceCliBudgetPort,
+  GovernanceCliBudget,
   GovernanceCliPersonalWorkspace,
   GovernanceCliRestPorts,
 } from "@langwatch/enterprise-governance-server";
@@ -61,7 +61,7 @@ export type ApiGovernanceCliRestOptions = Readonly<{
   /** The AuthZ graph both RBAC checks run on. */
   authz: AuthzService | undefined;
   /** The spend decision the budget pre-flight asks, where one is composed. */
-  budgets: GovernanceCliBudgetPort | undefined;
+  budgets: GovernanceCliBudget | undefined;
   /** This deployment's public origin, where it declared one. */
   publicBaseUrl: string | undefined;
 }>;

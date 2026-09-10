@@ -9,7 +9,7 @@ import {
   NavigationHostProvider,
   type NavigationAccountMenu,
   type NavigationDeployment,
-  type NavigationHostPort,
+  type NavigationHost,
   type NavigationLangy,
   type NavigationOrganization,
   type NavigationProject,
@@ -346,7 +346,7 @@ export function NavigationHostSection({
     };
   }, [routePattern, organizations.data, activeScope.organizationId, activeScope.projectId]);
 
-  const host = useMemo<NavigationHostPort>(
+  const host = useMemo<NavigationHost>(
     () => ({
       organizations: () => graph,
       organization: () => organization,

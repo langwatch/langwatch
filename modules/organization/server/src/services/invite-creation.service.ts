@@ -20,7 +20,7 @@ import {
 } from "@langwatch/organization-contract";
 import type { PlanProvider, PlanProviderUser } from "@langwatch/entitlement-contract";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
-import type { OrganizationInviteMailPort } from "../app/organization.infrastructure.ts";
+import type { OrganizationInviteMail } from "../app/organization.infrastructure.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
 import { InviteService } from "./invite.service.ts";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
@@ -61,7 +61,7 @@ export class InviteCreationService {
     return this.deps.roles;
   }
 
-  private get mailer(): OrganizationInviteMailPort | undefined {
+  private get mailer(): OrganizationInviteMail | undefined {
     return this.deps.mail;
   }
 

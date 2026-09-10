@@ -7,15 +7,15 @@ import {
   type SlackTemplateType,
 } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
-import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
-import type { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port.ts";
+import type { AutomationClock } from "../app/automation.infrastructure.ts";
+import type { AutomationGraphDelivery } from "../app/automation.infrastructure.ts";
 import type {
   GraphAlertDispatchInput,
   GraphAlertDispatchResult,
-} from "../ports/automation-graph.port.ts";
-import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
+} from "../app/automation.infrastructure.ts";
+import type { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
-import type { AutomationWebhookProviderPort } from "../ports/automation-provider.port.ts";
+import type { AutomationWebhookProvider } from "../ports/automation-provider.port.ts";
 import { fromDate } from "@langwatch/time";
 
 function destinationHash(destination: string): string {
@@ -29,21 +29,21 @@ function emptyResult(channel: GraphAlertDispatchResult["channel"]): GraphAlertDi
 /** Graph-alert notification policy shared by real-time and heartbeat dispatch. */
 export class GraphAlertDispatchService {
   private constructor(
-    private readonly persistence: AutomationGraphDeliveryPort,
+    private readonly persistence: AutomationGraphDelivery,
     private readonly emailCaps: AutomationEmailCapService,
-    private readonly delivery: AutomationNotificationDeliveryPort,
-    private readonly webhooks: AutomationWebhookProviderPort,
-    private readonly clock: AutomationClockPort,
+    private readonly delivery: AutomationNotificationDelivery,
+    private readonly webhooks: AutomationWebhookProvider,
+    private readonly clock: AutomationClock,
     private readonly emailHourlyCap: number,
     private readonly tenantDailyCap: number,
   ) {}
 
   static create(input: {
-    persistence: AutomationGraphDeliveryPort;
+    persistence: AutomationGraphDelivery;
     emailCaps: AutomationEmailCapService;
-    delivery: AutomationNotificationDeliveryPort;
-    webhooks: AutomationWebhookProviderPort;
-    clock: AutomationClockPort;
+    delivery: AutomationNotificationDelivery;
+    webhooks: AutomationWebhookProvider;
+    clock: AutomationClock;
     emailHourlyCap: number;
     tenantDailyCap: number;
   }): GraphAlertDispatchService {

@@ -12,7 +12,7 @@ import type { TRPCCreateRouterOptions } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
-  ApiTrpcFeaturesPort,
+  ApiTrpcFeatures,
   NoApiTrpcFeatures,
   type ApiTrpcFeatureMount,
 } from "../api.application.ts";
@@ -54,7 +54,7 @@ function testSecrets() {
  * carry queries and mutations only, so without this the positive case could only be
  * asserted against a procedure the lane is now right to refuse.
  */
-class LiveUpdateFeatures extends ApiTrpcFeaturesPort<TRPCCreateRouterOptions> {
+class LiveUpdateFeatures extends ApiTrpcFeatures<TRPCCreateRouterOptions> {
   private readonly none = new NoApiTrpcFeatures();
 
   readonly authorization = this.none.authorization;

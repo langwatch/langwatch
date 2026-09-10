@@ -2,9 +2,9 @@
 
 import type { PersonalVirtualKey } from "@langwatch/enterprise-governance-contract";
 import {
-  AiToolProviderCatalogPort,
-  AiToolSlugPort,
-  CliAdminContactPort,
+  AiToolProviderCatalog,
+  AiToolSlug,
+  CliAdminContact,
   PersonalVirtualKeyIssuerPort,
 } from "@langwatch/enterprise-governance-server";
 import { nanoid } from "nanoid";
@@ -28,7 +28,7 @@ type VirtualKeyWithScopes = {
   }>;
 };
 
-export type GovernanceVirtualKeyPort = {
+export type GovernanceVirtualKey = {
   create(input: {
     organizationId: string;
     name: string;
@@ -45,21 +45,21 @@ export type GovernanceVirtualKeyPort = {
   }): Promise<VirtualKeyWithScopes>;
 };
 
-export type GovernanceModelProviderCatalogPort = {
+export type GovernanceModelProviderCatalog = {
   list(): Array<{ providerKey: string; displayName: string; type: string }>;
 };
 
-export type GovernanceOrganizationContactPort = {
+export type GovernanceOrganizationContact = {
   tryResolveAdminEmail(organizationId: string): Promise<string | null>;
 };
 
-export class AppPersonalVirtualKeyIssuerPort extends PersonalVirtualKeyIssuerPort {
-  private constructor(private readonly virtualKeys: GovernanceVirtualKeyPort) {
+export class AppPersonalVirtualKeyIssuer extends PersonalVirtualKeyIssuerPort {
+  private constructor(private readonly virtualKeys: GovernanceVirtualKey) {
     super();
   }
 
-  static create(virtualKeys: GovernanceVirtualKeyPort): AppPersonalVirtualKeyIssuerPort {
-    return new AppPersonalVirtualKeyIssuerPort(virtualKeys);
+  static create(virtualKeys: GovernanceVirtualKey): AppPersonalVirtualKeyIssuer {
+    return new AppPersonalVirtualKeyIssuer(virtualKeys);
   }
 
   async issue(input: {
@@ -93,7 +93,7 @@ export class AppPersonalVirtualKeyIssuerPort extends PersonalVirtualKeyIssuerPor
   }
 }
 
-export class AppAiToolSlugPort extends AiToolSlugPort {
+export class AppAiToolSlug extends AiToolSlug {
   generate(displayName: string): string {
     const base = displayName
       .toLowerCase()
@@ -107,13 +107,13 @@ export class AppAiToolSlugPort extends AiToolSlugPort {
   }
 }
 
-export class AppAiToolProviderCatalogPort extends AiToolProviderCatalogPort {
-  private constructor(private readonly providers: GovernanceModelProviderCatalogPort) {
+export class AppAiToolProviderCatalog extends AiToolProviderCatalog {
+  private constructor(private readonly providers: GovernanceModelProviderCatalog) {
     super();
   }
 
-  static create(providers: GovernanceModelProviderCatalogPort): AppAiToolProviderCatalogPort {
-    return new AppAiToolProviderCatalogPort(providers);
+  static create(providers: GovernanceModelProviderCatalog): AppAiToolProviderCatalog {
+    return new AppAiToolProviderCatalog(providers);
   }
 
   list(): Array<{
@@ -125,13 +125,13 @@ export class AppAiToolProviderCatalogPort extends AiToolProviderCatalogPort {
   }
 }
 
-export class AppCliAdminContactPort extends CliAdminContactPort {
-  private constructor(private readonly contacts: GovernanceOrganizationContactPort) {
+export class AppCliAdminContact extends CliAdminContact {
+  private constructor(private readonly contacts: GovernanceOrganizationContact) {
     super();
   }
 
-  static create(contacts: GovernanceOrganizationContactPort): AppCliAdminContactPort {
-    return new AppCliAdminContactPort(contacts);
+  static create(contacts: GovernanceOrganizationContact): AppCliAdminContact {
+    return new AppCliAdminContact(contacts);
   }
 
   tryResolveAdminEmail(organizationId: string): Promise<string | null> {

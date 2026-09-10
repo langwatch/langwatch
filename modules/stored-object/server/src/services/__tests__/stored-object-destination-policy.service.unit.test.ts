@@ -18,9 +18,9 @@ import {
 import { AzureBlobCredentialsAdapter } from "../azure-blob-credentials.service.ts";
 const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
 import {
-  StoredObjectAzureDestinationPort,
+  StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
-  StoredObjectProjectS3ConfigPort,
+  StoredObjectProjectS3Config,
 } from "../stored-object-destination-policy.service.ts";
 
 const TEST_BYTES = Buffer.from("hello");
@@ -30,7 +30,7 @@ function sha256(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-class StubProjects extends StoredObjectProjectS3ConfigPort {
+class StubProjects extends StoredObjectProjectS3Config {
   constructor(private readonly bucket: string | null) {
     super();
   }
@@ -39,7 +39,7 @@ class StubProjects extends StoredObjectProjectS3ConfigPort {
   }
 }
 
-class StubAzureDestination extends StoredObjectAzureDestinationPort {
+class StubAzureDestination extends StoredObjectAzureDestination {
   constructor(private readonly value: Readonly<{ accountName: string; container: string }>) {
     super();
   }
@@ -143,14 +143,14 @@ describe("StoredObjectDestinationPolicyAdapter", () => {
 
 /**
  * A destination port composed from `resolveAzureCredentials`, mirroring what
- * a composition root wires `StoredObjectAzureDestinationPort` to in
+ * a composition root wires `StoredObjectAzureDestination` to in
  * production. Used below to test the full BYOC -> azure -> global S3 -> local
  * filesystem precedence chain that used to live in one function,
  * `resolveProjectStorageDestination` — now split across
  * `StoredObjectDestinationPolicyAdapter` (the precedence) and
  * `resolveAzureCredentials` (the azure-arm validation).
  */
-class ConfiguredAzureDestination extends StoredObjectAzureDestinationPort {
+class ConfiguredAzureDestination extends StoredObjectAzureDestination {
   constructor(private readonly config: AzureBlobCredentialsConfig) {
     super();
   }

@@ -1,14 +1,14 @@
 import {
   IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
   IDENTITY_SECRET_HEAL_MIGRATION_NAME,
-  IdentityEventingPort,
+  IdentityEventing,
 } from "@langwatch/identity-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 import { registeredUserMigrations } from "../system-migrations.composition.ts";
 
 /** This process produces commands; nothing here appends during composition. */
-class StubIdentityEventing extends IdentityEventingPort {
+class StubIdentityEventing extends IdentityEventing {
   tryPipelineCommand(): Promise<{ send(data: unknown): Promise<unknown> } | null> {
     return Promise.resolve(null);
   }

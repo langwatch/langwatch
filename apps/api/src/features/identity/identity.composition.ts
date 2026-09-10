@@ -10,11 +10,11 @@ import {
   AdminEmailPlatformOperatorsRepository,
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
-  type IdentityEventingPort,
+  type IdentityEventing,
   type IdentityInfrastructure,
   IdentityLedgerWriterAdapter,
-  type JoinRequestMailPort,
-  type PlatformOperatorPort,
+  type JoinRequestMail,
+  type PlatformOperator,
   PrismaIdentityProjectionRepository,
   PrismaIdentityReservationRepository,
   PrismaIdentitySecretCarryRepository,
@@ -33,11 +33,11 @@ export type ApiIdentityInfrastructureOptions = Readonly<{
   /** This process's own guarded connection. */
   prisma: PrismaClient;
   /** How every identity command stages. */
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
   /** The deployment's operator list, for the SSO connection guards. */
-  operators: PlatformOperatorPort;
+  operators: PlatformOperator;
   /** How the two wake-driven join-request mails are sent, or none. */
-  mail: JoinRequestMailPort | null;
+  mail: JoinRequestMail | null;
   /**
    * The runtime the SSO connection ledger appends through, or none. Absent
    * on a process with no queue: `ssoConnections`/`ssoBackoffice` then refuse

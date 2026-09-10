@@ -66,7 +66,7 @@ import {
   type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
-import type { GovernanceDirectoryPort } from "../../repositories/directory/governance-directory.repository.ts";
+import type { GovernanceDirectory } from "../../repositories/directory/governance-directory.repository.ts";
 import { randomBytes } from "node:crypto";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -95,7 +95,7 @@ export type GovernanceCliCaller = Readonly<{
  * composition root binds it to the one implementation, so there is still
  * exactly one place the keyspace is spelled.
  */
-export type GovernanceCliAccessTokenPort = Readonly<{
+export type GovernanceCliAccessToken = Readonly<{
   /** The caller behind an `Authorization` header, or nothing. */
   resolve: (authHeader: string | null | undefined) => Promise<GovernanceCliCaller | null>;
   /**
@@ -121,7 +121,7 @@ export type GovernanceCliPersonalWorkspace = Readonly<{
  * real block on the first request through the same code path — which is the
  * documented degradation for installs that run no ClickHouse, not a new one.
  */
-export type GovernanceCliBudgetPort = Readonly<{
+export type GovernanceCliBudgetReader = Readonly<{
   check: (input: {
     organizationId: string;
     teamId: string;
@@ -144,13 +144,13 @@ export type GovernanceCliBudgetPort = Readonly<{
 }>;
 
 /** Everything the CLI governance plane reaches that governance does not own. */
-export type GovernanceCliRestPorts = Readonly<{
+export type GovernanceCliRestDependencies = Readonly<{
   /** The device session a bearer names, and how to sever it. */
-  accessTokens: GovernanceCliAccessTokenPort;
+  accessTokens: GovernanceCliAccessToken;
   /** The SAME governance service the console's tRPC procedures read. */
   governance: () => GovernanceApi;
   /** The identity, membership and project reads this family performs. */
-  directory: () => GovernanceDirectoryPort;
+  directory: () => GovernanceDirectory;
   /** Who to point a blocked caller at, when a budget refuses the request. */
   supportContacts: () => OrganizationSupportContactService;
   /** Resolves — creating if needed — the caller's personal workspace. */
@@ -185,7 +185,7 @@ export type GovernanceCliRestPorts = Readonly<{
     permission: AuthzPermission;
   }) => Promise<boolean>;
   /** The spend decision the budget pre-flight asks, where one is composed. */
-  budgets?: GovernanceCliBudgetPort | undefined;
+  budgets?: GovernanceCliBudgetReader | undefined;
   /** The deployment's public origin; the upgrade and OTLP links are built from it. */
   publicBaseUrl?: string | undefined;
 }>;
@@ -232,7 +232,7 @@ function sanitizeDeviceLabel(raw: string | undefined | null): string | null {
 /** Builds the CLI governance family over one process's ports. */
 export function createGovernanceCliRestApp(options: {
   security: AppRestSecurity;
-  ports: GovernanceCliRestPorts;
+  ports: GovernanceCliRestDependencies;
 }): MountableRestApp {
   const { security, ports } = options;
   const { service, policy } = security.createServiceVersionedApp({
@@ -1261,7 +1261,7 @@ export function createGovernanceCliRestApp(options: {
  */
 async function issuePersonalVirtualKey(input: {
   governance: GovernanceApi;
-  ensurePersonalWorkspace: GovernanceCliRestPorts["ensurePersonalWorkspace"];
+  ensurePersonalWorkspace: GovernanceCliRestDependencies["ensurePersonalWorkspace"];
   userId: string;
   organizationId: string;
   displayName?: string | null;

@@ -1,5 +1,5 @@
 import {
-  UnsubscribeTokenVerifierPort,
+  UnsubscribeTokenVerifier,
   type UnsubscribeTokenPayload,
 } from "../ports/unsubscribe-token.port.ts";
 import { UnsubscribeTokenService } from "../services/unsubscribe-token.service.ts";
@@ -12,7 +12,7 @@ import { UnsubscribeTokenService } from "../services/unsubscribe-token.service.t
  * re-implemented the verify half would be free to disagree with the sign half
  * that minted the link.
  */
-export class HmacUnsubscribeTokenAdapter extends UnsubscribeTokenVerifierPort {
+export class HmacUnsubscribeTokenAdapter extends UnsubscribeTokenVerifier {
   static create(input: { secret: string | undefined }): HmacUnsubscribeTokenAdapter {
     return new HmacUnsubscribeTokenAdapter(UnsubscribeTokenService.create(input));
   }

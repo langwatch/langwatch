@@ -7,7 +7,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import {
   type EmailContent,
-  EmailGatewayPort,
+  EmailGateway,
   type MailerConfiguration,
 } from "./email-gateway.service.ts";
 import { EmailMimeService } from "./email-mime.service.ts";
@@ -30,7 +30,7 @@ const defaultSesHost = (region: string) =>
   `email.${region}.amazonaws.com${region.startsWith("cn-") ? ".cn" : ""}`;
 
 /** One lazy SES client per mailer process. Its borrowed handler is released by AWS shutdown. */
-export class SesEmailGatewayAdapter extends EmailGatewayPort {
+export class SesEmailGatewayAdapter extends EmailGateway {
   static create(input: {
     configuration: MailerConfiguration["ses"];
     aws: SesAwsClientConfiguration;
@@ -110,8 +110,8 @@ export class SesEmailGatewayAdapter extends EmailGatewayPort {
     defaultFrom: string;
   }) {
     const from = content.from ?? defaultFrom;
-    const toAddresses = EmailGatewayPort.recipients(content.to);
-    const allDestinations = [...toAddresses, ...EmailGatewayPort.recipients(content.bcc)];
+    const toAddresses = EmailGateway.recipients(content.to);
+    const allDestinations = [...toAddresses, ...EmailGateway.recipients(content.bcc)];
     const rawMessage = this.mime.buildRawMessage({
       from,
       to: toAddresses,
@@ -144,8 +144,8 @@ export class SesEmailGatewayAdapter extends EmailGatewayPort {
     defaultFrom: string;
   }) {
     const from = content.from ?? defaultFrom;
-    const toAddresses = EmailGatewayPort.recipients(content.to);
-    const bccAddresses = EmailGatewayPort.recipients(content.bcc);
+    const toAddresses = EmailGateway.recipients(content.to);
+    const bccAddresses = EmailGateway.recipients(content.bcc);
     const data = await client.send(
       new SendEmailCommand({
         Destination: {

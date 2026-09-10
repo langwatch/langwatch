@@ -6,9 +6,9 @@ import {
   type CodingAgentProcessingEvent,
 } from "@langwatch/coding-agent-contract";
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
-import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port.ts";
+import type { CodingAgentCostEstimator } from "../app/coding-agent.infrastructure.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import type { CodingAgentCostMetricsPort } from "../ports/coding-agent-cost-metrics.port.ts";
+import type { CodingAgentCostMetrics } from "../app/coding-agent.infrastructure.ts";
 import { CodingAgentSessionStateProjection } from "../projections/coding-agent-session-state.projection.ts";
 import { CodingAgentSessionSpanProjection } from "../projections/coding-agent-session-span.projection.ts";
 import { CodingAgentSessionLogProjection } from "../projections/coding-agent-session-log.projection.ts";
@@ -23,8 +23,8 @@ function labels(agent: string, facts: Record<string, unknown>) {
 }
 
 export function createCodingAgentCostDriftSubscriber(input: {
-  metrics: CodingAgentCostMetricsPort;
-  modelProviders: CodingAgentCostEstimatorPort;
+  metrics: CodingAgentCostMetrics;
+  modelProviders: CodingAgentCostEstimator;
   traceCanonicalisation: TraceCanonicalisationService;
 }): EventSubscriberDefinition<CodingAgentProcessingEvent> {
   const stateProjection = CodingAgentSessionStateProjection.create();

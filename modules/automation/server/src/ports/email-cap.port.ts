@@ -1,4 +1,4 @@
-export abstract class AutomationEmailCapStorePort {
+export abstract class AutomationEmailCapStore {
   abstract trySet(
     key: string,
     value: string,

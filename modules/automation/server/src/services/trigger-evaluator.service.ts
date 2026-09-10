@@ -6,14 +6,14 @@ import type {
 } from "@langwatch/automation-contract";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";
-import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
+import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
 import type {
-  AutomationDispatchErrorPort,
-  AutomationGraphNotifierPort,
-  AutomationLoggerPort,
-  AutomationSlackBotTokenDecryptorPort,
-} from "../ports/automation-graph.port.ts";
-import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+  AutomationDispatchError,
+  AutomationGraphNotifier,
+  AutomationLogger,
+  AutomationSlackBotTokenDecryptor,
+} from "../app/automation.infrastructure.ts";
+import type { AutomationClock } from "../app/automation.infrastructure.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
@@ -98,11 +98,11 @@ export type GraphTriggerEvaluationDeps = {
   projects: AutomationProjectIdentityPort;
   analytics: AnalyticsService;
   triggerSent: GraphTriggerSentRepository;
-  notifier: AutomationGraphNotifierPort;
-  logger: AutomationLoggerPort;
-  slackTokens: AutomationSlackBotTokenDecryptorPort;
-  dispatchErrors: AutomationDispatchErrorPort;
-  clock: AutomationClockPort;
+  notifier: AutomationGraphNotifier;
+  logger: AutomationLogger;
+  slackTokens: AutomationSlackBotTokenDecryptor;
+  dispatchErrors: AutomationDispatchError;
+  clock: AutomationClock;
   baseHost: string;
 };
 

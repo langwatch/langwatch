@@ -1,6 +1,6 @@
 export type AuthzRevocationReason = "revocation" | "offboard";
 
-export abstract class AuthzRevocationTelemetryPort {
+export abstract class AuthzRevocationTelemetry {
   abstract record(args: {
     organizationId: string;
     reason: AuthzRevocationReason;

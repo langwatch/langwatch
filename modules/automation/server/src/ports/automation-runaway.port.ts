@@ -5,7 +5,7 @@ type LimitEmailKind = "ceiling_reached" | "paused";
 export type ClaimLease = { key: string; token: string };
 
 /** Explicit infrastructure ports used by Automation's containment policy. */
-export abstract class AutomationRunawayPort {
+export abstract class AutomationRunaway {
   abstract countProjectTraces24h(projectId: string): Promise<number>;
   abstract notificationRecipients(params: {
     projectId: string;

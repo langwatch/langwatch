@@ -8,7 +8,7 @@ import {
 } from "@langwatch/webhook-server";
 import {
   GovernanceEventDeliveryProcess,
-  GovernanceWebhookPort,
+  GovernanceWebhook,
   type GovernanceWebhookSendBatch,
 } from "@langwatch/enterprise-governance-server";
 import type { IntentContext } from "@langwatch/eventing";
@@ -18,7 +18,7 @@ type WebhookSendBatch = (
   context: IntentContext,
 ) => Promise<void>;
 
-export class AppGovernanceWebhookPort extends GovernanceWebhookPort {
+export class AppGovernanceWebhook extends GovernanceWebhook {
   readonly maxAttempts = WEBHOOK_SEND_MAX_ATTEMPTS;
 
   private constructor(
@@ -28,8 +28,8 @@ export class AppGovernanceWebhookPort extends GovernanceWebhookPort {
     super();
   }
 
-  static create(dependencies: WebhookDeliveryProcessDeps): AppGovernanceWebhookPort {
-    return new AppGovernanceWebhookPort(
+  static create(dependencies: WebhookDeliveryProcessDeps): AppGovernanceWebhook {
+    return new AppGovernanceWebhook(
       dependencies,
       WebhookDeliveryService.create(dependencies).runWebhookSendBatch(),
     );
@@ -75,7 +75,7 @@ export class AppGovernanceWebhookAdapter {
 
   build(): GovernanceEventDeliveryProcess {
     return GovernanceEventDeliveryProcess.create(
-      AppGovernanceWebhookPort.create(this.dependencies),
+      AppGovernanceWebhook.create(this.dependencies),
     );
   }
 }

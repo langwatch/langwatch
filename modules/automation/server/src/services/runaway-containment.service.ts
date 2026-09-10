@@ -3,8 +3,8 @@ import {
   RUNAWAY_PAUSE_REASON,
   type AutomationPersistCapBreach,
 } from "@langwatch/automation-contract";
-import { AutomationRunawayPort } from "../ports/automation-runaway.port.ts";
-import { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import { AutomationRunaway } from "../ports/automation-runaway.port.ts";
+import { AutomationClock } from "../app/automation.infrastructure.ts";
 import { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
@@ -18,15 +18,15 @@ export const RUNAWAY_MIN_PROJECT_TRACES = 100;
 /** Private, process-lifetime collaborator for claim-gated containment. */
 export class RunawayContainmentService {
   private constructor(
-    private readonly runaway: AutomationRunawayPort,
+    private readonly runaway: AutomationRunaway,
     private readonly triggers: TriggerRepository,
-    private readonly clock: AutomationClockPort,
+    private readonly clock: AutomationClock,
   ) {}
 
   static create(input: {
-    runaway: AutomationRunawayPort;
+    runaway: AutomationRunaway;
     triggers: TriggerRepository;
-    clock: AutomationClockPort;
+    clock: AutomationClock;
   }): RunawayContainmentService {
     return new RunawayContainmentService(input.runaway, input.triggers, input.clock);
   }

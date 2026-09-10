@@ -90,9 +90,9 @@ import type {
   CodexTokenRefresher,
   ModelProviderCatalog,
   ModelProviderConnectionRateLimiter,
-  ModelProviderCredentialProbePort,
-  ModelTranslationPort,
-} from "../ports/model-provider.port.ts";
+  ModelProviderCredentialProbe,
+  ModelTranslation,
+} from "./model-provider.infrastructure.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
@@ -122,7 +122,7 @@ export interface ModelProviderInfrastructure {
   /** The provider registry, and the system credentials this deployment holds. */
   catalog: ModelProviderCatalog;
   /** How a resolved model is executed, for the translation call. */
-  translation: ModelTranslationPort;
+  translation: ModelTranslation;
   /** The identifier format every row this module writes is minted in. */
   ids: ModelProviderIdFactory;
   /** The OAuth exchange a stored Codex token is refreshed through. */
@@ -134,7 +134,7 @@ export interface ModelProviderInfrastructure {
    * composed. A technical port: the network is the deployment's, the decision
    * about who may reach it is this application's.
    */
-  credentialProbe: ModelProviderCredentialProbePort;
+  credentialProbe: ModelProviderCredentialProbe;
   /**
    * The Codex device flow. Named as the two answers this module asks for
    * rather than as the class that gives them, because the outbound `fetch`
@@ -204,7 +204,7 @@ export class ModelProviderApp implements ModelProviderApi {
 
   /** The read, write, defaults and cost lifecycles, over the chosen backend. */
   readonly #modelProviders: ModelProviderGateway;
-  readonly #credentialProbe: ModelProviderCredentialProbePort;
+  readonly #credentialProbe: ModelProviderCredentialProbe;
   readonly #codexAccounts: ModelProviderCodexDeviceFlow;
   readonly #spans: SpanReader;
   /**

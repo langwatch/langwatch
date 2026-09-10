@@ -32,7 +32,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApp } from "@langwatch/experiment-server";
 import type { OrganizationApp } from "@langwatch/organization-server";
 import type { PresenceApi } from "@langwatch/presence-contract";
-import type { PresenceEmitterPort } from "@langwatch/presence-server";
+import type { PresenceEmitter } from "@langwatch/presence-server";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ModelProviderApp } from "@langwatch/model-provider-server";
@@ -65,7 +65,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
   codingAgentApp: CodingAgentApi;
   /** What the caller may do at one scope, as `authz.*` reports it back to them. */
   authzApp: AuthzApi;
-  broadcast: PresenceEmitterPort;
+  broadcast: PresenceEmitter;
   dashboard: DashboardApi;
   /**
    * A project's datasets, the rows inside them and the batch-evaluation

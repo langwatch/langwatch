@@ -6,7 +6,7 @@ import {
 } from "../../app/metric.infrastructure.ts";
 import { MetricService } from "../metric.service.ts";
 
-class RecordingPreparationPort implements MetricPreparation {
+class RecordingPreparation implements MetricPreparation {
   input: MetricPreparationInput | null = null;
 
   async prepare(input: MetricPreparationInput): Promise<MetricDataPointPreparation> {
@@ -17,7 +17,7 @@ class RecordingPreparationPort implements MetricPreparation {
 
 describe("MetricService", () => {
   it("delegates canonical preparation to its composed preparation service", async () => {
-    const preparation = new RecordingPreparationPort();
+    const preparation = new RecordingPreparation();
     const service = MetricService.create({ preparation });
 
     await service.prepareMetricDataPoints({

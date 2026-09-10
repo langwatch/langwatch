@@ -49,7 +49,7 @@ export interface LangWatchQLConnection {
 }
 
 /** The narrow seam the LangWatchQL service depends on. */
-export abstract class LangWatchQLExecutorPort {
+export abstract class LangWatchQLExecutor {
   abstract execute(request: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult>;
 
   /**

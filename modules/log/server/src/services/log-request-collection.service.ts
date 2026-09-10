@@ -10,7 +10,7 @@ import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer"
 import { getLangWatchTracer } from "langwatch";
 import { piiRedactionLevelSchema } from "@langwatch/trace-contract";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
-import type { LogTraceIoPort } from "../ports/log-trace-io.port.ts";
+import type { LogTraceIoExtractor } from "../app/log.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
@@ -20,7 +20,7 @@ type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } 
 
 export interface LogRequestCollectionDeps {
   traceCanonicalisation: TraceCanonicalisationService;
-  traceIo: LogTraceIoPort;
+  traceIo: LogTraceIoExtractor;
   logs: LogApi;
   recordLogRecords: (data: CanonicalLogRecord[]) => Promise<void>;
   recordLogContributions: (data: LogTraceContribution[]) => Promise<void>;
@@ -238,7 +238,7 @@ function makeTraceContribution({
 }: {
   prepared: LogPreparation["accepted"][number];
   traceCanonicalisation: TraceCanonicalisationService;
-  traceIo: LogTraceIoPort;
+  traceIo: LogTraceIoExtractor;
 }): LogTraceContribution {
   const { record, normalized } = prepared;
   const legacyView: LogRecordReceivedEventData = {

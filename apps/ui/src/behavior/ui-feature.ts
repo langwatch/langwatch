@@ -16,13 +16,13 @@ import type {
 import type { UiPageLoaderRegistry } from "./ui-page-loaders";
 import type { UiWebRouteParent } from "./ui-web-installation";
 import type { RouteObject } from "react-router";
-import type { UiRpcPort } from "./ui-rpc";
+import type { UiRpc } from "./ui-rpc";
 import type { UiSessionSource } from "./ui-session";
 
 /** What a failure interceptor may do about the failure it just read. */
 export type UiFailureHost = {
   /** Procedures by path, for a remediation the reader can take in one click. */
-  readonly rpc: UiRpcPort;
+  readonly rpc: UiRpc;
   /** Moves the address bar, for a remediation that is a page. */
   readonly navigate: (href: string) => void;
 };

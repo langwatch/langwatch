@@ -1,19 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { WorkerHandlePort, WorkerLifecyclePort, WorkerTransportPort } from "../worker-runtime.port.ts";
+import { WorkerHandle, WorkerLifecycle, WorkerTransport } from "../worker-runtime.port.ts";
 import { WorkerRuntime } from "../worker.runtime.ts";
 
-class TestWorkerHandle extends WorkerHandlePort {
+class TestWorkerHandle extends WorkerHandle {
   readonly shutdown = vi.fn(async (): Promise<void> => void 0);
 }
 
-class TestWorkerLifecycle extends WorkerLifecyclePort {
+class TestWorkerLifecycle extends WorkerLifecycle {
   readonly close = vi.fn(async (): Promise<void> => void 0);
 }
 
-class TestWorkerTransport extends WorkerTransportPort {
+class TestWorkerTransport extends WorkerTransport {
   readonly handle = new TestWorkerHandle();
-  readonly start = vi.fn(async (): Promise<WorkerHandlePort> => this.handle);
+  readonly start = vi.fn(async (): Promise<WorkerHandle> => this.handle);
 }
 
 function createDeferred<T>() {
@@ -52,7 +52,7 @@ describe("WorkerRuntime", () => {
 
   it("shares an in-flight transport start", async () => {
     const transport = new TestWorkerTransport();
-    const start = createDeferred<WorkerHandlePort>();
+    const start = createDeferred<WorkerHandle>();
     transport.start.mockImplementation(() => start.promise);
     const runtime = WorkerRuntime.create({
       lifecycle: new TestWorkerLifecycle(),
@@ -99,7 +99,7 @@ describe("WorkerRuntime", () => {
     const phases: string[] = [];
     const lifecycle = new TestWorkerLifecycle();
     const transport = new TestWorkerTransport();
-    const start = createDeferred<WorkerHandlePort>();
+    const start = createDeferred<WorkerHandle>();
     transport.start.mockImplementation(() => start.promise);
     transport.handle.shutdown.mockImplementation(async () => {
       phases.push("transport");

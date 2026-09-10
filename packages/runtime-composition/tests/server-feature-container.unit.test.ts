@@ -77,30 +77,27 @@ describe("the server feature container", () => {
     it("constructs nothing until boot", async () => {
       const setup = vi.fn();
       const declaration = greetingFeature(setup);
-      const application = createApp({ name: "test" })
-        .withInfrastructure({ prefix: "a" })
-        .withModule(declaration);
+      const application = createApp({ role: "api", infrastructure: { prefix: "a" } })
+        .withModules([declaration]);
 
       expect(setup).not.toHaveBeenCalled();
 
-      await application.boot({ role: "api" });
+      await application.boot();
       expect(setup).toHaveBeenCalledOnce();
     });
 
-    it("binds a feature to its own infrastructure while sharing the process graph", async () => {
-      type FeatureInfrastructure = Readonly<{ suffix: string }>;
-      const declaration = serverFeature<FeatureInfrastructure>("isolated")
-        .withSetup(({ infrastructure }) => ({ value: infrastructure.suffix }))
+    it("hands every module the one pool the process holds", async () => {
+      const declaration = serverFeature<TestInfrastructure>("isolated")
+        .withSetup(({ infrastructure }) => ({ value: infrastructure.prefix }))
         .build();
 
       const processInfrastructure = { prefix: "process" };
-      const booted = await createApp({ name: "test" })
-        .withInfrastructure(processInfrastructure)
-        .withModule(declaration, { infrastructure: { suffix: "feature" } })
-        .boot({ role: "worker" });
+      const booted = await createApp({ role: "worker", infrastructure: processInfrastructure })
+        .withModules([declaration])
+        .boot();
 
       expect(booted.infrastructure).toBe(processInfrastructure);
-      expect(booted.module(declaration).provided.value).toBe("feature");
+      expect(booted.module(declaration).provided.value).toBe("process");
     });
 
     it("parses the feature's own config slice and refuses one that does not match", async () => {
@@ -109,18 +106,16 @@ describe("the server feature container", () => {
         .withSetup(({ config }) => ({ maximum: config.maximum }))
         .build();
 
-      const booted = await createApp({ name: "test" })
-        .withInfrastructure({ prefix: "a" })
-        .withModule(declaration)
-        .boot({ role: "api", config: { limits: { maximum: 3 } } });
+      const booted = await createApp({ role: "api", config: { limits: { maximum: 3 } }, infrastructure: { prefix: "a" } })
+        .withModules([declaration])
+        .boot();
       expect(booted.module(declaration).provided.maximum).toBe(3);
 
       await expect(
         Promise.resolve().then(() =>
-          createApp({ name: "test" })
-            .withInfrastructure({ prefix: "a" })
-            .withModule(declaration)
-            .boot({ role: "api", config: { limits: { maximum: "three" } } }),
+          createApp({ role: "api", config: { limits: { maximum: "three" } }, infrastructure: { prefix: "a" } })
+            .withModules([declaration])
+            .boot(),
         ),
       ).rejects.toBeInstanceOf(FeatureConfigError);
     });
@@ -146,10 +141,9 @@ describe("the server feature container", () => {
       .withTransport(transport)
       .withWorker(worker)
       .build();
-    const runtime = await createApp({ name: "task" })
-      .withInfrastructure({ prefix: "task" })
-      .withModule(declaration)
-      .boot({ role: "task" });
+    const runtime = await createApp({ role: "tasks", infrastructure: { prefix: "task" } })
+      .withModules([declaration])
+      .boot();
 
     expect(runtime.service(GreetingApp)).toBe(runtime.module(declaration).provided);
     expect(runtime.service(GreetingApp).greeting.greet()).toBe("task hello");
@@ -165,11 +159,9 @@ describe("the server feature container", () => {
       const declaration = greetingFeature(setup);
 
       const boot = Promise.resolve().then(() =>
-        createApp({ name: "test" })
-          .withInfrastructure({ prefix: "a" })
-          .withModule(declaration)
-          .withModule(declaration)
-          .boot({ role: "api" }),
+        createApp({ role: "api", infrastructure: { prefix: "a" } })
+          .withModules([declaration, declaration])
+          .boot(),
       );
 
       const error = await boot.catch((thrown: unknown) => thrown);
@@ -193,10 +185,9 @@ describe("the server feature container", () => {
         .build();
 
       const boot = Promise.resolve().then(() =>
-        createApp({ name: "test" })
-          .withInfrastructure({ prefix: "a" })
-          .withModule(declaration)
-          .boot({ role: "api" }),
+        createApp({ role: "api", infrastructure: { prefix: "a" } })
+          .withModules([declaration])
+          .boot(),
       );
 
       const error = await boot.catch((thrown: unknown) => thrown);
@@ -207,20 +198,6 @@ describe("the server feature container", () => {
       expect(setup).not.toHaveBeenCalled();
     });
 
-    it("accepts a service the application root hands in already constructed", async () => {
-      const declaration = serverFeature<TestInfrastructure>("queue")
-        .withDependencies({ directory: DirectoryApp })
-        .withSetup(({ dependencies }) => ({ named: dependencies.directory.directory.nameOf("7") }))
-        .build();
-
-      const booted = await createApp({ name: "test" })
-        .withInfrastructure({ prefix: "a" })
-        .withProvided(DirectoryApp, { directory: new Directory() })
-        .withModule(declaration)
-        .boot({ role: "api" });
-
-      expect(booted.module(declaration).provided.named).toBe("person-7");
-    });
   });
 
   describe("when features depend on each other", () => {
@@ -238,11 +215,9 @@ describe("the server feature container", () => {
 
       const error = await Promise.resolve()
         .then(() =>
-          createApp({ name: "test" })
-            .withInfrastructure({ prefix: "a" })
-            .withModule(first)
-            .withModule(second)
-            .boot({ role: "api" }),
+          createApp({ role: "api", infrastructure: { prefix: "a" } })
+            .withModules([first, second])
+            .boot(),
         )
         .catch((thrown: unknown) => thrown);
 
@@ -267,11 +242,9 @@ describe("the server feature container", () => {
         })
         .build();
 
-      await createApp({ name: "test" })
-        .withInfrastructure({ prefix: "a" })
-        .withModule(queue)
-        .withModule(directory)
-        .boot({ role: "api" });
+      await createApp({ role: "api", infrastructure: { prefix: "a" } })
+        .withModules([queue, directory])
+        .boot();
 
       expect(order).toEqual(["directory", "queue"]);
     });
@@ -285,10 +258,9 @@ describe("the server feature container", () => {
         .withRest(() => ({ route: "/index" }))
         .withWorker(worker)
         .build();
-      const runtime = await createApp({ name: "test" })
-        .withInfrastructure({ prefix: "a" })
-        .withModule(declaration)
-        .boot({ role: "api" });
+      const runtime = await createApp({ role: "api", infrastructure: { prefix: "a" } })
+        .withModules([declaration])
+        .boot();
 
       expect(runtime.module(declaration).rest()).toEqual({ route: "/index" });
       expect(() => runtime.module(declaration).worker()).toThrow(RoleContributionError);
@@ -302,10 +274,9 @@ describe("the server feature container", () => {
         .withWorker(() => ({ consumers: ["index-traces"] }))
         .build();
 
-      const booted = await createApp({ name: "test" })
-        .withInfrastructure({ prefix: "a" })
-        .withModule(declaration)
-        .boot({ role: "worker" });
+      const booted = await createApp({ role: "worker", infrastructure: { prefix: "a" } })
+        .withModules([declaration])
+        .boot();
 
       expect(booted.module(declaration).worker()).toEqual({ consumers: ["index-traces"] });
     });
@@ -330,11 +301,9 @@ describe("the server feature container", () => {
 
       await expect(
         Promise.resolve().then(() =>
-          createApp({ name: "test" })
-            .withInfrastructure({ prefix: "a" })
-            .withModule(directory)
-            .withModule(failing)
-            .boot({ role: "api" }),
+          createApp({ role: "api", infrastructure: { prefix: "a" } })
+            .withModules([directory, failing])
+            .boot(),
         ),
       ).rejects.toThrow("no index storage");
       expect(closed).toEqual(["directory"]);
@@ -351,9 +320,7 @@ describe("the server feature container", () => {
         })
         .build();
 
-      const booted = await createApp({ name: "test" })
-        .withInfrastructure({ prefix: "a" })
-        .withModule(declaration)
+      const booted = await createApp({ role: "worker", infrastructure: { prefix: "a" } })
         .withService({
           name: "consumers",
           start: () => {
@@ -363,7 +330,8 @@ describe("the server feature container", () => {
             phases.push("drained");
           },
         })
-        .boot({ role: "worker" });
+        .withModules([declaration])
+        .boot();
 
       await booted.start();
       await booted.stop();
@@ -377,10 +345,9 @@ describe("the server feature container", () => {
     it("answers both contributions from the single service the setup constructed", async () => {
       const setup = vi.fn();
       const declaration = greetingFeature(setup);
-      const booted = await createApp({ name: "test" })
-        .withInfrastructure({ prefix: "one" })
-        .withModule(declaration)
-        .boot({ role: "api" });
+      const booted = await createApp({ role: "api", infrastructure: { prefix: "one" } })
+        .withModules([declaration])
+        .boot();
 
       const installed = booted.module(declaration);
       expect(installed.rest().greetings()).toBe(installed.trpc().door);
@@ -399,10 +366,9 @@ describe("runtime failure ownership", () => {
       .withSetup(() => ({}))
       .withWorker(worker)
       .build();
-    const runtime = await createApp({ name: "worker" })
-      .withInfrastructure({})
-      .withModule(feature)
-      .boot({ role: "worker" });
+    const runtime = await createApp({ role: "worker", infrastructure: {} })
+      .withModules([feature])
+      .boot();
     expect(worker).toHaveBeenCalledOnce();
     expect(runtime.module(feature).worker()).toBe(runtime.module(feature).worker());
     expect(worker).toHaveBeenCalledOnce();
@@ -439,11 +405,9 @@ describe("runtime failure ownership", () => {
         })
         .build();
       await expect(
-        createApp({ name: "test" })
-          .withInfrastructure({})
-          .withModule(first)
-          .withModule(failing)
-          .boot({ role: "api" }),
+        createApp({ role: "api", infrastructure: {} })
+          .withModules([first, failing])
+          .boot(),
       ).rejects.toBe(failure);
       expect(closed).toEqual(
         phase === "setup" ? ["partial", "first"] : ["complete", "partial", "first"],
@@ -464,10 +428,9 @@ describe("runtime failure ownership", () => {
         throw failure;
       })
       .build();
-    const error = await createApp({ name: "test" })
-      .withInfrastructure({})
-      .withModule(feature)
-      .boot({ role: "task" })
+    const error = await createApp({ role: "tasks", infrastructure: {} })
+      .withModules([feature])
+      .boot()
       .catch((error: unknown) => error);
     expect(error).toBeInstanceOf(AggregateError);
     expect(error).toHaveProperty("cause", failure);
@@ -476,8 +439,7 @@ describe("runtime failure ownership", () => {
 
   it("serialises concurrent starts and stops and closes each resource once", async () => {
     const phases: string[] = [];
-    const runtime = await createApp({ name: "test" })
-      .withInfrastructure({})
+    const runtime = await createApp({ role: "api", infrastructure: {} })
       .withService({
         name: "listener",
         start: async () => {
@@ -489,7 +451,7 @@ describe("runtime failure ownership", () => {
           phases.push("stop");
         },
       })
-      .boot({ role: "api" });
+      .boot();
     const start = runtime.start();
     expect(runtime.start()).toBe(start);
     const stop = runtime.stop();
@@ -508,9 +470,7 @@ describe("runtime failure ownership", () => {
         phases.push("resources");
       })
       .build();
-    const runtime = await createApp({ name: "test" })
-      .withInfrastructure({})
-      .withModule(feature)
+    const runtime = await createApp({ role: "api", infrastructure: {} })
       .withService({
         name: "first",
         start: () => {
@@ -530,7 +490,8 @@ describe("runtime failure ownership", () => {
           phases.push("second stop");
         },
       })
-      .boot({ role: "api" });
+      .withModules([feature])
+      .boot();
     await expect(runtime.start()).rejects.toBe(failure);
     await runtime.stop();
     expect(phases).toEqual([
@@ -551,9 +512,7 @@ describe("runtime failure ownership", () => {
         throw new Error("resource");
       })
       .build();
-    const runtime = await createApp({ name: "test" })
-      .withInfrastructure({})
-      .withModule(feature)
+    const runtime = await createApp({ role: "api", infrastructure: {} })
       .withService({
         name: "first",
         start: () => {},
@@ -570,7 +529,8 @@ describe("runtime failure ownership", () => {
           throw new Error("second");
         },
       })
-      .boot({ role: "api" });
+      .withModules([feature])
+      .boot();
     await runtime.start();
     const stop = runtime.stop();
     await expect(stop).rejects.toBeInstanceOf(AggregateError);

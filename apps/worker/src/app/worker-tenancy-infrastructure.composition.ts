@@ -6,7 +6,7 @@ import {
 import {
   EventingAuthzGrantAdapter,
   KsuidAuthzBindingIdAdapter,
-  type AuthzGrantsCommandDispatcherPort,
+  type AuthzGrantsCommandDispatcher,
 } from "@langwatch/authz-server";
 import {
   DataRetentionPlanPort,
@@ -36,7 +36,7 @@ export type WorkerTenancyInfrastructureOptions = Readonly<{
   redis: RedisConnection | null;
   config: WorkerConfig;
   plans: PlanProvider;
-  authzDispatcher: AuthzGrantsCommandDispatcherPort;
+  authzDispatcher: AuthzGrantsCommandDispatcher;
   topicClustering: ProjectInfrastructure["topicClustering"];
   topicSchedule: TopicInfrastructure["schedule"];
   dataRetention: Omit<DataRetentionInfrastructure, "redis">;
@@ -48,14 +48,12 @@ export type WorkerTenancyInfrastructureOptions = Readonly<{
  * on. Which plan types count as enterprise, and whether this install is SaaS at
  * all, are billing and licensing facts the feature deliberately does not know.
  */
-export class WorkerDataRetentionPlans extends DataRetentionPlanPort {
+export class WorkerDataRetentionPlans implements DataRetentionPlanPort {
   static create(plans: Pick<PlanProvider, "getActivePlan">): WorkerDataRetentionPlans {
     return new WorkerDataRetentionPlans(plans);
   }
 
-  private constructor(private readonly plans: Pick<PlanProvider, "getActivePlan">) {
-    super();
-  }
+  private constructor(private readonly plans: Pick<PlanProvider, "getActivePlan">) {}
 
   async getPlan(input: {
     organizationId: string;

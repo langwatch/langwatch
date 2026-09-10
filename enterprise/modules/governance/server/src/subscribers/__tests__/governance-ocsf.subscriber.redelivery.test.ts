@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
-  GovernanceOcsfEventPort,
+  GovernanceOcsfEventWriter,
   type GovernanceOcsfEvent,
-} from "../../ports/governance-subscriber.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber.ts";
 import {
   governanceTraceContext,
   governanceTraceEvent,
   SilentSubscriberDiagnostics,
-} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures.ts";
+} from "./governance-subscriber.fixtures.ts";
 
-class ReplacingOcsfEvents extends GovernanceOcsfEventPort {
+class ReplacingOcsfEvents implements GovernanceOcsfEventWriter {
   readonly rows = new Map<string, GovernanceOcsfEvent>();
 
   insertEvent(row: GovernanceOcsfEvent): Promise<void> {

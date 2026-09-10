@@ -12,8 +12,8 @@ import type {
 } from "@langwatch/automation-contract";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import { describe, expect, it, vi } from "vitest";
-import { AutomationNotificationDeliveryPort } from "../../ports/automation-notification-delivery.port.ts";
-import { AutomationSlackProviderPort } from "../../ports/automation-provider.port.ts";
+import { AutomationNotificationDelivery } from "../../ports/automation-notification-delivery.port.ts";
+import { AutomationSlackProvider } from "../../ports/automation-provider.port.ts";
 import { ReportChartService } from "../report-chart.service.ts";
 import { ReportDispatchService, type ReportDispatchDeps } from "../report-dispatch.service.ts";
 import { ReportTraceRowService } from "../report-trace-row.service.ts";
@@ -28,7 +28,7 @@ const SCHEDULE = { cron: "0 9 * * *", timezone: "UTC" };
 /**
  * The mail gateway a report actually leaves through, faked.
  */
-class FakeMailGateway extends AutomationNotificationDeliveryPort {
+class FakeMailGateway extends AutomationNotificationDelivery {
   readonly emails: Array<{ recipients: string[]; subject: string; html: string }> = [];
   readonly slackMessages: Array<{ payload: SlackPayload }> = [];
 
@@ -58,7 +58,7 @@ class FakeMailGateway extends AutomationNotificationDeliveryPort {
   }
 }
 
-class NoSlackTokens extends AutomationSlackProviderPort {
+class NoSlackTokens extends AutomationSlackProvider {
   tryDecrypt(): string | null {
     return null;
   }

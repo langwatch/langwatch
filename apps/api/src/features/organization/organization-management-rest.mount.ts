@@ -12,7 +12,7 @@
 import { EnterprisePlanRequiredError, isEnterpriseTier } from "@langwatch/enterprise-plan-gate";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { AppRestManagementAuditPort, MountableRestApp } from "@langwatch/api/rest";
+import type { AppRestManagementAudit, MountableRestApp } from "@langwatch/api/rest";
 import { bindRestMiddleware } from "@langwatch/api/rest";
 import { organizationManagementEnterpriseGate, organizationManagementRest } from "@langwatch/organization-server";
 import type { MiddlewareHandler } from "hono";
@@ -26,7 +26,7 @@ const VERSION_SEGMENT = /^(latest|20\d{2}-\d{2}-\d{2})$/;
 export type OrganizationManagementRestOptions = Readonly<{
   organizations: () => OrganizationApi;
   plans: () => PlanProvider;
-  audit: AppRestManagementAuditPort;
+  audit: AppRestManagementAudit;
 }>;
 
 /** Mounts `/api/organization` behind this process's organization credential. */
@@ -58,7 +58,7 @@ export function mountOrganizationManagementRest(
  */
 function recordOrganizationManagementAudit(
   runtime: ApiRestRuntime,
-  audit: AppRestManagementAuditPort,
+  audit: AppRestManagementAudit,
 ): MiddlewareHandler {
   return async (context, next) => {
     await next();

@@ -2,11 +2,11 @@ import { TraceDeferredOriginEventingAdapter } from "./eventing.deferred-origin.s
 import { EventSourcing, mapCommands, type EventSourcedQueueProcessor } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
-  DatasetNormalizationWorkerPort,
+  DatasetNormalizationWorker,
   type DatasetNormalizePayload,
 } from "@langwatch/dataset-contract";
 import type { AssignTopicCommandData, ResolveOriginCommandData } from "@langwatch/trace-contract";
-import { EventingTraceTopicAssignmentPort } from "./eventing.trace-topic-assignment.service.ts";
+import { EventingTraceTopicAssignment } from "./eventing.trace-topic-assignment.service.ts";
 import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "./eventing.deferred-origin.service.ts";
 import type { DeferredOriginPayload, TraceDeferredOriginScheduler } from "../app/trace.infrastructure.ts";
 import { TraceProcessingPipeline } from "../app/trace.infrastructure.ts";
@@ -55,7 +55,7 @@ class RegisteredTraceTopicCommand implements TraceTopicAssignmentCommand {
 export class TraceProcessingServerInstallerAdapter implements TraceProcessingInstaller {
   static create(options: {
     pipeline: TraceProcessingPipeline;
-    datasetNormalization: DatasetNormalizationWorkerPort;
+    datasetNormalization: DatasetNormalizationWorker;
   }): TraceProcessingServerInstallerAdapter {
     return new TraceProcessingServerInstallerAdapter(
       options.pipeline,
@@ -67,7 +67,7 @@ export class TraceProcessingServerInstallerAdapter implements TraceProcessingIns
 
   private constructor(
     private readonly pipelineDefinition: TraceProcessingPipeline,
-    private readonly datasetNormalization: DatasetNormalizationWorkerPort,
+    private readonly datasetNormalization: DatasetNormalizationWorker,
   ) {
   }
 
@@ -125,7 +125,7 @@ export class TraceProcessingServerInstallerAdapter implements TraceProcessingIns
     }
 
     const commands = mapCommands(pipeline.commands);
-    const traceAssignments = EventingTraceTopicAssignmentPort.create(
+    const traceAssignments = EventingTraceTopicAssignment.create(
       RegisteredTraceTopicCommand.create(assignTopic),
     );
     this.installed = true;

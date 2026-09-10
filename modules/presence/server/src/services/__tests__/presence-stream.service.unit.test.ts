@@ -5,7 +5,7 @@ import type {
   PresenceSession,
 } from "@langwatch/presence-contract";
 import { describe, expect, it, vi } from "vitest";
-import { PresenceEmitterPort } from "../../ports/presence.port.ts";
+import type { PresenceEmitter } from "../../app/presence.app.ts";
 import { PresenceStreamService } from "../presence-stream.service.ts";
 
 const session: PresenceSession = {
@@ -26,7 +26,7 @@ const cursor: PresenceCursorEvent = {
   emittedAt: 2,
 };
 
-class RecordingEmitters extends PresenceEmitterPort {
+class RecordingEmitters implements PresenceEmitter {
   readonly emitter = new EventEmitter();
   cleaned: string[] = [];
 

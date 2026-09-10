@@ -9,7 +9,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { moduleApi } from "@langwatch/runtime-composition";
 
-import type { AuthDirectoryPort } from "./auth-directory.ts";
+import type { AuthDirectory } from "./auth-directory.ts";
 import { isBornFinalizedSignUp } from "./better-auth/born-finalized-opt-in.api.ts";
 import { isAllowedAuthOrigin } from "./better-auth/origin-gate.api.ts";
 
@@ -59,7 +59,7 @@ export interface AuthDoorApi {
   /** This deployment's flag store, for the born-finalized entrance. */
   featureFlags: () => FeatureFlagApi;
   /** The typed client the born-finalized entrance reads its allowlist through. */
-  directory: () => AuthDirectoryPort;
+  directory: () => AuthDirectory;
   /** The origin every state-changing auth request is checked against. */
   baseUrl: string;
   /** Where a GET logout lands, once the local cookies are cleared. */

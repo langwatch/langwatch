@@ -58,10 +58,10 @@ export type CollectorCredentialPort = (input: { request: Request }) => Promise<C
 /**
  * The plan allowance, enforced before the body is reshaped.
  */
-export type CollectorUsageLimitPort = (input: { project: CollectorProject }) => Promise<void>;
+export type CollectorUsageLimit = (input: { project: CollectorProject }) => Promise<void>;
 
 /** One already-normalized span, handed to the ingestion pipeline. */
-export type CollectorSpanIngestPort = (input: {
+export type CollectorSpanIngest = (input: {
   tenantId: string;
   span: ReturnType<typeof TraceCollectorSpanService.convertSpanToOtlp>;
   resource: ReturnType<typeof TraceCollectorSpanService.buildResource>;
@@ -70,7 +70,7 @@ export type CollectorSpanIngestPort = (input: {
 }) => Promise<Readonly<{ status: string; error?: string | undefined }>>;
 
 /** One custom SDK evaluation, reported to the evaluation pipeline. */
-export type CollectorEvaluationReportPort = (input: {
+export type CollectorEvaluationReport = (input: {
   tenantId: string;
   evaluationId: string;
   evaluatorId: string;
@@ -88,7 +88,7 @@ export type CollectorEvaluationReportPort = (input: {
 }) => Promise<unknown>;
 
 /** Reports a failure the collector answered but did not raise. */
-export type CollectorErrorReportPort = (
+export type CollectorErrorReport = (
   error: Error,
   context: Readonly<{ projectId: string; traceId?: string | undefined }>,
 ) => void;
@@ -99,21 +99,21 @@ export type CollectorRestPorts = Readonly<{
    * The plan allowance, or none. None where the process composed no usage meter, and then no
    * monthly allowance is enforced.
    */
-  usageLimit?: CollectorUsageLimitPort | undefined;
+  usageLimit?: CollectorUsageLimit | undefined;
   /** Where a normalized span goes. Required: it is the whole of this door. */
-  ingestSpan: CollectorSpanIngestPort;
+  ingestSpan: CollectorSpanIngest;
   /**
    * Where a custom SDK evaluation goes, or none. None where the process registered no
    * evaluation pipeline.
    */
-  reportEvaluation?: CollectorEvaluationReportPort | undefined;
+  reportEvaluation?: CollectorEvaluationReport | undefined;
   /**
    * The evaluator-id slug rule, for an evaluation that names no evaluator. A port because the
    * rule is EVALUATION's — the same one its own `custom-evaluation-sync` subscriber applies —
    * and a feature server package may not reach into another feature's server package.
    */
   deriveEvaluatorId: (name: string) => string;
-  reportError?: CollectorErrorReportPort | undefined;
+  reportError?: CollectorErrorReport | undefined;
 }>;
 
 /** The request body as a JSON object, or the refusal reading it earned. */
@@ -156,7 +156,7 @@ async function readCollectorBody(
 /** The legacy rewrites, the evaluation refusals, and the schema the whole body must satisfy. */
 function parseCollectorParams(
   body: Record<string, any>,
-  input: Readonly<{ projectId: string; reportError?: CollectorErrorReportPort | undefined }>,
+  input: Readonly<{ projectId: string; reportError?: CollectorErrorReport | undefined }>,
 ): CollectorRESTParamsValidator | CollectorRejection {
   applyLegacyMetadataFields(body);
 
@@ -192,7 +192,7 @@ type PreparedCollectorBody = Readonly<{
 function prepareCollectorBody(
   body: Record<string, any>,
   params: CollectorRESTParamsValidator,
-  input: Readonly<{ projectId: string; reportError?: CollectorErrorReportPort | undefined }>,
+  input: Readonly<{ projectId: string; reportError?: CollectorErrorReport | undefined }>,
 ): PreparedCollectorBody | CollectorRejection {
   const { projectId } = input;
   const nullableTraceId = params.trace_id;

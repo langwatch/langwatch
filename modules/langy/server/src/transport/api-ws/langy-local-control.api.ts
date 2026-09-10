@@ -8,7 +8,7 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
-import type { ConnectUpgradeRouterPort as UpgradeRouter } from "@langwatch/api";
+import type { ConnectUpgradeRouter as UpgradeRouter } from "@langwatch/api";
 import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
 import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
 import type { PresenceHeartbeat } from "../../repositories/langy-local-presence.repository.ts";

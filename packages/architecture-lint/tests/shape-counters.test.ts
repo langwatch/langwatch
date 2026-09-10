@@ -151,7 +151,7 @@ describe("ports and adapters folders", () => {
   describe("given a file under a module's ports or adapters folder", () => {
     /** @scenario A ports/adapters file is refused with the instruction to fold it into repositories or services */
     it("reports the file by its path", () => {
-      write("modules/widget/server/src/ports/widget-clock.port.ts", "export type WidgetClockPort = unknown;\n");
+      write("modules/widget/server/src/ports/widget-clock.port.ts", "export type WidgetClock = unknown;\n");
       write(
         "enterprise/modules/billing/server/src/adapters/postgres.billing.adapter.ts",
         "export const adapter = 1;\n",
@@ -178,7 +178,7 @@ describe("ports and adapters folders", () => {
 
   describe("given a baseline", () => {
     it("silences a listed path and refuses a stale entry", () => {
-      write("modules/widget/server/src/ports/widget-clock.port.ts", "export type WidgetClockPort = unknown;\n");
+      write("modules/widget/server/src/ports/widget-clock.port.ts", "export type WidgetClock = unknown;\n");
       write(
         PORTS_BASELINE,
         baselineText(PORTS_AND_ADAPTERS_FOLDERS_BASELINE, [

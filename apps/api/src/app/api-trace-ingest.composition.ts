@@ -17,20 +17,20 @@ import {
   OtelTraceEdgeMediaTelemetryAdapter,
   TraceEdgeMediaPayloadService,
   TraceIngestionService,
-  TraceIngressCommandPort,
+  TraceIngressCommand,
   TraceSpanCollectionService,
-  TraceSpanDedupPort,
+  TraceSpanDedup,
   TrackedEventSpanService,
   type CodingAgentIngestFilter,
   type EdgeMediaExtractionDeps,
   type SpanDedupRef,
-  type TraceIngressPayloadPort,
+  type TraceIngressPayload,
 } from "@langwatch/trace-server";
 import type {
   CollectorCredential,
   CollectorCredentialPort,
-  CollectorSpanIngestPort,
-  CollectorUsageLimitPort,
+  CollectorSpanIngest,
+  CollectorUsageLimit,
 } from "@langwatch/trace-server/api-rest/collector";
 import type {
   OtlpIngestCredential,
@@ -111,7 +111,7 @@ export type ApiTraceIngestOptions = Readonly<{
    * The ADR-022 whole-payload spool, when this process composed one. Media
    * extraction runs before it, which is what usually keeps it from firing.
    */
-  payloads?: TraceIngressPayloadPort;
+  payloads?: TraceIngressPayload;
   report?: ApiTraceIngestAbsenceReport;
 }>;
 
@@ -126,9 +126,9 @@ export type ApiTraceIngestComposition = Readonly<{
    * is, published separately because the collector's ports are assembled by the root
    * rather than returned whole here.
    */
-  usageLimit: CollectorUsageLimitPort;
+  usageLimit: CollectorUsageLimit;
   /** `POST /api/collector`: one already-normalized span at a time. */
-  ingestSpan: CollectorSpanIngestPort;
+  ingestSpan: CollectorSpanIngest;
   /**
    * The collector's own credential resolution, over the SAME
    * `ApiHandlerManagedCredentials` the OTLP door uses.
@@ -220,7 +220,7 @@ function composeApiTraceIngestUsageLimit(options: {
   allowance: ApiTraceIngestAllowance | undefined;
   logger: Logger;
   report: ApiTraceIngestAbsenceReport | undefined;
-}): CollectorUsageLimitPort {
+}): CollectorUsageLimit {
   const { allowance } = options;
   if (!allowance) {
     options.report?.absent("plan-allowance");
@@ -358,7 +358,7 @@ function tryGetPipeline(eventing: EventSourcing): { commands: unknown } | undefi
   }
 }
 
-class ApiTraceIngressCommandAdapter extends TraceIngressCommandPort {
+class ApiTraceIngressCommandAdapter extends TraceIngressCommand {
   static create(
     send: (data: RecordSpanCommandData) => Promise<unknown>,
   ): ApiTraceIngressCommandAdapter {
@@ -388,7 +388,7 @@ function composeApiTraceSpanDedup(input: {
   redis: RedisConnection | null | undefined;
   logger: Logger;
   report?: ApiTraceIngestAbsenceReport;
-}): TraceSpanDedupPort {
+}): TraceSpanDedup {
   if (!input.redis) {
     input.report?.absent("dedup");
     return new ApiNullTraceSpanDedupAdapter();
@@ -399,7 +399,7 @@ function composeApiTraceSpanDedup(input: {
 const dedupKey = (span: SpanDedupRef): string =>
   `${SPAN_DEDUP_KEY_PREFIX}${span.tenantId}:${span.traceId}:${span.spanId}`;
 
-class ApiRedisTraceSpanDedupAdapter extends TraceSpanDedupPort {
+class ApiRedisTraceSpanDedupAdapter extends TraceSpanDedup {
   constructor(
     private readonly redis: RedisConnection,
     private readonly logger: Logger,
@@ -441,7 +441,7 @@ class ApiRedisTraceSpanDedupAdapter extends TraceSpanDedupPort {
 }
 
 /** No Redis: every span is claimed, and a duplicate export records twice. */
-class ApiNullTraceSpanDedupAdapter extends TraceSpanDedupPort {
+class ApiNullTraceSpanDedupAdapter extends TraceSpanDedup {
   tryAcquireProcessingLock(): Promise<boolean | null> {
     return Promise.resolve(true);
   }
@@ -474,9 +474,9 @@ function apiCodingAgentIngestFilter(): CodingAgentIngestFilter {
 /** The ingest path's payload preparation, in the one order that matters. */
 function composeApiTraceIngestPayloads(options: {
   media: ApiTraceIngestOptions["media"];
-  payloads: TraceIngressPayloadPort | undefined;
+  payloads: TraceIngressPayload | undefined;
   report: ApiTraceIngestAbsenceReport | undefined;
-}): TraceIngressPayloadPort | undefined {
+}): TraceIngressPayload | undefined {
   const { media } = options;
   if (!media?.service) {
     options.report?.absent("edge-media-extraction");

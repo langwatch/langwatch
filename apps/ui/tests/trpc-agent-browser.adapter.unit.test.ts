@@ -1,6 +1,6 @@
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
-import { UiRpcPort, type UiRpcSubscription } from "../src/behavior/ui-rpc";
+import { UiRpc, type UiRpcSubscription } from "../src/behavior/ui-rpc";
 import { TrpcAgentClient } from "../src/features/agent/behavior/trpc-agent.client";
 
 type RpcCall = {
@@ -9,7 +9,7 @@ type RpcCall = {
   input: unknown;
 };
 
-class RecordingRpc extends UiRpcPort {
+class RecordingRpc extends UiRpc {
   readonly calls: RpcCall[] = [];
 
   constructor(private readonly responses: Map<string, unknown>) {

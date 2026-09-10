@@ -3,7 +3,7 @@
  * registration) to the `redirect_uris` it registered with, over the Redis
  * handle the caller already holds.
  */
-import type { HostedMcpRedis } from "../ports/hosted-mcp.port.ts";
+import type { HostedMcpRedis } from "../app/hosted-mcp-infrastructure.ts";
 
 const REDIS_CLIENT_PREFIX = "mcp:oauth:client:";
 

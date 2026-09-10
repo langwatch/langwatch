@@ -12,7 +12,7 @@ import {
   type PresenceUpdateInput,
 } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../ports/presence.port.ts";
+import type { PresenceBroadcast, PresenceDiagnostics } from "../ports/presence.port.ts";
 import type { PresenceRepository } from "../repositories/presence.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
@@ -21,18 +21,18 @@ export const PRESENCE_TTL_SECONDS = 30;
 export class PresenceService {
   private constructor(
     private readonly repository: PresenceRepository,
-    private readonly broadcast: PresenceBroadcastPort,
+    private readonly broadcast: PresenceBroadcast,
     private readonly projects: ProjectApi,
-    private readonly diagnostics: PresenceDiagnosticsPort,
+    private readonly diagnostics: PresenceDiagnostics,
     private readonly ttlSeconds: number,
     private readonly now: () => number,
   ) {}
 
   static create(options: {
     repository: PresenceRepository;
-    broadcast: PresenceBroadcastPort;
+    broadcast: PresenceBroadcast;
     projects: ProjectApi;
-    diagnostics: PresenceDiagnosticsPort;
+    diagnostics: PresenceDiagnostics;
     ttlSeconds?: number;
     now?: () => number;
   }): PresenceService {

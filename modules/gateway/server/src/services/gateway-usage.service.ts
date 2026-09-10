@@ -6,15 +6,15 @@
 import { type Instant, toDate } from "@langwatch/time";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
-import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
-import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
+import type { GatewayVirtualKeySpendPort } from "../app/gateway.infrastructure.ts";
 
 /**
  * The one project read these surfaces make: which tenants an org's gateway traces can land in.
  * Narrower than the project service on purpose — anything that can answer the question satisfies
  * it, which is what a test needs.
  */
-export type GatewayUsageProjectsPort = {
+export type GatewayUsageProjects = {
   listIdsByOrganization(input: { organizationId: string }): Promise<string[]>;
 };
 
@@ -23,7 +23,7 @@ export type GatewayUsageProjectsPort = {
  * reported spend against. Narrow for the same reason as the project port —
  * the repository satisfies it, and so can two lines in a test.
  */
-export type GatewayUsageVirtualKeysPort = {
+export type GatewayUsageVirtualKeys = {
   findMetaByIds(input: {
     organizationId: string;
     ids: string[];
@@ -82,9 +82,9 @@ const RECENT_DEBITS_LIMIT = 20;
 
 export class GatewayUsageService {
   private constructor(
-    private readonly projects: GatewayUsageProjectsPort,
-    private readonly virtualKeys: GatewayUsageVirtualKeysPort,
-    private readonly chRepo?: GatewayBudgetSpendPort,
+    private readonly projects: GatewayUsageProjects,
+    private readonly virtualKeys: GatewayUsageVirtualKeys,
+    private readonly chRepo?: GatewayBudgetSpend,
     private readonly spendRepo?: GatewayVirtualKeySpendPort,
   ) {}
 
@@ -94,9 +94,9 @@ export class GatewayUsageService {
    * dependency fails to compile instead of silently reporting nothing.
    */
   static create(args: {
-    projects: GatewayUsageProjectsPort;
-    virtualKeys: GatewayUsageVirtualKeysPort;
-    chRepo: GatewayBudgetSpendPort | undefined;
+    projects: GatewayUsageProjects;
+    virtualKeys: GatewayUsageVirtualKeys;
+    chRepo: GatewayBudgetSpend | undefined;
     spendRepo: GatewayVirtualKeySpendPort | undefined;
   }): GatewayUsageService {
     return new GatewayUsageService(args.projects, args.virtualKeys, args.chRepo, args.spendRepo);

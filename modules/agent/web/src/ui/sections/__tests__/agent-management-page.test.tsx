@@ -15,14 +15,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { AgentClient } from "../../../model/agent-client.ts";
 import {
   type AgentCardRenderInput,
-  type AgentManagementCardPort,
-  type AgentManagementFeedbackPort,
-  type AgentManagementLifecyclePort,
-  type AgentManagementNavigationPort,
+  type AgentManagementCard,
+  type AgentManagementFeedback,
+  type AgentManagementLifecycle,
+  type AgentManagementNavigation,
   AgentManagementPage,
   type AgentArchiveDialogInput,
   type AgentCopyDialogInput,
-  type AgentPageCompositionPort,
+  type AgentPageComposition,
   type AgentPushDialogInput,
   type AgentWithFields as WireAgentWithFields,
 } from "../agent-management-page.tsx";
@@ -125,7 +125,7 @@ class TestAgentBrowser implements AgentClient {
   }
 }
 
-class TestAgentPageComposition implements AgentPageCompositionPort {
+class TestAgentPageComposition implements AgentPageComposition {
   renderHeader(): ReactNode {
     return null;
   }
@@ -158,7 +158,7 @@ class TestAgentPageComposition implements AgentPageCompositionPort {
   }
 }
 
-class TestNavigation implements AgentManagementNavigationPort {
+class TestNavigation implements AgentManagementNavigation {
   openEditor(): void {}
 
   openTypeSelector(): void {}
@@ -168,13 +168,13 @@ class TestNavigation implements AgentManagementNavigationPort {
   openWorkflow(): void {}
 }
 
-class TestFeedback implements AgentManagementFeedbackPort {
+class TestFeedback implements AgentManagementFeedback {
   showSuccess(): void {}
 
   showError(): void {}
 }
 
-class TestLifecycle implements AgentManagementLifecyclePort {
+class TestLifecycle implements AgentManagementLifecycle {
   agentsChangedCalls = 0;
   agentArchivedCalls = 0;
 
@@ -187,7 +187,7 @@ class TestLifecycle implements AgentManagementLifecyclePort {
   }
 }
 
-class TestCard implements AgentManagementCardPort {
+class TestCard implements AgentManagementCard {
   render(props: AgentCardRenderInput): ReactNode {
     return (
       <div>
@@ -319,7 +319,7 @@ describe("AgentManagementPage", () => {
     it("draws an empty state whose control opens the new agent flow", async () => {
       const browser = new TestAgentBrowser();
       const openTypeSelectorCalls: unknown[] = [];
-      class EmptyNavigation implements AgentManagementNavigationPort {
+      class EmptyNavigation implements AgentManagementNavigation {
         openEditor(): void {}
         openTypeSelector(): void {
           openTypeSelectorCalls.push(true);

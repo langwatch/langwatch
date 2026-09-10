@@ -43,7 +43,7 @@ export type IdentityAccountSecrets = Partial<
   >
 >;
 
-export interface IdentityAccountsPort {
+export interface IdentityAccounts {
   /** The user's live sign-in methods — the account-list read. */
   findByUser(args: { userId: string }): Promise<IdentityAccountRow[]>;
   /** By pinned account id — the id better-auth already holds for a row. */

@@ -23,7 +23,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import { PostgresPromptAdapter } from "@langwatch/prompt-server";
 import {
   ExperimentExecutionDataService,
-  type ExperimentWorkflowDslPort,
+  type ExperimentWorkflowDsl,
 } from "@langwatch/experiment-server";
 
 /**
@@ -84,8 +84,8 @@ class FakeEvaluatorApi implements Pick<EvaluatorApi, "findById"> {
   }
 }
 
-/** Real-Postgres-backed `ExperimentWorkflowDslPort`, scoped to this suite's own rows. */
-function createWorkflowDslPort(prisma: PrismaClient): ExperimentWorkflowDslPort {
+/** Real-Postgres-backed `ExperimentWorkflowDsl`, scoped to this suite's own rows. */
+function createWorkflowDslPort(prisma: PrismaClient): ExperimentWorkflowDsl {
   return {
     async findWorkflow(input) {
       const workflow = await prisma.workflow.findFirst({
@@ -106,7 +106,7 @@ function createWorkflowDslPort(prisma: PrismaClient): ExperimentWorkflowDslPort 
     async findEvaluableVersion() {
       throw new Error("not implemented — unused by this suite");
     },
-  } satisfies ExperimentWorkflowDslPort as ExperimentWorkflowDslPort;
+  } satisfies ExperimentWorkflowDsl as ExperimentWorkflowDsl;
 }
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;

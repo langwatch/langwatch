@@ -2,32 +2,31 @@ import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
 import { ClickHouseCodingAgentRepositories } from "../clickhouse/clickhouse.coding-agent.repositories.ts";
 import { CodingAgentProjectionPersistenceService } from "../../services/coding-agent-projection-persistence.service.ts";
-import { SystemCodingAgentClockAdapter } from "../../adapters/coding-agent-clock.adapter.ts";
+import { SystemCodingAgentClockAdapter } from "../../services/coding-agent-clock.service.ts";
 import {
   EventingCodingAgentProcessingAdapter,
   type CodingAgentProcessingPipeline,
 } from "./redis.coding-agent-session-pipeline.repository.ts";
-import { ModelCatalogCostEstimatorAdapter } from "../../adapters/model-catalog.cost-estimator.adapter.ts";
-import { OtelCodingAgentCostMetricsAdapter } from "../../adapters/otel.coding-agent-cost-metrics.adapter.ts";
+import { ModelCatalogCostEstimatorAdapter } from "../../services/model-catalog-cost-estimator.service.ts";
+import { OtelCodingAgentCostMetricsAdapter } from "../../services/coding-agent-cost-metrics.service.ts";
 import {
-  CodingAgentClickHousePort,
+  CodingAgentClickHouse,
   type CodingAgentClickHouseClient,
-} from "../../ports/coding-agent-clickhouse.port.ts";
-import type { CodingAgentProjectActivityPort } from "../../ports/coding-agent-project-activity.port.ts";
-import type { CodingAgentPullRequestMappingPort } from "../../ports/coding-agent-pull-request-mapping.port.ts";
+} from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentProjectActivity } from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentPullRequestMapping } from "../../app/coding-agent.infrastructure.ts";
 
 /** Binds the feature's ClickHouse port to a process's tenant-keyed resolver. */
-class ResolvedCodingAgentClickHousePort extends CodingAgentClickHousePort {
+class ResolvedCodingAgentClickHouse implements CodingAgentClickHouse {
   static create(
     resolveClient: (tenantId: string) => Promise<CodingAgentClickHouseClient>,
-  ): ResolvedCodingAgentClickHousePort {
-    return new ResolvedCodingAgentClickHousePort(resolveClient);
+  ): ResolvedCodingAgentClickHouse {
+    return new ResolvedCodingAgentClickHouse(resolveClient);
   }
 
   private constructor(
     private readonly resolveClient: (tenantId: string) => Promise<CodingAgentClickHouseClient>,
   ) {
-    super();
   }
 
   resolve(tenantId: string): Promise<CodingAgentClickHouseClient> {
@@ -35,7 +34,7 @@ class ResolvedCodingAgentClickHousePort extends CodingAgentClickHousePort {
   }
 }
 
-export type ClickHouseCodingAgentProcessingAdapterOptions = {
+export type RedisCodingAgentProcessingRepositoryOptions = {
   resolveClient: (tenantId: string) => Promise<CodingAgentClickHouseClient>;
   /** The fallback for rows whose tenant declares no retention override. */
   defaultRetentionDays: number;
@@ -52,11 +51,11 @@ export type ClickHouseCodingAgentProcessingAdapterOptions = {
    */
   traceCanonicalisation: TraceCanonicalisationService;
   /** The single throttled project write a stored session performs. */
-  projectActivity: CodingAgentProjectActivityPort;
+  projectActivity: CodingAgentProjectActivity;
   /**
    * The GitHub demand path the mapping subscriber asks.
    */
-  pullRequestMapping?: CodingAgentPullRequestMappingPort;
+  pullRequestMapping?: CodingAgentPullRequestMapping;
 };
 
 /**
@@ -65,12 +64,12 @@ export type ClickHouseCodingAgentProcessingAdapterOptions = {
  */
 export class RedisCodingAgentProcessingRepository {
   static create(
-    options: ClickHouseCodingAgentProcessingAdapterOptions,
+    options: RedisCodingAgentProcessingRepositoryOptions,
   ): RedisCodingAgentProcessingRepository {
     return new RedisCodingAgentProcessingRepository(options);
   }
 
-  private constructor(private readonly options: ClickHouseCodingAgentProcessingAdapterOptions) {}
+  private constructor(private readonly options: RedisCodingAgentProcessingRepositoryOptions) {}
 
   buildProcessing(): CodingAgentProcessingPipeline {
     const options = this.options;
@@ -81,7 +80,7 @@ export class RedisCodingAgentProcessingRepository {
       costMetrics: OtelCodingAgentCostMetricsAdapter.create(),
       projections: CodingAgentProjectionPersistenceService.create(
         ClickHouseCodingAgentRepositories.create({
-          clickhouse: ResolvedCodingAgentClickHousePort.create(options.resolveClient),
+          clickhouse: ResolvedCodingAgentClickHouse.create(options.resolveClient),
           defaultRetentionDays: options.defaultRetentionDays,
         }),
       ),

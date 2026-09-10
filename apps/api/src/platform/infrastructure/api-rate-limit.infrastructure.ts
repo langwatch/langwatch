@@ -25,7 +25,7 @@ export interface ApiRateLimitRequest {
  * Redis, and it is the injected form of the lazy lookup the platform's
  * implementation does through the global application container.
  */
-export type ApiRateLimitConnectionPort = () => RedisConnection | undefined;
+export type ApiRateLimitConnection = () => RedisConnection | undefined;
 
 /** The key space the counters share with every other process in the deployment. */
 const REDIS_KEY_PREFIX = "langwatch:ratelimit:";
@@ -66,14 +66,14 @@ interface RetainedWindow {
  */
 export class ApiRateLimitInfrastructure {
   static create(
-    options: { connection?: ApiRateLimitConnectionPort } = {},
+    options: { connection?: ApiRateLimitConnection } = {},
   ): ApiRateLimitInfrastructure {
     return new ApiRateLimitInfrastructure(options.connection);
   }
 
   private readonly windows = new Map<string, RetainedWindow>();
 
-  private constructor(private readonly connection: ApiRateLimitConnectionPort | undefined) {}
+  private constructor(private readonly connection: ApiRateLimitConnection | undefined) {}
 
   /** Counts one hit against `key`'s window and answers whether it is allowed. */
   async consume({ key, windowSeconds, max }: ApiRateLimitRequest): Promise<ApiRateLimitResult> {

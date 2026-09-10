@@ -32,12 +32,12 @@ vi.mock("@langwatch/analytics-web/surfaces/custom-graph", () => ({
 
 import {
   ProjectHomeHostProvider,
-  ProjectHomeHostPort,
+  ProjectHomeHost,
   type ProjectHomeProject,
 } from "../../../../../model/project-home-host.ts";
 import { TracesOverview } from "../traces-overview.tsx";
 
-class StubProjectHomeHost extends ProjectHomeHostPort {
+class StubProjectHomeHost extends ProjectHomeHost {
   project(): ProjectHomeProject | undefined {
     return { id: "project-1", name: "My Project", slug: "my-project" };
   }

@@ -4,8 +4,8 @@ import {
   type SlackActionParams,
   slackDeliveryMethodOf,
 } from "@langwatch/automation-contract";
-import { AutomationSlackProviderPort } from "../ports/automation-provider.port.ts";
-import { AutomationSlackBotTokenDecryptorPort } from "../ports/automation-graph.port.ts";
+import { AutomationSlackProvider } from "../ports/automation-provider.port.ts";
+import { AutomationSlackBotTokenDecryptor } from "../ports/automation-graph.port.ts";
 
 export interface AutomationSecretCrypto {
   encrypt(value: string): string;
@@ -77,7 +77,7 @@ function assertSlackBotToken(
 
 /** Owns Slack action-parameter persistence and secret handling. Crypto is
  * process configuration and is bound once when the adapter is composed. */
-export class SlackProviderAdapter extends AutomationSlackProviderPort {
+export class SlackProviderAdapter extends AutomationSlackProvider {
   private constructor(private readonly crypto: AutomationSecretCrypto) {
     super();
   }
@@ -121,7 +121,7 @@ export class SlackProviderAdapter extends AutomationSlackProviderPort {
  * evaluator's dependency honest — and it is a class rather than an object
  * literal because the port it satisfies is nominal.
  */
-export class SlackBotTokenDecryptorAdapter extends AutomationSlackBotTokenDecryptorPort {
+export class SlackBotTokenDecryptorAdapter extends AutomationSlackBotTokenDecryptor {
   constructor(private readonly provider: SlackProviderAdapter) {
     super();
   }

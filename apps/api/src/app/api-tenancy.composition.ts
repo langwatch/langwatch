@@ -21,17 +21,17 @@ import { ProjectApi } from "@langwatch/project-contract";
 import {
   PrismaProjectRepository,
   ProjectCredentialsAdapter,
-  ProjectDiagnosticsPort,
+  ProjectDiagnostics,
   ProjectService,
-  type ProjectKeyMapPort,
+  type ProjectKeyMap,
   type ProjectManagementDirectory,
 } from "@langwatch/project-server";
 import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { ApiOrganizationSettingsSecretAdapter } from "./api-organization-settings-secret.adapter.ts";
 
 /** Reports the composition decision a missing collaborator would otherwise hide. */
-export abstract class ApiTenancyAbsenceReportPort {
+export abstract class ApiTenancyAbsenceReport {
   abstract absent(reason: "no-database" | "no-authz" | "no-pepper"): void;
 }
 
@@ -47,7 +47,7 @@ export type ApiTenancyCompositionOptions = {
   /** The two AuthZ services as one graph; see `ApiProductionComposition.authz`. */
   authz: { permissions: AuthzService; grants: AuthzGrantsService };
   /** The same cipher the stored-secret family runs under. */
-  encryption: SecretEncryptionPort;
+  encryption: SecretEncryption;
   /** The HMAC key an API key's stored hash is derived under, verbatim. */
   pepper: string;
   /**
@@ -55,7 +55,7 @@ export type ApiTenancyCompositionOptions = {
    * to reach the table the approved views read, or a governed query against a project
    * created after the last backfill resolves nothing.
    */
-  keyMap?: ProjectKeyMapPort | undefined;
+  keyMap?: ProjectKeyMap | undefined;
   /**
    * The process's own scope, which the credential store's runtime is stopped
    * through. Without it the installed module outlives a failed boot.
@@ -75,9 +75,9 @@ export class ApiTenancyComposition {
     options: Omit<ApiTenancyCompositionOptions, "database" | "authz" | "encryption" | "pepper"> & {
       database: PrismaConnection | undefined;
       authz: { permissions: AuthzService; grants: AuthzGrantsService } | undefined;
-      encryption: SecretEncryptionPort | undefined;
+      encryption: SecretEncryption | undefined;
       pepper: string | undefined;
-      report?: ApiTenancyAbsenceReportPort;
+      report?: ApiTenancyAbsenceReport;
     },
   ): Promise<ApiTenancyComposition | undefined> {
     if (!options.database) {
@@ -179,7 +179,7 @@ export class ApiTenancyComposition {
  * exists because a project operation can fail in a way nothing above it can act on, and
  * the platform app answers that by handing the error to Sentry.
  */
-class LoggedApiProjectDiagnostics extends ProjectDiagnosticsPort {
+class LoggedApiProjectDiagnostics extends ProjectDiagnostics {
   static create(): LoggedApiProjectDiagnostics {
     return new LoggedApiProjectDiagnostics(createLogger("langwatch:project"));
   }

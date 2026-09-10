@@ -1,5 +1,5 @@
 export type { PromptService } from "./services/prompt.service.ts";
-export { PostgresPromptAdapter } from "./adapters/postgres.prompt.adapter.ts";
+export { PostgresPromptAdapter } from "./services/prompt-postgres-composition.service.ts";
 export { promptServer } from "./prompt.server.ts";
 export {
   PromptApp,

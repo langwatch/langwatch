@@ -21,7 +21,7 @@ export type AuthzCounter = { inc(): void };
  * feature either way is WHEN each counter moves, which is the part that must
  * not be described twice.
  */
-export abstract class AuthzMetricsPort {
+export abstract class AuthzMetrics {
   /** Labelled by cause, so one series answers "which kind of direct write". */
   abstract revocationCounter(reason: AuthzRevocationReason): AuthzCounter;
 
@@ -39,7 +39,7 @@ export abstract class AuthzMetricsPort {
  * the cutover reporter warns on every failed read, with or without a counter
  * behind it.
  */
-export class UncountedAuthzMetrics extends AuthzMetricsPort {
+export class UncountedAuthzMetrics extends AuthzMetrics {
   static create(): UncountedAuthzMetrics {
     return new UncountedAuthzMetrics();
   }

@@ -2,10 +2,10 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  TraceEvaluationMonitorPort,
-  TraceModelCostCatalogPort,
-  TraceProductAnalyticsPort,
-  TraceProjectMetadataPort,
+  TraceEvaluationMonitor,
+  TraceModelCostCatalog,
+  TraceProductAnalytics,
+  TraceProjectMetadata,
   type TraceProductEvent,
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
@@ -69,10 +69,10 @@ describe("createWorkerTraceNarrowPorts", () => {
           productAnalytics,
         });
 
-        expect(ports.projects).toBeInstanceOf(TraceProjectMetadataPort);
-        expect(ports.monitors).toBeInstanceOf(TraceEvaluationMonitorPort);
-        expect(ports.modelCosts).toBeInstanceOf(TraceModelCostCatalogPort);
-        expect(ports.productAnalytics).toBeInstanceOf(TraceProductAnalyticsPort);
+        expect(ports.projects).toBeInstanceOf(TraceProjectMetadata);
+        expect(ports.monitors).toBeInstanceOf(TraceEvaluationMonitor);
+        expect(ports.modelCosts).toBeInstanceOf(TraceModelCostCatalog);
+        expect(ports.productAnalytics).toBeInstanceOf(TraceProductAnalytics);
       });
 
       /** @scenario "The project metadata subscriber names three capabilities, not a service" */
@@ -148,7 +148,7 @@ describe("createWorkerTraceNarrowPorts", () => {
       it("hands the milestone to the sink it was composed with", () => {
         const { projects, monitors, modelProviders } = services();
         const recorded: TraceProductEvent[] = [];
-        const productAnalytics = new (class extends TraceProductAnalyticsPort {
+        const productAnalytics = new (class extends TraceProductAnalytics {
           record(event: TraceProductEvent): void {
             recorded.push(event);
           }

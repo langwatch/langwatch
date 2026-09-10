@@ -5,7 +5,7 @@ import { TraceContentExtractionService } from "@langwatch/trace-server";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type {
-  AppRestManagementAuditPort,
+  AppRestManagementAudit,
   AppRestRbacVocabulary,
   PlatformUrlBuilder,
   RestErrorHandler,
@@ -21,12 +21,12 @@ import type { ScimApi } from "@langwatch/enterprise-api";
 import { createEnterprisePlanGate } from "@langwatch/enterprise-plan-gate";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import type { StoredObjectsService } from "@langwatch/stored-object-server";
-import { TraceMediaStorePort } from "@langwatch/trace-server";
+import { TraceMediaStore } from "@langwatch/trace-server";
 import type {
   CollectorProject,
-  CollectorUsageLimitPort,
+  CollectorUsageLimit,
 } from "@langwatch/trace-server/api-rest/collector";
 import type { TrackedEventPorts } from "@langwatch/trace-server";
 import type { WorkflowEvaluationOutcome } from "@langwatch/workflow-server";
@@ -85,7 +85,7 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   analytics: ComposedAnalyticsFeature;
   authz: AuthzService;
   credentials: ApiHandlerManagedCredentials;
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
   experiment: ComposedExperimentFeature;
   workflow: ComposedWorkflowFeature;
   /**
@@ -143,7 +143,7 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
    */
   requireApiKeyPermission: (permission: AuthzPermission) => MiddlewareHandler;
   audit: ApiAuditPort | undefined;
-  managementAudit: AppRestManagementAuditPort;
+  managementAudit: AppRestManagementAudit;
   /** Whether this deployment is the hosted product rather than self-hosted. */
   isSaas: boolean;
   /** The configured instance administrator credential, read per request. */
@@ -285,7 +285,7 @@ export function composeApiPackagedRest(
  * Refuses a project's write once its team has spent the plan's allowance.
  */
 function traceUsageGuardFor(options: {
-  usageLimit: CollectorUsageLimitPort | undefined;
+  usageLimit: CollectorUsageLimit | undefined;
   logger: Pick<Logger, "error">;
 }): MiddlewareHandler {
   const { usageLimit } = options;
@@ -316,7 +316,7 @@ function traceUsageGuardFor(options: {
 /**
  * The content-addressed store, in the shape the trace vertical's extractor takes.
  */
-export class ApiTraceMediaStore extends TraceMediaStorePort {
+export class ApiTraceMediaStore extends TraceMediaStore {
   static create(store: StoredObjectsService): ApiTraceMediaStore {
     return new ApiTraceMediaStore(store);
   }

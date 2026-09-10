@@ -3,18 +3,18 @@ import type {
   LogPiiRedactionLevel,
   LogPreparation,
 } from "@langwatch/log-contract";
-import type { LogPreparationPort } from "../ports/log-preparation.port.ts";
+import type { LogPreparer } from "../app/log.infrastructure.ts";
 import type { CanonicalLogRecordRepository } from "../repositories/canonical-log-record.repository.ts";
 
 /** Canonical log preparation and the trace-scoped read, over one repository. */
 export class LogService {
   private constructor(
-    private readonly preparation: LogPreparationPort,
+    private readonly preparation: LogPreparer,
     private readonly repository: CanonicalLogRecordRepository,
   ) {}
 
   static create(deps: {
-    preparation: LogPreparationPort;
+    preparation: LogPreparer;
     repository: CanonicalLogRecordRepository;
   }): LogService {
     return new LogService(deps.preparation, deps.repository);

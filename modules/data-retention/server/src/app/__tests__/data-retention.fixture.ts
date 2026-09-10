@@ -10,7 +10,7 @@ import { vi } from "vitest";
 import {
   DataRetentionPlanPort,
   type DataRetentionPlan,
-} from "../../ports/data-retention-plan.port.ts";
+} from "../data-retention.infrastructure.ts";
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
 import {
@@ -91,13 +91,12 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
 }
 
 /** The plan every gate is decided against, stated rather than billed for. */
-export class MemoryRetentionPlans extends DataRetentionPlanPort {
+export class MemoryRetentionPlans implements DataRetentionPlanPort {
   static create(plan: DataRetentionPlan = { free: false, uncapped: true }): MemoryRetentionPlans {
     return new MemoryRetentionPlans(plan);
   }
 
   private constructor(private readonly plan: DataRetentionPlan) {
-    super();
   }
 
   async getPlan(): Promise<DataRetentionPlan> {

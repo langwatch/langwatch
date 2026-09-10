@@ -8,8 +8,8 @@ import {
   type GovernanceHttpRequest,
 } from "@langwatch/enterprise-api/governance/ingestion-pull-worker.adapter";
 import type {
-  GovernanceIngestionPullMetricsPort,
-  GovernanceIngestionPullSchedulePort,
+  GovernanceIngestionPullMetrics,
+  GovernanceIngestionPullSchedule,
 } from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
 import type { GovernanceEncryption } from "@langwatch/enterprise-api/governance/governance-infrastructure.adapter";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -43,12 +43,12 @@ export const INGESTION_PULL_DURATION_METRIC_NAME = "ingestion_pull_duration_mill
  * with an unfenced fetch would let an ingestion source address the instance
  * metadata endpoint.
  */
-export abstract class GovernanceIngestionEgressPort {
+export abstract class GovernanceIngestionEgress {
   abstract fetch(url: string, init: GovernanceHttpRequest): Promise<GovernanceHttpResponse>;
 }
 
 /** The AWS client shape the S3-polling puller is configured with. */
-export abstract class GovernanceIngestionAwsPort {
+export abstract class GovernanceIngestionAws {
   abstract build(input: {
     region?: string;
     targetHost: string;
@@ -62,8 +62,8 @@ export abstract class GovernanceIngestionAwsPort {
 }
 
 export type WorkerGovernanceIngestionPullHostOptions = {
-  egress: GovernanceIngestionEgressPort;
-  aws: GovernanceIngestionAwsPort;
+  egress: GovernanceIngestionEgress;
+  aws: GovernanceIngestionAws;
   /**
    * The cipher the App wrote a source's credentials with.
    *
@@ -173,7 +173,7 @@ export function currentRegistryRateVersion(): string {
 }
 
 /** Ingestion-pull run outcomes and durations, pushed over OTLP. */
-export class OtelGovernanceIngestionPullMetrics implements GovernanceIngestionPullMetricsPort {
+export class OtelGovernanceIngestionPullMetrics implements GovernanceIngestionPullMetrics {
   static create(): OtelGovernanceIngestionPullMetrics {
     return new OtelGovernanceIngestionPullMetrics(
       counter({
@@ -209,7 +209,7 @@ export class OtelGovernanceIngestionPullMetrics implements GovernanceIngestionPu
  * cadence, not a person's calendar, and moving it under DST would change how
  * much usage each window covers twice a year.
  */
-export class UtcGovernanceIngestionPullSchedule implements GovernanceIngestionPullSchedulePort {
+export class UtcGovernanceIngestionPullSchedule implements GovernanceIngestionPullSchedule {
   static create(): UtcGovernanceIngestionPullSchedule {
     return new UtcGovernanceIngestionPullSchedule();
   }

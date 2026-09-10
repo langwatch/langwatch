@@ -4,7 +4,7 @@ import {
   identifierProviderFor,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import type { IdentifierIdentityPort } from "../app/identity.infrastructure.ts";
+import type { IdentifierIdentity } from "../app/identity.infrastructure.ts";
 import type {
   BackfillAccountRow,
   BackfillUserRow,
@@ -37,11 +37,11 @@ export type PlannedIdentifier = ExpectedIdentifier & {
  * `createdAt`, so live emission of the same fact derives the same identifier id.
  */
 export class IdentityBackfillPlanService {
-  static create(identifiers: IdentifierIdentityPort): IdentityBackfillPlanService {
+  static create(identifiers: IdentifierIdentity): IdentityBackfillPlanService {
     return new IdentityBackfillPlanService(identifiers);
   }
 
-  private constructor(private readonly identifiers: IdentifierIdentityPort) {}
+  private constructor(private readonly identifiers: IdentifierIdentity) {}
 
   planIdentifiers({
     user,

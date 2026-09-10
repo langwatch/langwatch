@@ -8,7 +8,7 @@ import {
   type WorkerProcessFactoryContext,
 } from "./worker.process.ts";
 
-export abstract class WorkerExecutableCompositionPort {
+export abstract class WorkerExecutableComposition {
   abstract compose(
     context: WorkerProcessFactoryContext,
   ): WorkerProcessComposition | Promise<WorkerProcessComposition>;
@@ -24,7 +24,7 @@ export interface WorkerExecutableHost extends WorkerSignalSource {
 
 export type WorkerExecutableOptions = Readonly<{
   source: Readonly<Record<string, unknown>>;
-  composition: WorkerExecutableCompositionPort;
+  composition: WorkerExecutableComposition;
   observability?: Omit<ProcessObservabilityOptions, "serviceName" | "loggerName">;
   host?: WorkerExecutableHost;
 }>;

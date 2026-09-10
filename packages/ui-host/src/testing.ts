@@ -1,19 +1,19 @@
 /**
  * The capabilities a test mounts when it renders a screen outside the shell. In the product the
- * application shell answers `UiRoutePort`, `UiNavigationPort` and `UiFeedbackPort` above every
+ * application shell answers `UiRoute`, `UiNavigation` and `UiFeedback` above every
  * route, and a screen rendered with none of them degrades — an empty address, an inert link.
  */
 
 import {
   BrowserUiDocumentTitle,
-  UiFeedbackPort,
-  UiNavigationPort,
-  UiRoutePort,
+  UiFeedback,
+  UiNavigation,
+  UiRoute,
   UNAVAILABLE_UI_SESSION,
   type UiCapabilities,
   type UiFailureNotice,
   type UiRouteReadingValues,
-  type UiSessionPort,
+  type UiSession,
   type UiSuccessNotice,
 } from "./capabilities.ts";
 
@@ -45,7 +45,7 @@ function single(
   return flat;
 }
 
-class HostUiRoute extends UiRoutePort {
+class HostUiRoute extends UiRoute {
   constructor(private readonly host: UiTestHost) {
     super();
   }
@@ -67,7 +67,7 @@ class HostUiRoute extends UiRoutePort {
   }
 }
 
-class HostUiNavigation extends UiNavigationPort {
+class HostUiNavigation extends UiNavigation {
   constructor(private readonly host: UiTestHost) {
     super();
   }
@@ -85,7 +85,7 @@ class HostUiNavigation extends UiNavigationPort {
   }
 }
 
-class HostUiFeedback extends UiFeedbackPort {
+class HostUiFeedback extends UiFeedback {
   constructor(private readonly host: UiTestHost) {
     super();
   }
@@ -102,7 +102,7 @@ class HostUiFeedback extends UiFeedbackPort {
 /** The capabilities a screen under test reads, answered by the host double. */
 export function createUiCapabilitiesFromHost(
   host: UiTestHost,
-  session: UiSessionPort = UNAVAILABLE_UI_SESSION,
+  session: UiSession = UNAVAILABLE_UI_SESSION,
 ): UiCapabilities {
   return {
     documentTitle: BrowserUiDocumentTitle.create(),

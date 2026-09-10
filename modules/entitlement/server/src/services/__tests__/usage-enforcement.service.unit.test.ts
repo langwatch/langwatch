@@ -4,12 +4,12 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "@langwatch/entitlement-contract";
-import { USAGE_UNKNOWN } from "../../ports/usage-counter.port.ts";
-import { UsageOrganizationPort } from "../../ports/usage-organization.port.ts";
+import { USAGE_UNKNOWN } from "../../app/entitlement.infrastructure.ts";
+import { UsageOrganization } from "../../app/entitlement.infrastructure.ts";
 import {
-  UsageVolumeCounterPort,
+  UsageVolumeCounter,
   type ProjectUsageCounts,
-} from "../../ports/usage-volume-counter.port.ts";
+} from "../../app/entitlement.infrastructure.ts";
 import { UsageService } from "../usage-enforcement.service.ts";
 
 function plan(maxMessagesPerMonth: number): PlanInfo {
@@ -26,7 +26,7 @@ function plan(maxMessagesPerMonth: number): PlanInfo {
   };
 }
 
-class TestOrganizations extends UsageOrganizationPort {
+class TestOrganizations implements UsageOrganization {
   tryGetOrganizationIdByTeamId(): Promise<string | null> {
     return Promise.resolve("org-1");
   }
@@ -38,9 +38,8 @@ class TestOrganizations extends UsageOrganizationPort {
   }
 }
 
-class TestCounter extends UsageVolumeCounterPort {
+class TestCounter implements UsageVolumeCounter {
   constructor(private readonly counts: ProjectUsageCounts) {
-    super();
   }
   getCountByProjects(): Promise<ProjectUsageCounts> {
     return Promise.resolve(this.counts);
@@ -99,7 +98,7 @@ describe("given the counting store could not answer", () => {
         USAGE_UNKNOWN,
         [{ projectId: "project-1", count: 90_000 }],
       ];
-      class FlakyCounter extends UsageVolumeCounterPort {
+      class FlakyCounter implements UsageVolumeCounter {
         getCountByProjects(): Promise<ProjectUsageCounts> {
           return Promise.resolve(counts.shift() ?? USAGE_UNKNOWN);
         }

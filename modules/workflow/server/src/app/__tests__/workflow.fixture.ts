@@ -21,23 +21,23 @@ import type {
   WorkflowStudioRuns,
 } from "../workflow.app.ts";
 import {
-  WorkflowAgentMappingPort,
-  WorkflowStudioDslPort,
-} from "../../ports/workflow.port.ts";
+  WorkflowAgentMapping,
+  WorkflowStudioDsl,
+} from "../../app/workflow.app.ts";
 import {
   WorkflowRowRepository,
   type WorkflowRowDraft,
 } from "../../repositories/workflow-row.repository.ts";
 
 /** A Studio graph prepared by doing nothing to it. */
-class UnchangedStudioDsl extends WorkflowStudioDslPort {
+class UnchangedStudioDsl implements WorkflowStudioDsl {
   prepare(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow> {
     return Promise.resolve(input.dsl);
   }
 }
 
 /** Agent mappings nothing recomputes. */
-class UnrecordedAgentMappings extends WorkflowAgentMappingPort {
+class UnrecordedAgentMappings implements WorkflowAgentMapping {
   recompute(): Promise<void> {
     return Promise.resolve();
   }

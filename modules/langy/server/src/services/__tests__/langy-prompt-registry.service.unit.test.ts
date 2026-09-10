@@ -4,15 +4,15 @@ import {
   LANGY_PROMPT_HANDLES,
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
-import { LangyPromptPort, LangyPromptRegistryService } from "../langy-prompt-registry.service.ts";
+import { LangyPrompt, LangyPromptRegistryService } from "../langy-prompt-registry.service.ts";
 
 const FALLBACK = "IN-REPO FALLBACK PROMPT";
 const PROJECT_ID = "project_system";
 
-/** Build a fake LangyPromptPort whose read returns whatever `prompt` is passed. */
+/** Build a fake LangyPrompt whose read returns whatever `prompt` is passed. */
 function fakePromptPort(
-  tryGetPromptByIdOrHandle: LangyPromptPort["tryGetPromptByIdOrHandle"],
-): LangyPromptPort {
+  tryGetPromptByIdOrHandle: LangyPrompt["tryGetPromptByIdOrHandle"],
+): LangyPrompt {
   return { tryGetPromptByIdOrHandle };
 }
 

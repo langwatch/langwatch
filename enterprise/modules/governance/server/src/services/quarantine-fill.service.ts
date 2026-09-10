@@ -4,27 +4,25 @@ import {
   type QuarantineFillInput,
   type QuarantineFillStats,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  GovernanceDiagnosticsPort,
-  NullGovernanceDiagnosticsAdapter,
-} from "../ports/governance-diagnostics.port.ts";
+import type { GovernanceDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 import type {
-  QuarantineTenantPort,
-  QuarantineTraceActivityPort,
-} from "../ports/quarantine-fill.port.ts";
+  QuarantineTenantResolver,
+  QuarantineTraceActivityReader,
+} from "../app/governance.infrastructure.ts";
 
 export class QuarantineFillEvaluatorService {
   private constructor(
-    private readonly tenant: QuarantineTenantPort,
-    private readonly traceActivity: QuarantineTraceActivityPort | undefined,
-    private readonly diagnostics: GovernanceDiagnosticsPort,
+    private readonly tenant: QuarantineTenantResolver,
+    private readonly traceActivity: QuarantineTraceActivityReader | undefined,
+    private readonly diagnostics: GovernanceDiagnosticsSink,
     private readonly now: () => number,
   ) {}
 
   static create(options: {
-    tenant: QuarantineTenantPort;
-    traceActivity?: QuarantineTraceActivityPort;
-    diagnostics?: GovernanceDiagnosticsPort;
+    tenant: QuarantineTenantResolver;
+    traceActivity?: QuarantineTraceActivityReader;
+    diagnostics?: GovernanceDiagnosticsSink;
     now?: () => number;
   }): QuarantineFillEvaluatorService {
     return new QuarantineFillEvaluatorService(

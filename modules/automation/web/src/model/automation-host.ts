@@ -110,7 +110,7 @@ export type AutomationDatasetCreation = {
   columnTypes: DatasetColumns;
 };
 
-export abstract class AutomationHostPort {
+export abstract class AutomationHost {
   /** The organization, team and project this page is about. */
   abstract scope(): AutomationScope;
 
@@ -203,7 +203,7 @@ export abstract class AutomationHostPort {
   abstract describeFailure(failure: AutomationFailureNotice): string;
 }
 
-const AutomationHostContext = createContext<AutomationHostPort | undefined>(void 0);
+const AutomationHostContext = createContext<AutomationHost | undefined>(void 0);
 
 /** Publishes the host to every automations screen and drawer below it. */
 export const AutomationHostProvider = AutomationHostContext.Provider;
@@ -214,7 +214,7 @@ export const AutomationHostProvider = AutomationHostContext.Provider;
  * Missing means the screen was mounted outside its frontend feature, which is a
  * composition fault rather than something the screen can degrade around.
  */
-export function useAutomationHost(): AutomationHostPort {
+export function useAutomationHost(): AutomationHost {
   const host = useContext(AutomationHostContext);
   if (!host) {
     throw new Error(

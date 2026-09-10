@@ -5,6 +5,6 @@ import type { AssignTopicCommandData } from "./trace-processing.commands.ts";
  * topic on its trace projections. Other features use this portable command
  * port rather than reaching into Trace's Eventing pipeline.
  */
-export abstract class TraceTopicAssignmentPort {
+export abstract class TraceTopicAssignment {
   abstract assignTopic(input: AssignTopicCommandData): Promise<void>;
 }

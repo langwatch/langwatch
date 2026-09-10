@@ -4,17 +4,17 @@ import type {
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import type { GovernanceProjectPort } from "../ports/governance-project.port.ts";
+import type { GovernanceProjectDirectory } from "../app/governance.infrastructure.ts";
 import type {
   GovernanceOcsfEventInput,
-  GovernanceOcsfEventSinkPort,
-  GovernanceTraceIngestionPort,
+  GovernanceOcsfEventSink,
+  GovernanceTraceIngestionClient,
   GovernanceTraceRequest,
-  IngestionPullDiagnosticsPort,
-  IngestionPullSourcePort,
-  PulledUsageDispatcherPort,
-  PulledUsageEntitlementPort,
-} from "../ports/ingestion-pull-worker.port.ts";
+  IngestionPullDiagnosticsSink,
+  IngestionPullSourceReader,
+  PulledUsageDispatcher,
+  PulledUsageEntitlements,
+} from "../app/governance.infrastructure.ts";
 import {
   COPILOT_ROUTING_PROFILE,
   CopilotStudioTraceMapperService,
@@ -81,29 +81,29 @@ export class IngestionPullWorkerService {
   }
 
   private constructor(
-    private readonly sources: IngestionPullSourcePort,
+    private readonly sources: IngestionPullSourceReader,
     private readonly registry: PullerRegistryService,
     private readonly credentials: IngestionCredentialsService,
-    private readonly projects: GovernanceProjectPort,
-    private readonly sink: GovernanceOcsfEventSinkPort,
-    private readonly usageEntitlement: PulledUsageEntitlementPort,
+    private readonly projects: GovernanceProjectDirectory,
+    private readonly sink: GovernanceOcsfEventSink,
+    private readonly usageEntitlement: PulledUsageEntitlements,
     private readonly usageRecords: PulledUsageRecordService,
-    private readonly diagnostics: IngestionPullDiagnosticsPort,
-    private readonly traceIngestion: GovernanceTraceIngestionPort | undefined,
+    private readonly diagnostics: IngestionPullDiagnosticsSink,
+    private readonly traceIngestion: GovernanceTraceIngestionClient | undefined,
     private readonly configuration: IngestionPullWorkerConfiguration,
     private readonly now: () => number,
   ) {}
 
   static create(options: {
-    sources: IngestionPullSourcePort;
+    sources: IngestionPullSourceReader;
     registry: PullerRegistryService;
     credentials: IngestionCredentialsService;
-    projects: GovernanceProjectPort;
-    sink: GovernanceOcsfEventSinkPort;
-    usageEntitlement: PulledUsageEntitlementPort;
+    projects: GovernanceProjectDirectory;
+    sink: GovernanceOcsfEventSink;
+    usageEntitlement: PulledUsageEntitlements;
     usageRecords: PulledUsageRecordService;
-    diagnostics: IngestionPullDiagnosticsPort;
-    traceIngestion?: GovernanceTraceIngestionPort;
+    diagnostics: IngestionPullDiagnosticsSink;
+    traceIngestion?: GovernanceTraceIngestionClient;
     configuration?: IngestionPullWorkerConfiguration;
     now?: () => number;
   }): IngestionPullWorkerService {
@@ -125,7 +125,7 @@ export class IngestionPullWorkerService {
   async run(input: {
     sourceId: string;
     cursor: string | null;
-    pulledUsage?: PulledUsageDispatcherPort;
+    pulledUsage?: PulledUsageDispatcher;
   }): Promise<{ nextCursor: string | null; eventCount: number }> {
     const source = await this.sources.findById(input.sourceId);
     if (!source) {
@@ -289,7 +289,7 @@ export class IngestionPullWorkerService {
   private async writeEvents(input: {
     events: NormalizedPullEvent[];
     source: GovernanceIngestionSource;
-    pulledUsage?: PulledUsageDispatcherPort;
+    pulledUsage?: PulledUsageDispatcher;
   }): Promise<void> {
     const project = await this.projects.ensureInternal({
       organizationId: input.source.organizationId,

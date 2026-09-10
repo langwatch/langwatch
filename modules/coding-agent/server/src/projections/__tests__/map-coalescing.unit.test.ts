@@ -5,7 +5,7 @@ import { SessionMetricSeriesMapProjection } from "../session-metric-series.proje
 import {
   EventingCodingAgentTraceSessionAppendAdapter,
   EventingSessionMetricSeriesAppendAdapter,
-} from "../../adapters/eventing.coding-agent-projections.adapter.ts";
+} from "../../services/coding-agent-projection-append.service.ts";
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
 
 const persistence = {

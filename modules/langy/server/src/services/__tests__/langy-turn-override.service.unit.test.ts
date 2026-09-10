@@ -6,11 +6,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { LANGY_TURN_OVERRIDE_FALLBACK } from "@langwatch/langy-contract";
 import { LangyTurnOverrideService } from "../langy-turn-override.service.ts";
-import type { LangyPromptPort } from "../langy-prompt-registry.service.ts";
+import type { LangyPrompt } from "../langy-prompt-registry.service.ts";
 
 function fakePrompts(
-  tryGetPromptByIdOrHandle: LangyPromptPort["tryGetPromptByIdOrHandle"],
-): LangyPromptPort {
+  tryGetPromptByIdOrHandle: LangyPrompt["tryGetPromptByIdOrHandle"],
+): LangyPrompt {
   return { tryGetPromptByIdOrHandle };
 }
 

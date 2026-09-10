@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BrowserUiDocumentTitle,
   UiCapabilityContextProvider,
-  UiNavigationPort,
-  UiRoutePort,
+  UiNavigation,
+  UiRoute,
   UNAVAILABLE_UI_FEEDBACK,
   UNAVAILABLE_UI_SESSION,
   type UiCapabilities,
@@ -17,7 +17,7 @@ import { Link } from "../link.tsx";
 
 const navigate = vi.fn<(to: string) => void>();
 
-class RecordingNavigation extends UiNavigationPort {
+class RecordingNavigation extends UiNavigation {
   navigate(to: string): void {
     navigate(to);
   }
@@ -27,7 +27,7 @@ class RecordingNavigation extends UiNavigationPort {
   back(): void {}
 }
 
-class EmptyRoute extends UiRoutePort {
+class EmptyRoute extends UiRoute {
   reading(): UiRouteReadingValues {
     return { params: {}, query: {} };
   }

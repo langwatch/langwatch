@@ -11,12 +11,14 @@ export type {
   DataPrivacyOrganizationDirectory,
   DataPrivacyProjectLineage,
 } from "./app/data-privacy.app.ts";
-export { DataPrivacyProjectPort, DataPrivacyResolutionPort } from "./ports/data-privacy.port.ts";
 export {
-  PiiAnalysisMetricsPort,
+  type DataPrivacyProject,
+  type DataPrivacyResolution,
+  type PiiAnalysisMetrics,
   type PiiAnalysisOutcome,
-} from "./ports/pii-analysis-metrics.port.ts";
-export { type PIICheckOptions, PiiAnalysisPort } from "./ports/pii-analysis.port.ts";
+  type PIICheckOptions,
+  type PiiAnalysis,
+} from "./app/data-privacy.infrastructure.ts";
 export {
   PrismaDataPrivacyDirectoryRepository,
   type DataPrivacyDirectoryDatabase,
@@ -27,7 +29,7 @@ export {
   PII_ANALYSIS_EVALUATOR_TYPE,
   PII_ANALYSIS_STATUS_METRIC_NAME,
   PII_CHECKS_METRIC_NAME,
-} from "./adapters/otel.pii-analysis-metrics.adapter.ts";
+} from "./services/otel-pii-analysis-metrics.service.ts";
 /**
  * The ingestion halves the trace conversion composes directly, over a policy
  * source that resolves but does not write. They stay reachable until the trace

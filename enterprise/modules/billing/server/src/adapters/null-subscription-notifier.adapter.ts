@@ -1,7 +1,7 @@
-import { BillingSubscriptionNotifierPort } from "../ports/subscription-notifier.port.ts";
+import { BillingSubscriptionNotifier } from "../ports/subscription-notifier.port.ts";
 
 /** Drops subscription notices where no delivery transport is composed. */
-export class NullBillingSubscriptionNotifierAdapter extends BillingSubscriptionNotifierPort {
+export class NullBillingSubscriptionNotifierAdapter extends BillingSubscriptionNotifier {
   private constructor() {
     super();
   }

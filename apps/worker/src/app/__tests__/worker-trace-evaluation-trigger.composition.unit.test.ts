@@ -5,9 +5,9 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorService, MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import {
-  TraceEvaluationDispatchPort,
-  TraceEvaluationLoopMetricsPort,
-  TraceEvaluationMonitorPort,
+  TraceEvaluationDispatch,
+  TraceEvaluationLoopMetrics,
+  TraceEvaluationMonitor,
   type TraceEvaluationLoopBlockReason,
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
@@ -88,7 +88,7 @@ function spanEvent(attributes: Array<{ key: string; value: unknown }> = []): Tra
   } as unknown as TraceProcessingEvent;
 }
 
-class RecordingLoopMetrics extends TraceEvaluationLoopMetricsPort {
+class RecordingLoopMetrics extends TraceEvaluationLoopMetrics {
   readonly blocked: TraceEvaluationLoopBlockReason[] = [];
 
   loopBlocked(reason: TraceEvaluationLoopBlockReason): void {
@@ -146,8 +146,8 @@ describe("createWorkerTraceEvaluationTrigger", () => {
         const { built } = graph();
 
         expect(built.subscriber().name).toBe("evaluationTrigger");
-        expect(built.monitors).toBeInstanceOf(TraceEvaluationMonitorPort);
-        expect(built.dispatch).toBeInstanceOf(TraceEvaluationDispatchPort);
+        expect(built.monitors).toBeInstanceOf(TraceEvaluationMonitor);
+        expect(built.dispatch).toBeInstanceOf(TraceEvaluationDispatch);
       });
 
       /** @scenario "The composed path dispatches one evaluation per monitor" */

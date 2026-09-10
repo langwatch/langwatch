@@ -1,6 +1,6 @@
 import {
-  ApiRuntimeCompositionPort,
-  ApiRuntimeProcessPort,
+  ApiRuntimeComposition,
+  ApiRuntimeProcess,
   type ApiRuntimeCompositionOptions,
 } from "../api.main.ts";
 import {
@@ -57,7 +57,7 @@ import {
  * lifecycle surface — listener, readiness gate, health route, optional metrics
  * route and bounded drain.
  */
-export class ApiStandaloneComposition extends ApiRuntimeCompositionPort {
+export class ApiStandaloneComposition extends ApiRuntimeComposition {
   static create(options: ApiProductionCompositionOptions = {}): ApiStandaloneComposition {
     return new ApiStandaloneComposition(options);
   }
@@ -66,7 +66,7 @@ export class ApiStandaloneComposition extends ApiRuntimeCompositionPort {
     super();
   }
 
-  compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
+  compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcess> {
     return ApiProductionComposition.create(this.options).compose(options);
   }
 }

@@ -6,13 +6,13 @@ import {
 } from "@langwatch/automation-contract";
 import { handleEvaluationAlertTriggerMatch } from "../subscribers/evaluation-alert-trigger-match.subscriber.ts";
 import { handleGraphTriggerActivity } from "../subscribers/graph-trigger-activity.subscriber.ts";
-import type { AutomationGraphActivityPort } from "../ports/automation-graph-activity.port.ts";
-import type { AutomationTraceTriggerCataloguePort } from "../ports/automation-trace-trigger-catalogue.port.ts";
+import type { AutomationGraphActivity } from "../app/automation.infrastructure.ts";
+import type { AutomationTraceTriggerCatalogue } from "../ports/automation-trace-trigger-catalogue.port.ts";
 import {
-  AutomationEvaluationTraceSummaryPort,
-  AutomationEvaluationTriggerFilterPort,
-  AutomationTriggerMatchRecorderPort,
-} from "../ports/automation-evaluation-subscriber.port.ts";
+  AutomationEvaluationTraceSummary,
+  AutomationEvaluationTriggerFilter,
+  AutomationTriggerMatchRecorder,
+} from "../app/automation.infrastructure.ts";
 
 /**
  * Process-lifetime Automation implementation of Evaluation's two terminal
@@ -30,22 +30,22 @@ import {
  */
 export class AutomationEvaluationSubscriberService extends AutomationEvaluationSubscriberCapability {
   static create(input: {
-    triggers: AutomationTraceTriggerCataloguePort;
-    graphActivity: AutomationGraphActivityPort;
-    traces: AutomationEvaluationTraceSummaryPort;
-    evaluationFilters: AutomationEvaluationTriggerFilterPort;
-    triggerMatches: AutomationTriggerMatchRecorderPort;
+    triggers: AutomationTraceTriggerCatalogue;
+    graphActivity: AutomationGraphActivity;
+    traces: AutomationEvaluationTraceSummary;
+    evaluationFilters: AutomationEvaluationTriggerFilter;
+    triggerMatches: AutomationTriggerMatchRecorder;
   }): AutomationEvaluationSubscriberService {
     return new AutomationEvaluationSubscriberService(input);
   }
 
   private constructor(
     private readonly deps: {
-      triggers: AutomationTraceTriggerCataloguePort;
-      graphActivity: AutomationGraphActivityPort;
-      traces: AutomationEvaluationTraceSummaryPort;
-      evaluationFilters: AutomationEvaluationTriggerFilterPort;
-      triggerMatches: AutomationTriggerMatchRecorderPort;
+      triggers: AutomationTraceTriggerCatalogue;
+      graphActivity: AutomationGraphActivity;
+      traces: AutomationEvaluationTraceSummary;
+      evaluationFilters: AutomationEvaluationTriggerFilter;
+      triggerMatches: AutomationTriggerMatchRecorder;
     },
   ) {
     super();

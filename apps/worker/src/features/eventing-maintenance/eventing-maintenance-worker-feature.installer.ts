@@ -2,13 +2,13 @@ import type { BlobSweepReport } from "@langwatch/group-queue/operational";
 import {
   createBlobMaintenancePipeline,
   createProcessManagerMaintenancePipeline,
-  type ProcessRetentionMetricsPort,
+  type ProcessRetentionMetrics,
 } from "@langwatch/eventing/server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** The queue-owned blob keyspace pass, injected because the sweeper holds Redis. */
-export abstract class WorkerBlobSweepPort {
+export abstract class WorkerBlobSweep {
   abstract sweep(): Promise<BlobSweepReport>;
 }
 
@@ -23,11 +23,11 @@ export abstract class WorkerBlobSweepPort {
  * mounts them in, and because both are unconditional: the substrate exists in
  * every worker whether or not any feature pipeline is registered.
  */
-export class EventingMaintenanceWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class EventingMaintenanceWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     eventing: WorkerEventingRuntime;
-    blobSweep: WorkerBlobSweepPort;
-    retentionMetrics: ProcessRetentionMetricsPort;
+    blobSweep: WorkerBlobSweep;
+    retentionMetrics: ProcessRetentionMetrics;
   }): EventingMaintenanceWorkerFeatureInstaller {
     return new EventingMaintenanceWorkerFeatureInstaller(
       options.eventing,
@@ -41,8 +41,8 @@ export class EventingMaintenanceWorkerFeatureInstaller implements WorkerFeatureI
 
   private constructor(
     private readonly eventing: WorkerEventingRuntime,
-    private readonly blobSweep: WorkerBlobSweepPort,
-    private readonly retentionMetrics: ProcessRetentionMetricsPort,
+    private readonly blobSweep: WorkerBlobSweep,
+    private readonly retentionMetrics: ProcessRetentionMetrics,
   ) {}
 
   async install(): Promise<WorkerFeatureCloser | undefined> {

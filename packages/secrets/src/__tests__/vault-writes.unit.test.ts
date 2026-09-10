@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { DevGeneratedSecretSource } from "../dev-generated.secret-source.ts";
-import { ProcessRunnerPort, type ProcessResult } from "../process-runner.port.ts";
+import { ProcessRunner, type ProcessResult } from "../process-runner.port.ts";
 import { SecretMigrationService } from "../secret-migration.service.ts";
 
-class FakeRunner extends ProcessRunnerPort {
+class FakeRunner extends ProcessRunner {
   readonly calls: { command: string; args: readonly string[] }[] = [];
 
   constructor(private readonly answer: (args: readonly string[]) => ProcessResult) {

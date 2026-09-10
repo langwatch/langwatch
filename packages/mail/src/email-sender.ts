@@ -1,12 +1,12 @@
-import type { EmailContent, EmailDeliveryPort } from "./providers/types.ts";
+import type { EmailContent, EmailDelivery } from "./providers/types.ts";
 
-export const computeDefaultFrom = (mailer: EmailDeliveryPort): string => mailer.defaultFrom();
+export const computeDefaultFrom = (mailer: EmailDelivery): string => mailer.defaultFrom();
 
 export const sendEmail = async ({
   mailer,
   content,
 }: {
-  mailer: EmailDeliveryPort;
+  mailer: EmailDelivery;
   content: EmailContent;
 }) => {
   return await mailer.send(content);

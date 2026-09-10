@@ -1,4 +1,4 @@
-import { IdentityEventingPort } from "@langwatch/identity-server";
+import { IdentityEventing } from "@langwatch/identity-server";
 import type { ApiIdentityPipelines } from "./api-identity-pipelines.composition.ts";
 
 /**
@@ -31,7 +31,7 @@ import type { ApiIdentityPipelines } from "./api-identity-pipelines.composition.
  * calling path — against `EventStoreProducerOnly`, which refuses by name, so
  * every join verb failed at the door.
  */
-export class ApiEventingIdentityAdapter extends IdentityEventingPort {
+export class ApiEventingIdentityAdapter extends IdentityEventing {
   static create(input: {
     /** The senders read out of this process's own producer registrations. */
     pipelines: ApiIdentityPipelines;

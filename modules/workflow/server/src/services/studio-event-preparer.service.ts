@@ -1,9 +1,9 @@
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import type {
-  WorkflowLlmParametersPort,
-  WorkflowProjectEnvironmentPort,
-} from "../ports/workflow.port.ts";
+  WorkflowLlmParameters,
+  WorkflowProjectEnvironment,
+} from "../app/workflow.app.ts";
 import { StudioDatasetMaterializerService } from "./studio-dataset-materializer.service.ts";
 import {
   StudioWorkflowEventEnricherService,
@@ -22,8 +22,8 @@ export type StudioEventPreparer = {
 
 type StudioEventPreparerOptions = {
   datasets: DatasetApi;
-  projectEnvironment: WorkflowProjectEnvironmentPort;
-  llmParameters: WorkflowLlmParametersPort;
+  projectEnvironment: WorkflowProjectEnvironment;
+  llmParameters: WorkflowLlmParameters;
 };
 
 export class StudioEventPreparerService implements StudioEventPreparer {

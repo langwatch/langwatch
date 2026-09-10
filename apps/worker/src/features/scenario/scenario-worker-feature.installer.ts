@@ -7,7 +7,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import { scenarioDeferredComputeRunMetricsJob } from "@langwatch/scenario-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
@@ -87,7 +87,7 @@ export interface ScenarioWorkerCapability<
  * job from the legacy registry cannot disagree with this one about the routing
  * key both consumers stage.
  */
-export class ScenarioWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class ScenarioWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create<TComputeRunMetrics extends Record<string, unknown>, TEvent extends Event>(options: {
     installer: ScenarioWorkerCapability<TComputeRunMetrics, TEvent>;
     eventing: WorkerEventingRuntime;

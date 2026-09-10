@@ -40,23 +40,23 @@ import { EventingServerRuntime } from "@langwatch/eventing/server";
 import { createWorkerDurableComposition } from "../worker-durable.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "../../platform/lifecycle/worker-runtime.port.ts";
-import { WorkerProjectS3SourcePort } from "../../platform/infrastructure/worker-stored-object-storage.adapter.ts";
+import { WorkerProjectS3Source } from "../../platform/infrastructure/worker-stored-object-storage.adapter.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
-class Lifecycle extends WorkerLifecyclePort {
+class Lifecycle extends WorkerLifecycle {
   async close() {}
 }
 
-class Transport extends WorkerTransportPort {
+class Transport extends WorkerTransport {
   async start() {
     return { shutdown: async () => {} };
   }
 }
 
-class NoProjectBuckets extends WorkerProjectS3SourcePort {
+class NoProjectBuckets extends WorkerProjectS3Source {
   async tryGet() {
     return null;
   }

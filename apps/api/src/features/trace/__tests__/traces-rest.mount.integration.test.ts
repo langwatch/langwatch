@@ -22,7 +22,7 @@ import { z } from "zod";
 import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
 import { createApiRestRuntime, type ApiRestRuntime } from "../../../app-rest/api-rest.runtime.ts";
 import { mountTracesRest, type ApiTracesRestOptions } from "../traces-rest.mount.ts";
-import type { ApiTraceReadStackPort } from "../trace-read-stack.port.ts";
+import type { ApiTraceReadStack } from "../trace-read-stack.port.ts";
 
 const PROJECT: RestProjectIdentity = {
   id: "project-1",
@@ -323,7 +323,7 @@ function mountTraces(options: {
   app?: Partial<TraceApi>;
   updateTraceMetadata?: ApiTracesRestOptions["updateTraceMetadata"];
   credential?: "apiKey" | "legacyProjectKey" | "refused";
-  getApiKeyProtections?: ApiTraceReadStackPort["getApiKeyProtections"];
+  getApiKeyProtections?: ApiTraceReadStack["getApiKeyProtections"];
 }) {
   const runtime = buildTestRuntime(options);
 
@@ -333,7 +333,7 @@ function mountTraces(options: {
       getApiKeyProtections:
         options.getApiKeyProtections ??
         (async () => ({ canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true })),
-    } as unknown as ApiTraceReadStackPort,
+    } as unknown as ApiTraceReadStack,
     platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
     ...(options.updateTraceMetadata ? { updateTraceMetadata: options.updateTraceMetadata } : {}),
   };

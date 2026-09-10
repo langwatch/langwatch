@@ -2,13 +2,13 @@ import { createLogger } from "@langwatch/observability";
 import type { z } from "zod";
 import type {
   expireRequestIntentSchema,
-  JoinRequestLifecyclePort,
+  JoinRequestLifecycle,
   remindAdminsIntentSchema,
 } from "../processes/join-request-lifecycle.process.ts";
 
 const logger = createLogger("langwatch:identity:join-request-lifecycle");
 
-export function runRemindAdmins(deps: { port: JoinRequestLifecyclePort }) {
+export function runRemindAdmins(deps: { port: JoinRequestLifecycle }) {
   return async (payload: z.infer<typeof remindAdminsIntentSchema>): Promise<void> => {
     await deps.port.remindAdmins({
       joinRequestId: payload.joinRequestId,
@@ -21,7 +21,7 @@ export function runRemindAdmins(deps: { port: JoinRequestLifecyclePort }) {
   };
 }
 
-export function runExpireRequest(deps: { port: JoinRequestLifecyclePort }) {
+export function runExpireRequest(deps: { port: JoinRequestLifecycle }) {
   return async (payload: z.infer<typeof expireRequestIntentSchema>): Promise<void> => {
     await deps.port.expireRequest({
       joinRequestId: payload.joinRequestId,

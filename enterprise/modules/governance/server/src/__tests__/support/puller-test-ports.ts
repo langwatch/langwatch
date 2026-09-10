@@ -4,46 +4,46 @@ import type {
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
 import {
-  GovernanceHttpPort,
-  GovernanceObjectStoragePort,
-  GovernanceOcsfEventSinkPort,
-  type GovernanceEncryptionPort,
+  GovernanceHttpClient,
+  GovernanceObjectStore,
+  GovernanceOcsfEventSink,
+  type GovernanceEncryptor,
   IngestionCredentialsService,
-  IngestionPullSourcePort,
+  IngestionPullSourceReader,
   IngestionPullWorkerService,
   NullIngestionPullDiagnosticsAdapter,
-  PulledUsageEntitlementPort,
+  PulledUsageEntitlements,
   PulledUsagePricingService,
   PulledUsageRecordService,
   type GovernanceHttpResponse,
   type GovernanceObjectStorageCredentials,
   type GovernanceOcsfEventInput,
 } from "@langwatch/enterprise-governance-server";
-import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts";
+import type { PulledUsageRateInput } from "../../app/governance.infrastructure.ts";
 import { PullerRegistryService } from "../../services/puller-registry.service.ts";
-import { TestProjectApi as CompleteTestProjectService } from "../../ports/__tests__/support/test-project-api.ts";
+import { TestProjectApi as CompleteTestProjectService } from "./test-project-api.ts";
 
-export class TestHttpPort implements GovernanceHttpPort {
+export class TestHttp implements GovernanceHttpClient {
   constructor(
     private readonly handler: (
       url: string,
-      init: Parameters<GovernanceHttpPort["fetch"]>[1],
+      init: Parameters<GovernanceHttpClient["fetch"]>[1],
     ) => Promise<GovernanceHttpResponse>,
   ) {
   }
 
   fetch(
     url: string,
-    init: Parameters<GovernanceHttpPort["fetch"]>[1],
+    init: Parameters<GovernanceHttpClient["fetch"]>[1],
   ): Promise<GovernanceHttpResponse> {
     return this.handler(url, init);
   }
 }
 
-export class FetchHttpPort implements GovernanceHttpPort {
+export class FetchHttp implements GovernanceHttpClient {
   async fetch(
     url: string,
-    init: Parameters<GovernanceHttpPort["fetch"]>[1],
+    init: Parameters<GovernanceHttpClient["fetch"]>[1],
   ): Promise<GovernanceHttpResponse> {
     const response = await fetch(url, init);
     return {
@@ -56,7 +56,7 @@ export class FetchHttpPort implements GovernanceHttpPort {
   }
 }
 
-export class TestObjectStoragePort implements GovernanceObjectStoragePort {
+export class TestObjectStorage implements GovernanceObjectStore {
   objects: Array<{ key: string; body: string }> = [];
   lastList:
     | {
@@ -104,7 +104,7 @@ export class TestObjectStoragePort implements GovernanceObjectStoragePort {
   }
 }
 
-class TestSourcePort extends IngestionPullSourcePort {
+class TestSource extends IngestionPullSourceReader {
   constructor(private readonly find: () => Promise<GovernanceIngestionSource | null>) {
     super();
   }
@@ -114,7 +114,7 @@ class TestSourcePort extends IngestionPullSourcePort {
   }
 }
 
-class TestSinkPort extends GovernanceOcsfEventSinkPort {
+class TestSink extends GovernanceOcsfEventSink {
   constructor(private readonly insert: (input: GovernanceOcsfEventInput) => Promise<void>) {
     super();
   }
@@ -124,7 +124,7 @@ class TestSinkPort extends GovernanceOcsfEventSinkPort {
   }
 }
 
-class TestEntitlementPort extends PulledUsageEntitlementPort {
+class TestEntitlement extends PulledUsageEntitlements {
   constructor(private readonly enabled: (organizationId: string) => Promise<boolean>) {
     super();
   }
@@ -134,7 +134,7 @@ class TestEntitlementPort extends PulledUsageEntitlementPort {
   }
 }
 
-class TestRatePort {
+class TestRate {
   rate(input: PulledUsageRateInput) {
     return {
       costNanoUsd: input.quantities.tokensInput + input.quantities.tokensOutput > 0 ? 1 : 0,
@@ -158,7 +158,7 @@ export type WorkerTestDoubles = {
 export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWorkerService {
   const registry = PullerRegistryService.create();
   registry.register(doubles.adapter);
-  const pricing = PulledUsagePricingService.create(new TestRatePort());
+  const pricing = PulledUsagePricingService.create(new TestRate());
   const diagnostics = new NullIngestionPullDiagnosticsAdapter();
   const projects = new CompleteTestProjectService();
   projects.ensureInternal = async () => {
@@ -173,7 +173,7 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
       traceSharingEnabled: false,
     };
   };
-  const encryption: GovernanceEncryptionPort = {
+  const encryption: GovernanceEncryptor = {
     encrypt(value: string): string {
       return value;
     },
@@ -182,12 +182,12 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
     },
   };
   return IngestionPullWorkerService.create({
-    sources: new TestSourcePort(async () => doubles.source),
+    sources: new TestSource(async () => doubles.source),
     registry,
     credentials: IngestionCredentialsService.create(encryption),
     projects,
-    sink: new TestSinkPort(doubles.insertEvent),
-    usageEntitlement: new TestEntitlementPort(doubles.usageEnabled),
+    sink: new TestSink(doubles.insertEvent),
+    usageEntitlement: new TestEntitlement(doubles.usageEnabled),
     usageRecords: PulledUsageRecordService.create(pricing),
     diagnostics,
   });

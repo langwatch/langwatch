@@ -14,7 +14,7 @@ import {
   type ScimSyncFactInput,
 } from "@langwatch/identity-contract";
 import type { ScimSyncLedger } from "../rules/scim-sync-ledger.rules.ts";
-import type { IdentityEventingPort } from "../app/identity.infrastructure.ts";
+import type { IdentityEventing } from "../app/identity.infrastructure.ts";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
 
@@ -36,13 +36,13 @@ export interface ScimSyncLedgerWriterDeps {
    * be absent: a deployment can run with the stack disabled, and the ledger
    * says so rather than refusing the directory's push.
    */
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
   /** Defaults to the module's own logger; a test injects a captured one. */
   logger?: Logger;
 }
 
 export class ScimSyncLedgerWriterAdapter implements ScimSyncLedger {
-  private readonly eventing: IdentityEventingPort;
+  private readonly eventing: IdentityEventing;
   private readonly logger: Logger;
 
   static create(deps: ScimSyncLedgerWriterDeps): ScimSyncLedgerWriterAdapter {

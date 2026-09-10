@@ -2,32 +2,32 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkerApplication } from "../worker.application.ts";
 import type {
   WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
+  WorkerFeatureInstaller,
 } from "../../features/worker-feature.installer.ts";
 import { WorkerRuntime } from "../../platform/lifecycle/worker.runtime.ts";
 import {
-  WorkerHandlePort,
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerHandle,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "../../platform/lifecycle/worker-runtime.port.ts";
 import { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { InMemoryProcessStore, type EventSourcedQueueProcessor } from "@langwatch/eventing";
 
-class Handle extends WorkerHandlePort {
+class Handle extends WorkerHandle {
   readonly shutdown = vi.fn(async (): Promise<void> => void 0);
 }
 
-class Lifecycle extends WorkerLifecyclePort {
+class Lifecycle extends WorkerLifecycle {
   readonly close = vi.fn(async (): Promise<void> => void 0);
 }
 
-class Transport extends WorkerTransportPort {
+class Transport extends WorkerTransport {
   readonly handle = new Handle();
   readonly start = vi.fn(async () => this.handle);
 }
 
-class FeatureInstaller implements WorkerFeatureInstallerPort {
+class FeatureInstaller implements WorkerFeatureInstaller {
   readonly name = "topic";
   readonly close = vi.fn(async (): Promise<void> => void 0);
   readonly install = vi.fn(async (): Promise<WorkerFeatureCloser | undefined> => this.close);

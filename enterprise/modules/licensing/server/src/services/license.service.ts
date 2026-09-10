@@ -17,7 +17,7 @@ import type { LicenseCryptography } from "../app/licensing.infrastructure.ts";
 import type { LicenseLogger } from "../app/licensing.infrastructure.ts";
 import type { LicenseRetention } from "../app/licensing.infrastructure.ts";
 import type { LicenseUsage } from "../app/licensing.infrastructure.ts";
-import type { LicenseStoragePort } from "../ports/license-storage.port.ts";
+import type { LicenseStorage } from "../app/licensing.infrastructure.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
 export type LicenseRetentionConfiguration = {
@@ -47,7 +47,7 @@ class SilentLicenseLogger implements LicenseLogger {
 }
 
 export type LicenseServiceOptions = {
-  repository: LicenseStoragePort;
+  repository: LicenseStorage;
   cryptography: LicenseCryptography;
   usage?: LicenseUsage;
   retention?: LicenseRetention;
@@ -66,7 +66,7 @@ type LicenseResourceCounts = {
 
 /** Signed-license plan source and lifecycle service. */
 export class LicenseService extends LicensingServiceContract {
-  private readonly repository: LicenseStoragePort;
+  private readonly repository: LicenseStorage;
   private readonly cryptography: LicenseCryptography;
   private readonly usage: LicenseUsage | undefined;
   private readonly retention: LicenseRetention | undefined;

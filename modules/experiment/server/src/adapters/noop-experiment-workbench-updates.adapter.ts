@@ -1,7 +1,7 @@
-import { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port.ts";
+import { ExperimentWorkbenchUpdates } from "../ports/experiment-workbench-updates.port.ts";
 
 /** Drops workbench update notices where no live update transport is composed. */
-export class NoopExperimentWorkbenchUpdatesAdapter extends ExperimentWorkbenchUpdatesPort {
+export class NoopExperimentWorkbenchUpdatesAdapter extends ExperimentWorkbenchUpdates {
   static create(): NoopExperimentWorkbenchUpdatesAdapter {
     return new NoopExperimentWorkbenchUpdatesAdapter();
   }

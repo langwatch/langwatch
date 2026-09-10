@@ -1,5 +1,5 @@
 import type { Registry } from "prom-client";
-import { ApiMetricsPort } from "../../api-process.lifecycle.ts";
+import { ApiMetrics } from "../../api-process.lifecycle.ts";
 
 /**
  * Who this process will render its registry to.
@@ -32,7 +32,7 @@ export type ApiMetricsRegistry = Pick<Registry, "metrics" | "contentType">;
  * is decided by the packages that count it; what this class owns is who may
  * read the result.
  */
-export class PrometheusApiMetricsAdapter extends ApiMetricsPort {
+export class PrometheusApiMetricsAdapter extends ApiMetrics {
   static create(options: {
     registry: ApiMetricsRegistry;
     access: ApiMetricsAccess;

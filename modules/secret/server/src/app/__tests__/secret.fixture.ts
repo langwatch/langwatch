@@ -1,5 +1,5 @@
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { SecretEncryptionPort } from "../../ports/secret.port.ts";
+import { SecretEncryption } from "../secret.app.ts";
 import { MemorySecretRepositories } from "../../repositories/memory/memory.secret.repositories.ts";
 import type { SecretRepositories } from "../../repositories/secret.repositories.ts";
 import { SecretApp } from "../secret.app.ts";
@@ -9,7 +9,7 @@ import { SecretApp } from "../secret.app.ts";
  * to be one: what a service test needs from encryption is that what went in
  * comes back and that a ciphertext is not the plaintext.
  */
-export class ReversibleTestSecretEncryption extends SecretEncryptionPort {
+export class ReversibleTestSecretEncryption implements SecretEncryption {
   encrypt(value: string): string {
     return `encrypted(${value})`;
   }
@@ -22,7 +22,7 @@ export class ReversibleTestSecretEncryption extends SecretEncryptionPort {
 export function createSecretTestApp(
   input: Readonly<{
     repositories?: SecretRepositories;
-    encryption?: SecretEncryptionPort;
+    encryption?: SecretEncryption;
   }> = {},
 ): SecretApp {
   return SecretApp.create({

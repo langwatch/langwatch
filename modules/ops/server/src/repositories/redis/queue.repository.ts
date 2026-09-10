@@ -24,7 +24,7 @@ import type {
 } from "@langwatch/ops-contract";
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
-import { QueuePayloadDecoderPort } from "../../app/ops.app.ts";
+import { QueuePayloadDecoder } from "../../app/ops.app.ts";
 import { QueueRepository } from "../process/queue.repository.ts";
 import { nowInstant } from "@langwatch/time";
 import type {
@@ -38,7 +38,7 @@ import type {
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
 
-class NullQueuePayloadDecoder implements QueuePayloadDecoderPort {
+class NullQueuePayloadDecoder implements QueuePayloadDecoder {
   async tryDecode(): Promise<Record<string, unknown> | null> {
     return null;
   }
@@ -434,14 +434,14 @@ function resolveRetryCount(attemptRaw: string | null): number | null {
 
 export class QueueRedisRepository extends QueueRepository {
   private readonly redis: IORedis | Cluster;
-  private readonly payloads: QueuePayloadDecoderPort;
+  private readonly payloads: QueuePayloadDecoder;
 
   static create({
     redis,
     payloads,
   }: {
     redis: IORedis | Cluster;
-    payloads?: QueuePayloadDecoderPort;
+    payloads?: QueuePayloadDecoder;
   }): QueueRedisRepository {
     return new QueueRedisRepository(redis, payloads);
   }
@@ -472,7 +472,7 @@ export class QueueRedisRepository extends QueueRepository {
 
   private constructor(
     redis: IORedis | Cluster,
-    payloads: QueuePayloadDecoderPort = new NullQueuePayloadDecoder(),
+    payloads: QueuePayloadDecoder = new NullQueuePayloadDecoder(),
   ) {
     super();
     this.redis = redis;

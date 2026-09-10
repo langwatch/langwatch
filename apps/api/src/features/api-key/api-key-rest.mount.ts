@@ -7,7 +7,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { apiKeyRest, apiKeyRestCredential } from "@langwatch/api-key-server";
 import {
   bindRestMiddleware,
-  type AppRestManagementAuditPort,
+  type AppRestManagementAudit,
   type MountableRestApp,
 } from "@langwatch/api/rest";
 import type { MiddlewareHandler } from "hono";
@@ -26,7 +26,7 @@ const VERSION_SEGMENT = /^(latest|20\d{2}-\d{2}-\d{2})$/;
 /** Mounts `/api/api-keys` behind this process's organization credential. */
 export function mountApiKeyRest(
   runtime: ApiRestRuntime,
-  options: Readonly<{ apiKeys: () => ApiKeyApi; audit: AppRestManagementAuditPort }>,
+  options: Readonly<{ apiKeys: () => ApiKeyApi; audit: AppRestManagementAudit }>,
 ): MountableRestApp {
   return runtime.mount(apiKeyRest.router(), options.apiKeys, {
     // The credential itself, not just its holder: two of these routes ask
@@ -50,7 +50,7 @@ export function mountApiKeyRest(
  */
 function recordApiKeyManagementAudit(
   runtime: ApiRestRuntime,
-  audit: AppRestManagementAuditPort,
+  audit: AppRestManagementAudit,
 ): MiddlewareHandler {
   return async (context, next) => {
     await next();

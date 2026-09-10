@@ -7,7 +7,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { SubsystemProbePort } from "../ports/subsystem-probe.port.ts";
+import type { SubsystemProbe } from "../app/platform-health.infrastructure.ts";
 import { rollUpStatus } from "../rules/platform-health-report.rules.ts";
 
 const logger = createLogger("langwatch:platform-health");
@@ -18,13 +18,13 @@ const logger = createLogger("langwatch:platform-health");
  * broken platform from a broken health check.
  */
 export class PlatformHealthService {
-  readonly #probes: readonly SubsystemProbePort[];
+  readonly #probes: readonly SubsystemProbe[];
 
-  private constructor(probes: readonly SubsystemProbePort[]) {
+  private constructor(probes: readonly SubsystemProbe[]) {
     this.#probes = probes;
   }
 
-  static create(options: { probes: readonly SubsystemProbePort[] }): PlatformHealthService {
+  static create(options: { probes: readonly SubsystemProbe[] }): PlatformHealthService {
     return new PlatformHealthService(options.probes);
   }
 
@@ -49,7 +49,7 @@ export class PlatformHealthService {
     };
   }
 
-  async #run(probe: SubsystemProbePort, query: PlatformHealthQuery): Promise<PlatformHealthCheck> {
+  async #run(probe: SubsystemProbe, query: PlatformHealthQuery): Promise<PlatformHealthCheck> {
     const startedAt = nowInstant().epochMilliseconds;
     try {
       const result = await probe.run(query);

@@ -36,7 +36,7 @@ export class AutomationTraceRecordUnavailableError extends Error {
   readonly name = "AutomationTraceRecordUnavailableError";
 }
 
-export abstract class AutomationSettlementTraceReaderPort {
+export abstract class AutomationSettlementTraceReader {
   abstract tryGetSummary(input: {
     projectId: string;
     traceId: string;
@@ -68,7 +68,7 @@ export abstract class AutomationSettlementTraceReaderPort {
  * workflow resolution; the confirmation check reaches exactly this one, and it
  * is a ClickHouse read keyed by trace.
  */
-export abstract class AutomationSettlementEvaluationReaderPort {
+export abstract class AutomationSettlementEvaluationReader {
   abstract findRunsByTraceId(input: {
     tenantId: string;
     traceId: string;

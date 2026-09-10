@@ -6,7 +6,7 @@ import {
   executeEvaluationCommandDataSchema,
   type ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
-import { EvaluationExecutionIntentPort } from "../ports/evaluation.port.ts";
+import { EvaluationExecutionIntent } from "../app/evaluation.infrastructure.ts";
 
 const schema = defineCommandSchema(
   EXECUTE_EVALUATION_COMMAND_TYPE,
@@ -21,11 +21,11 @@ export class ExecuteEvaluationCommand implements CommandHandler<
 > {
   static readonly schema = schema;
 
-  static create(intent: EvaluationExecutionIntentPort): ExecuteEvaluationCommand {
+  static create(intent: EvaluationExecutionIntent): ExecuteEvaluationCommand {
     return new ExecuteEvaluationCommand(intent);
   }
 
-  private constructor(private readonly intent: EvaluationExecutionIntentPort) {}
+  private constructor(private readonly intent: EvaluationExecutionIntent) {}
 
   static getAggregateId(payload: ExecuteEvaluationCommandData): string {
     return payload.evaluationId;

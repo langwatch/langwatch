@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { LangyTitleModelPort } from "@langwatch/langy-server";
+import { LangyTitleModel } from "@langwatch/langy-server";
 import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   createWorkerLangyConversation,
-  WorkerLangyAbsenceReportPort,
+  WorkerLangyAbsenceReport,
 } from "../worker-langy-conversation.composition.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
@@ -41,7 +41,7 @@ function reset(): void {
   STASHED.clear();
 }
 
-class RecordingAbsence extends WorkerLangyAbsenceReportPort {
+class RecordingAbsence extends WorkerLangyAbsenceReport {
   withoutAgentManager(): void {
     RECORDED.absences.push("agentManager");
   }
@@ -93,7 +93,7 @@ function clickHouseDouble() {
  * generator DOES with a handle is that service's own suite, which is where the
  * prompt, the character budget and the failure contract live.
  */
-class FakeTitleModel extends LangyTitleModelPort {
+class FakeTitleModel extends LangyTitleModel {
   resolveTitleModel(): Promise<never> {
     return Promise.reject(new Error("the composition test never resolves a model"));
   }
@@ -101,7 +101,7 @@ class FakeTitleModel extends LangyTitleModelPort {
 
 function compose(
   source: Record<string, unknown> = {},
-  titleModels?: LangyTitleModelPort,
+  titleModels?: LangyTitleModel,
   database: object = createWorkerProcessDatabase(),
 ) {
   return createWorkerLangyConversation({

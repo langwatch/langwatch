@@ -6,7 +6,7 @@ import {
   type Currency as CurrencyType,
   UnsupportedBillingCurrencyError,
 } from "@langwatch/enterprise-billing-contract";
-import type { StripeErrorTranslatorPort } from "../ports/stripe-error-translator.port.ts";
+import type { StripeErrorTranslator } from "../ports/stripe-error-translator.port.ts";
 
 const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
 
@@ -22,9 +22,9 @@ export type CheckoutCurrencyResolution =
  * Establish the currency a checkout session must be created in.
  */
 export class StripeCustomerCurrencyService {
-  private constructor(private readonly stripeErrors: StripeErrorTranslatorPort) {}
+  private constructor(private readonly stripeErrors: StripeErrorTranslator) {}
 
-  static create(stripeErrors: StripeErrorTranslatorPort): StripeCustomerCurrencyService {
+  static create(stripeErrors: StripeErrorTranslator): StripeCustomerCurrencyService {
     return new StripeCustomerCurrencyService(stripeErrors);
   }
 

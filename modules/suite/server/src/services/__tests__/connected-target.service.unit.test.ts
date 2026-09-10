@@ -16,7 +16,7 @@ import {
 
 import { ConnectedTargetService } from "../connected-target.service.ts";
 import { SuiteService } from "../suite.service.ts";
-import type { SuiteExecutionPort } from "../../ports/suite-execution.port.ts";
+import type { SuiteExecution } from "../../app/suite.app.ts";
 import type { SuiteRepository } from "../../repositories/suite.repository.ts";
 import type { SuiteRunReadRepository } from "../../repositories/suite-run.repository.ts";
 
@@ -113,7 +113,7 @@ function connectedAgentApi(agents: ConnectedAgentFixture[]): AgentApi {
 }
 
 function buildService(agents: AgentApi) {
-  const execute = vi.fn(async (input: Parameters<SuiteExecutionPort["execute"]>[0]) => ({
+  const execute = vi.fn(async (input: Parameters<SuiteExecution["execute"]>[0]) => ({
     batchRunId: "batch_1",
     setId: `suiteset_${input.suiteId}`,
     jobCount: input.activeScenarioIds.length * input.activeTargets.length,
@@ -155,7 +155,7 @@ function buildService(agents: AgentApi) {
       })),
     ),
   } as unknown as SuiteService["options"]["scenarios"];
-  const execution = { execute } as unknown as SuiteExecutionPort;
+  const execution = { execute } as unknown as SuiteExecution;
 
   const service = SuiteService.create({
     repository,

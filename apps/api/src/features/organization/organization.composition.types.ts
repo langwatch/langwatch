@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { OrganizationApi, OrganizationService } from "@langwatch/organization-contract";
 import type {
-  OrganizationProvisioningPort,
+  OrganizationProvisioning,
   OrganizationRestService,
 } from "@langwatch/organization-server";
 
@@ -21,7 +21,7 @@ export type ComposedOrganizationFeature = Readonly<{
   /**
    * The same object again, in the shape `/api/organizations` takes.
    */
-  provisioning: (OrganizationService & OrganizationProvisioningPort) | undefined;
+  provisioning: (OrganizationService & OrganizationProvisioning) | undefined;
   routers(
     mount: ApiTrpcFeatureMount,
   ): ReturnType<typeof createOrganizationTrpcRouters<ApiTrpcContext>>;

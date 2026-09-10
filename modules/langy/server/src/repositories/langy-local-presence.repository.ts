@@ -27,7 +27,7 @@ export type PresenceHeartbeat = "refreshed" | "restored" | "replaced";
  * service depends on this abstract surface, never on the concrete Redis or
  * memory adapter behind it.
  */
-export abstract class LangyLocalPresencePort {
+export abstract class LangyLocalPresence {
   /** Writes the folder as connected, replacing whatever was there. */
   abstract register(workspace: ConnectedWorkspace): Promise<void>;
 

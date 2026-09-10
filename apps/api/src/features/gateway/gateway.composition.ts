@@ -10,7 +10,7 @@ import {
   gatewayServer,
   ModelCatalogGatewaySpendRatingAdapter,
   type GatewayRestInfrastructure,
-  type GatewaySpendConfirmationPort,
+  type GatewaySpendConfirmation,
 } from "@langwatch/gateway-server";
 import {
   MemoryGatewayAgentCacheEntryStore,
@@ -24,14 +24,14 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { createApp } from "@langwatch/runtime-composition";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import {
   composeApiGateway,
-  type ApiGatewayClickHousePort,
-  type ApiGatewayIdempotencyPort,
+  type ApiGatewayClickHouse,
+  type ApiGatewayIdempotency,
 } from "../../app/api-gateway.composition.ts";
 
 /** A capability this deployment did not compose, refused by name. */
@@ -71,11 +71,11 @@ export type GatewayFeatureOptions = Readonly<{
    * where the deployment opened none, which turns the spend source off by name
    * rather than by a zero nobody can tell from a key that spent nothing.
    */
-  clickhouse: ApiGatewayClickHousePort | null;
+  clickhouse: ApiGatewayClickHouse | null;
   /** The HMAC key a virtual key's stored secret is hashed under. */
   virtualKeyPepper: string | undefined;
   /** The receipt ledger the keyed REST creates run through, where one exists. */
-  idempotency?: ApiGatewayIdempotencyPort | undefined;
+  idempotency?: ApiGatewayIdempotency | undefined;
   /** Absent without encryption, preserving the agent-cache family's conditional mount. */
   agentCache?: GatewayRestInfrastructure["agentCache"];
   /** Absent where the process does not mount the vendor callback. */
@@ -87,7 +87,7 @@ import type { ComposedGatewayFeature } from "./gateway.composition.types.ts";
 import { ApiGatewayModelProviderCredentials } from "./gateway-model-provider-credentials.adapter.ts";
 
 export function composeGatewayAgentCache(options: {
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
   redis: RedisConnection | undefined;
 }): GatewayFeatureOptions["agentCache"] {
   if (!options.encryption) return void 0;
@@ -102,8 +102,8 @@ export function composeGatewayAgentCache(options: {
 
 export function composeGatewayElevenLabsWebhook(options: {
   prisma: PrismaClient | undefined;
-  encryption: SecretEncryptionPort | undefined;
-  spendConfirmation: GatewaySpendConfirmationPort | undefined;
+  encryption: SecretEncryption | undefined;
+  spendConfirmation: GatewaySpendConfirmation | undefined;
 }): GatewayFeatureOptions["elevenLabsWebhook"] {
   if (!options.prisma || !options.encryption || !options.spendConfirmation) return void 0;
 

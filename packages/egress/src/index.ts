@@ -15,7 +15,7 @@ export type {
 export { fetchValidatedDestination, RedirectRefusedError } from "./ssrf/fenced-fetch.ts";
 export type { EgressTlsPolicy, FencedFetchOptions } from "./ssrf/fenced-fetch.ts";
 
-export { WebhookDispatchRateLimiterPort } from "./ports/webhook-dispatch-rate-limiter.port.ts";
+export { WebhookDispatchRateLimiter } from "./ports/webhook-dispatch-rate-limiter.port.ts";
 export type { WebhookDispatchRateLimitResult } from "./ports/webhook-dispatch-rate-limiter.port.ts";
 export { InMemoryWebhookDispatchRateLimiterAdapter } from "./adapters/in-memory.webhook-dispatch-rate-limiter.adapter.ts";
 

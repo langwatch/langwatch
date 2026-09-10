@@ -2,7 +2,7 @@
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type {
-  PayloadStagingPort,
+  PayloadStaging,
   StoredObjectApp,
   StoredObjectStorageRuntimeAdapter,
   StoredObjectsService,
@@ -29,7 +29,7 @@ export type ComposedStoredObjectFeature = Readonly<{
    * is in flight. Published here because this feature owns the deployment's S3
    * access; the features that stage take it as a required collaborator.
    */
-  payloadStaging: PayloadStagingPort;
+  payloadStaging: PayloadStaging;
   /**
    * The project-keyed byte storage, beside the AWS runtime its S3 driver
    * builds clients on. For a consumer that writes objects this feature owns no

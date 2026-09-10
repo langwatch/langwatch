@@ -5,13 +5,13 @@
  * the user module behind them still answered.
  */
 import {
-  BetterAuthAnnouncementsPort,
+  BetterAuthAnnouncements,
   passkeySignUpRegistration,
   type PasskeySignUpDirectory,
-  type SignUpVerificationPort,
+  type SignUpVerification,
 } from "@langwatch/auth-server";
 import type { ScimUserProvisioning } from "@langwatch/enterprise-scim-server";
-import { IdentityEventingPort } from "@langwatch/identity-server";
+import { IdentityEventing } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 import { installApiUser } from "../user.composition.ts";
@@ -81,14 +81,14 @@ function testPrisma() {
 }
 
 /** No event stack: nothing here spends an identifier command. */
-class SilentEventing extends IdentityEventingPort {
+class SilentEventing extends IdentityEventing {
   async tryPipelineCommand() {
     return null;
   }
 }
 
 /** Records the announcements without letting one fail the ceremony. */
-class SilentAnnouncements extends BetterAuthAnnouncementsPort {
+class SilentAnnouncements extends BetterAuthAnnouncements {
   trackServerEvent(): void {}
   reportError(): void {}
   announceSignup(): void {}
@@ -124,7 +124,7 @@ const pluginContext = () =>
 
 function passkeyCeremony(users: PasskeySignUpDirectory) {
   const requestVerification = vi.fn(async () => {});
-  const verification: SignUpVerificationPort = { requestVerification };
+  const verification: SignUpVerification = { requestVerification };
   const registration = passkeySignUpRegistration({
     announcements: new SilentAnnouncements(),
     handleSecret: "test-secret",

@@ -21,7 +21,7 @@ import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts"
 import type {
   DataRetentionPlan,
   DataRetentionPlanPort,
-} from "../ports/data-retention-plan.port.ts";
+} from "../app/data-retention.infrastructure.ts";
 import type { RetentionPermissionsService } from "./retention-permissions.service.ts";
 
 /** The caller a gate is decided for, resolved once per request by the app. */

@@ -15,10 +15,10 @@ import {
   isHandledByLiteMemberHandler,
 } from "@langwatch/enterprise-licensing-web/surfaces/license-error-interceptor";
 import type { UiFailureHost } from "../../../../behavior/ui-feature";
-import { UiRpcPort, type UiRpcSubscription } from "../../../../behavior/ui-rpc";
+import { UiRpc, type UiRpcSubscription } from "../../../../behavior/ui-rpc";
 import { licensingFailures } from "../licensing-failures";
 
-class UnusedRpc extends UiRpcPort {
+class UnusedRpc extends UiRpc {
   query(): Promise<unknown> {
     return Promise.reject(new Error("not used"));
   }

@@ -12,10 +12,10 @@ import {
 import { deriveNewbornUserId } from "../rules/identifier-hash.rules.ts";
 import { adoptUserEmailCommandId } from "../rules/identity-command-id.rules.ts";
 import { type IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
-import { IdentityBirthPort, type IdentityNewborn } from "../app/identity.infrastructure.ts";
+import { IdentityBirth, type IdentityNewborn } from "../app/identity.infrastructure.ts";
 import { createLogger } from "@langwatch/observability";
 import type { IdentityEvent } from "../projections/identity-state.projection.ts";
-import type { IdentityBirthLedgerPort } from "../app/identity.infrastructure.ts";
+import type { IdentityBirthLedger } from "../app/identity.infrastructure.ts";
 import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository.ts";
 import { identityEventsFor } from "../intents/identity-events.intent.ts";
 
@@ -23,7 +23,7 @@ const logger = createLogger("langwatch:identity:birth");
 
 export interface IdentityBirthServiceDeps {
   guards: IdentityGuardsApi;
-  ledger: IdentityBirthLedgerPort;
+  ledger: IdentityBirthLedger;
   rows: IdentityNewbornRepository;
   /** The address lock (ADR-116 §6): the entrance and the verification
    *  ceremony contend on one constraint, not on two reads. */
@@ -39,7 +39,7 @@ export interface IdentityBirthServiceDeps {
  * The born-finalized entrance (ADR-116 §3): the idempotent sequence a
  * ADR-116 §3 lists it among the transaction's row writes. better-auth makes
  */
-export class IdentityBirthService implements IdentityBirthPort {
+export class IdentityBirthService implements IdentityBirth {
   static create(deps: IdentityBirthServiceDeps): IdentityBirthService {
     return new IdentityBirthService(deps);
   }

@@ -324,7 +324,7 @@ export interface TraceEdgeMediaTelemetry {
  * The project's own model-cost rules, as record-time cost enrichment reads them.
  *
  * This is deliberately NOT the shape the coding-agent cost estimator uses.
- * `CodingAgentCostEstimatorPort.estimateCost` is pure and synchronous over a
+ * `CodingAgentCostEstimator.estimateCost` is pure and synchronous over a
  * static catalog, and Trace already has the same thing in `TraceModelCostPort`
  * for fold-time cost. Neither can answer this question: an operator's
  * per-project, per-team and per-organization overrides live in a table, they
@@ -362,7 +362,7 @@ export interface TraceProcessingCommands {
 /** Worker-facing installation capability for Trace's complete processing graph. */
 export interface TraceProcessingInstaller {
   install(eventSourcing: EventSourcing): {
-    traceAssignments: TraceTopicAssignmentPort;
+    traceAssignments: TraceTopicAssignment;
     /**
      * The registered `recordSpan` command, named because two of Trace's own
      * paths reach the pipeline through the queue rather than through the fold:

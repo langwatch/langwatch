@@ -14,7 +14,7 @@ import {
 } from "@langwatch/suite-contract";
 
 import { SuiteService } from "../suite.service.ts";
-import type { SuiteExecutionPort } from "../../ports/suite-execution.port.ts";
+import type { SuiteExecution } from "../../app/suite.app.ts";
 import type { SuiteRepository } from "../../repositories/suite.repository.ts";
 import type { SuiteRunReadRepository } from "../../repositories/suite-run.repository.ts";
 
@@ -46,7 +46,7 @@ function buildService(overrides: {
   repository?: Partial<SuiteRepository>;
   scenarios?: Partial<ScenarioApi>;
   agents?: Partial<AgentApi>;
-  execution?: SuiteExecutionPort;
+  execution?: SuiteExecution;
 }) {
   // Spied so a refusal test can assert the plan row was never touched: a
   // refused run must resolve entirely from the config it was sent, never
@@ -80,7 +80,7 @@ function buildService(overrides: {
     ...overrides.scenarios,
   } as ScenarioApi;
 
-  const execution: SuiteExecutionPort =
+  const execution: SuiteExecution =
     overrides.execution ??
     ({
       execute: async (input) => ({
@@ -90,7 +90,7 @@ function buildService(overrides: {
         skippedArchived: input.skippedArchived,
         items: [],
       }),
-    } as SuiteExecutionPort);
+    } as SuiteExecution);
 
   const agents = createApiFixture<AgentApi>({
     getReferenceStates: async ({ ids }: { ids: string[] }) =>
@@ -268,7 +268,7 @@ describe("SuiteService.runPlan", () => {
             created: true,
           }),
         },
-        execution: { execute: executeSpy } as unknown as SuiteExecutionPort,
+        execution: { execute: executeSpy } as unknown as SuiteExecution,
       });
 
       await service.runPlan({
@@ -309,7 +309,7 @@ describe("given a scenario declaring a secret parameter", () => {
       const executed = vi.fn();
       const { service, findOrCreatePlanByName } = buildService({
         scenarios: declaringSecret,
-        execution: { execute: executed } as unknown as SuiteExecutionPort,
+        execution: { execute: executed } as unknown as SuiteExecution,
       });
 
       await expect(

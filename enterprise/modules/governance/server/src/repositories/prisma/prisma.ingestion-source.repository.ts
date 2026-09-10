@@ -4,11 +4,11 @@ import {
   type IngestionSource,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import type {
-  CreateIngestionSourceRecord,
-  UpdateIngestionSourceRecord,
-} from "../../ports/ingestion-source.port.ts";
-import { IngestionSourceRepository } from "../../ports/ingestion-source.port.ts";
+import {
+  IngestionSourceRepository,
+  type CreateIngestionSourceRecord,
+  type UpdateIngestionSourceRecord,
+} from "../ingestion-source.repository.ts";
 import { toDate } from "@langwatch/time";
 
 /** The update as Prisma takes it: the seam where instants become dates. */

@@ -7,14 +7,14 @@ import {
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import {
-  ApiAuthenticationPort,
+  ApiAuthentication,
   ApiAuditPort,
-  ApiAuthorizationPort,
+  ApiAuthorization,
   ApiRequestPolicy,
 } from "../api-request.policy.ts";
 import type { ApiTrpcSession } from "../app-trpc/app-trpc.context.ts";
 
-class TestAuthentication extends ApiAuthenticationPort {
+class TestAuthentication extends ApiAuthentication {
   constructor(private readonly session: ApiTrpcSession | null) {
     super();
   }
@@ -27,7 +27,7 @@ const signedIn: ApiTrpcSession = {
   sessionId: "session-1",
 };
 
-class TestAuthorization extends ApiAuthorizationPort {
+class TestAuthorization extends ApiAuthorization {
   readonly can = vi.fn(
     async (_input: { userId: string; permission: AuthzPermission; projectId: string }) => true,
   );

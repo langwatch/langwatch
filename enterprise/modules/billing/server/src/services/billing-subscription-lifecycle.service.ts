@@ -21,10 +21,10 @@ import { BestEffortService } from "./best-effort.service.ts";
 import { NurturingSubscriptionSyncService } from "./nurturing-subscription-sync.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
-import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port.ts";
-import type { BillingWebhookOrganizationPort } from "../repositories/billing-webhook-organization.repository.ts";
+import type { BillingWebhookHost } from "../ports/billing-webhook-host.port.ts";
+import type { BillingWebhookOrganization } from "../repositories/billing-webhook-organization.repository.ts";
 import type {
-  BillingWebhookSubscriptionPort,
+  BillingWebhookSubscription,
   SubscriptionWithOrg,
 } from "../repositories/billing-webhook-subscription.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
@@ -39,13 +39,13 @@ const waitForStripeConsistency = () =>
   new Promise((resolve) => setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS));
 
 type BillingSubscriptionLifecycleOptions = {
-  subscriptionRepository: BillingWebhookSubscriptionPort;
-  organizationRepository: BillingWebhookOrganizationPort;
+  subscriptionRepository: BillingWebhookSubscription;
+  organizationRepository: BillingWebhookOrganization;
   stripe: Stripe;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
   };
-  host: BillingWebhookHostPort;
+  host: BillingWebhookHost;
 };
 
 export class BillingSubscriptionLifecycleService {
@@ -53,11 +53,11 @@ export class BillingSubscriptionLifecycleService {
     return new BillingSubscriptionLifecycleService(options);
   }
 
-  private readonly subscriptionRepository: BillingWebhookSubscriptionPort;
-  private readonly organizationRepository: BillingWebhookOrganizationPort;
+  private readonly subscriptionRepository: BillingWebhookSubscription;
+  private readonly organizationRepository: BillingWebhookOrganization;
   private readonly stripe: Stripe;
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
-  private readonly host: BillingWebhookHostPort;
+  private readonly host: BillingWebhookHost;
   private readonly bestEffort = BestEffortService.create();
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {

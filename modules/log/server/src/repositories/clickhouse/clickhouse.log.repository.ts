@@ -1,8 +1,8 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { LogApi, LogProcessingEvent } from "@langwatch/log-contract";
-import type { LogRedactionPort } from "../../ports/log-redaction.port.ts";
-import { CanonicalLogAdapter } from "../../adapters/canonical-log.adapter.ts";
-import { LogProcessingAdapter, type LogProcessingPipeline } from "../../adapters/log-processing.adapter.ts";
+import type { LogRedaction } from "../../app/log.infrastructure.ts";
+import { CanonicalLogAdapter } from "../../services/canonical-log.service.ts";
+import { LogProcessingAdapter, type LogProcessingPipeline } from "../../services/log-processing.service.ts";
 import { LogService } from "../../services/log.service.ts";
 import type { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
 import type { LogClickHouseClientResolver } from "./clickhouse.canonical-log-record-append.repository.ts";
@@ -23,7 +23,7 @@ export class ClickhouseLogRepository {
     defaultRetentionDays: number;
     defaultReadLimit: number;
     logCommandShardCount: number;
-    redaction: LogRedactionPort;
+    redaction: LogRedaction;
   }): ClickhouseLogRepository {
     const repository = ClickHouseCanonicalLogRecordRepository.create(options);
     const service = LogService.create({
@@ -41,7 +41,7 @@ export class ClickhouseLogRepository {
   static createUnavailable(options: {
     defaultRetentionDays: number;
     logCommandShardCount: number;
-    redaction: LogRedactionPort;
+    redaction: LogRedaction;
   }): ClickhouseLogRepository {
     const repository = NullCanonicalLogRecordRepository.create();
     const service = LogService.create({

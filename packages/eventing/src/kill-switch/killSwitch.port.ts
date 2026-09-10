@@ -20,7 +20,7 @@ export interface KillSwitchQuery {
  * must be total: a lookup that fails answers "not killed", so a flag store
  * outage never stops the pipeline it exists to control.
  */
-export abstract class KillSwitchPort {
+export abstract class KillSwitch {
   abstract isKilled(query: KillSwitchQuery): Promise<boolean>;
 }
 
@@ -33,7 +33,7 @@ export async function isComponentKilled({
   logger,
   ...query
 }: KillSwitchQuery & {
-  killSwitch: KillSwitchPort | undefined;
+  killSwitch: KillSwitch | undefined;
   logger?: ReturnType<typeof createLogger>;
 }): Promise<boolean> {
   if (!killSwitch) return false;

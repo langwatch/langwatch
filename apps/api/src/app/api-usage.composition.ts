@@ -9,7 +9,7 @@ import {
   UsageLimitEmailPort,
   UsageWarningService,
   type BillingNextStepResolver,
-  type BillingSubscriptionPort,
+  type BillingSubscription,
   type UsageLimitEmailData,
 } from "@langwatch/enterprise-billing-server";
 import {
@@ -38,12 +38,12 @@ import {
   InProcessUsageCache,
   UsageMeterPolicyService,
   USAGE_UNKNOWN,
-  UsageCounterPort,
-  UsageOrganizationPort,
   UsageService,
-  UsageVolumeCounterPort,
-  UsageWarningPort,
   PlanNextStepService,
+  type UsageCounter,
+  type UsageOrganizationPort,
+  type UsageVolumeCounterPort,
+  type UsageWarning,
   type CataloguePlan,
   type PlanCatalogueReader,
   type EntitlementServiceOptions,
@@ -79,7 +79,7 @@ export type ApiPlanProviderOptions = Readonly<{
    * self-hosted deployment has none to read, and because a host may compose the provider
    * itself.
    */
-  subscriptions?: BillingSubscriptionPort;
+  subscriptions?: BillingSubscription;
   /**
    * The operator allow-list, for the ONE thing the subscription source does
    * with it: an impersonating staff member sees the organization's real
@@ -261,7 +261,7 @@ export type ApiUsageStatsOptions = Readonly<{
  */
 export function composeApiUsageStats(
   options: ApiUsageStatsOptions,
-): Readonly<{ counter: UsageCounterPort; warnings: UsageWarningPort }> {
+): Readonly<{ counter: UsageCounter; warnings: UsageWarning }> {
   if (!options.mail) options.report?.absent("usage-mail");
 
   // ONE counter, read by both halves. The panel's total and the warning's
@@ -417,7 +417,7 @@ class ApiUsageNextStepResolver implements BillingNextStepResolver {
  * that composed no gateway, and then the send refuses by name rather than
  * reporting that it sent something.
  */
-class ApiComposedUsageWarnings extends UsageWarningPort {
+class ApiComposedUsageWarnings implements UsageWarning {
   static create(options: {
     warnings: UsageWarningService | undefined;
     processName: string;
@@ -428,9 +428,7 @@ class ApiComposedUsageWarnings extends UsageWarningPort {
   private constructor(
     private readonly warnings: UsageWarningService | undefined,
     private readonly processName: string,
-  ) {
-    super();
-  }
+  ) {}
 
   async sendWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {
     if (!this.warnings) throw new ApiUsageNotifierUnavailableError(this.processName);
@@ -557,7 +555,7 @@ class ApiUsageBreakdownAdapter implements BillingUsageCounter {
  * application's, unchanged: a licence's own `usageUnit` wins, then a seat-and-event
  * pricing model, then the free tier, and otherwise traces.
  */
-class ApiUsageCounterAdapter extends UsageCounterPort {
+class ApiUsageCounterAdapter implements UsageCounter {
   static create(options: ApiUsageStatsOptions): ApiUsageCounterAdapter {
     return new ApiUsageCounterAdapter(
       options.prisma,
@@ -576,9 +574,7 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
     private readonly prisma: PrismaClient,
     private readonly plans: PlanProvider,
     private readonly billing: BillableEventsQueryService,
-  ) {
-    super();
-  }
+  ) {}
 
   async getCurrentMonthCountForDisplay(input: { organizationId: string }): Promise<UsageCount> {
     const unit = await this.getResolvedUsageUnit(input);
@@ -666,14 +662,12 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
 /**
  * The organization graph, as enforcement needs it: three reads, one client.
  */
-class ApiUsageOrganizationDirectory extends UsageOrganizationPort {
+class ApiUsageOrganizationDirectory implements UsageOrganizationPort {
   static create(prisma: PrismaClient): ApiUsageOrganizationDirectory {
     return new ApiUsageOrganizationDirectory(prisma);
   }
 
-  private constructor(private readonly prisma: PrismaClient) {
-    super();
-  }
+  private constructor(private readonly prisma: PrismaClient) {}
 
   async tryGetOrganizationIdByTeamId(input: { teamId: string }): Promise<string | null> {
     const team = await this.prisma.team.findUnique({
@@ -703,14 +697,12 @@ class ApiUsageOrganizationDirectory extends UsageOrganizationPort {
 /**
  * The month's TRACE volume, one project at a time.
  */
-class ApiTraceVolumeCounter extends UsageVolumeCounterPort {
+class ApiTraceVolumeCounter implements UsageVolumeCounterPort {
   static create(billing: BillableEventsQueryService): ApiTraceVolumeCounter {
     return new ApiTraceVolumeCounter(billing);
   }
 
-  private constructor(private readonly billing: BillableEventsQueryService) {
-    super();
-  }
+  private constructor(private readonly billing: BillableEventsQueryService) {}
 
   async getCountByProjects(input: {
     organizationId: string;
@@ -737,14 +729,12 @@ class ApiTraceVolumeCounter extends UsageVolumeCounterPort {
  * BY TenantId` on rows already keyed by the organization that is billed for them, so
  * there is nothing to fan out and `projectIds` is not consulted.
  */
-class ApiEventVolumeCounter extends UsageVolumeCounterPort {
+class ApiEventVolumeCounter implements UsageVolumeCounterPort {
   static create(billing: BillableEventsQueryService): ApiEventVolumeCounter {
     return new ApiEventVolumeCounter(billing);
   }
 
-  private constructor(private readonly billing: BillableEventsQueryService) {
-    super();
-  }
+  private constructor(private readonly billing: BillableEventsQueryService) {}
 
   async getCountByProjects(input: {
     organizationId: string;

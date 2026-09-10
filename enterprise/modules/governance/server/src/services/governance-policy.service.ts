@@ -5,10 +5,8 @@ import type {
 import { buildIngestKeyReceiverPolicies } from "../rules/ingest-key-provenance.rules.ts";
 import type { TraceDepartmentInput } from "@langwatch/enterprise-governance-contract";
 import type { CostAttributionPolicyRepository } from "../repositories/policy/cost-attribution-policy.repository.ts";
-import {
-  NullGovernanceDiagnosticsAdapter,
-  type GovernanceDiagnosticsPort,
-} from "../ports/governance-diagnostics.port.ts";
+import type { GovernanceDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 import { z } from "zod";
 
 const UNASSIGNED_DEPARTMENT = "unassigned";
@@ -25,7 +23,7 @@ export class PostgresGovernancePolicyService {
     options: {
       clock?: () => number;
       cacheTtlMs?: number;
-      diagnostics?: GovernanceDiagnosticsPort;
+      diagnostics?: GovernanceDiagnosticsSink;
     } = {},
   ): PostgresGovernancePolicyService {
     return new PostgresGovernancePolicyService(repository, options);
@@ -36,7 +34,7 @@ export class PostgresGovernancePolicyService {
     private readonly options: {
       clock?: () => number;
       cacheTtlMs?: number;
-      diagnostics?: GovernanceDiagnosticsPort;
+      diagnostics?: GovernanceDiagnosticsSink;
     } = {},
   ) {}
 

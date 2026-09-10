@@ -7,7 +7,7 @@ import { generate } from "@langwatch/ksuid";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/runtime-composition";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import {
   WebhookApp,
   WebhookEndpointConfiguration,
@@ -29,11 +29,11 @@ class ApiWebhookIds implements WebhookId {
 /** An endpoint's signing secret, under the same cipher every other at-rest
  *  secret on this process is written with. */
 class ApiWebhookSecrets implements WebhookSecret {
-  static create(cipher: SecretEncryptionPort): ApiWebhookSecrets {
+  static create(cipher: SecretEncryption): ApiWebhookSecrets {
     return new ApiWebhookSecrets(cipher);
   }
 
-  private constructor(private readonly cipher: SecretEncryptionPort) {}
+  private constructor(private readonly cipher: SecretEncryption) {}
 
   encrypt(value: string): string {
     return this.cipher.encrypt(value);
@@ -55,7 +55,7 @@ export async function installApiWebhook(options: {
   /** The one guarded connection the registry and the delivery log run on. */
   prisma: PrismaClient;
   /** The cipher an endpoint's signing secret is written under. */
-  encryption: SecretEncryptionPort;
+  encryption: SecretEncryption;
   /** This process's ClickHouse, where the emitted envelopes are projected. */
   resolveClickHouseClient: WebhookClickHouseClientResolver;
 }): Promise<ComposedWebhookFeature> {

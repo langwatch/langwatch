@@ -1,5 +1,5 @@
 import { agentConnectCredentialsSchema, relayPayloadCaps } from "@langwatch/agent-contract";
-import { WebSocketProtocol, type ConnectUpgradeRouterPort } from "@langwatch/api";
+import { WebSocketProtocol, type ConnectUpgradeRouter } from "@langwatch/api";
 import {
   AgentSessionService,
   type SessionCoreOptions,
@@ -40,7 +40,7 @@ export class ConnectGatewayFixture {
   get sessionCount() {
     return this.#connections.sessionCount;
   }
-  mount(router: ConnectUpgradeRouterPort) {
+  mount(router: ConnectUpgradeRouter) {
     this.#protocol.mount(router, this.#connections);
   }
   async close() {

@@ -9,7 +9,7 @@ import {
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BetterAuthSsoAdapter } from "../services/better-auth-sso.service.ts";
-import { SsoGateLoggerPort } from "../app/sso.infrastructure.ts";
+import { SsoGateLogger } from "../app/sso.infrastructure.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 
 class FakeLicensingService extends LicensingService {
@@ -33,9 +33,9 @@ class FakeLicensingService extends LicensingService {
   }
 }
 
-class FakeLogger implements SsoGateLoggerPort {
-  readonly info = vi.fn<SsoGateLoggerPort["info"]>();
-  readonly warn = vi.fn<SsoGateLoggerPort["warn"]>();
+class FakeLogger implements SsoGateLogger {
+  readonly info = vi.fn<SsoGateLogger["info"]>();
+  readonly warn = vi.fn<SsoGateLogger["warn"]>();
 }
 
 class FakeProviderMountInspector extends SsoProviderMountInspector {

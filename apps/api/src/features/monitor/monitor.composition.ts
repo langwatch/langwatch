@@ -14,8 +14,8 @@ import { EvaluatorReplicationService } from "@langwatch/evaluator-server";
 import { HandledError } from "@langwatch/handled-error";
 import {
   monitorServer,
-  MonitorEvaluatorPort,
-  MonitorPerformancePort,
+  MonitorEvaluator,
+  MonitorPerformance,
   type MonitorReplicationReader,
 } from "@langwatch/monitor-server";
 import { createApp } from "@langwatch/runtime-composition";
@@ -95,10 +95,8 @@ export async function installApiMonitor(options: {
 }
 
 /** The one evaluator service on this process, as the monitor reads it. */
-class ProcessMonitorEvaluators extends MonitorEvaluatorPort {
-  constructor(private readonly evaluators: EvaluatorApi) {
-    super();
-  }
+class ProcessMonitorEvaluators implements MonitorEvaluator {
+  constructor(private readonly evaluators: EvaluatorApi) {}
 
   getById(input: { id: string; projectId: string }) {
     return this.evaluators.getById(input);
@@ -154,7 +152,7 @@ class ProcessMonitorReplication implements MonitorReplicationReader {
  */
 function composeMonitorPerformance(
   resolveClickHouseClient: ((projectId: string) => Promise<unknown>) | null,
-): MonitorPerformancePort {
+): MonitorPerformance {
   const window = AnalyticsComparisonWindowService.create();
   const previousPeriodStartMs = ({ startMs, endMs }: { startMs: number; endMs: number }) =>
     window
@@ -174,15 +172,13 @@ function composeMonitorPerformance(
   return new ClickHouseMonitorPerformance(evaluations, previousPeriodStartMs);
 }
 
-class ClickHouseMonitorPerformance extends MonitorPerformancePort {
+class ClickHouseMonitorPerformance implements MonitorPerformance {
   constructor(
     private readonly evaluations: {
-      getMonitorPerformance: MonitorPerformancePort["getMonitorPerformance"];
+      getMonitorPerformance: MonitorPerformance["getMonitorPerformance"];
     },
     private readonly window: (range: { startMs: number; endMs: number }) => number,
-  ) {
-    super();
-  }
+  ) {}
 
   getMonitorPerformance(query: MonitorPerformanceQuery) {
     return this.evaluations.getMonitorPerformance(query);
@@ -194,10 +190,8 @@ class ClickHouseMonitorPerformance extends MonitorPerformancePort {
 }
 
 /** The trend on a deployment that composed no ClickHouse connection. */
-class UncomposedMonitorPerformance extends MonitorPerformancePort {
-  constructor(private readonly window: (range: { startMs: number; endMs: number }) => number) {
-    super();
-  }
+class UncomposedMonitorPerformance implements MonitorPerformance {
+  constructor(private readonly window: (range: { startMs: number; endMs: number }) => number) {}
 
   getMonitorPerformance(): Promise<never> {
     return Promise.reject(

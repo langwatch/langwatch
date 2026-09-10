@@ -11,14 +11,14 @@ import {
 } from "@langwatch/evaluation-contract";
 import {
   evaluationServer,
-  EvaluationCustomEvaluatorsPort,
-  EvaluationExecutionPort,
-  EvaluationInputsResolutionPort,
-  EvaluationInstallEnvironmentPort,
+  EvaluationCustomEvaluators,
+  EvaluationExecution,
+  EvaluationInputsResolution,
+  EvaluationInstallEnvironment,
   EvaluationProcessingProducerAdapter,
-  EvaluationReportPort,
-  EvaluationRescorePort,
-  EvaluationRunAnalyticsPort,
+  EvaluationReport,
+  EvaluationRescore,
+  EvaluationRunAnalytics,
   EvaluationWarmupPort,
   type EvaluationClickHouseResolver,
   type EvaluationInfrastructure,
@@ -58,7 +58,7 @@ export type EvaluationCollaborators = Readonly<{
   environment: Readonly<Record<string, string | undefined>>;
 }>;
 
-class ApiEvaluationInstallEnvironment extends EvaluationInstallEnvironmentPort {
+class ApiEvaluationInstallEnvironment extends EvaluationInstallEnvironment {
   constructor(private readonly environment: Readonly<Record<string, string | undefined>>) {
     super();
   }
@@ -73,7 +73,7 @@ class ApiEvaluationInstallEnvironment extends EvaluationInstallEnvironmentPort {
  * Workflow table, so this stays a process-level read until the Workflow
  * capability owns the query.
  */
-class ApiEvaluationCustomEvaluators extends EvaluationCustomEvaluatorsPort {
+class ApiEvaluationCustomEvaluators extends EvaluationCustomEvaluators {
   constructor(private readonly prisma: ApiTrpcInfrastructure["prisma"]) {
     super();
   }
@@ -83,7 +83,7 @@ class ApiEvaluationCustomEvaluators extends EvaluationCustomEvaluatorsPort {
   }
 }
 
-class ApiEvaluationRescore extends EvaluationRescorePort {
+class ApiEvaluationRescore extends EvaluationRescore {
   constructor(private readonly run: EvaluationCollaborators["runTraceEvaluation"]) {
     super();
   }
@@ -103,7 +103,7 @@ class ApiEvaluationWarmup extends EvaluationWarmupPort {
   }
 }
 
-class ApiEvaluationRunAnalytics extends EvaluationRunAnalyticsPort {
+class ApiEvaluationRunAnalytics extends EvaluationRunAnalytics {
   constructor(private readonly track: EvaluationCollaborators["trackEvaluationRan"]) {
     super();
   }
@@ -118,7 +118,7 @@ class ApiEvaluationRunAnalytics extends EvaluationRunAnalyticsPort {
  * the durable execution path the worker owns: an execute reaching here is a
  * wiring mistake, and says which process it reached.
  */
-class UnavailableEvaluationExecution extends EvaluationExecutionPort {
+class UnavailableEvaluationExecution extends EvaluationExecution {
   constructor(private readonly processName: string) {
     super();
   }
@@ -131,7 +131,7 @@ class UnavailableEvaluationExecution extends EvaluationExecutionPort {
 }
 
 /** Stored inputs reach this process already resolved. */
-class PassThroughEvaluationInputs extends EvaluationInputsResolutionPort {
+class PassThroughEvaluationInputs extends EvaluationInputsResolution {
   async tryResolve(input: {
     tenantId: string;
     inputs: Record<string, unknown> | null;
@@ -140,7 +140,7 @@ class PassThroughEvaluationInputs extends EvaluationInputsResolutionPort {
   }
 }
 
-class ApiEvaluationReport extends EvaluationReportPort {
+class ApiEvaluationReport extends EvaluationReport {
   constructor(private readonly send: (data: ReportEvaluationCommandData) => Promise<unknown>) {
     super();
   }

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDeliveryPort } from "../providers/types.ts";
+import type { EmailDelivery } from "../providers/types.ts";
 import {
   ActionRow,
   DataTable,
@@ -208,7 +208,7 @@ export const sendAutomationLimitEmail = async ({
   mailer,
   to,
   ...props
-}: AutomationLimitEmailProps & { to: string[]; mailer: EmailDeliveryPort }) => {
+}: AutomationLimitEmailProps & { to: string[]; mailer: EmailDelivery }) => {
   const { subject, html } = await renderMailTemplate(automationLimitEmailTemplate, props);
   const results = await Promise.allSettled(
     to.map((recipient) => sendEmail({ mailer, content: { to: recipient, subject, html } })),

@@ -40,8 +40,8 @@ import type {
   VirtualKeyCamelDto,
   VirtualKeySnakeDto,
 } from "../adapters/gateway-virtual-key-dto.adapter.ts";
-import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
-import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port.ts";
+import type { GatewayBudgetSpend } from "./gateway.infrastructure.ts";
+import type { GatewayVirtualKeySpendPort } from "./gateway.infrastructure.ts";
 
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import {
@@ -221,7 +221,7 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
    * which is why every read of it degrades explicitly rather than reporting a
    * confident zero.
    */
-  budgetSpend: GatewayBudgetSpendPort | undefined;
+  budgetSpend: GatewayBudgetSpend | undefined;
   /** The ClickHouse per-key spend source. Absent likewise. */
   virtualKeySpend: GatewayVirtualKeySpendPort | undefined;
   /** The spend-event ledger reader. Absent likewise. */

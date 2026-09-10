@@ -7,15 +7,15 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Anomaly } from "@langwatch/ops-contract";
 import {
-  AnomalyHardTierAlertPort,
+  AnomalyHardTierAlert,
   OpsWorkerAdapter,
   OtelStorageStatsMetricsAdapter,
   StorageStatsCollectionService,
-  UsageStatsClickHouseClientPort,
-  UsageStatsClickHouseClientResolverPort,
-  UsageStatsErrorReporterPort,
-  UsageStatsTelemetryClientPort,
-  type OpsWorkerPort,
+  UsageStatsClickHouseClient,
+  UsageStatsClickHouseClientResolver,
+  UsageStatsErrorReporter,
+  UsageStatsTelemetryClient,
+  type OpsWorker,
   type StorageStatsInstance,
   type UsageStatsWorkerDatabase,
 } from "@langwatch/ops-server";
@@ -38,7 +38,7 @@ const BUILDER_CHART_KIND = "builder";
  * construction: the anomaly page just never surfaces a tenant, and the storage gauges just never
  * appear.
  */
-export abstract class WorkerOpsAbsenceReportPort {
+export abstract class WorkerOpsAbsenceReport {
   abstract withoutAnomalyDetection(): void;
 
   abstract withoutStorageStats(): void;
@@ -54,7 +54,7 @@ export type WorkerOpsCompositionInput = Readonly<{
   featureFlags: FeatureFlagApi;
   /** The organization's own ClickHouse endpoint, for its usage counts. */
   resolveOrganizationClient:
-    | ((organizationId: string) => UsageStatsClickHouseClientPort)
+    | ((organizationId: string) => UsageStatsClickHouseClient)
     | undefined;
   /**
    * Every configured endpoint, for the one read that is nobody's tenant. `system.parts` is a
@@ -62,11 +62,11 @@ export type WorkerOpsCompositionInput = Readonly<{
    * has more than one.
    */
   resolveClickHouseInstances: (() => Promise<readonly StorageStatsInstance[]>) | undefined;
-  absence?: WorkerOpsAbsenceReportPort;
+  absence?: WorkerOpsAbsenceReport;
 }>;
 
 export interface WorkerOpsComposition {
-  workers: OpsWorkerPort;
+  workers: OpsWorker;
   storageStats: StorageStatsCollectionService | undefined;
 }
 
@@ -114,7 +114,7 @@ export function createWorkerOps(options: WorkerOpsCompositionInput): WorkerOpsCo
  * tenant this loop is wrong about would be cut off by a heuristic, so the detector surfaces the
  * anomaly and an operator decides. The log line is the page.
  */
-class LoggedHardTierAlert extends AnomalyHardTierAlertPort {
+class LoggedHardTierAlert extends AnomalyHardTierAlert {
   static create(logger: Logger): LoggedHardTierAlert {
     return new LoggedHardTierAlert(logger);
   }
@@ -138,22 +138,22 @@ class LoggedHardTierAlert extends AnomalyHardTierAlertPort {
 }
 
 /** An organization's own endpoint, or nothing where this process routes none. */
-class WorkerUsageStatsClickHouse extends UsageStatsClickHouseClientResolverPort {
+class WorkerUsageStatsClickHouse extends UsageStatsClickHouseClientResolver {
   static create(
-    resolve: ((organizationId: string) => UsageStatsClickHouseClientPort) | undefined,
+    resolve: ((organizationId: string) => UsageStatsClickHouseClient) | undefined,
   ): WorkerUsageStatsClickHouse {
     return new WorkerUsageStatsClickHouse(resolve);
   }
 
   private constructor(
     private readonly resolve:
-      | ((organizationId: string) => UsageStatsClickHouseClientPort)
+      | ((organizationId: string) => UsageStatsClickHouseClient)
       | undefined,
   ) {
     super();
   }
 
-  tryResolve(organizationId: string): Promise<UsageStatsClickHouseClientPort | null> {
+  tryResolve(organizationId: string): Promise<UsageStatsClickHouseClient | null> {
     return Promise.resolve(this.resolve ? this.resolve(organizationId) : null);
   }
 }
@@ -163,7 +163,7 @@ class WorkerUsageStatsClickHouse extends UsageStatsClickHouseClientResolverPort 
  * sender: the destination is a constant in this file rather than anything a customer configured, so
  * there is no customer-supplied host to fence and nothing of the customer's own to leak to one.
  */
-class WorkerUsageStatsTelemetry extends UsageStatsTelemetryClientPort {
+class WorkerUsageStatsTelemetry extends UsageStatsTelemetryClient {
   static create(): WorkerUsageStatsTelemetry {
     return new WorkerUsageStatsTelemetry();
   }
@@ -182,7 +182,7 @@ class WorkerUsageStatsTelemetry extends UsageStatsTelemetryClientPort {
 }
 
 /** A failed report is logged and the loop continues to the next organization. */
-class LoggedUsageStatsErrors extends UsageStatsErrorReporterPort {
+class LoggedUsageStatsErrors extends UsageStatsErrorReporter {
   static create(logger: Logger): LoggedUsageStatsErrors {
     return new LoggedUsageStatsErrors(logger);
   }
@@ -198,7 +198,7 @@ class LoggedUsageStatsErrors extends UsageStatsErrorReporterPort {
 }
 
 /** Names an absent operational loop in this process's own log. */
-export class LoggedWorkerOpsAbsence extends WorkerOpsAbsenceReportPort {
+export class LoggedWorkerOpsAbsence extends WorkerOpsAbsenceReport {
   static create(logger: Logger): LoggedWorkerOpsAbsence {
     return new LoggedWorkerOpsAbsence(logger);
   }

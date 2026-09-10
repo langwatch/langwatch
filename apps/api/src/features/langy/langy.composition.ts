@@ -9,16 +9,16 @@ import {
   FeatureFlagLangyUiActionSurfaceAdapter,
   LANGY_GITHUB_PRS_PER_DAY,
   LangyApp,
-  LangyGithubPermitPort,
-  LangyGithubPrCounterPort,
+  LangyGithubPermit,
+  LangyGithubPrCounter,
   LangyGithubPrQuotaService,
   LangyNavigateFallbackService,
-  type LangyNavigateResourcePort,
+  type LangyNavigateResource,
   LangyBlockOtelMetricsAdapter,
   LangyTokenBufferRedisRepository,
   MemoryLangyRepositories,
   PostgresLangyRepositories,
-  LangyUiActionCatalogPort,
+  LangyUiActionCatalog,
   LangyUiActionService,
   type LangyEgressTrpcPorts,
   type LangyRelayCompositionOptions,
@@ -31,7 +31,7 @@ import {
 } from "@langwatch/langy-server";
 import { LangyNotEnabledError, renderLangyTurnContext } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PresenceEmitterPort } from "@langwatch/presence-server";
+import type { PresenceEmitter } from "@langwatch/presence-server";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
@@ -63,7 +63,7 @@ export type LangyFeatureCollaborators = Readonly<{
   /** The address the worker's relay frames and navigate fallbacks are built under. */
   publicBaseUrl: string | undefined;
   /** The fabric both live channels publish on. */
-  broadcast: PresenceEmitterPort;
+  broadcast: PresenceEmitter;
   /** The one project Langy never runs on, whatever a permission says. */
   demoProjectId: string | undefined;
   /** The shared counter the two Langy budgets meter through. */
@@ -78,7 +78,7 @@ export type LangyFeatureCollaborators = Readonly<{
    * resolve, which is the honest answer for a process holding none of the
    * eight directories a resource id names.
    */
-  navigateResources: LangyNavigateResourcePort | undefined;
+  navigateResources: LangyNavigateResource | undefined;
   /**
    * The developer's own machine (ADR-129). The SAME runtime the worker's REST
    * door reads — two over process memory would answer two different folders
@@ -96,11 +96,11 @@ export function composeLangyFeature(options: {
   commands: LangyConversationCommands;
   redis: RedisConnection | null;
   publicBaseUrl: string | undefined;
-  broadcast: PresenceEmitterPort;
+  broadcast: PresenceEmitter;
   demoProjectId: string | undefined;
   rateLimit: LangyFeatureCollaborators["rateLimit"];
   processName: string;
-  navigateResources?: LangyNavigateResourcePort | undefined;
+  navigateResources?: LangyNavigateResource | undefined;
   local?: LangyLocalTrpcPorts | undefined;
 }): ComposedLangyFeature {
   const collaborators: LangyFeatureCollaborators = {
@@ -272,7 +272,7 @@ function composeLangyRelay(
  * workbench's, and it is a browser module: a Langy server package may not reach it and
  * neither may this composition root.
  */
-class UnavailableApiLangyUiActionCatalog extends LangyUiActionCatalogPort {
+class UnavailableApiLangyUiActionCatalog extends LangyUiActionCatalog {
   tryFind(_kind: string): LangyUiActionDefinition | null {
     return null;
   }
@@ -284,7 +284,7 @@ class UnavailableApiLangyUiActionCatalog extends LangyUiActionCatalogPort {
  * check-and-decrement; without it the release falls back to a read-then-decr
  * that can underflow the bucket and grant unlimited permits.
  */
-class ApiLangyGithubPrCounter extends LangyGithubPrCounterPort {
+class ApiLangyGithubPrCounter extends LangyGithubPrCounter {
   static create(redis: RedisConnection): ApiLangyGithubPrCounter {
     return new ApiLangyGithubPrCounter(redis);
   }
@@ -319,7 +319,7 @@ class ApiLangyGithubPrCounter extends LangyGithubPrCounterPort {
 }
 
 /** The turn's three permit calls, on the feature package's quota service. */
-class ApiLangyGithubPrPermits extends LangyGithubPermitPort {
+class ApiLangyGithubPrPermits extends LangyGithubPermit {
   static create(quota: LangyGithubPrQuotaService): ApiLangyGithubPrPermits {
     return new ApiLangyGithubPrPermits(quota);
   }

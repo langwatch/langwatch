@@ -2,7 +2,7 @@
  * One pipeline definition, two registrations: the worker mounts the process managers and drains every routing key; a producer takes only the four command dispatchers and no consumer loop. Passing none of the (optional) process managers is load-bearing — mounting either would drain the worker's queue rather than produce onto it — and a stand-in ledger refuses by name if ever called, rather than silently no-op'ing a fold that was never meant to happen.
  */
 import { EventingGatewaySpendAdapter } from "./eventing.gateway-spend.adapter.ts";
-import { GatewaySpendEventsPort } from "../ports/gateway-spend-events.port.ts";
+import { GatewaySpendEvents } from "../ports/gateway-spend-events.port.ts";
 
 /** Why every read and write below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {
@@ -14,7 +14,7 @@ function producerOnly(processName: string, capability: string): Error {
 /**
  * The spend ledger a process that never folds holds. Every member refuses — a real read here means the graph wired the reconciliation door (which composes the REAL ledger) to the producer's stand-in instead, worth failing loudly.
  */
-class ProducerOnlyGatewaySpendEvents extends GatewaySpendEventsPort {
+class ProducerOnlyGatewaySpendEvents extends GatewaySpendEvents {
   constructor(private readonly processName: string) {
     super();
   }

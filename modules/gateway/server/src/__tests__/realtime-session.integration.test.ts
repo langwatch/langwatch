@@ -21,8 +21,8 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { ModelCatalogGatewaySpendRatingAdapter } from "../adapters/model-catalog.gateway-spend-rating.adapter.ts";
-import { GatewaySpanIngestionPort } from "../ports/gateway-span-ingestion.port.ts";
-import { GatewaySpendConfirmationPort } from "../ports/gateway-spend-confirmation.port.ts";
+import { GatewaySpanIngestion } from "../app/gateway.infrastructure.ts";
+import { GatewaySpendConfirmation } from "../app/gateway.infrastructure.ts";
 import type { ConfirmSpendCommandData } from "../processes/gateway-spend-commands.process.ts";
 import {
   GatewayRealtimeSessionService,
@@ -54,13 +54,13 @@ const prisma = connection?.client as PrismaClient;
 const sentConfirmations: ConfirmSpendCommandData[] = [];
 const ingestedSpans: Record<string, any>[] = [];
 
-class RecordingSpendConfirmation extends GatewaySpendConfirmationPort {
+class RecordingSpendConfirmation implements GatewaySpendConfirmation {
   async confirmSpend(data: ConfirmSpendCommandData): Promise<void> {
     sentConfirmations.push(data);
   }
 }
 
-class RecordingSpanIngestion extends GatewaySpanIngestionPort {
+class RecordingSpanIngestion implements GatewaySpanIngestion {
   async ingestNormalizedSpan(input: any): Promise<void> {
     ingestedSpans.push(input);
   }

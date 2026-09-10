@@ -4,14 +4,14 @@ import { Temporal } from "@langwatch/time";
  */
 import { createLogger } from "@langwatch/observability";
 
-import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port.ts";
+import type { GatewayClickHouseResolver } from "../../app/gateway.infrastructure.ts";
 import {
   type GatewaySpendWindow,
   type GatewayTraceRow,
   type GatewayUsageBucket,
   type GatewayVirtualKeySpend,
   GatewayVirtualKeySpendPort,
-} from "../../ports/gateway-virtual-key-spend.port.ts";
+} from "../../app/gateway.infrastructure.ts";
 import { usdDisplayString } from "@langwatch/gateway-contract";
 
 const TRACE_SUMMARIES_TABLE = "trace_summaries";
@@ -19,13 +19,12 @@ const VK_ATTRIBUTE = "langwatch.virtual_key_id";
 
 const logger = createLogger("langwatch:gateway:virtual-key-spend-repository");
 
-export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort {
+export class GatewayVirtualKeySpendRepository implements GatewayVirtualKeySpendPort {
   static create(resolveClient: GatewayClickHouseResolver): GatewayVirtualKeySpendRepository {
     return new GatewayVirtualKeySpendRepository(resolveClient);
   }
 
   constructor(private readonly resolveClient: GatewayClickHouseResolver) {
-    super();
   }
 
   /**

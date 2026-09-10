@@ -7,9 +7,9 @@ import {
   type LogRequestCollectionResult,
   LogRequestCollectionService,
 } from "../log-request-collection.service.ts";
-import type { LogRedactionPort } from "../../ports/log-redaction.port.ts";
+import type { LogRedaction } from "../../app/log.infrastructure.ts";
 import { createLogTestService } from "./log.fixture.ts";
-import { LogTraceIoPort, type LogTraceIo } from "../../ports/log-trace-io.port.ts";
+import { LogTraceIoExtractor, type LogTraceIo } from "../../app/log.infrastructure.ts";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 
 /**
@@ -26,7 +26,7 @@ const unreadableLogRecords = {
 } as unknown as CanonicalLogRecordRepository;
 
 /** Every request below asks for no redaction, so the port never rewrites. */
-const disabledRedaction: LogRedactionPort = { redactLog: async () => {} };
+const disabledRedaction: LogRedaction = { redactLog: async () => {} };
 
 /** Trace's byte budget stands in for `IO_PREVIEW_BYTES`; the flag is what matters. */
 const PREVIEW_BYTES = 64;
@@ -35,7 +35,7 @@ const PREVIEW_BYTES = 64;
  * Stands in for Trace's log reader: input is the record's `prompt` attribute,
  * clamped to whole UTF-8 characters within the budget above.
  */
-class PromptTraceIo extends LogTraceIoPort {
+class PromptTraceIo implements LogTraceIoExtractor {
   extractIo(data: LogRecordReceivedEventData): LogTraceIo {
     const prompt = data.attributes.prompt;
     return { input: typeof prompt === "string" ? prompt : null, output: null };

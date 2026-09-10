@@ -8,9 +8,9 @@ import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import {
   ANNUAL_EVENTS_BILLING_THRESHOLD,
   EEWebhookService,
-  type BillingWebhookHostPort,
-  type BillingWebhookOrganizationPort,
-  type BillingWebhookSubscriptionPort,
+  type BillingWebhookHost,
+  type BillingWebhookOrganization,
+  type BillingWebhookSubscription,
   type SubscriptionWithOrg,
 } from "../../index.ts";
 import { Temporal } from "@langwatch/time";
@@ -24,7 +24,7 @@ const mockSetOrganizationRetention = vi.fn().mockResolvedValue(undefined);
 const mockListOrganizationRetentionRules = vi.fn().mockResolvedValue([]);
 
 const createMockHost = (): {
-  [K in keyof BillingWebhookHostPort]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingWebhookHost]: ReturnType<typeof vi.fn>;
 } => ({
   sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
   sendSlackBillingThresholdFailureAlert: mockSendSlackBillingThresholdFailureAlert,
@@ -33,7 +33,7 @@ const createMockHost = (): {
 });
 
 const createMockSubscriptionRepository = (): {
-  [K in keyof BillingWebhookSubscriptionPort]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingWebhookSubscription]: ReturnType<typeof vi.fn>;
 } => ({
   tryFindLastNonCancelled: vi.fn(),
   tryCreatePending: vi.fn(),
@@ -50,7 +50,7 @@ const createMockSubscriptionRepository = (): {
 });
 
 const createMockOrganizationRepository = (): {
-  [K in keyof BillingWebhookOrganizationPort]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingWebhookOrganization]: ReturnType<typeof vi.fn>;
 } => ({
   tryFindByStripeCustomerId: vi.fn(),
   tryFindNameById: vi.fn(),
@@ -147,11 +147,11 @@ describe("EEWebhookService", () => {
     mockStripeInstance = createMockStripe();
     host = createMockHost();
     service = EEWebhookService.create({
-      subscriptionRepository: subRepo as unknown as BillingWebhookSubscriptionPort,
-      organizationRepository: orgRepo as unknown as BillingWebhookOrganizationPort,
+      subscriptionRepository: subRepo as unknown as BillingWebhookSubscription,
+      organizationRepository: orgRepo as unknown as BillingWebhookOrganization,
       stripe: mockStripeInstance as any,
       itemCalculator,
-      host: host as unknown as BillingWebhookHostPort,
+      host: host as unknown as BillingWebhookHost,
     });
   });
 
@@ -270,11 +270,11 @@ describe("EEWebhookService", () => {
         const published = () =>
           traced(
             EEWebhookService.create({
-              subscriptionRepository: subRepo as unknown as BillingWebhookSubscriptionPort,
-              organizationRepository: orgRepo as unknown as BillingWebhookOrganizationPort,
+              subscriptionRepository: subRepo as unknown as BillingWebhookSubscription,
+              organizationRepository: orgRepo as unknown as BillingWebhookOrganization,
               stripe: mockStripeInstance as any,
               itemCalculator,
-              host: host as unknown as BillingWebhookHostPort,
+              host: host as unknown as BillingWebhookHost,
             }),
             "EEWebhookService",
           );
@@ -320,11 +320,11 @@ describe("EEWebhookService", () => {
           approvePaymentPendingInvites: vi.fn().mockRejectedValue(new Error("invite error")),
         };
         service = EEWebhookService.create({
-          subscriptionRepository: subRepo as unknown as BillingWebhookSubscriptionPort,
-          organizationRepository: orgRepo as unknown as BillingWebhookOrganizationPort,
+          subscriptionRepository: subRepo as unknown as BillingWebhookSubscription,
+          organizationRepository: orgRepo as unknown as BillingWebhookOrganization,
           stripe: mockStripeInstance as any,
           itemCalculator,
-          host: host as unknown as BillingWebhookHostPort,
+          host: host as unknown as BillingWebhookHost,
           inviteApprover: mockInviteApprover,
         });
 
@@ -609,11 +609,11 @@ describe("EEWebhookService", () => {
       it("migrates tiered subscriptions and cancels old Stripe subs", async () => {
         const localStripe = createMockStripe();
         service = EEWebhookService.create({
-          subscriptionRepository: subRepo as unknown as BillingWebhookSubscriptionPort,
-          organizationRepository: orgRepo as unknown as BillingWebhookOrganizationPort,
+          subscriptionRepository: subRepo as unknown as BillingWebhookSubscription,
+          organizationRepository: orgRepo as unknown as BillingWebhookOrganization,
           stripe: localStripe as any,
           itemCalculator,
-          host: host as unknown as BillingWebhookHostPort,
+          host: host as unknown as BillingWebhookHost,
         });
 
         subRepo.tryFindByStripeId.mockResolvedValue(
@@ -656,11 +656,11 @@ describe("EEWebhookService", () => {
         const localStripe = createMockStripe();
         localStripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe error"));
         service = EEWebhookService.create({
-          subscriptionRepository: subRepo as unknown as BillingWebhookSubscriptionPort,
-          organizationRepository: orgRepo as unknown as BillingWebhookOrganizationPort,
+          subscriptionRepository: subRepo as unknown as BillingWebhookSubscription,
+          organizationRepository: orgRepo as unknown as BillingWebhookOrganization,
           stripe: localStripe as any,
           itemCalculator,
-          host: host as unknown as BillingWebhookHostPort,
+          host: host as unknown as BillingWebhookHost,
         });
 
         subRepo.tryFindByStripeId.mockResolvedValue(
@@ -1215,7 +1215,7 @@ describe("EEWebhookService", () => {
     });
 
     // Retention-removal-on-cancellation is deactivated until the paid-retention
-    // feature is released, and `BillingWebhookHostPort` carries no method for
+    // feature is released, and `BillingWebhookHost` carries no method for
     // it at all — there is nothing left that could remove a policy here.
     describe("when no active subscription remains", () => {
       /** @scenario Cancelling a subscription leaves the retention policies in place */
@@ -1441,7 +1441,7 @@ describe("EEWebhookService", () => {
     });
 
     // Retention-removal-on-cancellation is deactivated until the paid-retention
-    // feature is released, and `BillingWebhookHostPort` carries no method for
+    // feature is released, and `BillingWebhookHost` carries no method for
     // it at all — there is nothing left that could remove a policy here.
     describe("when a cancel-by-update leaves no active subscription", () => {
       /** @scenario Cancelling a subscription leaves the retention policies in place */

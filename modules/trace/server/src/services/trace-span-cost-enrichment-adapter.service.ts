@@ -4,7 +4,7 @@ import { TraceSpanCostEnrichment } from "../app/trace.infrastructure.ts";
 import { OtlpSpanCostEnrichmentService } from "./span/span-cost-enrichment.service.ts";
 
 /**
- * Renames record-time cost enrichment onto the narrow port `RecordSpanCommand`
+ * Renames record-time cost enrichment onto the narrow port `EventingRecordSpanAdapter`
  * names.
  *
  * The service is not a subclass of the port and must not become one: it takes a

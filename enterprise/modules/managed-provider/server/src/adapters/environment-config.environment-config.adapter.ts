@@ -3,13 +3,13 @@ import {
   managedBedrockConfigSchema,
 } from "@langwatch/enterprise-managed-provider-contract";
 import {
-  ManagedProviderConfigurationPort,
+  ManagedProviderConfiguration,
   type ManagedProviderConfigurationReporter,
 } from "../ports/managed-provider-configuration.port.ts";
 
 const PRIVATE_BEDROCK_ENV_PREFIX = "MANAGED_BEDROCK__";
 
-export class EnvironmentManagedProviderConfigurationAdapter extends ManagedProviderConfigurationPort {
+export class EnvironmentManagedProviderConfigurationAdapter extends ManagedProviderConfiguration {
   private constructor(private readonly configs: ReadonlyMap<string, ManagedBedrockConfig>) {
     super();
   }

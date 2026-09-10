@@ -6,7 +6,7 @@ import {
   resolveDataPrivacy,
   type DataPrivacyRow,
 } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyResolutionPort } from "@langwatch/data-privacy-server";
+import type { DataPrivacyResolution } from "@langwatch/data-privacy-server";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -20,7 +20,7 @@ import {
   createWorkerTraceModelCostCatalogPort,
   createWorkerTraceNarrowPorts,
 } from "../worker-trace-narrow-ports.composition.ts";
-import { TraceProductAnalyticsPort, type TraceProductEvent } from "@langwatch/trace-server";
+import { TraceProductAnalytics, type TraceProductEvent } from "@langwatch/trace-server";
 
 /**
  * Spec: specs/trace-processing/worker-record-span-capability-services.feature
@@ -90,7 +90,7 @@ function teamRow() {
 type FakeDatabase = {
   database: WorkerTraceCapabilityDatabase;
   /** The resolution the process hands the record path, over the same rows. */
-  dataPrivacy: DataPrivacyResolutionPort;
+  dataPrivacy: DataPrivacyResolution;
   projectFindUnique: ReturnType<typeof vi.fn>;
   projectUpdate: ReturnType<typeof vi.fn>;
   policyFindMany: ReturnType<typeof vi.fn>;
@@ -158,7 +158,7 @@ function fakeDatabase(
   };
 }
 
-class RecordingProductAnalytics extends TraceProductAnalyticsPort {
+class RecordingProductAnalytics extends TraceProductAnalytics {
   readonly captured: TraceProductEvent[] = [];
 
   record(event: TraceProductEvent): void {

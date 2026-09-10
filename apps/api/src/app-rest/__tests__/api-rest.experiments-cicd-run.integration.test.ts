@@ -7,7 +7,7 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type {
   ExecutionDataServices,
   ExperimentRunPorts,
-  ExperimentRunProgressPort,
+  ExperimentRunProgress,
 } from "@langwatch/experiment-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -132,7 +132,7 @@ function mount(
     experiments: () => experiments,
     run: createApiFixture<ApiExperimentRun>({
       ports: createApiFixture<ExperimentRunPorts>(),
-      progress: createApiFixture<ExperimentRunProgressPort>({
+      progress: createApiFixture<ExperimentRunProgress>({
         findRunState: async () => options.runState ?? null,
       }),
       services: createApiFixture<ExecutionDataServices>(),

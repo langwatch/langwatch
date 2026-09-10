@@ -22,8 +22,8 @@ import {
   type StoredObjectsGetOutput,
 } from "@langwatch/stored-object-contract";
 import {
-  StoredObjectDeliveryPort,
-  StoredObjectStoragePort,
+  StoredObjectDelivery,
+  StoredObjectStorage,
   StoredObjectUploadTokenPort,
   type StoredObjectStorageAddress,
 } from "../app/stored-object.infrastructure.ts";
@@ -37,8 +37,8 @@ import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 export type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
-  storage: StoredObjectStoragePort;
-  delivery: StoredObjectDeliveryPort;
+  storage: StoredObjectStorage;
+  delivery: StoredObjectDelivery;
   uploadTokens: StoredObjectUploadTokenPort;
   idDeriver: StoredObjectIdDeriver;
   maximumUploadBytes: number;

@@ -2,7 +2,7 @@
 
 import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { CanonicalCostExtractorService } from "./canonical-cost-extractor.service.ts";
-import type { GovernanceEventingPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceEventingChannel } from "../app/governance.infrastructure.ts";
 import type { IngestionKeyService } from "./ingestion-source-key.service.ts";
 import type { IngestionSourceService } from "./ingestion-source.service.ts";
 import type { IngestionTemplateService } from "./ingestion-template.service.ts";
@@ -13,7 +13,7 @@ import type { GovernanceOttlGateway } from "@langwatch/enterprise-governance-con
 export class GovernanceIngestionOperationsService {
   private constructor(
     private readonly canonicalCost: CanonicalCostExtractorService,
-    private readonly eventing: GovernanceEventingPort,
+    private readonly eventing: GovernanceEventingChannel,
     private readonly ingestionKeys: IngestionKeyService,
     private readonly ingestionSources: IngestionSourceService,
     private readonly templates: IngestionTemplateService,
@@ -23,7 +23,7 @@ export class GovernanceIngestionOperationsService {
 
   static create(
     canonicalCost: CanonicalCostExtractorService,
-    eventing: GovernanceEventingPort,
+    eventing: GovernanceEventingChannel,
     ingestionKeys: IngestionKeyService,
     ingestionSources: IngestionSourceService,
     templates: IngestionTemplateService,

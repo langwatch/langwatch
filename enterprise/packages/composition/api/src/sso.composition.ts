@@ -8,7 +8,7 @@ import {
 import {
   ssoServer,
   type SsoConnectionLedgerPort,
-  type SsoGateLoggerPort,
+  type SsoGateLogger,
 } from "@langwatch/enterprise-sso-server";
 import { OpsApi } from "@langwatch/ops-contract";
 import { createApp } from "@langwatch/runtime-composition";
@@ -36,7 +36,7 @@ export class EnterpriseApiSso {
   static async create(options: {
     configuration: SsoConfiguration;
     connections: SsoConnectionLedgerPort;
-    logger: SsoGateLoggerPort;
+    logger: SsoGateLogger;
     peers: EnterpriseApiSsoPeers;
   }): Promise<EnterpriseApiSso> {
     const runtime = await createApp({ name: "enterprise-api:sso" })

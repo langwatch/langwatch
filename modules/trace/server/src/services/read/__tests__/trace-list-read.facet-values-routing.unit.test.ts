@@ -4,7 +4,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceListReadPort } from "@langwatch/trace-contract";
+import type { TraceListRead } from "@langwatch/trace-contract";
 import { TraceListService } from "../trace-list-read.service.ts";
 
 const emptyResult = { values: [], totalDistinct: 0 };
@@ -14,7 +14,7 @@ function makeService() {
     findAttributeValues: vi.fn().mockResolvedValue(emptyResult),
     findEventAttributeValues: vi.fn().mockResolvedValue(emptyResult),
     findSpanAttributeValues: vi.fn().mockResolvedValue(emptyResult),
-  } as unknown as TraceListReadPort & {
+  } as unknown as TraceListRead & {
     findAttributeValues: ReturnType<typeof vi.fn>;
     findEventAttributeValues: ReturnType<typeof vi.fn>;
     findSpanAttributeValues: ReturnType<typeof vi.fn>;

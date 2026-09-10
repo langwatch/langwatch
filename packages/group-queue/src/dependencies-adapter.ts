@@ -1,7 +1,7 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
 import type {
-  GroupQueueActivityPort,
-  GroupQueueContextPort,
+  GroupQueueActivity,
+  GroupQueueContext,
   GroupQueueDependencies,
   GroupQueueFailureClassifier,
   GroupQueuePolicy,
@@ -18,7 +18,7 @@ export type GroupQueueRedis = IORedis | Cluster;
  * a shared Redis connection from being disconnected while Eventing or another
  * feature is still draining work.
  */
-export interface GroupQueueStoragePort {
+export interface GroupQueueStorage {
   objectStoreFor(projectId: string): ObjectStore;
   resolveDestination(projectId: string): Promise<ProjectStorageDestination>;
 }
@@ -26,9 +26,9 @@ export interface GroupQueueStoragePort {
 export type GroupQueueDependenciesAdapterOptions = {
   redis: GroupQueueRedis;
   policy?: GroupQueuePolicy;
-  storage?: GroupQueueStoragePort;
-  context?: GroupQueueContextPort;
-  activity?: GroupQueueActivityPort<Record<string, unknown>>;
+  storage?: GroupQueueStorage;
+  context?: GroupQueueContext;
+  activity?: GroupQueueActivity<Record<string, unknown>>;
   failures?: GroupQueueFailureClassifier;
 };
 

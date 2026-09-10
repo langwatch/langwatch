@@ -19,7 +19,7 @@ import {
   OpsApp,
   OpsOperations,
   PrismaProcessAuditRepository,
-  OpsSnapshotRedisPort,
+  OpsSnapshotRedis,
   ProcessOpsPrismaRepository,
   DefaultOpsSnapshotService,
   RedisOpsSnapshotRepository,
@@ -343,7 +343,7 @@ function unavailableOperatorRuntime<T>(capability: string): T {
  * for them. `set` and `incr` belong to the writer, which is the worker's; this process
  * composes the whole port because the artifact is one key shape, not two.
  */
-class ApiOpsSnapshotRedis extends OpsSnapshotRedisPort {
+class ApiOpsSnapshotRedis extends OpsSnapshotRedis {
   static create(redis: RedisConnection): ApiOpsSnapshotRedis {
     return new ApiOpsSnapshotRedis(redis);
   }

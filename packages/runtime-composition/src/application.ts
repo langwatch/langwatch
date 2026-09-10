@@ -70,6 +70,12 @@ export class BootedRuntime<Infrastructure, Rest = never, Trpc = never> {
     readonly transports: MountedTransports<Rest, Trpc>,
     private readonly installed: ReadonlyMap<string, InstalledFeatureState>,
     private readonly provided: ReadonlyMap<TokenIdentity, unknown>,
+    /**
+     * The background work this role owns: everything the installed modules
+     * declared with `withWorkers` under the worker role, and with `withTasks`
+     * under the tasks role. Every other role reads an empty list.
+     */
+    readonly contributions: readonly unknown[],
     scope: ResourceScope,
     services: readonly RuntimeService[],
   ) {
@@ -136,23 +142,15 @@ export class BootedRuntime<Infrastructure, Rest = never, Trpc = never> {
   }
 }
 
-/** What one install states beyond the feature's own declaration. */
-export type FeatureInstallOptions = Readonly<{
-  /**
-   * One binding per module-specific fact this feature's declarations name. A
-   * standard fact the process's own runtime binds needs nothing here.
-   */
-  facts?: readonly unknown[];
-  /** Family-level REST options the declaration itself cannot carry. */
-  rest?: Readonly<{ onError?: unknown }>;
-}>;
-
 /** One feature declared on an application, before boot looks at it. */
 interface DeclaredFeature {
   readonly name: string;
+  /** The background work this module declared, started by the worker role. */
+  readonly workers: readonly unknown[];
+  /** The one-shot work this module declared, exposed by the tasks role. */
+  readonly tasks: readonly unknown[];
   readonly transports: readonly FeatureTransportDescriptor[];
   readonly facts: readonly unknown[];
-  readonly restErrorHandler: unknown;
   readonly repositories?: FeatureRepositories;
   readonly repositoryRegistry?: RepositoryRegistry<
     Record<
@@ -173,30 +171,32 @@ interface DeclaredFeature {
 /** What a builder collects, shared when one is re-parameterised by its doors. */
 interface BuilderState<Rest, Trpc> {
   readonly features: DeclaredFeature[];
-  readonly preProvided: Map<TokenIdentity, unknown>;
   readonly services: RuntimeService[];
-  persistence:
-    | Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }>
-    | undefined;
   hosts: FeatureTransportHosts<Rest, Trpc>;
+}
+
+/** What a process is: a role, its parsed config and its one pool (ADR-144). */
+export interface ApplicationOptions<Pool> {
+  readonly role: ServerRole;
+  /** One slice per module name, for the modules that declared a config. */
+  readonly config?: Readonly<Record<string, unknown>>;
+  readonly infrastructure: Pool;
 }
 
 /** An application with its infrastructure named, collecting declarations. */
 export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
   private readonly state: BuilderState<Rest, Trpc>;
+  private readonly role: ServerRole;
+  private readonly config: Readonly<Record<string, unknown>>;
+  private readonly infrastructure: Infrastructure;
+  readonly name: string;
 
-  constructor(
-    private readonly name: string,
-    private readonly infrastructure: Infrastructure,
-    state?: BuilderState<Rest, Trpc>,
-  ) {
-    this.state = state ?? {
-      features: [],
-      preProvided: new Map(),
-      services: [],
-      persistence: undefined,
-      hosts: {},
-    };
+  constructor(options: ApplicationOptions<Infrastructure>, state?: BuilderState<Rest, Trpc>) {
+    this.role = options.role;
+    this.config = options.config ?? {};
+    this.infrastructure = options.infrastructure;
+    this.name = options.role;
+    this.state = state ?? { features: [], services: [], hosts: {} };
   }
 
   /**
@@ -208,31 +208,9 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
     hosts: FeatureTransportHosts<NextRest, NextTrpc>,
   ): ApplicationBuilder<Infrastructure, NextRest, NextTrpc> {
     return new ApplicationBuilder<Infrastructure, NextRest, NextTrpc>(
-      this.name,
-      this.infrastructure,
+      { role: this.role, config: this.config, infrastructure: this.infrastructure },
       { ...this.state, hosts },
     );
-  }
-
-  /** Declares one feature. Constructs nothing. */
-  withModule(
-    declaration: InstallableServerFeature<Infrastructure>,
-    options?: FeatureInstallOptions,
-  ): this;
-  withModule<FeatureInfrastructure>(
-    declaration: InstallableServerFeature<FeatureInfrastructure>,
-    options: FeatureInstallOptions & { infrastructure: FeatureInfrastructure },
-  ): this;
-  withModule<FeatureInfrastructure>(
-    declaration: InstallableServerFeature<FeatureInfrastructure>,
-    options?: FeatureInstallOptions & { infrastructure?: FeatureInfrastructure },
-  ): this {
-    const featureInfrastructure =
-      options && "infrastructure" in options && options.infrastructure !== undefined
-        ? options.infrastructure
-        : (this.infrastructure as Infrastructure & FeatureInfrastructure);
-
-    return this.addFeature(declaration, featureInfrastructure, options);
   }
 
   /**
@@ -240,30 +218,16 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
    * member this pool lacks is not assignable, so the list fails to compile.
    */
   withModules(modules: readonly InstallableServerFeature<Infrastructure>[]): this {
-    for (const module of modules) this.withModule(module);
+    for (const module of modules) this.addFeature(module);
     return this;
   }
 
-  /** Selects one persistence backend for repository-aware feature installers. */
-  withPersistence<Backend extends string>(
-    backend: Backend,
-    infrastructure: Readonly<Record<string, unknown>>,
-  ): this {
-    if (backend.trim().length === 0) throw new Error("A persistence backend needs a name.");
-    this.state.persistence = Object.freeze({ backend, infrastructure });
-    return this;
-  }
-
-  private addFeature<FeatureInfrastructure>(
-    declaration: InstallableServerFeature<FeatureInfrastructure>,
-    featureInfrastructure: FeatureInfrastructure,
-    options: FeatureInstallOptions | undefined,
-  ): this {
+  private addFeature(declaration: InstallableServerFeature<Infrastructure>): this {
+    const infrastructure = this.infrastructure;
     this.state.features.push({
       name: declaration.name,
       transports: declaration.transports ?? [],
-      facts: options?.facts ?? [],
-      restErrorHandler: options?.rest?.onError,
+      facts: [],
       repositories: snapshotRepositories(declaration.repositories),
       repositoryRegistry: declaration.repositoryRegistry,
       apiContract: declaration.apiContract,
@@ -272,18 +236,10 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
       providers: declaration.providers,
       contributesWorkerWork: declaration.contributesWorkerWork,
       requiredInfrastructure: declaration.requiredInfrastructure ?? [],
-      install: (args) => declaration.install({ ...args, infrastructure: featureInfrastructure }),
+      workers: declaration.workers ?? [],
+      tasks: declaration.tasks ?? [],
+      install: (args) => declaration.install({ ...args, infrastructure }),
     });
-    return this;
-  }
-
-  /** Supplies an existing implementation while its installer is being migrated. */
-  withProvided<Instance>(token: DependencyToken<Instance>, instance: NoInfer<Instance>): this {
-    const provided = this.state.preProvided;
-    if (provided.has(token)) {
-      throw new DuplicateProviderError(tokenName(token), ["<already provided>"]);
-    }
-    provided.set(token, instance);
     return this;
   }
 
@@ -294,14 +250,10 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
   }
 
   /** Validates providers, allocates peer clients and constructs Apps before serving. */
-  async boot(options: {
-    role: ServerRole;
-    /** One slice per feature name, for the features that declared a config. */
-    config?: Readonly<Record<string, unknown>>;
-  }): Promise<BootedRuntime<Infrastructure, Rest, Trpc>> {
-    const { role } = options;
-    const config = options.config ?? {};
-    const persistence = this.state.persistence;
+  async boot(): Promise<BootedRuntime<Infrastructure, Rest, Trpc>> {
+    const role = this.role;
+    const config = this.config;
+    const persistence = persistenceFor(this.infrastructure);
 
     const declarations = this.state.features;
     for (const declaration of declarations) {
@@ -317,7 +269,7 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
         ...declaration,
         repositories: {
           ...declaration.repositories,
-          ...(declaration.repositoryRegistry && persistence
+          ...(declaration.repositoryRegistry
             ? selectedRepositoryOwnership(declaration.repositoryRegistry, persistence)
             : {}),
         },
@@ -335,7 +287,7 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
     const scope = new ResourceScope();
     const featureServices: RuntimeService[] = [];
     const installed = new Map<string, InstalledFeatureState>();
-    const provided = new Map<TokenIdentity, unknown>(this.state.preProvided);
+    const provided = new Map<TokenIdentity, unknown>();
     const apis = new LocalFeatureApis();
     const declared: DeclaredTransports[] = [];
     this.allocateApiClients(apis, providerOf, provided);
@@ -380,6 +332,7 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
       transports,
       installed,
       provided,
+      roleContributions(declarations, role),
       scope,
       [...featureServices, ...this.state.services],
     );
@@ -402,11 +355,6 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
   ): void {
     for (const token of providerOf.keys()) {
       if (token instanceof ModuleApiToken) apis.declare(token);
-    }
-    for (const [token, value] of this.state.preProvided) {
-      if (!(token instanceof ModuleApiToken)) continue;
-      apis.bind(token, value);
-      provided.set(token, apis.reference(token));
     }
   }
 
@@ -450,9 +398,6 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
       if (token instanceof ModuleApiToken) apiOwners.set(token.name, owner);
       providerOf.set(token, owner);
     };
-    for (const token of this.state.preProvided.keys()) {
-      register(token, "<provided by the application root>");
-    }
     for (const declaration of declarations) {
       for (const provider of declaration.providers) {
         register(provider.token, declaration.name);
@@ -497,54 +442,45 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
   }
 }
 
-/** Names an application. Nothing is constructed until `boot`. */
-export function createApp(options: { name: string }): {
-  withPersistence<Backend extends string>(
-    backend: Backend,
-    infrastructure: Readonly<Record<string, unknown>>,
-  ): {
-    withInfrastructure<Infrastructure>(
-      infrastructure: Infrastructure,
-    ): ApplicationBuilder<Infrastructure>;
-  };
-  withInfrastructure<Infrastructure>(
-    infrastructure: Infrastructure,
-  ): ApplicationBuilder<Infrastructure>;
-} {
-  const name = options.name.trim();
-  if (!name) throw new Error("An application needs a name.");
-  return {
-    withPersistence<Backend extends string>(
-      backend: Backend,
-      persistence: Readonly<Record<string, unknown>>,
-    ) {
-      return {
-        withInfrastructure<Infrastructure>(infrastructure: Infrastructure) {
-          return new ApplicationBuilder<Infrastructure>(name, infrastructure).withPersistence(
-            backend,
-            persistence,
-          );
-        },
-      };
-    },
-    withInfrastructure<Infrastructure>(infrastructure: Infrastructure) {
-      return new ApplicationBuilder<Infrastructure>(name, infrastructure);
-    },
-  };
+/**
+ * A process, named by its role and holding its config and its one pool.
+ * Nothing is constructed until `boot`.
+ */
+export function createApp<Pool>(options: ApplicationOptions<Pool>): ApplicationBuilder<Pool> {
+  return new ApplicationBuilder<Pool>(options);
 }
 
-/** Each repository-aware feature has a backend the process selected for it. */
+/** What this role starts: declared workers on a worker, declared tasks on tasks. */
+function roleContributions(
+  declarations: readonly DeclaredFeature[],
+  role: ServerRole,
+): readonly unknown[] {
+  if (role === "worker") return declarations.flatMap((declaration) => declaration.workers);
+  if (role === "tasks") return declarations.flatMap((declaration) => declaration.tasks);
+  return [];
+}
+
+/**
+ * The pool decides persistence: a pool holding a Prisma client selects the
+ * postgres backend, and one without it selects the memory backend, so a test
+ * and production differ by their pool and by nothing else.
+ */
+function persistenceFor(
+  infrastructure: unknown,
+): Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }> {
+  const pool = (infrastructure ?? {}) as Readonly<Record<string, unknown>>;
+  return Object.freeze({
+    backend: pool.prisma === undefined ? "memory" : "postgres",
+    infrastructure: pool,
+  });
+}
+
 function assertRepositoryBackend(
   declarations: readonly DeclaredFeature[],
-  persistence:
-    | Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }>
-    | undefined,
+  persistence: Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }>,
 ): void {
   for (const declaration of declarations) {
     if (!declaration.repositoryRegistry) continue;
-    if (!persistence) {
-      throw new Error(`Feature "${declaration.name}" requires process persistence.`);
-    }
     validateRepositorySelection(declaration.repositoryRegistry, persistence);
   }
 }
@@ -562,7 +498,6 @@ function declaredTransportsOf(
       transports: declaration.transports,
       provided: () => state.provided,
       facts: declaration.facts,
-      restErrorHandler: declaration.restErrorHandler,
     },
   ];
 }

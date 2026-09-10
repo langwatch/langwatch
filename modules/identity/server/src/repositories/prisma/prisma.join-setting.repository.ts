@@ -1,6 +1,6 @@
 import { DEFAULT_DOMAIN_JOIN_SETTING, type DomainJoinSetting } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { JoinSettingPort } from "../../rules/join-requests-contract.rules.ts";
+import type { JoinSetting } from "../../rules/join-requests-contract.rules.ts";
 import { PrismaJoinCandidateRepository } from "./prisma.join-request.repository.ts";
 
 /**
@@ -9,7 +9,7 @@ import { PrismaJoinCandidateRepository } from "./prisma.join-request.repository.
  * organization setting, and the thing that needs a history is the requests it
  * produces rather than the switch itself.
  */
-export class PrismaJoinSettingRepository implements JoinSettingPort {
+export class PrismaJoinSettingRepository implements JoinSetting {
   static create(prisma: PrismaClient): PrismaJoinSettingRepository {
     return new PrismaJoinSettingRepository(prisma);
   }

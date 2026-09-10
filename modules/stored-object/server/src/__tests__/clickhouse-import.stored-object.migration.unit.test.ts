@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   ClickHouseImportStoredObjectMigration,
-  StoredObjectLegacyLocationPort,
-  StoredObjectLegacySourcePort,
-  StoredObjectLegacyWriterDrainPort,
-  StoredObjectProjectSourcePort,
+  StoredObjectLegacyLocation,
+  StoredObjectLegacySource,
+  StoredObjectLegacyWriterDrain,
+  StoredObjectProjectSource,
 } from "../index.ts";
 import { MemoryStoredObjectRecordRepository } from "../repositories/memory/memory.stored-object-record.repository.ts";
 import { Temporal } from "@langwatch/time";
 
-class OneProject extends StoredObjectProjectSourcePort {
+class OneProject extends StoredObjectProjectSource {
   async listForOrganization() {
     return [{ id: "project_1" }];
   }
 }
 
-class OneLegacyObject extends StoredObjectLegacySourcePort {
+class OneLegacyObject extends StoredObjectLegacySource {
   async findPage(input: { afterId?: string }) {
     if (input.afterId) return [];
     return [
@@ -36,7 +36,7 @@ class OneLegacyObject extends StoredObjectLegacySourcePort {
   }
 }
 
-class LegacyLocations extends StoredObjectLegacyLocationPort {
+class LegacyLocations extends StoredObjectLegacyLocation {
   parse() {
     return {
       provider: "s3",
@@ -46,7 +46,7 @@ class LegacyLocations extends StoredObjectLegacyLocationPort {
   }
 }
 
-class ProvedDrain extends StoredObjectLegacyWriterDrainPort {
+class ProvedDrain extends StoredObjectLegacyWriterDrain {
   async get() {
     return {
       valid: true as const,
@@ -56,7 +56,7 @@ class ProvedDrain extends StoredObjectLegacyWriterDrainPort {
   }
 }
 
-class DrainBecomesValidAfterFirstScan extends StoredObjectLegacyWriterDrainPort {
+class DrainBecomesValidAfterFirstScan extends StoredObjectLegacyWriterDrain {
   private calls = 0;
   async get() {
     this.calls += 1;

@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-import { ApiHttpListener, ApiRawRequestSurfacePort } from "../api-http.listener.ts";
+import { ApiHttpListener, ApiRawRequestSurface } from "../api-http.listener.ts";
 
-class PathClaimingSurface extends ApiRawRequestSurfacePort {
+class PathClaimingSurface extends ApiRawRequestSurface {
   readonly seen: string[] = [];
 
   constructor(private readonly prefix: string) {

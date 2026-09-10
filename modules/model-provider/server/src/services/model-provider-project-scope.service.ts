@@ -1,6 +1,6 @@
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
 import { fromDate, type Instant } from "@langwatch/time";
-import type { ModelCostProjectPort } from "../ports/model-provider.port.ts";
+import type { ModelCostProject } from "../app/model-provider.infrastructure.ts";
 
 export type ModelProviderProjectSystemContext = {
   scopes: ModelDefaultScope[];
@@ -11,9 +11,9 @@ export type ModelProviderProjectSystemContext = {
  * The scope facts that come off a project row and nothing else.
  */
 export class ModelProviderProjectScopeService {
-  private constructor(private readonly projects: ModelCostProjectPort) {}
+  private constructor(private readonly projects: ModelCostProject) {}
 
-  static create(options: { projects: ModelCostProjectPort }): ModelProviderProjectScopeService {
+  static create(options: { projects: ModelCostProject }): ModelProviderProjectScopeService {
     return new ModelProviderProjectScopeService(options.projects);
   }
 

@@ -5,21 +5,21 @@ import type {
 } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
 import {
-  EvaluationExecutionIntentPort,
+  EvaluationExecutionIntent,
   type ExecuteEvaluationCommandDeps,
-} from "../ports/evaluation.port.ts";
+} from "../app/evaluation.infrastructure.ts";
 import { EvaluationExecutionOutcomeService } from "./evaluation-execution-outcome.service.ts";
 import {
   EvaluationExecutionPreparationService,
   type EvaluationPreparationResult,
 } from "./evaluation-execution-preparation.service.ts";
 import { EvaluationReportedEventService } from "./evaluation-reported-event.service.ts";
-export type { ExecuteEvaluationCommandDeps } from "../ports/evaluation.port.ts";
+export type { ExecuteEvaluationCommandDeps } from "../app/evaluation.infrastructure.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
 
 /** Coordinates preparation, external evaluation, and the reported event. */
-export class EvaluationExecutionIntentService extends EvaluationExecutionIntentPort {
+export class EvaluationExecutionIntentService implements EvaluationExecutionIntent {
   static create(deps: ExecuteEvaluationCommandDeps): EvaluationExecutionIntentService {
     const reportedEvents = EvaluationReportedEventService.create(deps.inputsOffload);
 
@@ -37,9 +37,7 @@ export class EvaluationExecutionIntentService extends EvaluationExecutionIntentP
     private readonly preparation: EvaluationExecutionPreparationService,
     private readonly outcome: EvaluationExecutionOutcomeService,
     private readonly reportedEvents: EvaluationReportedEventService,
-  ) {
-    super();
-  }
+  ) {}
 
   async execute(data: ExecuteEvaluationCommandData): Promise<EvaluationProcessingEvent[]> {
     logger.debug(

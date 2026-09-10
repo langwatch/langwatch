@@ -2,8 +2,8 @@ import { createLogger } from "@langwatch/observability";
 import type { OpsWorkerHandle, UsageStatsWorkerConfig } from "../app/ops.app.ts";
 import type {
   UsageStatsCollector,
-  UsageStatsErrorReporterPort,
-  UsageStatsTelemetryClientPort,
+  UsageStatsErrorReporter,
+  UsageStatsTelemetryClient,
 } from "../app/ops.app.ts";
 import type { UsageStatsOrganizationRepository } from "../repositories/observe/usage-stats.repository.ts";
 
@@ -19,12 +19,12 @@ export interface AnomalyTickResult {
 }
 
 /** The anomaly capability scheduled by this worker contribution. */
-export interface AnomalyTickPort {
+export interface AnomalyTick {
   tick(): Promise<AnomalyTickResult>;
 }
 
 export interface AnomalyWorkerContributionOptions {
-  detector: AnomalyTickPort;
+  detector: AnomalyTick;
 }
 
 /**
@@ -32,7 +32,7 @@ export interface AnomalyWorkerContributionOptions {
  * Construction has no effects; the worker process explicitly calls start.
  */
 export class AnomalyWorkerContributionAdapter {
-  private constructor(private readonly detector: AnomalyTickPort) {}
+  private constructor(private readonly detector: AnomalyTick) {}
 
   static create(options: AnomalyWorkerContributionOptions): AnomalyWorkerContributionAdapter {
     return new AnomalyWorkerContributionAdapter(options.detector);
@@ -84,8 +84,8 @@ export interface UsageStatsWorkerContributionOptions {
   config: UsageStatsWorkerConfig;
   organizations: UsageStatsOrganizationRepository;
   usageStats: UsageStatsCollector;
-  telemetry: UsageStatsTelemetryClientPort;
-  errors: UsageStatsErrorReporterPort;
+  telemetry: UsageStatsTelemetryClient;
+  errors: UsageStatsErrorReporter;
 }
 
 /**

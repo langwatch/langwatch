@@ -19,7 +19,7 @@ export type ApiDatabaseInfrastructureOptions = {
 };
 
 /** Reports the composition decision an unconfigured database would otherwise hide. */
-export abstract class ApiDatabaseAbsenceReportPort {
+export abstract class ApiDatabaseAbsenceReport {
   abstract absent(): void;
 }
 
@@ -52,7 +52,7 @@ export class ApiDatabaseInfrastructure {
    * client whose first query is the one that discovers the problem.
    */
   static tryCreate(
-    options: ApiDatabaseInfrastructureOptions & { report?: ApiDatabaseAbsenceReportPort },
+    options: ApiDatabaseInfrastructureOptions & { report?: ApiDatabaseAbsenceReport },
   ): ApiDatabaseInfrastructure | undefined {
     if (!options.database.url?.trim()) {
       options.report?.absent();

@@ -38,7 +38,7 @@ const HMAC_BYTES = 6;
 export const TEST_FIRE_TRIGGER_ID_SENTINEL = "preview";
 
 /** Reports an absent signing key. Never carries the key or the address. */
-export abstract class TriggerNoReplyWarningPort {
+export abstract class TriggerNoReplyWarning {
   abstract unguessabilityUnavailable(message: string): void;
 }
 
@@ -46,14 +46,14 @@ export class TriggerNoReplyService {
   static create(input: {
     /** Injected signing key. Absent or empty degrades unguessability, never blocks. */
     secret: string | undefined;
-    warnings?: TriggerNoReplyWarningPort;
+    warnings?: TriggerNoReplyWarning;
   }): TriggerNoReplyService {
     return new TriggerNoReplyService(input.secret, input.warnings);
   }
 
   private constructor(
     private readonly secret: string | undefined,
-    private readonly warnings: TriggerNoReplyWarningPort | undefined,
+    private readonly warnings: TriggerNoReplyWarning | undefined,
   ) {}
 
   addressFor(input: { defaultFrom: string; triggerId: string }): string {

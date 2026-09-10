@@ -3,8 +3,8 @@
  * address is STILL platform-computed, never agent-authored; anything unknown
  * or failing resolves to null rather than tearing down the relay stream.
  */
-import type { LangyNavigateProjectPort } from "../ports/langy-navigate-project.port.ts";
-import type { LangyNavigateResourcePort } from "../ports/langy-navigate-resource.port.ts";
+import type { LangyNavigateProject } from "../app/langy.infrastructure.ts";
+import type { LangyNavigateResource } from "../app/langy.infrastructure.ts";
 import { navigatePagePathFor } from "../rules/langy-navigate-pages.rules.ts";
 import { navigateResourceKindFor } from "../rules/langy-navigate-resources.rules.ts";
 
@@ -13,19 +13,19 @@ export type LangyNavigatePlatformUrl = (input: { projectSlug: string; path: stri
 
 export class LangyNavigateFallbackService {
   private constructor(
-    private readonly projects: LangyNavigateProjectPort,
+    private readonly projects: LangyNavigateProject,
     private readonly platformUrl: LangyNavigatePlatformUrl,
-    private readonly resources: LangyNavigateResourcePort | undefined,
+    private readonly resources: LangyNavigateResource | undefined,
   ) {}
 
   static create(deps: {
-    projects: LangyNavigateProjectPort;
+    projects: LangyNavigateProject;
     platformUrl: LangyNavigatePlatformUrl;
     /**
      * Absent where a process composed none of the eight features a resource id
      * names; only page names resolve then.
      */
-    resources?: LangyNavigateResourcePort;
+    resources?: LangyNavigateResource;
   }): LangyNavigateFallbackService {
     return new LangyNavigateFallbackService(deps.projects, deps.platformUrl, deps.resources);
   }

@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 
-import type { QueueSimulationRunCommandData } from "../../ports/suite-execution.port.ts";
+import type { QueueSimulationRunCommandData } from "../../app/suite.app.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";
 import type { SuiteRunModelsResolver } from "../suite-run-models.service.ts";
 

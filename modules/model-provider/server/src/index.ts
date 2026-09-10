@@ -3,7 +3,7 @@ export {
   type PostgresModelProviderAdapterOptions,
 } from "./services/model-provider-service.composition.ts";
 export {
-  PrismaModelCostCatalogRepository as PostgresModelCostCatalogAdapter,
+  PrismaModelCostCatalogRepository,
   type ModelCostCatalogDatabase,
 } from "./repositories/prisma/prisma.model-cost-catalog.repository.ts";
 export { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
@@ -14,46 +14,42 @@ export {
 export { ModelProviderEvidenceService } from "./services/model-provider-evidence.service.ts";
 export { ModelProviderProjectScopeService } from "./services/model-provider-project-scope.service.ts";
 export {
-  ModelCostProjectPort,
-  ModelCostProjectScopePort,
+  ModelCostProject,
+  ModelCostProjectScope,
   ModelProviderCatalog,
-  ModelProviderCodexHandlePort,
-  ModelProviderCredentialCipherPort,
+  ModelProviderCodexHandle,
+  ModelProviderCredentialCipher,
   ModelProviderCredentialCodec,
   ModelProviderCredentialPolicy,
-  ModelProviderCredentialProbePort,
+  ModelProviderCredentialProbe,
   ModelProviderConnectionRateLimiter,
-  ModelProviderEgressPort,
-  ModelProviderManagedGatewayPort,
-  ModelProviderRateLimitPort,
+  ModelProviderEgress,
+  ModelProviderManagedGateway,
+  ModelProviderRateLimit,
   CodexTokenRefresher,
-  ModelTranslationPort,
+  ModelTranslation,
   ModelProviderIdService,
-} from "./ports/model-provider.port.ts";
+} from "./app/model-provider.infrastructure.ts";
 export type {
   ModelProviderEgressRequest,
   ModelProviderEgressResponse,
-} from "./ports/model-provider.port.ts";
+} from "./app/model-provider.infrastructure.ts";
 export {
   EncryptedModelProviderCredentialAdapter,
   type CustomKeysRead,
-} from "./adapters/encrypted.model-provider-api-key-credential.adapter.ts";
+} from "./services/encrypted.model-provider-api-key-credential.service.ts";
 export {
   RegistryModelProviderCatalogAdapter,
-  UnmanagedModelProviderGatewayAdapter,
   type RegistryModelProviderCatalogOptions,
-} from "./adapters/registry.model-provider-catalog.adapter.ts";
+} from "./services/registry.model-provider-catalog.service.ts";
+export { UnmanagedModelProviderGatewayAdapter } from "./services/unmanaged.model-provider-gateway.service.ts";
+export { HttpModelProviderCredentialProbeAdapter } from "./adapters/http.model-provider-credential-probe.adapter.ts";
+export { UnavailableModelProviderCredentialProbeAdapter } from "./services/unavailable.model-provider-credential-probe.service.ts";
 export {
-  HttpModelProviderCredentialProbeAdapter,
-  UnavailableModelProviderCredentialProbeAdapter,
-} from "./adapters/http.model-provider-credential-probe.adapter.ts";
-export {
-  CodexAccountService,
-  CodexAuthError,
   CodexOAuthModelProviderTokenRefresherAdapter,
   type CodexDeviceCode,
   type CodexPollResult,
-} from "./adapters/codex-oauth.model-provider-token-refresher.adapter.ts";
+} from "./services/codex-oauth.model-provider-token-refresher.service.ts";
 export {
   AI_CALL_FAILED_CAUSE,
   AiCallFailedError,
@@ -67,13 +63,13 @@ export {
   type ModelCostPreviewSpanReader,
   type ModelCostRuleReader,
 } from "./services/model-cost-preview.service.ts";
-export { WindowedModelProviderConnectionRateLimiterAdapter } from "./adapters/windowed.model-provider-connection-rate-limiter.adapter.ts";
+export { WindowedModelProviderConnectionRateLimiterAdapter } from "./services/windowed.model-provider-connection-rate-limiter.service.ts";
 export {
   SsrfModelProviderEgressAdapter,
   type ModelProviderEgressPolicy,
-} from "./adapters/ssrf.model-provider-egress.adapter.ts";
-export { PrefixedModelProviderIdAdapter } from "./adapters/prefixed.model-provider-id.adapter.ts";
-export { VercelAiModelTranslationAdapter } from "./adapters/vercel-ai.model-translation.adapter.ts";
+} from "./services/ssrf.model-provider-egress.service.ts";
+export { PrefixedModelProviderIdAdapter } from "./services/prefixed.model-provider-id.service.ts";
+export { VercelAiModelTranslationAdapter } from "./services/vercel-ai.model-translation.service.ts";
 export {
   ModelProviderExecutionHandleService,
   type ModelProviderExecutionHandleInput,
@@ -81,7 +77,7 @@ export {
 } from "./services/model-provider-execution-handle.service.ts";
 export { ModelProviderKeysService } from "./services/model-provider-keys.service.ts";
 export { resolveMaxTokensCeiling } from "./rules/max-tokens-ceiling.rules.ts";
-export { ModelProviderExecutionAdapter } from "./adapters/model-provider-execution.adapter.ts";
+export { ModelProviderExecutionAdapter } from "./services/model-provider-topic-clustering-execution.service.ts";
 export {
   getModelMetadataForFrontend,
   getProjectModelProviders,

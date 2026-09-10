@@ -1,7 +1,7 @@
 export { AwsClientProcessRuntime } from "./process-runtime.ts";
 export {
   AwsClientConfiguration,
-  OutboundProxyResolverPort,
+  OutboundProxyResolver,
   staticCredentialsOrUndefined,
   type AssumeRoleCredentials,
   type AwsClientConfig,

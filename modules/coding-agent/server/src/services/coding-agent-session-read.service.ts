@@ -15,7 +15,7 @@ import {
   normalizeMetricName,
   normalizeTokenType,
 } from "@langwatch/coding-agent-contract";
-import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
+import type { CodingAgentClock } from "../app/coding-agent.infrastructure.ts";
 import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository.ts";
@@ -33,7 +33,7 @@ export class CodingAgentSessionReadService {
     traceSessions: CodingAgentTraceSessionRepository;
     metricSeries: SessionMetricSeriesRepository;
     sessionEvents: CodingAgentSessionEventRepository;
-    clock: CodingAgentClockPort;
+    clock: CodingAgentClock;
   }): CodingAgentSessionReadService {
     return new CodingAgentSessionReadService(options);
   }
@@ -44,7 +44,7 @@ export class CodingAgentSessionReadService {
       traceSessions: CodingAgentTraceSessionRepository;
       metricSeries: SessionMetricSeriesRepository;
       sessionEvents: CodingAgentSessionEventRepository;
-      clock: CodingAgentClockPort;
+      clock: CodingAgentClock;
     },
   ) {}
 

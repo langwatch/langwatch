@@ -1,7 +1,7 @@
 import {
   TraceSpanCostEnrichmentAdapter,
-  type TraceModelCostCatalogPort,
-  type TraceSpanCostEnrichmentPort,
+  type TraceModelCostCatalog,
+  type TraceSpanCostEnrichment,
 } from "@langwatch/trace-server";
 
 /**
@@ -9,17 +9,17 @@ import {
  * priced themselves.
  *
  * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `RecordSpanCommand`'s adapters and still enriches every span it ingests — so
+ * `EventingRecordSpanAdapter`'s adapters and still enriches every span it ingests — so
  * nothing in this process prices anything yet. What has to be true today is
  * that this composition root CAN build the path from what it already holds:
  * the model-cost catalog port, which `createWorkerTraceNarrowPorts` already
  * answers from a published `ModelProviderApi`. That is the whole
  * dependency list — no Prisma client, no scope resolver, no static registry.
  *
- *     TraceSpanCostEnrichmentPort          (trace-server declares it)
+ *     TraceSpanCostEnrichment          (trace-server declares it)
  *       └─ OtlpSpanCostEnrichmentService   (trace-server owns it)
  *            ├─ matchModelCost             (model-provider-contract owns it)
- *            └─ TraceModelCostCatalogPort  the project's own cost rules
+ *            └─ TraceModelCostCatalog  the project's own cost rules
  *                 └─ ModelProviderApi  scope cascade, three tiers
  *
  * The catalog port is taken rather than built here, because the four-port
@@ -34,7 +34,7 @@ import {
  * disagreement would show up only as a bill.
  */
 export function createWorkerTraceCostEnrichment(options: {
-  modelCosts: TraceModelCostCatalogPort;
+  modelCosts: TraceModelCostCatalog;
 }): WorkerTraceCostEnrichment {
   return new WorkerTraceCostEnrichment(
     options.modelCosts,
@@ -45,12 +45,12 @@ export function createWorkerTraceCostEnrichment(options: {
 /** One process-owned enrichment graph, and the catalog read it rests on. */
 export class WorkerTraceCostEnrichment {
   constructor(
-    readonly modelCosts: TraceModelCostCatalogPort,
+    readonly modelCosts: TraceModelCostCatalog,
     private readonly enrichment: TraceSpanCostEnrichmentAdapter,
   ) {}
 
-  /** The narrow port `RecordSpanCommand` names, over this graph. */
-  spanCostEnrichmentPort(): TraceSpanCostEnrichmentPort {
+  /** The narrow port `EventingRecordSpanAdapter` names, over this graph. */
+  spanCostEnrichmentPort(): TraceSpanCostEnrichment {
     return this.enrichment;
   }
 }

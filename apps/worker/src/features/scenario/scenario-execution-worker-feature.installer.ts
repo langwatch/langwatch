@@ -1,10 +1,10 @@
 import { NlpFetchAdapter, type ScenarioProcessorService } from "@langwatch/scenario-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 
 /**
  * Worker registration for the scenario EXECUTOR.
  */
-export class ScenarioExecutionWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class ScenarioExecutionWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     processor: ScenarioProcessorService;
   }): ScenarioExecutionWorkerFeatureInstaller {

@@ -128,7 +128,7 @@ describe("service projection boundaries", () => {
     write(
       "modules/example/server/src/ports/example-read-model.port.ts",
       `
-        export abstract class ExampleReadModelPort {
+        export abstract class ExampleReadModel {
           abstract getProjection(id: string): Promise<unknown>;
         }
       `,
@@ -136,10 +136,10 @@ describe("service projection boundaries", () => {
     write(
       "modules/example/server/src/services/example.service.ts",
       `
-        import type { ExampleReadModelPort } from "../ports/example-read-model.port";
+        import type { ExampleReadModel } from "../ports/example-read-model.port";
 
         export class ExampleService {
-          constructor(private readonly readModel: ExampleReadModelPort) {}
+          constructor(private readonly readModel: ExampleReadModel) {}
         }
       `,
     );

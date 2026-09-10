@@ -34,7 +34,7 @@ export type AutomationScreenName = keyof typeof automationScreens;
 export { AUTOMATION_SECTIONS, type AutomationSection } from "./ui/sections/automations-layout.tsx";
 export { automationApi } from "./behavior/automation-api.ts";
 export {
-  AutomationHostPort,
+  AutomationHost,
   AutomationHostProvider,
   type AutomationDatasetCreation,
   type AutomationDrawer,

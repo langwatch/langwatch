@@ -4,16 +4,16 @@
  * it degrades to remembering nothing rather than failing.
  */
 
-export abstract class UiStoragePort {
+export abstract class UiStorage {
   abstract read(key: string): string | undefined;
   abstract write(key: string, value: string): void;
   abstract remove(key: string): void;
 }
 
-let installed: UiStoragePort | undefined;
+let installed: UiStorage | undefined;
 
 /** Called by whatever mounts the UI shell, and cleared on unmount. */
-export function setUiStorage(port: UiStoragePort | undefined): void {
+export function setUiStorage(port: UiStorage | undefined): void {
   installed = port;
 }
 
@@ -37,7 +37,7 @@ export function removeUiStorage(key: string): void {
  * behavior. Every accessor can throw, so a refusal reads as "nothing
  * remembered" rather than taking the screen down with it.
  */
-export class BrowserUiStorage extends UiStoragePort {
+export class BrowserUiStorage extends UiStorage {
   read(key: string): string | undefined {
     try {
       return globalThis.localStorage?.getItem(key) ?? void 0;

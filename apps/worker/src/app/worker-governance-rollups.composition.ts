@@ -5,7 +5,7 @@ import {
   GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
   GovernanceKpisSubscriber,
   GovernanceOcsfSubscriber,
-  GovernanceSubscriberDiagnosticsPort,
+  GovernanceSubscriberDiagnostics,
   type GovernanceTraceContext,
   type GovernanceTraceEvent,
 } from "@langwatch/enterprise-governance-server";
@@ -93,7 +93,7 @@ export function createWorkerGovernanceRollups(options: {
  * sink; this process has none, so the log line is the whole record — and
  * saying so here is better than composing a capture that swallows.
  */
-class WorkerGovernanceSubscriberDiagnostics extends GovernanceSubscriberDiagnosticsPort {
+class WorkerGovernanceSubscriberDiagnostics extends GovernanceSubscriberDiagnostics {
   constructor(private readonly logger: Logger) {
     super();
   }

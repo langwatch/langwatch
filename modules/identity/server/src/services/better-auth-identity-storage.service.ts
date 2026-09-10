@@ -21,12 +21,12 @@ import {
 } from "./better-auth-account-queries.service.ts";
 import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules.ts";
 import { BetterAuthIdentityBirthAdapter } from "./better-auth-identity-birth.service.ts";
-import type { IdentityBirthPort } from "../app/identity.infrastructure.ts";
+import type { IdentityBirth } from "../app/identity.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
-  IdentityAccountsPort,
+  IdentityAccounts,
   IdentityResolutionPort,
 } from "../rules/identity-storage-ports.rules.ts";
 
@@ -92,7 +92,7 @@ export interface IdentityStorageAdapterDeps {
    * verbatim, so an unlatched user's behavior is byte-for-byte what the stock adapter did.
    */
   legacyEngine: (options: BetterAuthOptions) => DBAdapter;
-  accounts: IdentityAccountsPort;
+  accounts: IdentityAccounts;
   resolution: IdentityResolutionPort;
   ceremonies: IdentityAccountCeremonies;
   /** ADR-116 §2: `finalized` and nothing else, cached, fail-closed. */
@@ -107,7 +107,7 @@ export interface IdentityStorageAdapterDeps {
    * boundary marked. Outside one this is never called, which is what keeps a
    * deploy of the entrance from changing anything on its own.
    */
-  birth: IdentityBirthPort;
+  birth: IdentityBirth;
 }
 
 /**

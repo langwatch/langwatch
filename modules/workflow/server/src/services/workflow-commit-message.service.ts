@@ -13,9 +13,9 @@ import { generateText } from "ai";
 import { createPatch } from "diff";
 
 import type {
-  WorkflowAiCallPort,
-  WorkflowCommitMessageModelPort,
-} from "../ports/workflow-commit-message.port.ts";
+  WorkflowAiCall,
+  WorkflowCommitMessageModel,
+} from "../app/workflow.app.ts";
 import {
   WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY,
   WORKFLOW_COMMIT_MESSAGE_PATCH_FILE,
@@ -25,16 +25,16 @@ import {
 
 export class WorkflowCommitMessageService {
   static create(options: {
-    models: WorkflowCommitMessageModelPort;
-    aiCalls: WorkflowAiCallPort;
+    models: WorkflowCommitMessageModel;
+    aiCalls: WorkflowAiCall;
   }): WorkflowCommitMessageService {
     return new WorkflowCommitMessageService(options);
   }
 
   private constructor(
     private readonly options: {
-      models: WorkflowCommitMessageModelPort;
-      aiCalls: WorkflowAiCallPort;
+      models: WorkflowCommitMessageModel;
+      aiCalls: WorkflowAiCall;
     },
   ) {}
 

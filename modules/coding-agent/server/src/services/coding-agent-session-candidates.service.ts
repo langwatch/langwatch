@@ -1,5 +1,5 @@
 import type { CodingAgentSessionBranchRecord } from "@langwatch/coding-agent-contract";
-import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port.ts";
+import type { CodingAgentBillingPolicy } from "../app/coding-agent.infrastructure.ts";
 import type { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service.ts";
@@ -8,7 +8,7 @@ import type { CodingAgentPullRequestUsageService } from "./coding-agent-pull-req
 type CodingAgentSessionCandidatesDependencies = {
   sessions: CodingAgentSessionRepository;
   sessionEvents: CodingAgentSessionEventRepository;
-  billing: CodingAgentBillingPolicyPort;
+  billing: CodingAgentBillingPolicy;
   usage: CodingAgentPullRequestUsageService;
 };
 

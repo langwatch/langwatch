@@ -19,7 +19,7 @@ export {
   type PostgresAuthzPipelineOptions,
 } from "./app/postgres-authz-pipeline.build.ts";
 export {
-  AuthzGrantsCommandDispatcherPort,
+  AuthzGrantsCommandDispatcher,
   AuthzLedgerUnavailableError,
   LEDGER_APP_HANDLE_WAIT_MS,
   type AuthzGrantsCommandSenders,
@@ -27,11 +27,11 @@ export {
 export { EventingAuthzCommandDispatcherAdapter } from "./adapters/eventing.authz-command-dispatcher.adapter.ts";
 export { KsuidAuthzBindingIdAdapter } from "./adapters/ksuid.authz-binding-id.adapter.ts";
 export {
-  AuthzMetricsPort,
+  AuthzMetrics,
   UncountedAuthzMetrics,
   type AuthzCounter,
 } from "./ports/authz-metrics.port.ts";
-export { AuthzRevocationTelemetryPort } from "./ports/authz-revocation-telemetry.port.ts";
+export { AuthzRevocationTelemetry } from "./ports/authz-revocation-telemetry.port.ts";
 export type { AuthzRevocationReason } from "./ports/authz-revocation-telemetry.port.ts";
 export {
   ObservabilityAuthzRevocationAdapter,
@@ -39,7 +39,7 @@ export {
   type ObservabilityAuthzRevocationAdapterOptions,
 } from "./adapters/observability.authz-revocation.adapter.ts";
 export { ObservabilityAuthzMetricsAdapter } from "./adapters/observability.authz-metrics.adapter.ts";
-export type { PostgresAuthzDatabasePort } from "./ports/postgres-authz-database.port.ts";
+export type { PostgresAuthzDatabase } from "./ports/postgres-authz-database.port.ts";
 export {
   ObservabilityAuthzCutoverAdapter,
   type AuthzCutoverCounter,

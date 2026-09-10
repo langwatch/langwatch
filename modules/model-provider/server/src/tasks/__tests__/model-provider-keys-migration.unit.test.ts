@@ -6,13 +6,13 @@
  * the walk itself — that it writes only the rows that need it, counts what it
  * did, and can be run again without re-encrypting an encrypted row.
  */
-import type { ModelProviderCredentialCipherPort } from "@langwatch/model-provider-server";
+import type { ModelProviderCredentialCipher } from "@langwatch/model-provider-server";
 import { describe, expect, it } from "vitest";
 import { runModelProviderKeysMigration } from "../model-provider-credentials-migrate.task.ts";
 import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules.ts";
 
 /** A stand-in for AES-GCM with the same three-segment shape the column holds. */
-function cipher(): ModelProviderCredentialCipherPort & { decrypted: string[] } {
+function cipher(): ModelProviderCredentialCipher & { decrypted: string[] } {
   const decrypted: string[] = [];
 
   return {
@@ -26,7 +26,7 @@ function cipher(): ModelProviderCredentialCipherPort & { decrypted: string[] } {
       decrypted.push(plain);
       return plain;
     },
-  } as ModelProviderCredentialCipherPort & { decrypted: string[] };
+  } as ModelProviderCredentialCipher & { decrypted: string[] };
 }
 
 function databaseOver(rows: Array<{ id: string; customKeys: unknown }>) {

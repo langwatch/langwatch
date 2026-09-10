@@ -18,7 +18,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { CliAdminContactPort, CliBudgetOverviewPort } from "../../app/governance.infrastructure.ts";
+import { CliAdminContactReader, CliBudgetOverviewReader } from "../../app/governance.infrastructure.ts";
 import { DefaultGovernanceCliBootstrapService } from "../governance-cli-tool-bootstrap.service.ts";
 import { OrganizationSupportContactService } from "../organization-support-contact.service.ts";
 import { PrismaOrganizationSupportContactRepository } from "../../repositories/prisma/prisma.organization-support-contact.repository.ts";
@@ -50,7 +50,7 @@ const DELETED_ADMIN_ID = `usr-deleted-${ns}`;
 const ORPHAN_CREATED_AT = new Date("2020-01-01T00:00:00.000Z");
 const HEALTHY_CREATED_AT = new Date("2021-01-01T00:00:00.000Z");
 
-class PrismaContacts implements CliAdminContactPort {
+class PrismaContacts implements CliAdminContactReader {
   tryResolveAdminEmail(organizationId: string): Promise<string | null> {
     return OrganizationSupportContactService.create({
       repository: PrismaOrganizationSupportContactRepository.create({ prisma }),
@@ -60,7 +60,7 @@ class PrismaContacts implements CliAdminContactPort {
   }
 }
 
-class MemoryBudgets implements CliBudgetOverviewPort {
+class MemoryBudgets implements CliBudgetOverviewReader {
   overviewForUser(): Promise<{ gatewayAccess: boolean; budgets: [] }> {
     return Promise.resolve({ gatewayAccess: false, budgets: [] });
   }

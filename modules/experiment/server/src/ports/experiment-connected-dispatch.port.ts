@@ -4,7 +4,7 @@ import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-
  * Dispatches one turn to a connected agent, through the runtime a live SDK
  * process registered its instances on (ADR-128).
  */
-export abstract class ExperimentConnectedDispatchPort {
+export abstract class ExperimentConnectedDispatch {
   abstract dispatch(input: {
     projectId: string;
     agent: DispatchAgent;

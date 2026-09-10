@@ -1,12 +1,12 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type {
-  AutomationSettlementEvaluationReaderPort,
-  AutomationSettlementTraceReaderPort,
+  AutomationSettlementEvaluationReader,
+  AutomationSettlementTraceReader,
 } from "../ports/automation-settlement-read.port.ts";
 import {
-  AutomationSettlementFilterEvaluatorPort,
-  AutomationSettlementMatchConfirmationPort,
+  AutomationSettlementFilterEvaluator,
+  AutomationSettlementMatchConfirmation,
 } from "../ports/automation-settlement.port.ts";
 
 const EVENT_FILTER_FIELDS = new Set([
@@ -41,19 +41,19 @@ function splitFilters(filters: Record<string, unknown>): {
 /** Confirms a recorded match against its settled trace state before delivery.
  * The service owns conditional reads and fail-closed sequencing; the injected
  * trace evaluator owns only the host's query/filter implementation. */
-export class AutomationSettlementMatchConfirmationService extends AutomationSettlementMatchConfirmationPort {
+export class AutomationSettlementMatchConfirmationService extends AutomationSettlementMatchConfirmation {
   private constructor(
-    private readonly evaluations: AutomationSettlementEvaluationReaderPort,
-    private readonly traces: AutomationSettlementTraceReaderPort,
-    private readonly filterEvaluator: AutomationSettlementFilterEvaluatorPort,
+    private readonly evaluations: AutomationSettlementEvaluationReader,
+    private readonly traces: AutomationSettlementTraceReader,
+    private readonly filterEvaluator: AutomationSettlementFilterEvaluator,
   ) {
     super();
   }
 
   static create(input: {
-    evaluations: AutomationSettlementEvaluationReaderPort;
-    traces: AutomationSettlementTraceReaderPort;
-    filterEvaluator: AutomationSettlementFilterEvaluatorPort;
+    evaluations: AutomationSettlementEvaluationReader;
+    traces: AutomationSettlementTraceReader;
+    filterEvaluator: AutomationSettlementFilterEvaluator;
   }): AutomationSettlementMatchConfirmationService {
     return new AutomationSettlementMatchConfirmationService(
       input.evaluations,

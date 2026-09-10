@@ -4,7 +4,7 @@ import {
   type RoutableConnection,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SignInDomainRoutingPort } from "./signin-router.service.ts";
+import type { SignInDomainRouting } from "./signin-router.service.ts";
 
 const logger = createLogger("langwatch:identity:ssoconn-routing-shadow");
 
@@ -51,20 +51,20 @@ const defaultRecorder: SsoConnectionRoutingShadowRecorder = {
 
 export interface SsoConnectionRoutingShadowDeps {
   /** The port whose answer is returned. In shadow that is the strings. */
-  deciding: SignInDomainRoutingPort;
+  deciding: SignInDomainRouting;
   /** The port whose answer is only compared. In shadow that is the
    *  `SsoConnection` projection. */
-  shadow: SignInDomainRoutingPort;
+  shadow: SignInDomainRouting;
   recorder?: SsoConnectionRoutingShadowRecorder;
 }
 
-export class ShadowComparingDomainRoutingAdapter implements SignInDomainRoutingPort {
+export class ShadowComparingDomainRoutingAdapter implements SignInDomainRouting {
   static create(deps: SsoConnectionRoutingShadowDeps): ShadowComparingDomainRoutingAdapter {
     return new ShadowComparingDomainRoutingAdapter(deps);
   }
 
-  private readonly deciding: SignInDomainRoutingPort;
-  private readonly shadow: SignInDomainRoutingPort;
+  private readonly deciding: SignInDomainRouting;
+  private readonly shadow: SignInDomainRouting;
   private readonly recorder: SsoConnectionRoutingShadowRecorder;
 
   private constructor(deps: SsoConnectionRoutingShadowDeps) {

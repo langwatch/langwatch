@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
-  type GatewayDebitPort,
+  type GatewayBudgetLedger,
 } from "../../app/governance.infrastructure.ts";
 import { GatewayDebitProcess } from "../gateway-debit.process.ts";
 
@@ -136,7 +136,7 @@ describe("transient process message keys", () => {
       it("mints the same keys regardless of wall clock", () => {
         // The handlers under test never reach the port: they mint intents and
         // return, and only the outbox worker would execute one.
-        const port = {} as GatewayDebitPort;
+        const port = {} as GatewayBudgetLedger;
         const { handlers, initial } = capture(
           GatewayDebitProcess.create(port).processManager() as unknown as (
             process: unknown,

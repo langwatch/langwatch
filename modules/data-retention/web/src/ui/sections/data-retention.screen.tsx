@@ -15,7 +15,7 @@
  *   round trip through the address, so the mirror only ever risked disagreeing
  *   with the URL.
  *
- * RECORDED COST: `UiFeedbackPort` has two levels and `toaster` had four. The
+ * RECORDED COST: `UiFeedback` has two levels and `toaster` had four. The
  * amber "Saved 7 of 9 updates" line and the blue "Applying retention to existing
  * data…" line are both success-lane notices now. The words are unchanged and the
  * error toast beside the first is what still tells the reader something failed;

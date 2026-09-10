@@ -7,7 +7,7 @@ import { randomBytes } from "node:crypto";
 
 import { nowInstant, type TimeInput } from "@langwatch/time";
 
-import type { HostedMcpRedis } from "../ports/hosted-mcp.port.ts";
+import type { HostedMcpRedis } from "../app/hosted-mcp-infrastructure.ts";
 import { McpOAuthClientRegistryService } from "./mcp-oauth-client-registry.service.ts";
 
 const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";

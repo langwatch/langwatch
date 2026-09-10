@@ -1,13 +1,13 @@
 import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contract";
-import { AutomationTriggerMatchRecorderPort } from "@langwatch/automation-server";
-import type { AutomationIntentRetentionPort } from "@langwatch/automation-server";
+import { AutomationTriggerMatchRecorder } from "@langwatch/automation-server";
+import type { AutomationIntentRetention } from "@langwatch/automation-server";
 import type {
   Event,
   Projection,
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
@@ -37,10 +37,10 @@ type RecordTriggerMatchInput = TriggerMatchRecordedEventData & {
  * receive this port and Automation connects the real command sender to it at
  * install time — the same late-binding shape Trace uses for Topic assignment.
  */
-class WorkerAutomationTriggerMatches extends AutomationTriggerMatchRecorderPort {
-  private delegate: AutomationTriggerMatchRecorderPort | undefined;
+class WorkerAutomationTriggerMatches extends AutomationTriggerMatchRecorder {
+  private delegate: AutomationTriggerMatchRecorder | undefined;
 
-  connect(delegate: AutomationTriggerMatchRecorderPort): void {
+  connect(delegate: AutomationTriggerMatchRecorder): void {
     this.delegate = delegate;
   }
 
@@ -52,7 +52,7 @@ class WorkerAutomationTriggerMatches extends AutomationTriggerMatchRecorderPort 
   }
 }
 
-class RegisteredAutomationTriggerMatches extends AutomationTriggerMatchRecorderPort {
+class RegisteredAutomationTriggerMatches extends AutomationTriggerMatchRecorder {
   static create(command: {
     send(data: RecordTriggerMatchInput): Promise<unknown>;
   }): RegisteredAutomationTriggerMatches {
@@ -79,7 +79,7 @@ export interface AutomationWorkerCapability<TEvent extends Event = Event> {
    * different process stores.
    */
   buildPipeline(options: {
-    retention: AutomationIntentRetentionPort;
+    retention: AutomationIntentRetention;
   }): WorkerPipelineDefinition<TEvent>;
 }
 
@@ -92,7 +92,7 @@ export interface AutomationWorkerCapability<TEvent extends Event = Event> {
  * governance graphs produce, and its settlement process manager is what turns
  * those matches into one notification per window.
  */
-export class AutomationWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class AutomationWorkerFeatureInstaller implements WorkerFeatureInstaller {
   /**
    * The registration is captured as a closure, and that is what erases the
    * event union.

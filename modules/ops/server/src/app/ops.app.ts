@@ -75,7 +75,7 @@ import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
-import type { OpsEventingIntrospectionPort } from "./ops.app.ts";
+import type { OpsEventingIntrospection } from "./ops.app.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { timingSafeEqual } from "node:crypto";
 import { Instant, nowInstant } from "@langwatch/time";
@@ -359,7 +359,7 @@ export interface OpsAppInfrastructure {
    * The live pipeline graph, read for the kill-switch keys an operator may
    * set. Without it every generated key is unsettable.
    */
-  eventingIntrospection: OpsEventingIntrospectionPort;
+  eventingIntrospection: OpsEventingIntrospection;
   pipelines: OpsPipelineRegistry;
   eventLogWindow: OpsEventLogWindowReader;
   grafana: OpsGrafanaLinks;
@@ -380,18 +380,18 @@ export interface OpsAppInfrastructure {
    * package reads none.
    */
   isProduction: boolean;
-  anomalyHardTierAlert: AnomalyHardTierAlertPort;
+  anomalyHardTierAlert: AnomalyHardTierAlert;
   opsReplayRuntime: OpsReplayRuntimePort;
-  opsSnapshotRedis: OpsSnapshotRedisPort;
-  opsWorker: OpsWorkerPort;
+  opsSnapshotRedis: OpsSnapshotRedis;
+  opsWorker: OpsWorker;
   organizationDataplane: OrganizationDataplanePort;
-  queuePayloadDecoder: QueuePayloadDecoderPort;
-  schedulerWake: SchedulerWakePort;
-  storageStatsMetrics: StorageStatsMetricsPort;
-  usageStatsClickHouseClient: UsageStatsClickHouseClientPort;
-  usageStatsClickHouseClientResolver: UsageStatsClickHouseClientResolverPort;
-  usageStatsErrorReporter: UsageStatsErrorReporterPort;
-  usageStatsTelemetryClient: UsageStatsTelemetryClientPort;
+  queuePayloadDecoder: QueuePayloadDecoder;
+  schedulerWake: SchedulerWake;
+  storageStatsMetrics: StorageStatsMetrics;
+  usageStatsClickHouseClient: UsageStatsClickHouseClient;
+  usageStatsClickHouseClientResolver: UsageStatsClickHouseClientResolver;
+  usageStatsErrorReporter: UsageStatsErrorReporter;
+  usageStatsTelemetryClient: UsageStatsTelemetryClient;
 }
 type OpsRuntimeDependencies = Readonly<{
   ops: OpsCapability;
@@ -399,7 +399,7 @@ type OpsRuntimeDependencies = Readonly<{
   projects: ProjectApiContract;
   auditLog: AuditLogApiContract;
   apiKeys: ApiKeyApiContract;
-  eventingIntrospection: OpsEventingIntrospectionPort;
+  eventingIntrospection: OpsEventingIntrospection;
   pipelines: OpsPipelineRegistry;
   eventLogWindow: OpsEventLogWindowReader;
   grafana: OpsGrafanaLinks;
@@ -1329,7 +1329,7 @@ export class OpsApp implements OpsApi {
 }
 
 /** External alert delivery for a newly surfaced hard-tier anomaly. */
-export interface AnomalyHardTierAlertPort {
+export interface AnomalyHardTierAlert {
   notify(anomaly: Anomaly): Promise<void>;
 }
 
@@ -1393,7 +1393,7 @@ export interface OpsKillSwitchDescriptor {
 }
 
 
-export interface OpsEventingIntrospectionPort {
+export interface OpsEventingIntrospection {
   /** Every fold, map and state projection mounted across the pipelines. */
   projections(): OpsProjectionMetadata[];
 
@@ -1411,7 +1411,7 @@ export interface OpsEventingIntrospectionPort {
 }
 
 
-export interface OpsSnapshotRedisPort {
+export interface OpsSnapshotRedis {
   eval(script: string, numberOfKeys: number, ...args: string[]): Promise<unknown>;
   set(
     key: string,
@@ -1437,7 +1437,7 @@ export interface UsageStatsWorkerConfig {
 }
 
 /** Process controls for the complete Ops worker graph. */
-export interface OpsWorkerPort {
+export interface OpsWorker {
   tryStartAnomalyWorker(): OpsWorkerHandle | undefined;
   tryStartUsageStatsWorker(): OpsWorkerHandle | undefined;
   /**
@@ -1472,7 +1472,7 @@ export interface OrganizationDataplanePort {
 }
 
 
-export interface QueuePayloadDecoderPort {
+export interface QueuePayloadDecoder {
   tryDecode(input: {
     queueName: string;
     value: string;
@@ -1510,14 +1510,14 @@ export interface OpsReplayRuntimePort {
 }
 
 /** Wakes the scheduler loop after an operator makes work due. */
-export interface SchedulerWakePort {
+export interface SchedulerWake {
   wake(): void;
 }
 
 /**
  * Where a storage-stats tick writes what it read.
  */
-export interface StorageStatsMetricsPort {
+export interface StorageStatsMetrics {
   /** Clears the per-table and per-disk series this tick is about to rewrite. */
   beginTick(instance: string): void;
 
@@ -1623,13 +1623,13 @@ export interface UsageStatsClickHouseQueryResult {
 }
 
 
-export interface UsageStatsClickHouseClientPort {
+export interface UsageStatsClickHouseClient {
   query(input: UsageStatsClickHouseQuery): Promise<UsageStatsClickHouseQueryResult>;
 }
 
 /** Resolves the ClickHouse client for the organization owning a report. */
-export interface UsageStatsClickHouseClientResolverPort {
-  tryResolve(organizationId: string): Promise<UsageStatsClickHouseClientPort | null>;
+export interface UsageStatsClickHouseClientResolver {
+  tryResolve(organizationId: string): Promise<UsageStatsClickHouseClient | null>;
 }
 
 export interface UsageStatsCollector {
@@ -1637,12 +1637,12 @@ export interface UsageStatsCollector {
 }
 
 /** Infrastructure boundary for the self-hosted telemetry receiver. */
-export interface UsageStatsTelemetryClientPort {
+export interface UsageStatsTelemetryClient {
   send(report: Record<string, unknown>): Promise<void>;
 }
 
 /** Infrastructure boundary for reporting a per-organization delivery failure. */
-export interface UsageStatsErrorReporterPort {
+export interface UsageStatsErrorReporter {
   capture(input: { instanceId: string; error: unknown }): Promise<void>;
 }
 
@@ -1661,7 +1661,7 @@ export type QueueControlAction =
  * DLQ entries at their TTL, so for a discard THIS row is the retained mark: the queue, the groups, how many jobs
  * they held, and their last errors survive here after the entries themselves are gone.
  */
-export abstract class QueueAuditSinkPort {
+export abstract class QueueAuditSink {
   abstract append(entry: {
     actorUserId: string;
     action: QueueControlAction;

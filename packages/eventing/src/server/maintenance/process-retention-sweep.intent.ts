@@ -11,7 +11,7 @@ import {
   RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
   RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
 } from "./process-retention-sweep.process.ts";
-import type { ProcessRetentionMetricsPort, RetentionFamily } from "./retention-metrics.port.ts";
+import type { ProcessRetentionMetrics, RetentionFamily } from "./retention-metrics.port.ts";
 
 const logger = createLogger("langwatch:process-manager:retention-sweep");
 
@@ -19,7 +19,7 @@ export interface ProcessRetentionSweepDeps {
   deleteDispatchedOutboxBatch: (params: { before: number; limit: number }) => Promise<number>;
   deleteDeadOutboxBatch: (params: { before: number; limit: number }) => Promise<number>;
   deleteConsumedInboxBatch: (params: { before: number; limit: number }) => Promise<number>;
-  metrics: ProcessRetentionMetricsPort;
+  metrics: ProcessRetentionMetrics;
   now?: () => number;
   /** Overridable so a test does not wait out the pacing pause. */
   sleep?: (ms: number) => Promise<void>;
@@ -109,7 +109,7 @@ async function sweepFamily(
     now: () => number;
     maxBatches: number;
     sleep: (ms: number) => Promise<void>;
-    metrics: ProcessRetentionMetricsPort;
+    metrics: ProcessRetentionMetrics;
   },
 ): Promise<number> {
   try {

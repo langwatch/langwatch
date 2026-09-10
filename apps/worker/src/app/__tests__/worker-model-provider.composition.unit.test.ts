@@ -8,7 +8,7 @@ import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   createWorkerModelProviders,
   tryCreateWorkerModelProviders,
-  WorkerModelProviderAbsenceReportPort,
+  WorkerModelProviderAbsenceReport,
   type WorkerModelProviderTenancy,
   type WorkerModelProviders,
 } from "../worker-model-provider.composition.ts";
@@ -31,7 +31,7 @@ import { createWorkerTopicClusteringExecution } from "../worker-topic-clustering
  * this composition needs from a database.
  */
 
-class RecordingAbsence extends WorkerModelProviderAbsenceReportPort {
+class RecordingAbsence extends WorkerModelProviderAbsenceReport {
   readonly gateway: Array<"no-encryption" | "no-tenancy"> = [];
   translation = 0;
   connectionWindows = 0;

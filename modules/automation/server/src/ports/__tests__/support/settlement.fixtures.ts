@@ -10,18 +10,18 @@ import {
 } from "@langwatch/trace-contract";
 import { SlackProviderAdapter } from "../../../adapters/slack-provider.adapter.ts";
 import { WebhookProviderAdapter } from "../../../adapters/webhook-provider.adapter.ts";
-import { AutomationClockPort } from "../../automation-clock.port.ts";
-import { AutomationEmailCapStorePort } from "../../email-cap.port.ts";
-import { AutomationNotificationDeliveryPort } from "../../automation-notification-delivery.port.ts";
+import { AutomationClock } from "../../../app/automation.infrastructure.ts";
+import { AutomationEmailCapStore } from "../../email-cap.port.ts";
+import { AutomationNotificationDelivery } from "../../automation-notification-delivery.port.ts";
 import {
-  AutomationDatasetMapperPort,
-  AutomationPersistActionWriterPort,
+  AutomationDatasetMapper,
+  AutomationPersistActionWriter,
 } from "../../automation-persist-action.port.ts";
 import {
-  AutomationSettlementMatchConfirmationPort,
-  AutomationSettlementObservabilityPort,
+  AutomationSettlementMatchConfirmation,
+  AutomationSettlementObservability,
 } from "../../automation-settlement.port.ts";
-import type { AutomationSettlementLedgerPort } from "../../automation-settlement-ledger.port.ts";
+import type { AutomationSettlementLedger } from "../../automation-settlement-ledger.port.ts";
 import { AutomationEmailCapService } from "../../../services/email-cap.service.ts";
 import { AutomationPersistActionService } from "../../../services/persist-action.service.ts";
 import { AutomationSettlementDispatchService } from "../../../services/trigger-settlement-dispatch.service.ts";
@@ -140,12 +140,12 @@ export function settlementSummary(
 }
 
 /**
- * Exactly `AutomationSettlementLedgerPort`'s ten methods — the settlement
+ * Exactly `AutomationSettlementLedger`'s ten methods — the settlement
  * dispatch path's whole dependency on Automation. Folded off the deleted
  * `AutomationService` contract-service (ADR-133); no method beyond the port
  * belongs here, since nothing in this suite reaches one.
  */
-class SettlementAutomationService implements AutomationSettlementLedgerPort {
+class SettlementAutomationService implements AutomationSettlementLedger {
   readonly claims: Array<{ triggerId: string; traceId: string; projectId: string }> = [];
   readonly lastRuns: Array<{ triggerId: string; projectId: string }> = [];
   readonly capInputs: Array<Record<string, unknown>> = [];
@@ -321,7 +321,7 @@ class SettlementTraceService extends TraceService {
   }
 }
 
-class SettlementConfirmation extends AutomationSettlementMatchConfirmationPort {
+class SettlementConfirmation extends AutomationSettlementMatchConfirmation {
   readonly rejected = new Set<string>();
 
   async confirms(input: { traceId: string }): Promise<boolean> {
@@ -329,13 +329,13 @@ class SettlementConfirmation extends AutomationSettlementMatchConfirmationPort {
   }
 }
 
-class SettlementClock extends AutomationClockPort {
+class SettlementClock implements AutomationClock {
   now(): Instant {
     return Temporal.Instant.from("2026-01-01T00:00:00.000Z");
   }
 }
 
-class SettlementDelivery extends AutomationNotificationDeliveryPort {
+class SettlementDelivery extends AutomationNotificationDelivery {
   readonly legacyEmails: Array<Record<string, unknown>> = [];
   readonly emails: Array<Record<string, unknown>> = [];
   readonly slackWebhooks: Array<Record<string, unknown>> = [];
@@ -366,7 +366,7 @@ class SettlementDelivery extends AutomationNotificationDeliveryPort {
   }
 }
 
-class SettlementEmailCapStore extends AutomationEmailCapStorePort {
+class SettlementEmailCapStore extends AutomationEmailCapStore {
   readonly claimKeys: string[] = [];
   private readonly counts = new Map<string, number>();
 
@@ -397,13 +397,13 @@ class SettlementEmailCapStore extends AutomationEmailCapStorePort {
   }
 }
 
-class SettlementMapper extends AutomationDatasetMapperPort {
+class SettlementMapper extends AutomationDatasetMapper {
   map(input: { trace: TraceRecord }): Array<Record<string, string | number>> {
     return [{ traceId: input.trace.trace_id }];
   }
 }
 
-class SettlementWriter extends AutomationPersistActionWriterPort {
+class SettlementWriter extends AutomationPersistActionWriter {
   readonly annotationWrites: Array<Record<string, unknown>> = [];
   readonly datasetWrites: Array<{ datasetRecords: Array<{ id: string }> }> = [];
   readonly errors = new Map<string, unknown>();
@@ -421,7 +421,7 @@ class SettlementWriter extends AutomationPersistActionWriterPort {
   }
 }
 
-class SettlementObservability extends AutomationSettlementObservabilityPort {
+class SettlementObservability extends AutomationSettlementObservability {
   readonly overflows: number[] = [];
   readonly captures: Array<{ error: Error; extra: Record<string, unknown> }> = [];
 

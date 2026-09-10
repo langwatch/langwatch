@@ -8,7 +8,7 @@ import {
   homeApi,
   ProjectHomeHostProvider,
   type ProjectHomeDeployment,
-  type ProjectHomeHostPort,
+  type ProjectHomeHost,
   type ProjectHomeOrganization,
   type ProjectHomeProject,
   type ProjectHomeUser,
@@ -111,7 +111,7 @@ export function ProjectHomeHostSection({ children }: { children: ReactNode }) {
     demoProjectSlug: deployment.demoProjectSlug,
   });
 
-  const host = useMemo<ProjectHomeHostPort>(
+  const host = useMemo<ProjectHomeHost>(
     () => ({
       project: () => project,
       organization: () => organization,

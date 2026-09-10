@@ -9,7 +9,7 @@
  * Ids with no row are absent rather than null, so a deleted entity falls back
  * to the column id the rest of the projection is keyed by.
  */
-export abstract class ExperimentTargetEntityNamesPort {
+export abstract class ExperimentTargetEntityNames {
   abstract findAgentNames(input: {
     projectId: string;
     ids: string[];

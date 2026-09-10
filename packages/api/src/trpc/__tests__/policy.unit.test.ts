@@ -29,7 +29,7 @@ import {
   createScopeLineageGuard,
   type PendingPermissionProcedureBuilder,
   type TrpcAuthorizationDecisions,
-  type TrpcAuthorizationPort,
+  type TrpcAuthorization,
   type TrpcCheckMiddleware,
   type TrpcDeclaredAuthzContext,
   type TrpcDeclaredAuthzPorts,
@@ -390,7 +390,7 @@ function lineagePorts(
   checkScopeLineage: ReturnType<
     typeof vi.fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>
   >,
-): Readonly<{ authorization: TrpcAuthorizationPort<unknown> }> {
+): Readonly<{ authorization: TrpcAuthorization<unknown> }> {
   return {
     authorization: {
       forRequest: () => ({

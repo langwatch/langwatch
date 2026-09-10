@@ -95,7 +95,7 @@ export interface BlobResolutionDeps {
 /**
  * Unified service for fetching traces from ClickHouse.
  */
-export class TraceService {
+export class TraceLegacyReadService {
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
   private readonly logger = createLogger("langwatch:traces:service");
   private constructor(
@@ -121,8 +121,8 @@ export class TraceService {
     logRecordStorage?: TraceLogRecordReader;
     /** Required: every single-trace read resolves the evaluations behind it. */
     evaluationService: EvaluationApi;
-  }): TraceService {
-    return new TraceService(
+  }): TraceLegacyReadService {
+    return new TraceLegacyReadService(
       TraceReadEnrichmentService.create({ traceCanonicalisation, editOverlay, logRecordStorage }),
       traceRead,
       evaluationService,

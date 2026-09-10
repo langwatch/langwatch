@@ -2,7 +2,7 @@
  * The dedup port is a shape, not a base class to inherit.
  *
  * The app holds its own Redis-backed dedup service and hands it to the Trace
- * pipeline. That only works while `TraceSpanDedupPort` stays structurally
+ * pipeline. That only works while `TraceSpanDedup` stays structurally
  * satisfiable — no private members, no constructor to call — so a plain
  * object with the three methods is assignable to it.
  *
@@ -11,13 +11,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { TraceSpanDedupPort, type SpanDedupRef } from "../../ingestion/trace-ingestion.service.ts";
+import { TraceSpanDedup, type SpanDedupRef } from "../../ingestion/trace-ingestion.service.ts";
 
-describe("TraceSpanDedupPort", () => {
+describe("TraceSpanDedup", () => {
   describe("given a plain object with the port's three methods", () => {
     it("is usable as the port, so a caller needs no adapter class", () => {
       const seen: SpanDedupRef[] = [];
-      const dedup: TraceSpanDedupPort = {
+      const dedup: TraceSpanDedup = {
         async tryAcquireProcessingLock(span: SpanDedupRef) {
           seen.push(span);
           return true;

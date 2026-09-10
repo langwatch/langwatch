@@ -24,7 +24,7 @@ export type MigrationPageRequest = {
   limit: number;
 };
 
-export abstract class ObjectStorageMigrationInventoryPort {
+export abstract class ObjectStorageMigrationInventory {
   abstract listProjectsPage(request: MigrationPageRequest): Promise<MigrationProject[]>;
 
   /** Returns a stable id-ordered page of latest ReplacingMergeTree versions. */

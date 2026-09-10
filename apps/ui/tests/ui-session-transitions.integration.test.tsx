@@ -4,7 +4,7 @@ import { render, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
-import { UiFeedbackPort, useUiCapabilities } from "@langwatch/ui-host/capabilities";
+import { UiFeedback, useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useActiveScope, usePermissions, useSession } from "@langwatch/ui-host/session";
 import { trpcQueryKey } from "@langwatch/api/web";
 import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
@@ -29,7 +29,7 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject };
 }
 
-class SilentFeedback extends UiFeedbackPort {
+class SilentFeedback extends UiFeedback {
   succeeded(): void {}
   failed(): void {}
 }

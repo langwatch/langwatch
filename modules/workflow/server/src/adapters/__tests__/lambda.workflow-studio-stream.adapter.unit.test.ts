@@ -5,17 +5,17 @@
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
 import { describe, expect, it } from "vitest";
-import { NlpLambdaFunctionPort } from "../../ports/nlp-lambda-arn.port.ts";
+import { NlpLambdaFunctionPort } from "../../app/workflow.app.ts";
 import {
-  NlpLambdaStreamInvokePort,
+  NlpLambdaStreamInvoke,
   type NlpLambdaStreamChunk,
-} from "../../ports/nlp-lambda-stream.port.ts";
+} from "../../app/workflow.app.ts";
 import {
-  NlpPayloadStagingPort,
+  NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type StagedNlpPayload,
-} from "../../ports/workflow-nlp-lambda.port.ts";
-import type { WorkflowStudioStreamInput } from "../../ports/workflow.port.ts";
+} from "../../app/workflow.app.ts";
+import type { WorkflowStudioStreamInput } from "../../app/workflow.app.ts";
 import { LambdaWorkflowStudioStreamAdapter } from "../lambda.workflow-studio-stream.adapter.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";
@@ -26,7 +26,7 @@ const INPUT: WorkflowStudioStreamInput = {
   origin: "workflow",
 };
 
-class FixedFunctions extends NlpLambdaFunctionPort {
+class FixedFunctions implements NlpLambdaFunctionPort {
   readonly asked: string[] = [];
 
   arnFor(input: { projectId: string }): Promise<string> {
@@ -36,7 +36,7 @@ class FixedFunctions extends NlpLambdaFunctionPort {
   }
 }
 
-class RecordingStaging extends NlpPayloadStagingPort {
+class RecordingStaging implements NlpPayloadStaging {
   readonly staged: { projectId: string; keyPrefix: string; bytes: number }[] = [];
   discards = 0;
 
@@ -63,12 +63,11 @@ class RecordingStaging extends NlpPayloadStagingPort {
   }
 }
 
-class ScriptedInvoke extends NlpLambdaStreamInvokePort {
+class ScriptedInvoke implements NlpLambdaStreamInvoke {
   readonly payloads: string[] = [];
   signal: AbortSignal | undefined;
 
   constructor(private readonly script: readonly NlpLambdaStreamChunk[]) {
-    super();
   }
 
   invokeStream(input: {
@@ -105,8 +104,8 @@ function framed(statusCode: number, body: string): Uint8Array {
 }
 
 function adapter(options: {
-  invoke: NlpLambdaStreamInvokePort;
-  staging?: NlpPayloadStagingPort | undefined;
+  invoke: NlpLambdaStreamInvoke;
+  staging?: NlpPayloadStaging | undefined;
   thresholdBytes?: number;
 }) {
   const functions = new FixedFunctions();

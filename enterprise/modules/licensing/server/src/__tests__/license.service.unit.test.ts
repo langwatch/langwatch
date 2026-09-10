@@ -3,7 +3,7 @@ import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import {
   LicenseGenerationService,
   LicenseLogger,
-  LicenseStoragePort,
+  LicenseStorage,
   LicenseRetention,
   LicenseService,
   LicenseServiceConfiguration,
@@ -34,7 +34,7 @@ function mintLicenseKey(options: { organizationId?: string } = {}): string {
 
 const ORGANIZATION_ID = "org_123";
 
-class MemoryLicenseRepository extends LicenseStoragePort {
+class MemoryLicenseRepository implements LicenseStorage {
   readonly organizations = new Set([ORGANIZATION_ID]);
   readonly stored = new Map<string, StoredLicense>();
   memberCount = 3;

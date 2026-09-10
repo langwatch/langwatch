@@ -11,7 +11,7 @@ import {
 import {
   DataRetentionPlanPort,
   type DataRetentionPlan,
-} from "../../ports/data-retention-plan.port.ts";
+} from "../../app/data-retention.infrastructure.ts";
 import { createDataRetentionTestAuthz } from "../../app/__tests__/data-retention.fixture.ts";
 import { DataRetentionPolicyService } from "../data-retention-policy.service.ts";
 import { RetentionPermissionsService } from "../retention-permissions.service.ts";
@@ -40,9 +40,8 @@ class StubDirectory implements DataRetentionDirectoryReader {
   }
 }
 
-class StubPlans extends DataRetentionPlanPort {
+class StubPlans implements DataRetentionPlanPort {
   constructor(private readonly plan: DataRetentionPlan) {
-    super();
   }
   async getPlan(): Promise<DataRetentionPlan> {
     return this.plan;

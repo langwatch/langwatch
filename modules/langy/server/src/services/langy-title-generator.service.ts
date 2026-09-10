@@ -6,8 +6,8 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
-import type { LangyTitleGenerator } from "../ports/langy-effect.port.ts";
-import type { LangyTitleModelPort } from "../ports/langy-title-model.port.ts";
+import type { LangyTitleGenerator } from "../app/langy.infrastructure.ts";
+import type { LangyTitleModel } from "../app/langy.infrastructure.ts";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules.ts";
 import type { LangyTrustedMessageReader } from "./langy-message.service.ts";
@@ -30,8 +30,8 @@ const TITLE_SYSTEM_PROMPT = [
 export type LangyTitleGeneratorDeps = Readonly<{
   /** The transcript, off the conversation's own message projection. */
   messages: LangyTrustedMessageReader;
-  /** Where the model handle comes from; see {@link LangyTitleModelPort}. */
-  models: LangyTitleModelPort;
+  /** Where the model handle comes from; see {@link LangyTitleModel}. */
+  models: LangyTitleModel;
 }>;
 
 /**
@@ -63,7 +63,7 @@ export class LangyTitleGeneratorService {
       return null;
     }
 
-    let model: Awaited<ReturnType<LangyTitleModelPort["resolveTitleModel"]>>;
+    let model: Awaited<ReturnType<LangyTitleModel["resolveTitleModel"]>>;
     try {
       model = await this.deps.models.resolveTitleModel({
         projectId,

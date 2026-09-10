@@ -15,7 +15,7 @@ import {
   PostgresSsoConnectionPipelineAdapter,
   type SsoConnectionPipelineDatabase,
 } from "../prisma.sso-connection-pipeline.repository.ts";
-import { PlatformOperatorPort } from "../../../app/identity.infrastructure.ts";
+import { PlatformOperator } from "../../../app/identity.infrastructure.ts";
 
 /** The models the connection graph reads, none of them touched at composition time. */
 function testDatabase(): SsoConnectionPipelineDatabase {
@@ -37,7 +37,7 @@ function testEventSourcing(): EventSourcing {
   } as unknown as EventSourcing;
 }
 
-class TestOperators implements PlatformOperatorPort {
+class TestOperators implements PlatformOperator {
   isPlatformOperatorEmail(): boolean {
     return true;
   }

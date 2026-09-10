@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { DEV_GENERATED_KEYS } from "./keys.ts";
 import { referenceFor, writeFields, type VaultItem } from "./one-password-item.ts";
-import type { ProcessRunnerPort } from "./process-runner.port.ts";
+import type { ProcessRunner } from "./process-runner.port.ts";
 import { SecretSource } from "./secret-source.port.ts";
 
 /** The cadence `.env.example` and the two ensure scripts already document. */
@@ -26,7 +26,7 @@ export class DevGeneratedSecretSource extends SecretSource {
     name = "generated",
   }: {
     item: VaultItem;
-    runner: ProcessRunnerPort;
+    runner: ProcessRunner;
     name?: string;
   }): DevGeneratedSecretSource {
     return new DevGeneratedSecretSource(item, runner, name);
@@ -34,7 +34,7 @@ export class DevGeneratedSecretSource extends SecretSource {
 
   private constructor(
     private readonly item: VaultItem,
-    private readonly runner: ProcessRunnerPort,
+    private readonly runner: ProcessRunner,
     readonly name: string,
   ) {
     super();

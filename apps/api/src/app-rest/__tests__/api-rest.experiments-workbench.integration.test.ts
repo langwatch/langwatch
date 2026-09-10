@@ -14,7 +14,7 @@ import {
   ClickHouseExperimentRunRepository,
   ExperimentApp,
   ExperimentService,
-  ExperimentWorkbenchUpdatesPort,
+  ExperimentWorkbenchUpdates,
   PrismaExperimentRepository,
   PrismaExperimentWorkflowVersionRepository,
 } from "@langwatch/experiment-server";
@@ -52,10 +52,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 }
 
 /** Every workbench update published, in the order it was published. */
-class RecordingWorkbenchUpdates extends ExperimentWorkbenchUpdatesPort {
-  readonly published: Parameters<ExperimentWorkbenchUpdatesPort["publish"]>[0][] = [];
+class RecordingWorkbenchUpdates extends ExperimentWorkbenchUpdates {
+  readonly published: Parameters<ExperimentWorkbenchUpdates["publish"]>[0][] = [];
 
-  publish(input: Parameters<ExperimentWorkbenchUpdatesPort["publish"]>[0]): Promise<void> {
+  publish(input: Parameters<ExperimentWorkbenchUpdates["publish"]>[0]): Promise<void> {
     this.published.push(input);
 
     return Promise.resolve();

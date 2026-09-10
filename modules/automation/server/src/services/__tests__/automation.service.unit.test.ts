@@ -12,12 +12,12 @@ import { EmailSuppressionNameRepository } from "../../repositories/email-suppres
 import { TriggerFireHistoryRepository } from "../../repositories/trigger-fire-history.repository.ts";
 import { TriggerRepository } from "../../repositories/trigger.repository.ts";
 import type { ReportScheduleTarget } from "../../repositories/trigger.repository.ts";
-import { UnsubscribeTokenVerifierPort } from "../../ports/unsubscribe-token.port.ts";
+import { UnsubscribeTokenVerifier } from "../../ports/unsubscribe-token.port.ts";
 import { ReportScheduleService } from "../report-schedule.service.ts";
-import { AutomationClockPort } from "../../ports/automation-clock.port.ts";
+import { AutomationClock } from "../../app/automation.infrastructure.ts";
 import { ScheduledJobStorePort } from "../../ports/scheduled-jobs.port.ts";
 import type { ScheduledJobRecord } from "../../ports/scheduled-jobs.port.ts";
-import { SchedulerWakePort } from "../../ports/scheduler-wake.port.ts";
+import { SchedulerWake } from "../../ports/scheduler-wake.port.ts";
 import { CustomGraphRepository } from "../../repositories/custom-graph.repository.ts";
 import { WebhookDeliveryRepository } from "../../repositories/webhook-delivery.repository.ts";
 import { GraphTriggerSentRepository } from "../../repositories/graph-trigger-sent.repository.ts";
@@ -117,7 +117,7 @@ class Names extends EmailSuppressionNameRepository {
     return Promise.resolve(new Map<string, string>());
   }
 }
-class Verifier extends UnsubscribeTokenVerifierPort {
+class Verifier extends UnsubscribeTokenVerifier {
   tryVerify() {
     return null;
   }
@@ -151,12 +151,12 @@ class Jobs extends ScheduledJobStorePort {
     return Promise.resolve(this.rows);
   }
 }
-class Clock extends AutomationClockPort {
+class Clock implements AutomationClock {
   now() {
     return Temporal.Instant.from("2026-01-01T00:00:00Z");
   }
 }
-class Wake extends SchedulerWakePort {
+class Wake extends SchedulerWake {
   publish() {}
 }
 class Triggers extends TriggerRepository {

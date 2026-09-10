@@ -1,4 +1,4 @@
-import type { GithubRedisPort } from "./github-redis.connection.ts";
+import type { GithubRedis } from "./github-redis.connection.ts";
 import { GithubPullRequestStatusCacheRepository } from "../github-pull-request-status-cache.repository.ts";
 import type {
   GithubPullRequestRef,
@@ -15,12 +15,12 @@ const STATUSES: readonly string[] = ["open", "draft", "merged", "closed"];
  */
 export class GithubPullRequestStatusCacheRedisRepository extends GithubPullRequestStatusCacheRepository {
   static create(parts: {
-    redis: GithubRedisPort | null;
+    redis: GithubRedis | null;
   }): GithubPullRequestStatusCacheRedisRepository {
     return new GithubPullRequestStatusCacheRedisRepository(parts.redis);
   }
 
-  private constructor(private readonly redis: GithubRedisPort | null) {
+  private constructor(private readonly redis: GithubRedis | null) {
     super();
   }
 

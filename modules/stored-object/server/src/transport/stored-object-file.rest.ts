@@ -147,7 +147,7 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   // The browser's own door: an `<img>` or `<audio>` fires with a cookie and no
   // headers, so no API client can present what opens this family and it
   // publishes no operation. A project API key opens the SAME door.
-  .withCredential("session")
+  .withCredential("browser")
   .withAddressing("literal", { v1Twin: true })
 
   .get("/api/files/:projectId/:id", "readProjectStoredObjectBytes")

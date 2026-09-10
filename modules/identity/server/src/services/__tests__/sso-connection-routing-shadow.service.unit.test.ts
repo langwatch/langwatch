@@ -1,6 +1,6 @@
 import type { RoutableConnection } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import type { SignInDomainRoutingPort } from "../signin-router.service.ts";
+import type { SignInDomainRouting } from "../signin-router.service.ts";
 import {
   ShadowComparingDomainRoutingAdapter,
   type SsoConnectionRoutingShadowRecord,
@@ -22,7 +22,7 @@ function routable(
   };
 }
 
-class StubRouting implements SignInDomainRoutingPort {
+class StubRouting implements SignInDomainRouting {
   constructor(
     private readonly answer: RoutableConnection | null,
     private readonly failure?: Error,

@@ -5,7 +5,7 @@ import { IdentityLedgerWriterAdapter } from "../../services/identity-ledger.serv
 import { PostgresIdentityGuardsAdapter } from "../../repositories/prisma/prisma.identity-guards.repository.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../../services/system-migration-identity-secret-heal.service.ts";
-import type { IdentityEventingPort } from "../../app/identity.infrastructure.ts";
+import type { IdentityEventing } from "../../app/identity.infrastructure.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
 import { PrismaIdentityProjectionRepository } from "./prisma.identity-projection.repository.ts";
 import { PrismaIdentitySecretCarryRepository } from "./prisma.identity-secret-carry.repository.ts";
@@ -19,7 +19,7 @@ export type PostgresIdentityUserMigrationsOptions = {
   /** The composition root's own typed client, handed down with no cast. */
   database: PrismaClient;
   /** The event stack the adoption commands stage through. */
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
 };
 
 /**

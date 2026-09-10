@@ -13,7 +13,7 @@ import {
   LangyActorSessionService,
   type LangyActorUserReader,
 } from "./langy-actor-session.service.ts";
-import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
 import {
   connectMessage,
@@ -27,7 +27,7 @@ import type { ControlRequestService } from "./langy-local-control-request.servic
 import { LangyWaitExpiredError } from "@langwatch/langy-contract";
 import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
 import type {
-  LangyLocalPresencePort,
+  LangyLocalPresence,
   PresenceHeartbeat,
 } from "../repositories/langy-local-presence.repository.ts";
 import {
@@ -71,7 +71,7 @@ export interface LocalControlSessionCoreOptions {
   /** This deployment's own origin, for the follow-along link. */
   baseHost: string | undefined;
   store: SessionStateStore;
-  presence: LangyLocalPresencePort;
+  presence: LangyLocalPresence;
   dispatcher: LocalCallDispatcherService;
   waits: UserWaitService;
   requests: ControlRequestService;
@@ -94,7 +94,7 @@ export class LocalControlSessionCoreService {
   private readonly conversations: () => ControlConversations;
   private readonly events: () => ControlEvents;
   private readonly buffer: () => ControlBuffer;
-  readonly presence: LangyLocalPresencePort;
+  readonly presence: LangyLocalPresence;
   readonly dispatcher: LocalCallDispatcherService;
   readonly waits: UserWaitService;
   readonly requests: ControlRequestService;

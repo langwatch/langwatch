@@ -13,7 +13,7 @@ import type { TriggerDigestMail } from "../templates/trigger-digest-email.tsx";
  * dependency by type and a test can substitute a renderer without loading
  * react-email at all.
  */
-export abstract class MailRenderPort {
+export abstract class MailRender {
   /**
    * The digest an automation sends when its author wrote no template of their
    * own — which is most automations.

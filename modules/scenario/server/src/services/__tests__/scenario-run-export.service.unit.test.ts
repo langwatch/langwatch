@@ -7,7 +7,7 @@
 import Parse from "papaparse";
 import type { SimulationExportRun, SimulationService } from "@langwatch/scenario-contract";
 import {
-  SimulationExecutionRepository as SimulationExecutionPort,
+  SimulationExecutionRepository as SimulationExecution,
   NullSimulationRepository,
 } from "../../index.ts";
 import { SimulationService as SimulationServiceClass } from "../simulation.service.ts";
@@ -47,7 +47,7 @@ type FindCall = Parameters<SimulationService["findRunsForExport"]>[0];
 
 const noop = async () => undefined;
 
-class NoopSimulationExecutionPort extends SimulationExecutionPort {
+class NoopSimulationExecution extends SimulationExecution {
   queueRun = noop;
   startRun = noop;
   messageSnapshot = noop;
@@ -62,7 +62,7 @@ class NoopSimulationExecutionPort extends SimulationExecutionPort {
 function createSimulationService(): SimulationService {
   return SimulationServiceClass.create(
     new NullSimulationRepository(),
-    new NoopSimulationExecutionPort(),
+    new NoopSimulationExecution(),
   );
 }
 

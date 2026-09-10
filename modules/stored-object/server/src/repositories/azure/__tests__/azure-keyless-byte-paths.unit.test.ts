@@ -30,9 +30,9 @@ const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
 import { AzureBlobTokenProviderAdapter } from "#services/azure-blob-token-provider.service";
 const { resetAzureTokenCacheForTests } = AzureBlobTokenProviderAdapter;
 import {
-  StoredObjectAzureDestinationPort,
+  StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
-  StoredObjectProjectS3ConfigPort,
+  StoredObjectProjectS3Config,
 } from "#services/stored-object-destination-policy.service";
 import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 
@@ -72,14 +72,14 @@ const READ_ONLY_CONFIG: AzureBlobCredentialsConfig = {
   allowInsecureTokenEndpointForTests: false,
 };
 
-class NoPrivateBucket extends StoredObjectProjectS3ConfigPort {
+class NoPrivateBucket extends StoredObjectProjectS3Config {
   async tryGet(): Promise<null> {
     return null;
   }
 }
 
 /** The destination port a composition root wires from the shared resolver. */
-class ResolvedAzureDestination extends StoredObjectAzureDestinationPort {
+class ResolvedAzureDestination extends StoredObjectAzureDestination {
   constructor(
     private readonly config: AzureBlobCredentialsConfig,
     private readonly identity: AzureInjectedIdentity,

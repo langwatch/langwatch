@@ -22,9 +22,9 @@ const rateLimitMock = vi.fn(
 import { JoinRequestsService } from "../join-requests.service.ts";
 import {
   JOIN_REJECTION_COOLDOWN_MS,
-  type JoinMembershipPort,
+  type JoinMembership,
   type JoinRequestNotifier,
-  type JoinSettingPort,
+  type JoinSetting,
 } from "../../rules/join-requests-contract.rules.ts";
 
 /**
@@ -85,7 +85,7 @@ function harness({
     withdrawJoin: vi.fn(async () => []),
     expireJoin: vi.fn(async () => []),
   };
-  const membership: JoinMembershipPort = {
+  const membership: JoinMembership = {
     attachDefaultMembership: vi.fn(async () => undefined),
     isMember: vi.fn(async () => isMember),
   };
@@ -97,7 +97,7 @@ function harness({
     requestExpired: vi.fn(async () => undefined),
     joinedAutomatically: vi.fn(async () => undefined),
   } satisfies JoinRequestNotifier;
-  const settings: JoinSettingPort = {
+  const settings: JoinSetting = {
     read: vi.fn(async () => setting),
     write: vi.fn(async () => undefined),
   };

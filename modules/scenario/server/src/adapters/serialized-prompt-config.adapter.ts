@@ -17,7 +17,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { createModelFromParams } from "./litellm-model.adapter.ts";
 import { PromptTemplateAdapter } from "./prompt-template.adapter.ts";
-import { SerializedAgentPort } from "../ports/serialized-agent.port.ts";
+import { SerializedAgent } from "../ports/serialized-agent.port.ts";
 
 // Shared Liquid engine for template interpolation. Sandboxed: a customer
 // prompt template must not be able to inline a file from the worker's working
@@ -28,7 +28,7 @@ const liquid = createSandboxedLiquid();
  * Serialized prompt config adapter that uses pre-fetched configuration.
  * No database access required.
  */
-export class SerializedPromptConfigAdapter extends SerializedAgentPort {
+export class SerializedPromptConfigAdapter extends SerializedAgent {
   static create(options: {
     config: PromptConfigData;
     litellmParams: LiteLLMParams;

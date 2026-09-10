@@ -8,8 +8,8 @@ export {
   type TopicClusteringRunHistoryEntry,
   type TopicClusteringRunStatusData,
   type TopicModelData,
-} from "./adapters/eventing.topic-clustering.adapter.ts";
-export { TopicClusteringProcessingProducerAdapter } from "./adapters/topic-clustering-processing-producer.adapter.ts";
+} from "./services/topic-clustering-eventing.service.ts";
+export { TopicClusteringProcessingProducerAdapter } from "./services/topic-clustering-processing-producer.service.ts";
 export { TopicApp, type TopicInfrastructure } from "./app/topic.app.ts";
 export { topicServer } from "./topic.server.ts";
 export { topicRepositories } from "./repositories/topic-repositories.registry.ts";
@@ -20,12 +20,12 @@ export {
   type TopicServerInstallerDependencies,
 } from "./repositories/prisma/prisma.topic-server-installer.repository.ts";
 export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository.ts";
-export { EventingTopicClusteringScheduleAdapter } from "./adapters/eventing.topic-clustering-schedule.adapter.ts";
+export { EventingTopicClusteringScheduleAdapter } from "./services/topic-clustering-schedule.service.ts";
 export {
   OtelTopicClusteringMetricsAdapter,
   TOPIC_CLUSTERING_PAGE_DURATION_METRIC_NAME,
   TOPIC_CLUSTERING_PAGE_TOTAL_METRIC_NAME,
-} from "./adapters/otel.topic-clustering-metrics.adapter.ts";
+} from "./services/topic-clustering-metrics.service.ts";
 export {
   BOOTSTRAP_CLAIM_TTL_SECONDS,
   RedisTopicClusteringBootstrapRepository as RedisTopicClusteringBootstrapAdapter,
@@ -40,11 +40,11 @@ export {
   type TopicClusteringDispatchDeps,
   type TopicClusteringErrorClassifier,
   type TopicClusteringIntents,
-  type TopicClusteringMetricsPort,
+  type TopicClusteringMetrics,
   type TopicClusteringOutcomeCommands,
   type TopicClusteringPageOutcome,
   type TopicClusteringRunIntent,
-  type TopicClusteringRunPort,
+  type TopicClusteringRun,
 } from "./intents/topic-clustering.intent.ts";
 export {
   batchClusterTraces,
@@ -68,14 +68,14 @@ export {
   type TopicClusteringBackfillSummary,
 } from "./migrations/legacy-import.topic-clustering.migration.ts";
 export {
-  TopicClusteringClickHousePort,
+  TopicClusteringClickHouse,
   type TopicClusteringClickHouseQuery,
   type TopicClusteringClickHouseQueryParams,
   type TopicClusteringClickHouseResolver,
 } from "./ports/topic-clustering-clickhouse.port.ts";
 export { TopicClusteringCommandsPort } from "./ports/topic-clustering-commands.port.ts";
 export {
-  LangevalsPayloadStagingPort,
+  LangevalsPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type StagedLangevalsPayload,
 } from "./ports/langevals-payload-staging.port.ts";
@@ -85,9 +85,9 @@ export {
   type LangevalsCallKind,
   type LangevalsStagedPayloadConfig,
   type StagedFetchOptions,
-} from "./adapters/langevals-staged-payload.adapter.ts";
+} from "./services/langevals-staged-payload.service.ts";
 export {
-  TopicClusteringLangevalsPort,
+  TopicClusteringLangevals,
   type TopicClusteringLangevalsKind,
   type TopicClusteringLangevalsResponse,
 } from "./ports/topic-clustering-langevals.port.ts";

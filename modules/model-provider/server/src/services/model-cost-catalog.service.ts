@@ -1,7 +1,7 @@
 import { modelCostListInputSchema, type ModelCost } from "@langwatch/model-provider-contract";
 import type {
-  ModelCostProjectScopePort
-} from "../ports/model-provider.port.ts";
+  ModelCostProjectScope
+} from "../app/model-provider.infrastructure.ts";
 import type {
   ModelCostRepository
 } from "../repositories/model-cost.repository.ts";
@@ -32,12 +32,12 @@ import type {
 export class ModelCostCatalogService {
   private constructor(
     private readonly costs: ModelCostRepository,
-    private readonly scopes: ModelCostProjectScopePort,
+    private readonly scopes: ModelCostProjectScope,
   ) {}
 
   static create(options: {
     costs: ModelCostRepository;
-    scopes: ModelCostProjectScopePort;
+    scopes: ModelCostProjectScope;
   }): ModelCostCatalogService {
     return new ModelCostCatalogService(options.costs, options.scopes);
   }

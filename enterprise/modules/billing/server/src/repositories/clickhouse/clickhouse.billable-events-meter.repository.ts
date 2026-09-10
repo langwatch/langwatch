@@ -14,7 +14,7 @@
 import type { ClickHouseSettings, DataFormat } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import {
-  BillableEventsMeterPort,
+  BillableEventsMeter,
   type BillableEventRecord,
 } from "../../ports/billable-events-meter.port.ts";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
@@ -51,7 +51,7 @@ export type BillableEventsMeterClickHouseClientResolver = (
   organizationId: string,
 ) => Promise<BillableEventsMeterClickHouseClient | null>;
 
-export class BillableEventsMeterClickHouseRepository extends BillableEventsMeterPort {
+export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter {
   private constructor(private readonly resolveClient: BillableEventsMeterClickHouseClientResolver) {
     super();
   }

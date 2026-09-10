@@ -9,11 +9,11 @@ import {
   type EvaluationSummary,
   type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
+import type { EvaluationRetentionFloor } from "../../app/evaluation.infrastructure.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseResolver,
-  EvaluationRetentionFloorPort,
-} from "../../ports/evaluation.port.ts";
+} from "./evaluation-clickhouse-client.ts";
 import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
@@ -79,7 +79,7 @@ function parseObject(value: string | null): Record<string, unknown> | null {
 export class EvaluationRunClickHouseReadRepository {
   static create(options: {
     resolveClient: EvaluationClickHouseResolver;
-    retentionFloor: EvaluationRetentionFloorPort;
+    retentionFloor: EvaluationRetentionFloor;
   }): EvaluationRunClickHouseReadRepository {
     return new EvaluationRunClickHouseReadRepository(options);
   }
@@ -87,7 +87,7 @@ export class EvaluationRunClickHouseReadRepository {
   private constructor(
     private readonly options: {
       resolveClient: EvaluationClickHouseResolver;
-      retentionFloor: EvaluationRetentionFloorPort;
+      retentionFloor: EvaluationRetentionFloor;
     },
   ) {}
 

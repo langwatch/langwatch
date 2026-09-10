@@ -8,9 +8,9 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { LangyUiActionService, type UiActionRedis, uiActionKeys } from "../langy-ui-action.service.ts";
 import {
-  LangyUiActionCatalogPort,
+  LangyUiActionCatalog,
   type LangyUiActionDefinition,
-} from "../../ports/langy-ui-action-catalog.port.ts";
+} from "../../app/langy.infrastructure.ts";
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
 
 const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
@@ -20,7 +20,7 @@ const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
   },
 };
 
-class FakeUiActionCatalog extends LangyUiActionCatalogPort {
+class FakeUiActionCatalog implements LangyUiActionCatalog {
   tryFind(kind: string): LangyUiActionDefinition | null {
     return FAKE_DEFINITIONS[kind] ?? null;
   }

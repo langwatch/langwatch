@@ -6,7 +6,7 @@
  * committed version, and says so differently. Both live in Postgres beside the
  * Workflow feature, which this package may not reach into.
  */
-export abstract class ExperimentWorkflowDslPort {
+export abstract class ExperimentWorkflowDsl {
   /** The workflow, or null when the project has none by that id. */
   abstract findWorkflow(input: {
     projectId: string;

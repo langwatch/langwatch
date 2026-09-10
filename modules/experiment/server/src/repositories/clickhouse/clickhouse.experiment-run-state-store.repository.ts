@@ -3,7 +3,7 @@
  */
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import type {
-  ExperimentClickHousePort,
+  ExperimentClickHouse,
   ExperimentEventingClickHouseClient,
 } from "../../ports/experiment-clickhouse.port.ts";
 import { ClickHouseExperimentRunStateRepository } from "./clickhouse.experiment-run-state.repository.ts";
@@ -14,14 +14,14 @@ export class ClickhouseExperimentRunStateStoreRepository {
   /**
    * Takes the resolver rather than the port, the way Scenario's adapter does. The process has a `resolveClient`
    * function to hand, and the previous call site passed exactly that where the repository declares an {@link
-   * ExperimentClickHousePort} — a bare function has no `resolveClient` on it, so the first read would have thrown.
+   * ExperimentClickHouse} — a bare function has no `resolveClient` on it, so the first read would have thrown.
    */
   static create(options: {
     type: "clickhouse";
     resolveClient: (tenantId: string) => Promise<ExperimentEventingClickHouseClient>;
     defaultRetentionDays: number;
   }): ClickhouseExperimentRunStateStoreRepository {
-    const clickhouse: ExperimentClickHousePort = { resolveClient: options.resolveClient };
+    const clickhouse: ExperimentClickHouse = { resolveClient: options.resolveClient };
     return new ClickhouseExperimentRunStateStoreRepository(
       ClickHouseExperimentRunStateRepository.create({
         clickhouse,

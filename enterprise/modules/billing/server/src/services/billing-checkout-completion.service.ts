@@ -12,9 +12,9 @@ import { AnnualEventsBillingThresholdService } from "./annual-events-billing-thr
 import { BestEffortService } from "./best-effort.service.ts";
 import { BillingSubscriptionLifecycleService } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
-import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port.ts";
-import type { BillingWebhookOrganizationPort } from "../repositories/billing-webhook-organization.repository.ts";
-import type { BillingWebhookSubscriptionPort } from "../repositories/billing-webhook-subscription.repository.ts";
+import type { BillingWebhookHost } from "../ports/billing-webhook-host.port.ts";
+import type { BillingWebhookOrganization } from "../repositories/billing-webhook-organization.repository.ts";
+import type { BillingWebhookSubscription } from "../repositories/billing-webhook-subscription.repository.ts";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import { Temporal } from "@langwatch/time";
 
@@ -31,15 +31,15 @@ export type InviteApprover = {
 };
 
 type BillingCheckoutCompletionOptions = {
-  subscriptionRepository: BillingWebhookSubscriptionPort;
-  organizationRepository: BillingWebhookOrganizationPort;
+  subscriptionRepository: BillingWebhookSubscription;
+  organizationRepository: BillingWebhookOrganization;
   stripe: Stripe;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
   };
   inviteApprover?: InviteApprover;
   getPostHog?: () => PostHog | null;
-  host: BillingWebhookHostPort;
+  host: BillingWebhookHost;
 };
 
 export class BillingCheckoutCompletionService {
@@ -47,11 +47,11 @@ export class BillingCheckoutCompletionService {
     return new BillingCheckoutCompletionService(options);
   }
 
-  private readonly subscriptionRepository: BillingWebhookSubscriptionPort;
-  private readonly organizationRepository: BillingWebhookOrganizationPort;
+  private readonly subscriptionRepository: BillingWebhookSubscription;
+  private readonly organizationRepository: BillingWebhookOrganization;
   private readonly inviteApprover?: InviteApprover;
   private readonly getPostHog?: () => PostHog | null;
-  private readonly host: BillingWebhookHostPort;
+  private readonly host: BillingWebhookHost;
   private readonly bestEffort = BestEffortService.create();
   private readonly annualThreshold: AnnualEventsBillingThresholdService;
   private readonly lifecycle: BillingSubscriptionLifecycleService;

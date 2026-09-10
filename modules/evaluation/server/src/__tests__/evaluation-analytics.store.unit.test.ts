@@ -12,7 +12,7 @@ import {
   type EvaluationAnalyticsRow,
   EvaluationAnalyticsRowProjection,
 } from "../projections/evaluation-analytics-row.projection.ts";
-import { EvaluationAnalyticsAttributePolicy } from "../ports/evaluation.port.ts";
+import { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.infrastructure.ts";
 import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attributes.store.ts";
 
 /**
@@ -23,7 +23,7 @@ import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attribut
 
 const TENANT = "proj-eval-rb";
 const BASE_MS = 1_760_000_000_000;
-class PassthroughAnalyticsAttributePolicy extends EvaluationAnalyticsAttributePolicy {
+class PassthroughAnalyticsAttributePolicy implements EvaluationAnalyticsAttributePolicy {
   trim(attributes: Record<string, string>): Record<string, string> {
     return attributes;
   }

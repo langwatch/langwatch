@@ -5,7 +5,7 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { TraceSpanContentDropPort } from "@langwatch/trace-server";
+import { TraceSpanContentDrop } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceContentDrop } from "../worker-trace-content-drop.composition.ts";
 
@@ -16,7 +16,7 @@ import { createWorkerTraceContentDrop } from "../worker-trace-content-drop.compo
  * process drops content. What has to be true today is that this composition
  * root can honour a customer's `drop` from the two things it already holds —
  * the scoped data-privacy service and the enforcement flag — and that it does
- * so THROUGH the port `RecordSpanCommand` names, because that port is the
+ * so THROUGH the port `EventingRecordSpanAdapter` names, because that port is the
  * whole reason the drop is composable outside the application.
  */
 
@@ -75,7 +75,7 @@ describe("createWorkerTraceContentDrop", () => {
           nativePolicyEnforced: true,
         });
 
-        expect(graph.spanContentDropPort()).toBeInstanceOf(TraceSpanContentDropPort);
+        expect(graph.spanContentDropPort()).toBeInstanceOf(TraceSpanContentDrop);
       });
 
       /** @scenario "The composed path removes a dropped category's content" */

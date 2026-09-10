@@ -1,7 +1,7 @@
 /**
  * The surface a coding-agent activity table is mounted in, faked.
  *
- * The tables read the world through `CodingAgentActivityHostPort`: what the
+ * The tables read the world through `CodingAgentActivityHost`: what the
  * reader may do, what the address says, and where a notice goes. A test that
  * mounts one therefore has to answer that port, and answering it ad hoc per
  * file is how three suites come to disagree about what a viewer is.
@@ -28,7 +28,7 @@ import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
 import {
-  CodingAgentActivityHostPort,
+  CodingAgentActivityHost,
   CodingAgentActivityHostProvider,
   type CodingAgentFailure,
   type CodingAgentNotice,
@@ -54,7 +54,7 @@ export type FakeCodingAgentHostOptions = {
   query?: CodingAgentQuery;
 };
 
-export class FakeCodingAgentActivityHost extends CodingAgentActivityHostPort {
+export class FakeCodingAgentActivityHost extends CodingAgentActivityHost {
   static create(options: FakeCodingAgentHostOptions = {}): FakeCodingAgentActivityHost {
     return new FakeCodingAgentActivityHost({
       options,

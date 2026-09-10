@@ -13,7 +13,7 @@ import { SimulationExecutionRepository } from "../clickhouse/simulation-clickhou
 import { NullSimulationRepository } from "../simulation.repository.ts";
 import { SimulationService } from "../../services/simulation.service.ts";
 
-class RecordingExecutionPort extends SimulationExecutionRepository {
+class RecordingExecution extends SimulationExecutionRepository {
   queue: SimulationQueueRun | undefined;
   async queueRun(input: SimulationQueueRun): Promise<void> {
     this.queue = input;
@@ -33,7 +33,7 @@ describe("SimulationService", () => {
   it("delegates run reads through Simulation's own repository", async () => {
     const service = SimulationService.create(
       new NullSimulationRepository(),
-      new RecordingExecutionPort(),
+      new RecordingExecution(),
     );
 
     await expect(
@@ -45,7 +45,7 @@ describe("SimulationService", () => {
   });
 
   it("validates and dispatches execution through Simulation's port", async () => {
-    const execution = new RecordingExecutionPort();
+    const execution = new RecordingExecution();
     const service = SimulationService.create(new NullSimulationRepository(), execution);
 
     await service.queueRun({

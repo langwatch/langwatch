@@ -14,7 +14,7 @@ import {
   IngestionPullIntent,
   ingestionPullRunIntentSchema,
 } from "../intents/ingestion-pull.intent.ts";
-import type { IngestionPullSchedulePort } from "../ports/ingestion-pull.port.ts";
+import type { IngestionPullScheduler } from "../app/governance.infrastructure.ts";
 import {
   INGESTION_PULL_CONCURRENCY,
   INGESTION_PULL_LEASE_DURATION_MS,
@@ -54,12 +54,12 @@ type ProcessContext = ProcessHandlerContext<IngestionPullIntents>;
 
 export class IngestionPullProcess {
   private constructor(
-    private readonly schedule: IngestionPullSchedulePort,
+    private readonly schedule: IngestionPullScheduler,
     private readonly intent: IngestionPullIntent,
   ) {}
 
   static create(options: {
-    schedule: IngestionPullSchedulePort;
+    schedule: IngestionPullScheduler;
     execution: IngestionPullService;
   }): IngestionPullProcess {
     return new IngestionPullProcess(

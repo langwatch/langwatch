@@ -1,9 +1,9 @@
 import { EventingGithubMaintenanceAdapter } from "@langwatch/github-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** The sweep, so a caller can supply one without a GitHub App or a database. */
-export abstract class WorkerGithubBranchMaintenancePort {
+export abstract class WorkerGithubBranchMaintenance {
   /** Re-asks GitHub about branches whose mapping is due; answers how many. */
   abstract recheckDueBranches(): Promise<number>;
 
@@ -26,10 +26,10 @@ export abstract class WorkerGithubBranchMaintenancePort {
  * the definition's dependency — the whole `GithubService`, an organization
  * service and a project service behind it — for two methods that read neither.
  */
-export class GithubWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class GithubWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     eventing: WorkerEventingRuntime;
-    branchMaintenance: WorkerGithubBranchMaintenancePort;
+    branchMaintenance: WorkerGithubBranchMaintenance;
   }): GithubWorkerFeatureInstaller {
     return new GithubWorkerFeatureInstaller(options.eventing, options.branchMaintenance);
   }
@@ -39,7 +39,7 @@ export class GithubWorkerFeatureInstaller implements WorkerFeatureInstallerPort 
 
   private constructor(
     private readonly eventing: WorkerEventingRuntime,
-    private readonly branchMaintenance: WorkerGithubBranchMaintenancePort,
+    private readonly branchMaintenance: WorkerGithubBranchMaintenance,
   ) {}
 
   async install(): Promise<WorkerFeatureCloser | undefined> {

@@ -27,7 +27,7 @@ import {
   buildExecuteCommand,
   buildExecutionDeps,
   buildMonitor as buildTypedMonitor,
-} from "../ports/__tests__/support/evaluation-execution.fixtures.ts";
+} from "./support/evaluation-execution.fixtures.ts";
 
 const EVALUATOR_SETTINGS = { model: "gpt-5-mini", temperature: 0.7 };
 const MONITOR_PARAMETERS = { model: "gpt-5-mini", temperature: 0.5 };

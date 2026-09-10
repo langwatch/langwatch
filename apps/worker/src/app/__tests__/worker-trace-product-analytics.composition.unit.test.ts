@@ -1,5 +1,5 @@
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { TraceProductAnalyticsPort } from "@langwatch/trace-server";
+import { TraceProductAnalytics } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition.ts";
 
@@ -22,14 +22,14 @@ describe("createWorkerTraceProductAnalytics", () => {
           config: { key: "phc_test", host: "https://eu.i.posthog.com" },
         });
 
-        expect(analytics).toBeInstanceOf(TraceProductAnalyticsPort);
+        expect(analytics).toBeInstanceOf(TraceProductAnalytics);
       });
 
       /** @scenario "A deployment that configured no product analytics records nothing" */
       it("composes a sink on a deployment that named no key rather than none at all", () => {
         const analytics = createWorkerTraceProductAnalytics({ config: {} });
 
-        expect(analytics).toBeInstanceOf(TraceProductAnalyticsPort);
+        expect(analytics).toBeInstanceOf(TraceProductAnalytics);
         expect(() =>
           analytics.record({ userId: "user-1", event: "first_trace_integrated" }),
         ).not.toThrow();

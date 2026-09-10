@@ -5,7 +5,7 @@ export {
 export { automationRepositories } from "./repositories/automation-repositories.registry.ts";
 export type { AutomationRepositories } from "./repositories/automation.repositories.ts";
 export { automationServer } from "./automation.server.ts";
-export { PostgresAutomationGraphDeliveryAdapter } from "./adapters/postgres.automation-graph-delivery.adapter.ts";
+export { PrismaAutomationGraphDeliveryRepository as PostgresAutomationGraphDeliveryAdapter } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
 export { SlackWebhookDeliveryAdapter } from "./adapters/slack-webhook.delivery.adapter.ts";
 export type {
   RenderedSlackMessageRequest,
@@ -33,8 +33,8 @@ export type {
 } from "./adapters/registry.automation-provider.adapter.ts";
 export { AutomationPersistActionService } from "./services/persist-action.service.ts";
 export {
-  AutomationDatasetMapperPort,
-  AutomationPersistActionWriterPort,
+  AutomationDatasetMapper,
+  AutomationPersistActionWriter,
 } from "./ports/automation-persist-action.port.ts";
 export {
   computeScheduledFor,
@@ -72,10 +72,10 @@ export {
 export { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 export { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
 export {
-  AutomationEvaluationQueryClassificationPort,
-  AutomationEvaluationTraceSummaryPort,
-  AutomationEvaluationTriggerFilterPort,
-  AutomationTriggerMatchRecorderPort,
+  AutomationEvaluationQueryClassification,
+  AutomationEvaluationTraceSummary,
+  AutomationEvaluationTriggerFilter,
+  AutomationTriggerMatchRecorder,
 } from "./ports/automation-evaluation-subscriber.port.ts";
 export type {
   LogOverflowIntent,
@@ -97,22 +97,22 @@ export type {
   PersistCapDecision,
   PersistCapDependencies,
   ReadPersistCapCountsInput,
-  AutomationPersistCapRedisPort,
+  AutomationPersistCapRedis,
 } from "./services/persist-cap.service.ts";
-export { AutomationEmailCapStorePort } from "./ports/email-cap.port.ts";
+export { AutomationEmailCapStore } from "./ports/email-cap.port.ts";
 export {
-  AutomationGraphNotifierPort,
-  AutomationLoggerPort,
-  AutomationHeartbeatPort,
-  AutomationSlackBotTokenDecryptorPort,
-  AutomationDispatchErrorPort,
+  AutomationGraphNotifier,
+  AutomationLogger,
+  AutomationHeartbeat,
+  AutomationSlackBotTokenDecryptor,
+  AutomationDispatchError,
 } from "./ports/automation-graph.port.ts";
 export type {
   GraphAlertDispatchInput,
   GraphAlertDispatchResult,
 } from "./ports/automation-graph.port.ts";
-export { AutomationGraphDeliveryPort } from "./ports/automation-graph-delivery.port.ts";
-export { AutomationRunawayPort, type ClaimLease } from "./ports/automation-runaway.port.ts";
+export { AutomationGraphDelivery } from "./ports/automation-graph-delivery.port.ts";
+export { AutomationRunaway, type ClaimLease } from "./ports/automation-runaway.port.ts";
 /**
  * The containment POLICY behind that port.
  */
@@ -123,26 +123,26 @@ export {
   RUNAWAY_TRAFFIC_SHARE,
   RunawayContainmentService,
 } from "./services/runaway-containment.service.ts";
-export { AutomationNotificationDeliveryPort } from "./ports/automation-notification-delivery.port.ts";
+export { AutomationNotificationDelivery } from "./ports/automation-notification-delivery.port.ts";
 export {
-  AutomationSlackProviderPort,
-  AutomationWebhookProviderPort,
+  AutomationSlackProvider,
+  AutomationWebhookProvider,
   type AutomationWebhookStoredParams,
 } from "./ports/automation-provider.port.ts";
 export {
-  AutomationSettlementFilterEvaluatorPort,
-  AutomationSettlementMatchConfirmationPort,
-  AutomationSettlementExecutorPort,
-  AutomationSettlementObservabilityPort,
+  AutomationSettlementFilterEvaluator,
+  AutomationSettlementMatchConfirmation,
+  AutomationSettlementExecutor,
+  AutomationSettlementObservability,
 } from "./ports/automation-settlement.port.ts";
-export { AutomationSettlementLedgerPort } from "./ports/automation-settlement-ledger.port.ts";
+export { AutomationSettlementLedger } from "./ports/automation-settlement-ledger.port.ts";
 export {
-  AutomationSettlementEvaluationReaderPort,
-  AutomationSettlementTraceReaderPort,
+  AutomationSettlementEvaluationReader,
+  AutomationSettlementTraceReader,
   AutomationTraceRecordUnavailableError,
 } from "./ports/automation-settlement-read.port.ts";
 export {
-  AutomationSettlementBreachPort,
+  AutomationSettlementBreach,
   type AutomationSettlementPersistCap,
 } from "./ports/automation-settlement-ledger.port.ts";
 export {
@@ -184,16 +184,16 @@ export {
 } from "./services/automation-trace-trigger-catalogue.service.ts";
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service.ts";
 export { GraphAlertDispatchService } from "./services/graph-alert-dispatch.service.ts";
-export { AutomationClockPort } from "./ports/automation-clock.port.ts";
+export { AutomationClock } from "./ports/automation-clock.port.ts";
 export {
-  AutomationGraphActivityPort,
+  AutomationGraphActivity,
   AutomationProjectIdentityPort,
 } from "./ports/automation-graph-activity.port.ts";
 export {
-  PostgresAutomationGraphActivityAdapter,
+  PrismaAutomationGraphActivityRepository as PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,
-} from "./adapters/postgres.automation-graph-activity.adapter.ts";
-export { AutomationTraceTriggerCataloguePort } from "./ports/automation-trace-trigger-catalogue.port.ts";
+} from "./repositories/prisma/prisma.automation-graph-activity.repository.ts";
+export { AutomationTraceTriggerCatalogue } from "./ports/automation-trace-trigger-catalogue.port.ts";
 export {
   PostgresAutomationTraceTriggerCatalogueAdapter,
   type AutomationTraceTriggerCatalogueDatabase,
@@ -204,20 +204,20 @@ export { UnsubscribeTokenService } from "./services/unsubscribe-token.service.ts
 export {
   TEST_FIRE_TRIGGER_ID_SENTINEL,
   TriggerNoReplyService,
-  TriggerNoReplyWarningPort,
+  TriggerNoReplyWarning,
 } from "./services/trigger-no-reply.service.ts";
-export { AutomationIntentRetentionPort } from "./ports/automation-intent-retention.port.ts";
-export { AutomationScheduledIntentPort } from "./ports/automation-scheduled-intent.port.ts";
+export { AutomationIntentRetention } from "./ports/automation-intent-retention.port.ts";
+export { AutomationScheduledIntent } from "./ports/automation-scheduled-intent.port.ts";
 export {
-  AutomationTestFirePort,
+  AutomationTestFire,
   type TestFireEmail,
   type TestFireSlackBot,
   type TestFireSlackWebhook,
   type TestFireWebhook,
 } from "./ports/automation-test-fire.port.ts";
-export { SchedulerWakePort } from "./ports/scheduler-wake.port.ts";
+export { SchedulerWake } from "./ports/scheduler-wake.port.ts";
 export {
-  UnsubscribeTokenVerifierPort,
+  UnsubscribeTokenVerifier,
   type UnsubscribeTokenPayload,
 } from "./ports/unsubscribe-token.port.ts";
 export { ScheduledJobStorePort, type ScheduledJobRecord } from "./ports/scheduled-jobs.port.ts";

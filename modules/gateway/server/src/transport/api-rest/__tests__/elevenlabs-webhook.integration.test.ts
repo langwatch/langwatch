@@ -21,8 +21,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/runtime-composition";
 
 import { ModelCatalogGatewaySpendRatingAdapter } from "../../../adapters/model-catalog.gateway-spend-rating.adapter.ts";
-import { GatewayModelProviderCredentialsPort } from "../../../ports/gateway-model-provider-credentials.port.ts";
-import { GatewaySpendConfirmationPort } from "../../../ports/gateway-spend-confirmation.port.ts";
+import { GatewayModelProviderCredentials } from "../../../app/gateway.infrastructure.ts";
+import { GatewaySpendConfirmation } from "../../../app/gateway.infrastructure.ts";
 import type { ConfirmSpendCommandData } from "../../../processes/gateway-spend-commands.process.ts";
 import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../../services/gateway-elevenlabs-credential.service.ts";
 import {
@@ -57,7 +57,7 @@ function database(): PrismaClient {
 /** Recorded so a confirmation can be asserted without the whole spend spine. */
 const sentConfirmations: ConfirmSpendCommandData[] = [];
 
-class RecordingSpendConfirmation extends GatewaySpendConfirmationPort {
+class RecordingSpendConfirmation implements GatewaySpendConfirmation {
   async confirmSpend(data: ConfirmSpendCommandData): Promise<void> {
     sentConfirmations.push(data);
   }
@@ -68,7 +68,7 @@ class RecordingSpendConfirmation extends GatewaySpendConfirmationPort {
  * back is the plaintext key map. The row below stores that map as plain JSON,
  * so the port here is the identity the encryption would have undone.
  */
-class PlainCustomKeys extends GatewayModelProviderCredentialsPort {
+class PlainCustomKeys implements GatewayModelProviderCredentials {
   readCustomKeys(stored: unknown): Record<string, unknown> {
     return typeof stored === "string" ? JSON.parse(stored) : {};
   }

@@ -22,7 +22,7 @@ import {
   type LLMConfig,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import { WorkflowStudioDslPort } from "../ports/workflow.port.ts";
+import { WorkflowStudioDsl } from "../app/workflow.app.ts";
 
 /**
  * The terminal fallback model, the registry flagship.
@@ -46,16 +46,14 @@ const hasModel = (value: unknown): boolean =>
   (value as LLMConfig).model !== "";
 
 /** Folds local node configuration in, then materialises every missing model. */
-export class ModelProviderWorkflowStudioDslAdapter extends WorkflowStudioDslPort {
+export class ModelProviderWorkflowStudioDslAdapter implements WorkflowStudioDsl {
   static create(options: {
     modelProviders: ModelProviderApi;
   }): ModelProviderWorkflowStudioDslAdapter {
     return new ModelProviderWorkflowStudioDslAdapter(options);
   }
 
-  private constructor(private readonly options: { modelProviders: ModelProviderApi }) {
-    super();
-  }
+  private constructor(private readonly options: { modelProviders: ModelProviderApi }) {}
 
   async prepare(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow> {
     // The cast is the platform app's and stays: the Studio schema types nodes

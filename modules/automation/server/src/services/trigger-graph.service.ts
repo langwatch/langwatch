@@ -10,14 +10,14 @@ import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-s
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type {
-  AutomationDispatchErrorPort,
-  AutomationGraphNotifierPort,
-  AutomationLoggerPort,
-  AutomationHeartbeatPort,
-  AutomationSlackBotTokenDecryptorPort,
-} from "../ports/automation-graph.port.ts";
-import { AutomationRunawayPort } from "../ports/automation-runaway.port.ts";
-import { AutomationClockPort } from "../ports/automation-clock.port.ts";
+  AutomationDispatchError,
+  AutomationGraphNotifier,
+  AutomationLogger,
+  AutomationHeartbeat,
+  AutomationSlackBotTokenDecryptor,
+} from "../app/automation.infrastructure.ts";
+import { AutomationRunaway } from "../ports/automation-runaway.port.ts";
+import { AutomationClock } from "../app/automation.infrastructure.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
 import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service.ts";
 import { RunawayContainmentService } from "./runaway-containment.service.ts";
@@ -37,13 +37,13 @@ export class AutomationGraphService {
     projects: ProjectApi;
     analytics: AnalyticsService;
     triggerSent: GraphTriggerSentRepository;
-    notifier: AutomationGraphNotifierPort;
-    logger: AutomationLoggerPort;
-    slackTokens: AutomationSlackBotTokenDecryptorPort;
-    dispatchErrors: AutomationDispatchErrorPort;
-    heartbeat: AutomationHeartbeatPort;
-    runaway: AutomationRunawayPort;
-    clock: AutomationClockPort;
+    notifier: AutomationGraphNotifier;
+    logger: AutomationLogger;
+    slackTokens: AutomationSlackBotTokenDecryptor;
+    dispatchErrors: AutomationDispatchError;
+    heartbeat: AutomationHeartbeat;
+    runaway: AutomationRunaway;
+    clock: AutomationClock;
     baseHost: string;
   }): AutomationGraphService {
     return new AutomationGraphService(

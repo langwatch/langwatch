@@ -8,13 +8,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository.ts";
 import type {
-  BetterAuthAnnouncementsPort,
-  BetterAuthFederationPort,
-  BetterAuthPendingInvitePort,
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+  BetterAuthPendingInvite,
 } from "../better-auth.collaborators.ts";
 import { afterUserCreate, tryBeforeAccountCreate } from "../better-auth-hooks.api.ts";
 
-class LicensedFederationPort implements BetterAuthFederationPort {
+class LicensedFederation implements BetterAuthFederation {
   federationCapable(): boolean {
     return true;
   }
@@ -26,7 +26,7 @@ class LicensedFederationPort implements BetterAuthFederationPort {
   }
 }
 
-class NoInvitesPort implements BetterAuthPendingInvitePort {
+class NoInvites implements BetterAuthPendingInvite {
   tryFindPendingByOrganizationAndEmail(): Promise<null> {
     return Promise.resolve(null);
   }
@@ -35,7 +35,7 @@ class NoInvitesPort implements BetterAuthPendingInvitePort {
   }
 }
 
-class RecordingAnnouncementsPort implements BetterAuthAnnouncementsPort {
+class RecordingAnnouncements implements BetterAuthAnnouncements {
   readonly trackServerEvent = vi.fn();
   readonly reportError = vi.fn();
   readonly announceSignup = vi.fn();
@@ -80,9 +80,9 @@ describe("signing in through a domain-matched organization's identity provider",
         repo,
         user: { id: "user_new", email: "new@acme.com", name: "New User" },
         collaborators: {
-          federation: new LicensedFederationPort(),
-          invites: new NoInvitesPort(),
-          announcements: new RecordingAnnouncementsPort(),
+          federation: new LicensedFederation(),
+          invites: new NoInvites(),
+          announcements: new RecordingAnnouncements(),
           authzGrants: { attachBindings } as never,
         },
       });
@@ -105,7 +105,7 @@ describe("signing in through a domain-matched organization's identity provider",
       await tryBeforeAccountCreate({
         repo,
         account: { userId: "user_1", providerId: "google", accountId: "google|123" },
-        federation: new LicensedFederationPort(),
+        federation: new LicensedFederation(),
       });
 
       expect(repo.flagPendingSsoSetup).not.toHaveBeenCalled();
@@ -123,7 +123,7 @@ describe("signing in through a domain-matched organization's identity provider",
       await tryBeforeAccountCreate({
         repo,
         account: { userId: "user_1", providerId: "google", accountId: "google|123" },
-        federation: new LicensedFederationPort(),
+        federation: new LicensedFederation(),
       });
 
       expect(repo.flagPendingSsoSetup).toHaveBeenCalledWith({ userId: "user_1" });

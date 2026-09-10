@@ -21,8 +21,8 @@ import {
   PostgresSuiteRepositories,
   SuiteApp,
   SuiteExecutionService,
-  SuiteRunCommandsPort,
-  SuiteRunIdPort,
+  SuiteRunCommands,
+  SuiteRunId,
   type QueueSimulationRunCommandData,
 } from "@langwatch/suite-server";
 import { cleanupTestRows } from "@langwatch/test-harness";
@@ -69,14 +69,14 @@ class TestSecretCipher implements ScenarioSecretCipher {
   }
 }
 
-class RunIds extends SuiteRunIdPort {
+class RunIds implements SuiteRunId {
   next(): string {
     return `scenario_run_${randomUUID()}`;
   }
 }
 
 /** Records the durable commands the execution service would have appended. */
-class CapturingCommands extends SuiteRunCommandsPort {
+class CapturingCommands implements SuiteRunCommands {
   readonly queued: QueueSimulationRunCommandData[] = [];
 
   async startSuiteRun(_data: StartSuiteRunCommandData): Promise<void> {}

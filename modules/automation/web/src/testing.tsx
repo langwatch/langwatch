@@ -2,7 +2,7 @@
  * The application an automations surface is mounted in, faked.
  *
  * Every screen, drawer and delivery provider in this package reads the world
- * through `AutomationHostPort`: which project the page is about, what the
+ * through `AutomationHost`: which project the page is about, what the
  * reader may do, which flags are on, what the address says, and where a success
  * or a failure is announced. A test that mounts one therefore has to answer
  * that port, and answering it ad hoc per file is how a dozen suites come to
@@ -39,7 +39,7 @@ import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
 import type { AutomationToast, AutomationToaster } from "./behavior/automation-feedback.ts";
 import {
-  AutomationHostPort,
+  AutomationHost,
   AutomationHostProvider,
   type AutomationDatasetCreation,
   type AutomationDrawer,
@@ -126,7 +126,7 @@ export type FakeAutomationHostOptions = {
 
 const DEFAULT_APP_BASE_URL = "https://app.langwatch.ai";
 
-export class FakeAutomationHost extends AutomationHostPort {
+export class FakeAutomationHost extends AutomationHost {
   static create(options: FakeAutomationHostOptions = {}): FakeAutomationHost {
     return new FakeAutomationHost({
       options,

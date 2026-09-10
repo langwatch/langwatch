@@ -7,7 +7,7 @@
  * currency its invoices settle in, and the trial licence a paid subscription
  * retires.
  */
-export abstract class BillingWebhookOrganizationPort {
+export abstract class BillingWebhookOrganization {
   abstract tryFindByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string } | null>;
 
   abstract tryFindNameById(organizationId: string): Promise<{ id: string; name: string } | null>;

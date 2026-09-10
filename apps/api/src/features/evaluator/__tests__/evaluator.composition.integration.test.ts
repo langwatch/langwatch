@@ -16,7 +16,7 @@ import { createApp } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
-import type { WorkflowApp, WorkflowNlpRuntimePort, WorkflowService,} from "@langwatch/workflow-server";
+import type { WorkflowApp, WorkflowNlpRuntime, WorkflowService,} from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthzService } from "@langwatch/authz-contract";
@@ -245,7 +245,7 @@ describe("given a workflow evaluator whose graph has never been saved", () => {
       infrastructure: testInfrastructure(prisma as unknown as PrismaClient),
       peers: {
         workflows: createApiFixture<WorkflowService>(),
-        nlpRuntime: createApiFixture<WorkflowNlpRuntimePort>(),
+        nlpRuntime: createApiFixture<WorkflowNlpRuntime>(),
         workflowApp: () => createApiFixture<WorkflowApp>(),
         modelProviders: createApiFixture<ModelProviderApi>(),
         permissions: createApiFixture<AuthzApi>({ hasPermission: async () => true }),

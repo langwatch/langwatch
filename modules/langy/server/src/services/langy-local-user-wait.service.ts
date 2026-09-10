@@ -10,7 +10,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import {
   CALL_POLL_HOLD_MS,
   LIVE_STREAM_KEEPALIVE_MS,

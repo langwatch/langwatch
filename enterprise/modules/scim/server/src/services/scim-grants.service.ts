@@ -22,7 +22,7 @@ import {
   authzBindingIdentityKey,
 } from "@langwatch/authz-contract";
 import { randomUUID } from "node:crypto";
-import type { ScimGrantBindingScope, ScimGrantRepositoryPort } from "../repositories/scim.repository.ts";
+import type { ScimGrantBindingScope, ScimGrantRepository } from "../repositories/scim.repository.ts";
 
 /** What the directory says this principal should hold, minus the ids. */
 export type DesiredScimGrant = {
@@ -96,12 +96,12 @@ function keyOfDesired(grant: DesiredScimGrant): string {
  */
 export class ScimGrantsService {
   private constructor(
-    private readonly repository: ScimGrantRepositoryPort,
+    private readonly repository: ScimGrantRepository,
     private readonly grants: AuthzGrantsService,
   ) {}
 
   static create(options: {
-    repository: ScimGrantRepositoryPort;
+    repository: ScimGrantRepository;
     grants: AuthzGrantsService;
   }): ScimGrantsService {
     return new ScimGrantsService(options.repository, options.grants);

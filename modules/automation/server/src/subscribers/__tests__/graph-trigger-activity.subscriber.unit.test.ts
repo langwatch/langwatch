@@ -20,7 +20,7 @@ import {
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
 import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
-import { AutomationGraphActivityPort } from "../../ports/automation-graph-activity.port.ts";
+import { AutomationGraphActivity } from "../../app/automation.infrastructure.ts";
 import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
@@ -38,14 +38,13 @@ import { createGraphTriggerActivityHandler } from "../graph-trigger-activity.sub
 const context = { tenantId: "project-1" } as never;
 const event = { occurredAt: Date.now() } as never;
 
-class ScriptedActivity extends AutomationGraphActivityPort {
+class ScriptedActivity implements AutomationGraphActivity {
   readonly evaluated: string[] = [];
 
   constructor(
     private readonly triggerIds: string[],
     private readonly failing: string,
   ) {
-    super();
   }
 
   async getActiveGraphTriggersForProject(): Promise<TriggerSummary[]> {

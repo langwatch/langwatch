@@ -1,19 +1,19 @@
 import type { BrowserSessionApi, VerifiedBrowserSession } from "@langwatch/auth-contract";
-import type { SignUpVerificationPort } from "@langwatch/auth-server";
+import type { SignUpVerification } from "@langwatch/auth-server";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import type { IdentityEventingPort } from "@langwatch/identity-server";
+import type { IdentityEventing } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
 import type { ApiBrowserSessionConfig } from "../platform/config/api.config.ts";
-import { ApiAuthenticationPort } from "../api-request.policy.ts";
+import { ApiAuthentication } from "../api-request.policy.ts";
 import type { ApiTrpcSession } from "../app-trpc/app-trpc.context.ts";
 import {
   announceApiBetterAuthAbsences,
   composeApiBetterAuth,
-  type ApiPasswordResetMailPort,
+  type ApiPasswordResetMail,
 } from "./api-better-auth.composition.ts";
 
 const logger = createLogger("langwatch:api:auth");
@@ -37,7 +37,7 @@ export type ApiComposedBetterAuth = Readonly<{
 }>;
 
 /** The Better Auth request boundary required by the API process. */
-export abstract class ApiBrowserSessionTransportPort {
+export abstract class ApiBrowserSessionTransport {
   /** A missing or unusable Better Auth session resolves to null. */
   abstract tryResolveVerifiedSession(request: Request): Promise<VerifiedBrowserSession | null>;
 }
@@ -58,7 +58,7 @@ function presentedSessionCookies(request: Request): string[] {
  * Adapts Better Auth's verified browser session lookup to the API process. Two failures
  * are told apart here, and keeping them apart is the point.
  */
-export class BetterAuthBrowserSessionTransportAdapter extends ApiBrowserSessionTransportPort {
+export class BetterAuthBrowserSessionTransportAdapter extends ApiBrowserSessionTransport {
   static create(transport: BetterAuthSessionLookup): BetterAuthBrowserSessionTransportAdapter {
     return new BetterAuthBrowserSessionTransportAdapter(transport);
   }
@@ -90,7 +90,7 @@ export class BetterAuthBrowserSessionTransportAdapter extends ApiBrowserSessionT
 
 export type ApiAuthSessionDependencies = Readonly<{
   auth: BrowserSessionApi;
-  sessions: ApiBrowserSessionTransportPort;
+  sessions: ApiBrowserSessionTransport;
   /**
    * The user directory the Auth service already resolves a signed-in person
    * through, in the shape SCIM and the back office still name it.
@@ -101,12 +101,12 @@ export type ApiAuthSessionDependencies = Readonly<{
 /**
  * Required process composition for browser-session authentication.
  */
-export abstract class ApiAuthSessionCompositionPort {
+export abstract class ApiAuthSessionComposition {
   abstract compose(): ApiAuthSessionDependencies;
 }
 
 /** Reports the composition decisions a missing collaborator would otherwise hide. */
-export abstract class ApiAuthAbsenceReportPort {
+export abstract class ApiAuthAbsenceReport {
   abstract absent(reason: "no-database" | "no-tenancy" | "no-browser-session-transport"): void;
 }
 
@@ -132,7 +132,7 @@ export type ApiAuthCompositionOptions = {
   /**
    * A host's own Better Auth request boundary, where it has one.
    */
-  browserSessions?: ApiBrowserSessionTransportPort | undefined;
+  browserSessions?: ApiBrowserSessionTransport | undefined;
   /**
    * The deployment's browser-session identity, read from its environment. Without it —
    * and without an injected transport — there is no way to verify a browser caller, and
@@ -146,15 +146,15 @@ export type ApiAuthCompositionOptions = {
   /** The grant ledger an SSO domain auto-join writes its membership through. */
   authzGrants?: AuthzGrantsService | undefined;
   /** The gateway a password-reset link leaves through. */
-  mail?: ApiPasswordResetMailPort | undefined;
+  mail?: ApiPasswordResetMail | undefined;
   /** Sign-up's address confirmation, for the passkey ceremony. */
-  signUpVerification?: SignUpVerificationPort | undefined;
+  signUpVerification?: SignUpVerification | undefined;
   /**
    * The identity pipeline this process produces commands on, where it registered one.
    * The ONE registration, passed through rather than re-composed: Better Auth's storage
    * and its account ceremonies append to the same log every other identity write does.
    */
-  identityEventing?: IdentityEventingPort | undefined;
+  identityEventing?: IdentityEventing | undefined;
   /**
    * The process's Redis, where it has one. Better Auth caches live sessions there under
    * its own key prefix, so revoking a session has to clear that cache as well as the row.
@@ -168,7 +168,7 @@ export type ApiAuthCompositionOptions = {
  * The API process's own Auth service, composed rather than received — and the one half of
  * it that is still received.
  */
-export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
+export class ApiAuthComposition extends ApiAuthSessionComposition {
   /**
    * Composes the Auth graph only when this process holds everything it reads through.
    */
@@ -176,7 +176,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
     options: Omit<ApiAuthCompositionOptions, "database" | "organizations"> & {
       database: PrismaConnection | undefined;
       organizations: OrganizationService | undefined;
-      report?: ApiAuthAbsenceReportPort;
+      report?: ApiAuthAbsenceReport;
     },
   ): ApiAuthComposition | undefined {
     if (!options.database) {
@@ -278,7 +278,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
 }
 
 /** Converts one verified browser session into the request actor vocabulary. */
-export class AuthSessionApiAuthenticationAdapter extends ApiAuthenticationPort {
+export class AuthSessionApiAuthenticationAdapter extends ApiAuthentication {
   /**
    * Narrower than {@link ApiAuthSessionDependencies} on purpose: turning a verified
    * session into an actor needs the Auth service and the transport and nothing else.
@@ -291,7 +291,7 @@ export class AuthSessionApiAuthenticationAdapter extends ApiAuthenticationPort {
 
   private constructor(
     private readonly auth: BrowserSessionApi,
-    private readonly sessions: ApiBrowserSessionTransportPort,
+    private readonly sessions: ApiBrowserSessionTransport,
   ) {
     super();
   }

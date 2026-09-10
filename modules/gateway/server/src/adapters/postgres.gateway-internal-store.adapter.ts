@@ -5,7 +5,7 @@ import type { GatewayBudget, GatewayBudgetBucketBoundary } from "@langwatch/gate
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { GatewayInternalStorePort } from "../ports/gateway-internal-store.port.ts";
+import { GatewayInternalStore } from "../ports/gateway-internal-store.port.ts";
 
 import { gatewayRoutingPolicySelect } from "../ports/gateway-virtual-key.port.ts";
 
@@ -14,7 +14,7 @@ const logger = createLogger("langwatch:gateway:internal-store");
 /**
  * Every query below is transcribed from the route handler it replaced, include/select clauses intact — those clauses ARE the contract (e.g. the config read's routingPolicy selection carries model aliases and deny rules; losing it would serve a bundle with neither).
  */
-export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStorePort {
+export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStore {
   static create(options: { database: PrismaClient }): PrismaGatewayInternalStoreAdapter {
     return new PrismaGatewayInternalStoreAdapter(options.database);
   }

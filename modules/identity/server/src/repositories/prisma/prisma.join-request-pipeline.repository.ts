@@ -1,5 +1,5 @@
 import { JoinRequestGuardsService } from "../../services/join-request-guards.service.ts";
-import type { JoinRequestMailPort } from "../../app/identity.infrastructure.ts";
+import type { JoinRequestMail } from "../../app/identity.infrastructure.ts";
 import { JoinRequestService } from "../../services/join-request.service.ts";
 import { PostgresJoinRequestNotificationAdapter } from "../../repositories/prisma/prisma.join-request-notification.repository.ts";
 import type { EventSourcing } from "@langwatch/eventing";
@@ -29,7 +29,7 @@ export type PostgresJoinRequestPipelineOptions = {
    */
   eventSourcing: EventSourcing;
   /** How the reminder and the lapse notice are rendered and sent. */
-  mail: JoinRequestMailPort;
+  mail: JoinRequestMail;
 };
 
 /**

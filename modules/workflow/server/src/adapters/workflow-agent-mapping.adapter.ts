@@ -3,17 +3,16 @@ import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { getMappingSurfaceInputs, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { z } from "zod";
-import { WorkflowAgentMappingPort } from "../ports/workflow.port.ts";
+import { WorkflowAgentMapping } from "../app/workflow.app.ts";
 
 const identifiedFieldSchema = z.object({ identifier: z.string() });
 const mappingsSchema = z.record(z.string(), z.unknown());
 
-export class WorkflowAgentMappingAdapter extends WorkflowAgentMappingPort {
+export class WorkflowAgentMappingAdapter implements WorkflowAgentMapping {
   #agents: AgentApi;
   #logger: Logger;
 
   private constructor(agents: AgentApi, logger: Logger) {
-    super();
     this.#agents = agents;
     this.#logger = logger;
   }

@@ -9,7 +9,7 @@ export type ProcessResult = Readonly<{
  * Running a command. The 1Password adapter shells out to the `op` CLI through
  * this port, so a test injects a fake instead of requiring the binary.
  */
-export abstract class ProcessRunnerPort {
+export abstract class ProcessRunner {
   abstract run({
     command,
     args,

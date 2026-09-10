@@ -9,10 +9,10 @@ import { TRPCClientError } from "@trpc/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UiFailureHost } from "../../../../behavior/ui-feature";
-import { UiRpcPort, type UiRpcSubscription } from "../../../../behavior/ui-rpc";
+import { UiRpc, type UiRpcSubscription } from "../../../../behavior/ui-rpc";
 import { modelProviderFailures } from "../model-provider-failures";
 
-class RecordingRpc extends UiRpcPort {
+class RecordingRpc extends UiRpc {
   readonly mutations: { path: string; input: unknown }[] = [];
 
   query(): Promise<unknown> {
@@ -35,7 +35,7 @@ function failedCall(cause: Record<string, unknown>): Error {
   return error;
 }
 
-function hostWith(rpc: UiRpcPort): { host: UiFailureHost; navigate: ReturnType<typeof vi.fn> } {
+function hostWith(rpc: UiRpc): { host: UiFailureHost; navigate: ReturnType<typeof vi.fn> } {
   const navigate = vi.fn();
   return { host: { rpc, navigate }, navigate };
 }

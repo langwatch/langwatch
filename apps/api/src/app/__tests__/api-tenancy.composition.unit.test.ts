@@ -8,7 +8,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiOrganizationSettingsSecretAdapter } from "../api-organization-settings-secret.adapter.ts";
-import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "../api-tenancy.composition.ts";
+import { ApiTenancyAbsenceReport, ApiTenancyComposition } from "../api-tenancy.composition.ts";
 
 const ENCRYPTION_KEY = "0f".repeat(32);
 const PEPPER = "  a-pepper-with-surrounding-space  ";
@@ -39,7 +39,7 @@ function encryption() {
   return AesGcmSecretEncryptionAdapter.create({ key: ENCRYPTION_KEY });
 }
 
-class RecordingAbsence extends ApiTenancyAbsenceReportPort {
+class RecordingAbsence extends ApiTenancyAbsenceReport {
   readonly reasons: string[] = [];
 
   absent(reason: "no-database" | "no-authz" | "no-pepper"): void {

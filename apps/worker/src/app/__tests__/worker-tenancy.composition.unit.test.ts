@@ -1,7 +1,7 @@
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { AuthzGrantsCommandDispatcherPort } from "@langwatch/authz-server";
+import type { AuthzGrantsCommandDispatcher } from "@langwatch/authz-server";
 import type {
-  DataRetentionDirectoryPort,
+  DataRetentionDirectoryReader,
   DataRetentionPlanPort,
 } from "@langwatch/data-retention-server";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -11,7 +11,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { ProjectInfrastructure } from "@langwatch/project-server";
 import { createApp } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicClusteringSchedulePort } from "@langwatch/topic-server";
+import type { TopicClusteringScheduleReader } from "@langwatch/topic-server";
 import { UserApi } from "@langwatch/user-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
@@ -19,7 +19,7 @@ import { createWorkerTenancyInfrastructure } from "../worker-tenancy-infrastruct
 import { installWorkerTenancy } from "../worker-tenancy.composition.ts";
 import {
   tryCreateWorkerModelProviders,
-  WorkerModelProviderAbsenceReportPort,
+  WorkerModelProviderAbsenceReport,
 } from "../worker-model-provider.composition.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
@@ -33,7 +33,7 @@ afterEach(async () => {
   for (const runtime of runtimes.splice(0)) await runtime.stop();
 });
 
-class RecordingModelProviderAbsence extends WorkerModelProviderAbsenceReportPort {
+class RecordingModelProviderAbsence extends WorkerModelProviderAbsenceReport {
   readonly gateway: Array<"no-encryption" | "no-tenancy"> = [];
   withoutModelGateway(reason: "no-encryption" | "no-tenancy"): void {
     this.gateway.push(reason);
@@ -66,7 +66,7 @@ function connection() {
 }
 
 async function compose(
-  options: { includeUser?: boolean; dispatcher?: AuthzGrantsCommandDispatcherPort } = {},
+  options: { includeUser?: boolean; dispatcher?: AuthzGrantsCommandDispatcher } = {},
 ) {
   const config = resolveWorkerConfig({ CREDENTIALS_SECRET: "0".repeat(64) });
   const database = connection();
@@ -79,11 +79,11 @@ async function compose(
     config,
     redis: null,
     plans: createApiFixture<PlanProvider>(),
-    authzDispatcher: options.dispatcher ?? createApiFixture<AuthzGrantsCommandDispatcherPort>(),
+    authzDispatcher: options.dispatcher ?? createApiFixture<AuthzGrantsCommandDispatcher>(),
     topicClustering: createApiFixture<ProjectInfrastructure["topicClustering"]>(),
-    topicSchedule: createApiFixture<TopicClusteringSchedulePort>(),
+    topicSchedule: createApiFixture<TopicClusteringScheduleReader>(),
     dataRetention: {
-      directory: createApiFixture<DataRetentionDirectoryPort>({}, "retention directory"),
+      directory: createApiFixture<DataRetentionDirectoryReader>({}, "retention directory"),
       plans: createApiFixture<DataRetentionPlanPort>({}, "retention plans"),
       resolveClickHouseClient: null,
     },
@@ -126,10 +126,10 @@ describe("installWorkerTenancy", () => {
   it("uses the supplied grant dispatcher and propagates its failure", async () => {
     const failure = new Error("Grant dispatcher unavailable");
     const commands = vi
-      .fn<AuthzGrantsCommandDispatcherPort["commands"]>()
+      .fn<AuthzGrantsCommandDispatcher["commands"]>()
       .mockRejectedValue(failure);
     const { tenancy } = await compose({
-      dispatcher: createApiFixture<AuthzGrantsCommandDispatcherPort>({ commands }),
+      dispatcher: createApiFixture<AuthzGrantsCommandDispatcher>({ commands }),
     });
 
     await expect(

@@ -17,13 +17,13 @@ export {
 export {
   WorkerInfrastructureAdapter,
   WorkerStoredObjectStorageFactory,
-  WorkerStorageFactoryPort,
+  WorkerStorageFactory,
   type WorkerInfrastructureAdapterOptions,
   type WorkerStorageLease,
 } from "./platform/infrastructure/worker-foundation.adapter.ts";
 export {
-  WorkerAzureStorageFactoryPort,
-  WorkerProjectS3SourcePort,
+  WorkerAzureStorageFactory,
+  WorkerProjectS3Source,
   WorkerStoredObjectStorageRuntimeFactory,
   type WorkerProjectS3Target,
   type WorkerS3Credentials,
@@ -75,7 +75,7 @@ export {
 } from "./features/suite/suite-worker-feature.installer.ts";
 export {
   type WorkerFeatureCloser,
-  type WorkerFeatureInstallerPort,
+  type WorkerFeatureInstaller,
 } from "./features/worker-feature.installer.ts";
 export {
   resolveWorkerConfig,
@@ -93,9 +93,9 @@ export {
   type WorkerEventingProductionOptions,
 } from "./platform/eventing/worker-eventing.runtime.ts";
 export {
-  WorkerHandlePort,
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerHandle,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "./platform/lifecycle/worker-runtime.port.ts";
 export { WorkerRuntime } from "./platform/lifecycle/worker.runtime.ts";
 export {
@@ -132,13 +132,13 @@ export {
   bootWorkerMain,
   WorkerMain,
   type WorkerMainOptions,
-  type WorkerMainProcessPort,
+  type WorkerMainProcess,
   type WorkerMainSignals,
 } from "./worker.main.ts";
 export {
   bootWorkerExecutable,
   WorkerExecutable,
-  WorkerExecutableCompositionPort,
+  WorkerExecutableComposition,
   type WorkerExecutableHost,
   type WorkerExecutableOptions,
 } from "./worker.executable.ts";

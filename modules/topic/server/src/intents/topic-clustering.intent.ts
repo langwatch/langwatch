@@ -218,7 +218,7 @@ export interface TopicClusteringPageOutcome {
 }
 
 /** The domain function one clustering intent executes. */
-export interface TopicClusteringRunPort {
+export interface TopicClusteringRun {
   runClusteringPage(params: {
     projectId: string;
     searchAfter: [number, string] | null;
@@ -270,7 +270,7 @@ export type TopicClusteringErrorClassifier = (error: unknown) => ClassifiedClust
  * The page-execution metrics the executor reports (ADR-054). The concrete
  * counters live in the app's metrics module; composition wires them in.
  */
-export interface TopicClusteringMetricsPort {
+export interface TopicClusteringMetrics {
   incrementPageTotal(params: {
     outcome: "completed" | "skipped" | "failed_customer" | "failed_retryable" | "failed_final";
   }): void;
@@ -278,7 +278,7 @@ export interface TopicClusteringMetricsPort {
 }
 
 export interface TopicClusteringDispatchDeps {
-  runPort: TopicClusteringRunPort;
+  runPort: TopicClusteringRun;
   /**
    * Late-bound on purpose: the executor is declared while the pipeline is
    * being built, and these are the SAME pipeline's commands — they only
@@ -287,7 +287,7 @@ export interface TopicClusteringDispatchDeps {
    */
   commands: TopicClusteringOutcomeCommands;
   classifyError: TopicClusteringErrorClassifier;
-  metrics: TopicClusteringMetricsPort;
+  metrics: TopicClusteringMetrics;
   maxAttempts?: number;
   clock?: () => number;
 }

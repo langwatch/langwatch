@@ -15,15 +15,15 @@
  */
 // @vitest-environment node
 import type { EventSourcing } from "@langwatch/eventing";
-import { PlatformOperatorPort } from "@langwatch/identity-server";
+import { PlatformOperator } from "@langwatch/identity-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
 
 import { composeEnterpriseGovernanceApplication } from "../../features/enterprise/enterprise-governance.composition.ts";
 import {
   composeEnterpriseFeature,
-  type ApiEnterpriseApplicationPort,
+  type ApiEnterpriseApplication,
 } from "../../features/enterprise/enterprise.composition.ts";
 import { ApiUnavailableSsoConnectionLedger } from "../../features/sso/sso-process.ports.ts";
 import { composeApiEnterpriseApplication } from "../api-enterprise-application.composition.ts";
@@ -53,11 +53,11 @@ function testDatabase(): PrismaClient {
   } as unknown as PrismaClient;
 }
 
-function testCipher(): SecretEncryptionPort {
+function testCipher(): SecretEncryption {
   return {
     encrypt: (value: string) => `enc:${value}`,
     decrypt: (value: string) => value.replace(/^enc:/, ""),
-  } as SecretEncryptionPort;
+  } as SecretEncryption;
 }
 
 function testEventSourcing(): EventSourcing {
@@ -68,7 +68,7 @@ function testEventSourcing(): EventSourcing {
   } as unknown as EventSourcing;
 }
 
-class TestOperators extends PlatformOperatorPort {
+class TestOperators extends PlatformOperator {
   isPlatformOperatorEmail(): boolean {
     return false;
   }
@@ -76,7 +76,7 @@ class TestOperators extends PlatformOperatorPort {
 
 function compose(
   overrides: Partial<Parameters<typeof composeApiEnterpriseApplication>[0]> = {},
-): ApiEnterpriseApplicationPort {
+): ApiEnterpriseApplication {
   return composeApiEnterpriseApplication({
     prisma: testDatabase(),
     encryption: testCipher(),

@@ -1,6 +1,6 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { CodingAgentProcessingPipeline } from "@langwatch/coding-agent-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
@@ -35,7 +35,7 @@ export interface CodingAgentWorkerCapability {
  * make that ordering checkable — a subscriber built too early still cannot
  * dispatch, and says so.
  */
-export class CodingAgentWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class CodingAgentWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: CodingAgentWorkerCapability;
     eventing: WorkerEventingRuntime;

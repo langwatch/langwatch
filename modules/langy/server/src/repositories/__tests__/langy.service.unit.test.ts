@@ -4,7 +4,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { LangyFeedbackPromptPolicy } from "../../ports/langy-feedback-prompt.port.ts";
+import { LangyFeedbackPromptPolicy } from "../../services/langy-feedback-prompt.service.ts";
 import { LangyService } from "../../services/langy.service.ts";
 import type { LangyConversationService } from "../../services/langy-conversation.service.ts";
 import type { LangyCredentialService } from "../../services/langy-credential.service.ts";

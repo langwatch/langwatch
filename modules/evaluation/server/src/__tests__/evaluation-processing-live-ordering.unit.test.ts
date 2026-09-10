@@ -8,9 +8,9 @@ import {
 import { EventStoreMemory, QueueManager } from "@langwatch/eventing/testing";
 import { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
-import { EvaluationCommandAdapter } from "../adapters/evaluation-command.adapter.ts";
+import { EvaluationCommandAdapter } from "../services/evaluation-command.service.ts";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import { createEvaluationProcessingPipeline } from "../adapters/evaluation-processing.adapter.ts";
+import { createEvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
 import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent.ts";
 import { EvaluationAnalyticsFoldProjection } from "../projections/evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsData } from "../projections/evaluation-analytics-row.projection.ts";

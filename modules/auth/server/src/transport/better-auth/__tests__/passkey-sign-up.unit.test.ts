@@ -1,21 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BetterAuthAnnouncementsPort } from "../better-auth.collaborators.ts";
+import { BetterAuthAnnouncements } from "../better-auth.collaborators.ts";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
   type PasskeySignUpDirectory,
-  type SignUpVerificationPort,
+  type SignUpVerification,
 } from "../passkey-sign-up.api.ts";
 
 const requestVerification = vi.fn();
 const createPasskeyUser = vi.fn();
 const findByEmail = vi.fn();
 const users: PasskeySignUpDirectory = { createPasskeyUser, findByEmail };
-const verification: SignUpVerificationPort = { requestVerification };
+const verification: SignUpVerification = { requestVerification };
 
 /** Records the announcements without letting one fail the ceremony. */
-class SilentAnnouncements extends BetterAuthAnnouncementsPort {
+class SilentAnnouncements extends BetterAuthAnnouncements {
   readonly tracked: Array<{ userId: string; event: string }> = [];
 
   trackServerEvent(input: { userId: string; event: string }): void {

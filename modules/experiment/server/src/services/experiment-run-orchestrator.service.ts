@@ -14,7 +14,7 @@ import {
 } from "@langwatch/experiment-contract";
 import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port.ts";
+import type { ExperimentModelCost } from "../ports/experiment-model-cost.port.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
 import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
@@ -209,7 +209,7 @@ export class ExperimentRunOrchestratorService {
 
   /** Its own tiny implementation, not a delegation: it only reaches `cost`, not a full port bag. */
   static priceMetrics = async (
-    cost: ExperimentModelCostPort,
+    cost: ExperimentModelCost,
     projectId: string,
     metrics: ExecutionState["metrics"] | undefined,
   ): Promise<number | undefined> => {

@@ -16,7 +16,7 @@ import {
   type StartConversationTurnInput,
 } from "./langy-turn-shared.service.ts";
 import { LangyTurnSharedService } from "./langy-turn-shared.service.ts";
-import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port.ts";
+import { LangySessionKeyScopeError } from "./langy-session-key-scope.error.ts";
 
 /** The shared turn helpers. Stateless: one instance for the module. */
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();

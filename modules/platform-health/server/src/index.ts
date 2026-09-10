@@ -12,8 +12,11 @@ export {
   SubsystemProbeAdapter,
   type SubsystemProbeCredential,
   type SubsystemProbeRunner,
-} from "./adapters/subsystem-probe.adapter.ts";
-export { SubsystemProbePort, type SubsystemProbeResult } from "./ports/subsystem-probe.port.ts";
+} from "./services/subsystem-probe-run.service.ts";
+export {
+  type SubsystemProbe,
+  type SubsystemProbeResult,
+} from "./app/platform-health.infrastructure.ts";
 export { httpStatusForReport, rollUpStatus } from "./rules/platform-health-report.rules.ts";
 export {
   platformHealthAuthorization,

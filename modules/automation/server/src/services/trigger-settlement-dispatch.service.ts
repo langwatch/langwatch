@@ -8,20 +8,20 @@ import type {
   PersistMatchIntent,
 } from "../intents/trigger-settlement.intent.ts";
 import { TRIGGER_SETTLEMENT_INTENT_TYPES } from "../intents/trigger-settlement.intent.ts";
-import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
-import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
+import type { AutomationClock } from "../app/automation.infrastructure.ts";
+import type { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
 import type {
-  AutomationSlackProviderPort,
-  AutomationWebhookProviderPort,
+  AutomationSlackProvider,
+  AutomationWebhookProvider,
 } from "../ports/automation-provider.port.ts";
 import type {
-  AutomationSettlementMatchConfirmationPort,
-  AutomationSettlementObservabilityPort,
+  AutomationSettlementMatchConfirmation,
+  AutomationSettlementObservability,
 } from "../ports/automation-settlement.port.ts";
-import { AutomationSettlementExecutorPort } from "../ports/automation-settlement.port.ts";
-import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port.ts";
-import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port.ts";
-import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
+import { AutomationSettlementExecutor } from "../ports/automation-settlement.port.ts";
+import type { AutomationSettlementLedger } from "../ports/automation-settlement-ledger.port.ts";
+import type { AutomationSettlementTraceReader } from "../ports/automation-settlement-read.port.ts";
+import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import type { AutomationPersistActionService } from "./persist-action.service.ts";
 import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service.ts";
@@ -30,23 +30,23 @@ import { TriggerSettlementPersistenceService } from "./trigger-settlement-persis
 const logger = createLogger("langwatch:automation:settlement-dispatch");
 
 type SettlementComposition = {
-  automation: AutomationSettlementLedgerPort;
+  automation: AutomationSettlementLedger;
   projects: AutomationProjectIdentityPort;
-  traces: AutomationSettlementTraceReaderPort;
-  confirmation: AutomationSettlementMatchConfirmationPort;
+  traces: AutomationSettlementTraceReader;
+  confirmation: AutomationSettlementMatchConfirmation;
   persistActions: AutomationPersistActionService;
-  delivery: AutomationNotificationDeliveryPort;
+  delivery: AutomationNotificationDelivery;
   emailCaps: AutomationEmailCapService;
-  slack: AutomationSlackProviderPort;
-  webhooks: AutomationWebhookProviderPort;
-  clock: AutomationClockPort;
-  observability: AutomationSettlementObservabilityPort;
+  slack: AutomationSlackProvider;
+  webhooks: AutomationWebhookProvider;
+  clock: AutomationClock;
+  observability: AutomationSettlementObservability;
   baseHost: string;
   emailHourlyCap: number;
   tenantDailyCap: number;
 };
 
-export class AutomationSettlementDispatchService extends AutomationSettlementExecutorPort {
+export class AutomationSettlementDispatchService extends AutomationSettlementExecutor {
   private readonly notifications: TriggerSettlementNotificationService;
   private readonly persistence: TriggerSettlementPersistenceService;
 

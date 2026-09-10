@@ -7,13 +7,11 @@ import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
 import {
-  EvaluationAzureSafetyCredentialsPort,
-  EvaluationSettingsRecoveryPort,
-} from "../ports/evaluation.port.ts";
-import type {
-  EvaluationMonitorLookupPort,
-  EvaluationTraceEvidencePort,
-} from "../ports/evaluation-execution.port.ts";
+  EvaluationAzureSafetyCredentials,
+  EvaluationSettingsRecovery,
+  type EvaluationMonitorLookup,
+  type EvaluationTraceEvidence,
+} from "../app/evaluation.infrastructure.ts";
 import { EvaluationPreconditionService } from "./evaluation-precondition.service.ts";
 import {
   EvaluatorSettingsService,
@@ -37,10 +35,10 @@ export type EvaluationPreparationResult =
 
 export class EvaluationExecutionPreparationService {
   static create(input: {
-    monitors: EvaluationMonitorLookupPort;
-    traces: EvaluationTraceEvidencePort;
-    azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
-    settingsRecovery: EvaluationSettingsRecoveryPort;
+    monitors: EvaluationMonitorLookup;
+    traces: EvaluationTraceEvidence;
+    azureSafetyCredentials: EvaluationAzureSafetyCredentials;
+    settingsRecovery: EvaluationSettingsRecovery;
   }): EvaluationExecutionPreparationService {
     return new EvaluationExecutionPreparationService(
       input,
@@ -51,10 +49,10 @@ export class EvaluationExecutionPreparationService {
 
   private constructor(
     private readonly deps: {
-      monitors: EvaluationMonitorLookupPort;
-      traces: EvaluationTraceEvidencePort;
-      azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
-      settingsRecovery: EvaluationSettingsRecoveryPort;
+      monitors: EvaluationMonitorLookup;
+      traces: EvaluationTraceEvidence;
+      azureSafetyCredentials: EvaluationAzureSafetyCredentials;
+      settingsRecovery: EvaluationSettingsRecovery;
     },
     private readonly preconditions: EvaluationPreconditionService,
     private readonly settings: EvaluatorSettingsService,

@@ -9,12 +9,12 @@ import type { AgentClient } from "../model/agent-client.ts";
 
 type AgentWithFields = WireOf<StoredAgentWithFields>;
 
-export interface AgentManagementFeedbackPort {
+export interface AgentManagementFeedback {
   showSuccess(input: { title: string; description?: string }): void;
   showError(input: { error: unknown; fallbackTitle: string }): void;
 }
 
-export interface AgentManagementLifecyclePort {
+export interface AgentManagementLifecycle {
   agentsChanged(): Promise<void>;
   agentArchived(): Promise<void>;
 }
@@ -26,8 +26,8 @@ type SelectedAgent = {
 
 type AgentManagementOptions = {
   data: { projectId: string; agents: AgentClient };
-  feedback: AgentManagementFeedbackPort;
-  lifecycle: AgentManagementLifecyclePort;
+  feedback: AgentManagementFeedback;
+  lifecycle: AgentManagementLifecycle;
 };
 
 function useAgentRelatedEntities(

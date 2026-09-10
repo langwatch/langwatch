@@ -6,7 +6,7 @@
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
-import { KillSwitchPort, type KillSwitchQuery } from "../../kill-switch/index.ts";
+import { KillSwitch, type KillSwitchQuery } from "../../kill-switch/index.ts";
 import type { Event } from "../../domain/types.ts";
 import { ProjectionRouter } from "../../projections/projectionRouter.ts";
 import {
@@ -122,7 +122,7 @@ describe("subscriber enqueue-time contract", () => {
           TEST_CONSTANTS.PIPELINE_NAME,
           makeQueueManager(),
           {
-            killSwitch: new (class extends KillSwitchPort {
+            killSwitch: new (class extends KillSwitch {
               async isKilled(query: KillSwitchQuery): Promise<boolean> {
                 asked.push(query);
                 return query.tenantId === killedTenant;
@@ -182,7 +182,7 @@ describe("subscriber enqueue-time contract", () => {
           TEST_CONSTANTS.PIPELINE_NAME,
           makeQueueManager(),
           {
-            killSwitch: new (class extends KillSwitchPort {
+            killSwitch: new (class extends KillSwitch {
               async isKilled(): Promise<boolean> {
                 lookups += 1;
                 return false;

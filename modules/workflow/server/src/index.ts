@@ -48,17 +48,17 @@ export {
   type NlpInvokeStagingConfig,
 } from "./adapters/workflow-nlp-lambda.adapter.ts";
 export {
-  NlpLambdaInvokePort,
-  NlpPayloadStagingPort,
+  NlpLambdaInvoke,
+  NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type NlpLambdaInvokeResult,
   type StagedNlpPayload,
-} from "./ports/workflow-nlp-lambda.port.ts";
+} from "./app/workflow.app.ts";
 export {
-  NlpLambdaArnResolverPort,
+  NlpLambdaArnResolver,
   NlpLambdaFunctionPort,
   type NlpLambdaArnEntry,
-} from "./ports/nlp-lambda-arn.port.ts";
+} from "./app/workflow.app.ts";
 export {
   NLP_LAMBDA_ARN_CACHE_PREFIX,
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
@@ -107,25 +107,25 @@ export {
   type WorkflowRestDeclaration,
 } from "./transport/workflow.rest.ts";
 export {
-  WorkflowAgentMappingPort,
-  WorkflowDslMigrationPort,
-  WorkflowLlmParametersPort,
-  WorkflowProjectEnvironmentPort,
-  WorkflowExecutionPort,
-  WorkflowIdPort,
-  WorkflowNlpRuntimePort,
-  WorkflowStudioStreamPort,
-  WorkflowStudioDslPort,
+  WorkflowAgentMapping,
+  WorkflowDslMigration,
+  WorkflowLlmParameters,
+  WorkflowProjectEnvironment,
+  WorkflowExecution,
+  WorkflowId,
+  WorkflowNlpRuntime,
+  WorkflowStudioStream,
+  WorkflowStudioDsl,
   type WorkflowExecutionInput,
   type WorkflowLlmParameterResolution,
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
-} from "./ports/workflow.port.ts";
+} from "./app/workflow.app.ts";
 export {
-  WorkflowAiCallPort,
-  WorkflowCommitMessageModelPort,
+  WorkflowAiCall,
+  WorkflowCommitMessageModel,
   type WorkflowAiCallFeature,
-} from "./ports/workflow-commit-message.port.ts";
+} from "./app/workflow.app.ts";
 export { WorkflowCommitMessageService } from "./services/workflow-commit-message.service.ts";
 export { WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY } from "./rules/workflow-commit-message.rules.ts";
 export { WorkflowService, type WorkflowServiceOptions } from "./services/workflow.service.ts";
@@ -147,7 +147,7 @@ export {
 export {
   WORKFLOW_CODE_COMPLETION_FEATURE_KEY,
   WorkflowCodeCompletionAdapter,
-  type WorkflowModelResolverPort,
+  type WorkflowModelResolver,
 } from "./adapters/workflow-code-completion.adapter.ts";
 export { AwsNlpLambdaFleetAdapter } from "./adapters/aws.nlp-lambda-fleet.adapter.ts";
 export {
@@ -169,9 +169,9 @@ export {
   type StudioLambdaFleetFields,
 } from "./rules/nlp-lambda-config.rules.ts";
 export {
-  NlpLambdaStreamInvokePort,
+  NlpLambdaStreamInvoke,
   type NlpLambdaStreamChunk,
-} from "./ports/nlp-lambda-stream.port.ts";
+} from "./app/workflow.app.ts";
 export { AwsNlpLambdaStreamInvokeAdapter } from "./adapters/aws.nlp-lambda-stream-invoke.adapter.ts";
 export { AwsNlpLambdaArnResolverAdapter } from "./adapters/aws.nlp-lambda-arn-resolver.adapter.ts";
 export {

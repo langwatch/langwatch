@@ -5,20 +5,18 @@ import {
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
 import {
-  WorkflowLlmParametersPort,
-  WorkflowProjectEnvironmentPort,
+  WorkflowLlmParameters,
+  WorkflowProjectEnvironment,
   type WorkflowLlmParameterResolution,
-} from "../../ports/workflow.port.ts";
+} from "../../app/workflow.app.ts";
 import { StudioWorkflowEventEnricherService } from "../studio-workflow-event-enricher.service.ts";
 
 const projectId = "project-123";
 
-class FakeProjectEnvironment extends WorkflowProjectEnvironmentPort {
+class FakeProjectEnvironment implements WorkflowProjectEnvironment {
   readonly projectIds: string[] = [];
 
-  constructor(private readonly secrets: Record<string, string> = { OPENAI_API_KEY: "sk-abc123" }) {
-    super();
-  }
+  constructor(private readonly secrets: Record<string, string> = { OPENAI_API_KEY: "sk-abc123" }) {}
 
   async get(input: {
     projectId: string;
@@ -31,12 +29,10 @@ class FakeProjectEnvironment extends WorkflowProjectEnvironmentPort {
   }
 }
 
-class FakeLlmParameters extends WorkflowLlmParametersPort {
+class FakeLlmParameters implements WorkflowLlmParameters {
   readonly calls: Array<{ projectId: string; models: readonly string[] }> = [];
 
-  constructor(private readonly resolution: Partial<WorkflowLlmParameterResolution> = {}) {
-    super();
-  }
+  constructor(private readonly resolution: Partial<WorkflowLlmParameterResolution> = {}) {}
 
   async resolve(input: { projectId: string; models: readonly string[] }) {
     this.calls.push(input);

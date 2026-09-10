@@ -3,8 +3,8 @@ import { InviteNotFoundError, InviteThrottledError } from "@langwatch/organizati
 import { InviteService } from "../invite.service.ts";
 import { InviteSendThrottleService } from "../invite-send-throttle.service.ts";
 import type {
-  OrganizationInviteMailPort,
-  OrganizationInviteRateLimitPort,
+  OrganizationInviteMail,
+  OrganizationInviteRateLimit,
 } from "../../app/organization.infrastructure.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
 
@@ -16,7 +16,7 @@ import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/pr
 const sendInviteReRequestEmail = vi.fn();
 
 /** A fixed-window counter in memory, standing in for the real rate limiter. */
-function makeInMemoryRateLimiter(): OrganizationInviteRateLimitPort {
+function makeInMemoryRateLimiter(): OrganizationInviteRateLimit {
   const counters = new Map<string, { count: number; resetAt: number }>();
   return {
     async limit({ key, windowSeconds, max }) {
@@ -39,7 +39,7 @@ function makeService({
 }: {
   prisma: any;
   throttle: { assertInviteSendAllowed: (input: { inviteId: string }) => Promise<void> };
-  mail?: OrganizationInviteMailPort;
+  mail?: OrganizationInviteMail;
 }): InviteService {
   return InviteService.create({
     invites: PrismaOrganizationInviteRepository.create({ database: prisma }),
@@ -151,7 +151,7 @@ describe("given an expired invitation", () => {
       typeof vi.fn<(input: { inviteId: string }) => Promise<void>>
     >;
   };
-  let mail: OrganizationInviteMailPort;
+  let mail: OrganizationInviteMail;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -173,7 +173,7 @@ describe("given an expired invitation", () => {
     mail = {
       sendInvite: vi.fn(),
       sendInviteReRequest: sendInviteReRequestEmail,
-    } as unknown as OrganizationInviteMailPort;
+    } as unknown as OrganizationInviteMail;
   });
 
   describe("when its holder asks for a fresh one", () => {

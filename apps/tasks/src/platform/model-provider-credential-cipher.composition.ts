@@ -1,8 +1,8 @@
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import { ModelProviderCredentialCipherPort } from "@langwatch/model-provider-server";
+import { ModelProviderCredentialCipher } from "@langwatch/model-provider-server";
 
 /** The deployment's stored-secret cipher, as the ModelProvider rows want it. */
-class AesGcmModelProviderCredentialCipher extends ModelProviderCredentialCipherPort {
+class AesGcmModelProviderCredentialCipher extends ModelProviderCredentialCipher {
   constructor(private readonly encryption: AesGcmSecretEncryptionAdapter) {
     super();
   }
@@ -25,7 +25,7 @@ export function modelProviderCredentialCipherFromEnv({
   key,
 }: {
   key: string | undefined;
-}): ModelProviderCredentialCipherPort {
+}): ModelProviderCredentialCipher {
   const trimmed = key?.trim();
   if (!trimmed) {
     throw new Error(

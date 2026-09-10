@@ -1,9 +1,11 @@
 export { dashboardServer } from "./dashboard.server.ts";
 export type { DashboardInfrastructure } from "./app/dashboard.app.ts";
-export { AlertRedactionPort } from "./ports/alert-redaction.port.ts";
-export { PlatformUrlPort } from "./ports/platform-url.port.ts";
-export { WorkbenchAccessPort } from "./ports/workbench-access.port.ts";
-export { WorkbenchCallerPort } from "./ports/workbench-caller.port.ts";
+export {
+  type AlertRedaction,
+  type PlatformUrl,
+  type WorkbenchAccess,
+  type WorkbenchCaller,
+} from "./app/dashboard.infrastructure.ts";
 export { dashboardRest } from "./transport/dashboard.rest.ts";
 export { dashboardTrpcTransport } from "./transport/dashboard.trpc.ts";
 export { graphRest } from "./transport/graph.rest.ts";

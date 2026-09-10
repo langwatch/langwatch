@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  ApiSecretEncryptionAbsenceReportPort,
+  ApiSecretEncryptionAbsenceReport,
   ApiSecretEncryptionInfrastructure,
 } from "../api-secret-encryption.infrastructure.ts";
 
 const KEY = "0f".repeat(32);
 
-class RecordedAbsence extends ApiSecretEncryptionAbsenceReportPort {
+class RecordedAbsence extends ApiSecretEncryptionAbsenceReport {
   calls = 0;
 
   absent(): void {

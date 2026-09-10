@@ -16,17 +16,17 @@ import type { EventSourcing } from "@langwatch/eventing";
 import type { TargetConfig } from "@langwatch/experiment-contract";
 import {
   ExperimentEventingAdapter,
-  ExperimentConnectedAgentOwnershipPort,
-  ExperimentConnectedDispatchPort,
+  ExperimentConnectedAgentOwnership,
+  ExperimentConnectedDispatch,
   type ExperimentConnectedAgentSubject,
-  ExperimentEvaluationReportingPort,
-  type ExperimentExecutionPort,
-  ExperimentModelCostPort,
+  ExperimentEvaluationReporting,
+  type ExperimentExecution,
+  ExperimentModelCost,
   type ExperimentService,
-  ExperimentSandboxCredentialPort,
-  ExperimentStudioDispatchPort,
-  ExperimentTargetEntityNamesPort,
-  ExperimentWorkflowDslPort,
+  ExperimentSandboxCredential,
+  ExperimentStudioDispatch,
+  ExperimentTargetEntityNames,
+  ExperimentWorkflowDsl,
   RedisExperimentRunAbortAdapter,
   RedisExperimentRunProgressAdapter,
   WorkflowEvaluationService,
@@ -35,7 +35,7 @@ import {
   type ExecutionDataServices,
   type ExperimentRunPorts,
   type ExperimentRunProcessingPipelineDeps,
-  type ExperimentRunProgressPort,
+  type ExperimentRunProgress,
   type StartPollingRunInput,
   type WorkflowEvaluationOutcome,
 } from "@langwatch/experiment-server";
@@ -68,7 +68,7 @@ import type { RunActor } from "@langwatch/scenario-contract";
  * The four dispatchers a run's HISTORY is written through, or `undefined` where this
  * process composed no command queue.
  */
-export type ApiExperimentRunCommands = ExperimentExecutionPort;
+export type ApiExperimentRunCommands = ExperimentExecution;
 
 /**
  * Registers `experiment_run_processing` as a PRODUCER and hands back the four dispatchers
@@ -259,7 +259,7 @@ export type ApiExperimentRun = Readonly<{
    */
   ports: ExperimentRunPorts | null;
   /** Where a poll reads a run's progress, or `null` for the same reason. */
-  progress: ExperimentRunProgressPort | null;
+  progress: ExperimentRunProgress | null;
   /** The four contract services a run's rows, prompts, agents and evaluators load through. */
   services: ExecutionDataServices;
   /** The studio graph service the orchestrator runs a workflow cell with. */
@@ -397,7 +397,7 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
 }
 
 /** Experiment turns use the same Agent App as the interactive relay. */
-class ApiExperimentConnectedDispatchAdapter extends ExperimentConnectedDispatchPort {
+class ApiExperimentConnectedDispatchAdapter extends ExperimentConnectedDispatch {
   readonly #agents: AgentApi;
 
   static create(agents: AgentApi): ApiExperimentConnectedDispatchAdapter {
@@ -420,7 +420,7 @@ class ApiExperimentConnectedDispatchAdapter extends ExperimentConnectedDispatchP
 }
 
 /** Joins the experiment run's ownership port to suite's rule, for the same reason. */
-class ApiExperimentConnectedAgentOwnershipAdapter extends ExperimentConnectedAgentOwnershipPort {
+class ApiExperimentConnectedAgentOwnershipAdapter extends ExperimentConnectedAgentOwnership {
   static create(): ApiExperimentConnectedAgentOwnershipAdapter {
     return new ApiExperimentConnectedAgentOwnershipAdapter();
   }
@@ -441,7 +441,7 @@ class ApiExperimentConnectedAgentOwnershipAdapter extends ExperimentConnectedAge
  * service is built here rather than taken from `api-studio-host.composition.ts`, which
  * builds its own for the `httpProxy.*` surface.
  */
-class ApiExperimentStudioDispatchAdapter extends ExperimentStudioDispatchPort {
+class ApiExperimentStudioDispatchAdapter extends ExperimentStudioDispatch {
   static create(options: {
     modelProviders: ModelProviderApi;
     nlpServiceUrl: string | undefined;
@@ -474,7 +474,7 @@ class ApiExperimentStudioDispatchAdapter extends ExperimentStudioDispatchPort {
 /**
  * What a cell's tokens cost, in this deployment's own rate table.
  */
-class ApiExperimentModelCostAdapter extends ExperimentModelCostPort {
+class ApiExperimentModelCostAdapter extends ExperimentModelCost {
   static create(options: { modelProviders: ModelProviderApi }): ApiExperimentModelCostAdapter {
     return new ApiExperimentModelCostAdapter(options.modelProviders);
   }
@@ -550,7 +550,7 @@ class ApiExperimentModelCostAdapter extends ExperimentModelCostPort {
 /**
  * Where a workbench cell's evaluator result is reported as an evaluation.
  */
-class ApiExperimentEvaluationReportingAdapter extends ExperimentEvaluationReportingPort {
+class ApiExperimentEvaluationReportingAdapter extends ExperimentEvaluationReporting {
   static create(options: {
     reportEvaluation: (data: ReportEvaluationCommandData) => Promise<unknown>;
   }): ApiExperimentEvaluationReportingAdapter {
@@ -572,7 +572,7 @@ class ApiExperimentEvaluationReportingAdapter extends ExperimentEvaluationReport
  * The scoped key a run lends the code it executes. One question, two reads: the project's
  * organization, and the mint.
  */
-class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialPort {
+class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredential {
   /**
    * The share is Redis when the queue composed one and in-process otherwise, and none at all
    * when this deployment has no key to seal a token with: the plaintext is the whole value of a
@@ -622,7 +622,7 @@ class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialP
 /**
  * The committed studio workflow a workflow target runs, once per dataset row.
  */
-class PostgresExperimentWorkflowDslAdapter extends ExperimentWorkflowDslPort {
+class PostgresExperimentWorkflowDslAdapter extends ExperimentWorkflowDsl {
   static create(options: { prisma: PrismaClient }): PostgresExperimentWorkflowDslAdapter {
     return new PostgresExperimentWorkflowDslAdapter(options.prisma);
   }
@@ -711,7 +711,7 @@ class PostgresExperimentWorkflowDslAdapter extends ExperimentWorkflowDslPort {
  * What the agents and evaluators a saved workbench points at are called. Two batched
  * reads.
  */
-class PostgresExperimentTargetEntityNamesAdapter extends ExperimentTargetEntityNamesPort {
+class PostgresExperimentTargetEntityNamesAdapter extends ExperimentTargetEntityNames {
   static create(options: { prisma: PrismaClient }): PostgresExperimentTargetEntityNamesAdapter {
     return new PostgresExperimentTargetEntityNamesAdapter(options.prisma);
   }

@@ -9,7 +9,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { GatewaySpendConfirmationPort } from "@langwatch/gateway-server";
+import type { GatewaySpendConfirmation } from "@langwatch/gateway-server";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -122,7 +122,7 @@ describe("installing the gateway on the API process", () => {
       const elevenLabsWebhook = composeGatewayElevenLabsWebhook({
         prisma: memoryDatabase(),
         encryption: cacheEncryption,
-        spendConfirmation: createApiFixture<GatewaySpendConfirmationPort>(),
+        spendConfirmation: createApiFixture<GatewaySpendConfirmation>(),
       });
       const gateway = await installApiGateway({
         infrastructure: void 0,
@@ -144,7 +144,7 @@ describe("installing the gateway on the API process", () => {
 
     it("keeps ElevenLabs unavailable until all existing collaborators are present", () => {
       const prisma = memoryDatabase();
-      const confirmation = createApiFixture<GatewaySpendConfirmationPort>();
+      const confirmation = createApiFixture<GatewaySpendConfirmation>();
 
       expect(
         composeGatewayElevenLabsWebhook({

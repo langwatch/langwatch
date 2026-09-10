@@ -8,7 +8,7 @@ import type {
   MigrationDataset,
   MigrationPageRequest,
   MigrationProject,
-  ObjectStorageMigrationInventoryPort,
+  ObjectStorageMigrationInventory,
 } from "#repositories/object-storage-migration-inventory.repository";
 import {
   assertUriDigest,
@@ -95,7 +95,7 @@ export class MigrationBlockedError extends Error {
 export type ObjectStorageMigrationDeps = {
   source: MigrationStorageEndpoint;
   destination: MigrationStorageEndpoint;
-  inventory: ObjectStorageMigrationInventoryPort;
+  inventory: ObjectStorageMigrationInventory;
   /**
    * Must append a newer stored_objects version. It must never ALTER UPDATE or
    * delete the prior version.

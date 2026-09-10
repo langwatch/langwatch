@@ -1,6 +1,6 @@
 import type {
   WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
+  WorkerFeatureInstaller,
 } from "../features/worker-feature.installer.ts";
 import { WorkerEventingRuntime } from "../platform/eventing/worker-eventing.runtime.ts";
 import { WorkerRuntime } from "../platform/lifecycle/worker.runtime.ts";
@@ -8,7 +8,7 @@ import { WorkerRuntime } from "../platform/lifecycle/worker.runtime.ts";
 export class WorkerApplication {
   static create(options: {
     runtime: WorkerRuntime;
-    featureInstallers: readonly WorkerFeatureInstallerPort[];
+    featureInstallers: readonly WorkerFeatureInstaller[];
     eventing?: WorkerEventingRuntime;
   }): WorkerApplication {
     return new WorkerApplication(options.runtime, options.featureInstallers, options.eventing);
@@ -23,7 +23,7 @@ export class WorkerApplication {
 
   private constructor(
     private readonly runtime: WorkerRuntime,
-    private readonly featureInstallers: readonly WorkerFeatureInstallerPort[],
+    private readonly featureInstallers: readonly WorkerFeatureInstaller[],
     private readonly eventing: WorkerEventingRuntime | undefined,
   ) {}
 

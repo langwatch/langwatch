@@ -15,7 +15,7 @@ export type LegacyStoredObjectRow = Readonly<{
 }>;
 
 /** Pages through the legacy stored-object rows one project still holds. */
-export abstract class StoredObjectLegacySourcePort {
+export abstract class StoredObjectLegacySource {
   abstract findPage(input: {
     projectId: string;
     afterId?: string;

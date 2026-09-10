@@ -247,6 +247,39 @@ describe("feature shape", () => {
     });
   });
 
+  describe("given a channels folder", () => {
+    /** @scenario "A channels folder without a registry is conversion debt" */
+    it("asks for a registry when channels are not selected by one", () => {
+      referenceFeature();
+      write("modules/widget/server/src/channels/webhook.channel.ts");
+      write("modules/widget/server/src/channels/memory/memory.webhook.channel.ts");
+
+      expect(findings()).toEqual([
+        {
+          feature: "widget",
+          kind: "unregistered-channels",
+          path: "modules/widget/server/src/channels",
+        },
+      ]);
+    });
+
+    /** @scenario "A live channel without a memory twin is conversion debt" */
+    it("asks for a memory twin when only a live tier exists", () => {
+      referenceFeature();
+      write("modules/widget/server/src/channels/webhook.channel.ts");
+      write("modules/widget/server/src/channels/widget-channels.registry.ts");
+      write("modules/widget/server/src/channels/http/http.webhook.channel.ts");
+
+      expect(findings()).toEqual([
+        {
+          feature: "widget",
+          kind: "unregistered-channels",
+          path: "modules/widget/server/src/channels/http",
+        },
+      ]);
+    });
+  });
+
   describe("given a repositories folder without the reference's selection", () => {
     it("asks for a registry when repositories are not selected by one", () => {
       referenceFeature();

@@ -9,8 +9,8 @@ import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { EnterpriseWorkerCompositionOptions } from "@langwatch/enterprise-worker";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import {
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "../platform/lifecycle/worker-runtime.port.ts";
 import {
   createWorkerPrivateInfrastructureComposition,
@@ -43,8 +43,8 @@ export type WorkerDurableCompositionOptions = Readonly<{
   config: WorkerConfig;
   /** Owns every client this composition constructs, released on shutdown. */
   resources: ResourceScope;
-  lifecycle: WorkerLifecyclePort;
-  transport: WorkerTransportPort;
+  lifecycle: WorkerLifecycle;
+  transport: WorkerTransport;
   persistence: WorkerDurablePersistencePorts;
   /** Project BYOC and Azure capabilities for the Group Queue's blob offload. */
   storage: WorkerPrivateInfrastructurePorts;

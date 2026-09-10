@@ -34,10 +34,10 @@ import {
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 
-import type { AlertRedactionPort } from "../ports/alert-redaction.port.ts";
-import type { PlatformUrlPort } from "../ports/platform-url.port.ts";
-import type { WorkbenchAccessPort } from "../ports/workbench-access.port.ts";
-import type { WorkbenchCallerPort } from "../ports/workbench-caller.port.ts";
+import type { AlertRedaction } from "./dashboard.infrastructure.ts";
+import type { PlatformUrl } from "./dashboard.infrastructure.ts";
+import type { WorkbenchAccess } from "./dashboard.infrastructure.ts";
+import type { WorkbenchCaller } from "./dashboard.infrastructure.ts";
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { DashboardService } from "../services/dashboard.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
@@ -46,10 +46,10 @@ import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.se
 
 /** What the deployment answers that Dashboard cannot answer for itself. */
 export type DashboardInfrastructure = Readonly<{
-  workbenchAccess: WorkbenchAccessPort;
-  workbenchCaller: WorkbenchCallerPort;
-  alertRedaction: AlertRedactionPort;
-  platformUrl: PlatformUrlPort;
+  workbenchAccess: WorkbenchAccess;
+  workbenchCaller: WorkbenchCaller;
+  alertRedaction: AlertRedaction;
+  platformUrl: PlatformUrl;
 }>;
 
 type DashboardDependencies = Readonly<{

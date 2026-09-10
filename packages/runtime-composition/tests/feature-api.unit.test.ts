@@ -210,18 +210,16 @@ class OrganizationApp implements OrganizationApi {
 const project = defineModule("project").withApp(ProjectApp).build();
 const organization = defineModule("organization").withApp(OrganizationApp).build();
 
-function graph(infrastructure: Infrastructure, reversed = false) {
-  const builder = createApp({ name: "api-bindings" }).withInfrastructure(infrastructure);
-  return reversed
-    ? builder.withModule(organization).withModule(project)
-    : builder.withModule(project).withModule(organization);
+function graph(infrastructure: Infrastructure, reversed = false, role: ServerRole = "api") {
+  const builder = createApp({ role, infrastructure });
+  return builder.withModules(reversed ? [organization, project] : [project, organization]);
 }
 
 describe("feature APIs", () => {
   it.each(["api", "worker"] satisfies ServerRole[])(
     "forwards an installed %s client through outer references without exposing its implementation",
     async (role) => {
-      const runtime = await graph({ events: [] }).boot({ role });
+      const runtime = await graph({ events: [] }, false, role).boot();
       const outer = new LocalFeatureApis();
       outer.declare(ProjectApi);
       outer.bind(ProjectApi, runtime.service(ProjectApi));
@@ -266,10 +264,9 @@ describe("feature APIs", () => {
       .provides(ProjectApi)
       .build();
     await expect(
-      createApp({ name: "legacy-api" })
-        .withInfrastructure({})
-        .withModule(legacy)
-        .boot({ role: "api" }),
+      createApp({ role: "api", infrastructure: {} })
+        .withModules([legacy])
+        .boot(),
     ).rejects.toThrow("defineModule().withApp()");
     expect(events).toEqual([]);
   });
@@ -278,7 +275,7 @@ describe("feature APIs", () => {
     "binds mutual APIs once before returning the %s runtime",
     async (role) => {
       const events: string[] = [];
-      const runtime = await graph({ events }).boot({ role });
+      const runtime = await graph({ events }, false, role).boot();
       const projects = runtime.service(ProjectApi);
       const organizations = runtime.service(OrganizationApi);
 
@@ -293,7 +290,7 @@ describe("feature APIs", () => {
 
   it("does not depend on feature registration order", async () => {
     const events: string[] = [];
-    const runtime = await graph({ events }, true).boot({ role: "api" });
+    const runtime = await graph({ events }, true).boot();
     await expect(runtime.service(OrganizationApi).projectName()).resolves.toBe("project");
     await runtime.stop();
     expect(events).toEqual([
@@ -306,7 +303,7 @@ describe("feature APIs", () => {
 
   it("rejects constructor access even when that peer was constructed earlier", async () => {
     const events: string[] = [];
-    await expect(graph({ events, inspectPeer: true }).boot({ role: "api" })).rejects.toBeInstanceOf(
+    await expect(graph({ events, inspectPeer: true }).boot()).rejects.toBeInstanceOf(
       FeatureApiUnavailableError,
     );
     expect(events).toEqual([
@@ -320,9 +317,9 @@ describe("feature APIs", () => {
   it("preserves factory failures and unwinds partial construction", async () => {
     const events: string[] = [];
     const cause = new Error("organization failed");
-    await expect(graph({ events, failOrganization: cause }).boot({ role: "worker" })).rejects.toBe(
-      cause,
-    );
+    await expect(
+      graph({ events, failOrganization: cause }, false, "worker").boot(),
+    ).rejects.toBe(cause);
     expect(events).toEqual([
       "create:project",
       "create:organization",
@@ -334,16 +331,15 @@ describe("feature APIs", () => {
   it("rejects a missing API before constructing anything", async () => {
     const events: string[] = [];
     await expect(
-      createApp({ name: "missing" })
-        .withInfrastructure({ events })
-        .withModule(project)
-        .boot({ role: "api" }),
+      createApp({ role: "api", infrastructure: { events } })
+        .withModules([project])
+        .boot(),
     ).rejects.toBeInstanceOf(MissingProviderError);
     expect(events).toEqual([]);
   });
 
   it("does not publish service-valued implementation fields", async () => {
-    const runtime = await graph({ events: [] }).boot({ role: "api" });
+    const runtime = await graph({ events: [] }).boot();
     expect(() => Reflect.get(runtime.service(ProjectApi), "organizations")).toThrow(
       "operations only",
     );
@@ -354,7 +350,7 @@ describe("feature APIs", () => {
   });
 
   it("does not expose implementation objects or evaluate implementation getters", async () => {
-    const runtime = await graph({ events: [] }).boot({ role: "api" });
+    const runtime = await graph({ events: [] }).boot();
     const api = runtime.service(ProjectApi);
 
     expect(() => Reflect.get(api, "valueOf")).toThrow("operations only");
@@ -363,7 +359,7 @@ describe("feature APIs", () => {
   });
 
   it("preserves argument, result, error identity, and method this binding", async () => {
-    const runtime = await graph({ events: [] }).boot({ role: "api" });
+    const runtime = await graph({ events: [] }).boot();
     const api = runtime.service(ProjectApi);
     const value = { identity: true };
     const error = new Error("same error");
@@ -383,7 +379,7 @@ describe("feature APIs", () => {
   });
 
   it("closes retained API methods when the runtime stops", async () => {
-    const runtime = await graph({ events: [] }).boot({ role: "api" });
+    const runtime = await graph({ events: [] }).boot();
     const name = runtime.service(ProjectApi).name;
     await expect(name()).resolves.toBe("project");
     await runtime.stop();
@@ -400,11 +396,11 @@ describe("feature APIs", () => {
         throw error;
       },
     };
-    const builder = createApp({ name: "duplicate" })
-      .withInfrastructure({})
-      .withProvided(ProjectApi, existing)
-      .withProvided(duplicate, existing);
-    await expect(builder.boot({ role: "api" })).rejects.toBeInstanceOf(DuplicateProviderError);
+    const builder = createApp({ role: "api", infrastructure: { events: [] } }).withModules([
+      project,
+      defineModule("project").withApp(ProjectApp).build(),
+    ]);
+    await expect(builder.boot()).rejects.toBeInstanceOf(DuplicateProviderError);
   });
 
   it("rejects a declaration/API name mismatch before invoking the factory", async () => {
@@ -412,10 +408,9 @@ describe("feature APIs", () => {
     const declaration = defineModule("organization").withApp(ProjectApp).build();
 
     await expect(
-      createApp({ name: "mismatch" })
-        .withInfrastructure({ events })
-        .withModule(declaration)
-        .boot({ role: "api" }),
+      createApp({ role: "api", infrastructure: { events } })
+        .withModules([declaration])
+        .boot(),
     ).rejects.toThrow('cannot provide API "project"');
     expect(events).toEqual([]);
   });
@@ -428,7 +423,7 @@ describe("feature APIs", () => {
         start: () => Promise.reject(startFailure),
         stop: () => undefined,
       })
-      .boot({ role: "api" });
+      .boot();
     const api = runtime.service(ProjectApi);
 
     await expect(runtime.start()).rejects.toBe(startFailure);
@@ -443,7 +438,7 @@ describe("feature APIs", () => {
         start: () => undefined,
         stop: () => Promise.reject(cleanupFailure),
       })
-      .boot({ role: "api" });
+      .boot();
     const api = runtime.service(ProjectApi);
 
     await runtime.start();

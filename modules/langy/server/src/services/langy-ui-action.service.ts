@@ -8,11 +8,11 @@ import {
   LangyUiTimeoutError,
   LangyUiTurnInactiveError,
 } from "@langwatch/langy-contract";
-import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import type {
-  LangyUiActionCatalogPort,
+  LangyUiActionCatalog,
   LangyUiActionDefinition,
-} from "../ports/langy-ui-action-catalog.port.ts";
+} from "../app/langy.infrastructure.ts";
 
 /**
  * The agent-to-page action channel (specs/langy/langy-ui-actions.feature).
@@ -115,13 +115,13 @@ export interface UiActionConversations {
 export type LangyUiActionServiceDependencies = {
   redis: UiActionRedis;
   conversations: UiActionConversations;
-  buffer: Pick<LangyTokenBufferPort, "appendUiAction">;
+  buffer: Pick<LangyTokenBuffer, "appendUiAction">;
   /**
    * Which kinds exist and what each one's payload must look like. A port rather than an import: the
    * only catalogue that exists is the experiments workbench's, and a Langy server package may not
    * reach into another feature's.
    */
-  actions: LangyUiActionCatalogPort;
+  actions: LangyUiActionCatalog;
   backendRunner?: UiActionBackendRunner;
 };
 
@@ -132,8 +132,8 @@ export class LangyUiActionService {
 
   private readonly redis: UiActionRedis;
   private readonly conversations: UiActionConversations;
-  private readonly buffer: Pick<LangyTokenBufferPort, "appendUiAction">;
-  private readonly actions: LangyUiActionCatalogPort;
+  private readonly buffer: Pick<LangyTokenBuffer, "appendUiAction">;
+  private readonly actions: LangyUiActionCatalog;
   private readonly backendRunner?: UiActionBackendRunner;
 
   private constructor(deps: LangyUiActionServiceDependencies) {

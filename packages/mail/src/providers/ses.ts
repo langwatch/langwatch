@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import { buildRawMimeMessage } from "./mime.ts";
 import {
   type EmailContent,
-  type EmailProviderPort,
+  type EmailProvider,
   type MailerConfiguration,
   toArray,
 } from "./types.ts";
@@ -42,7 +42,7 @@ export const buildSesClientConfig = ({
 };
 
 /** One lazy SES client per mailer process. Its borrowed handler is released by AWS shutdown. */
-export class SesEmailProvider implements EmailProviderPort {
+export class SesEmailProvider implements EmailProvider {
   readonly name = "ses" as const;
 
   static create(input: {

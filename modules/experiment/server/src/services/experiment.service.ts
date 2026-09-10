@@ -59,8 +59,8 @@ import {
 } from "../repositories/experiment.repository.ts";
 import type { ExperimentRunRepository } from "../repositories/experiment-run.repository.ts";
 import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository.ts";
-import type { ExperimentExecutionPort } from "../ports/experiment-execution.port.ts";
-import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port.ts";
+import type { ExperimentExecution } from "../ports/experiment-execution.port.ts";
+import type { ExperimentWorkbenchUpdates } from "../ports/experiment-workbench-updates.port.ts";
 import { isPostgresUniqueConflict } from "../rules/postgres-unique-conflict.rules.ts";
 import { ExperimentSlugService } from "./experiment-slug.service.ts";
 import { ExperimentWorkbenchService } from "./experiment-workbench.service.ts";
@@ -77,13 +77,13 @@ export type ExperimentServiceOptions = {
   runRepository: ExperimentRunRepository;
   dspyRepository: ExperimentDspyRepository;
   /** Refuses by name where the runtime composes no Eventing pipeline. */
-  execution?: ExperimentExecutionPort;
+  execution?: ExperimentExecution;
   slugify: (value: string) => string;
   newId: () => string;
   now?: () => Instant;
   references: ExperimentWorkbenchReferenceServices;
   /** Drops workbench update notices where no live update transport is composed. */
-  updates?: ExperimentWorkbenchUpdatesPort;
+  updates?: ExperimentWorkbenchUpdates;
 };
 
 /**
@@ -99,8 +99,8 @@ export class ExperimentService {
     return new ExperimentService(options);
   }
 
-  private readonly execution: ExperimentExecutionPort;
-  private readonly updates: ExperimentWorkbenchUpdatesPort;
+  private readonly execution: ExperimentExecution;
+  private readonly updates: ExperimentWorkbenchUpdates;
   private readonly slugs: ExperimentSlugService;
   private readonly workbenchReferences: ExperimentWorkbenchReferencesService;
   private readonly workbench: ExperimentWorkbenchService;

@@ -20,8 +20,8 @@ import type { PricingModel } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
-import { UsageCounterPort } from "../ports/usage-counter.port.ts";
-import { UsageWarningPort } from "../ports/usage-warning.port.ts";
+import type { UsageCounter } from "./entitlement.infrastructure.ts";
+import type { UsageWarning } from "./entitlement.infrastructure.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
@@ -84,9 +84,9 @@ export type EntitlementInfrastructure = Readonly<{
   enrichers?: readonly PlanEnricher[];
   authorization?: AuthorizationContextResolver;
   /** The month's billable volume, counted in the deployment's analytics store. */
-  counter: UsageCounterPort;
+  counter: UsageCounter;
   /** The approaching-limit mail, over the deployment's gateway. */
-  warnings: UsageWarningPort;
+  warnings: UsageWarning;
 }>;
 
 /** How recent an end date has to be for the rollup to read it as "up to now". */
@@ -106,7 +106,7 @@ export class EntitlementApp implements EntitlementApiContract {
 
   #plans: EntitlementService;
   #usage: UsageStatsService;
-  #warnings: UsageWarningPort;
+  #warnings: UsageWarning;
   #spend: EntitlementRepositories["spend"];
   #users: UserApi;
 

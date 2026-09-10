@@ -14,7 +14,7 @@ import {
   readOffsets,
   recomputeOffsets,
 } from "../rules/dataset-chunk-lines.rules.ts";
-import { type DatasetStorage } from "../ports/dataset-storage.port.ts";
+import { type DatasetStorage } from "../app/dataset.app.ts";
 
 const logger = createLogger("langwatch:datasets:mutations");
 

@@ -14,7 +14,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { MountableRestApp, RestErrorHandler } from "@langwatch/api/rest";
 
 import type {
-  ApiBrowserSessionTransportPort,
+  ApiBrowserSessionTransport,
   ApiComposedBetterAuth,
 } from "../../app/api-auth.composition.ts";
 import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
@@ -23,7 +23,7 @@ export type ApiAuthRestOptions = Readonly<{
   /** The instance this process composed, or none where a host supplied one. */
   betterAuth: ApiComposedBetterAuth | undefined;
   /** The SAME transport every other door verifies a cookie through. */
-  sessions: ApiBrowserSessionTransportPort | undefined;
+  sessions: ApiBrowserSessionTransport | undefined;
   /** The Auth service a logout revokes the browser session on. */
   auth: AuthApi | undefined;
   /** The SAME credential service the legacy token check resolves through. */

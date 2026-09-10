@@ -45,7 +45,7 @@ import {
   PostgresIdentityPipelineAdapter,
   PostgresJoinRequestPipelineAdapter,
   PostgresScimSyncPipelineAdapter,
-  type PlatformOperatorPort,
+  type PlatformOperator,
   PostgresSsoConnectionPipelineAdapter,
   type SsoConnectionPipelineDatabase,
   type ScimSyncPipelineDatabase,
@@ -57,11 +57,11 @@ import {
   PrismaLangySessionKeyReapRepository,
 } from "@langwatch/langy-server";
 import {
-  ClickHouseCodingAgentProcessingAdapter,
+  RedisCodingAgentProcessingRepository,
   createCodingAgentLogFactsDispatchSubscriber,
   createCodingAgentMetricFactsDispatchSubscriber,
 } from "@langwatch/coding-agent-server";
-import { CanonicalLogAdapter, ClickHouseLogProcessingAdapter } from "@langwatch/log-server";
+import { CanonicalLogAdapter, ClickhouseLogProcessingRepository } from "@langwatch/log-server";
 import {
   ClickHouseMetricProcessingAdapter,
   resolveMetricCommandShardCount,
@@ -93,7 +93,7 @@ import {
   type CodingAgentActivityDatabase,
   PrismaCodingAgentActivityRepository,
   PrismaGovernanceInternalProjectRepository,
-  ProjectOldestTeamPort,
+  ProjectOldestTeam,
 } from "@langwatch/project-server";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
 import {
@@ -106,7 +106,7 @@ import { ApiKeyWorkerFeatureInstaller } from "../features/api-key/api-key-worker
 import { AuthzWorkerFeatureInstaller } from "../features/authz/authz-worker-feature.installer.ts";
 import {
   WorkerAutomationNextStepAdapter,
-  WorkerAutomationOrganizationPricingPort,
+  WorkerAutomationOrganizationPricing,
 } from "../features/automation/automation-next-step.adapter.ts";
 import { AutomationWorkerFeatureInstaller } from "../features/automation/automation-worker-feature.installer.ts";
 import { BillingReportingWorkerFeatureInstaller } from "../features/billing/billing-reporting-worker-feature.installer.ts";
@@ -114,7 +114,7 @@ import { CodingAgentWorkerFeatureInstaller } from "../features/coding-agent/codi
 import { EvaluationWorkerFeatureInstaller } from "../features/evaluation/evaluation-worker-feature.installer.ts";
 import {
   EventingMaintenanceWorkerFeatureInstaller,
-  WorkerBlobSweepPort,
+  WorkerBlobSweep,
 } from "../features/eventing-maintenance/eventing-maintenance-worker-feature.installer.ts";
 import { ExperimentWorkerFeatureInstaller } from "../features/experiment/experiment-worker-feature.installer.ts";
 import { GatewaySpendWorkerFeatureInstaller } from "../features/gateway/gateway-spend-worker-feature.installer.ts";
@@ -154,16 +154,16 @@ import {
   type WorkerInfrastructureAdapterOptions,
 } from "../platform/infrastructure/worker-foundation.adapter.ts";
 import {
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "../platform/lifecycle/worker-runtime.port.ts";
 import { WorkerRuntime } from "../platform/lifecycle/worker.runtime.ts";
-import type { WorkerFeatureInstallerPort } from "../features/worker-feature.installer.ts";
+import type { WorkerFeatureInstaller } from "../features/worker-feature.installer.ts";
 import { WorkerApplication } from "./worker.application.ts";
 import type { DatasetContentDatabase } from "@langwatch/dataset-server/composition/dataset-content";
 import {
-  AutomationGraphActivityPort,
-  AutomationTriggerMatchRecorderPort,
+  AutomationGraphActivity,
+  AutomationTriggerMatchRecorder,
   PostgresAutomationTraceTriggerCatalogueAdapter,
   type AutomationGraphActivityDatabase,
   type AutomationTraceTriggerCatalogueDatabase,
@@ -187,11 +187,11 @@ import {
 import type { IngestionPullLifecycleDatabase } from "@langwatch/enterprise-governance-server";
 import {
   createWorkerTopicRuntime,
-  WorkerTopicAbsenceReportPort,
+  WorkerTopicAbsenceReport,
 } from "./worker-topic-clustering.composition.ts";
 import {
   tryCreateWorkerModelProviders,
-  WorkerModelProviderAbsenceReportPort,
+  WorkerModelProviderAbsenceReport,
 } from "./worker-model-provider.composition.ts";
 import {
   createWorkerPlanProvider,
@@ -199,7 +199,7 @@ import {
 } from "./worker-plan-provider.composition.ts";
 import {
   createWorkerEvaluationProcessing,
-  WorkerEvaluationAbsenceReportPort,
+  WorkerEvaluationAbsenceReport,
 } from "./worker-evaluation-processing.composition.ts";
 import type { WorkerProjectStorageDatabase } from "./worker-object-storage.composition.ts";
 import type { WorkerTraceCapabilityDatabase } from "./worker-trace-capability-services.composition.ts";
@@ -225,7 +225,7 @@ import {
 } from "./worker-automation-graph.composition.ts";
 import {
   createWorkerAutomationSettlement,
-  WorkerAutomationSettlementAbsenceReportPort,
+  WorkerAutomationSettlementAbsenceReport,
 } from "./worker-automation-settlement.composition.ts";
 import {
   WorkerAutomationHeartbeat,
@@ -238,35 +238,35 @@ import { tryCreateWorkerTraceBroadcast } from "./worker-trace-broadcast.composit
 import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition.ts";
 import {
   createWorkerLangyConversation,
-  WorkerLangyAbsenceReportPort,
+  WorkerLangyAbsenceReport,
   type WorkerLangyConversationDatabase,
 } from "./worker-langy-conversation.composition.ts";
 import { tryCreateWorkerLangyTitleModel } from "./worker-langy-title-model.composition.ts";
 import {
   createWorkerScenarioProcessing,
-  WorkerScenarioAbsenceReportPort,
+  WorkerScenarioAbsenceReport,
 } from "./worker-scenario-processing.composition.ts";
 import {
   createWorkerOps,
   LoggedWorkerOpsAbsence,
-  type WorkerOpsAbsenceReportPort,
+  type WorkerOpsAbsenceReport,
 } from "./worker-ops.composition.ts";
 import {
   LoggedWorkerRealtimeSessionAbsence,
   tryCreateWorkerRealtimeSessionPoller,
-  type WorkerRealtimeSessionAbsenceReportPort,
+  type WorkerRealtimeSessionAbsenceReport,
 } from "./worker-realtime-session.composition.ts";
 import {
   LoggedWorkerScenarioExecutionAbsence,
   resolveWorkerScenarioExecutionPrerequisites,
-  type WorkerScenarioExecutionAbsenceReportPort,
+  type WorkerScenarioExecutionAbsenceReport,
 } from "./worker-scenario-execution.composition.ts";
 import { createWorkerAgentApps } from "./worker-agent-apps.composition.ts";
 import { createWorkerEvaluationWorkflows } from "./worker-evaluation-app.composition.ts";
 import { installWorkerEvaluator } from "./worker-evaluator.composition.ts";
 import {
   createWorkerGatewaySpend,
-  WorkerGatewaySpendAbsenceReportPort,
+  WorkerGatewaySpendAbsenceReport,
   type WorkerGatewaySpendCompositionInput,
 } from "./worker-gateway-spend.composition.ts";
 import {
@@ -300,7 +300,7 @@ export type WorkerTopicCompositionOptions = {
  * deployment should read in its own logs at boot rather than infer from work that quietly never
  * completes.
  */
-export abstract class WorkerTraceAbsenceReportPort {
+export abstract class WorkerTraceAbsenceReport {
   /** No pub/sub bridge: the two broadcast subscribers register and stay inert. */
   abstract withoutBroadcast(): void;
 }
@@ -337,7 +337,7 @@ export type WorkerDatabaseCompositionOptions = PrismaApiKeyDatabase &
  * `@langwatch/identity-server`'s Postgres seams,
  * The ONE identity ledger this graph still RECEIVES (ADR-101).
  */
-export abstract class WorkerGithubAbsenceReportPort {
+export abstract class WorkerGithubAbsenceReport {
   abstract withoutAppCredentials(): void;
 }
 
@@ -368,8 +368,8 @@ type WorkerEventingConsumerCompositionOptions = {
 
 type WorkerProductionCompositionBaseOptions = {
   config: WorkerConfig;
-  lifecycle: WorkerLifecyclePort;
-  transport: WorkerTransportPort;
+  lifecycle: WorkerLifecycle;
+  transport: WorkerTransport;
   /** The one Prisma client this process opened. */
   database: WorkerDatabaseCompositionOptions;
   /**
@@ -561,7 +561,7 @@ export class WorkerProductionComposition {
     const projectActivity = WorkerProjectActivityAdapter.create(codingAgentActivity);
     const codingAgent = CodingAgentWorkerFeatureInstaller.create({
       eventing,
-      installer: ClickHouseCodingAgentProcessingAdapter.create({
+      installer: RedisCodingAgentProcessingRepository.create({
         resolveClient: options.eventing.resolveClickHouseClient,
         defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
         redis: eventingOptions.groupQueue.redis,
@@ -684,7 +684,7 @@ export class WorkerProductionComposition {
     });
     const log = LogWorkerFeatureInstaller.create({
       eventing,
-      installer: ClickHouseLogProcessingAdapter.create({
+      installer: ClickhouseLogProcessingRepository.create({
         resolveClient: options.eventing.resolveClickHouseClient,
         defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
         logCommandShardCount: CanonicalLogAdapter.resolveLogCommandShardCount(
@@ -1730,7 +1730,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place Trace's storage absences are declared. */
   private static traceAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerTraceAbsenceReportPort | undefined {
+  ): WorkerTraceAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerTraceAbsence.create(options.observability.logger)
       : undefined;
@@ -1739,7 +1739,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place the spend graph's absences are declared. */
   private static gatewayAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerGatewaySpendAbsenceReportPort | undefined {
+  ): WorkerGatewaySpendAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerGatewaySpendAbsence.create(options.observability.logger)
       : undefined;
@@ -1748,7 +1748,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place Scenario's execution absence is declared. */
   private static scenarioAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerScenarioAbsenceReportPort | undefined {
+  ): WorkerScenarioAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerScenarioAbsence.create(options.observability.logger)
       : undefined;
@@ -1757,7 +1757,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place the operational loops' absences are declared. */
   private static opsAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerOpsAbsenceReportPort | undefined {
+  ): WorkerOpsAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerOpsAbsence.create(options.observability.logger)
       : undefined;
@@ -1766,7 +1766,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place the voice reconciler's absence is declared. */
   private static realtimeSessionAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerRealtimeSessionAbsenceReportPort | undefined {
+  ): WorkerRealtimeSessionAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerRealtimeSessionAbsence.create(options.observability.logger)
       : undefined;
@@ -1775,7 +1775,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place the scenario EXECUTOR's absence is declared. */
   private static scenarioExecutionAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerScenarioExecutionAbsenceReportPort | undefined {
+  ): WorkerScenarioExecutionAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerScenarioExecutionAbsence.create(options.config.serviceName)
       : undefined;
@@ -1784,7 +1784,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place Automation settlement's absences are declared. */
   private static automationAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerAutomationSettlementAbsenceReportPort | undefined {
+  ): WorkerAutomationSettlementAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerAutomationSettlementAbsence.create(options.observability.logger)
       : undefined;
@@ -1793,7 +1793,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place Langy's three absences are declared. */
   private static langyAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerLangyAbsenceReportPort | undefined {
+  ): WorkerLangyAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerLangyAbsence.create(options.observability.logger)
       : undefined;
@@ -1808,7 +1808,7 @@ export class WorkerProductionComposition {
     adminEmails,
   }: {
     adminEmails: string | undefined;
-  }): PlatformOperatorPort {
+  }): PlatformOperator {
     const access = AdminAccessService.create({ adminEmails: adminEmails ?? "" });
 
     return { isPlatformOperatorEmail: ({ email }) => access.isAdmin({ email }) };
@@ -1817,7 +1817,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place Identity's one absence is declared. */
   private static identityAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerIdentityAbsenceReportPort | undefined {
+  ): WorkerIdentityAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerIdentityAbsence.create(options.observability.logger)
       : undefined;
@@ -1826,7 +1826,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place the model gateway's absences are declared. */
   private static modelProviderAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerModelProviderAbsenceReportPort | undefined {
+  ): WorkerModelProviderAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerModelProviderAbsence.create(options.observability.logger)
       : undefined;
@@ -1835,7 +1835,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place Topic's one absence is declared. */
   private static topicAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerTopicAbsenceReportPort | undefined {
+  ): WorkerTopicAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerTopicAbsence.create(options.observability.logger)
       : undefined;
@@ -1844,7 +1844,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place Evaluation's one absence is declared. */
   private static evaluationAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerEvaluationAbsenceReportPort | undefined {
+  ): WorkerEvaluationAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerEvaluationAbsence.create(options.observability.logger)
       : undefined;
@@ -1853,7 +1853,7 @@ export class WorkerProductionComposition {
   /** The boot logger, as the one place a composition absence is declared. */
   private static githubAbsence(
     options: WorkerProductionCompositionOptions,
-  ): WorkerGithubAbsenceReportPort | undefined {
+  ): WorkerGithubAbsenceReport | undefined {
     return options.observability
       ? LoggedWorkerGithubAbsence.create(options.observability.logger)
       : undefined;
@@ -1866,9 +1866,9 @@ export class WorkerProductionComposition {
   static createFromPorts(options: {
     config: WorkerConfig;
     eventing: WorkerEventingRuntime;
-    lifecycle: WorkerLifecyclePort;
-    transport: WorkerTransportPort;
-    featureApps?: WorkerFeatureInstallerPort;
+    lifecycle: WorkerLifecycle;
+    transport: WorkerTransport;
+    featureApps?: WorkerFeatureInstaller;
     automation?: AutomationWorkerFeatureInstaller;
     eventingMaintenance?: EventingMaintenanceWorkerFeatureInstaller;
     langyConversation?: LangyConversationWorkerFeatureInstaller;
@@ -1957,7 +1957,7 @@ export class WorkerProductionComposition {
   readonly enterprise: EnterpriseWorkerComposition | undefined;
   readonly infrastructure: WorkerInfrastructureAdapter | undefined;
   /** Exactly the installers the application mounts, in mount order. */
-  readonly featureInstallers: readonly WorkerFeatureInstallerPort[];
+  readonly featureInstallers: readonly WorkerFeatureInstaller[];
   /**
    * The installers a host wires producers against. Each publishes callable command proxies that
    * refuse until the installer has registered, so exposing them here is what lets a host hand a
@@ -1981,7 +1981,7 @@ export class WorkerProductionComposition {
     trace: TraceWorkerFeatureInstaller;
     enterprise: EnterpriseWorkerComposition | undefined;
     infrastructure: WorkerInfrastructureAdapter | undefined;
-    featureInstallers: readonly WorkerFeatureInstallerPort[];
+    featureInstallers: readonly WorkerFeatureInstaller[];
     automation: AutomationWorkerFeatureInstaller | undefined;
     evaluation: EvaluationWorkerFeatureInstaller | undefined;
     codingAgent: CodingAgentWorkerFeatureInstaller | undefined;
@@ -2019,7 +2019,7 @@ export class WorkerProductionComposition {
  */
 function orderedFeatureInstallers(
   options: Parameters<typeof WorkerProductionComposition.createFromPorts>[0],
-): readonly WorkerFeatureInstallerPort[] {
+): readonly WorkerFeatureInstaller[] {
   return [
     options.automation,
     options.eventingMaintenance,
@@ -2052,12 +2052,12 @@ function orderedFeatureInstallers(
   ].filter((installer) => installer !== undefined);
 }
 
-class WorkerProductionLifecycle extends WorkerLifecyclePort {
-  static create(lifecycle: WorkerLifecyclePort): WorkerProductionLifecycle {
+class WorkerProductionLifecycle extends WorkerLifecycle {
+  static create(lifecycle: WorkerLifecycle): WorkerProductionLifecycle {
     return new WorkerProductionLifecycle(lifecycle);
   }
 
-  private constructor(private readonly lifecycle: WorkerLifecyclePort) {
+  private constructor(private readonly lifecycle: WorkerLifecycle) {
     super();
   }
 
@@ -2069,7 +2069,7 @@ class WorkerProductionLifecycle extends WorkerLifecyclePort {
 /**
  * The Group Queue's own blob keyspace pass.
  */
-class WorkerGroupQueueBlobSweep extends WorkerBlobSweepPort {
+class WorkerGroupQueueBlobSweep extends WorkerBlobSweep {
   static create(
     redis: EventingServerRuntimeOptions["groupQueue"]["redis"],
   ): WorkerGroupQueueBlobSweep {
@@ -2090,7 +2090,7 @@ class WorkerGroupQueueBlobSweep extends WorkerBlobSweepPort {
  * organization's internal project is created, and `OrganizationService` answers it by exactly this
  * query — a `findFirst` ordered by creation.
  */
-class PrismaGovernanceOldestTeamAdapter extends ProjectOldestTeamPort {
+class PrismaGovernanceOldestTeamAdapter extends ProjectOldestTeam {
   static create(database: { team: { findFirst: (args: never) => Promise<unknown> } }) {
     return new PrismaGovernanceOldestTeamAdapter(database);
   }
@@ -2120,7 +2120,7 @@ class PrismaGovernanceOldestTeamAdapter extends ProjectOldestTeamPort {
  * carrying an organization repository into automation's mail to reach two columns
  * would couple the notice to an aggregate it never otherwise touches.
  */
-class PrismaAutomationOrganizationPricingAdapter extends WorkerAutomationOrganizationPricingPort {
+class PrismaAutomationOrganizationPricingAdapter extends WorkerAutomationOrganizationPricing {
   static create(database: {
     organization: { findUnique: (args: never) => Promise<unknown> };
   }): PrismaAutomationOrganizationPricingAdapter {
@@ -2205,7 +2205,7 @@ function withoutConsumers<Options extends WorkerEventingConsumerCompositionOptio
 }
 
 /** Names the spend graph's four absences once, at boot, rather than leaving them inferred. */
-export class LoggedWorkerGatewaySpendAbsence extends WorkerGatewaySpendAbsenceReportPort {
+export class LoggedWorkerGatewaySpendAbsence extends WorkerGatewaySpendAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerGatewaySpendAbsence {
     return new LoggedWorkerGatewaySpendAbsence(logger);
   }
@@ -2243,7 +2243,7 @@ export class LoggedWorkerGatewaySpendAbsence extends WorkerGatewaySpendAbsenceRe
 }
 
 /** Names the missing execution pool once, at boot, rather than leaving it inferred. */
-export class LoggedWorkerScenarioAbsence extends WorkerScenarioAbsenceReportPort {
+export class LoggedWorkerScenarioAbsence extends WorkerScenarioAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerScenarioAbsence {
     return new LoggedWorkerScenarioAbsence(logger);
   }
@@ -2264,7 +2264,7 @@ export class LoggedWorkerScenarioAbsence extends WorkerScenarioAbsenceReportPort
  * rather than seven checks scattered through the graph, because they answer
  * one question a reader has exactly once.
  */
-export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSettlementAbsenceReportPort {
+export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSettlementAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerAutomationSettlementAbsence {
     return new LoggedWorkerAutomationSettlementAbsence(logger);
   }
@@ -2322,7 +2322,7 @@ export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSet
 }
 
 /** Names Langy's three conversation absences once, at boot, rather than leaving them inferred. */
-export class LoggedWorkerLangyAbsence extends WorkerLangyAbsenceReportPort {
+export class LoggedWorkerLangyAbsence extends WorkerLangyAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerLangyAbsence {
     return new LoggedWorkerLangyAbsence(logger);
   }
@@ -2351,7 +2351,7 @@ export class LoggedWorkerLangyAbsence extends WorkerLangyAbsenceReportPort {
 }
 
 /** Names the missing GitHub App once, at boot, rather than leaving it inferred. */
-export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReportPort {
+export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerGithubAbsence {
     return new LoggedWorkerGithubAbsence(logger);
   }
@@ -2373,12 +2373,12 @@ export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReportPort {
  * connection pipeline mounts either way, so all sixteen of its routing keys are claimed and a
  * requested teardown completes on time.
  */
-export abstract class WorkerIdentityAbsenceReportPort {
+export abstract class WorkerIdentityAbsenceReport {
   abstract withoutDirectoryTokenRevocation(): void;
 }
 
 /** Names Identity's one absence once, at boot, rather than leaving it inferred. */
-export class LoggedWorkerIdentityAbsence extends WorkerIdentityAbsenceReportPort {
+export class LoggedWorkerIdentityAbsence extends WorkerIdentityAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerIdentityAbsence {
     return new LoggedWorkerIdentityAbsence(logger);
   }
@@ -2396,7 +2396,7 @@ export class LoggedWorkerIdentityAbsence extends WorkerIdentityAbsenceReportPort
 }
 
 /** Names Topic's one absence once, at boot, rather than leaving it inferred. */
-export class LoggedWorkerTopicAbsence extends WorkerTopicAbsenceReportPort {
+export class LoggedWorkerTopicAbsence extends WorkerTopicAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerTopicAbsence {
     return new LoggedWorkerTopicAbsence(logger);
   }
@@ -2413,7 +2413,7 @@ export class LoggedWorkerTopicAbsence extends WorkerTopicAbsenceReportPort {
   }
 }
 
-export class LoggedWorkerModelProviderAbsence extends WorkerModelProviderAbsenceReportPort {
+export class LoggedWorkerModelProviderAbsence extends WorkerModelProviderAbsenceReport {
   static create(logger: Pick<Logger, "warn" | "info">): LoggedWorkerModelProviderAbsence {
     return new LoggedWorkerModelProviderAbsence(logger);
   }
@@ -2445,7 +2445,7 @@ export class LoggedWorkerModelProviderAbsence extends WorkerModelProviderAbsence
 }
 
 /** Names Evaluation's one absence once, at boot, rather than leaving it inferred. */
-export class LoggedWorkerEvaluationAbsence extends WorkerEvaluationAbsenceReportPort {
+export class LoggedWorkerEvaluationAbsence extends WorkerEvaluationAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerEvaluationAbsence {
     return new LoggedWorkerEvaluationAbsence(logger);
   }
@@ -2474,7 +2474,7 @@ export class LoggedWorkerEvaluationAbsence extends WorkerEvaluationAbsenceReport
  * Reached only where `BASE_HOST` is unset, which is the same condition that already refuses every
  * outbound delivery: a graph alert that fired here could not be sent anywhere.
  */
-class AbsentEvaluationGraphActivity extends AutomationGraphActivityPort {
+class AbsentEvaluationGraphActivity extends AutomationGraphActivity {
   async getActiveGraphTriggersForProject(): Promise<[]> {
     return [];
   }
@@ -2489,7 +2489,7 @@ class AbsentEvaluationGraphActivity extends AutomationGraphActivityPort {
 }
 
 /** Names Trace's storage absence once, at boot, rather than leaving it inferred. */
-export class LoggedWorkerTraceAbsence extends WorkerTraceAbsenceReportPort {
+export class LoggedWorkerTraceAbsence extends WorkerTraceAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerTraceAbsence {
     return new LoggedWorkerTraceAbsence(logger);
   }
@@ -2509,13 +2509,13 @@ export class LoggedWorkerTraceAbsence extends WorkerTraceAbsenceReportPort {
 /**
  * The trigger-match recorder a non-consuming graph gets.
  */
-class AbsentTraceTriggerMatches extends AutomationTriggerMatchRecorderPort {
+class AbsentTraceTriggerMatches extends AutomationTriggerMatchRecorder {
   async send(): Promise<void> {
     throw new Error("Trace processing recorded a trigger match, but Automation is not composed.");
   }
 }
 
-class WorkerFeatureAppsInstaller implements WorkerFeatureInstallerPort {
+class WorkerFeatureAppsInstaller implements WorkerFeatureInstaller {
   readonly name = "feature-apps";
   readonly #apps: readonly { start(): Promise<void> }[];
 

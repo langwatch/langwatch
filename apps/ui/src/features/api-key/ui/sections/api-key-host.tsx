@@ -46,7 +46,7 @@ function readApiEndpoint(): string {
 }
 
 /**
- * The `#...` part of the address, without the hash. `UiRoutePort` carries no
+ * The `#...` part of the address, without the hash. `UiRoute` carries no
  * fragment and a screen may not read `window.location`, so this comes off
  * the global layer's `useUiAddress` — the seam keeping `react-router` out.
  */

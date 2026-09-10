@@ -12,13 +12,12 @@ import {
   type SecretCaller,
   type UpdateSecretInput,
 } from "@langwatch/secret-contract";
-import type { SecretEncryptionPort } from "../ports/secret.port.ts";
 import type { SecretRepositories } from "../repositories/secret.repositories.ts";
 import { SecretService } from "../services/secret.service.ts";
 
 /** The cipher the composing process owns; the key never reaches this package. */
 export interface SecretInfrastructure {
-  readonly encryption: SecretEncryptionPort;
+  readonly encryption: SecretEncryption;
 }
 
 type SecretSetup = FeatureSetup<
@@ -81,4 +80,10 @@ export class SecretApp implements SecretApiContract {
   update(input: Omit<UpdateSecretInput, "actorId">, by: SecretCaller): Promise<Secret> {
     return this.#secrets.update({ ...input, actorId: by.id });
   }
+}
+
+
+export interface SecretEncryption {
+  encrypt(value: string): string;
+  decrypt(value: string): string;
 }

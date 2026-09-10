@@ -4,13 +4,13 @@ import {
 } from "@langwatch/authz-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
-import { type AuthzMetricsPort, UncountedAuthzMetrics } from "../ports/authz-metrics.port.ts";
-import type { PostgresAuthzDatabasePort } from "../ports/postgres-authz-database.port.ts";
+import { type AuthzMetrics, UncountedAuthzMetrics } from "../ports/authz-metrics.port.ts";
+import type { PostgresAuthzDatabase } from "../ports/postgres-authz-database.port.ts";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
 import type {
-  AuthzGrantsCommandDispatcherPort,
+  AuthzGrantsCommandDispatcher,
   AuthzGrantsCommandSenders,
 } from "../ports/authz-grants-command-dispatcher.port.ts";
 import {
@@ -67,7 +67,7 @@ type InternalPostgresAuthzDatabase = AuthzLedgerDatabase &
   AuthzProjectionDatabase;
 
 export type PostgresAuthzAdapterOptions = {
-  database: PostgresAuthzDatabasePort;
+  database: PostgresAuthzDatabase;
   /**
    * The rows the process selected at boot. A caller that composes this graph
    * by hand may omit them, and the two selectable rows are then built from the
@@ -75,7 +75,7 @@ export type PostgresAuthzAdapterOptions = {
    */
   repositories?: AuthzRepositories;
   redis: AuthzEpochRedis | null;
-  dispatcher: AuthzGrantsCommandDispatcherPort;
+  dispatcher: AuthzGrantsCommandDispatcher;
   /**
    * Where the two AuthZ counters go, on a process that renders any.
    *
@@ -86,7 +86,7 @@ export type PostgresAuthzAdapterOptions = {
    * still records — because both are built here from this one input rather
    * than handed in ready-made.
    */
-  metrics?: AuthzMetricsPort;
+  metrics?: AuthzMetrics;
   newBindingId: () => string;
   newCommandId?: () => string;
   now?: () => number;
@@ -113,7 +113,7 @@ export type PostgresAuthzBuild = Readonly<{
  * availability/error policy.
  */
 class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
-  constructor(private readonly dispatcher: AuthzGrantsCommandDispatcherPort) {}
+  constructor(private readonly dispatcher: AuthzGrantsCommandDispatcher) {}
 
   private async commands(): Promise<AuthzGrantsCommandSenders> {
     return (await this.dispatcher.commands()).commands;
@@ -187,7 +187,7 @@ export class PostgresAuthzAdapter {
    * see what the engine sees (the share ledger's cut-over check does). The
    * repository stays private; this is the one door to it.
    */
-  static createReader({ database }: { database: PostgresAuthzDatabasePort }) {
+  static createReader({ database }: { database: PostgresAuthzDatabase }) {
     return PrismaAuthzReadRepository.create(database as unknown as AuthzDatabase);
   }
 

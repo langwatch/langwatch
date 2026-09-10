@@ -5,7 +5,7 @@ import type { ProcessHandlerContext } from "@langwatch/eventing";
 import {
   CONNECTION_TEARDOWN_INITIAL_STATE,
   type ConnectionTeardownIntents,
-  type ConnectionTeardownPort,
+  type ConnectionTeardown,
   connectionTeardownWake,
   onTeardownRequested,
   onTornDown,
@@ -71,7 +71,7 @@ describe("the connection teardown grace", () => {
         },
       });
 
-      const port: ConnectionTeardownPort = { completeTeardown: vi.fn() };
+      const port: ConnectionTeardown = { completeTeardown: vi.fn() };
       await runCompleteTeardown({ port })(woken.intents![0]!.payload as never);
       expect(port.completeTeardown).toHaveBeenCalledWith({
         connectionId: CONNECTION,

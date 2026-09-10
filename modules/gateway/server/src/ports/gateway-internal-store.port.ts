@@ -19,7 +19,7 @@ import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
  * without it emits an empty alias map and the gateway silently stops resolving
  * aliases and enforcing model deny rules.
  */
-export abstract class GatewayInternalStorePort {
+export abstract class GatewayInternalStore {
   /**
    * One virtual key with everything the warm-cache config is built from.
    *

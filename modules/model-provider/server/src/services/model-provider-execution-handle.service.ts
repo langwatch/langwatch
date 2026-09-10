@@ -14,9 +14,9 @@ import {
   prepareLitellmParams,
 } from "../rules/legacy-model-provider.rules.ts";
 import type {
-  ModelCostProjectPort,
-  ModelProviderCodexHandlePort,
-} from "../ports/model-provider.port.ts";
+  ModelCostProject,
+  ModelProviderCodexHandle,
+} from "../app/model-provider.infrastructure.ts";
 
 /**
  * Returns a Vercel AI SDK model handle for the given project + feature.
@@ -36,16 +36,16 @@ export type ModelProviderExecutionHandleOptions = {
   /**
    * The project read that decides whether the id names anything at all.
    */
-  projects: ModelCostProjectPort;
+  projects: ModelCostProject;
   /**
    * Where the execution proxy answers, fully formed: nlpgo's `/go/proxy/v1`.
    */
   executionProxyBaseUrl: string;
   /**
    * Codex's own road, where the process composed one. Absent means codex
-   * models refuse by name — see {@link ModelProviderCodexHandlePort}.
+   * models refuse by name — see {@link ModelProviderCodexHandle}.
    */
-  codexHandles?: ModelProviderCodexHandlePort;
+  codexHandles?: ModelProviderCodexHandle;
 };
 
 async function resolveModel({

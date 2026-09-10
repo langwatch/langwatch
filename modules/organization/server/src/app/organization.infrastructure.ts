@@ -8,10 +8,10 @@ export interface OrganizationInfrastructure {  groupIdentity: GroupIdentity;
   personalWorkspaceDiagnostics: PersonalWorkspaceDiagnostics;
   personalWorkspaceIdentity: PersonalWorkspaceIdentity;
   teamIdentity: TeamIdentity;
-  organizationInviteSeatCensus?: OrganizationInviteSeatCensusPort;
-  organizationInviteMail?: OrganizationInviteMailPort;
-  organizationInviteWorkspaceCensus?: OrganizationInviteWorkspaceCensusPort;
-  organizationInviteRateLimit?: OrganizationInviteRateLimitPort;
+  organizationInviteSeatCensus?: OrganizationInviteSeatCensus;
+  organizationInviteMail?: OrganizationInviteMail;
+  organizationInviteWorkspaceCensus?: OrganizationInviteWorkspaceCensus;
+  organizationInviteRateLimit?: OrganizationInviteRateLimit;
 }
 
 /**
@@ -19,7 +19,7 @@ export interface OrganizationInfrastructure {  groupIdentity: GroupIdentity;
  * predicate for the single question "is there room for these invitations." A process with none
  * composed is told so by name rather than handed zeroes, which would sell unlimited seats.
  */
-export interface OrganizationInviteSeatCensusPort {
+export interface OrganizationInviteSeatCensus {
   /** Members holding a FULL seat right now, live invitations included. */
   getMemberCount(organizationId: string): Promise<number>;
   /** Members holding a LITE seat right now, live invitations included. */
@@ -36,7 +36,7 @@ export interface OrganizationInviteSeatCensusPort {
  * `@langwatch/mail`, since rendering is react-email and `frontend-boundary.unit.test.ts` bans a
  * value-import chain from a backend process to React. Absent is a supported state, not degraded.
  */
-export interface OrganizationInviteMailPort {
+export interface OrganizationInviteMail {
   /**
    * The invitation itself, carrying the already-built accept URL.
    *
@@ -82,7 +82,7 @@ export interface OrganizationInviteMailPort {
  * not compose it says so by not having one rather than by reporting zero,
  * which would tell every invitee the room is empty.
  */
-export interface OrganizationInviteWorkspaceCensusPort {
+export interface OrganizationInviteWorkspaceCensus {
   countProjects(organizationId: string): Promise<number>;
 }
 
@@ -90,7 +90,7 @@ export interface OrganizationInviteWorkspaceCensusPort {
  * The process's fixed-window counter, as the invitation throttle spends it. A port rather than a
  * Redis client, so the admin's resend and the invitee's re-request spend the same allowance.
  */
-export interface OrganizationInviteRateLimitPort {
+export interface OrganizationInviteRateLimit {
   limit(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<Readonly<{ allowed: boolean; resetAt: number }>>;

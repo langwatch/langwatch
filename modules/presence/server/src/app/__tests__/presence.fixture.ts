@@ -10,26 +10,26 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { EventEmitter } from "node:events";
 import { vi } from "vitest";
-import {
-  PresenceBroadcastPort,
-  PresenceDiagnosticsPort,
-  PresenceEmitterPort,
-} from "../../ports/presence.port.ts";
+import type {
+  PresenceBroadcast,
+  PresenceDiagnostics,
+  PresenceEmitter,
+} from "../presence.app.ts";
 import type { PresenceRepositories } from "../../repositories/presence.repositories.ts";
 import { MemoryPresenceRepositories } from "../../repositories/memory/memory.presence.repositories.ts";
 import { PresenceApp } from "../presence.app.ts";
 
-type PresencePublishInput = Parameters<PresenceBroadcastPort["publish"]>[0];
+type PresencePublishInput = Parameters<PresenceBroadcast["publish"]>[0];
 
-export class RecordingPresenceBroadcast extends PresenceBroadcastPort {
+export class RecordingPresenceBroadcast implements PresenceBroadcast {
   readonly publish = vi.fn<(input: PresencePublishInput) => Promise<void>>(async () => undefined);
 }
 
-export class RecordingPresenceDiagnostics extends PresenceDiagnosticsPort {
+export class RecordingPresenceDiagnostics implements PresenceDiagnostics {
   readonly warn = vi.fn();
 }
 
-export class TestPresenceEmitters extends PresenceEmitterPort {
+export class TestPresenceEmitters implements PresenceEmitter {
   readonly emitter = new EventEmitter();
   readonly getTenantEmitter = vi.fn(() => this.emitter);
   readonly cleanupTenantEmitter = vi.fn();
@@ -62,9 +62,9 @@ export function createPresenceTestUsers(profile?: Pick<PresenceUser, "name" | "i
 export function createPresenceTestApp(
   input: Readonly<{
     repositories?: PresenceRepositories;
-    broadcast?: PresenceBroadcastPort;
-    emitters?: PresenceEmitterPort;
-    diagnostics?: PresenceDiagnosticsPort;
+    broadcast?: PresenceBroadcast;
+    emitters?: PresenceEmitter;
+    diagnostics?: PresenceDiagnostics;
     projects?: ProjectApi;
     users?: UserApi;
   }> = {},

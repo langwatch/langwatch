@@ -2,7 +2,7 @@
  * What the user feature's composition reads on its own connection, and how.
  */
 import { compareSync, hashSync } from "bcrypt";
-import { IdentityEventingPort } from "@langwatch/identity-server";
+import { IdentityEventing } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 import { installApiUser } from "../user.composition.ts";
@@ -95,7 +95,7 @@ function testPrisma() {
 }
 
 /** No event stack: nothing here spends an identifier command. */
-class SilentEventing extends IdentityEventingPort {
+class SilentEventing extends IdentityEventing {
   async tryPipelineCommand() {
     return null;
   }

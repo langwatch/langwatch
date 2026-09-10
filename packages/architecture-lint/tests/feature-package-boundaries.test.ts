@@ -319,7 +319,7 @@ describe("feature package boundary lint", () => {
     );
     write(
       "modules/agent/server/src/ports/simulation-execution.port.ts",
-      "export abstract class SimulationExecutionPort {}",
+      "export abstract class SimulationExecution {}",
     );
 
     expect(

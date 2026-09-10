@@ -234,7 +234,7 @@ export type NavigationAccountMenu = {
   };
 };
 
-export abstract class NavigationHostPort {
+export abstract class NavigationHost {
   /** Every organization the reader belongs to; empty is a real answer. */
   abstract organizations(): NavigationOrganization[];
 
@@ -434,7 +434,7 @@ export abstract class NavigationHostPort {
   abstract setDocumentTitle(title: string): () => void;
 }
 
-const NavigationHostContext = createContext<NavigationHostPort | undefined>(void 0);
+const NavigationHostContext = createContext<NavigationHost | undefined>(void 0);
 
 /** Publishes the host to the screens and everything they render. */
 export const NavigationHostProvider = NavigationHostContext.Provider;
@@ -445,10 +445,10 @@ export const NavigationHostProvider = NavigationHostContext.Provider;
  * Throws rather than degrading: a navigation surface with no host cannot pick
  * a destination, and a silent default would send the reader somewhere wrong.
  */
-export function useNavigationHost(): NavigationHostPort {
+export function useNavigationHost(): NavigationHost {
   const host = useContext(NavigationHostContext);
   if (!host) {
-    throw new Error("No NavigationHostPort in context. Mount NavigationHostProvider above.");
+    throw new Error("No NavigationHost in context. Mount NavigationHostProvider above.");
   }
   return host;
 }
@@ -462,6 +462,6 @@ export function useNavigationHost(): NavigationHostPort {
  * a header decoration. Rendering no switcher is the honest answer there — the
  * same answer the port gave before there was one.
  */
-export function useOptionalNavigationHost(): NavigationHostPort | undefined {
+export function useOptionalNavigationHost(): NavigationHost | undefined {
   return useContext(NavigationHostContext);
 }

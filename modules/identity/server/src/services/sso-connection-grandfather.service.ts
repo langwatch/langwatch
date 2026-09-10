@@ -5,7 +5,7 @@ import {
   type SsoConnectionType,
   type SsoIdpMetadata,
 } from "@langwatch/identity-contract";
-import type { SignInDomainRoutingPort } from "./signin-router.service.ts";
+import type { SignInDomainRouting } from "./signin-router.service.ts";
 import {
   grandfatherCommandId,
   grandfatheredSsoConnectionId,
@@ -52,9 +52,9 @@ export interface SsoConnectionGrandfatherDeps {
   connections: SsoConnectionService;
   legacy: LegacySsoOrganizationRepository;
   /** The string-based lookup — what decides sign-in today. */
-  legacyRouting: SignInDomainRoutingPort;
+  legacyRouting: SignInDomainRouting;
   /** The projection-based lookup — what will decide it after the flip. */
-  connectionRouting: SignInDomainRoutingPort;
+  connectionRouting: SignInDomainRouting;
   /** How the connection is dialed. `providerId` comes from the org's
    *  `ssoProvider`; the rest is what the deployment already holds, which is
    *  why it arrives as a resolver rather than a constant. */

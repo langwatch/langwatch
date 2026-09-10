@@ -21,7 +21,7 @@ import { ApiApplication } from "../../../api.application.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { composeApiModelProviders } from "../../../app/api-model-provider.composition.ts";
 import { composeDatasetService } from "../../dataset/dataset.composition.ts";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -291,14 +291,14 @@ function testOrganizations(): OrganizationService {
 /**
  * The stored-secret cipher, with the deployment's key replaced by a marker.
  */
-function testCipher(): SecretEncryptionPort {
+function testCipher(): SecretEncryption {
   return {
     encrypt: (value: string) => `enc:${value}`,
     decrypt: (value: string) => {
       if (!value.startsWith("enc:")) throw new Error("Invalid encrypted string format");
       return value.slice("enc:".length);
     },
-  } as SecretEncryptionPort;
+  } as SecretEncryption;
 }
 
 /**

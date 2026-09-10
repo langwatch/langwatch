@@ -4,9 +4,9 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
-  WorkerHandlePort,
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerHandle,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "../../platform/lifecycle/worker-runtime.port.ts";
 import { EventingMaintenanceWorkerFeatureInstaller } from "../../features/eventing-maintenance/eventing-maintenance-worker-feature.installer.ts";
 import { WorkerProductionComposition } from "../worker-production.composition.ts";
@@ -33,16 +33,16 @@ import { createWorkerProcessRedis } from "./support/worker-redis.double.ts";
  * cannot see — the ones where a collaborator is reached rather than counted.
  */
 
-class Lifecycle extends WorkerLifecyclePort {
+class Lifecycle extends WorkerLifecycle {
   async close(): Promise<void> {}
 }
 
-class Handle extends WorkerHandlePort {
+class Handle extends WorkerHandle {
   async shutdown(): Promise<void> {}
 }
 
-class Transport extends WorkerTransportPort {
-  async start(): Promise<WorkerHandlePort> {
+class Transport extends WorkerTransport {
+  async start(): Promise<WorkerHandle> {
     return new Handle();
   }
 }

@@ -2,7 +2,7 @@ import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
-  IdentityAccountsPort,
+  IdentityAccounts,
 } from "../../rules/identity-storage-ports.rules.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -83,7 +83,7 @@ function accountMirrorData(secrets: IdentityAccountSecrets): Record<string, unkn
  * the identifier's pinned `accountId` — says what secrets it carries.
  * (ADR-116 §6): `Identifier` says who holds the sign-in method, and
  */
-export class PrismaIdentityAccountsRepository implements IdentityAccountsPort {
+export class PrismaIdentityAccountsRepository implements IdentityAccounts {
   static create(prisma: PrismaClient): PrismaIdentityAccountsRepository {
     return new PrismaIdentityAccountsRepository(prisma);
   }

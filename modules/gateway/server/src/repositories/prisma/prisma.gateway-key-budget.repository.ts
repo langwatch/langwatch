@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayBudget } from "@langwatch/gateway-contract";
 import { toGatewayBudgetRow } from "./prisma.gateway-budget.repository.ts";
-import type { GatewayPersistenceTransaction } from "../../ports/gateway-change-events.port.ts";
+import type { GatewayPersistenceTransaction } from "../../app/gateway.infrastructure.ts";
 import {
   GatewayKeyBudgetRepository,
   type GatewayKeyBudgetFields,

@@ -7,7 +7,7 @@ import type { ModelProvider } from "@langwatch/gateway-contract";
 import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter.ts";
 
 const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
+import type { GatewayModelProviderCredentials } from "../app/gateway.infrastructure.ts";
 
 const geminiRow = (customKeys: Record<string, string>): ModelProvider =>
   ({
@@ -15,7 +15,7 @@ const geminiRow = (customKeys: Record<string, string>): ModelProvider =>
     customKeys,
   }) as unknown as ModelProvider;
 
-const credentialsPort: GatewayModelProviderCredentialsPort = {
+const credentialsPort: GatewayModelProviderCredentials = {
   readCustomKeys: (stored: unknown) => stored as Record<string, unknown>,
 };
 

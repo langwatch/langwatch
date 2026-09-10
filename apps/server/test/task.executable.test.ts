@@ -22,7 +22,7 @@ vi.mock("@langwatch/observability/node", () => ({
 
 import {
   LocalTaskExecutable,
-  LocalTaskExecutorPort,
+  LocalTaskExecutor,
   resolveLocalTaskExecutableConfig,
   runLocalTaskEntrypoint,
   type LocalTaskExecution,
@@ -30,7 +30,7 @@ import {
 
 const taskSource = { NODE_ENV: "test" };
 
-class RecordingExecutor extends LocalTaskExecutorPort {
+class RecordingExecutor extends LocalTaskExecutor {
   readonly executions: LocalTaskExecution[] = [];
 
   async execute(input: LocalTaskExecution): Promise<void> {
@@ -38,7 +38,7 @@ class RecordingExecutor extends LocalTaskExecutorPort {
   }
 }
 
-class FailingExecutor extends LocalTaskExecutorPort {
+class FailingExecutor extends LocalTaskExecutor {
   async execute(): Promise<void> {
     throw new Error("task failed");
   }

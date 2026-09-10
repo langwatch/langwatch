@@ -1,5 +1,5 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { RecordSpanCommand, type TraceSpanSpoolPort } from "@langwatch/trace-server";
+import { EventingRecordSpanAdapter, type TraceSpanSpool } from "@langwatch/trace-server";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import { createWorkerTraceContentDrop } from "./worker-trace-content-drop.composition.ts";
 import { createWorkerTraceCostEnrichment } from "./worker-trace-cost-enrichment.composition.ts";
@@ -21,12 +21,12 @@ import type { WorkerTraceCapabilityServices } from "./worker-trace-capability-se
  *
  * The four ports and what each one now rests on:
  *
- *     RecordSpanCommand                   (trace-server owns it)
- *       ├─ TraceSpanPiiRedactionPort      DataPrivacyResolutionPort + flags + Presidio
- *       ├─ TraceSpanContentDropPort       DataPrivacyResolutionPort
- *       ├─ TraceSpanTokenEstimationPort   flags + the local BPE tables
- *       ├─ TraceSpanCostEnrichmentPort    the project's own cost rules
- *       └─ TraceSpanSpoolPort             optional; the stored-object runtime
+ *     EventingRecordSpanAdapter                   (trace-server owns it)
+ *       ├─ TraceSpanPiiRedaction      DataPrivacyResolution + flags + Presidio
+ *       ├─ TraceSpanContentDrop       DataPrivacyResolution
+ *       ├─ TraceSpanTokenEstimation   flags + the local BPE tables
+ *       ├─ TraceSpanCostEnrichment    the project's own cost rules
+ *       └─ TraceSpanSpool             optional; the stored-object runtime
  *
  * Every one of those five is now composable from the one Prisma client, the
  * queue's Redis, the deployment's own variables and the stored-object runtime
@@ -46,11 +46,11 @@ export function createWorkerRecordSpanCommand(options: {
   config: WorkerConfig;
   services: WorkerTraceCapabilityServices;
   featureFlags: FeatureFlagApi;
-  spool?: TraceSpanSpoolPort;
-}): RecordSpanCommand {
+  spool?: TraceSpanSpool;
+}): EventingRecordSpanAdapter {
   const { config, services } = options;
 
-  return RecordSpanCommand.create({
+  return EventingRecordSpanAdapter.create({
     piiRedaction: createWorkerTracePrivacy({
       config: config.tracePrivacy,
       dataPrivacy: services.dataPrivacy,

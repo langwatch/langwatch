@@ -7,17 +7,17 @@ import {
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
-import type { CodingAgentClockPort } from "../../ports/coding-agent-clock.port.ts";
-import type { CodingAgentCostEstimatorPort } from "../../ports/coding-agent-cost-estimator.port.ts";
-import type { CodingAgentCostMetricsPort } from "../../ports/coding-agent-cost-metrics.port.ts";
-import type { CodingAgentProjectActivityPort } from "../../ports/coding-agent-project-activity.port.ts";
-import type { CodingAgentPullRequestMappingPort } from "../../ports/coding-agent-pull-request-mapping.port.ts";
+import type { CodingAgentClock } from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentCostEstimator } from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentCostMetrics } from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentProjectActivity } from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentPullRequestMapping } from "../../app/coding-agent.infrastructure.ts";
 import type { CodingAgentSessionContextMemoRepository } from "../session-context-memo.repository.ts";
 import { RedisSessionContextMemoRepository } from "./redis.session-context-memo.repository.ts";
 import { createCodingAgentCostDriftSubscriber } from "../../subscribers/coding-agent-cost-drift.subscriber.ts";
-import { EventingContributeLogFactsAdapter } from "../../adapters/eventing.contribute-log-facts.adapter.ts";
-import { EventingContributeMetricFactsAdapter } from "../../adapters/eventing.contribute-metric-facts.adapter.ts";
-import { EventingContributeSpanFactsAdapter } from "../../adapters/eventing.contribute-span-facts.adapter.ts";
+import { EventingContributeLogFactsAdapter } from "../../services/contribute-log-facts.service.ts";
+import { EventingContributeMetricFactsAdapter } from "../../services/contribute-metric-facts.service.ts";
+import { EventingContributeSpanFactsAdapter } from "../../services/contribute-span-facts.service.ts";
 import {
   CodingAgentSessionFoldProjection,
   type CodingAgentSessionState,
@@ -36,16 +36,16 @@ import {
   EventingCodingAgentSessionEventsAppendAdapter,
   EventingCodingAgentTraceSessionAppendAdapter,
   EventingSessionMetricSeriesAppendAdapter,
-} from "../../adapters/eventing.coding-agent-projections.adapter.ts";
-import { EventingCodingAgentSessionStoreAdapter } from "../../adapters/eventing.coding-agent-session-store.adapter.ts";
+} from "../../services/coding-agent-projection-append.service.ts";
+import { EventingCodingAgentSessionStoreAdapter } from "../../services/coding-agent-session-store.service.ts";
 
 export interface CodingAgentProcessingPipelineDeps {
   traceCanonicalisation: TraceCanonicalisationService;
-  modelProviders: CodingAgentCostEstimatorPort;
-  costMetrics: CodingAgentCostMetricsPort;
+  modelProviders: CodingAgentCostEstimator;
+  costMetrics: CodingAgentCostMetrics;
   projections: CodingAgentProjectionPersistence;
-  projects: CodingAgentProjectActivityPort;
-  clock: CodingAgentClockPort;
+  projects: CodingAgentProjectActivity;
+  clock: CodingAgentClock;
   redis: Redis | Cluster;
   defaultRetentionDays: number;
   /**
@@ -61,7 +61,7 @@ export interface CodingAgentProcessingPipelineDeps {
    * session's branch has hosted. Absent where there is no GitHub connection to
    * ask (the test app), in which case the pipeline mounts no subscriber at all.
    */
-  github?: CodingAgentPullRequestMappingPort;
+  github?: CodingAgentPullRequestMapping;
 }
 
 /**

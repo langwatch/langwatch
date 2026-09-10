@@ -30,9 +30,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   NlpInvokeTransportAdapter,
-  NlpLambdaInvokePort,
+  NlpLambdaInvoke,
   type NlpLambdaInvokeResult,
-  NlpPayloadStagingPort,
+  NlpPayloadStaging,
   type StagedNlpPayload,
 } from "@langwatch/workflow-server/testing";
 
@@ -103,7 +103,7 @@ class FakeObjectStore {
 }
 
 /** The staging port over the store above — the driver, not the decision. */
-class InMemoryPayloadStaging extends NlpPayloadStagingPort {
+class InMemoryPayloadStaging extends NlpPayloadStaging {
   constructor(private readonly store: FakeObjectStore) {
     super();
   }
@@ -124,7 +124,7 @@ class InMemoryPayloadStaging extends NlpPayloadStagingPort {
  * The one hop AWS owns, faked: it takes the invoke Payload the transport built
  * and replays it at the live engine as the HTTP request Lambda would have.
  */
-class HttpLambdaTransport extends NlpLambdaInvokePort {
+class HttpLambdaTransport extends NlpLambdaInvoke {
   /** Every payload as invoked, so the test can assert what went over the wire. */
   readonly payloads: string[] = [];
 

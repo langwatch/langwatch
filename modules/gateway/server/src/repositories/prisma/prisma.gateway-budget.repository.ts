@@ -36,8 +36,8 @@ import {
 } from "@langwatch/gateway-contract";
 import type {
   BudgetBucketBoundary,
-  GatewayBudgetSpendPort,
-} from "../../ports/gateway-budget-spend.port.ts";
+  GatewayBudgetSpend,
+} from "../../app/gateway.infrastructure.ts";
 import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository.ts";
 import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository.ts";
 import type { GatewayBudgetScopeReach } from "../gateway-budget.repository.ts";
@@ -273,14 +273,14 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     private readonly changeEvents = new PrismaGatewayChangeEventsRepository(prisma),
     private readonly auditLog = new PrismaGatewayAuditRepository(prisma),
     private readonly scopeReach = PrismaGatewayBudgetScopeReachRepository.create(prisma),
-    private readonly chRepo?: GatewayBudgetSpendPort,
+    private readonly chRepo?: GatewayBudgetSpend,
   ) {
     super();
   }
 
   static create(
     database: GatewayBudgetDatabase,
-    chRepo?: GatewayBudgetSpendPort,
+    chRepo?: GatewayBudgetSpend,
   ): PrismaGatewayBudgetRepository {
     return new PrismaGatewayBudgetRepository(
       database,

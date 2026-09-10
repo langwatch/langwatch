@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import {
   createUiScopeHost,
   UiScopeHostProvider,
-  type UiScopeHostPort,
+  type UiScopeHost,
 } from "@langwatch/ui-host/use-organization-team-project";
 
 /** The project every scenario read is scoped to. */
@@ -127,7 +127,7 @@ export function ScenarioHostProvider({
   value: ScenarioHostPort | undefined;
   children: ReactNode;
 }) {
-  const scope = useMemo<UiScopeHostPort | undefined>(
+  const scope = useMemo<UiScopeHost | undefined>(
     () =>
       value
         ? createUiScopeHost({

@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { GraphTriggerSweepCandidate } from "@langwatch/automation-contract";
 import { z } from "zod";
-import type { AutomationIntentRetentionPort } from "../ports/automation-intent-retention.port.ts";
-import type { AutomationScheduledIntentPort } from "../ports/automation-scheduled-intent.port.ts";
+import type { AutomationIntentRetention } from "../ports/automation-intent-retention.port.ts";
+import type { AutomationScheduledIntent } from "../ports/automation-scheduled-intent.port.ts";
 import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automation:graph-alert-sweep");
@@ -13,8 +13,8 @@ export const graphAlertSweepIntentSchema = z.object({
 });
 
 export function runGraphAlertSweep(
-  scheduledIntents: AutomationScheduledIntentPort,
-  retention: AutomationIntentRetentionPort,
+  scheduledIntents: AutomationScheduledIntent,
+  retention: AutomationIntentRetention,
 ) {
   return async (input: z.infer<typeof graphAlertSweepIntentSchema>): Promise<void> => {
     const startedAt = input.scheduledFor;

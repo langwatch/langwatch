@@ -11,7 +11,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   connectedWorkspaceSchema,
   type ConnectedWorkspace,
-  LangyLocalPresencePort,
+  LangyLocalPresence,
   type PresenceHeartbeat,
 } from "../langy-local-presence.repository.ts";
 
@@ -24,7 +24,7 @@ export interface LocalPresenceOptions {
   presenceTtlMs?: number;
 }
 
-export class LangyLocalPresenceRedisRepository extends LangyLocalPresencePort {
+export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
   private readonly store: SessionStateStore;
   private readonly presenceTtlMs: number;
   readonly now: () => number;

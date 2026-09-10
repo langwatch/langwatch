@@ -37,7 +37,7 @@ import type {
   SsoConnectionLedgerOperator,
   SsoConnectionLedgerPort,
 } from "./sso.infrastructure.ts";
-import type { SsoGateLoggerPort } from "./sso.infrastructure.ts";
+import type { SsoGateLogger } from "./sso.infrastructure.ts";
 import { SsoGateService } from "../services/sso-gate.service.ts";
 
 /** What the process composes this feature's application over. */
@@ -45,7 +45,7 @@ export type SsoInfrastructure = Readonly<{
   /** The identity aggregate's connection ledger, as the back office commands it. */
   connections: SsoConnectionLedgerPort;
   /** Where the gate's decisions are written. */
-  logger: SsoGateLoggerPort;
+  logger: SsoGateLogger;
 }>;
 
 type SsoSetup = FeatureSetup<typeof SsoApp.dependencies, SsoInfrastructure, SsoConfiguration>;

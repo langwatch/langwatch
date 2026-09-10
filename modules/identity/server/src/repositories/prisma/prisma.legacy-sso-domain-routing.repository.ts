@@ -1,5 +1,5 @@
 import type { RoutableConnection, SignInMethod } from "@langwatch/identity-contract";
-import type { SignInDomainRoutingPort } from "../../services/signin-router.service.ts";
+import type { SignInDomainRouting } from "../../services/signin-router.service.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
@@ -7,7 +7,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * `ssoProvider`, two staff-set strings.
  * are on, so the swap is a line in `runtime.ts` (ADR-117 §1, §5).
  */
-export class LegacySsoDomainRoutingRepository implements SignInDomainRoutingPort {
+export class LegacySsoDomainRoutingRepository implements SignInDomainRouting {
   static create({
     prisma,
     instanceMethod,

@@ -33,6 +33,7 @@ import {
   ROLE_PERMISSION_RESOURCES,
   roleResourceIsOrganizationExclusive,
   type Role,
+  type RoleBindingScopeType,
   type RoleCaller,
   type RoleCreate,
   type RolePermissionCatalog,
@@ -45,22 +46,25 @@ import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
-import type {
-  RoleBindingIdPort,
-  RoleCustomRolePlanPort,
-  RoleScopePort,
-} from "../ports/role.port.ts";
 import type { RoleRepositories } from "../repositories/role.repositories.ts";
 import { RoleService } from "../services/role.service.ts";
 
 /** What the composing process owns and this feature may not build for itself. */
 export interface RoleInfrastructure {
   /** The personal-workspace fence a team binding is refused at. */
-  readonly scope: RoleScopePort;
+  readonly scope: {
+    assertNoPersonalTeamScope(input: {
+      scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
+    }): Promise<void>;
+  };
   /** Whether the organization's plan carries custom roles. */
-  readonly plan: RoleCustomRolePlanPort;
+  readonly plan: {
+    assertCustomRolesAllowed(input: { organizationId: string }): Promise<void>;
+  };
   /** The identifier format a new binding is written under. */
-  readonly bindingIds: RoleBindingIdPort;
+  readonly bindingIds: {
+    newBindingId(): string;
+  };
 }
 
 type RoleSetup = FeatureSetup<
@@ -84,9 +88,9 @@ export class RoleApp implements RoleApi {
   #permissions: AuthzApi;
   #organizations: OrganizationApi;
   #users: UserApi;
-  #scope: RoleScopePort;
-  #plan: RoleCustomRolePlanPort;
-  #bindingIds: RoleBindingIdPort;
+  #scope: RoleInfrastructure["scope"];
+  #plan: RoleInfrastructure["plan"];
+  #bindingIds: RoleInfrastructure["bindingIds"];
 
   private constructor(
     repositories: RoleRepositories,

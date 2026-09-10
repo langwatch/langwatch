@@ -8,7 +8,7 @@ import type {
 import type { SharedTraceTrpcPorts } from "@langwatch/trace-server/api-trpc/shared-trace";
 import type { TracesV2TrpcPorts } from "@langwatch/trace-server/api-trpc/traces-v2";
 import type { TraceApp } from "@langwatch/trace-server";
-import type { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
+import type { ApiTraceReadStack } from "./trace-read-stack.port.ts";
 
 /** The application slices and the group's ports, composed together. The five
  * tRPC namespaces are not here: their transports are unconverted. */
@@ -18,7 +18,7 @@ export type ComposedTraceFeature = Readonly<{
   /**
    * The read stack itself, where this process composed one.
    */
-  traceReads?: ApiTraceReadStackPort | undefined;
+  traceReads?: ApiTraceReadStack | undefined;
   /** For `ctx.app.planProvider`. */
   planProvider: Pick<PlanProvider, "getActivePlan">;
   ports: ApiTracePorts;

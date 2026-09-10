@@ -1,5 +1,5 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
@@ -29,7 +29,7 @@ export interface BillingReportingWorkerCapability<TReportUsage = unknown> {
  * is configured before any pipeline exists — which is exactly why the sender
  * it closes over is the proxy published here and not a direct handle.
  */
-export class BillingReportingWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class BillingReportingWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: BillingReportingWorkerCapability;
     eventing: WorkerEventingRuntime;

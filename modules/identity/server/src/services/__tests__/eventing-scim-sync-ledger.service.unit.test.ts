@@ -12,7 +12,7 @@ import {
 } from "@langwatch/identity-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
-import { IdentityEventingPort } from "../../app/identity.infrastructure.ts";
+import { IdentityEventing } from "../../app/identity.infrastructure.ts";
 import { ScimSyncLedgerWriterAdapter } from "../eventing-scim-sync-ledger.service.ts";
 
 const ORGANIZATION = "org_acme";
@@ -20,7 +20,7 @@ const CONNECTION = "conn_1";
 const SYNC = "scimsync_1";
 const ACTOR = { type: "system" as const, id: null };
 
-class RecordingEventing implements IdentityEventingPort {
+class RecordingEventing implements IdentityEventing {
   readonly asked: Array<{ pipeline: string; command: string }> = [];
   readonly staged: unknown[] = [];
 

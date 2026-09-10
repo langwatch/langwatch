@@ -7,7 +7,7 @@ import { InviteNotFoundError } from "@langwatch/organization-contract";
 
 import { TeamUserRole } from "@langwatch/organization-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { OrganizationInviteMailPort } from "../app/organization.infrastructure.ts";
+import type { OrganizationInviteMail } from "../app/organization.infrastructure.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
 import {
   resolveInviteDisplayStatus,
@@ -214,7 +214,7 @@ export class InviteService {
     return this.deps.roles;
   }
 
-  private get mailer(): OrganizationInviteMailPort | undefined {
+  private get mailer(): OrganizationInviteMail | undefined {
     return this.deps.mail;
   }
 

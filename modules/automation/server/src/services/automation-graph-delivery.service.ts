@@ -1,5 +1,5 @@
 import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
-import { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port.ts";
+import { AutomationGraphDelivery } from "../app/automation.infrastructure.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
@@ -7,13 +7,12 @@ import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
 /** Graph delivery's Automation persistence, over repository interfaces only. */
-export class AutomationGraphDeliveryService extends AutomationGraphDeliveryPort {
+export class AutomationGraphDeliveryService implements AutomationGraphDelivery {
   private constructor(
     private readonly triggers: TriggerRepository,
     private readonly suppressions: EmailSuppressionRepository,
     private readonly webhookDeliveries: WebhookDeliveryRepository,
   ) {
-    super();
   }
 
   static create(input: {

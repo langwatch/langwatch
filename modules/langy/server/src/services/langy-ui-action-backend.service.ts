@@ -3,11 +3,11 @@ import {
   LangyUiExperimentRequiredError,
   LangyUiHandlerFailedError,
 } from "@langwatch/langy-contract";
-import type { LangyUiActionDefinition } from "../ports/langy-ui-action-catalog.port.ts";
+import type { LangyUiActionDefinition } from "../app/langy.infrastructure.ts";
 import {
   type LangyBackendActor,
-  LangyUiActionBackendPort,
-} from "../ports/langy-ui-action-backend.port.ts";
+  LangyUiActionBackend,
+} from "../app/langy.infrastructure.ts";
 import { tryReadTransformRefusalCode } from "../rules/langy-ui-action-refusal.rules.ts";
 
 /**
@@ -28,7 +28,7 @@ const logger = createLogger("langwatch:langy:ui-actions:backend");
 const LANGY_ACTOR_LABEL = "langy";
 
 export type LangyUiActionBackendServiceDependencies = {
-  backend: LangyUiActionBackendPort;
+  backend: LangyUiActionBackend;
 };
 
 export class LangyUiActionBackendService {
@@ -36,7 +36,7 @@ export class LangyUiActionBackendService {
     return new LangyUiActionBackendService(deps);
   }
 
-  private readonly backend: LangyUiActionBackendPort;
+  private readonly backend: LangyUiActionBackend;
 
   private constructor(deps: LangyUiActionBackendServiceDependencies) {
     this.backend = deps.backend;

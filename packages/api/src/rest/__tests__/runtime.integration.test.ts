@@ -29,7 +29,7 @@ import {
 } from "../openapi.ts";
 import { declined } from "../response.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
-import { createRestRuntime, type RestDeprecationLogPort } from "../runtime.ts";
+import { createRestRuntime, type RestDeprecationLog } from "../runtime.ts";
 import { getRoutePolicy } from "../security.ts";
 
 const SPEC_OPTIONS = { excludeStaticFile: false } as const;
@@ -485,7 +485,7 @@ const legacyReports = defineRestRouter(ReportApi)
   .build();
 
 /** The mount, plus the door's own spy: a public route must never reach it. */
-function legacyReportsApp(deprecationLog?: RestDeprecationLogPort): {
+function legacyReportsApp(deprecationLog?: RestDeprecationLog): {
   app: Hono;
   authenticate: ReturnType<typeof vi.fn>;
 } {

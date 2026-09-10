@@ -1,6 +1,6 @@
-import { JoinRequestMailPort } from "@langwatch/identity-server";
-import type { MailRenderPort } from "@langwatch/mail";
-import type { EmailDeliveryPort } from "@langwatch/notification-server";
+import { JoinRequestMail } from "@langwatch/identity-server";
+import type { MailRender } from "@langwatch/mail";
+import type { EmailDelivery } from "@langwatch/notification-server";
 
 /**
  * The two join-request mails this process's wakes send (D12).
@@ -12,7 +12,7 @@ import type { EmailDeliveryPort } from "@langwatch/notification-server";
  * telling them fails.
  *
  * The WORDS do not live here. They are `@langwatch/mail`'s, rendered through
- * `MailRenderPort`, because this file used to hold a `createElement`
+ * `MailRender`, because this file used to hold a `createElement`
  * translation of the same two mails the mail package already rendered from
  * JSX — a twin, and one that put react-email on the worker's boot graph. A
  * drift between twins is invisible in production: two admins on one
@@ -31,11 +31,11 @@ import type { EmailDeliveryPort } from "@langwatch/notification-server";
  * The ending is deliberately quiet: a requester who learns which colleague
  * turned them down has learned something that is not theirs.
  */
-export class JoinRequestMailAdapter extends JoinRequestMailPort {
+export class JoinRequestMailAdapter extends JoinRequestMail {
   static create(options: {
-    mailer: EmailDeliveryPort;
+    mailer: EmailDelivery;
     /** Renders the words. `ReactEmailMailRenderer` in every real process. */
-    renderer: MailRenderPort;
+    renderer: MailRender;
     /** The deployment's own host, as every link in these mails is built from. */
     baseHost: string;
   }): JoinRequestMailAdapter {
@@ -43,8 +43,8 @@ export class JoinRequestMailAdapter extends JoinRequestMailPort {
   }
 
   private constructor(
-    private readonly mailer: EmailDeliveryPort,
-    private readonly renderer: MailRenderPort,
+    private readonly mailer: EmailDelivery,
+    private readonly renderer: MailRender,
     private readonly baseHost: string,
   ) {
     super();
@@ -109,7 +109,7 @@ export class JoinRequestMailAdapter extends JoinRequestMailPort {
  * A process that CLAIMS `event-sourcing/jobs` never gets here:
  * `WorkerProductionComposition` refuses to compose that graph without mail.
  */
-export class AbsentJoinRequestMail extends JoinRequestMailPort {
+export class AbsentJoinRequestMail extends JoinRequestMail {
   static create(): AbsentJoinRequestMail {
     return new AbsentJoinRequestMail();
   }

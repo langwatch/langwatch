@@ -6,10 +6,10 @@ import type {
 } from "@langwatch/project-contract";
 import type { ModelCost } from "@langwatch/model-provider-contract";
 import {
-  TraceEvaluationMonitorPort,
-  TraceModelCostCatalogPort,
-  TraceProductAnalyticsPort,
-  TraceProjectMetadataPort,
+  TraceEvaluationMonitor,
+  TraceModelCostCatalog,
+  TraceProductAnalytics,
+  TraceProjectMetadata,
 } from "@langwatch/trace-server";
 
 /**
@@ -50,7 +50,7 @@ export function createWorkerTraceNarrowPorts(options: {
   projects: TraceProjectMetadataReader;
   monitors: TraceEvaluationMonitorReader;
   modelProviders: TraceModelCostReader;
-  productAnalytics: TraceProductAnalyticsPort;
+  productAnalytics: TraceProductAnalytics;
 }): WorkerTraceNarrowPorts {
   return {
     projects: new WorkerTraceProjectMetadataAdapter(options.projects),
@@ -70,14 +70,14 @@ export function createWorkerTraceNarrowPorts(options: {
  */
 export function createWorkerTraceEvaluationMonitorPort(
   monitors: TraceEvaluationMonitorReader,
-): TraceEvaluationMonitorPort {
+): TraceEvaluationMonitor {
   return new WorkerTraceEvaluationMonitorAdapter(monitors);
 }
 
 /** The project's own cost rules on their own, for record-time enrichment. */
 export function createWorkerTraceModelCostCatalogPort(
   modelProviders: TraceModelCostReader,
-): TraceModelCostCatalogPort {
+): TraceModelCostCatalog {
   return new WorkerTraceModelCostCatalogAdapter(modelProviders);
 }
 
@@ -104,13 +104,13 @@ export type TraceModelCostReader = {
 };
 
 export type WorkerTraceNarrowPorts = Readonly<{
-  projects: TraceProjectMetadataPort;
-  monitors: TraceEvaluationMonitorPort;
-  modelCosts: TraceModelCostCatalogPort;
-  productAnalytics: TraceProductAnalyticsPort;
+  projects: TraceProjectMetadata;
+  monitors: TraceEvaluationMonitor;
+  modelCosts: TraceModelCostCatalog;
+  productAnalytics: TraceProductAnalytics;
 }>;
 
-class WorkerTraceProjectMetadataAdapter extends TraceProjectMetadataPort {
+class WorkerTraceProjectMetadataAdapter extends TraceProjectMetadata {
   constructor(private readonly projects: TraceProjectMetadataReader) {
     super();
   }
@@ -128,7 +128,7 @@ class WorkerTraceProjectMetadataAdapter extends TraceProjectMetadataPort {
   }
 }
 
-class WorkerTraceEvaluationMonitorAdapter extends TraceEvaluationMonitorPort {
+class WorkerTraceEvaluationMonitorAdapter extends TraceEvaluationMonitor {
   constructor(private readonly monitors: TraceEvaluationMonitorReader) {
     super();
   }
@@ -138,7 +138,7 @@ class WorkerTraceEvaluationMonitorAdapter extends TraceEvaluationMonitorPort {
   }
 }
 
-class WorkerTraceModelCostCatalogAdapter extends TraceModelCostCatalogPort {
+class WorkerTraceModelCostCatalogAdapter extends TraceModelCostCatalog {
   constructor(private readonly modelProviders: TraceModelCostReader) {
     super();
   }

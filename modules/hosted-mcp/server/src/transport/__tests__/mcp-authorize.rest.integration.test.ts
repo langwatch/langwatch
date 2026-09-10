@@ -6,7 +6,7 @@
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { HostedMcpRedis } from "../../ports/hosted-mcp.port.ts";
+import type { HostedMcpRedis } from "../../app/hosted-mcp-infrastructure.ts";
 import {
   McpAuthorizationService,
   MCP_AUTHORIZE_PERMISSION,

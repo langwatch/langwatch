@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { StorageStatsMetricsPort } from "../../app/ops.app.ts";
+import { StorageStatsMetrics } from "../../app/ops.app.ts";
 import {
   StorageStatsCollectionService,
   type StorageStatsClickHouseClient,
@@ -14,7 +14,7 @@ import {
 type TableSeries = { instance: string; table: string; rows: number; bytes: number; parts: number };
 type DiskSeries = { instance: string; disk: string };
 
-class RecordingMetrics implements StorageStatsMetricsPort {
+class RecordingMetrics implements StorageStatsMetrics {
   readonly tables = new Map<string, TableSeries>();
   readonly disks = new Map<string, DiskSeries>();
 

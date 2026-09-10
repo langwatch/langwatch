@@ -10,7 +10,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { installApiModelProvider } from "../model-provider.composition.ts";
@@ -46,11 +46,11 @@ function testProject() {
 }
 
 /** A cipher that is present and reversible; the format is not under test here. */
-function testEncryption(): SecretEncryptionPort {
+function testEncryption(): SecretEncryption {
   return {
     encrypt: (value: string) => `sealed:${value}`,
     decrypt: (value: string) => value.replace(/^sealed:/, ""),
-  } as SecretEncryptionPort;
+  } as SecretEncryption;
 }
 
 function installOver(prisma: ReturnType<typeof testPrisma>) {

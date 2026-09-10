@@ -6,9 +6,9 @@ import {
   type EventSourcedQueueProcessor,
   type EventSourcing,
 } from "@langwatch/eventing";
-import type { ProcessRetentionMetricsPort, RetentionFamily } from "@langwatch/eventing/server";
+import type { ProcessRetentionMetrics, RetentionFamily } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { TraceTopicAssignmentPort, type AssignTopicCommandData } from "@langwatch/trace-contract";
+import { TraceTopicAssignment, type AssignTopicCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import { WorkerProductionComposition } from "../worker-production.composition.ts";
 import { ApiKeyWorkerFeatureInstaller } from "../../features/api-key/api-key-worker-feature.installer.ts";
@@ -19,7 +19,7 @@ import { CodingAgentWorkerFeatureInstaller } from "../../features/coding-agent/c
 import { EvaluationWorkerFeatureInstaller } from "../../features/evaluation/evaluation-worker-feature.installer.ts";
 import {
   EventingMaintenanceWorkerFeatureInstaller,
-  WorkerBlobSweepPort,
+  WorkerBlobSweep,
 } from "../../features/eventing-maintenance/eventing-maintenance-worker-feature.installer.ts";
 import { ExperimentWorkerFeatureInstaller } from "../../features/experiment/experiment-worker-feature.installer.ts";
 import { GatewaySpendWorkerFeatureInstaller } from "../../features/gateway/gateway-spend-worker-feature.installer.ts";
@@ -42,9 +42,9 @@ import { TraceWorkerFeatureInstaller } from "../../features/trace/trace-worker-f
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 import {
-  WorkerHandlePort,
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerHandle,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "../../platform/lifecycle/worker-runtime.port.ts";
 
 class Queue implements EventSourcedQueueProcessor<Record<string, unknown>> {
@@ -54,20 +54,20 @@ class Queue implements EventSourcedQueueProcessor<Record<string, unknown>> {
   readonly waitUntilReady = vi.fn(async () => undefined);
 }
 
-class Handle extends WorkerHandlePort {
+class Handle extends WorkerHandle {
   readonly shutdown = vi.fn(async () => undefined);
 }
 
-class Transport extends WorkerTransportPort {
+class Transport extends WorkerTransport {
   readonly handle = new Handle();
   readonly start = vi.fn(async () => this.handle);
 }
 
-class Lifecycle extends WorkerLifecyclePort {
+class Lifecycle extends WorkerLifecycle {
   readonly close = vi.fn(async () => undefined);
 }
 
-class TraceAssignments extends TraceTopicAssignmentPort {
+class TraceAssignments extends TraceTopicAssignment {
   readonly assignTopic = vi.fn(async (_input: AssignTopicCommandData) => undefined);
 }
 
@@ -84,7 +84,7 @@ class TopicCapability implements TopicWorkerCapability {
   };
 }
 
-class BlobSweep extends WorkerBlobSweepPort {
+class BlobSweep extends WorkerBlobSweep {
   readonly sweep = vi.fn(async () => ({
     queues: [],
     totals: {
@@ -101,7 +101,7 @@ class BlobSweep extends WorkerBlobSweepPort {
   }));
 }
 
-class RetentionMetrics implements ProcessRetentionMetricsPort {
+class RetentionMetrics implements ProcessRetentionMetrics {
   recordSweptRows(_family: RetentionFamily, _rows: number): void {}
   recordFailure(_family: RetentionFamily): void {}
 }

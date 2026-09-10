@@ -1,27 +1,27 @@
 import type {
   GovernanceTraceContext,
   GovernanceTraceEvent,
-} from "../ports/governance-subscriber.port.ts";
+} from "../app/governance.infrastructure.ts";
 import {
-  TraceAlertMetricsPort,
-  TraceAlertOriginGuardPort,
-  TraceAlertTriggerMatchPort,
-  TraceAlertTriggerPort,
-} from "../ports/governance-subscriber.port.ts";
+  TraceAlertMetricsSink,
+  TraceAlertOriginGuard,
+  TraceAlertTriggerMatchChannel,
+  TraceAlertTriggerReader,
+} from "../app/governance.infrastructure.ts";
 
 export class TraceAlertTriggerMatchSubscriber {
   private constructor(
-    private readonly triggers: TraceAlertTriggerPort,
-    private readonly matches: TraceAlertTriggerMatchPort,
-    private readonly originGuard: TraceAlertOriginGuardPort,
-    private readonly metrics: TraceAlertMetricsPort,
+    private readonly triggers: TraceAlertTriggerReader,
+    private readonly mat: TraceAlertTriggerMatchChannel,
+    private readonly originGuard: TraceAlertOriginGuard,
+    private readonly metrics: TraceAlertMetricsSink,
   ) {}
 
   static create(options: {
-    triggers: TraceAlertTriggerPort;
-    matches: TraceAlertTriggerMatchPort;
-    originGuard: TraceAlertOriginGuardPort;
-    metrics: TraceAlertMetricsPort;
+    triggers: TraceAlertTriggerReader;
+    mat: TraceAlertTriggerMatchChannel;
+    originGuard: TraceAlertOriginGuard;
+    metrics: TraceAlertMetricsSink;
   }): TraceAlertTriggerMatchSubscriber {
     return new TraceAlertTriggerMatchSubscriber(
       options.triggers,

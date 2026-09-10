@@ -7,7 +7,7 @@ import {
   toWireEnum,
   usdDisplayString,
 } from "@langwatch/gateway-contract";
-import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
 import type {
   AttributedUserBudgetTemplate,
   GatewayBudgetRepository,
@@ -21,14 +21,14 @@ import type {
 export class GatewayEndUserCapsService {
   static create(options: {
     budgets: GatewayBudgetRepository;
-    spend: GatewayBudgetSpendPort;
+    spend: GatewayBudgetSpend;
   }): GatewayEndUserCapsService {
     return new GatewayEndUserCapsService(options.budgets, options.spend);
   }
 
   private constructor(
     private readonly budgets: GatewayBudgetRepository,
-    private readonly spend: GatewayBudgetSpendPort,
+    private readonly spend: GatewayBudgetSpend,
   ) {}
 
   async forEndUser(input: {

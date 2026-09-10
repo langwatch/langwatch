@@ -1,6 +1,6 @@
 import {
   DeploymentPlanSourcesService,
-  type BillingSubscriptionPort,
+  type BillingSubscription,
 } from "@langwatch/enterprise-billing-server";
 import {
   LicensingEntitlementSourceAdapter,
@@ -35,20 +35,20 @@ export type WorkerPlanProviderOptions = Readonly<{
    * opened no typed Prisma client. Absent on a HOSTED deployment, every organization resolves free
    * — including ones that are paying — which is why it is reported rather than inferred.
    */
-  subscriptions?: BillingSubscriptionPort;
+  subscriptions?: BillingSubscription;
   /** Where the absent plan sources are written down. */
-  report?: WorkerEntitlementAbsenceReportPort;
+  report?: WorkerEntitlementAbsenceReport;
 }>;
 
 /**
  * Which plan sources this process could not compose, said once at composition.
  */
-export abstract class WorkerEntitlementAbsenceReportPort {
+export abstract class WorkerEntitlementAbsenceReport {
   abstract absent(source: "licence" | "subscription"): void;
 }
 
 /** Writes each absent plan source to the process log, with what it costs. */
-export class LoggedWorkerEntitlementAbsence extends WorkerEntitlementAbsenceReportPort {
+export class LoggedWorkerEntitlementAbsence extends WorkerEntitlementAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerEntitlementAbsence {
     return new LoggedWorkerEntitlementAbsence(logger);
   }

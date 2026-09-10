@@ -13,7 +13,7 @@ import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-c
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  RedisScenarioTabStoreAdapter,
+  RedisScenarioTabStoreRepository,
   SCENARIO_TAB_DISCONNECT_GRACE_SECONDS,
   SCENARIO_TAB_PENDING_TTL_SECONDS,
   SCENARIO_TAB_TTL_SECONDS,
@@ -57,7 +57,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
       throw new Error("These tests need a real Redis; run them through the integration suite");
     }
     scenarioTabRegistry = ScenarioTabRegistryService.create({
-      store: RedisScenarioTabStoreAdapter.create(connection),
+      store: RedisScenarioTabStoreRepository.create(connection),
       clock: new SystemClock(),
     });
   });

@@ -46,7 +46,7 @@ export type TraceExportRequestFields = Readonly<{
 type TraceExportProgress = Readonly<{ exported: number; total: number }>;
 
 /** The export, as this route uses it. */
-export interface TraceExportPort<TRequest> {
+export interface TraceExport<TRequest> {
   /** How many traces the export will produce, for the caller's progress bar. */
   getTotalCount(input: Readonly<{ request: TRequest; protections: unknown }>): Promise<number>;
   /** The serialized export, one chunk at a time. */
@@ -88,7 +88,7 @@ export interface TraceExportRestPorts<
    */
   getViewerProtections(session: TSession, input: Readonly<{ projectId: string }>): Promise<unknown>;
   /** The export itself. Resolved per request, never constructed at mount. */
-  exports(): TraceExportPort<TRequest>;
+  exports(): TraceExport<TRequest>;
   /** Fans one progress event out to every pod serving this tenant. */
   broadcast(): AppRestBroadcast;
   /**
@@ -122,7 +122,7 @@ function exportStream({
   request: TraceExportRequestFields;
   protections: unknown;
   exportId: string;
-  exportService: TraceExportPort<TraceExportRequestFields>;
+  exportService: TraceExport<TraceExportRequestFields>;
   broadcast: AppRestBroadcast;
 }): ReadableStream {
   const encoder = new TextEncoder();

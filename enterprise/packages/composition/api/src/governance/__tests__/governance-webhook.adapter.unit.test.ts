@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WebhookEndpointView } from "@langwatch/webhook-contract";
 import type { WebhookDeliveryProcessDeps } from "@langwatch/webhook-server";
-import { AppGovernanceWebhookPort } from "../governance-webhook.adapter.ts";
+import { AppGovernanceWebhook } from "../governance-webhook.adapter.ts";
 
 function endpoint(
   overrides: Partial<WebhookEndpointView> & { id: string; enabledEvents: string[] },
@@ -34,7 +34,7 @@ function harness(endpoints: WebhookEndpointView[]) {
       getActiveByOrganization: vi.fn(async () => endpoints),
     },
   } as unknown as WebhookDeliveryProcessDeps;
-  return AppGovernanceWebhookPort.create(deps);
+  return AppGovernanceWebhook.create(deps);
 }
 
 describe("governance webhook delivery fan-out", () => {

@@ -8,13 +8,13 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type {
   CodingAgentClickHouseClient,
-  CodingAgentClickHousePort,
-} from "../../ports/coding-agent-clickhouse.port.ts";
-import type { CodingAgentClockPort } from "../../ports/coding-agent-clock.port.ts";
+  CodingAgentClickHouse,
+} from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentClock } from "../../app/coding-agent.infrastructure.ts";
 import type {
-  CodingAgentReadMetricsPort,
+  CodingAgentReadMetrics,
   CodingAgentSessionListReadOutcome,
-} from "../../ports/coding-agent-read-metrics.port.ts";
+} from "../../app/coding-agent.infrastructure.ts";
 import type { CodingAgentSessionRepository as SessionRepository } from "../coding-agent-session.repository.ts";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -351,17 +351,17 @@ function toRecord({
 
 export class CodingAgentSessionClickHouseRepository implements SessionRepository {
   private constructor(
-    private readonly clickHouse: CodingAgentClickHousePort,
+    private readonly clickHouse: CodingAgentClickHouse,
     private readonly defaultTraceRetentionDays: number,
-    private readonly metrics: CodingAgentReadMetricsPort,
-    private readonly clock: CodingAgentClockPort,
+    private readonly metrics: CodingAgentReadMetrics,
+    private readonly clock: CodingAgentClock,
   ) {}
 
   static create(deps: {
-    clickHouse: CodingAgentClickHousePort;
+    clickHouse: CodingAgentClickHouse;
     defaultTraceRetentionDays: number;
-    metrics: CodingAgentReadMetricsPort;
-    clock: CodingAgentClockPort;
+    metrics: CodingAgentReadMetrics;
+    clock: CodingAgentClock;
   }): CodingAgentSessionClickHouseRepository {
     return new CodingAgentSessionClickHouseRepository(
       deps.clickHouse,

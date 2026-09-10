@@ -15,7 +15,7 @@ type PostgresAuthzDelegate = {
  * Structural database surface accepted at the application composition root.
  * Concrete repository requirements remain private to the adapter build.
  */
-export abstract class PostgresAuthzDatabasePort {
+export abstract class PostgresAuthzDatabase {
   abstract readonly apiKey: PostgresAuthzDelegate;
   abstract readonly auditLog: PostgresAuthzDelegate;
   abstract readonly customRole: PostgresAuthzDelegate;

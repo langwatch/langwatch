@@ -10,7 +10,7 @@ import type {
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
 } from "@langwatch/scenario-contract";
-import { SimulationRunStateStoreAdapter } from "../simulation-eventing.adapter.ts";
+import { SimulationRunStateStoreAdapter } from "../../repositories/clickhouse/clickhouse.simulation-eventing.repository.ts";
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,

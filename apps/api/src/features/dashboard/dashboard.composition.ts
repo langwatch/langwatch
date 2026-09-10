@@ -16,11 +16,11 @@ import {
   type Trigger,
 } from "@langwatch/automation-contract";
 import {
-  AlertRedactionPort,
   dashboardServer,
-  PlatformUrlPort,
-  WorkbenchAccessPort,
-  WorkbenchCallerPort,
+  type AlertRedaction,
+  type PlatformUrl,
+  type WorkbenchAccess,
+  type WorkbenchCaller,
 } from "@langwatch/dashboard-server";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import { createApp } from "@langwatch/runtime-composition";
@@ -106,20 +106,16 @@ export async function installApiDashboard(options: {
   };
 }
 
-class ProcessWorkbenchAccess extends WorkbenchAccessPort {
-  constructor(private readonly ports: DashboardProcessPorts) {
-    super();
-  }
+class ProcessWorkbenchAccess implements WorkbenchAccess {
+  constructor(private readonly ports: DashboardProcessPorts) {}
 
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean> {
     return this.ports.isWorkbenchEnabled(input);
   }
 }
 
-class ProcessWorkbenchCaller extends WorkbenchCallerPort {
-  constructor(private readonly ports: DashboardProcessPorts) {
-    super();
-  }
+class ProcessWorkbenchCaller implements WorkbenchCaller {
+  constructor(private readonly ports: DashboardProcessPorts) {}
 
   resolveProtections(input: {
     actorId: string;
@@ -133,10 +129,8 @@ class ProcessWorkbenchCaller extends WorkbenchCallerPort {
   }
 }
 
-class ProcessAlertRedaction extends AlertRedactionPort {
-  constructor(private readonly ports: DashboardProcessPorts) {
-    super();
-  }
+class ProcessAlertRedaction implements AlertRedaction {
+  constructor(private readonly ports: DashboardProcessPorts) {}
 
   redactActionParams(
     action: Trigger["action"],
@@ -146,10 +140,8 @@ class ProcessAlertRedaction extends AlertRedactionPort {
   }
 }
 
-class ProcessPlatformUrl extends PlatformUrlPort {
-  constructor(private readonly ports: DashboardProcessPorts) {
-    super();
-  }
+class ProcessPlatformUrl implements PlatformUrl {
+  constructor(private readonly ports: DashboardProcessPorts) {}
 
   linkTo(input: { projectSlug: string; path: string }): string {
     return this.ports.platformUrl(input);

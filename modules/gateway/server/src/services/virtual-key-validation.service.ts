@@ -30,8 +30,8 @@ import {
   VirtualKeyExpiryInPastError,
 } from "@langwatch/gateway-contract";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
-import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port.ts";
-import type { GatewayVirtualKeysPort } from "../ports/gateway-virtual-key.port.ts";
+import type { GatewayPersistenceTransaction } from "../app/gateway.infrastructure.ts";
+import type { GatewayVirtualKeys } from "../ports/gateway-virtual-key.port.ts";
 
 export const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
@@ -267,13 +267,13 @@ export class VirtualKeyValidationService {
   }
 
   private constructor(
-    private readonly repository: GatewayVirtualKeysPort,
+    private readonly repository: GatewayVirtualKeys,
     private readonly scopeResolution: GatewayScopeResolutionService,
     private readonly projects: ProjectApi,
   ) {}
 
   static create(input: {
-    repository: GatewayVirtualKeysPort;
+    repository: GatewayVirtualKeys;
     scopeResolution: GatewayScopeResolutionService;
     projects: ProjectApi;
   }): VirtualKeyValidationService {

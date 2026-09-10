@@ -12,7 +12,7 @@ import {
 import type {
   MigrationDataset,
   MigrationProject,
-  ObjectStorageMigrationInventoryPort,
+  ObjectStorageMigrationInventory,
 } from "#repositories/object-storage-migration-inventory.repository";
 import {
   ObjectStorageMigrationService,
@@ -115,7 +115,7 @@ const setup = ({
       current.map((candidate) => (candidate.id === row.id ? row : candidate)),
     );
   };
-  const inventory: ObjectStorageMigrationInventoryPort = {
+  const inventory: ObjectStorageMigrationInventory = {
     listProjectsPage: vi.fn(async (request) => pageById(projects, request)),
     listStoredObjectsPage: vi.fn(async (projectId, request) =>
       pageById(rows.get(projectId) ?? [], request),

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { JoinRequestAudiencePort } from "../../repositories/join-request-audience.repository.ts";
-import { JoinRequestMailPort } from "../../app/identity.infrastructure.ts";
+import { JoinRequestAudience } from "../../repositories/join-request-audience.repository.ts";
+import { JoinRequestMail } from "../../app/identity.infrastructure.ts";
 import { JoinRequestNotificationService } from "../join-request-notification.service.ts";
 
 /**
@@ -10,7 +10,7 @@ const ORGANIZATION = "organization_acme";
 const REQUEST = "joinreq_1";
 const REQUESTER = "user_ada";
 
-class Audience extends JoinRequestAudiencePort {
+class Audience extends JoinRequestAudience {
   constructor(
     private readonly answers: {
       requesterId?: string | null;
@@ -44,7 +44,7 @@ class Audience extends JoinRequestAudiencePort {
   }
 }
 
-class RecordingMail implements JoinRequestMailPort {
+class RecordingMail implements JoinRequestMail {
   readonly stillWaiting: { adminEmail: string; organizationName: string }[] = [];
   readonly expired: { requesterEmail: string; organizationName: string }[] = [];
 

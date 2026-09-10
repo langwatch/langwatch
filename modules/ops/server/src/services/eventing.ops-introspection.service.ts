@@ -1,6 +1,6 @@
 import { killSwitchDescriptorsFor, type StaticPipelineDefinition } from "@langwatch/eventing";
 import {
-  OpsEventingIntrospectionPort,
+  OpsEventingIntrospection,
   type OpsDejaViewProjection,
   type OpsProcessManagerMetadata,
   type OpsKillSwitchDescriptor,
@@ -14,7 +14,7 @@ type AnyPipelineDefinition = StaticPipelineDefinition<any, any, any>;
  * resolved lazily on every call because a composition registers pipelines
  * during boot and an explorer may be built before the last one lands.
  */
-export class EventingOpsIntrospectionAdapter implements OpsEventingIntrospectionPort {
+export class EventingOpsIntrospectionAdapter implements OpsEventingIntrospection {
   private constructor(private readonly definitions: () => ReadonlyArray<AnyPipelineDefinition>) {
   }
 

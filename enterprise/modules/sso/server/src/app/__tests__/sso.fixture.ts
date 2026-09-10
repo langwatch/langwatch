@@ -10,7 +10,7 @@ import { vi } from "vitest";
 
 import { SsoApp, type SsoInfrastructure } from "../sso.app.ts";
 import { SsoConnectionLedgerPort } from "../sso.infrastructure.ts";
-import { SsoGateLoggerPort } from "../sso.infrastructure.ts";
+import { SsoGateLogger } from "../sso.infrastructure.ts";
 
 /** The one operator on the staff list, exactly as `ADMIN_EMAILS` decides it. */
 export const SSO_TEST_STAFF_EMAIL = "olive@langwatch.ai";
@@ -89,13 +89,13 @@ export class RecordingSsoConnectionLedger implements SsoConnectionLedgerPort {
 }
 
 /** The gate's log lines, kept so a test can read what an operator would. */
-export class RecordingSsoGateLogger implements SsoGateLoggerPort {
+export class RecordingSsoGateLogger implements SsoGateLogger {
   static create(): RecordingSsoGateLogger {
     return new RecordingSsoGateLogger();
   }
 
-  readonly info = vi.fn<SsoGateLoggerPort["info"]>();
-  readonly warn = vi.fn<SsoGateLoggerPort["warn"]>();
+  readonly info = vi.fn<SsoGateLogger["info"]>();
+  readonly warn = vi.fn<SsoGateLogger["warn"]>();
 }
 
 export function createSsoTestApp(

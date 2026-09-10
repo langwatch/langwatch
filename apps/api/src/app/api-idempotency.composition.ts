@@ -32,9 +32,9 @@ import {
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 
-import { ApiGatewayIdempotencyPort } from "./api-gateway.composition.ts";
+import { ApiGatewayIdempotency } from "./api-gateway.composition.ts";
 
 export type ApiIdempotencyCompositionOptions = Readonly<{
   /** The one guarded connection this process's receipts are claimed on. */
@@ -48,7 +48,7 @@ export type ApiIdempotencyCompositionOptions = Readonly<{
    * treats as an expired receipt rather than as a failure the caller has to
    * understand.
    */
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
 }>;
 
 /** What this composition opened, for the doors that dispatch through it. */
@@ -56,7 +56,7 @@ export type ApiIdempotencyComposition = Readonly<{
   /** The runner every keyed create on this process dispatches through. */
   run: IdempotentRunner;
   /** The same runner, as the gateway composition's port declares it. */
-  gateway: ApiGatewayIdempotencyPort;
+  gateway: ApiGatewayIdempotency;
 }>;
 
 /** A key this deployment cannot honour, refused by name. */
@@ -88,7 +88,7 @@ export const unavailableIdempotentRunner: IdempotentRunner = async ({ key, handl
 };
 
 /** The gateway composition's port, over this process's one ledger. */
-class ApiGatewayIdempotencyLedger extends ApiGatewayIdempotencyPort {
+class ApiGatewayIdempotencyLedger extends ApiGatewayIdempotency {
   static create(run: IdempotentRunner): ApiGatewayIdempotencyLedger {
     return new ApiGatewayIdempotencyLedger(run);
   }

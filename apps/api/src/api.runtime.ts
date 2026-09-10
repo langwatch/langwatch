@@ -1,11 +1,11 @@
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { ApiApplicationPort, ApiLifecyclePort, type ApiShutdownOptions } from "./api-runtime.port.ts";
+import { ApiApplicationPort, ApiLifecycle, type ApiShutdownOptions } from "./api-runtime.port.ts";
 
-export { ApiApplicationPort, ApiLifecyclePort, type ApiShutdownOptions } from "./api-runtime.port.ts";
+export { ApiApplicationPort, ApiLifecycle, type ApiShutdownOptions } from "./api-runtime.port.ts";
 
 export type ApiRuntimeOptions<Application, Services> = {
   application: ApiApplicationPort<Application>;
-  lifecycle: ApiLifecyclePort<Services>;
+  lifecycle: ApiLifecycle<Services>;
   resources?: ResourceScope;
   ownsResources?: boolean;
 };

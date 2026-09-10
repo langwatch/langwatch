@@ -2,7 +2,7 @@ import type { TraceSpanSpool, TraceSpanSpoolIdentity } from "../app/trace.infras
 import { TraceSpoolService } from "./ingestion/trace-spool.service.ts";
 
 /**
- * Renames the spool service onto the narrow infrastructure `RecordSpanCommand` names.
+ * Renames the spool service onto the narrow infrastructure `EventingRecordSpanAdapter` names.
  *
  * The service is not a subclass of the infrastructure member and must not become
  * one: `putSpool` belongs to the ingestion edge, which is a different process

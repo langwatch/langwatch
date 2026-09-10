@@ -11,7 +11,7 @@ export type SubscriptionWithOrg = BillingSubscriptionRecord & {
 };
 export type CancelledSubscription = { stripeSubscriptionId: string | null };
 
-export abstract class BillingWebhookSubscriptionPort {
+export abstract class BillingWebhookSubscription {
   abstract tryFindLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null>;
 
   abstract tryCreatePending(input: {
@@ -55,7 +55,7 @@ export abstract class BillingWebhookSubscriptionPort {
   }): Promise<SubscriptionWithOrg | null>;
 }
 
-export class NullBillingWebhookSubscriptionAdapter extends BillingWebhookSubscriptionPort {
+export class NullBillingWebhookSubscriptionAdapter extends BillingWebhookSubscription {
   async tryFindLastNonCancelled(_organizationId: string): Promise<BillingSubscriptionRecord | null> {
     return null;
   }

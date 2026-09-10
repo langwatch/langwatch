@@ -7,13 +7,13 @@
 import { type Instant, nowInstant } from "@langwatch/time";
 import type { ScopeInput, VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
-import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
-import type { GatewayTransactionPort } from "../ports/gateway-transaction.port.ts";
+import { GatewayAudit } from "../app/gateway.infrastructure.ts";
+import { GatewayChangeEvents } from "../app/gateway.infrastructure.ts";
+import type { GatewayTransaction } from "../app/gateway.infrastructure.ts";
 import type { GatewayKeyBudgetRepository } from "../repositories/gateway-key-budget.repository.ts";
-import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port.ts";
-import type { GatewayVirtualKeysPort } from "../ports/gateway-virtual-key.port.ts";
-import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port.ts";
+import { GatewayVirtualKeyCrypto } from "../app/gateway.infrastructure.ts";
+import type { GatewayVirtualKeys } from "../ports/gateway-virtual-key.port.ts";
+import type { GatewayGovernanceSignals } from "../app/gateway.infrastructure.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import { VirtualKeyProvisioningService } from "./virtual-key-provisioning.service.ts";
@@ -30,23 +30,23 @@ import {
 
 export class VirtualKeyService {
   private constructor(
-    private readonly repository: GatewayVirtualKeysPort,
-    private readonly crypto: GatewayVirtualKeyCryptoPort,
+    private readonly repository: GatewayVirtualKeys,
+    private readonly crypto: GatewayVirtualKeyCrypto,
     private readonly provisioning: VirtualKeyProvisioningService,
     private readonly rotation: VirtualKeyRotationService,
     private readonly status: VirtualKeyStatusService,
   ) {}
 
   static create(input: {
-    transactions: GatewayTransactionPort;
+    transactions: GatewayTransaction;
     keyBudgets: GatewayKeyBudgetRepository;
     scopeResolution: GatewayScopeResolutionService;
     projects: ProjectApi;
-    repository: GatewayVirtualKeysPort;
-    changeEvents: GatewayChangeEventsPort;
-    auditLog: GatewayAuditPort;
-    crypto: GatewayVirtualKeyCryptoPort;
-    governanceSignals?: GatewayGovernanceSignalsPort;
+    repository: GatewayVirtualKeys;
+    changeEvents: GatewayChangeEvents;
+    auditLog: GatewayAudit;
+    crypto: GatewayVirtualKeyCrypto;
+    governanceSignals?: GatewayGovernanceSignals;
   }): VirtualKeyService {
     const validation = VirtualKeyValidationService.create({
       repository: input.repository,

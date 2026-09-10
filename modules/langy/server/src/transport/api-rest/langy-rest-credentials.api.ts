@@ -31,7 +31,7 @@ export type LangyRestCredentialReader = (
 /**
  * Enforces one permission as the resolved key's ceiling, throwing the deployment's own refusal.
  */
-export type LangyRestCeilingPort = (input: {
+export type LangyRestCeiling = (input: {
   resolved: ResolvedApiKeyCredential;
   permission: AuthzPermission;
 }) => Promise<void>;
@@ -43,7 +43,7 @@ export type LangyRestCredentialPorts = Readonly<{
   /** The directory the credential is resolved and stamped through. */
   apiKeys: () => ApiKeyApi;
   /** Enforces one permission as the key's ceiling. */
-  enforceCeiling: LangyRestCeilingPort;
+  enforceCeiling: LangyRestCeiling;
   /** This deployment's flag store, for the per-project rollout gate. */
   featureFlags: () => FeatureFlagApi;
   /** The user directory a key's owner is read from. */

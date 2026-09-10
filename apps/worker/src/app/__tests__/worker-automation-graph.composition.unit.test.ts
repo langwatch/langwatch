@@ -9,7 +9,7 @@ import {
 import type { SlackApiTransport } from "@langwatch/automation-server";
 import { WebhookEgressService } from "@langwatch/egress";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
-import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
+import { EmailDelivery, type EmailContent } from "@langwatch/notification-server";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
@@ -36,7 +36,7 @@ const ENVIRONMENT = {
   EMAIL_DEFAULT_FROM: "LangWatch <contact@langwatch.ai>",
 };
 
-class RecordingMailer extends EmailDeliveryPort {
+class RecordingMailer extends EmailDelivery {
   readonly sent: EmailContent[] = [];
 
   defaultFrom(): string {

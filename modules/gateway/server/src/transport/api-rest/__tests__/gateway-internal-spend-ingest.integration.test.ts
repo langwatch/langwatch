@@ -15,7 +15,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { PrismaGatewayInternalStoreAdapter } from "../../../adapters/postgres.gateway-internal-store.adapter.ts";
-import { GatewaySpendRatingPort } from "../../../ports/gateway-spend-rating.port.ts";
+import { GatewaySpendRating } from "../../../app/gateway.infrastructure.ts";
 import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
@@ -57,7 +57,7 @@ let appended: Array<Record<string, unknown>> = [];
 let appendedConfirms: Array<Record<string, unknown>> = [];
 
 /** A flat price, because what is under test is the join, not the rating. */
-class FlatRating extends GatewaySpendRatingPort {
+class FlatRating implements GatewaySpendRating {
   rate(): { costNanoUsd: number; rateVersion: string } {
     return { costNanoUsd: 0, rateVersion: "test" };
   }

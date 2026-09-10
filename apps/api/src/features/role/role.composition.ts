@@ -20,18 +20,17 @@ import {
 } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RoleBindingScopeType } from "@langwatch/role-contract";
-import {
-  RoleBindingIdPort,
-  RoleCustomRolePlanPort,
-  RoleScopePort,
-  roleServer,
-} from "@langwatch/role-server";
+import { roleServer, type RoleInfrastructure } from "@langwatch/role-server";
 import { createApp } from "@langwatch/runtime-composition";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createRoleBindingTrpcRouter, createRoleTrpcRouter } from "./role-trpc.mount.ts";
 import type { ComposedRoleFeature } from "./role.composition.types.ts";
+
+type RoleScope = RoleInfrastructure["scope"];
+type RolePlan = RoleInfrastructure["plan"];
+type RoleBindingIds = RoleInfrastructure["bindingIds"];
 
 /** The other features' applications the role surfaces read. */
 export type RolePeers = Readonly<{
@@ -84,11 +83,10 @@ export async function installApiRole(options: {
  * process's own connection. A personal team holds exactly one member, its
  * owner, so nothing may be bound into it.
  */
-class ApiRoleScope extends RoleScopePort {
+class ApiRoleScope implements RoleScope {
   private readonly scope: PersonalTeamScopeService;
 
   constructor(prisma: PrismaClient) {
-    super();
     this.scope = PersonalTeamScopeService.create(bindPersonalTeamScopeReader(prisma));
   }
 
@@ -100,10 +98,8 @@ class ApiRoleScope extends RoleScopePort {
 }
 
 /** The Enterprise plan gate, over the one plan provider this process resolves. */
-class ApiCustomRolePlanGate extends RoleCustomRolePlanPort {
-  constructor(private readonly plans: PlanProvider) {
-    super();
-  }
+class ApiCustomRolePlanGate implements RolePlan {
+  constructor(private readonly plans: PlanProvider) {}
 
   async assertCustomRolesAllowed(input: { organizationId: string }): Promise<void> {
     const plan = await this.plans.getActivePlan({ organizationId: input.organizationId });
@@ -115,7 +111,7 @@ class ApiCustomRolePlanGate extends RoleCustomRolePlanPort {
 }
 
 /** The identifier a newly attached binding is written under, in the ledger's own format. */
-class ApiRoleBindingIds extends RoleBindingIdPort {
+class ApiRoleBindingIds implements RoleBindingIds {
   #ids = KsuidAuthzBindingIdAdapter.create();
 
   newBindingId(): string {

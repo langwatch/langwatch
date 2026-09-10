@@ -1,16 +1,14 @@
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { PrismaDatasetMigrationRepository } from "../prisma.dataset-migration.repository.ts";
-import { AzureDatasetStorageAdapter } from "../../../adapters/azure.dataset-storage.adapter.ts";
-import type {
-  DatasetBlobDriver,
-  DatasetStorage,
-  PresignedUpload,
-} from "../../../ports/dataset-storage.port.ts";
+import { AzureDatasetStorageAdapter } from "../../../services/azure.dataset-storage.service.ts";
 import {
-  DatasetAzureConfigResolverPort,
-  DatasetStorageResolverPort,
-} from "../../../ports/dataset-storage.port.ts";
+  DatasetAzureConfigResolver,
+  DatasetStorageResolver,
+  type DatasetBlobDriver,
+  type DatasetStorage,
+  type PresignedUpload,
+} from "../../../app/dataset.app.ts";
 import {
   toJsonlChunks,
   type ChunkOffset,
@@ -53,12 +51,10 @@ class FixtureStorage implements DatasetStorage {
   }
 }
 
-class FixtureStorageResolver extends DatasetStorageResolverPort {
+class FixtureStorageResolver implements DatasetStorageResolver {
   readonly forProject = vi.fn(async () => this.storage);
 
-  constructor(private readonly storage: DatasetStorage) {
-    super();
-  }
+  constructor(private readonly storage: DatasetStorage) {}
 }
 
 function fingerprintRow(input: Fingerprint) {
@@ -155,7 +151,7 @@ describe("given a deployment whose dataset destination is Azure Blob", () => {
         delete: async () => undefined,
       };
       const azure = AzureDatasetStorageAdapter.create(
-        new (class extends DatasetAzureConfigResolverPort {
+        new (class implements DatasetAzureConfigResolver {
           async resolve() {
             return { driver, accountName: "lwacct", container: "datasets" };
           }

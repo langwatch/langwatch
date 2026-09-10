@@ -3,7 +3,7 @@ import { nowInstant } from "@langwatch/time";
  * Per-user daily cap on PRs Langy may open on the user's behalf.
  * Issue #4747. Spec: specs/langy/langy-github-prs.feature.
  */
-export abstract class LangyGithubPrCounterPort {
+export abstract class LangyGithubPrCounter {
   abstract tryGet(key: string): Promise<string | null>;
   abstract incr(key: string): Promise<number>;
   abstract decr(key: string): Promise<number>;
@@ -37,14 +37,14 @@ function resetAtForBucket(bucket: number): number {
 export class LangyGithubPrQuotaService {
   static create(options: {
     /** The process's counter, or `null` where none is composed. */
-    counter: LangyGithubPrCounterPort | null;
+    counter: LangyGithubPrCounter | null;
   }): LangyGithubPrQuotaService {
     return new LangyGithubPrQuotaService(options);
   }
 
-  private readonly counter: LangyGithubPrCounterPort | null;
+  private readonly counter: LangyGithubPrCounter | null;
 
-  private constructor(options: { counter: LangyGithubPrCounterPort | null }) {
+  private constructor(options: { counter: LangyGithubPrCounter | null }) {
     this.counter = options.counter;
   }
 
@@ -283,7 +283,7 @@ export class LangyGithubPrQuotaService {
       // never INCRed because Redis was up-then-down), the counter goes negative — and a negative
       // count < limit means the next 20+ reservations all `allowed: true`. Lua keeps the check-and-
       // decr atomic.
-      const conn = connection as LangyGithubPrCounterPort & {
+      const conn = connection as LangyGithubPrCounter & {
         eval?: (
           script: string,
           numKeys: number,

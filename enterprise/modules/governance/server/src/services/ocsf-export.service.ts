@@ -3,18 +3,18 @@ import {
   type GovernanceOcsfExportInput,
   type GovernanceOcsfExportPage,
 } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceOcsfEventsReaderPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceOcsfEventsReader } from "../app/governance.infrastructure.ts";
 import type { GovernanceOcsfExportRepository } from "../repositories/audit/governance-setup-state.repository.ts";
 
 export class DefaultGovernanceOcsfExportService {
   private constructor(
     private readonly repository: GovernanceOcsfExportRepository,
-    private readonly events: GovernanceOcsfEventsReaderPort | undefined,
+    private readonly events: GovernanceOcsfEventsReader | undefined,
   ) {}
 
   static create(options: {
     repository: GovernanceOcsfExportRepository;
-    events?: GovernanceOcsfEventsReaderPort;
+    events?: GovernanceOcsfEventsReader;
   }): DefaultGovernanceOcsfExportService {
     return new DefaultGovernanceOcsfExportService(options.repository, options.events);
   }

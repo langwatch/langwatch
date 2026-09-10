@@ -29,7 +29,7 @@ import type {
 import { LangyMessageService, type LangyTrustedMessageReader } from "./langy-message.service.ts";
 import { LangyTurnService } from "./langy-turn.service.ts";
 import { LangyCredentialService } from "./langy-credential.service.ts";
-import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port.ts";
+import { LangyFeedbackPromptPolicy } from "./langy-feedback-prompt.service.ts";
 
 /**
  * How this process opens a relay connection for a conversation runtime.

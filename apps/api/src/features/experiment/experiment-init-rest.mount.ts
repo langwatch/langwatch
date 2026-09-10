@@ -42,14 +42,14 @@ import type { HandlerManagedCredential } from "../../app/api-handler-managed-cre
 import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 
 /** The project credential this door reads. */
-export type ApiExperimentInitCredentialPort = (input: {
+export type ApiExperimentInitCredential = (input: {
   request: Request;
   permission: AuthzPermission;
 }) => Promise<HandlerManagedCredential>;
 
 /** Everything `POST /api/experiment/init` binds to on this process. */
 export type ApiExperimentInitRestCollaborators = Readonly<{
-  credential: ApiExperimentInitCredentialPort;
+  credential: ApiExperimentInitCredential;
   /** The SAME experiment service the `experiments.*` namespace answers from. */
   findOrCreate: ExperimentFindOrCreateService;
   reportError?: ((error: unknown, context: { projectId: string }) => void) | undefined;

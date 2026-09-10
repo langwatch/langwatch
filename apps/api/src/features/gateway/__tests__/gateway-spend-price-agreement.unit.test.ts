@@ -27,7 +27,7 @@ import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_EVENT_VERSION_LATEST,
-  GatewaySpendRatingPort,
+  GatewaySpendRating,
   type SpendUsage,
   type ConfirmSpendCommandData as GatewayConfirmSpendCommandData,
   type GatewaySpendConfirmedEvent,
@@ -36,7 +36,7 @@ import {
 import { GatewaySpendFoldProjection } from "@langwatch/gateway-server/composition/gateway-spend-fold";
 import {
   GATEWAY_DEBITS_PROCESS_NAME,
-  GatewayDebitPort,
+  GatewayDebit,
   GatewayDebitProcess,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
@@ -52,7 +52,7 @@ import {
 } from "@langwatch/webhook-server";
 
 /** The vertical's rating seam, standing in for the static catalog behind it. */
-class TestSpendRating extends GatewaySpendRatingPort {
+class TestSpendRating extends GatewaySpendRating {
   rate(_input: { model: string; usage: SpendUsage; rateVersion?: string }): {
     costNanoUsd: number;
     rateVersion: string;
@@ -141,7 +141,7 @@ function ledgerCostFor(costNanoUsd: number, rateVersion: string) {
 // The debit: governance-server's gateway-debits process.
 // ---------------------------------------------------------------------------
 
-class NoopGatewayDebitPort extends GatewayDebitPort {
+class NoopGatewayDebit extends GatewayDebit {
   resolve(): Promise<GatewayResolvedBudget[]> {
     return Promise.resolve([]);
   }
@@ -172,7 +172,7 @@ function debitEvent(costNanoUsd: number, rateVersion: string): ProcessEventEnvel
 }
 
 function debitPayloadFor(costNanoUsd: number, rateVersion: string) {
-  const service = GatewayDebitProcess.create(new NoopGatewayDebitPort());
+  const service = GatewayDebitProcess.create(new NoopGatewayDebit());
   const def = buildProcessDefinition(
     buildProcessManager<GovernanceGatewaySpendProcessingEvent>({
       name: GATEWAY_DEBITS_PROCESS_NAME,

@@ -15,14 +15,14 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
 import { PostgresModelProviderEvidenceAdapter } from "../services/model-provider-evidence-service.composition.ts";
-import { ModelCostProjectPort } from "../ports/model-provider.port.ts";
+import { ModelCostProject } from "../app/model-provider.infrastructure.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
 const testNamespace = `mpe-${randomBytes(5).toString("hex")}`;
 
 /** Reads the real project + team row this integration suite created. */
-class PrismaProjects extends ModelCostProjectPort {
+class PrismaProjects extends ModelCostProject {
   constructor(private readonly prisma: PrismaClient) {
     super();
   }

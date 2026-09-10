@@ -36,12 +36,12 @@ vi.mock("../use-project-reach.ts", () => ({ useProjectReach: () => reachMock() }
 
 import {
   ProjectHomeHostProvider,
-  ProjectHomeHostPort,
+  ProjectHomeHost,
   type ProjectHomeProject,
 } from "../../../../../model/project-home-host.ts";
 import { LangyHomeHero } from "../langy-home-hero.tsx";
 
-class StubProjectHomeHost extends ProjectHomeHostPort {
+class StubProjectHomeHost extends ProjectHomeHost {
   constructor(private readonly canAsk = true) {
     super();
   }

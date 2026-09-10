@@ -10,15 +10,15 @@ import {
 } from "@langwatch/workflow-contract";
 import type {
   WorkflowLlmParameterResolution,
-  WorkflowLlmParametersPort,
-  WorkflowProjectEnvironmentPort,
-} from "../ports/workflow.port.ts";
+  WorkflowLlmParameters,
+  WorkflowProjectEnvironment,
+} from "../app/workflow.app.ts";
 
 const workflowLlmConfigSchema = llmConfigSchema.passthrough().nullish();
 
 type StudioWorkflowEventEnricherOptions = {
-  projectEnvironment: WorkflowProjectEnvironmentPort;
-  llmParameters: WorkflowLlmParametersPort;
+  projectEnvironment: WorkflowProjectEnvironment;
+  llmParameters: WorkflowLlmParameters;
 };
 
 type WorkflowEvent = Exclude<StudioClientEvent, { type: "is_alive" | "stop_execution" }>;

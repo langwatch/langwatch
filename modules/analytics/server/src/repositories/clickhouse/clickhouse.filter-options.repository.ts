@@ -5,7 +5,7 @@ import { clickHouseFilters } from "./clickhouse.filter-definitions.mapper.ts";
 import { buildScopeConditions } from "./clickhouse.filter-query-helpers.mapper.ts";
 import type { SupportedClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper.ts";
 import {
-  FilterOptionsPort,
+  FilterOptions,
   type FilterOption,
   type FindFilterOptionsInput,
 } from "../filter-options.repository.ts";
@@ -18,7 +18,7 @@ const logger = createLogger("langwatch:filters:repository");
 /**
  * Reads the distinct values a filter can offer.
  */
-export class FilterOptionsClickHouseRepository extends FilterOptionsPort {
+export class FilterOptionsClickHouseRepository extends FilterOptions {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {
     super();
   }

@@ -5,7 +5,7 @@ import {
 } from "@langwatch/authz-server";
 import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
 import {
-  IdentityEventingPort,
+  IdentityEventing,
   IdentityProducerPipelinesAdapter,
   PostgresIdentityNewbornSweepAdapter,
   PostgresIdentityUserMigrationsAdapter,
@@ -83,7 +83,7 @@ export function registeredUserMigrations({
   eventing,
 }: {
   database: PrismaClient;
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
 }): readonly SystemMigration[] {
   return PostgresIdentityUserMigrationsAdapter.create({ database, eventing }).build();
 }
@@ -98,13 +98,13 @@ function newbornSweep({
   eventing,
 }: {
   database: PrismaClient;
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
 }): ReturnType<PostgresIdentityNewbornSweepAdapter["build"]> {
   return PostgresIdentityNewbornSweepAdapter.create({ database, eventing }).build();
 }
 
 /** The identity command senders this process produces, or none at all. */
-class TasksIdentityEventing extends IdentityEventingPort {
+class TasksIdentityEventing extends IdentityEventing {
   static create({
     eventing,
   }: {

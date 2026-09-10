@@ -16,7 +16,7 @@ const CLOSE_PHASE_SLACK_MS = 2_000;
  * needed for the hosted MCP endpoint (SSE holds the socket for the
  * session's life). `handles` is asked first so a "no" costs one compare.
  */
-export abstract class ApiRawRequestSurfacePort {
+export abstract class ApiRawRequestSurface {
   abstract handles(pathname: string): boolean;
   abstract handle(request: IncomingMessage, response: ServerResponse): void;
 }
@@ -26,7 +26,7 @@ export abstract class ApiRawRequestSurfacePort {
  * connected-agent WebSocket gateway is the only registrant today, routed by
  * pathname behind this port so the listener does not need to know it exists.
  */
-export abstract class ApiUpgradeSurfacePort {
+export abstract class ApiUpgradeSurface {
   abstract attach(server: Server): void;
 }
 
@@ -42,10 +42,10 @@ export type ApiHttpListenerOptions = Readonly<{
    * Model Context Protocol sessions are the live registrant.
    */
   closeSessions?: (() => Promise<void>) | undefined;
-  /** Served before the Hono application; see {@link ApiRawRequestSurfacePort}. */
-  rawSurface?: ApiRawRequestSurfacePort | undefined;
-  /** Attached to the server's own `upgrade` event; see {@link ApiUpgradeSurfacePort}. */
-  upgrades?: ApiUpgradeSurfacePort | undefined;
+  /** Served before the Hono application; see {@link ApiRawRequestSurface}. */
+  rawSurface?: ApiRawRequestSurface | undefined;
+  /** Attached to the server's own `upgrade` event; see {@link ApiUpgradeSurface}. */
+  upgrades?: ApiUpgradeSurface | undefined;
 }>;
 
 /**

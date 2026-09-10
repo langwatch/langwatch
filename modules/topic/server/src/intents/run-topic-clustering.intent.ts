@@ -1,16 +1,16 @@
-import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
+import type { TopicClusteringCommands } from "../app/topic.infrastructure.ts";
 
 /** A manual trigger enters Topic through its durable Eventing command. */
 export class RequestTopicClusteringTask {
   static create(options: {
-    commands: TopicClusteringCommandsPort;
+    commands: TopicClusteringCommands;
     now?: () => number;
   }): RequestTopicClusteringTask {
     return new RequestTopicClusteringTask(options.commands, options.now ?? Date.now);
   }
 
   private constructor(
-    private readonly commands: TopicClusteringCommandsPort,
+    private readonly commands: TopicClusteringCommands,
     private readonly now: () => number,
   ) {}
 

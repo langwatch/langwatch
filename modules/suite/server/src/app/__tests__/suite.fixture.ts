@@ -11,17 +11,17 @@ import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { SuiteExecutionPort } from "../../ports/suite-execution.port.ts";
+import { SuiteExecution } from "../suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import type { SuiteRepositories } from "../../repositories/suite.repositories.ts";
 import { SuiteApp } from "../suite.app.ts";
 
 /** A run that is accepted and scheduled nowhere, recording what it was handed. */
-export class RecordingSuiteExecution extends SuiteExecutionPort {
-  readonly executed: Parameters<SuiteExecutionPort["execute"]>[0][] = [];
+export class RecordingSuiteExecution implements SuiteExecution {
+  readonly executed: Parameters<SuiteExecution["execute"]>[0][] = [];
 
-  async execute(input: Parameters<SuiteExecutionPort["execute"]>[0]) {
+  async execute(input: Parameters<SuiteExecution["execute"]>[0]) {
     this.executed.push(input);
 
     return {
@@ -41,7 +41,7 @@ export function createSuiteTestRepositories(database?: MemorySuiteDatabase): Sui
 export function createSuiteTestApp(
   input: Readonly<{
     repositories?: SuiteRepositories;
-    execution?: SuiteExecutionPort;
+    execution?: SuiteExecution;
     dependencies?: Partial<{
       scenarios: ScenarioApi;
       agents: AgentApi;

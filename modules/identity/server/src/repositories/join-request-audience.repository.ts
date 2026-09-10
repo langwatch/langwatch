@@ -13,7 +13,7 @@
  * because the answer differs — a missing address means send nothing, a missing
  * organization name means send the mail with a generic one.
  */
-export abstract class JoinRequestAudiencePort {
+export abstract class JoinRequestAudience {
   abstract tryFindRequesterId(input: { joinRequestId: string }): Promise<string | null>;
 
   abstract tryFindOrganizationName(input: { organizationId: string }): Promise<string | null>;

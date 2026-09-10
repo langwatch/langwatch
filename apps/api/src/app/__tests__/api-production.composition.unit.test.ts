@@ -169,12 +169,12 @@ vi.mock("../../platform/infrastructure/api-database.infrastructure.ts", async (i
   return { ...actual, ApiDatabaseInfrastructure: { tryCreate: databaseMocks.tryCreate } };
 });
 
-import { ApiMetricsPort } from "../../api-process.lifecycle.ts";
-import { ApiProcessGraphPort } from "../../api.process.ts";
+import { ApiMetrics } from "../../api-process.lifecycle.ts";
+import { ApiProcessGraph } from "../../api.process.ts";
 import {
   ApiAuthComposition,
-  ApiAuthSessionCompositionPort,
-  ApiBrowserSessionTransportPort,
+  ApiAuthSessionComposition,
+  ApiBrowserSessionTransport,
 } from "../api-auth.composition.ts";
 import {
   ApiProductionComposition,
@@ -950,8 +950,8 @@ describe("ApiProductionComposition", () => {
       it("composes its own, gated by that credential", async () => {
         await composeWithout({ METRICS_API_KEY: "scrape-me" });
 
-        const composed = processMocks.metrics() as ApiMetricsPort;
-        expect(composed).toBeInstanceOf(ApiMetricsPort);
+        const composed = processMocks.metrics() as ApiMetrics;
+        expect(composed).toBeInstanceOf(ApiMetrics);
         expect(await composed.respond(metricsScrape())).toHaveProperty("status", 401);
         expect(await composed.respond(metricsScrape("Bearer scrape-me"))).toHaveProperty(
           "status",
@@ -977,7 +977,7 @@ function metricsScrape(authorization?: string): Request {
   });
 }
 
-class TestMetrics extends ApiMetricsPort {
+class TestMetrics extends ApiMetrics {
   async respond(): Promise<Response> {
     return new Response("langwatch_api_up 1", { status: 200 });
   }
@@ -986,7 +986,7 @@ class TestMetrics extends ApiMetricsPort {
 function productionComposition(
   overrides: {
     agents?: AgentApi;
-    metrics?: ApiMetricsPort;
+    metrics?: ApiMetrics;
   } = {},
 ): ApiProductionComposition {
   return ApiProductionComposition.create({
@@ -1005,7 +1005,7 @@ function agentsFixture(): AgentApi {
 
 async function composeWithout(
   source: Readonly<Record<string, unknown>>,
-  overrides: { agents?: AgentApi; metrics?: ApiMetricsPort } = {},
+  overrides: { agents?: AgentApi; metrics?: ApiMetrics } = {},
 ): Promise<ApiProductionComposition> {
   const composition = productionComposition(overrides);
   await composition.compose({
@@ -1056,7 +1056,7 @@ async function composeSelfComposedAuthz(
 /** Composes with no host-supplied Auth composition, so the process resolves its own. */
 async function composeSelfComposedAuth(
   source: Readonly<Record<string, unknown>>,
-  overrides: { browserSessions?: ApiBrowserSessionTransportPort } = {},
+  overrides: { browserSessions?: ApiBrowserSessionTransport } = {},
 ): Promise<ApiProductionComposition> {
   const composition = ApiProductionComposition.create({
     agents: agentsFixture(),
@@ -1092,11 +1092,11 @@ async function composedFeaturePorts(
   return ports;
 }
 
-class TestGraph extends ApiProcessGraphPort {
+class TestGraph extends ApiProcessGraph {
   async close(): Promise<void> {}
 }
 
-class TestAuthComposition extends ApiAuthSessionCompositionPort {
+class TestAuthComposition extends ApiAuthSessionComposition {
   compose() {
     return {
       auth: new TestAuthService(),
@@ -1130,7 +1130,7 @@ class TestAuthService implements BrowserSessionApi {
 }
 
 /** Counts the requests the composed policy actually authenticates through. */
-class RecordingSessionTransport extends ApiBrowserSessionTransportPort {
+class RecordingSessionTransport extends ApiBrowserSessionTransport {
   calls = 0;
 
   async tryResolveVerifiedSession() {
@@ -1139,7 +1139,7 @@ class RecordingSessionTransport extends ApiBrowserSessionTransportPort {
   }
 }
 
-class TestSessionTransport extends ApiBrowserSessionTransportPort {
+class TestSessionTransport extends ApiBrowserSessionTransport {
   async tryResolveVerifiedSession() {
     return null;
   }

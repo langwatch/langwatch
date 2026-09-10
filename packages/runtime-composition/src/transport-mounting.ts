@@ -10,8 +10,6 @@ export type MountableTransport = object;
 
 /** What one install states beyond the declaration, as a REST host reads it. */
 export type FeatureRestMountOptions = Readonly<{
-  /** The family's own error boundary, where the install named one. */
-  onError?: unknown;
   /** One binding per module-specific fact the declaration's routes name. */
   facts?: readonly unknown[];
 }>;
@@ -89,7 +87,6 @@ export type DeclaredTransports = Readonly<{
   transports: readonly FeatureTransportDescriptor[];
   provided: () => unknown;
   facts: readonly unknown[];
-  restErrorHandler: unknown;
 }>;
 
 /**
@@ -139,7 +136,6 @@ function mountRest<Rest>(
   if (!host) throw new MissingTransportHostError(entry.feature, "REST");
 
   return host.mount(descriptor.router(), entry.provided, {
-    ...(entry.restErrorHandler === undefined ? {} : { onError: entry.restErrorHandler }),
     ...(entry.facts.length > 0 ? { facts: entry.facts } : {}),
   });
 }

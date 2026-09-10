@@ -2,7 +2,7 @@ import { S3Client } from "@aws-sdk/client-s3";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import {
   type DatasetApi,
-  DatasetNormalizationWorkerPort,
+  DatasetNormalizationWorker,
   type DatasetNormalizationSender,
   type DatasetNormalizePayload,
 } from "@langwatch/dataset-contract";
@@ -11,11 +11,11 @@ import {
   AzureDatasetStorageAdapter,
   DatasetApp,
   datasetServer,
-  DatasetAzureConfigResolverPort,
+  DatasetAzureConfigResolver,
   DatasetNormalizationService,
   DatasetNormalizeAdapter,
-  DatasetS3ClientResolverPort,
-  DatasetStorageResolverPort,
+  DatasetS3ClientResolver,
+  DatasetStorageResolver,
   LocalDatasetStorageAdapter,
   S3DatasetStorageAdapter,
   type DatasetAzureConfig,
@@ -31,7 +31,7 @@ import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object
 import { createWorkerAzureBlobDriver } from "./worker-object-storage.composition.ts";
 import type { WorkerStorageConfig } from "../platform/config/worker.config.ts";
 import type {
-  WorkerProjectS3SourcePort,
+  WorkerProjectS3Source,
   WorkerProjectS3Target,
 } from "../platform/infrastructure/worker-stored-object-storage.adapter.ts";
 
@@ -43,7 +43,7 @@ import type {
 export function createWorkerDatasetNormalization(options: {
   database: DatasetContentDatabase;
   storage: WorkerDatasetObjectStorage;
-}): DatasetNormalizationWorkerPort {
+}): DatasetNormalizationWorker {
   const datasets = PrismaDatasetContentRepository.create(options.database);
   const storage = new WorkerDatasetStorageResolver(options.storage);
 
@@ -62,7 +62,7 @@ export function createWorkerDatasetNormalization(options: {
 export type WorkerDatasetObjectStorage = {
   runtime: StoredObjectStorageRuntimeAdapter;
   aws: AwsClientProcessRuntime;
-  projects: WorkerProjectS3SourcePort;
+  projects: WorkerProjectS3Source;
   globalS3?: WorkerProjectS3Target;
   /** The `AZURE_BLOB_*` block this process read, for an Azure-routed project. */
   azureConfig: WorkerStorageConfig["azure"];
@@ -110,7 +110,7 @@ function uncomposed<T extends object>(capability: string): T {
   });
 }
 
-class WorkerDatasetNormalizationAdapter extends DatasetNormalizationWorkerPort {
+class WorkerDatasetNormalizationAdapter extends DatasetNormalizationWorker {
   constructor(private readonly normalization: DatasetNormalizationService) {
     super();
   }
@@ -129,7 +129,7 @@ class WorkerDatasetNormalizationAdapter extends DatasetNormalizationWorkerPort {
  * policy the rest of this process's object storage uses — so dataset
  * chunks, the trace spool, and every other stored object agree on account.
  */
-export class WorkerDatasetStorageResolver extends DatasetStorageResolverPort {
+export class WorkerDatasetStorageResolver extends DatasetStorageResolver {
   private readonly s3: S3DatasetStorageAdapter;
   /** Built once, on first use — matching the general registry's Azure laziness. */
   private azure: AzureDatasetStorageAdapter | undefined;
@@ -162,7 +162,7 @@ export class WorkerDatasetStorageResolver extends DatasetStorageResolverPort {
  * one-account model `WorkerAzureStorageAdapter` uses for the general path.
  * `projectId` is unread: this process composes no per-project Azure routing.
  */
-class WorkerDatasetAzureConfigResolver extends DatasetAzureConfigResolverPort {
+class WorkerDatasetAzureConfigResolver extends DatasetAzureConfigResolver {
   constructor(private readonly azure: WorkerStorageConfig["azure"]) {
     super();
   }
@@ -183,10 +183,10 @@ class WorkerDatasetAzureConfigResolver extends DatasetAzureConfigResolverPort {
  * RELEASE: one normalize job per dataset, so a fresh client per job removes
  * the lifecycle the application's shared manager needs.
  */
-class WorkerDatasetS3ClientResolver extends DatasetS3ClientResolverPort {
+class WorkerDatasetS3ClientResolver extends DatasetS3ClientResolver {
   constructor(
     private readonly aws: AwsClientProcessRuntime,
-    private readonly projects: WorkerProjectS3SourcePort,
+    private readonly projects: WorkerProjectS3Source,
     private readonly globalS3: WorkerProjectS3Target | undefined,
   ) {
     super();

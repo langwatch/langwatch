@@ -4,10 +4,10 @@
  * writes their first test cases.
  *
  * Fire-and-forget by design - none of them may fail a write - so every method
- * answers nothing and a failure goes to {@link ScenarioActivityPort.failed}
+ * answers nothing and a failure goes to {@link ScenarioActivity.failed}
  * rather than to the caller.
  */
-export abstract class ScenarioActivityPort {
+export abstract class ScenarioActivity {
   /** Records the product-analytics event for a newly created scenario. */
   abstract trackScenarioCreated(input: Readonly<{ userId: string; projectId: string }>): void;
 
@@ -26,7 +26,7 @@ export abstract class ScenarioActivityPort {
 }
 
 /** A process that reports none of it: every call is dropped on the floor. */
-export class SilentScenarioActivity extends ScenarioActivityPort {
+export class SilentScenarioActivity extends ScenarioActivity {
   trackScenarioCreated(): void {
     // Nothing is recorded on a process that composed no analytics.
   }

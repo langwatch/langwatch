@@ -16,14 +16,14 @@ export { NlpFetchAdapter, type NlpFetchTimeouts } from "./adapters/nlp-fetch.ada
 export * from "./adapters/node-scenario-child-process.adapter.ts";
 export { OtelScenarioProcessorMetricsAdapter } from "./adapters/otel.scenario-processor-metrics.adapter.ts";
 export * from "./adapters/prompt-template.adapter.ts";
-export * from "./adapters/redis.cancellation-channel.adapter.ts";
+export * from "./repositories/redis/redis.cancellation-channel.repository.ts";
 export {
     CANCELLATION_CHANNEL,
     RedisCancellationPublisherAdapter,
     UnavailableCancellationPublisherAdapter,
     type CancellationPublisher
-} from "./adapters/redis.cancellation-channel.adapter.ts";
-export * from "./adapters/redis.scenario-tab-store.adapter.ts";
+} from "./repositories/redis/redis.cancellation-channel.repository.ts";
+export * from "./repositories/redis/redis.scenario-tab-store.repository.ts";
 export * from "./adapters/remote-trace-run.adapter.ts";
 export * from "./adapters/scenario-child-execution.adapter.ts";
 export * from "./adapters/scenario-role-model.adapter.ts";
@@ -39,13 +39,13 @@ export {
     SimulationRunStateStoreAdapter,
     SimulationStalledRunAdapter,
     type SimulationStalledRun
-} from "./adapters/simulation-eventing.adapter.ts";
+} from "./repositories/clickhouse/clickhouse.simulation-eventing.repository.ts";
 export * from "./adapters/simulation-processing-commands.adapter.ts";
 export {
     SimulationProcessingPipelineAdapter,
     type SimulationProcessingPipelineDeps
 } from "./adapters/simulation-processing-pipeline.adapter.ts";
-export { SimulationProcessingProducerAdapter } from "./adapters/simulation-processing-producer.adapter.ts";
+export { ClickhouseSimulationProcessingProducerRepository as SimulationProcessingProducerAdapter } from "./repositories/clickhouse/clickhouse.simulation-processing-producer.repository.ts";
 export {
     ScenarioApp,
     scenarioAppDependencyTokens,
@@ -164,7 +164,7 @@ export {
 } from "./transport/scenario-generate.rest.ts";
 export {
     createScenarioRunExportRest,
-    type ScenarioRunExportPort,
+    type ScenarioRunExport,
     type ScenarioRunExportRequestFields,
     type ScenarioRunExportRestPorts
 } from "./transport/scenario-run-export.rest.ts";

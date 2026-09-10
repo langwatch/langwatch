@@ -30,7 +30,7 @@ export interface LangyStreamRedis {
  * and a reader replays then follows.
  * A seam because the durability split is the point (ADR-044 part 3): what is
  */
-export abstract class LangyTokenBufferPort {
+export abstract class LangyTokenBuffer {
   /** Every entry written so far, with the id to follow from. */
   abstract readTail(input: {
     conversationId: string;

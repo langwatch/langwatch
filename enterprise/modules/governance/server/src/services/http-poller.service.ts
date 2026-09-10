@@ -18,12 +18,10 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type { GovernanceHttpPort, GovernanceHttpResponse } from "../app/governance.infrastructure.ts";
+import type { GovernanceHttpClient, GovernanceHttpResponse } from "../app/governance.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
-import {
-  NullIngestionPullDiagnosticsAdapter,
-  type IngestionPullDiagnosticsPort,
-} from "../ports/ingestion-pull-worker.port.ts";
+import type { IngestionPullDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import { NullIngestionPullDiagnosticsAdapter } from "./ingestion-pull-diagnostics.service.ts";
 
 import type {
   GovernancePuller as PullerAdapter,
@@ -93,13 +91,13 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
   readonly id: string = "http_polling";
 
   protected constructor(
-    private readonly http: GovernanceHttpPort,
-    private readonly diagnostics: IngestionPullDiagnosticsPort = new NullIngestionPullDiagnosticsAdapter(),
+    private readonly http: GovernanceHttpClient,
+    private readonly diagnostics: IngestionPullDiagnosticsSink = new NullIngestionPullDiagnosticsAdapter(),
   ) {}
 
   static create(options: {
-    http: GovernanceHttpPort;
-    diagnostics?: IngestionPullDiagnosticsPort;
+    http: GovernanceHttpClient;
+    diagnostics?: IngestionPullDiagnosticsSink;
   }): HttpPollingPullerAdapter {
     return new HttpPollingPullerAdapter(
       options.http,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  AuthzGrantsCommandDispatcherPort,
+  AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
   AuthzLedgerUnavailableError,
 } from "../authz-grants-command-dispatcher.port.ts";
@@ -11,7 +11,7 @@ import {
   harness,
 } from "../../adapters/__tests__/support/eventing.authz-ledger-fork.harness.ts";
 
-class RecoveringDispatcher extends AuthzGrantsCommandDispatcherPort {
+class RecoveringDispatcher extends AuthzGrantsCommandDispatcher {
   readonly commandsCall = vi.fn();
   readonly send = vi.fn().mockResolvedValue(undefined);
   private available = false;

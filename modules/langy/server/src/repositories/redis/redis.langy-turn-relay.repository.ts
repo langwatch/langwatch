@@ -19,7 +19,7 @@ import {
   type LangyToolFrame,
 } from "../../services/langy-cli-envelope.service.ts";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
-import { verifyFrame } from "../../ports/langy-frame-auth.port.ts";
+import { verifyFrame } from "../../services/langy-frame-auth.service.ts";
 import {
   type LangyFrameEnvelope,
   type LangyRelayFrame,

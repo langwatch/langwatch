@@ -3,7 +3,7 @@
  * Which storage engine and which account ceremonies this process composes.
  * @regression
  */
-import type { IdentityEventingPort } from "@langwatch/identity-server";
+import type { IdentityEventing } from "@langwatch/identity-server";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -21,8 +21,8 @@ function database(): PrismaClient {
   return new Proxy({} as PrismaClient, { get: () => ({}) });
 }
 
-function eventing(): IdentityEventingPort {
-  return { tryPipelineCommand: vi.fn(async () => null) } as unknown as IdentityEventingPort;
+function eventing(): IdentityEventing {
+  return { tryPipelineCommand: vi.fn(async () => null) } as unknown as IdentityEventing;
 }
 
 /** Only `guards`/`mfaGuards`/`reservations` are read by this branch. */

@@ -78,10 +78,7 @@ export type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 export { walkFiles } from "./workspace/layout.ts";
 export { lintFeatureLayouts } from "./policies/feature-layout.ts";
-export {
-  lintFeatureAppContracts,
-  lintFeatureSetupInfrastructure,
-} from "./policies/feature-app.ts";
+export { lintFeatureAppContracts, lintFeatureSetupInfrastructure } from "./policies/feature-app.ts";
 export { lintManifests } from "./policies/boundaries/manifests.ts";
 export {
   lintServiceCeilings,
@@ -163,6 +160,31 @@ export type {
   RestDoorWithoutMountFinding,
 } from "./policies/shape-counters.ts";
 export { lintStrictPortModules } from "./policies/boundaries/port-modules.ts";
+export {
+  collectUnusedModuleExportBaseline,
+  collectUnusedModuleExportFindings,
+  lintUnusedModuleExports,
+  UNUSED_MODULE_EXPORT_BASELINE,
+} from "./policies/quality/unused-module-export.ts";
+export type { UnusedModuleExportFinding } from "./policies/quality/unused-module-export.ts";
+export {
+  collectInfrastructureMemberBaseline,
+  collectInfrastructureMemberFindings,
+  INFRASTRUCTURE_MEMBER_UNUSED_BASELINE,
+  lintInfrastructureMembers,
+} from "./policies/quality/infrastructure-member-unused.ts";
+export type { InfrastructureMemberFinding } from "./policies/quality/infrastructure-member-unused.ts";
+export {
+  collectMemoryTwinDriftBaseline,
+  collectMemoryTwinDriftFindings,
+  lintMemoryTwinDrift,
+  MEMORY_TWIN_DRIFT_BASELINE,
+  MEMORY_TWIN_DRIFT_SIDES,
+} from "./policies/persistence/memory-twin-drift.ts";
+export type {
+  MemoryTwinDriftFinding,
+  MemoryTwinDriftSide,
+} from "./policies/persistence/memory-twin-drift.ts";
 export {
   COMPOSED_EXPORTS_BASELINE,
   collectComposedExportSubjects,

@@ -143,7 +143,7 @@ export interface TrpcActorPort<TContext> {
  * override the rest of the chain sees, so the process keeps ownership of its
  * own session shape.
  */
-export interface TrpcIdentityPort<
+export interface TrpcIdentity<
   TContext,
   TAuthenticatedContext extends object,
 > extends TrpcActorPort<TContext> {
@@ -176,7 +176,7 @@ export type TrpcAuditEntry = Readonly<{
 }>;
 
 /** Where an audit row is written. */
-export interface TrpcAuditPort {
+export interface TrpcAudit {
   record(entry: TrpcAuditEntry): Promise<void>;
 }
 
@@ -185,7 +185,7 @@ export interface TrpcAuditPort {
  * becomes an Error. Both belong to the process, which already owns the one
  * coercion rule the rest of the application uses.
  */
-export interface TrpcErrorReportingPort {
+export interface TrpcErrorReporting {
   capture(failure: unknown): void;
   asError(failure: unknown): Error;
 }
@@ -202,7 +202,7 @@ export type TrpcTranslatedCause = Readonly<{
  * here; this is for the typed causes a process re-raises with a code of its
  * own so a client interceptor can act on them.
  */
-export interface TrpcCauseTranslationPort {
+export interface TrpcCauseTranslation {
   translate(cause: unknown): TrpcTranslatedCause | undefined;
 }
 
@@ -220,7 +220,7 @@ export interface TrpcAuthorizationDecisions {
  * the process composes them per request and this package must not reach for a
  * process-wide one.
  */
-export interface TrpcAuthorizationPort<TContext> {
+export interface TrpcAuthorization<TContext> {
   forRequest(ctx: TrpcMiddlewareContext<TContext>): TrpcAuthorizationDecisions;
 }
 
@@ -231,7 +231,7 @@ export interface TrpcAuthorizationPort<TContext> {
  * that both answer UNAUTHORIZED with the domain error as the cause — but the
  * classes themselves carry product copy and codes a client renders.
  */
-export interface TrpcAuthorizationDenialPort {
+export interface TrpcAuthorizationDenial {
   /** The membership exists but an admin disabled it, so it grants nothing. */
   membershipDisabled(): Error;
   /** The organization role does not reach this feature at all. */
@@ -362,8 +362,8 @@ export interface TrpcDeclaredAuthzMiddlewares<TContext> {
 
 export type TrpcDeclaredAuthzPorts<TContext> = Readonly<{
   identity: TrpcActorPort<TContext>;
-  authorization: TrpcAuthorizationPort<TContext>;
-  denials: TrpcAuthorizationDenialPort;
+  authorization: TrpcAuthorization<TContext>;
+  denials: TrpcAuthorizationDenial;
 }>;
 
 /**
@@ -615,7 +615,7 @@ function deniedError({
   scope: DeclaredScopeId;
   organizationRole: TrpcOrganizationRole | null;
   denialReason?: AuthzDenialReason;
-  denials: TrpcAuthorizationDenialPort;
+  denials: TrpcAuthorizationDenial;
 }): TRPCError {
   // Checked before the role, because a disabled member HAS a role and the
   // role-shaped answers would all be wrong for them: the lite-member modal
@@ -706,7 +706,7 @@ function declaredPermissionOf(declaration: AuthzDeclaration | null): string {
  * resolves scope lineage through its composed repository and fails closed.
  */
 export function createScopeLineageGuard<TContext>(
-  ports: Readonly<{ authorization: TrpcAuthorizationPort<TContext> }>,
+  ports: Readonly<{ authorization: TrpcAuthorization<TContext> }>,
 ): (declaration: AuthzDeclaration | null) => ScopeLineageMiddleware<TContext> {
   return (declaration) =>
     async ({ ctx, input, next }: ScopeLineageParams<TContext>) => {
@@ -1171,10 +1171,10 @@ export function createIsPublicProcedure(
 
 /** Everything the process supplies for the policy below to exist. */
 export type TrpcRuntimePolicyPorts<TContext, TAuthenticatedContext extends object> = Readonly<{
-  identity: TrpcIdentityPort<TContext, TAuthenticatedContext>;
-  audit: TrpcAuditPort;
-  errorReporting: TrpcErrorReportingPort;
-  causes: TrpcCauseTranslationPort;
+  identity: TrpcIdentity<TContext, TAuthenticatedContext>;
+  audit: TrpcAudit;
+  errorReporting: TrpcErrorReporting;
+  causes: TrpcCauseTranslation;
 }>;
 
 function spanAttributes(path: string, type: string) {

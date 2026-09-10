@@ -16,12 +16,12 @@ export interface StoredObjectByteStore {
   exists(uri: string): Promise<boolean>;
 }
 
-export abstract class StoredObjectProjectDestinationResolverPort {
+export abstract class StoredObjectProjectDestinationResolver {
   abstract resolve(projectId: string): Promise<StoredObjectStorageDestination>;
 }
 
 export type StoredObjectStorageRuntimeOptions = {
-  destination: StoredObjectProjectDestinationResolverPort;
+  destination: StoredObjectProjectDestinationResolver;
   s3ForProject(projectId: string, aws: AwsClientProcessRuntime): StoredObjectStorageDriver;
   fileForProject(projectId: string, aws: AwsClientProcessRuntime): StoredObjectStorageDriver;
   azureForProject?(

@@ -20,9 +20,9 @@ import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { AuthzGrantsCommandDispatcherPort } from "@langwatch/authz-server";
+import type { AuthzGrantsCommandDispatcher } from "@langwatch/authz-server";
 import type {
-  DataRetentionDirectoryPort,
+  DataRetentionDirectoryReader,
   DataRetentionPlanPort,
 } from "@langwatch/data-retention-server";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -38,14 +38,14 @@ import {
 } from "@langwatch/runtime-composition";
 import type { ScenarioExecutionPrefetcherService } from "@langwatch/scenario-server";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicClusteringSchedulePort } from "@langwatch/topic-server";
+import type { TopicClusteringScheduleReader } from "@langwatch/topic-server";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import {
   WorkflowApp,
   workflowRepositories,
-  type WorkflowAgentMappingPort,
-  type WorkflowStudioDslPort,
+  type WorkflowAgentMapping,
+  type WorkflowStudioDsl,
 } from "@langwatch/workflow-server";
 import {
   PrismaConfigService,
@@ -127,11 +127,11 @@ async function composeTenancy(config: WorkerConfig) {
       config,
       redis: null,
       plans: createApiFixture<PlanProvider>(),
-      authzDispatcher: createApiFixture<AuthzGrantsCommandDispatcherPort>(),
+      authzDispatcher: createApiFixture<AuthzGrantsCommandDispatcher>(),
       topicClustering: createApiFixture<ProjectInfrastructure["topicClustering"]>(),
-      topicSchedule: createApiFixture<TopicClusteringSchedulePort>(),
+      topicSchedule: createApiFixture<TopicClusteringScheduleReader>(),
       dataRetention: {
-        directory: createApiFixture<DataRetentionDirectoryPort>({}, "retention directory"),
+        directory: createApiFixture<DataRetentionDirectoryReader>({}, "retention directory"),
         plans: createApiFixture<DataRetentionPlanPort>({}, "retention plans"),
         resolveClickHouseClient: null,
       },
@@ -346,8 +346,8 @@ describe.skipIf(!databaseUrl)(
           workflows: graph.workflows,
           datasets: graph.datasets,
           evaluators: createApiFixture<EvaluatorApi>(),
-          studioDsl: createApiFixture<WorkflowStudioDslPort>(),
-          agentMappings: createApiFixture<WorkflowAgentMappingPort>(),
+          studioDsl: createApiFixture<WorkflowStudioDsl>(),
+          agentMappings: createApiFixture<WorkflowAgentMapping>(),
           workflowRows: instantiateRepositories(workflowRepositories, {
             backend: "postgres",
             infrastructure: { prisma: db },

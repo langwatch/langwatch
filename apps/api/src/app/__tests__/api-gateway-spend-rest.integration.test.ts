@@ -9,7 +9,7 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import {
   GatewaySpendCursorAdapter,
-  GatewaySpendEventsPort,
+  GatewaySpendEvents,
   GatewaySpendEventsService,
 } from "@langwatch/gateway-server";
 import {
@@ -56,7 +56,7 @@ async function expectCanonicalError(
 }
 
 /** The ledger, as the routes read it. */
-class TestSpendLedger extends GatewaySpendEventsPort {
+class TestSpendLedger extends GatewaySpendEvents {
   summaries: Array<{ key: string; group: Record<string, string> }> = [];
   summariesCursor: string | null = null;
   readonly readSummaries = vi.fn();

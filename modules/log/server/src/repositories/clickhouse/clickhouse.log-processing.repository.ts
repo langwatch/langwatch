@@ -4,7 +4,7 @@ import {
   ClickHouseCanonicalLogRecordAppendRepository,
   type LogClickHouseClientResolver,
 } from "./clickhouse.canonical-log-record-append.repository.ts";
-import { LogProcessingAdapter, type LogProcessingPipeline } from "../../adapters/log-processing.adapter.ts";
+import { LogProcessingAdapter, type LogProcessingPipeline } from "../../services/log-processing.service.ts";
 
 /**
  * Durable log processing, composed from nothing but a tenant-keyed ClickHouse

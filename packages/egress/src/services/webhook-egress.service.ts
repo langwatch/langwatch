@@ -5,7 +5,7 @@ import {
   type WebhookMethod,
 } from "@langwatch/automation-contract";
 import type { EgressTlsPolicy } from "../ssrf/fenced-fetch.ts";
-import type { WebhookDispatchRateLimiterPort } from "../ports/webhook-dispatch-rate-limiter.port.ts";
+import type { WebhookDispatchRateLimiter } from "../ports/webhook-dispatch-rate-limiter.port.ts";
 import {
   WEBHOOK_DELIVERY_ATTEMPT_HEADER,
   WEBHOOK_EVENT_ID_HEADER,
@@ -143,14 +143,14 @@ function buildWebhookHeaders({
  */
 export class WebhookEgressService {
   private constructor(
-    private readonly rateLimiter: WebhookDispatchRateLimiterPort,
+    private readonly rateLimiter: WebhookDispatchRateLimiter,
     private readonly tls: EgressTlsPolicy,
     private readonly now: () => number,
   ) {}
 
   static create(options: {
     /** Where the hourly dispatch cap is counted. */
-    rateLimiter: WebhookDispatchRateLimiterPort;
+    rateLimiter: WebhookDispatchRateLimiter;
     /** Whether this deployment verifies TLS certificates. */
     tls: EgressTlsPolicy;
     /** Injected only so the signature timestamp is assertable; defaults to the wall clock. */

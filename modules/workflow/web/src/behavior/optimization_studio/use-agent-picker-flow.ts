@@ -3,13 +3,13 @@ import { useMemo } from "react";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-host/use-drawer";
 import {
   useWorkflowAgentPickerFlow,
-  type AgentPickerPort,
+  type AgentPicker,
 } from "../use-workflow-agent-picker-flow.ts";
 
 /** App composition adapter for the Workflow agent-selection state machine. */
 export function useAgentPickerFlow() {
   const { openDrawer, closeDrawer } = useDrawer();
-  const port = useMemo<AgentPickerPort>(
+  const port = useMemo<AgentPicker>(
     () => ({
       register: (callbacks) => setFlowCallbacks("agentList", callbacks),
       registerCreation: (onSave) => {

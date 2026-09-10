@@ -1,6 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 import {
-  WebhookDispatchRateLimiterPort,
+  WebhookDispatchRateLimiter,
   type WebhookDispatchRateLimitResult,
 } from "../ports/webhook-dispatch-rate-limiter.port.ts";
 
@@ -23,7 +23,7 @@ interface MemoryEntry {
   expiresAt: number;
 }
 
-export class InMemoryWebhookDispatchRateLimiterAdapter extends WebhookDispatchRateLimiterPort {
+export class InMemoryWebhookDispatchRateLimiterAdapter extends WebhookDispatchRateLimiter {
   private readonly entries = new Map<string, MemoryEntry>();
 
   static create(): InMemoryWebhookDispatchRateLimiterAdapter {

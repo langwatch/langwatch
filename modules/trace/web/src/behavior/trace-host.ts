@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import {
   createUiScopeHost,
   UiScopeHostProvider,
-  type UiScopeHostPort,
+  type UiScopeHost,
 } from "@langwatch/ui-host/use-organization-team-project";
 
 /** The project every trace read is scoped to. */
@@ -144,7 +144,7 @@ export function TraceHostProvider({
   value: TraceHostPort | undefined;
   children: ReactNode;
 }) {
-  const scope = useMemo<UiScopeHostPort | undefined>(
+  const scope = useMemo<UiScopeHost | undefined>(
     () =>
       value
         ? createUiScopeHost({

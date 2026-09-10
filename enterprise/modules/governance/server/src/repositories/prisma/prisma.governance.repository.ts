@@ -1,4 +1,4 @@
-import type { GovernanceDiagnosticsPort } from "../../ports/governance-diagnostics.port.ts";
+import type { GovernanceDiagnosticsSink } from "../../app/governance.infrastructure.ts";
 import { PrismaCostAttributionPolicyRepository } from "./prisma.cost-attribution-policy.repository.ts";
 import { PostgresGovernancePolicyService } from "../../services/governance-policy.service.ts";
 
@@ -18,7 +18,7 @@ export type GovernanceDatabase = {
 
 export type PostgresGovernanceAdapterOptions = {
   database: GovernanceDatabase;
-  diagnostics?: GovernanceDiagnosticsPort;
+  diagnostics?: GovernanceDiagnosticsSink;
   clock?: () => number;
   cacheTtlMs?: number;
 };

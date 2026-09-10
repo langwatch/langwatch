@@ -29,8 +29,8 @@ export {
 export { ClickhouseStoredObjectOwnerLookupRuntimeRepository as StoredObjectOwnerLookupRuntimeAdapter } from "./repositories/clickhouse/clickhouse.stored-object-owner-lookup-runtime.repository.ts";
 export {
   StoredObjectDestinationPolicyAdapter,
-  StoredObjectAzureDestinationPort,
-  StoredObjectProjectS3ConfigPort,
+  StoredObjectAzureDestination,
+  StoredObjectProjectS3Config,
   type StoredObjectStorageSelection,
 } from "./services/stored-object-destination-policy.service.ts";
 export { StoredObjectStorageRegistryAdapter } from "./services/stored-object-storage-registry.service.ts";
@@ -55,7 +55,7 @@ export {
   type TokenModeCredentials,
 } from "./services/azure-blob-token-provider.service.ts";
 export {
-  StoredObjectProjectDestinationResolverPort,
+  StoredObjectProjectDestinationResolver,
   StoredObjectStorageRuntimeAdapter,
   type StoredObjectStorageProject,
   type StoredObjectStorageRuntimeOptions,
@@ -66,21 +66,21 @@ export {
   type ClickHouseImportStoredObjectMigrationOptions,
 } from "./migrations/clickhouse-import.stored-object.migration.ts";
 export {
-  StoredObjectDeliveryPort,
-  StoredObjectStoragePort,
+  StoredObjectDelivery,
+  StoredObjectStorage,
   StoredObjectUploadTokenPort,
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
 } from "./app/stored-object.infrastructure.ts";
-export { StoredObjectLegacyLocationPort } from "./repositories/stored-object-legacy-location.repository.ts";
+export { StoredObjectLegacyLocation } from "./repositories/stored-object-legacy-location.repository.ts";
 export {
-  StoredObjectLegacySourcePort,
+  StoredObjectLegacySource,
   type LegacyStoredObjectRow,
 } from "./repositories/stored-object-legacy-source.repository.ts";
-export { StoredObjectLegacyWriterDrainPort } from "./repositories/stored-object-legacy-writer-drain.repository.ts";
-export { StoredObjectProjectSourcePort } from "./repositories/stored-object-project-source.repository.ts";
+export { StoredObjectLegacyWriterDrain } from "./repositories/stored-object-legacy-writer-drain.repository.ts";
+export { StoredObjectProjectSource } from "./repositories/stored-object-project-source.repository.ts";
 export {
-  StoredObjectOwnerInstanceDirectoryRepository as StoredObjectOwnerInstanceDirectoryPort,
+  StoredObjectOwnerInstanceDirectoryRepository as StoredObjectOwnerInstanceDirectory,
   type StoredObjectOwnerClickHouseClient,
   type StoredObjectOwnerClickHouseInstance,
 } from "./repositories/stored-object-owner-instance-directory.repository.ts";
@@ -124,7 +124,7 @@ export {
   type MigrationTaskPhase,
 } from "./tasks/object-storage-migrate.task.ts";
 export {
-  ObjectStorageMigrationInventoryPort,
+  ObjectStorageMigrationInventory,
   type MigrationDataset,
   type MigrationPageRequest,
   type MigrationProject,
@@ -152,7 +152,7 @@ export {
   GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
 } from "./services/group-queue.object-storage-migration.service.ts";
-export { PayloadStagingPort, type StagedPayload } from "./repositories/payload-staging.repository.ts";
+export { PayloadStaging, type StagedPayload } from "./repositories/payload-staging.repository.ts";
 export {
   PayloadStagingS3TargetPort,
   S3PayloadStagingAdapter,

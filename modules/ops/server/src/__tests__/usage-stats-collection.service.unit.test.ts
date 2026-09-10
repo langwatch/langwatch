@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  UsageStatsClickHouseClientPort,
-  UsageStatsClickHouseClientResolverPort,
+  UsageStatsClickHouseClient,
+  UsageStatsClickHouseClientResolver,
   type UsageStatsClickHouseQuery,
 } from "../index.ts";
 import type { UsageStatsProjectDatabase, UsageStatsProjectCounts } from "../app/ops.app.ts";
@@ -43,13 +43,13 @@ class CountsFake extends UsageStatsClickHouseRepository {
   readonly findScenarioRunCount = vi.fn(async () => 75);
 }
 
-class ClickHouseClientFake implements UsageStatsClickHouseClientPort {
+class ClickHouseClientFake implements UsageStatsClickHouseClient {
   readonly query = vi.fn<(input: UsageStatsClickHouseQuery) => ReturnType<typeof queryResult>>();
 }
 
-class ClickHouseClientsFake implements UsageStatsClickHouseClientResolverPort {
+class ClickHouseClientsFake implements UsageStatsClickHouseClientResolver {
   readonly tryResolve =
-    vi.fn<(organizationId: string) => Promise<UsageStatsClickHouseClientPort | null>>();
+    vi.fn<(organizationId: string) => Promise<UsageStatsClickHouseClient | null>>();
 }
 
 function queryResult(total: string) {

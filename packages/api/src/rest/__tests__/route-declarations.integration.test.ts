@@ -16,7 +16,7 @@ import { defineRestRouter } from "../declaration.ts";
 import {
   createRestRuntime,
   type RestAuditRow,
-  type RestIdentityPort,
+  type RestIdentity,
   type RestRuntimePorts,
 } from "../runtime.ts";
 
@@ -78,7 +78,7 @@ const keys = defineRestRouter(KeyApi)
   .handle(async ({ app, input }) => app.withdraw({ id: input.id }))
   .build();
 
-const organizationDoor: RestIdentityPort = {
+const organizationDoor: RestIdentity = {
   authenticate: () => ({
     actor: { type: "user", id: "user-1" },
     scope: { tier: "organization", id: "organization-1" },
@@ -86,7 +86,7 @@ const organizationDoor: RestIdentityPort = {
 };
 
 /** The instance administrator's bearer names no tenant and nobody inside one. */
-const instanceAdminDoor: RestIdentityPort = {
+const instanceAdminDoor: RestIdentity = {
   authenticate: () => ({ actor: null, scope: null }),
 };
 

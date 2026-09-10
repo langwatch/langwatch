@@ -1,6 +1,6 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { TraceTokenCounterPort } from "@langwatch/trace-server";
+import { TraceTokenCounter } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import { WorkerTiktokenCounterAdapter } from "../../platform/infrastructure/worker-token-counter.adapter.ts";
@@ -15,14 +15,14 @@ import { createWorkerTraceTokenEstimation } from "../worker-trace-token-estimati
  * estimator, the kill switches and the encoding tables — out of the two
  * tokenizer variables and the feature-flag service this process already holds.
  *
- * It is driven through `TraceSpanTokenEstimationPort`, the port the conversion
+ * It is driven through `TraceSpanTokenEstimation`, the port the conversion
  * will call, rather than through the service underneath it.
  */
 
 const flags = (enabled: Record<string, boolean> = {}): FeatureFlagApi =>
   ({ isEnabled: async (key: string) => enabled[key] ?? false }) as never;
 
-class FixedTokenizer extends TraceTokenCounterPort {
+class FixedTokenizer extends TraceTokenCounter {
   readonly calls: string[] = [];
 
   async tryCountTokens(model: string, text: string | undefined): Promise<number | undefined> {

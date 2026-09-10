@@ -3,25 +3,25 @@ import {
   isGovernanceOriginTrace,
 } from "@langwatch/enterprise-governance-contract";
 import {
-  GovernanceKpiContributionPort,
-  GovernanceSubscriberDiagnosticsPort,
+  GovernanceKpiContributionWriter,
+  GovernanceSubscriberDiagnosticsSink,
   type GovernanceKpiContribution,
   type GovernanceTraceContext,
   type GovernanceTraceEvent,
-} from "../ports/governance-subscriber.port.ts";
+} from "../app/governance.infrastructure.ts";
 import { Temporal } from "@langwatch/time";
 
 export const GOVERNANCE_KPIS_SYNC_WINDOW_MS = 30_000;
 
 export class GovernanceKpisSubscriber {
   private constructor(
-    private readonly contributions: GovernanceKpiContributionPort,
-    private readonly diagnostics: GovernanceSubscriberDiagnosticsPort,
+    private readonly contributions: GovernanceKpiContributionWriter,
+    private readonly diagnostics: GovernanceSubscriberDiagnosticsSink,
   ) {}
 
   static create(options: {
-    contributions: GovernanceKpiContributionPort;
-    diagnostics: GovernanceSubscriberDiagnosticsPort;
+    contributions: GovernanceKpiContributionWriter;
+    diagnostics: GovernanceSubscriberDiagnosticsSink;
   }): GovernanceKpisSubscriber {
     return new GovernanceKpisSubscriber(options.contributions, options.diagnostics);
   }

@@ -92,7 +92,7 @@ describe("the dataset REST declaration", () => {
       expect(declaration.namespace).toBe("dataset");
       expect(declaration.version).toBe("2026-08-07");
       expect(declaration.addressing).toBe("dated");
-      expect(declaration.credential).toBe("projectKey");
+      expect(declaration.credential).toBe("project");
     });
 
     it("answers a create with 201 and everything else with 200", () => {

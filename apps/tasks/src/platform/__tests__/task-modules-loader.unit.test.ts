@@ -1,8 +1,8 @@
-import { TaskHostPort } from "@langwatch/task";
+import { TaskHost } from "@langwatch/task";
 import { describe, expect, it } from "vitest";
 import { loadTaskModules, parseTaskModuleSpecifiers } from "../task-modules-loader.ts";
 
-class TestTaskHost extends TaskHostPort {
+class TestTaskHost extends TaskHost {
   readonly prisma = undefined;
   readonly clickhouse = undefined;
   readonly redis = undefined;

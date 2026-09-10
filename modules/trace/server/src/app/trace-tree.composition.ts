@@ -5,7 +5,7 @@ import {
 } from "@langwatch/trace-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import { TraceClickHousePort, type TraceClickHouseResolver } from "../repositories/trace-clickhouse-client.repository.ts";
+import { TraceClickHouse, type TraceClickHouseResolver } from "../repositories/trace-clickhouse-client.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 import { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
 import { TraceQueryClassifier } from "./trace.infrastructure.ts";
@@ -38,7 +38,7 @@ export class TraceTreeComposition {
   }
 
   build(): TraceService {
-    const clickhouse = ResolverTraceClickHousePort.create(this.options.resolveClient);
+    const clickhouse = ResolverTraceClickHouse.create(this.options.resolveClient);
     return TraceService.create({
       repository: ClickHouseTraceSpanRepository.create(clickhouse),
       modelProviders: this.options.modelProviders,
@@ -47,7 +47,7 @@ export class TraceTreeComposition {
         this.options.queryClassification ?? NullTraceQueryClassificationAdapter.create(),
       summaryReader: this.options.summaryReader ?? new NullTraceSummaryReader(),
       records: this.options.records ?? new NullTraceRecordRepository(),
-      eventDerivation: this.options.eventDerivation ?? new NullTraceEventDerivationPort(),
+      eventDerivation: this.options.eventDerivation ?? new NullTraceEventDerivation(),
       fullRecords: ClickHouseTraceFullRecordRepository.create(
         clickhouse,
         this.options.payloads,
@@ -57,13 +57,13 @@ export class TraceTreeComposition {
   }
 }
 
-class ResolverTraceClickHousePort extends TraceClickHousePort {
+class ResolverTraceClickHouse extends TraceClickHouse {
   private constructor(private readonly resolveClient: TraceClickHouseResolver) {
     super();
   }
 
-  static create(resolveClient: TraceClickHouseResolver): ResolverTraceClickHousePort {
-    return new ResolverTraceClickHousePort(resolveClient);
+  static create(resolveClient: TraceClickHouseResolver): ResolverTraceClickHouse {
+    return new ResolverTraceClickHouse(resolveClient);
   }
 
   resolve(tenantId: string) {
@@ -83,7 +83,7 @@ class NullTraceRecordRepository extends TraceRecordRepository {
   }
 }
 
-class NullTraceEventDerivationPort implements TraceEventDerivation {
+class NullTraceEventDerivation implements TraceEventDerivation {
   async derive(_input: TraceDerivedEventsInput): Promise<[]> {
     return [];
   }

@@ -1,6 +1,6 @@
-import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
-import { ReactEmailMailRenderer, type MailRenderPort } from "@langwatch/mail";
-import { EmailDeliveryAdapter, type EmailDeliveryPort } from "@langwatch/notification-server";
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
+import { ReactEmailMailRenderer, type MailRender } from "@langwatch/mail";
+import { EmailDeliveryAdapter, type EmailDelivery } from "@langwatch/notification-server";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { WorkerConfig, WorkerOutboundProxyConfig } from "../platform/config/worker.config.ts";
 
@@ -15,8 +15,8 @@ import type { WorkerConfig, WorkerOutboundProxyConfig } from "../platform/config
  * downstream free of a template of its own.
  */
 export type WorkerMailComposition = Readonly<{
-  delivery: EmailDeliveryPort;
-  renderer: MailRenderPort;
+  delivery: EmailDelivery;
+  renderer: MailRender;
   baseHost: string;
 }>;
 
@@ -84,7 +84,7 @@ function ownedAwsRuntime({
  * disables proxying entirely, a leading dot or bare domain matches
  * subdomains, and an optional `:port` suffix is ignored.
  */
-export class WorkerMailProxyResolver extends OutboundProxyResolverPort {
+export class WorkerMailProxyResolver extends OutboundProxyResolver {
   static create(config: WorkerOutboundProxyConfig): WorkerMailProxyResolver {
     return new WorkerMailProxyResolver(config);
   }

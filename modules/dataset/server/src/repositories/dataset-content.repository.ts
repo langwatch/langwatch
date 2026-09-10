@@ -1,4 +1,4 @@
-import type { DatasetRow } from "../ports/dataset.port.ts";
+import type { DatasetRow } from "./dataset.repository.ts";
 import type { Instant, TimeInput } from "@langwatch/time";
 
 /** A Json column's value, mirroring the generated client's own shape. */

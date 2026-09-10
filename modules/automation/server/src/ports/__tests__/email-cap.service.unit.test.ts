@@ -4,16 +4,16 @@ import {
   type ConsumeDailyEmailCapInput,
   type ConsumeHourlyEmailCapInput,
 } from "../../services/email-cap.service.ts";
-import type { AutomationEmailCapStorePort } from "../email-cap.port.ts";
+import type { AutomationEmailCapStore } from "../email-cap.port.ts";
 import { Temporal } from "@langwatch/time";
 
 // The package accepts the infrastructure connection explicitly. This holder
 // keeps the test's Redis-vs-memory choice local without a process-global App.
 const redisMock = vi.hoisted(() => ({
-  connection: undefined as AutomationEmailCapStorePort | undefined,
+  connection: undefined as AutomationEmailCapStore | undefined,
 }));
 
-function makeStore(overrides: Partial<AutomationEmailCapStorePort>): AutomationEmailCapStorePort {
+function makeStore(overrides: Partial<AutomationEmailCapStore>): AutomationEmailCapStore {
   return {
     trySet: vi.fn().mockResolvedValue("OK"),
     tryGet: vi.fn().mockResolvedValue(null),
@@ -25,7 +25,7 @@ function makeStore(overrides: Partial<AutomationEmailCapStorePort>): AutomationE
 }
 
 let service = AutomationEmailCapService.create({ store: null });
-let serviceStore: AutomationEmailCapStorePort | null = null;
+let serviceStore: AutomationEmailCapStore | null = null;
 
 function emailCapService(): AutomationEmailCapService {
   const store = redisMock.connection ?? null;

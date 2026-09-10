@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { OrganizationPricingPort } from "../../ports/organization-pricing.port.ts";
+import { OrganizationPricing } from "../../ports/organization-pricing.port.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -7,7 +7,7 @@ import { OrganizationPricingPort } from "../../ports/organization-pricing.port.t
  */
 export type BillingOrganizationPricingDatabase = Pick<PrismaClient, "organization">;
 
-export class PrismaOrganizationPricingRepository extends OrganizationPricingPort {
+export class PrismaOrganizationPricingRepository extends OrganizationPricing {
   private constructor(private readonly prisma: BillingOrganizationPricingDatabase) {
     super();
   }

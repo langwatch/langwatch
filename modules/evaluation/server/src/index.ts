@@ -17,28 +17,30 @@ export { MonitorPerformanceService } from "./services/monitor-performance.servic
 export {
   EvaluationEventingAdapter,
   type EvaluationEventingStores,
-} from "./adapters/evaluation.eventing.adapter.ts";
-export { EvaluationRunProjectionRepository as EvaluationRunProjectionPort } from "./repositories/evaluation-run-projection.repository.ts";
+} from "./services/evaluation.eventing.service.ts";
+export { EvaluationRunProjectionRepository as EvaluationRunProjection } from "./repositories/evaluation-run-projection.repository.ts";
 export { EvaluationRunProjectionService } from "./services/evaluation-run-projection.service.ts";
 export {
-  EvaluationExecutionPort,
-  EvaluationExecutionIntentPort,
-  EvaluationExecutionReceiptPort,
+  EvaluationExecution,
+  EvaluationExecutionIntent,
+  EvaluationExecutionReceipt,
   EvaluationAnalyticsAttributePolicy,
-  EvaluationCostRecorderPort,
-  EvaluationInputStoragePort,
-  EvaluationInputOffloadAvailabilityPort,
-  EvaluationAzureSafetyCredentialsPort,
-  EvaluationSettingsRecoveryPort,
-  EvaluationInputsOffloadPort,
-  EvaluationInputsResolutionPort,
-  EvaluationRetentionFloorPort,
+  EvaluationCostRecorder,
+  EvaluationInputStorage,
+  EvaluationInputOffloadAvailability,
+  EvaluationAzureSafetyCredentials,
+  EvaluationSettingsRecovery,
+  EvaluationInputsOffload,
+  EvaluationInputsResolution,
+  EvaluationRetentionFloor,
+} from "./app/evaluation.infrastructure.ts";
+export {
   type EvaluationClickHouseResolver,
   type EvaluationClickHouseClient,
   type EvaluationClickHouseInsert,
   type EvaluationClickHouseQuery,
   type EvaluationClickHouseResult,
-} from "./ports/evaluation.port.ts";
+} from "./repositories/clickhouse/evaluation-clickhouse-client.ts";
 export {
   EvaluationInputsOffloadService,
   EVALUATION_INPUTS_STORED_OBJECT_MARKER_KEY,
@@ -61,8 +63,8 @@ export {
 export {
   createEvaluationProcessingPipeline,
   type EvaluationProcessingPipelineDeps,
-} from "./adapters/evaluation-processing.adapter.ts";
-export { EvaluationProcessingProducerAdapter } from "./adapters/evaluation-processing-producer.adapter.ts";
+} from "./services/evaluation-processing.service.ts";
+export { EvaluationProcessingProducerAdapter } from "./services/evaluation-processing-producer.service.ts";
 export {
   EvaluatorAvailabilityService,
   LINGUA_ENABLE_ENV_VAR,
@@ -72,13 +74,13 @@ export {
 export type { EvaluationRunData } from "@langwatch/evaluation-contract";
 export { evaluationTrpcTransport } from "./transport/evaluation.trpc.ts";
 export {
-  EvaluationCustomEvaluatorsPort,
-  EvaluationInstallEnvironmentPort,
-  EvaluationReportPort,
-  EvaluationRescorePort,
-  EvaluationRunAnalyticsPort,
+  EvaluationCustomEvaluators,
+  EvaluationInstallEnvironment,
+  EvaluationReport,
+  EvaluationRescore,
+  EvaluationRunAnalytics,
   EvaluationWarmupPort,
-} from "./ports/evaluation-rescore.port.ts";
+} from "./app/evaluation.infrastructure.ts";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
 export {
   EvaluationPreconditionService,
@@ -103,28 +105,28 @@ export {
   type GetThreadTraces,
 } from "./services/evaluation-thread-mapping.service.ts";
 export {
-  EvaluationMonitorLookupPort,
-  EvaluationTraceEvidencePort,
-  EvaluationExecutionTelemetryPort,
-  EvaluationLangevalsPort,
-  EvaluationModelEnvPort,
-  EvaluationSpanDigestPort,
-  EvaluationTraceReadPort,
-  EvaluationWorkflowExecutorPort,
+  EvaluationMonitorLookup,
+  EvaluationTraceEvidence,
+  EvaluationExecutionTelemetry,
+  EvaluationLangevals,
+  EvaluationModelEnv,
+  EvaluationSpanDigest,
+  EvaluationTraceRead,
+  EvaluationWorkflowExecutor,
   type EvaluationTraceProtections,
   type LangevalsEvaluateParams,
-} from "./ports/evaluation-execution.port.ts";
+} from "./app/evaluation.infrastructure.ts";
 export {
   HttpLangevalsEvaluatorAdapter,
-  NullLangevalsEvaluatorClient,
   type LangevalsRuntimeConfig,
-} from "./adapters/http.langevals-evaluator.adapter.ts";
+} from "./services/http.langevals-evaluator.service.ts";
+export { NullLangevalsEvaluatorClient } from "./services/null.langevals-evaluator.service.ts";
 export {
   EVALUATION_DURATION_METRIC_NAME,
   EVALUATION_STATUS_METRIC_NAME,
   OtelEvaluationExecutionMetricsAdapter,
-} from "./adapters/otel.evaluation-execution-metrics.adapter.ts";
-export { DirectEvaluationExecutionReceiptAdapter } from "./adapters/direct.evaluation-execution-receipt.adapter.ts";
+} from "./services/otel.evaluation-execution-metrics.service.ts";
+export { DirectEvaluationExecutionReceiptAdapter } from "./services/direct.evaluation-execution-receipt.service.ts";
 
 // --------------------------------------------------------------------------- The public
 // evaluation REST doors: the evaluator catalogue, the batch result log, the three evaluate

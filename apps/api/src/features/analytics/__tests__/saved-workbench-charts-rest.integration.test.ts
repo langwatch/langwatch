@@ -43,7 +43,7 @@ import {
   createDashboardsRestApp,
   DashboardApp,
   PostgresDashboardAdapter,
-  WorkbenchAccessPort,
+  type WorkbenchAccess,
   WorkbenchAwareGraphVisibilityAdapter,
   type DashboardGraphAlertLookup,
 } from "@langwatch/dashboard-server";
@@ -249,7 +249,7 @@ function dashboardApp(): DashboardApp {
   });
 }
 
-class TestWorkbenchAccess extends WorkbenchAccessPort {
+class TestWorkbenchAccess implements WorkbenchAccess {
   isWorkbenchEnabled({ projectId }: { projectId: string }): Promise<boolean> {
     return lwqlEnabled({ featureFlags: featureFlags(), projectId, projects: projects() });
   }

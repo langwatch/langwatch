@@ -2,11 +2,11 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import {
   AutomationEvaluationSubscriberService,
   AutomationEvaluationTriggerFilterService,
-  type AutomationEvaluationQueryClassificationPort,
-  type AutomationEvaluationTraceSummaryPort,
-  type AutomationGraphActivityPort,
-  type AutomationTraceTriggerCataloguePort,
-  type AutomationTriggerMatchRecorderPort,
+  type AutomationEvaluationQueryClassification,
+  type AutomationEvaluationTraceSummary,
+  type AutomationGraphActivity,
+  type AutomationTraceTriggerCatalogue,
+  type AutomationTriggerMatchRecorder,
 } from "@langwatch/automation-server";
 import { RedisCachedFoldStore, type FoldProjectionStore } from "@langwatch/eventing";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
@@ -18,21 +18,21 @@ import {
   ClickHouseEvaluationRepository,
   DirectEvaluationExecutionReceiptAdapter,
   EvaluationEventingAdapter,
-  EvaluationExecutionIntentPort,
+  EvaluationExecutionIntent,
   EvaluationExecutionIntentService,
-  EvaluationExecutionPort,
+  EvaluationExecution,
   EvaluationExecutionService,
-  EvaluationRetentionFloorPort,
+  EvaluationRetentionFloor,
   EvaluationRunProjectionService,
   ExecuteEvaluationCommand,
   createEvaluationProcessingPipeline,
-  type EvaluationAzureSafetyCredentialsPort,
-  type EvaluationCostRecorderPort,
+  type EvaluationAzureSafetyCredentials,
+  type EvaluationCostRecorder,
   type EvaluationExecutionDeps,
-  type EvaluationInputsOffloadPort,
-  type EvaluationMonitorLookupPort,
-  type EvaluationSettingsRecoveryPort,
-  type EvaluationTraceEvidencePort,
+  type EvaluationInputsOffload,
+  type EvaluationMonitorLookup,
+  type EvaluationSettingsRecovery,
+  type EvaluationTraceEvidence,
 } from "@langwatch/evaluation-server";
 import type {
   EvaluationExecutionResult,
@@ -44,7 +44,7 @@ import type { EvaluationWorkerCapability } from "../features/evaluation/evaluati
 import { TraceAnalyticsAttributePolicy } from "../features/evaluation/evaluation-analytics-attribute-policy.adapter.ts";
 import { createWorkerEvaluationClickHouseResolver } from "./worker-evaluation-app.composition.ts";
 
-export abstract class WorkerEvaluationAbsenceReportPort {
+export abstract class WorkerEvaluationAbsenceReport {
   abstract withoutEvaluatorExecution(): void;
   abstract withoutExecutionReceiptLedger(): void;
 }
@@ -54,13 +54,13 @@ export abstract class WorkerEvaluationAbsenceReportPort {
  */
 export type WorkerEvaluationExecutionCollaborators = Readonly<{
   /** The monitor the command names, and the trace its preconditions read. */
-  monitors: EvaluationMonitorLookupPort;
-  evidence: EvaluationTraceEvidencePort;
-  azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
-  settingsRecovery: EvaluationSettingsRecoveryPort;
-  inputsOffload: EvaluationInputsOffloadPort;
+  monitors: EvaluationMonitorLookup;
+  evidence: EvaluationTraceEvidence;
+  azureSafetyCredentials: EvaluationAzureSafetyCredentials;
+  settingsRecovery: EvaluationSettingsRecovery;
+  inputsOffload: EvaluationInputsOffload;
   /** Where the run is billed. */
-  costs: EvaluationCostRecorderPort;
+  costs: EvaluationCostRecorder;
   /** The engine: trace reads, mappings, the evaluator call. */
   engine: EvaluationExecutionDeps;
 }>;
@@ -70,9 +70,9 @@ export type WorkerEvaluationExecutionCollaborators = Readonly<{
  * matches through.
  */
 export type WorkerEvaluationAutomationPorts = Readonly<{
-  triggers: AutomationTraceTriggerCataloguePort;
-  graphActivity: AutomationGraphActivityPort;
-  triggerMatches: AutomationTriggerMatchRecorderPort;
+  triggers: AutomationTraceTriggerCatalogue;
+  graphActivity: AutomationGraphActivity;
+  triggerMatches: AutomationTriggerMatchRecorder;
 }>;
 
 export type WorkerEvaluationProcessingOptions = Readonly<{
@@ -83,13 +83,13 @@ export type WorkerEvaluationProcessingOptions = Readonly<{
   /** The analytics capability this process composes once, for every feature. */
   analytics: AnalyticsService;
   /** The one trace reader this process composes: summary read and classifier. */
-  traces: AutomationEvaluationTraceSummaryPort & AutomationEvaluationQueryClassificationPort;
+  traces: AutomationEvaluationTraceSummary & AutomationEvaluationQueryClassification;
   automation: WorkerEvaluationAutomationPorts;
   /** The queue's own Redis, or nothing on a deployment that configured none. */
   redis?: RedisConnection | null;
   /** `LANGWATCH_FOLD_CACHE_TTL_SECONDS`, read once by the process. */
   foldCacheTtlSeconds?: number;
-  absence?: WorkerEvaluationAbsenceReportPort;
+  absence?: WorkerEvaluationAbsenceReport;
   execution?: WorkerEvaluationExecutionCollaborators;
 }>;
 
@@ -99,7 +99,7 @@ export type WorkerEvaluationProcessingOptions = Readonly<{
  * reuses `execution`; it never constructs a second evaluator engine.
  */
 export type WorkerEvaluationProcessing = EvaluationWorkerCapability<EvaluationProcessingEvent> &
-  Readonly<{ execution?: EvaluationExecutionPort }>;
+  Readonly<{ execution?: EvaluationExecution }>;
 
 /**
  * Evaluation's durable processing pipeline, composed from this process's own
@@ -110,7 +110,7 @@ export function createWorkerEvaluationProcessing(
   options: WorkerEvaluationProcessingOptions & {
     execution: WorkerEvaluationExecutionCollaborators;
   },
-): WorkerEvaluationProcessing & Readonly<{ execution: EvaluationExecutionPort }>;
+): WorkerEvaluationProcessing & Readonly<{ execution: EvaluationExecution }>;
 export function createWorkerEvaluationProcessing(
   options: WorkerEvaluationProcessingOptions,
 ): WorkerEvaluationProcessing;
@@ -161,8 +161,8 @@ export function createWorkerEvaluationProcessing(
  * name when it did not.
  */
 function createEvaluationExecutionIntent(options: WorkerEvaluationProcessingOptions): Readonly<{
-  intent: EvaluationExecutionIntentPort;
-  direct?: EvaluationExecutionPort;
+  intent: EvaluationExecutionIntent;
+  direct?: EvaluationExecution;
 }> {
   const collaborators = options.execution;
   if (!collaborators) {
@@ -194,7 +194,7 @@ function createEvaluationExecutionIntent(options: WorkerEvaluationProcessingOpti
  * mappings: the command carries them as an opaque record because a queue payload is JSON, and the
  * engine reads a parsed `MappingState`.
  */
-class WorkerEvaluationEngine extends EvaluationExecutionPort {
+class WorkerEvaluationEngine extends EvaluationExecution {
   #engine: EvaluationExecutionService;
 
   constructor(engine: EvaluationExecutionService) {
@@ -210,7 +210,7 @@ class WorkerEvaluationEngine extends EvaluationExecutionPort {
   }
 }
 
-class AbsentEvaluatorExecution extends EvaluationExecutionIntentPort {
+class AbsentEvaluatorExecution extends EvaluationExecutionIntent {
   execute(input: ExecuteEvaluationCommandData): Promise<never> {
     return Promise.reject(
       new Error(
@@ -225,7 +225,7 @@ class AbsentEvaluatorExecution extends EvaluationExecutionIntentPort {
  * configures its event store with. The same class the settlement reader uses, for the same reason:
  * a second number would let the fold read back runs the writer had already expired.
  */
-class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloorPort {
+class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloor {
   #defaultRetentionDays: number;
 
   constructor(defaultRetentionDays: number) {

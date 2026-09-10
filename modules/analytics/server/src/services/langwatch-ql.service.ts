@@ -25,7 +25,7 @@ import {
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "./langwatch-ql-executor.service.ts";
 import type {
-  LangWatchQLExecutorPort,
+  LangWatchQLExecutor,
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import {
@@ -171,7 +171,7 @@ export interface LangWatchQLServiceDependencies {
    * identity provisioned — in which case every query is refused rather than run
    * with weaker guarantees.
    */
-  readonly executor: LangWatchQLExecutorPort | null;
+  readonly executor: LangWatchQLExecutor | null;
   /** Database the LangWatchQL views live in, and what unqualified names resolve to. */
   readonly database: string;
   readonly views?: readonly LangWatchQLViewDefinition[];
@@ -366,7 +366,7 @@ export class LangWatchQLService {
     validation,
     granularity,
   }: {
-    readonly executor: LangWatchQLExecutorPort;
+    readonly executor: LangWatchQLExecutor;
     readonly project: LangWatchQLCaller;
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;

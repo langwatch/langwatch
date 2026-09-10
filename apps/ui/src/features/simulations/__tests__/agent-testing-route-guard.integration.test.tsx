@@ -27,11 +27,11 @@ vi.mock("../ui/sections/host", () => ({
 
 import {
   UiCapabilityContextProvider,
-  UiDocumentTitlePort,
-  UiFeedbackPort,
-  UiNavigationPort,
-  UiRoutePort,
-  UiSessionPort,
+  UiDocumentTitle,
+  UiFeedback,
+  UiNavigation,
+  UiRoute,
+  UiSession,
   type UiActiveScope,
   type UiCapabilities,
 } from "@langwatch/ui-host/capabilities";
@@ -40,32 +40,32 @@ import { simulationsPageLoaders } from "../ui/sections/routes";
 const AGENT_TESTING_PAGE = "pages/[project]/agent-testing/[[...path]]";
 const SCENARIOS_PERMISSION = "scenarios:view";
 
-class SilentNavigation extends UiNavigationPort {
+class SilentNavigation extends UiNavigation {
   navigate(): void {}
   replace(): void {}
   back(): void {}
 }
 
-class SilentRoute extends UiRoutePort {
+class SilentRoute extends UiRoute {
   reading() {
     return { params: { project: "demo" }, query: {} };
   }
   setQuery(): void {}
 }
 
-class SilentFeedback extends UiFeedbackPort {
+class SilentFeedback extends UiFeedback {
   succeeded(): void {}
   failed(): void {}
 }
 
-class SilentTitle extends UiDocumentTitlePort {
+class SilentTitle extends UiDocumentTitle {
   set(): () => void {
     return () => {};
   }
 }
 
 /** The reader the guard asks: a flag answer and one grant. */
-class GuardedSession extends UiSessionPort {
+class GuardedSession extends UiSession {
   currentUser() {
     return { id: "user-1", name: "Reader", email: "reader@example.com", image: null };
   }

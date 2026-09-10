@@ -44,6 +44,6 @@ export interface ResponseCache {
 
 export type UpgradeHandler = (request: IncomingMessage, socket: Duplex, head: Buffer) => void;
 
-export abstract class ConnectUpgradeRouterPort {
+export abstract class ConnectUpgradeRouter {
   abstract register(pathname: string, handler: UpgradeHandler): void;
 }

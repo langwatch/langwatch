@@ -5,21 +5,21 @@ import {
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
 import {
-  WorkflowIdPort,
-  WorkflowNlpRuntimePort,
+  WorkflowId,
+  WorkflowNlpRuntime,
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
-} from "../../ports/workflow.port.ts";
+} from "../../app/workflow.app.ts";
 import { WorkflowNlpExecutionService } from "../workflow-nlp-execution.service.ts";
 import { TestModelProviderService } from "./model-provider.service.fake.ts";
 
-class FixedWorkflowIdPort extends WorkflowIdPort {
+class FixedWorkflowId implements WorkflowId {
   next(): string {
     return "generated";
   }
 }
 
-class TestWorkflowNlpRuntimePort extends WorkflowNlpRuntimePort {
+class TestWorkflowNlpRuntime implements WorkflowNlpRuntime {
   constructor(
     private readonly dispatchNlp: (
       input: WorkflowNlpDispatchInput,
@@ -76,9 +76,9 @@ describe("WorkflowNlpExecutionService with a migrated legacy version", () => {
       json: async () => ({ result: {}, status: "success" }),
     });
     const runtime = {
-      ids: new FixedWorkflowIdPort(),
+      ids: new FixedWorkflowId(),
       modelProviders: new TestModelProviderService(),
-      nlpRuntime: new TestWorkflowNlpRuntimePort(dispatchNlp),
+      nlpRuntime: new TestWorkflowNlpRuntime(dispatchNlp),
     };
     const studioEvents = {
       enrich: async (event: { event: StudioClientEvent }) => event.event,

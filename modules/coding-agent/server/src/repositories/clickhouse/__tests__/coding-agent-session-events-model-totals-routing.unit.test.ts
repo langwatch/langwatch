@@ -4,7 +4,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it } from "vitest";
-import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port.ts";
+import { CodingAgentClickHouse } from "../../../app/coding-agent.infrastructure.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 
 const FROM_MS = Date.parse("2026-07-01T00:00:00.000Z");
@@ -49,9 +49,8 @@ function modelTotals({
   };
 }
 
-class RoutedClickHousePort extends CodingAgentClickHousePort {
+class RoutedClickHouse implements CodingAgentClickHouse {
   constructor(private readonly resolveClient: (tenantId: string) => ClickHouseClient) {
-    super();
   }
 
   async resolve(tenantId: string): Promise<ClickHouseClient> {
@@ -70,7 +69,7 @@ describe("CodingAgentSessionEventsClickHouseRepository per-model totals routing"
           modelTotals({ tenantId: "tenant-b", sessionId: "session-b", costUsd: 4 }),
         ]);
         const repository = CodingAgentSessionEventsClickHouseRepository.create({
-          clickHouse: new RoutedClickHousePort((tenantId) =>
+          clickHouse: new RoutedClickHouse((tenantId) =>
             tenantId === "tenant-a" ? first.client : second.client,
           ),
           defaultTraceRetentionDays: 30,
@@ -95,7 +94,7 @@ describe("CodingAgentSessionEventsClickHouseRepository per-model totals routing"
       it("asks for all of them in a single query", async () => {
         const only = endpointClient([]);
         const repository = CodingAgentSessionEventsClickHouseRepository.create({
-          clickHouse: new RoutedClickHousePort(() => only.client),
+          clickHouse: new RoutedClickHouse(() => only.client),
           defaultTraceRetentionDays: 30,
         });
 

@@ -1,5 +1,5 @@
 import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "@langwatch/ops-contract";
-import type { QueueAuditSinkPort } from "../app/ops.app.ts";
+import type { QueueAuditSink } from "../app/ops.app.ts";
 import { NullQueueAuditSink } from "./null.queue-audit-sink.service.ts";
 import type {
   BlockedSummary,
@@ -35,14 +35,14 @@ function summarizeErrorShapes(messages: string[]): string[] {
 
 export class QueueService {
   private readonly repository: QueueRepository;
-  private readonly audit: QueueAuditSinkPort;
+  private readonly audit: QueueAuditSink;
 
-  private constructor(params: { repo: QueueRepository; audit?: QueueAuditSinkPort }) {
+  private constructor(params: { repo: QueueRepository; audit?: QueueAuditSink }) {
     this.repository = params.repo;
     this.audit = params.audit ?? NullQueueAuditSink.create();
   }
 
-  static create(params: { repo: QueueRepository; audit?: QueueAuditSinkPort }): QueueService {
+  static create(params: { repo: QueueRepository; audit?: QueueAuditSink }): QueueService {
     return new QueueService(params);
   }
 

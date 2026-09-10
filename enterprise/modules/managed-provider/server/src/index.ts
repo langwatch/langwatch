@@ -1,7 +1,7 @@
 export { AwsStsManagedProviderCredentialAdapter } from "./adapters/aws-sts.aws-sts.adapter.ts";
 export { EnvironmentManagedProviderConfigurationAdapter } from "./adapters/environment-config.environment-config.adapter.ts";
 export {
-  ManagedProviderConfigurationPort,
+  ManagedProviderConfiguration,
   ManagedProviderConfigurationReporter,
 } from "./ports/managed-provider-configuration.port.ts";
 export {

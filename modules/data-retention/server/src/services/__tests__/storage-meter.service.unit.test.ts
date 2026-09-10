@@ -4,7 +4,7 @@ import { StorageMeterService } from "../storage-meter.service.ts";
 import type {
   StorageMeterClickHouseClient,
   StorageMeterQuery,
-} from "../../ports/storage-meter-clickhouse.port.ts";
+} from "../../app/data-retention.infrastructure.ts";
 
 describe("StorageMeterService memory guard", () => {
   function makeService() {

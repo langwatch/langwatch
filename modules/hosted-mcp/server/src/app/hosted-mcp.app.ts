@@ -5,7 +5,7 @@ import {
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { z } from "zod";
 import { createMcpHandler, type McpHandler } from "../transport/hosted-mcp.api.ts";
-import type { HostedMcpDependencies } from "../ports/hosted-mcp.port.ts";
+import type { HostedMcpDependencies } from "./hosted-mcp-infrastructure.ts";
 
 export type HostedMcpInfrastructure = Readonly<{
   mcp: Omit<HostedMcpDependencies, "baseHost">;

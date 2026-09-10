@@ -26,7 +26,7 @@ const logger = createLogger("langwatch:langy:internal");
  * state a feature package may not own: two registries would give one deployment two answers for
  * the same rate.
  */
-export type LangyInternalMetricsPort = Readonly<{
+export type LangyInternalMetrics = Readonly<{
   /** One completed or failed turn, by outcome. */
   turnResult(status: "completed" | "failed"): void;
   /** A revoke that named a key which is not a Langy session key. */
@@ -43,7 +43,7 @@ export type LangyInternalRestPorts = Readonly<{
    * rather than let the gate fall open.
    */
   internalSecret: () => string | undefined;
-  metrics: LangyInternalMetricsPort;
+  metrics: LangyInternalMetrics;
 }>;
 
 /**

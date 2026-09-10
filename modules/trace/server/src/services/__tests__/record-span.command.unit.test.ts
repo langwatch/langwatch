@@ -18,7 +18,7 @@ import {
   TraceSpanPiiRedaction,
   TraceSpanTokenEstimation,
 } from "../../app/trace.infrastructure.ts";
-import type { TraceSpanSpool as TraceSpanSpoolPort, TraceSpanSpoolIdentity } from "../../app/trace.infrastructure.ts";
+import type { TraceSpanSpool as TraceSpanSpool, TraceSpanSpoolIdentity } from "../../app/trace.infrastructure.ts";
 
 class PiiRedactionFake implements TraceSpanPiiRedaction {
   readonly redact = vi.fn(
@@ -46,7 +46,7 @@ class ContentDropFake implements TraceSpanContentDrop {
   }));
 }
 
-class SpoolFake implements TraceSpanSpoolPort {
+class SpoolFake implements TraceSpanSpool {
   readonly read = vi.fn(async (_identity: TraceSpanSpoolIdentity) => "");
   readonly delete = vi.fn(async (_identity: TraceSpanSpoolIdentity) => {});
 }
@@ -85,7 +85,7 @@ function command(data: RecordSpanCommandData = commandData()): Command<RecordSpa
   };
 }
 
-function harness(spool?: TraceSpanSpoolPort) {
+function harness(spool?: TraceSpanSpool) {
   const piiRedaction = new PiiRedactionFake();
   const costEnrichment = new CostEnrichmentFake();
   const tokenEstimation = new TokenEstimationFake();
@@ -107,7 +107,7 @@ function harness(spool?: TraceSpanSpoolPort) {
   };
 }
 
-describe("RecordSpanCommand", () => {
+describe("EventingRecordSpanAdapter", () => {
   /** @scenario Reserved causality_depth attribute passes through strip */
   it("emits the stable span event identity after preparing a cloned span", async () => {
     const input = commandData({

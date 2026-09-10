@@ -253,7 +253,7 @@ export async function runLwqlProvisioningTask({
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task lwql-provision`. A thin wrapper over {@link runLwqlProvisioningTask}: the body above
  * is the whole contract, and this class is only the seam the catalogue resolves by name. `database` is composed by the catalogue from the process's
- * real Prisma handle (`TaskHostPort.requirePrisma()`), which satisfies {@link LwqlProvisioningDatabase} structurally.
+ * real Prisma handle (`TaskHost.requirePrisma()`), which satisfies {@link LwqlProvisioningDatabase} structurally.
  */
 export class LwqlProvisionTask extends Task {
   readonly name = "lwql-provision";

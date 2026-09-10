@@ -5,14 +5,14 @@
 import type { MappingState } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluationSpanDigestPort } from "../../ports/evaluation-execution.port.ts";
+import type { EvaluationSpanDigest } from "../../app/evaluation.infrastructure.ts";
 import { EvaluationThreadMappingService } from "../evaluation-thread-mapping.service.ts";
 
 const spanDigest = {
   format: vi.fn(async (spans: { name?: string }[]) =>
     spans.map((span) => span.name ?? "span").join(" "),
   ),
-} as unknown as EvaluationSpanDigestPort;
+} as unknown as EvaluationSpanDigest;
 
 function trace(overrides: Partial<Trace> = {}): Trace {
   return {

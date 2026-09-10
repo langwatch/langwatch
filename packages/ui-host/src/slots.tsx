@@ -84,7 +84,7 @@ export const CORE_SEAT_TYPE_COPY: UiSeatTypeCopy = {
  * host that installed no slots at all behaves exactly like one that filled
  * none of them: the screen renders its fallback and nothing throws.
  */
-export abstract class UiSlotsPort {
+export abstract class UiSlots {
   /** The component filling this slot, or undefined where none is. */
   filled<Name extends UiSlotName>(_name: Name): UiSlotComponent<Name> | undefined {
     return void 0;
@@ -96,7 +96,7 @@ export abstract class UiSlotsPort {
   }
 }
 
-class InstalledUiSlots extends UiSlotsPort {
+class InstalledUiSlots extends UiSlots {
   constructor(
     private readonly components: UiSlotComponents,
     private readonly copy: UiSeatTypeCopy,
@@ -120,15 +120,15 @@ export function uiSlots({
 }: {
   components?: UiSlotComponents;
   seatTypeCopy?: UiSeatTypeCopy;
-} = {}): UiSlotsPort {
+} = {}): UiSlots {
   return new InstalledUiSlots(components, seatTypeCopy);
 }
 
 /** A composition that filled nothing. Every reading is the core default. */
-export const UNFILLED_UI_SLOTS: UiSlotsPort = uiSlots();
+export const UNFILLED_UI_SLOTS: UiSlots = uiSlots();
 
 /** The slots above this screen, degrading to the unfilled ones outside a shell. */
-export function useUiSlots(): UiSlotsPort {
+export function useUiSlots(): UiSlots {
   return useOptionalUiCapabilities()?.slots ?? UNFILLED_UI_SLOTS;
 }
 

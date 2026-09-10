@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Anomaly } from "@langwatch/ops-contract";
-import type { AnomalyHardTierAlertPort } from "../app/ops.app.ts";
+import type { AnomalyHardTierAlert } from "../app/ops.app.ts";
 import type {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,
@@ -25,14 +25,14 @@ export class AnomalyDetectorService {
     private readonly rateTracker: AnomalyRateTrackerRepository,
     private readonly anomalyState: AnomalyStateRepository,
     private readonly featureFlags: FeatureFlagApi | undefined,
-    private readonly hardTierAlerts: AnomalyHardTierAlertPort | undefined,
+    private readonly hardTierAlerts: AnomalyHardTierAlert | undefined,
   ) {}
 
   static create(options: {
     rateTracker: AnomalyRateTrackerRepository;
     anomalyState: AnomalyStateRepository;
     featureFlags?: FeatureFlagApi | undefined;
-    hardTierAlerts?: AnomalyHardTierAlertPort | undefined;
+    hardTierAlerts?: AnomalyHardTierAlert | undefined;
   }): AnomalyDetectorService {
     return new AnomalyDetectorService(
       options.rateTracker,

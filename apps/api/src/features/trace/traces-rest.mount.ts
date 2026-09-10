@@ -2,14 +2,14 @@
  * Binds the v1 trace REST declaration (`@langwatch/trace-server`'s
  * `createTracesRest`) to this process's project door: the deployment's own
  * filter vocabulary, the deployment origin, and the API-key-aware
- * protections `ApiTraceReadStackPort` already resolves.
+ * protections `ApiTraceReadStack` already resolves.
  */
 import { bindRestMiddleware, flexibleDateSchema, type PlatformUrlBuilder } from "@langwatch/api/rest";
 import type { TraceApp } from "@langwatch/trace-server";
 import { createTracesRest, tracesRestCredential } from "@langwatch/trace-server/api-rest/traces";
 
 import { API_TRACE_LIST_INPUT } from "../../app/api-trace-read-stack.composition.ts";
-import type { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
+import type { ApiTraceReadStack } from "./trace-read-stack.port.ts";
 import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 
 /**
@@ -30,7 +30,7 @@ export type ApiTracesRestOptions = Readonly<{
   /** The one application this process composed the module from. */
   traces: () => TraceApp;
   /** The read stack the browser's own trace surfaces answer from. */
-  reads: ApiTraceReadStackPort;
+  reads: ApiTraceReadStack;
   /** Deep links back into the product, built from the deployment's origin. */
   platformUrl: PlatformUrlBuilder;
   /**

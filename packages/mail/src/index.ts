@@ -23,21 +23,21 @@
  * because the footer, the no-reply `To` and the BCC fan-out are one envelope
  * decision with the unsubscribe token that signs it — but rendering it there
  * put react-email, and so React, on the worker's boot graph, next to a twin of
- * the join-request mails this package already held. `MailRenderPort` keeps the
+ * the join-request mails this package already held. `MailRender` keeps the
  * envelope where it belongs and moves only the words: this package renders,
  * the process sends. The usage-limit, automation-limit and licence messages
  * are whole sends, because each has no transport decision of its own and the
  * vertical that decides when to send one holds only a port.
  */
 export {
-  EmailDeliveryPort,
+  EmailDelivery,
   EmailProviderConfigurationError,
   EMAIL_PROVIDER_NAMES,
   toArray,
   type EmailAttachment,
   type EmailContent,
   type EmailProviderName,
-  type EmailProviderPort,
+  type EmailProvider,
   type MailerConfiguration,
 } from "./providers/types.ts";
 export { hasEmailProvider, resolveEmailProviderName } from "./providers/index.ts";
@@ -50,7 +50,7 @@ export { SendgridEmailProvider } from "./providers/sendgrid.ts";
 export { buildSmtpTransportOptions, isSmtpConfigured, SmtpEmailProvider } from "./providers/smtp.ts";
 export { ResendEmailProvider } from "./providers/resend.ts";
 export { computeDefaultFrom, sendEmail } from "./email-sender.ts";
-export { MailRenderPort } from "./ports/mail-render.port.ts";
+export { MailRender } from "./ports/mail-render.port.ts";
 export { mailTemplates } from "./templates/index.ts";
 export { propsFormSchema, renderMailTemplate } from "./templates/registry.ts";
 export type { MailFixture, MailTemplate } from "./templates/registry.ts";

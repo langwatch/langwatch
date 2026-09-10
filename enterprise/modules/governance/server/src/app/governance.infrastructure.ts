@@ -1,42 +1,44 @@
 import type { ApiKeyRevocationCause } from "@langwatch/api-key-contract";
-import type { ActivityEventDetailRow, ActivityMonitorPagedWindowQuery, ActivityMonitorSummary, ActivityMonitorWindowQuery, ConfigureIngestionPullCommand, DisableIngestionPullCommand, GovernanceOcsfExportRow, IngestionSourceHealthRow, PersonalUsageBreakdown, PersonalUsageBucket, PersonalUsageWindow, PersonalVirtualKey, RecentAnomalyRow, RecordIngestionPullRunCompletedCommand, RecordIngestionPullRunFailedCommand, RecordPulledUsageCommand, RecordWorkspaceViewInput, SourceHealthMetrics, SpendByDepartmentRow, SpendByTeamRow, SpendByUserRow, SpendOverTimeGroupBy, SpendOverTimeResult } from "@langwatch/enterprise-governance-contract";
+import type { ActivityEventDetailRow, ActivityMonitorPagedWindowQuery, ActivityMonitorSummary, ActivityMonitorWindowQuery, ConfigureIngestionPullCommand, DisableIngestionPullCommand, GovernanceIngestionSource, GovernanceOcsfExportRow, IngestionSourceHealthRow, PersonalUsageBreakdown, PersonalUsageBucket, PersonalUsageWindow, PersonalVirtualKey, PulledUsageObservedEventData, RecentAnomalyRow, RecordIngestionPullRunCompletedCommand, RecordIngestionPullRunFailedCommand, RecordPulledUsageCommand, RecordWorkspaceViewInput, SourceHealthMetrics, SpendByDepartmentRow, SpendByTeamRow, SpendByUserRow, SpendOverTimeGroupBy, SpendOverTimeResult } from "@langwatch/enterprise-governance-contract";
 import type { Event, IntentContext, ProcessStore, TriggerContext } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
+import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
+import type { z } from "zod";
 export interface GovernanceInfrastructure {  activityMonitorRepository: ActivityMonitorRepository;
-  adminWorkspaceViewOcsf: AdminWorkspaceViewOcsfPort;
-  anomalyAlertHttp: AnomalyAlertHttpPort;
-  anomalySpendReader: AnomalySpendReaderPort;
-  cliAdminContact: CliAdminContactPort;
-  cliBudgetOverview: CliBudgetOverviewPort;
-  cliTokenStore: CliTokenStorePort;
-  gatewayDebit: GatewayDebitPort;
-  governanceClickHouseClient: GovernanceClickHouseClientPort;
-  governanceClickHouseResolver: GovernanceClickHouseResolverPort;
-  governanceEncryption: GovernanceEncryptionPort;
-  governanceEventing: GovernanceEventingPort;
-  governanceHttp: GovernanceHttpPort;
-  governanceKpiContribution: GovernanceKpiContributionPort;
-  governanceObjectStorage: GovernanceObjectStoragePort;
-  governanceOcsfEvent: GovernanceOcsfEventPort;
-  governanceOcsfEventsReader: GovernanceOcsfEventsReaderPort;
-  governanceProject: GovernanceProjectPort;
-  governanceSetupActivity: GovernanceSetupActivityPort;
-  governanceSignal: GovernanceSignalPort;
-  governanceSubscriberDiagnostics: GovernanceSubscriberDiagnosticsPort;
-  governanceWebhook: GovernanceWebhookPort;
+  adminWorkspaceViewOcsf: AdminWorkspaceViewOcsfChannel;
+  anomalyAlertHttp: AnomalyAlertHttpClient;
+  anomalySpendReader: AnomalySpendReader;
+  cliAdminContact: CliAdminContactReader;
+  cliBudgetOverview: CliBudgetOverviewReader;
+  cliTokenStore: CliTokenStore;
+  gatewayDebit: GatewayBudgetLedger;
+  governanceClickHouseClient: GovernanceClickHouseClient;
+  governanceClickHouseResolver: GovernanceClickHouseResolver;
+  governanceEncryption: GovernanceEncryptor;
+  governanceEventing: GovernanceEventingChannel;
+  governanceHttp: GovernanceHttpClient;
+  governanceKpiContribution: GovernanceKpiContributionWriter;
+  governanceObjectStorage: GovernanceObjectStore;
+  governanceOcsfEvent: GovernanceOcsfEventWriter;
+  governanceOcsfEventsReader: GovernanceOcsfEventsReader;
+  governanceProject: GovernanceProjectDirectory;
+  governanceSetupActivity: GovernanceSetupActivityReader;
+  governanceSignal: GovernanceSignalChannel;
+  governanceSubscriberDiagnostics: GovernanceSubscriberDiagnosticsSink;
+  governanceWebhook: GovernanceWebhookChannel;
   ingestionKeyCapability: IngestionKeyCapability;
-  ingestionKeyIssuer: IngestionKeyIssuerPort;
+  ingestionKeyIssuer: IngestionKeyIssuer;
   ingestionKeyRepository: IngestionKeyRepository;
-  personalUsageReader: PersonalUsageReaderPort;
-  personalVirtualKeyIssuer: PersonalVirtualKeyIssuerPort;
-  pulledUsageLedger: PulledUsageLedgerPort;
-  pulledUsageRate: PulledUsageRatePort;
-  quarantineTenant: QuarantineTenantPort;
-  quarantineTraceActivity: QuarantineTraceActivityPort;
-  traceAlertMetrics: TraceAlertMetricsPort;
-  traceAlertOriginGuard: TraceAlertOriginGuardPort;
-  traceAlertTrigger: TraceAlertTriggerPort;
-  traceAlertTriggerMatch: TraceAlertTriggerMatchPort;
+  personalUsageReader: PersonalUsageReader;
+  personalVirtualKeyIssuer: PersonalVirtualKeyIssuer;
+  pulledUsageLedger: PulledUsageLedgerRepository;
+  pulledUsageRate: PulledUsageRateReader;
+  quarantineTenant: QuarantineTenantResolver;
+  quarantineTraceActivity: QuarantineTraceActivityReader;
+  traceAlertMetrics: TraceAlertMetricsSink;
+  traceAlertOriginGuard: TraceAlertOriginGuard;
+  traceAlertTrigger: TraceAlertTriggerReader;
+  traceAlertTriggerMatch: TraceAlertTriggerMatchChannel;
 }
 
 export type AnomalyAlertHttpResponse = {
@@ -46,7 +48,7 @@ export type AnomalyAlertHttpResponse = {
 };
 
 
-export interface AnomalyAlertHttpPort {
+export interface AnomalyAlertHttpClient {
   post(input: {
     url: string;
     headers: Record<string, string>;
@@ -65,7 +67,7 @@ export type CliBudgetOverview = {
 };
 
 
-export interface CliBudgetOverviewPort {
+export interface CliBudgetOverviewReader {
   overviewForUser(input: {
     userId: string;
     organizationId: string;
@@ -73,12 +75,12 @@ export interface CliBudgetOverviewPort {
 }
 
 
-export interface CliAdminContactPort {
+export interface CliAdminContactReader {
   tryResolveAdminEmail(organizationId: string): Promise<string | null>;
 }
 
 
-export interface CliTokenStorePort {
+export interface CliTokenStore {
   members(key: string): Promise<string[]>;
   tryGet(key: string): Promise<string | null>;
   delete(key: string): Promise<number>;
@@ -208,7 +210,7 @@ export type GatewayBudgetCrossingCandidate = {
 };
 
 
-export interface GatewayDebitPort {
+export interface GatewayBudgetLedger {
   resolve(input: {
     target: {
       organizationId: string;
@@ -244,7 +246,7 @@ export interface GatewayDebitPort {
  * read-side signal ports the installation adapter takes as optional
  * infrastructure, so they sit together here rather than as three stubs.
  */
-export interface GovernanceOcsfEventsReaderPort {
+export interface GovernanceOcsfEventsReader {
   findAll(input: {
     tenantId: string;
     sinceMs: number;
@@ -254,7 +256,7 @@ export interface GovernanceOcsfEventsReaderPort {
 }
 
 
-export interface AdminWorkspaceViewOcsfPort {
+export interface AdminWorkspaceViewOcsfChannel {
   mirror(input: {
     tenantId: string;
     auditLogId: string;
@@ -265,18 +267,22 @@ export interface AdminWorkspaceViewOcsfPort {
 }
 
 
-export interface GovernanceSetupActivityPort {
+export interface GovernanceSetupActivityReader {
   hasRecentActivity(input: { tenantId: string; sinceMs: number }): Promise<boolean>;
 }
 
+export interface GovernanceDiagnosticsSink {
+  warn(message: string, context: Record<string, unknown>): void;
+}
 
-export interface GovernanceEncryptionPort {
+
+export interface GovernanceEncryptor {
   encrypt(plaintext: string): string;
   decrypt(ciphertext: string): string;
 }
 
 /** Commands owned by the eventing process, not by the Governance domain. */
-export interface GovernanceEventingPort {
+export interface GovernanceEventingChannel {
   configureIngestion(input: ConfigureIngestionPullCommand): Promise<void>;
   disableIngestion(input: DisableIngestionPullCommand): Promise<void>;
   recordIngestionRunCompleted(
@@ -284,6 +290,140 @@ export interface GovernanceEventingPort {
   ): Promise<void>;
   recordIngestionRunFailed(input: RecordIngestionPullRunFailedCommand): Promise<void>;
   recordPulledUsage(input: RecordPulledUsageCommand): Promise<void>;
+}
+
+/** One scheduled pull run, as the worker composition root hands it in. */
+export type IngestionPullRun = {
+  sourceId: string;
+  runId: string;
+  scheduledFor: number;
+  cursor: string | null;
+};
+
+export interface IngestionPullRunner {
+  run(input: {
+    sourceId: string;
+    cursor: string | null;
+  }): Promise<{ nextCursor: string | null; eventCount: number }>;
+}
+
+export interface IngestionPullOutcomeChannel {
+  completed(input: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    runId: string;
+    scheduledFor: number;
+    nextCursor: string | null;
+    eventCount: number;
+  }): Promise<void>;
+
+  failed(input: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    runId: string;
+    scheduledFor: number;
+    error: string;
+    errorCode: string;
+    retryable: false;
+  }): Promise<void>;
+}
+
+export interface IngestionPullMetricsSink {
+  count(outcome: "completed" | "failed_retryable" | "failed_final"): void;
+  observeDuration(durationMs: number): void;
+}
+
+/** UTC schedule calculation supplied by the worker composition root. */
+export interface IngestionPullScheduler {
+  nextRunAt(input: { cron: string; after: number }): number;
+}
+
+export interface IngestionPullTenantResolver {
+  resolveTenantId(organizationId: string): Promise<string>;
+}
+
+export type GovernanceTraceRequest = z.input<typeof exportTraceServiceRequestSchema>;
+
+export interface GovernanceTraceIngestionClient {
+  ingest(input: { projectId: string; request: GovernanceTraceRequest }): Promise<{
+    rejectedSpans: number;
+    ingestionFailures: number;
+    ingestionFailureMessage?: string;
+  }>;
+}
+
+export type GovernanceOcsfEventInput = {
+  tenantId: string;
+  eventId: string;
+  traceId: string;
+  sourceId: string;
+  sourceType: string;
+  activityId: 1 | 2 | 3 | 4 | 6;
+  severityId: 1 | 3 | 4 | 5 | 6;
+  eventTime: Instant;
+  actorUserId: string;
+  actorEmail: string;
+  actorEnduserId: string;
+  actionName: string;
+  targetName: string;
+  anomalyAlertId: string;
+  rawOcsfJson: string;
+};
+
+export interface IngestionPullSourceReader {
+  findById(id: string): Promise<GovernanceIngestionSource | null>;
+}
+
+export interface GovernanceOcsfEventSink {
+  insertEvent(input: GovernanceOcsfEventInput): Promise<void>;
+}
+
+export interface PulledUsageDispatcher {
+  recordPulledUsage(
+    input: PulledUsageObservedEventData & {
+      tenantId: string;
+      occurredAt: number;
+    },
+  ): Promise<void>;
+}
+
+export interface PulledUsageEntitlements {
+  isEnabled(organizationId: string): Promise<boolean>;
+}
+
+export interface IngestionPullDiagnosticsSink {
+  info(message: string, context: Record<string, unknown>): void;
+  warn(message: string, context: Record<string, unknown>): void;
+  error(message: string, context: Record<string, unknown>): void;
+  capture(error: Error, context: Record<string, unknown>): void;
+}
+
+export interface IngestionSourceEntitlements {
+  hasEnterprisePlan(organizationId: string): Promise<boolean>;
+}
+
+export interface IngestionSourceLifecycleChannel {
+  sync(source: GovernanceIngestionSource): Promise<void>;
+}
+
+export interface IngestionPullLifecycleChannel {
+  configure(input: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    cron: string;
+    configVersion: string;
+    cursor: string | null;
+  }): Promise<void>;
+
+  disable(input: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    configVersion: string;
+  }): Promise<void>;
 }
 
 export type GovernanceHttpResponse = {
@@ -295,7 +435,7 @@ export type GovernanceHttpResponse = {
 };
 
 
-export interface GovernanceHttpPort {
+export interface GovernanceHttpClient {
   fetch(
     url: string,
     init: {
@@ -316,7 +456,7 @@ export type GovernanceObjectStorageCredentials = {
 };
 
 
-export interface GovernanceObjectStoragePort {
+export interface GovernanceObjectStore {
   list(input: {
     bucket: string;
     prefix: string;
@@ -347,7 +487,7 @@ export interface GovernanceObjectStoragePort {
  * server package, so composing it stays the process's job. The project
  * capability satisfies it as it stands.
  */
-export interface GovernanceProjectPort {
+export interface GovernanceProjectDirectory {
   tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
 
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
@@ -381,7 +521,7 @@ export type GovernanceResolvedBudgetCrossing = {
 };
 
 
-export interface GovernanceSignalPort {
+export interface GovernanceSignalChannel {
   available(): boolean;
   now(): Instant;
   tryResolveLifecycleTenant(input: {
@@ -449,19 +589,19 @@ export type GovernanceOcsfEvent = {
 };
 
 
-export interface GovernanceKpiContributionPort {
+export interface GovernanceKpiContributionWriter {
   /** Upsert/replacing identity is (tenant, source, hour, trace). */
   insertContribution(row: GovernanceKpiContribution): Promise<void>;
 }
 
 
-export interface GovernanceOcsfEventPort {
+export interface GovernanceOcsfEventWriter {
   /** Upsert/replacing identity is (tenant, eventId). */
   insertEvent(row: GovernanceOcsfEvent): Promise<void>;
 }
 
 
-export interface GovernanceSubscriberDiagnosticsPort {
+export interface GovernanceSubscriberDiagnosticsSink {
   warn(input: { code: string; tenantId: string; traceId: string }): void;
   capture(error: unknown): void;
 }
@@ -476,12 +616,12 @@ export type TraceAlertTrigger = {
 };
 
 
-export interface TraceAlertTriggerPort {
+export interface TraceAlertTriggerReader {
   activeForProject(projectId: string): Promise<TraceAlertTrigger[]>;
 }
 
 
-export interface TraceAlertTriggerMatchPort {
+export interface TraceAlertTriggerMatchChannel {
   send(input: {
     tenantId: string;
     occurredAt: number;
@@ -495,12 +635,12 @@ export interface TraceAlertTriggerMatchPort {
 }
 
 
-export interface TraceAlertOriginGuardPort {
+export interface TraceAlertOriginGuard {
   passes(input: { event: GovernanceTraceEvent; state: GovernanceTraceSummary }): boolean;
 }
 
 
-export interface TraceAlertMetricsPort {
+export interface TraceAlertMetricsSink {
   countRecorded(count: number): void;
 }
 
@@ -532,7 +672,7 @@ export type GovernanceWebhookSendBatch = {
 };
 
 
-export interface GovernanceWebhookPort {
+export interface GovernanceWebhookChannel {
   readonly processStore: ProcessStore;
   readonly maxAttempts: number;
 
@@ -581,7 +721,7 @@ export type GovernanceClickHouseResult = {
 };
 
 
-export interface GovernanceClickHouseClientPort {
+export interface GovernanceClickHouseClient {
   query(input: {
     query: string;
     query_params?: Record<string, unknown>;
@@ -590,8 +730,8 @@ export interface GovernanceClickHouseClientPort {
 }
 
 
-export interface GovernanceClickHouseResolverPort {
-  tryResolve(organizationId: string): Promise<GovernanceClickHouseClientPort | null>;
+export interface GovernanceClickHouseResolver {
+  tryResolve(organizationId: string): Promise<GovernanceClickHouseClient | null>;
 }
 
 export type StoredIngestionKey = {
@@ -632,7 +772,7 @@ export interface IngestionKeyRepository {
 }
 
 
-export interface IngestionKeyIssuerPort {
+export interface IngestionKeyIssuer {
   create(input: {
     name: string;
     userId: string | null;
@@ -668,7 +808,7 @@ export interface IngestionKeyCapability {
  * alone was under the twenty-line fragment-file floor once its repository
  * sibling moved to repositories/directory/.
  */
-export interface PersonalVirtualKeyIssuerPort {
+export interface PersonalVirtualKeyIssuer {
   issue(input: {
     organizationId: string;
     userId: string;
@@ -705,7 +845,7 @@ export type IngestionPrincipalSummaryRow = {
 };
 
 
-export interface PersonalUsageReaderPort {
+export interface PersonalUsageReader {
   findSummary(input: {
     tenantId: string;
     window: PersonalUsageWindow;
@@ -761,7 +901,7 @@ export type PulledUsageLedgerRow = {
 };
 
 
-export interface PulledUsageLedgerPort {
+export interface PulledUsageLedgerRepository {
   insert(rows: PulledUsageLedgerRow[]): Promise<void>;
 }
 
@@ -776,7 +916,7 @@ export type PulledUsageRateInput = {
 };
 
 
-export interface PulledUsageRatePort {
+export interface PulledUsageRateReader {
   rate(input: PulledUsageRateInput): {
     costNanoUsd: number;
     rateVersion: string;
@@ -784,12 +924,12 @@ export interface PulledUsageRatePort {
 }
 
 
-export interface QuarantineTenantPort {
+export interface QuarantineTenantResolver {
   resolveTenantId(organizationId: string): Promise<string>;
 }
 
 
-export interface QuarantineTraceActivityPort {
+export interface QuarantineTraceActivityReader {
   findSpanCountsBySource(input: {
     tenantId: string;
     sinceMs: number;
@@ -802,7 +942,7 @@ export type AnomalySpendSourceFilter =
   | { type: "source_type"; id: string };
 
 
-export interface AnomalySpendReaderPort {
+export interface AnomalySpendReader {
   findSpendTotals(input: {
     tenantId: string;
     windowStart: Instant;

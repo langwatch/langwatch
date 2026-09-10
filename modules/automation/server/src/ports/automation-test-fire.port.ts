@@ -26,7 +26,7 @@ export interface TestFireWebhook {
   triggerName: string;
 }
 
-export abstract class AutomationTestFirePort {
+export abstract class AutomationTestFire {
   abstract sendEmail(input: TestFireEmail): Promise<void>;
   abstract sendSlack(input: TestFireSlackWebhook): Promise<void>;
   abstract sendSlackBot(input: TestFireSlackBot): Promise<void>;

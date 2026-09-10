@@ -1,23 +1,23 @@
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import {
-  EvaluationExecutionPort,
-  EvaluationInputsResolutionPort,
-  type EvaluationClickHouseResolver,
-  type EvaluationRetentionFloorPort,
-} from "../../ports/evaluation.port.ts";
+  EvaluationExecution,
+  EvaluationInputsResolution,
+  type EvaluationRetentionFloor,
+} from "../../app/evaluation.infrastructure.ts";
+import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 import { ClickHouseEvaluationRepository } from "./evaluation.repository.ts";
 import { ClickHouseMonitorPerformanceRepository } from "./monitor-performance.repository.ts";
 import { EvaluationService } from "../../services/evaluation.service.ts";
 
 export type EvaluationAdapterOptions = {
   resolveClickHouse: EvaluationClickHouseResolver;
-  retentionFloor: EvaluationRetentionFloorPort;
-  execution: EvaluationExecutionPort;
-  inputResolution?: EvaluationInputsResolutionPort;
+  retentionFloor: EvaluationRetentionFloor;
+  execution: EvaluationExecution;
+  inputResolution?: EvaluationInputsResolution;
   workflows: WorkflowApi;
 };
 
-class PassthroughEvaluationInputsResolution extends EvaluationInputsResolutionPort {
+class PassthroughEvaluationInputsResolution implements EvaluationInputsResolution {
   async tryResolve(input: {
     tenantId: string;
     inputs: Record<string, unknown> | null;

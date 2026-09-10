@@ -29,7 +29,7 @@ import type { TraceMediaStore } from "../../../app/trace.infrastructure.ts";
 // Test helpers
 // ---------------------------------------------------------------------------
 
-/** Builds a minimal mock TraceMediaStorePort. */
+/** Builds a minimal mock TraceMediaStore. */
 function makeService(
   overrides: { storeFromBytes?: TraceMediaStore["storeFromBytes"] } = {},
 ): TraceMediaStore {

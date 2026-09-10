@@ -12,7 +12,7 @@ export type ExperimentConnectedAgentSubject = {
  * Refuses a run against a personal development agent of someone other than the
  * actor, before any cell exists.
  */
-export abstract class ExperimentConnectedAgentOwnershipPort {
+export abstract class ExperimentConnectedAgentOwnership {
   abstract assertRunnable(input: {
     agents: readonly ExperimentConnectedAgentSubject[];
     actor: RunActor | undefined;

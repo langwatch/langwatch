@@ -7,7 +7,7 @@ import {
 import { SystemMigrationCohortService } from "../system-migration-cohort.service.ts";
 
 /** The routing table as a fake: organizations it names are on their own instance. */
-class FakeDataplanePort implements OrganizationDataplanePort {
+class FakeDataplane implements OrganizationDataplanePort {
   readonly asked: string[] = [];
 
   constructor(private readonly endpoints: Record<string, string>) {
@@ -37,7 +37,7 @@ const cohortOf = ({
 }: {
   automatic: boolean;
   enrolled?: ReadonlyMap<string, ReadonlySet<string>>;
-  dataplane: FakeDataplanePort;
+  dataplane: FakeDataplane;
 }) =>
   SystemMigrationCohortService.create({
     isSaaS: true,
@@ -50,7 +50,7 @@ describe("given a cloud installation computing an organization cohort", () => {
   describe("when the migration is declared enrolled automatically", () => {
     /** @scenario "An automatic cohort includes a private-dataplane organization" */
     it("admits an organization on its own data plane, and names the endpoint", () => {
-      const dataplane = new FakeDataplanePort({
+      const dataplane = new FakeDataplane({
         org_isolated_inc: "https://clickhouse.isolated.example:8443",
       });
 
@@ -69,7 +69,7 @@ describe("given a cloud installation computing an organization cohort", () => {
     it("admits an organization on the shared instance the same way", () => {
       const admission = cohortOf({
         automatic: true,
-        dataplane: new FakeDataplanePort({}),
+        dataplane: new FakeDataplane({}),
       }).admits({ organizationId: "org_acme", migrationName: "identity-backfill" });
 
       expect(admission).toEqual({ admitted: true, dataplane: { kind: "shared" } });
@@ -78,7 +78,7 @@ describe("given a cloud installation computing an organization cohort", () => {
 
   describe("when the migration is paced by enrollment", () => {
     it("leaves out an organization nobody enrolled, whatever its data plane", () => {
-      const dataplane = new FakeDataplanePort({ org_isolated_inc: "https://ch.example:8443" });
+      const dataplane = new FakeDataplane({ org_isolated_inc: "https://ch.example:8443" });
 
       const admission = cohortOf({ automatic: false, dataplane }).admits({
         organizationId: "org_isolated_inc",
@@ -89,7 +89,7 @@ describe("given a cloud installation computing an organization cohort", () => {
     });
 
     it("admits an organization an operator enrolled, on its own data plane", () => {
-      const dataplane = new FakeDataplanePort({ org_isolated_inc: "https://ch.example:8443" });
+      const dataplane = new FakeDataplane({ org_isolated_inc: "https://ch.example:8443" });
 
       const admission = cohortOf({
         automatic: false,

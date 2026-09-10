@@ -5,7 +5,7 @@ import type {
   ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import { verdictPassedOf, verdictScoreOf } from "@langwatch/evaluation-contract";
-import { EvaluationExecutionReceiptPort } from "../ports/evaluation.port.ts";
+import { EvaluationExecutionReceipt } from "../app/evaluation.infrastructure.ts";
 import type { PreparedEvaluation } from "./evaluation-execution-preparation.service.ts";
 import {
   EvaluationReportedEventService,
@@ -20,7 +20,7 @@ function isCustomerFixable(error: unknown): error is HandledError {
 
 export class EvaluationExecutionOutcomeService {
   static create(input: {
-    executionReceipt: EvaluationExecutionReceiptPort;
+    executionReceipt: EvaluationExecutionReceipt;
     reportedEvents: EvaluationReportedEventService;
   }): EvaluationExecutionOutcomeService {
     return new EvaluationExecutionOutcomeService(input);
@@ -28,7 +28,7 @@ export class EvaluationExecutionOutcomeService {
 
   private constructor(
     private readonly deps: {
-      executionReceipt: EvaluationExecutionReceiptPort;
+      executionReceipt: EvaluationExecutionReceipt;
       reportedEvents: EvaluationReportedEventService;
     },
   ) {}

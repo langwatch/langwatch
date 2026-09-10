@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import type { ModelProviderCredentialCipherPort } from "#ports/model-provider.port";
+import type { ModelProviderCredentialCipher } from "#app/model-provider.infrastructure";
 import { ModelProviderLegacyMigrationService } from "#services/model-provider-legacy-migration.service";
 import type {
   ModelProviderMigrationDatabase,
@@ -17,7 +17,7 @@ export async function runModelProviderKeysMigration({
   cipher,
 }: {
   database: ModelProviderMigrationDatabase;
-  cipher: ModelProviderCredentialCipherPort;
+  cipher: ModelProviderCredentialCipher;
 }): Promise<ModelProviderMigrationOutcome> {
   const migrations = ModelProviderLegacyMigrationService.create();
   const projects = await database.project.findMany({ select: { id: true } });
@@ -66,7 +66,7 @@ export class ModelProviderCredentialsMigrateTask extends Task {
 
   private constructor(
     private readonly database: () => ModelProviderMigrationDatabase,
-    private readonly cipher: () => ModelProviderCredentialCipherPort,
+    private readonly cipher: () => ModelProviderCredentialCipher,
   ) {
     super();
   }
@@ -76,7 +76,7 @@ export class ModelProviderCredentialsMigrateTask extends Task {
     cipher,
   }: {
     database: () => ModelProviderMigrationDatabase;
-    cipher: () => ModelProviderCredentialCipherPort;
+    cipher: () => ModelProviderCredentialCipher;
   }): ModelProviderCredentialsMigrateTask {
     return new ModelProviderCredentialsMigrateTask(database, cipher);
   }

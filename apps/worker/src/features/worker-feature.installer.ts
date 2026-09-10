@@ -2,7 +2,7 @@
 export type WorkerFeatureCloser = () => Promise<void>;
 
 /** A feature-owned consumer/process-manager contribution to the worker graph. */
-export interface WorkerFeatureInstallerPort {
+export interface WorkerFeatureInstaller {
   readonly name: string;
 
   install(): Promise<WorkerFeatureCloser | undefined>;

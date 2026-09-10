@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AutomationTraceRecordUnavailableError } from "@langwatch/automation-server";
 import { TraceNotFoundError } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import { WorkerAutomationSettlementAbsenceReportPort } from "../worker-automation-settlement.composition.ts";
+import { WorkerAutomationSettlementAbsenceReport } from "../worker-automation-settlement.composition.ts";
 import {
   WorkerAutomationSettlementEvaluationReader,
   WorkerAutomationSettlementTraceReader,
@@ -135,7 +135,7 @@ function clickHouseWithAgedTrace() {
 }
 
 function recordingAbsence(into: string[]) {
-  return new (class extends WorkerAutomationSettlementAbsenceReportPort {
+  return new (class extends WorkerAutomationSettlementAbsenceReport {
     withoutTraceRecordRead(): void {
       into.push("traceRecordRead");
     }

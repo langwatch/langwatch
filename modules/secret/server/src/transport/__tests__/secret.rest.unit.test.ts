@@ -22,7 +22,7 @@ function mount(options: { project?: string; actor?: Actor | null } = {}) {
 
   return runtime.mount(secretRest.router(), {
     app: () => app,
-    credential: "projectKey",
+    credential: "project",
     onError: createErrorHandler(),
   });
 }
@@ -140,7 +140,7 @@ describe("the secret REST family", () => {
       });
       const plural = runtime.mount(secretsAliasRest.router(), {
         app: () => app,
-        credential: "projectKey",
+        credential: "project",
         onError: createErrorHandler(),
       });
 

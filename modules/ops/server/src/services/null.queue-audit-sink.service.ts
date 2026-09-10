@@ -1,7 +1,7 @@
-import { QueueAuditSinkPort } from "../app/ops.app.ts";
+import { QueueAuditSink } from "../app/ops.app.ts";
 
 /** For app presets that run without Postgres. */
-export class NullQueueAuditSink extends QueueAuditSinkPort {
+export class NullQueueAuditSink extends QueueAuditSink {
   private constructor() {
     super();
   }

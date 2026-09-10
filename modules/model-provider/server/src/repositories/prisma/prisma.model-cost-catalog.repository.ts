@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ModelCostProjectPort } from "../../ports/model-provider.port.ts";
+import type { ModelCostProject } from "../../app/model-provider.infrastructure.ts";
 import { PrismaModelCostRepository } from "./prisma.model-cost.repository.ts";
 import { ModelCostCatalogService } from "../../services/model-cost-catalog.service.ts";
 import { ModelProviderProjectScopeService } from "../../services/model-provider-project-scope.service.ts";
@@ -19,7 +19,7 @@ export type ModelCostCatalogDatabase = Pick<PrismaClient, "customLLMModelCost">;
  * Codex token refresher and a connection rate limiter — for a read that asks
  * none of them anything.
  *
- * The object it builds satisfies Trace's `TraceModelCostCatalogPort`.
+ * The object it builds satisfies Trace's `TraceModelCostCatalog`.
  * `ModelProviderApi` satisfies it as well, because it composes this same
  * service and delegates to it, which is what keeps the application's own
  * compositions compiling unchanged and what keeps the two processes pricing
@@ -28,14 +28,14 @@ export type ModelCostCatalogDatabase = Pick<PrismaClient, "customLLMModelCost">;
 export class PrismaModelCostCatalogRepository {
   static create(options: {
     database: ModelCostCatalogDatabase;
-    projects: ModelCostProjectPort;
+    projects: ModelCostProject;
   }): PrismaModelCostCatalogRepository {
     return new PrismaModelCostCatalogRepository(options.database, options.projects);
   }
 
   private constructor(
     private readonly database: ModelCostCatalogDatabase,
-    private readonly projects: ModelCostProjectPort,
+    private readonly projects: ModelCostProject,
   ) {}
 
   build(): ModelCostCatalogService {

@@ -5,7 +5,7 @@
  */
 
 import {
-  CodingAgentActivityHostPort,
+  CodingAgentActivityHost,
   CodingAgentActivityHostProvider,
   type CodingAgentFailure,
   type CodingAgentNotice,
@@ -18,7 +18,7 @@ import {
   type PersonalWorkspaceHostPort,
 } from "../../model/personal-workspace-host.ts";
 
-class PersonalCodingAgentHost extends CodingAgentActivityHostPort {
+class PersonalCodingAgentHost extends CodingAgentActivityHost {
   constructor(private readonly host: PersonalWorkspaceHostPort) {
     super();
   }

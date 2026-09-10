@@ -1,6 +1,6 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { ExperimentRunProcessingPipeline } from "@langwatch/experiment-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** Experiment's worker-facing capability after its server graph is composed. */
@@ -28,7 +28,7 @@ export interface ExperimentWorkerCapability {
  * that owns the ClickHouse resolver; it is deliberately not part of this
  * feature's worker surface.
  */
-export class ExperimentWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class ExperimentWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: ExperimentWorkerCapability;
     eventing: WorkerEventingRuntime;

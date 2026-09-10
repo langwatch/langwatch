@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
+import type { TopicClusteringCommands } from "../app/topic.infrastructure.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
@@ -55,7 +55,7 @@ export class LegacyImportTopicClusteringMigration {
   private constructor(
     private readonly repository: TopicClusteringRepository,
     private readonly redis: Redis | Cluster | null,
-    private readonly commands: TopicClusteringCommandsPort,
+    private readonly commands: TopicClusteringCommands,
     private readonly schedulePageSize?: number,
   ) {}
 
@@ -63,7 +63,7 @@ export class LegacyImportTopicClusteringMigration {
     repository: TopicClusteringRepository;
     /** Coordination only — without Redis both seeds still run safely. */
     redis: Redis | Cluster | null;
-    commands: TopicClusteringCommandsPort;
+    commands: TopicClusteringCommands;
     /** Test override for the schedule walk's page size. */
     schedulePageSize?: number;
   }): LegacyImportTopicClusteringMigration {

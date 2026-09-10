@@ -16,9 +16,9 @@ import {
   ClickHouseExperimentDspyRepository,
   ClickHouseExperimentRunRepository,
   ExperimentApp,
-  ExperimentDspyRetentionPort,
+  ExperimentDspyRetention,
   ExperimentService,
-  ExperimentWorkbenchUpdatesPort,
+  ExperimentWorkbenchUpdates,
   PrismaExperimentRepository,
   PrismaExperimentWorkflowVersionRepository,
   workbenchStateSchema,
@@ -282,7 +282,7 @@ const NO_BROADCAST: ExperimentBroadcast = (() => {
  * The frame is the one the browser already reads: the signal as JSON under
  * `event`, beside the timestamp, as the broadcast fabric puts it on the wire.
  */
-class EmitterExperimentWorkbenchUpdates extends ExperimentWorkbenchUpdatesPort {
+class EmitterExperimentWorkbenchUpdates extends ExperimentWorkbenchUpdates {
   static create(broadcast: ExperimentBroadcast): EmitterExperimentWorkbenchUpdates {
     return new EmitterExperimentWorkbenchUpdates(broadcast);
   }
@@ -312,7 +312,7 @@ class EmitterExperimentWorkbenchUpdates extends ExperimentWorkbenchUpdatesPort {
 /**
  * The DSPy retention floor, fixed for this process.
  */
-class FixedExperimentDspyRetention extends ExperimentDspyRetentionPort {
+class FixedExperimentDspyRetention extends ExperimentDspyRetention {
   static create(days: number): FixedExperimentDspyRetention {
     return new FixedExperimentDspyRetention(days);
   }

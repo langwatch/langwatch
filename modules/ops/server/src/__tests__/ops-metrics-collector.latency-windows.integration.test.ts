@@ -12,7 +12,7 @@ import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metri
 import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
-import type { OpsSnapshotRedisPort } from "../app/ops.app.ts";
+import type { OpsSnapshotRedis } from "../app/ops.app.ts";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;
@@ -106,7 +106,7 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
         const ops = OpsMetricsTestAdapter.create();
         ops.setQueueNames([name]);
         const snapshotRepository = RedisOpsSnapshotRepository.create(
-          redis as unknown as OpsSnapshotRedisPort,
+          redis as unknown as OpsSnapshotRedis,
         );
         const snapshots = DefaultOpsSnapshotService.create(snapshotRepository);
         const collector = OpsMetricsCollectorService.create({

@@ -4,7 +4,7 @@ import type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
@@ -47,7 +47,7 @@ export interface SsoConnectionWorkerCapability<TEvent extends Event = Event> {
  * the worker composition the live one drops the legacy registration in the
  * same change.
  */
-export class SsoConnectionWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class SsoConnectionWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create<TEvent extends Event>(options: {
     installer: SsoConnectionWorkerCapability<TEvent>;
     eventing: WorkerEventingRuntime;

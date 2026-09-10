@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TriggerNoReplyService, TriggerNoReplyWarningPort } from "../trigger-no-reply.service.ts";
+import { TriggerNoReplyService, TriggerNoReplyWarning } from "../trigger-no-reply.service.ts";
 import { UnsubscribeTokenService } from "../unsubscribe-token.service.ts";
 
 /**
@@ -19,7 +19,7 @@ const APPLICATION_TRIGGER_TOKEN =
 const APPLICATION_PROJECT_TOKEN =
   "eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJ0cmlnZ2VySWQiOm51bGwsImVtYWlsIjoiYWRhQGV4YW1wbGUuY29tIn0.ec785b87b9ec6dfda75a6bf6099fae99780222f09cba44b352eedac673ff18d0";
 
-class RecordingWarnings extends TriggerNoReplyWarningPort {
+class RecordingWarnings extends TriggerNoReplyWarning {
   readonly messages: string[] = [];
 
   unguessabilityUnavailable(message: string): void {

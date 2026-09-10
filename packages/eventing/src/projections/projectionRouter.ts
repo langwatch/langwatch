@@ -27,7 +27,7 @@ import type { EventStoreReadContext } from "../stores/eventStore.types.ts";
 import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
-import { isComponentKilled, type KillSwitchPort } from "../kill-switch/index.ts";
+import { isComponentKilled, type KillSwitch } from "../kill-switch/index.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import { toError } from "../utils/errors.ts";
 import {
@@ -85,7 +85,7 @@ export class ProjectionRouter<
   private readonly executionTarget?: ExecutionTarget;
   private readonly replayMarkerChecker?: ReplayMarkerChecker;
   private readonly retentionPolicyResolver?: RetentionPolicyResolver;
-  private readonly killSwitch?: KillSwitchPort;
+  private readonly killSwitch?: KillSwitch;
   private readonly tracer = getLangWatchTracer("langwatch.event-sourcing.projection-router");
   private readonly logger = createLogger("langwatch:event-sourcing:projection-router");
   private readonly foldExecutor = new FoldProjectionExecutor();
@@ -110,7 +110,7 @@ export class ProjectionRouter<
       executionTarget?: ExecutionTarget;
       replayMarkerChecker?: ReplayMarkerChecker;
       retentionPolicyResolver?: RetentionPolicyResolver;
-      killSwitch?: KillSwitchPort;
+      killSwitch?: KillSwitch;
     } = {},
   ) {
     this.executionTarget = options.executionTarget;

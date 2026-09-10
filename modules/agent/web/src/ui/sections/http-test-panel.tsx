@@ -20,12 +20,12 @@ import {
 } from "../blocks/http-test-messages-builder.tsx";
 import { HttpTestRequestPreview } from "../blocks/http-test-request-preview.tsx";
 import { HttpTestResponseDisplay } from "../blocks/http-test-response-display.tsx";
-import type { HttpTestErrorExplanationPort, HttpTestResult } from "../../model/http-test.types.ts";
+import type { HttpTestErrorExplanation, HttpTestResult } from "../../model/http-test.types.ts";
 
 const DEFAULT_THREAD_ID = "test-thread-123";
 const DEFAULT_MESSAGES: TestMessage[] = [{ role: "user", content: "Hello" }];
 
-export type { HttpTestErrorExplanationPort, HttpTestResult } from "../../model/http-test.types.ts";
+export type { HttpTestErrorExplanation, HttpTestResult } from "../../model/http-test.types.ts";
 
 export type HttpTestPanelProps = {
   /** Runs the request with template variables, so the engine renders the body. */
@@ -36,7 +36,7 @@ export type HttpTestPanelProps = {
   headers?: Array<{ key: string; value: string }>;
   outputPath?: string;
   bodyTemplate?: string;
-  explainError?: HttpTestErrorExplanationPort;
+  explainError?: HttpTestErrorExplanation;
 };
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

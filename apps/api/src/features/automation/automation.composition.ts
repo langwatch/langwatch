@@ -12,7 +12,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { composeApiAutomationApp } from "../../app/api-automation.composition.ts";
@@ -24,7 +24,7 @@ export type AutomationPeers = Readonly<{
   /** The monitors a trigger watches, named in the trigger list. */
   monitors: MonitorService;
   /** The deployment's cipher, for the stored credentials a channel carries. */
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
   /** The SAME Redis the worker spends the persist ceiling against. */
   redis: RedisConnection | null;
 }>;

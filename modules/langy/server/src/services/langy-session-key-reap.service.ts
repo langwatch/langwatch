@@ -1,6 +1,6 @@
 import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
-import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port.ts";
+import type { LangySessionKeyMetrics } from "../app/langy.infrastructure.ts";
 import type { LangySessionKeyReapRepository } from "../repositories/langy-session-key-reap.repository.ts";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -14,7 +14,7 @@ const logger = createLogger("langwatch:langy:session-key-reap");
 export class LangySessionKeyReapService {
   static create(options: {
     repository: LangySessionKeyReapRepository;
-    metrics: LangySessionKeyMetricsPort;
+    metrics: LangySessionKeyMetrics;
     now?: () => Instant;
   }): LangySessionKeyReapService {
     return new LangySessionKeyReapService(
@@ -26,7 +26,7 @@ export class LangySessionKeyReapService {
 
   private constructor(
     private readonly repository: LangySessionKeyReapRepository,
-    private readonly metrics: LangySessionKeyMetricsPort,
+    private readonly metrics: LangySessionKeyMetrics,
     private readonly now: () => Instant,
   ) {}
 

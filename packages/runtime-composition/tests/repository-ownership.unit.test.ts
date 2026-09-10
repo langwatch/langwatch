@@ -37,15 +37,15 @@ class AnnotationApp {
 }
 
 describe("repository ownership", () => {
-  it.each(["api", "worker", "task"] as const)(
+  it.each(["api", "worker", "tasks"] as const)(
     "rejects conflicting ownership before any %s factory runs",
     async (role) => {
       created.mockClear();
-      const runtime = createApp({ name: "ownership" })
-        .withInfrastructure({})
-        .withModule(defineModule("user").withApp(UserApp).build())
-        .withModule(defineModule("annotation").withApp(AnnotationApp).build());
-      await expect(runtime.boot({ role })).rejects.toThrow(RepositoryOwnershipConflictError);
+      const runtime = createApp({ role, infrastructure: {} }).withModules([
+        defineModule("user").withApp(UserApp).build(),
+        defineModule("annotation").withApp(AnnotationApp).build(),
+      ]);
+      await expect(runtime.boot()).rejects.toThrow(RepositoryOwnershipConflictError);
       expect(created).not.toHaveBeenCalled();
     },
   );

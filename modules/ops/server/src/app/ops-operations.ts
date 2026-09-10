@@ -24,14 +24,14 @@ import { NullBlobStoreRepository } from "../repositories/admin/blob-store.reposi
 import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.admin-backoffice.repository.ts";
 import { AdminBackofficeService } from "../services/admin-backoffice.service.ts";
 import type { SchedulerOpsRepository } from "../repositories/process/scheduler-ops.repository.ts";
-import type { SchedulerWakePort } from "./ops.app.ts";
+import type { SchedulerWake } from "./ops.app.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
 import { QueueAuditAdapter } from "../services/audit-log.queue-audit.service.ts";
 import { NullQueueRepository } from "../repositories/process/queue.repository.ts";
 import { QueueService } from "../services/queue.service.ts";
-import type { QueuePayloadDecoderPort } from "./ops.app.ts";
+import type { QueuePayloadDecoder } from "./ops.app.ts";
 import {
   PrismaSchedulerAuditRepository,
   type SchedulerAuditDatabase,
@@ -46,14 +46,14 @@ export interface OpsOperationsOptions extends AdminAccessServiceOptions {
   access?: AdminAccess | undefined;
   now?: (() => Instant) | undefined;
   redis?: IORedis | Cluster | undefined;
-  queuePayloads?: QueuePayloadDecoderPort | undefined;
+  queuePayloads?: QueuePayloadDecoder | undefined;
   users: UserApi;
   auth: AuthApi;
   /** True once the connection projection decides sign-in (`SSOCONN_ROUTING=enforce`). */
   legacySsoStringWritesRetired?: boolean | undefined;
   scheduler: {
     repository: SchedulerOpsRepository;
-    wake: SchedulerWakePort;
+    wake: SchedulerWake;
     projects: ProjectApi;
   };
 }
@@ -125,7 +125,7 @@ export class OpsOperations {
     });
   }
 
-  private queuePayloads(): QueuePayloadDecoderPort {
+  private queuePayloads(): QueuePayloadDecoder {
     if (!this.options.queuePayloads) {
       throw new Error("Ops queue composition requires a payload decoder when Redis is configured");
     }

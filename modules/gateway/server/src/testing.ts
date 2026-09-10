@@ -11,7 +11,7 @@ export {
   PrismaGatewayAdapter,
   type GatewayPersistence,
 } from "./adapters/prisma.gateway.adapter.ts";
-export { GatewayBudgetSpendPort } from "./ports/gateway-budget-spend.port.ts";
+export { GatewayBudgetSpend } from "./ports/gateway-budget-spend.port.ts";
 /** The complete Project contract fake the budget suites compose against; named
  *  here so a suite in another package composes the same one rather than
  *  carrying a second copy of thirty stub methods. */

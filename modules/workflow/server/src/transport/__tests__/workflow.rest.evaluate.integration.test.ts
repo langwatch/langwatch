@@ -57,7 +57,7 @@ function buildApi(options: {
 
   const hono = runtime.mount(createWorkflowRest(platformUrl).router(), {
     app: () => app,
-    credential: "projectKey",
+    credential: "project",
     onError: renderHandled,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({

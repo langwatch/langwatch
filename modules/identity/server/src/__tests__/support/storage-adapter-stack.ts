@@ -9,14 +9,14 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
 import { deriveNewbornUserId } from "../../rules/identifier-hash.rules.ts";
 import { BetterAuthIdentityBirthAdapter } from "../../services/better-auth-identity-birth.service.ts";
-import { type IdentityBirthPort } from "../../app/identity.infrastructure.ts";
+import { type IdentityBirth } from "../../app/identity.infrastructure.ts";
 import {
   BetterAuthCeremonyBridgeAdapter,
   IdentityCeremoniesAdapter,
 } from "../../services/better-auth-identity-ceremonies.service.ts";
 import { BetterAuthIdentityStorageAdapter } from "../../services/better-auth-identity-storage.service.ts";
 import type {
-  IdentityAccountsPort,
+  IdentityAccounts,
   IdentityResolutionPort,
 } from "../../rules/identity-storage-ports.rules.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
@@ -191,7 +191,7 @@ export function identityStack({
    * the waited append first, then the row writes, then the projection.
    * The born-finalized entrance, in memory, in the legs ADR-116 §3 pins:
    */
-  const birth: IdentityBirthPort = {
+  const birth: IdentityBirth = {
     async bear({ row, email, createdAtMs }) {
       const normalizedValue = normalizeIdentifierValue(email);
       const userId = deriveNewbornUserId({ normalizedValue });
@@ -224,7 +224,7 @@ export function identityStack({
     },
   };
 
-  const accounts: IdentityAccountsPort = inert ? inertIdentityPorts.accounts : storage;
+  const accounts: IdentityAccounts = inert ? inertIdentityPorts.accounts : storage;
   const resolution: IdentityResolutionPort = inert ? inertIdentityPorts.resolution : storage;
 
   const bridge = BetterAuthCeremonyBridgeAdapter.create({

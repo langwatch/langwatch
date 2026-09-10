@@ -1,7 +1,7 @@
 import type { Instant } from "@langwatch/time";
 
 /** Whether every legacy writer has drained past the generation the import needs. */
-export abstract class StoredObjectLegacyWriterDrainPort {
+export abstract class StoredObjectLegacyWriterDrain {
   abstract get(input: {
     organizationId: string;
   }): Promise<

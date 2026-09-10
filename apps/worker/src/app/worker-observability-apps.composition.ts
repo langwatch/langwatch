@@ -3,7 +3,7 @@ import { AnnotationApi } from "@langwatch/annotation-contract";
 import { annotationServer } from "@langwatch/annotation-server";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
-import { CodingAgentBillingPolicyPort } from "@langwatch/coding-agent-server";
+import { CodingAgentBillingPolicy } from "@langwatch/coding-agent-server";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { dataPrivacyServer } from "@langwatch/data-privacy-server";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -235,7 +235,7 @@ class WorkerModelProviderTraceSpans {
   }
 }
 
-class WorkerCodingAgentBilling extends CodingAgentBillingPolicyPort {
+class WorkerCodingAgentBilling extends CodingAgentBillingPolicy {
   #policy: PostgresGovernanceServices["policy"];
   constructor(policy: PostgresGovernanceServices["policy"]) {
     super();

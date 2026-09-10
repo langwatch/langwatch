@@ -14,6 +14,6 @@ import type { TriggerSummary } from "@langwatch/automation-contract";
  * `AutomationService` satisfies this, so the application's own composition is
  * unchanged and both graphs answer from the same implementation.
  */
-export abstract class AutomationTraceTriggerCataloguePort {
+export abstract class AutomationTraceTriggerCatalogue {
   abstract getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]>;
 }

@@ -28,7 +28,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 
 import {
-  type AppRestManagementAuditPort,
+  type AppRestManagementAudit,
   emitManagementAudit,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
@@ -386,7 +386,7 @@ export function createOrganizationRestApp(options: {
   organizations: (context: Context) => OrganizationRestService;
   invites: (context: Context) => OrganizationRestInviteService;
   permissions: (context: Context) => AuthzService;
-  audit: AppRestManagementAuditPort;
+  audit: AppRestManagementAudit;
   ports: OrganizationRestPorts;
 }): MountableRestApp {
   const { security, enterpriseGate, organizations, invites, permissions, audit, ports } = options;

@@ -7,7 +7,7 @@ import {
   GuardrailAttachForbiddenError,
   VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
-import type { GatewayScopePermissionsPort } from "../ports/gateway-scope-permissions.port.ts";
+import type { GatewayScopePermissions } from "../app/gateway.infrastructure.ts";
 import type { GuardrailAttachment } from "@langwatch/gateway-contract";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
 
@@ -22,7 +22,7 @@ export type VirtualKeySessionActor = { user: { id: string } } | null;
 
 export type RBACContext = {
   session: VirtualKeySessionActor;
-  permissions: GatewayScopePermissionsPort;
+  permissions: GatewayScopePermissions;
 };
 
 export type Scope = {
@@ -47,8 +47,8 @@ export type VirtualKeyActor =
 
 export type ActorContext = {
   actor: VirtualKeyActor;
-  /** The one authorization seam. See {@link GatewayScopePermissionsPort}. */
-  permissions: GatewayScopePermissionsPort;
+  /** The one authorization seam. See {@link GatewayScopePermissions}. */
+  permissions: GatewayScopePermissions;
 };
 
 function scopeLabel(scope: Scope): string {

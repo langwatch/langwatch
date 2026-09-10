@@ -1,10 +1,10 @@
-import { AutomationClockPort } from "../ports/automation-clock.port.ts";
-import { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
+import { AutomationClock } from "../app/automation.infrastructure.ts";
+import { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
 import {
-  AutomationDispatchErrorPort,
-  AutomationLoggerPort,
+  AutomationDispatchError,
+  AutomationLogger,
 } from "../ports/automation-graph.port.ts";
-import { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
+import { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 /**
@@ -25,13 +25,13 @@ export const FROZEN_NOW = Temporal.Instant.from("2026-09-02T12:00:00.000Z");
 /** The same moment as a stored column hands it back, for the row doubles. */
 const FROZEN_ROW_AT = toDate(FROZEN_NOW);
 
-export class FrozenClock extends AutomationClockPort {
+export class FrozenClock implements AutomationClock {
   now(): Instant {
     return FROZEN_NOW;
   }
 }
 
-export class SilentLogger extends AutomationLoggerPort {
+export class SilentLogger extends AutomationLogger {
   readonly errors: Array<[Record<string, unknown>, string]> = [];
 
   error(fields: Record<string, unknown>, message: string): void {
@@ -42,7 +42,7 @@ export class SilentLogger extends AutomationLoggerPort {
   warn(): void {}
 }
 
-export class TestDispatchErrors extends AutomationDispatchErrorPort {
+export class TestDispatchErrors extends AutomationDispatchError {
   isTerminal(): boolean {
     return false;
   }
@@ -52,7 +52,7 @@ export class TestDispatchErrors extends AutomationDispatchErrorPort {
 }
 
 /** Records what would have left the process, and never a token or a body. */
-export class RecordingDelivery extends AutomationNotificationDeliveryPort {
+export class RecordingDelivery extends AutomationNotificationDelivery {
   readonly emails: Array<{ recipients: string[]; subject: string; triggerId: string }> = [];
   readonly slackWebhooks: Array<{ webhook: string; triggerName: string }> = [];
   readonly slackBots: Array<{ channel: string; triggerName: string }> = [];
@@ -167,7 +167,7 @@ export class BreachingAnalytics {
   }
 }
 
-export class OneProject extends AutomationProjectIdentityPort {
+export class OneProject implements AutomationProjectIdentityPort {
   async tryGetById(
     projectId: string,
   ): Promise<{ id: string; name: string; slug: string } | null> {

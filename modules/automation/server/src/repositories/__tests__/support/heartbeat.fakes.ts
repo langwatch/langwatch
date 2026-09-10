@@ -4,7 +4,7 @@ import type {
   TriggerSummary,
   UpdateTriggerCommand,
 } from "@langwatch/automation-contract";
-import { AutomationLoggerPort } from "../../../ports/automation-graph.port.ts";
+import { AutomationLogger } from "../../../ports/automation-graph.port.ts";
 import type { ReportScheduleTarget } from "../../trigger.repository.ts";
 import { TriggerRepository } from "../../trigger.repository.ts";
 
@@ -68,7 +68,7 @@ export class HeartbeatTriggerRepository extends TriggerRepository {
   }
 }
 
-export class SilentAutomationLogger extends AutomationLoggerPort {
+export class SilentAutomationLogger extends AutomationLogger {
   error(): void {}
   debug(): void {}
   info(): void {}

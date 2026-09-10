@@ -72,12 +72,12 @@ export interface GroupQueueContextMetadata {
   [key: string]: unknown;
 }
 
-export interface GroupQueueContextPort {
+export interface GroupQueueContext {
   capture(): GroupQueueContextMetadata | undefined;
   run<T>(metadata: GroupQueueContextMetadata | undefined, operation: () => Promise<T>): Promise<T>;
 }
 
-export interface GroupQueueActivityPort<Payload> {
+export interface GroupQueueActivity<Payload> {
   staged(event: {
     queue: string;
     group: string;
@@ -98,8 +98,8 @@ export interface GroupQueueFailureClassifier {
 export interface GroupQueueDependencies<Payload> {
   redis: IORedis | Cluster;
   policy?: GroupQueuePolicy;
-  context?: GroupQueueContextPort;
-  activity?: GroupQueueActivityPort<Payload>;
+  context?: GroupQueueContext;
+  activity?: GroupQueueActivity<Payload>;
   failures?: GroupQueueFailureClassifier;
   objectStoreFor?: (projectId: string) => ObjectStore;
   resolveStorageDestination?: (projectId: string) => Promise<ProjectStorageDestination>;

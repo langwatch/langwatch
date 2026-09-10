@@ -21,9 +21,9 @@ import {
 } from "@langwatch/evaluation-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type {
-  EvaluationExecutionPort,
-  EvaluationInputsResolutionPort,
-} from "../ports/evaluation.port.ts";
+  EvaluationExecution,
+  EvaluationInputsResolution,
+} from "../app/evaluation.infrastructure.ts";
 import type { MonitorPerformanceRepository } from "../repositories/monitor-performance.repository.ts";
 import { MonitorPerformanceService } from "./monitor-performance.service.ts";
 import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
@@ -31,8 +31,8 @@ import type { EvaluationRunRepository } from "../repositories/evaluation.reposit
 export type EvaluationServiceOptions = {
   repository: EvaluationRunRepository;
   monitorPerformance: MonitorPerformanceRepository;
-  execution: EvaluationExecutionPort;
-  inputResolution: EvaluationInputsResolutionPort;
+  execution: EvaluationExecution;
+  inputResolution: EvaluationInputsResolution;
   workflows: WorkflowApi;
 };
 

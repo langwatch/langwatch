@@ -1,4 +1,4 @@
-import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port.ts";
+import type { ExperimentClickHouse } from "../../ports/experiment-clickhouse.port.ts";
 import { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
 
 const TABLE_NAME = "experiment_runs" as const;
@@ -9,12 +9,12 @@ const TABLE_NAME = "experiment_runs" as const;
  * `experimentId` it belongs to, and only `experiment_runs` carries that mapping.
  */
 export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRepository {
-  private constructor(private readonly clickhouse: ExperimentClickHousePort) {
+  private constructor(private readonly clickhouse: ExperimentClickHouse) {
     super();
   }
 
   static create(options: {
-    clickhouse: ExperimentClickHousePort;
+    clickhouse: ExperimentClickHouse;
   }): ClickHouseExperimentIdLookupRepository {
     return new ClickHouseExperimentIdLookupRepository(options.clickhouse);
   }

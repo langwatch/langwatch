@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HttpPollingPullerAdapter } from "../http-poller.service.ts";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
+import { GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
 
 const VALID_CONFIG = {
   adapter: "http_polling" as const,
@@ -36,16 +36,16 @@ const VALID_CONFIG = {
 
 interface FetchCall {
   url: string;
-  init: Parameters<GovernanceHttpPort["fetch"]>[1];
+  init: Parameters<GovernanceHttpClient["fetch"]>[1];
 }
 
 let capturedCalls: FetchCall[] = [];
 let responseQueue: Array<{ status: number; body: unknown }> = [];
 
-class TestHttpPort implements GovernanceHttpPort {
+class TestHttp implements GovernanceHttpClient {
   async fetch(
     url: string,
-    init: Parameters<GovernanceHttpPort["fetch"]>[1],
+    init: Parameters<GovernanceHttpClient["fetch"]>[1],
   ): Promise<GovernanceHttpResponse> {
     capturedCalls.push({ url, init });
     const next = responseQueue.shift();
@@ -61,7 +61,7 @@ class TestHttpPort implements GovernanceHttpPort {
 }
 
 function makeAdapter(): HttpPollingPullerAdapter {
-  return HttpPollingPullerAdapter.create({ http: new TestHttpPort() });
+  return HttpPollingPullerAdapter.create({ http: new TestHttp() });
 }
 
 beforeEach(() => {

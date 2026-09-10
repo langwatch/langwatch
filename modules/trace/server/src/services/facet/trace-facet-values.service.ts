@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   CategoricalFacetResult,
   FacetValuesResult,
-  TraceListReadPort,
+  TraceListRead,
 } from "@langwatch/trace-contract";
 import { ClickHouseFacetRegistryAdapter } from "../../repositories/clickhouse/trace-facet-registry.clickhouse.adapter.ts";
 
@@ -45,7 +45,7 @@ const FACET_VALUES_CACHE = new TtlCache<CachedFacetValues>(
 
 export class TraceFacetValuesService {
   private constructor(
-    private readonly repository: TraceListReadPort,
+    private readonly repository: TraceListRead,
     private readonly topicNaming: TraceTopicNamingService,
   ) {}
 
@@ -53,7 +53,7 @@ export class TraceFacetValuesService {
     repository,
     topicNaming,
   }: {
-    repository: TraceListReadPort;
+    repository: TraceListRead;
     topicNaming: TraceTopicNamingService;
   }): TraceFacetValuesService {
     return new TraceFacetValuesService(repository, topicNaming);

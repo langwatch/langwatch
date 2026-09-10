@@ -12,16 +12,14 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   CodexAccountService,
   CodexOAuthModelProviderTokenRefresherAdapter,
-} from "../../adapters/codex-oauth.model-provider-token-refresher.adapter.ts";
-import { UnavailableModelProviderCredentialProbeAdapter } from "../../adapters/http.model-provider-credential-probe.adapter.ts";
-import { PrefixedModelProviderIdAdapter } from "../../adapters/prefixed.model-provider-id.adapter.ts";
-import {
-  RegistryModelProviderCatalogAdapter,
-  UnmanagedModelProviderGatewayAdapter,
-} from "../../adapters/registry.model-provider-catalog.adapter.ts";
-import { VercelAiModelTranslationAdapter } from "../../adapters/vercel-ai.model-translation.adapter.ts";
-import { WindowedModelProviderConnectionRateLimiterAdapter } from "../../adapters/windowed.model-provider-connection-rate-limiter.adapter.ts";
-import type { ModelProviderCredentialProbePort } from "../../ports/model-provider.port.ts";
+} from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
+import { UnavailableModelProviderCredentialProbeAdapter } from "../../services/unavailable.model-provider-credential-probe.service.ts";
+import { PrefixedModelProviderIdAdapter } from "../../services/prefixed.model-provider-id.service.ts";
+import { RegistryModelProviderCatalogAdapter } from "../../services/registry.model-provider-catalog.service.ts";
+import { UnmanagedModelProviderGatewayAdapter } from "../../services/unmanaged.model-provider-gateway.service.ts";
+import { VercelAiModelTranslationAdapter } from "../../services/vercel-ai.model-translation.service.ts";
+import { WindowedModelProviderConnectionRateLimiterAdapter } from "../../services/windowed.model-provider-connection-rate-limiter.service.ts";
+import type { ModelProviderCredentialProbe } from "../model-provider.infrastructure.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import { ModelProviderApp, type ModelProviderInfrastructure } from "../model-provider.app.ts";
@@ -115,4 +113,4 @@ export function createModelProviderTestApp(
   });
 }
 
-export type { ModelProviderCredentialProbePort };
+export type { ModelProviderCredentialProbe };

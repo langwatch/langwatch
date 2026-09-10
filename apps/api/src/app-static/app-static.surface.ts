@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { canonicalOtlpPath } from "@langwatch/otlp";
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { resolvePublicAppConfig } from "@langwatch/config/public-app-config/projection";
-import { ApiRawRequestSurfacePort } from "../api-http.listener.ts";
+import { ApiRawRequestSurface } from "../api-http.listener.ts";
 import { isRootDiscoveryPath } from "../features/discovery/discovery-locations.ts";
 import { assetBaseOrigin, normalizeAssetBase } from "./app-static.asset-base.ts";
 import { serveStaticOrFallback } from "./app-static.handler.ts";
@@ -15,7 +15,7 @@ import { buildSecurityHeaders } from "./app-static.security-headers.ts";
  * The built browser bundle, served by the API process. ONE image serves both halves. `apps/ui`
  * is a Vite build, not a process: it emits `dist/client` and nothing runs it.
  */
-export class ApiStaticSurface extends ApiRawRequestSurfacePort {
+export class ApiStaticSurface extends ApiRawRequestSurface {
   private constructor(
     private readonly clientDistDir: string,
     private readonly publicConfig: PublicAppConfig,
@@ -139,17 +139,17 @@ export function tryCreateApiStaticSurface(options: {
  * specific surfaces are asked first and the SPA fallback, which claims everything left, is
  * asked last.
  */
-export class CompositeApiRawSurface extends ApiRawRequestSurfacePort {
-  private constructor(private readonly surfaces: readonly ApiRawRequestSurfacePort[]) {
+export class CompositeApiRawSurface extends ApiRawRequestSurface {
+  private constructor(private readonly surfaces: readonly ApiRawRequestSurface[]) {
     super();
   }
 
   /** `undefined` when nothing was supplied, so the listener stays on its plain path. */
   static of(
-    surfaces: readonly (ApiRawRequestSurfacePort | undefined)[],
-  ): ApiRawRequestSurfacePort | undefined {
+    surfaces: readonly (ApiRawRequestSurface | undefined)[],
+  ): ApiRawRequestSurface | undefined {
     const present = surfaces.filter(
-      (surface): surface is ApiRawRequestSurfacePort => surface !== undefined,
+      (surface): surface is ApiRawRequestSurface => surface !== undefined,
     );
     if (present.length === 0) return undefined;
     if (present.length === 1) return present[0];

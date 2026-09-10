@@ -34,42 +34,42 @@ vi.mock("../../../behavior/ui-departure", () => ({
 
 import {
   UiCapabilityContextProvider,
-  UiDocumentTitlePort,
-  UiFeedbackPort,
-  UiNavigationPort,
-  UiRoutePort,
-  UiSessionPort,
+  UiDocumentTitle,
+  UiFeedback,
+  UiNavigation,
+  UiRoute,
+  UiSession,
   type UiActiveScope,
   type UiCapabilities,
 } from "@langwatch/ui-host/capabilities";
 import { ProjectHomeHostSection } from "../ui/sections/home-host";
 
-class SilentNavigation extends UiNavigationPort {
+class SilentNavigation extends UiNavigation {
   navigate(): void {}
   replace(): void {}
   back(): void {}
 }
 
-class SilentRoute extends UiRoutePort {
+class SilentRoute extends UiRoute {
   reading() {
     return { params: {}, query: {} };
   }
   setQuery(): void {}
 }
 
-class SilentFeedback extends UiFeedbackPort {
+class SilentFeedback extends UiFeedback {
   succeeded(): void {}
   failed(): void {}
 }
 
-class SilentTitle extends UiDocumentTitlePort {
+class SilentTitle extends UiDocumentTitle {
   set(): () => void {
     return () => {};
   }
 }
 
 /** Nobody resolved, which is what a refused graph leaves behind. */
-class EmptySession extends UiSessionPort {
+class EmptySession extends UiSession {
   currentUser(): null {
     return null;
   }

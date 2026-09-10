@@ -13,5 +13,8 @@ export type {
   RetentionProjectLineage,
   TenantClickHouseClientResolver,
 } from "./app/data-retention.app.ts";
-export { DataRetentionPlanPort, type DataRetentionPlan } from "./ports/data-retention-plan.port.ts";
+export {
+  type DataRetentionPlan,
+  type DataRetentionPlanPort,
+} from "./app/data-retention.infrastructure.ts";
 export { PrismaDataRetentionDirectoryRepository } from "./repositories/prisma/prisma.data-retention-directory.repository.ts";

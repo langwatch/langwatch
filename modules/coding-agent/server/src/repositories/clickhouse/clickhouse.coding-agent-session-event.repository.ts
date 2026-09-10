@@ -6,8 +6,8 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type {
   CodingAgentClickHouseClient,
-  CodingAgentClickHousePort,
-} from "../../ports/coding-agent-clickhouse.port.ts";
+  CodingAgentClickHouse,
+} from "../../app/coding-agent.infrastructure.ts";
 import { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -168,14 +168,14 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     clickHouse,
     defaultTraceRetentionDays,
   }: {
-    clickHouse: CodingAgentClickHousePort;
+    clickHouse: CodingAgentClickHouse;
     defaultTraceRetentionDays: number;
   }): CodingAgentSessionEventsClickHouseRepository {
     return new CodingAgentSessionEventsClickHouseRepository(clickHouse, defaultTraceRetentionDays);
   }
 
   private constructor(
-    private readonly clickHouse: CodingAgentClickHousePort,
+    private readonly clickHouse: CodingAgentClickHouse,
     private readonly defaultTraceRetentionDays: number,
   ) {}
 

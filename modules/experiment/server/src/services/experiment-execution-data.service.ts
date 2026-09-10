@@ -10,7 +10,7 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import type { PromptApi, VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port.ts";
+import type { ExperimentWorkflowDsl } from "../ports/experiment-workflow-dsl.port.ts";
 import { ExperimentTargetLoadingService } from "./experiment-target-loading.service.ts";
 
 // Column types that store JSON and need parsing
@@ -175,7 +175,7 @@ export type ExecutionDataServices = {
   prompts: PromptApi;
   agents: AgentApi;
   /** The committed studio DSL a workflow target runs, once per dataset row. */
-  workflows: ExperimentWorkflowDslPort;
+  workflows: ExperimentWorkflowDsl;
   evaluators?: EvaluatorApi;
 };
 

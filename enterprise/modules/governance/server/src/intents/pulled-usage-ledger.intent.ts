@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PulledUsageLedgerPort } from "../ports/pulled-usage-ledger.port.ts";
+import { PulledUsageLedgerRepository } from "../app/governance.infrastructure.ts";
 import { Temporal } from "@langwatch/time";
 
 export const writePulledUsageSchema = z.object({
@@ -21,9 +21,9 @@ export const writePulledUsageSchema = z.object({
 export type WritePulledUsagePayload = z.infer<typeof writePulledUsageSchema>;
 
 export class PulledUsageLedgerIntent {
-  private constructor(private readonly ledger: PulledUsageLedgerPort) {}
+  private constructor(private readonly ledger: PulledUsageLedgerRepository) {}
 
-  static create(ledger: PulledUsageLedgerPort): PulledUsageLedgerIntent {
+  static create(ledger: PulledUsageLedgerRepository): PulledUsageLedgerIntent {
     return new PulledUsageLedgerIntent(ledger);
   }
 

@@ -2,24 +2,24 @@ import { describe, expect, it } from "vitest";
 import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber.ts";
 import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber.ts";
 import {
-  GovernanceKpiContributionPort,
-  GovernanceOcsfEventPort,
-  GovernanceSubscriberDiagnosticsPort,
-  TraceAlertMetricsPort,
-  TraceAlertOriginGuardPort,
-  TraceAlertTriggerMatchPort,
-  TraceAlertTriggerPort,
+  GovernanceKpiContributionWriter,
+  GovernanceOcsfEventWriter,
+  GovernanceSubscriberDiagnosticsSink,
+  TraceAlertMetricsSink,
+  TraceAlertOriginGuard,
+  TraceAlertTriggerMatchChannel,
+  TraceAlertTriggerReader,
   type GovernanceKpiContribution,
   type GovernanceOcsfEvent,
   type TraceAlertTrigger,
-} from "../../ports/governance-subscriber.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
 import {
   governanceTraceContext,
   governanceTraceEvent,
-} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures.ts";
+} from "./governance-subscriber.fixtures.ts";
 
-class RecordingKpis extends GovernanceKpiContributionPort {
+class RecordingKpis implements GovernanceKpiContributionWriter {
   readonly rows: GovernanceKpiContribution[] = [];
   insertContribution(row: GovernanceKpiContribution): Promise<void> {
     this.rows.push(row);
@@ -27,7 +27,7 @@ class RecordingKpis extends GovernanceKpiContributionPort {
   }
 }
 
-class RecordingOcsf extends GovernanceOcsfEventPort {
+class RecordingOcsf implements GovernanceOcsfEventWriter {
   readonly rows: GovernanceOcsfEvent[] = [];
   insertEvent(row: GovernanceOcsfEvent): Promise<void> {
     this.rows.push(row);
@@ -35,7 +35,7 @@ class RecordingOcsf extends GovernanceOcsfEventPort {
   }
 }
 
-class RecordingDiagnostics extends GovernanceSubscriberDiagnosticsPort {
+class RecordingDiagnostics implements GovernanceSubscriberDiagnosticsSink {
   readonly warnings: string[] = [];
   readonly errors: unknown[] = [];
   warn(input: { code: string }): void {
@@ -46,7 +46,7 @@ class RecordingDiagnostics extends GovernanceSubscriberDiagnosticsPort {
   }
 }
 
-class FixedTriggers extends TraceAlertTriggerPort {
+class FixedTriggers implements TraceAlertTriggerReader {
   constructor(private readonly triggers: TraceAlertTrigger[]) {
     super();
   }
@@ -55,21 +55,21 @@ class FixedTriggers extends TraceAlertTriggerPort {
   }
 }
 
-class RecordingMatches extends TraceAlertTriggerMatchPort {
-  readonly inputs: Parameters<TraceAlertTriggerMatchPort["send"]>[0][] = [];
-  send(input: Parameters<TraceAlertTriggerMatchPort["send"]>[0]): Promise<void> {
+class RecordingMatches implements TraceAlertTriggerMatchChannel {
+  readonly inputs: Parameters<TraceAlertTriggerMatchChannel["send"]>[0][] = [];
+  send(input: Parameters<TraceAlertTriggerMatchChannel["send"]>[0]): Promise<void> {
     this.inputs.push(input);
     return Promise.resolve();
   }
 }
 
-class PassingOrigin extends TraceAlertOriginGuardPort {
+class PassingOrigin implements TraceAlertOriginGuard {
   passes(): boolean {
     return true;
   }
 }
 
-class RecordingMetrics extends TraceAlertMetricsPort {
+class RecordingMetrics implements TraceAlertMetricsSink {
   readonly counts: number[] = [];
   countRecorded(count: number): void {
     this.counts.push(count);

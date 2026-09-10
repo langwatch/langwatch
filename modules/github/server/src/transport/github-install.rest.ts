@@ -86,7 +86,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   .withVersion(MANAGEMENT_API_VERSION)
   // A browser session is the only credential anywhere near this family, and no
   // API client can present one: the family advertises no operation.
-  .withCredential("session")
+  .withCredential("browser")
   .withAddressing("literal", { v1Twin: true })
 
   .get("/api/github/install", "startGithubInstallation")

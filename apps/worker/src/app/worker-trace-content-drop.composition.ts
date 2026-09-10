@@ -1,26 +1,26 @@
 import {
   OtlpSpanContentDropService,
-  type DataPrivacyResolutionPort,
+  type DataPrivacyResolution,
 } from "@langwatch/data-privacy-server";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { TraceSpanContentDropPort, type TraceSpanContentDropResult } from "@langwatch/trace-server";
+import { TraceSpanContentDrop, type TraceSpanContentDropResult } from "@langwatch/trace-server";
 
 /**
  * The content this process would refuse to store for a project that asked for
  * a category to be dropped.
  *
  * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `RecordSpanCommand`'s adapters and still drops content on every span it
+ * `EventingRecordSpanAdapter`'s adapters and still drops content on every span it
  * ingests — so nothing in this process drops anything yet. What has to be true
  * today is that this composition root CAN build the path from what it already
  * holds: the scoped data-privacy service and the enforcement flag it already
  * reads for redaction. That is the whole dependency list.
  *
- *     TraceSpanContentDropPort             (trace-server declares it)
+ *     TraceSpanContentDrop             (trace-server declares it)
  *       └─ OtlpSpanContentDropService      (data-privacy-server owns it)
  *            ├─ ContentDropPolicyService   policy → keys, roles, matchers
  *            ├─ CONTENT_KEY_CATALOG        (data-privacy-contract owns it)
- *            └─ DataPrivacyResolutionPort  resolves the scope's policy
+ *            └─ DataPrivacyResolution  resolves the scope's policy
  *
  * SEPARATE FROM THE REDACTION COMPOSITION ON PURPOSE, even though both rest on
  * the same policy source: a drop removes a whole attribute and a redaction
@@ -38,7 +38,7 @@ export function createWorkerTraceContentDrop(options: {
    * resolution-only service the feature publishes for a process that holds a
    * database and nothing else.
    */
-  dataPrivacy: DataPrivacyResolutionPort;
+  dataPrivacy: DataPrivacyResolution;
   nativePolicyEnforced: boolean;
 }): WorkerTraceContentDrop {
   return new WorkerTraceContentDrop(
@@ -53,8 +53,8 @@ export function createWorkerTraceContentDrop(options: {
 export class WorkerTraceContentDrop {
   constructor(private readonly drop: OtlpSpanContentDropService) {}
 
-  /** The narrow port `RecordSpanCommand` names, over this graph. */
-  spanContentDropPort(): TraceSpanContentDropPort {
+  /** The narrow port `EventingRecordSpanAdapter` names, over this graph. */
+  spanContentDropPort(): TraceSpanContentDrop {
     return new WorkerTraceSpanContentDropAdapter(this.drop);
   }
 }
@@ -67,7 +67,7 @@ export class WorkerTraceContentDrop {
  * ingestion paths when they convert, and a service extending one feature's
  * port could not answer the others'.
  */
-class WorkerTraceSpanContentDropAdapter extends TraceSpanContentDropPort {
+class WorkerTraceSpanContentDropAdapter extends TraceSpanContentDrop {
   constructor(private readonly service: OtlpSpanContentDropService) {
     super();
   }

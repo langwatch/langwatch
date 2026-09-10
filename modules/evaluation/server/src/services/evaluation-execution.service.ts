@@ -17,14 +17,14 @@ import type { MappingState } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import {
-  type EvaluationExecutionTelemetryPort,
-  type EvaluationLangevalsPort,
-  type EvaluationModelEnvPort,
-  type EvaluationSpanDigestPort,
+  type EvaluationExecutionTelemetry,
+  type EvaluationLangevals,
+  type EvaluationModelEnv,
+  type EvaluationSpanDigest,
   type EvaluationTraceProtections,
-  type EvaluationTraceReadPort,
-  type EvaluationWorkflowExecutorPort,
-} from "../ports/evaluation-execution.port.ts";
+  type EvaluationTraceRead,
+  type EvaluationWorkflowExecutor,
+} from "../app/evaluation.infrastructure.ts";
 import { type EvaluatorInstallEnvironment } from "./evaluator-availability.service.ts";
 import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service.ts";
 import { EvaluationDataService } from "./evaluation-data.service.ts";
@@ -46,13 +46,13 @@ const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {
 // ---------------------------------------------------------------------------
 
 export interface EvaluationExecutionDeps {
-  traceService: EvaluationTraceReadPort;
-  spanDigest: EvaluationSpanDigestPort;
-  modelEnvResolver: EvaluationModelEnvPort;
-  langevalsClient: EvaluationLangevalsPort;
+  traceService: EvaluationTraceRead;
+  spanDigest: EvaluationSpanDigest;
+  modelEnvResolver: EvaluationModelEnv;
+  langevalsClient: EvaluationLangevals;
   workflows: WorkflowApi;
   evaluators: EvaluatorApi;
-  workflowExecutor: EvaluationWorkflowExecutorPort;
+  workflowExecutor: EvaluationWorkflowExecutor;
   /**
    * The install environment the optional evaluators read their opt-out
    * switches from. Stated by the process rather than read here, because a
@@ -60,7 +60,7 @@ export interface EvaluationExecutionDeps {
    */
   installEnvironment: EvaluatorInstallEnvironment;
   /** Absent on a process that composes no metrics registry. */
-  telemetry?: EvaluationExecutionTelemetryPort;
+  telemetry?: EvaluationExecutionTelemetry;
 }
 
 // ---------------------------------------------------------------------------

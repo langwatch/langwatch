@@ -1,6 +1,6 @@
 import type { FoldProjectionOptions, FoldProjectionStore } from "@langwatch/eventing";
 import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
-import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port.ts";
+import type { CodingAgentCostEstimator } from "../app/coding-agent.infrastructure.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
   type LogFactsContributedEvent,
@@ -175,7 +175,7 @@ export class CodingAgentSessionFoldProjection
   private constructor(deps: {
     store: FoldProjectionStore<CodingAgentSessionState>;
     traceCanonicalisation: TraceCanonicalisationService;
-    modelProviders: CodingAgentCostEstimatorPort;
+    modelProviders: CodingAgentCostEstimator;
   }) {
     super({
       createdAtKey: "createdAt",
@@ -200,7 +200,7 @@ export class CodingAgentSessionFoldProjection
   static create(deps: {
     store: FoldProjectionStore<CodingAgentSessionState>;
     traceCanonicalisation: TraceCanonicalisationService;
-    modelProviders: CodingAgentCostEstimatorPort;
+    modelProviders: CodingAgentCostEstimator;
   }): CodingAgentSessionFoldProjection {
     return new CodingAgentSessionFoldProjection(deps);
   }

@@ -13,14 +13,14 @@ import {
   HTTP_FIXED_VARIABLE_IDS,
   type HttpAgentEditorOptions,
 } from "../../behavior/use-http-agent-editor.ts";
-import type { HttpTestErrorExplanationPort } from "../../model/http-test.types.ts";
+import type { HttpTestErrorExplanation } from "../../model/http-test.types.ts";
 
 export interface AgentHttpEditorDrawerProps extends HttpAgentEditorOptions {
   onGoBack?: () => void;
   renderScenarioMappings(input: RenderScenarioMappingsInput): ReactNode;
   renderVariables(input: RenderAgentVariablesInput): ReactNode;
   renderTestPanel(input: { agentId: string; projectId: string }): ReactNode;
-  explainTestError: HttpTestErrorExplanationPort;
+  explainTestError: HttpTestErrorExplanation;
 }
 
 export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {

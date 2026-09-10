@@ -9,7 +9,7 @@ import {
   AutomationHostProvider,
   type AutomationDatasetCreation,
   type AutomationFailureNotice,
-  type AutomationHostPort,
+  type AutomationHost,
 } from "@langwatch/automation-web/automations";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
@@ -67,7 +67,7 @@ export function AutomationsHost({ children }: { children: ReactNode }) {
   }, [organizations.data, scope.organizationId, scope.projectId]);
 
   const reading = route.reading();
-  const host = useMemo<AutomationHostPort>(
+  const host = useMemo<AutomationHost>(
     () => ({
       scope: () => ({
         organizationId: scope.organizationId,

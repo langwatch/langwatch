@@ -372,7 +372,7 @@ export function isInternalSecretValid({
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Action names follow `management.<resource>.<verb>`. */
-export type AppRestManagementAuditPort = (entry: {
+export type AppRestManagementAudit = (entry: {
   /** {@link managementActor}: the member, or the credential acting as nobody. */
   userId: string;
   organizationId: string;
@@ -402,7 +402,7 @@ export function emitManagementAudit({
   args,
 }: {
   c: Context;
-  audit: AppRestManagementAuditPort;
+  audit: AppRestManagementAudit;
   organizationId: string;
   action: `management.${string}.${string}`;
   args?: Record<string, unknown>;

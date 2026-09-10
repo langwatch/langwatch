@@ -88,7 +88,7 @@ vi.mock("../components/welcome-header.tsx", () => ({
 import { HomePage } from "../home-screen.tsx";
 import {
   ProjectHomeHostProvider,
-  ProjectHomeHostPort,
+  ProjectHomeHost,
   type ProjectHomeDeployment,
   type ProjectHomeFlagReading,
   type ProjectHomeLangyVisibility,
@@ -105,7 +105,7 @@ import {
  * is the organization the "Considering LangWatch?" ask is read for, and
  * fail-closed nothings for the rest.
  */
-class StubProjectHomeHost extends ProjectHomeHostPort {
+class StubProjectHomeHost extends ProjectHomeHost {
   project(): ProjectHomeProject | undefined {
     return { id: "project-1", name: "Acme App", slug: "acme-app" };
   }

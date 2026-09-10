@@ -10,7 +10,7 @@ import {
 import type {
   GovernanceCliCaller,
   GovernanceCliRestPorts,
-  GovernanceDirectoryPort,
+  GovernanceDirectory,
 } from "@langwatch/enterprise-governance-server";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
@@ -78,7 +78,7 @@ function virtualKeyWorld(
     organization_id: ORGANIZATION_ID,
   };
 
-  const directory: GovernanceDirectoryPort = {
+  const directory: GovernanceDirectory = {
     membershipStatus: () => Promise.resolve("active"),
     tryFindPersonProfile: () => Promise.resolve({ name: "Rogerio", email: "rogerio@example.test" }),
     tryFindOrganizationIdByProjectApiKey: () => Promise.resolve(null),

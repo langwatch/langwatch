@@ -43,11 +43,11 @@ import {
 } from "@langwatch/annotation-web/annotations";
 import {
   UiCapabilityContextProvider,
-  UiDocumentTitlePort,
-  UiFeedbackPort,
-  UiNavigationPort,
-  UiRoutePort,
-  UiSessionPort,
+  UiDocumentTitle,
+  UiFeedback,
+  UiNavigation,
+  UiRoute,
+  UiSession,
   type UiActiveScope,
   type UiActor,
   type UiCapabilities,
@@ -57,20 +57,20 @@ import {
 import { withHost } from "../src/ui/sections/ui-page";
 import { AnnotationHost } from "../src/features/annotation/ui/sections/annotation-host";
 
-class SilentNavigation extends UiNavigationPort {
+class SilentNavigation extends UiNavigation {
   navigate(): void {}
   replace(): void {}
   back(): void {}
 }
 
-class SilentRoute extends UiRoutePort {
+class SilentRoute extends UiRoute {
   reading() {
     return { params: {}, query: {} };
   }
   setQuery(): void {}
 }
 
-class RecordingFeedback extends UiFeedbackPort {
+class RecordingFeedback extends UiFeedback {
   readonly successes: UiSuccessNotice[] = [];
   succeeded(notice: UiSuccessNotice): void {
     this.successes.push(notice);
@@ -78,13 +78,13 @@ class RecordingFeedback extends UiFeedbackPort {
   failed(_: UiFailureNotice): void {}
 }
 
-class SilentTitle extends UiDocumentTitlePort {
+class SilentTitle extends UiDocumentTitle {
   set(): () => void {
     return () => {};
   }
 }
 
-class ScopedSession extends UiSessionPort {
+class ScopedSession extends UiSession {
   constructor(private readonly userId: string) {
     super();
   }

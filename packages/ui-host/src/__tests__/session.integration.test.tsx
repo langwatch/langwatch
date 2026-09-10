@@ -2,7 +2,7 @@ import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { UiCapabilityContextProvider, UiSessionPort } from "../capabilities.ts";
+import { UiCapabilityContextProvider, UiSession } from "../capabilities.ts";
 import type { UiSessionSnapshot } from "../session.ts";
 import { useSession } from "../session.ts";
 import { createUiCapabilitiesFromHost } from "../testing.ts";
@@ -41,7 +41,7 @@ function withSession(reading: UiSessionSnapshot) {
   };
 }
 
-class SnapshotSession extends UiSessionPort {
+class SnapshotSession extends UiSession {
   constructor(private readonly reading: UiSessionSnapshot) {
     super();
   }

@@ -16,11 +16,11 @@ import {
   parseSummedNanoUsd,
 } from "@langwatch/gateway-contract";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
-import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port.ts";
+import type { GatewayClickHouseResolver } from "../../app/gateway.infrastructure.ts";
 import {
-  GatewayBudgetSpendPort,
+  GatewayBudgetSpend,
   type GatewayBudgetSpendRecord,
-} from "../../ports/gateway-budget-spend.port.ts";
+} from "../../app/gateway.infrastructure.ts";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
@@ -217,13 +217,12 @@ type BucketQueryShape = {
   budgetFloorMs: number | undefined;
 };
 
-export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
+export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
   static create(resolveClient: GatewayClickHouseResolver): GatewayBudgetClickHouseRepository {
     return new GatewayBudgetClickHouseRepository(resolveClient);
   }
 
   constructor(private readonly resolveClient: GatewayClickHouseResolver) {
-    super();
   }
 
   /**
@@ -1250,7 +1249,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     const first = input[0]!;
     return "budgetId" in first
       ? (input as BudgetSpendTarget[])
-      : GatewayBudgetSpendPort.targetsForBudgets({
+      : GatewayBudgetSpend.targetsForBudgets({
           budgets: input as GatewayBudgetResource[],
           now,
         });

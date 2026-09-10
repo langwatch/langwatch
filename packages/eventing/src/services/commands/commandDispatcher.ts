@@ -14,7 +14,7 @@ import { EventSchema } from "../../domain/types.ts";
 import type { CommandSerializationOptions } from "../../pipeline/staticBuilder.types.ts";
 import type { DeduplicationStrategy } from "../../queues/index.ts";
 import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
-import { isComponentKilled, type KillSwitchOptions, type KillSwitchPort } from "../../kill-switch/index.ts";
+import { isComponentKilled, type KillSwitchOptions, type KillSwitch } from "../../kill-switch/index.ts";
 import { EventUtils } from "../../utils/event.utils.ts";
 import { ValidationError } from "../errorHandling.ts";
 
@@ -37,7 +37,7 @@ export interface ProcessCommandParams<EventType extends Event> {
   aggregateType: AggregateType;
   commandName: string;
   pipelineName: string;
-  killSwitch?: KillSwitchPort;
+  killSwitch?: KillSwitch;
   killSwitchOptions?: KillSwitchOptions;
   logger?: ReturnType<typeof createLogger>;
 }

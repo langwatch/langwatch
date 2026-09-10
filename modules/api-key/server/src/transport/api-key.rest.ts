@@ -208,7 +208,7 @@ const refuseNonAdminPrivilegedMint = async ({
 export const apiKeyRest = defineRestRouter(ApiKeyApi)
   .withNamespace("api-keys")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("organizationKey")
+  .withCredential("organization")
 
   // The route policy is organization:view for the caller's OWN keys. The
   // org-wide listing a service credential receives is a different disclosure

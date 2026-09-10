@@ -1,11 +1,11 @@
 import { Counter, register } from "prom-client";
 import { describe, expect, it } from "vitest";
 import {
-  ApiMetricsAbsenceReportPort,
+  ApiMetricsAbsenceReport,
   ApiMetricsInfrastructure,
 } from "../api-metrics.infrastructure.ts";
 
-class RecordedAbsence extends ApiMetricsAbsenceReportPort {
+class RecordedAbsence extends ApiMetricsAbsenceReport {
   calls = 0;
 
   absent(): void {

@@ -91,14 +91,12 @@ export async function installApiDataRetention(options: {
  * Which plan types count as enterprise, and whether this install is SaaS at all,
  * are billing and licensing facts the feature deliberately does not know.
  */
-class ApiDataRetentionPlans extends DataRetentionPlanPort {
+class ApiDataRetentionPlans implements DataRetentionPlanPort {
   static create(plans: Pick<PlanProvider, "getActivePlan">): ApiDataRetentionPlans {
     return new ApiDataRetentionPlans(plans);
   }
 
-  private constructor(private readonly plans: Pick<PlanProvider, "getActivePlan">) {
-    super();
-  }
+  private constructor(private readonly plans: Pick<PlanProvider, "getActivePlan">) {}
 
   async getPlan(input: {
     organizationId: string;

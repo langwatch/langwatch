@@ -14,7 +14,7 @@ import type { EventStore } from "../stores/eventStore.types.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
 import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types.ts";
-import type { KillSwitchPort } from "../kill-switch/index.ts";
+import type { KillSwitch } from "../kill-switch/index.ts";
 
 /**
  * Static metadata about a pipeline for tooling and introspection.
@@ -78,7 +78,7 @@ export interface EventSourcingPipelineDefinition<
   executionTarget?: ExecutionTarget;
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
-  killSwitch?: KillSwitchPort;
+  killSwitch?: KillSwitch;
   prepareEventForProjection?: (event: EventType) => EventType;
   warnWhenProjectionsRunInline?: boolean;
 }

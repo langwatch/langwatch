@@ -21,7 +21,7 @@ import {
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
 import { nowInstant } from "@langwatch/time";
-import type { ScimRepositoryPort } from "../repositories/scim.repository.ts";
+import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type {
   ScimSyncLifecycle,
   ScimUserPushOperation,
@@ -50,7 +50,7 @@ import type { ScimSessionRevocation } from "./scim-user-profile.service.ts";
  * than it needs.
  */
 export class ScimService extends ScimServiceContract {
-  private readonly repository: ScimRepositoryPort;
+  private readonly repository: ScimRepository;
   private readonly userOperations: ScimProvisioningService;
   private readonly groups: ScimDirectoryService;
   private readonly entitlements: Pick<EntitlementApi, "getActivePlan">;
@@ -67,7 +67,7 @@ export class ScimService extends ScimServiceContract {
     lifecycle,
     provenOffboarding,
   }: {
-    prisma: ScimRepositoryPort;
+    prisma: ScimRepository;
     writer: AuthzGrantsService;
     users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
@@ -96,7 +96,7 @@ export class ScimService extends ScimServiceContract {
   }
 
   static create(options: {
-    prisma: ScimRepositoryPort;
+    prisma: ScimRepository;
     writer: AuthzGrantsService;
     users: ScimUserProvisioning;
     auth: ScimSessionRevocation;

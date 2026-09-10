@@ -84,7 +84,8 @@ describe("defineModule compiler diagnostics", () => {
         static create(setup: FeatureSetup<{}, {}, undefined>): App { return new App(); }
       }
       const feature = defineModule("annotation").withApp(App).build();
-      createApp({ name: "test" }).withInfrastructure({}).withModule(feature);
+      createApp({ role: "api", infrastructure: {} })
+        .withModules([feature]);
     `);
     expect(diagnostics).toEqual([]);
   });
@@ -110,24 +111,13 @@ describe("defineModule compiler diagnostics", () => {
         projectName(): string { return this.#projects.name(); }
       }
       const feature = defineModule("annotation").withApp(App).build();
-      createApp({ name: "typed" }).withInfrastructure({})
-        .withProvided(ProjectApi, { name: () => "project" }).withModule(feature);
+      createApp({ role: "api", infrastructure: {} })
+        .withModules([feature]);
     `),
     ).toEqual([]);
   });
 
   const cases = [
-    [
-      "rejects explicit generic widening of a provided API",
-      "TS2345",
-      `
-      import { createApp } from "__APPLICATION__";
-      import { moduleApi } from "__CONTRACT__";
-      interface ProjectApi { name(): string; }
-      const ProjectApi = moduleApi<ProjectApi>("project");
-      createApp({ name: "invalid" }).withInfrastructure({}).withProvided<{}>(ProjectApi, {}); // EXPECT
-    `,
-    ],
     [
       "rejects a factory that omits a linked API operation",
       "TS2769",
@@ -158,30 +148,6 @@ describe("defineModule compiler diagnostics", () => {
     `,
     ],
 
-    [
-      "rejects a root without required infrastructure",
-      "TS2345",
-      `
-      import { createApp } from "__APPLICATION__";
-      import { defineModule, type FeatureSetup } from "__INSTALLER__";
-      abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value: string; constructor(value: string) { super(); this.value = value; } static create(setup: FeatureSetup<{}, { suffix: string }, undefined>): App { return new App(setup.infrastructure.suffix); } }
-      const feature = defineModule("annotation").withApp(App).build();
-      createApp({ name: "test" }).withInfrastructure({}).withModule(feature); // EXPECT
-    `,
-    ],
-    [
-      "rejects the explicit infrastructure bypass with a wrong root",
-      "TS2345",
-      `
-      import { createApp } from "__APPLICATION__";
-      import { defineModule, type FeatureSetup } from "__INSTALLER__";
-      abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value: string; constructor(value: string) { super(); this.value = value; } static create(setup: FeatureSetup<{}, { suffix: string }, undefined>): App { return new App(setup.infrastructure.suffix); } }
-      const feature = defineModule("annotation").withApp(App).build();
-      createApp({ name: "test" }).withInfrastructure({}).withModule<{}>(feature, { infrastructure: {} }); // EXPECT
-    `,
-    ],
     [
       "rejects an undeclared dependency",
       "TS2339",
@@ -284,10 +250,31 @@ describe("defineModule compiler diagnostics", () => {
   ] as const;
 
   it.each(cases)("%s", (_name, code, source) => {
-    const expectedLine = source.split("\n").findIndex((line) => line.includes("// EXPECT")) + 1;
-    const diagnostics = diagnosticsFor(source);
-    expect(
-      diagnostics.map(({ line, code: diagnosticCode }) => ({ line, code: diagnosticCode })),
-    ).toEqual([{ line: expectedLine, code }]);
+    expectOnlyDiagnostic(source, code);
+  });
+
+  /** @scenario A pool that lacks a member an installed module names */
+  it("rejects a module list whose pool lacks a member a module names", () => {
+    expectOnlyDiagnostic(
+      `
+      import { createApp } from "__APPLICATION__";
+      import { defineModule, type FeatureSetup } from "__INSTALLER__";
+      abstract class Contract { abstract readonly value: string; }
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value: string; constructor(value: string) { super(); this.value = value; } static create(setup: FeatureSetup<{}, { suffix: string }, undefined>): App { return new App(setup.infrastructure.suffix); } }
+      const feature = defineModule("annotation").withApp(App).build();
+      createApp({ role: "api", infrastructure: {} })
+        .withModules([feature]); // EXPECT
+    `,
+      "TS2322",
+    );
   });
 });
+
+/** The one diagnostic a fixture expects, on the line its `// EXPECT` marks. */
+function expectOnlyDiagnostic(source: string, code: string): void {
+  const expectedLine = source.split("\n").findIndex((line) => line.includes("// EXPECT")) + 1;
+  const diagnostics = diagnosticsFor(source);
+  expect(
+    diagnostics.map(({ line, code: diagnosticCode }) => ({ line, code: diagnosticCode })),
+  ).toEqual([{ line: expectedLine, code }]);
+}

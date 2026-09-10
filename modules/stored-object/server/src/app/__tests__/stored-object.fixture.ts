@@ -11,8 +11,8 @@ import type {
   StoredObjectOwnerResolver,
 } from "@langwatch/stored-object-contract";
 import {
-  StoredObjectDeliveryPort,
-  StoredObjectStoragePort,
+  StoredObjectDelivery,
+  StoredObjectStorage,
   StoredObjectUploadTokenPort,
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
@@ -34,7 +34,7 @@ export const storedObjectTestAddress: StoredObjectStorageAddress = {
   relativeId: "project_1/so_aaaaaaaa",
 };
 
-export class MemoryStoredObjectStorage extends StoredObjectStoragePort {
+export class MemoryStoredObjectStorage extends StoredObjectStorage {
   bytes = new Uint8Array([1, 2, 3]);
   deleted = false;
   deleteFailuresRemaining = 0;
@@ -95,7 +95,7 @@ export class MemoryStoredObjectTokens extends StoredObjectUploadTokenPort {
   }
 }
 
-export class FixedStoredObjectDelivery extends StoredObjectDeliveryPort {
+export class FixedStoredObjectDelivery extends StoredObjectDelivery {
   async mint(): Promise<StoredObjectDeliveryCapability> {
     return {
       url: "https://files.example/object",

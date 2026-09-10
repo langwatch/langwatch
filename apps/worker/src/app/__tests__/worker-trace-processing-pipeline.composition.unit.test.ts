@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { RecordSpanCommand, TraceSummarySubscriber } from "@langwatch/trace-server";
+import type { EventingRecordSpanAdapter, TraceSummarySubscriber } from "@langwatch/trace-server";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import {
@@ -24,7 +24,7 @@ function options(
   overrides: Partial<WorkerTraceProcessingPipelineOptions> = {},
 ): WorkerTraceProcessingPipelineOptions {
   return {
-    recordSpanCommand: { name: "recordSpan" } as unknown as RecordSpanCommand,
+    recordSpanCommand: { name: "recordSpan" } as unknown as EventingRecordSpanAdapter,
     traceCanonicalisation: TraceCanonicalisationService.create(),
     spanAppendStore: { append: noop } as never,
     traceAnalyticsRollupAppendStore: { append: noop } as never,

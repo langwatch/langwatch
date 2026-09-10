@@ -31,7 +31,7 @@ import {
 } from "@langwatch/suite-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { SuiteExecutionPort } from "../ports/suite-execution.port.ts";
+import type { SuiteExecution } from "../app/suite.app.ts";
 import { PrismaSuiteRepository } from "../repositories/prisma/prisma.suite.repository.ts";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
 import { SuiteService } from "../services/suite.service.ts";
@@ -168,7 +168,7 @@ function fakeScenarioService(): ScenarioApi {
   } as unknown as ScenarioApi;
 }
 
-function capturingExecution(started: Array<Record<string, unknown>>): SuiteExecutionPort {
+function capturingExecution(started: Array<Record<string, unknown>>): SuiteExecution {
   return {
     execute: vi.fn(async (input): Promise<SuiteRunResult> => {
       started.push(input);
@@ -180,7 +180,7 @@ function capturingExecution(started: Array<Record<string, unknown>>): SuiteExecu
         items: [],
       };
     }),
-  } as unknown as SuiteExecutionPort;
+  } as unknown as SuiteExecution;
 }
 
 let agents: Map<string, FakeAgent>;

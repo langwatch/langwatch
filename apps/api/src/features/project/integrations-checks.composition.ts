@@ -18,7 +18,7 @@ import type { ComposedIntegrationsChecksFeature } from "./integrations-checks.co
  * is a scenario-set read in ClickHouse and the scenario vertical is not composed here, so
  * the step arrives as a port.
  */
-export abstract class ApiSimulationEvidencePort {
+export abstract class ApiSimulationEvidence {
   abstract hasAnySimulation(input: { projectId: string }): Promise<boolean>;
 }
 
@@ -27,7 +27,7 @@ export abstract class ApiSimulationEvidencePort {
  * own step. A port rather than a `prisma.modelProvider` read written here, and the reason
  * is the column next to the one this needs.
  */
-export abstract class ApiModelProviderEvidencePort {
+export abstract class ApiModelProviderEvidence {
   abstract hasEnabledProvider(input: { projectId: string }): Promise<boolean>;
 }
 
@@ -35,9 +35,9 @@ export abstract class ApiModelProviderEvidencePort {
 export function composeIntegrationsChecksFeature(options: {
   infrastructure: ApiTrpcInfrastructure;
   /** The provider step, read through the model-provider feature's own persistence. */
-  modelProviders: ApiModelProviderEvidencePort;
+  modelProviders: ApiModelProviderEvidence;
   /** The simulations step, where the deployment composed a scenario read. */
-  simulations?: ApiSimulationEvidencePort;
+  simulations?: ApiSimulationEvidence;
 }): ComposedIntegrationsChecksFeature {
   const checklist = ApiOnboardingChecks.create({
     prisma: options.infrastructure.prisma,
@@ -81,8 +81,8 @@ class ApiIntegrationsChecksUnavailableError extends HandledError {
 class ApiOnboardingChecks {
   static create(dependencies: {
     prisma: PrismaClient;
-    modelProviders: ApiModelProviderEvidencePort;
-    simulations?: ApiSimulationEvidencePort;
+    modelProviders: ApiModelProviderEvidence;
+    simulations?: ApiSimulationEvidence;
   }): ApiOnboardingChecks {
     return new ApiOnboardingChecks(
       dependencies.prisma,
@@ -95,8 +95,8 @@ class ApiOnboardingChecks {
 
   private constructor(
     private readonly prisma: PrismaClient,
-    private readonly modelProviders: ApiModelProviderEvidencePort,
-    private readonly simulations: ApiSimulationEvidencePort | undefined,
+    private readonly modelProviders: ApiModelProviderEvidence,
+    private readonly simulations: ApiSimulationEvidence | undefined,
   ) {}
 
   async getCheckStatus(projectId: string): Promise<IntegrationsCheckStatus> {

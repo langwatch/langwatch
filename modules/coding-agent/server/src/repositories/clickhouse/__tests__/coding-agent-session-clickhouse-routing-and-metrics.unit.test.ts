@@ -5,9 +5,9 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it } from "vitest";
-import { NoopCodingAgentReadMetricsPort } from "../../../adapters/coding-agent-read-metrics.adapter.ts";
-import { CodingAgentReadMetricsPort } from "../../../ports/coding-agent-read-metrics.port.ts";
-import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port.ts";
+import { NoopCodingAgentReadMetrics } from "../../../services/coding-agent-read-metrics-noop.service.ts";
+import { CodingAgentReadMetrics } from "../../../app/coding-agent.infrastructure.ts";
+import { CodingAgentClickHouse } from "../../../app/coding-agent.infrastructure.ts";
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
@@ -63,15 +63,15 @@ function branchSession({
 
 function makeRepository(
   resolveClient: (tenantId: string) => ClickHouseClient,
-  metrics: CodingAgentReadMetricsPort = NoopCodingAgentReadMetricsPort.create(),
+  metrics: CodingAgentReadMetrics = NoopCodingAgentReadMetrics.create(),
 ) {
-  class RoutedPort extends CodingAgentClickHousePort {
+  class Routed implements CodingAgentClickHouse {
     async resolve(tenantId: string): Promise<ClickHouseClient> {
       return resolveClient(tenantId);
     }
   }
   return CodingAgentSessionClickHouseRepository.create({
-    clickHouse: new RoutedPort(),
+    clickHouse: new Routed(),
     defaultTraceRetentionDays: 30,
     metrics,
     clock: new TestClock(),
@@ -137,9 +137,9 @@ describe("CodingAgentSessionClickHouseRepository branch-list routing", () => {
 /**
  * A fake metrics port that just counts observations per outcome, rather than the
  * prom-client registry main pinned this against — the read now reaches ClickHouse through
- * an injected `CodingAgentReadMetricsPort`, so this is the seam the package's own tests
+ * an injected `CodingAgentReadMetrics`, so this is the seam the package's own tests
  */
-class CountingReadMetricsPort extends CodingAgentReadMetricsPort {
+class CountingReadMetrics implements CodingAgentReadMetrics {
   counts = { hit: 0, empty: 0, error: 0 };
 
   observeSessionListRead(input: { outcome: "hit" | "empty" | "error" }): void {
@@ -181,7 +181,7 @@ describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
   describe("given a window holding a session", () => {
     describe("when the window is listed", () => {
       it("times the read under the hit outcome", async () => {
-        const metrics = new CountingReadMetricsPort();
+        const metrics = new CountingReadMetrics();
         const repository = makeRepository(
           () =>
             listClient([
@@ -206,7 +206,7 @@ describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
   describe("given a window holding no sessions", () => {
     describe("when the window is listed", () => {
       it("times the read under the empty outcome, which is where the unpruned scan shows up alone", async () => {
-        const metrics = new CountingReadMetricsPort();
+        const metrics = new CountingReadMetrics();
         const repository = makeRepository(() => listClient([]), metrics);
 
         await repository.findManyRecent({
@@ -225,7 +225,7 @@ describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
   describe("given a read that fails", () => {
     describe("when the window is listed", () => {
       it("times the failure under the error outcome and still raises it", async () => {
-        const metrics = new CountingReadMetricsPort();
+        const metrics = new CountingReadMetrics();
         const failing = {
           query: async () => {
             throw new Error("clickhouse unavailable");

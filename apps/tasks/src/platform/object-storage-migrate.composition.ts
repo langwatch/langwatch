@@ -1,11 +1,11 @@
-import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   auditQueuesForCutover,
   createMigrationTask,
   MigrationBlobS3Repository,
   ObjectStorageMigrateTask,
-  ObjectStorageMigrationInventoryPort,
+  ObjectStorageMigrationInventory,
   parseMigrationTaskConfig,
   StoredObjectsClickHouse,
   type MigrationDataset,
@@ -36,7 +36,7 @@ class TasksStoredObjectsClickHouse extends StoredObjectsClickHouse {
  * configuration of its own yet, matching the API's and worker's mail/object-storage
  * compositions.
  */
-class TasksNoOutboundProxy extends OutboundProxyResolverPort {
+class TasksNoOutboundProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {
     return undefined;
   }
@@ -47,7 +47,7 @@ class TasksNoOutboundProxy extends OutboundProxyResolverPort {
  * features, so the process holding those clients reads them and hands the port over;
  * the stored-object page comes from the ClickHouse repository built beside it.
  */
-class TasksObjectStorageMigrationInventory extends ObjectStorageMigrationInventoryPort {
+class TasksObjectStorageMigrationInventory extends ObjectStorageMigrationInventory {
   private readonly repository: ClickHouseStoredObjectsRepository;
   private readonly prisma: Pick<PrismaClient, "project" | "dataset">;
 

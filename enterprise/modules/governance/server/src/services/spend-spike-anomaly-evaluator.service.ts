@@ -4,14 +4,12 @@ import {
   safeParseSpendSpikeThresholdConfig,
   type SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  GovernanceDiagnosticsPort,
-  NullGovernanceDiagnosticsAdapter,
-} from "../ports/governance-diagnostics.port.ts";
+import type { GovernanceDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 import type {
-  AnomalySpendReaderPort,
+  AnomalySpendReader,
   AnomalySpendSourceFilter,
-} from "../ports/spend-spike-anomaly.port.ts";
+} from "../app/governance.infrastructure.ts";
 import { SpendSpikeAnomalyRepository } from "../repositories/policy/spend-spike-anomaly.repository.ts";
 import type { AnomalyAlertDispatcherService } from "./anomaly-alert-dispatcher.service.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
@@ -27,16 +25,16 @@ export type SpendSpikeEvaluationSummary = {
 export class SpendSpikeAnomalyEvaluatorService {
   private constructor(
     private readonly repository: SpendSpikeAnomalyRepository,
-    private readonly spend: AnomalySpendReaderPort | undefined,
+    private readonly spend: AnomalySpendReader | undefined,
     private readonly dispatcher: AnomalyAlertDispatcherService,
-    private readonly diagnostics: GovernanceDiagnosticsPort,
+    private readonly diagnostics: GovernanceDiagnosticsSink,
   ) {}
 
   static create(options: {
     repository: SpendSpikeAnomalyRepository;
-    spend?: AnomalySpendReaderPort;
+    spend?: AnomalySpendReader;
     dispatcher: AnomalyAlertDispatcherService;
-    diagnostics?: GovernanceDiagnosticsPort;
+    diagnostics?: GovernanceDiagnosticsSink;
   }): SpendSpikeAnomalyEvaluatorService {
     return new SpendSpikeAnomalyEvaluatorService(
       options.repository,

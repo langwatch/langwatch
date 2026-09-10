@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { UiCapabilityContextProvider } from "../capabilities.ts";
 import { createUiCapabilitiesFromHost } from "../testing.ts";
-import type { UiSlotsPort } from "../slots.tsx";
+import type { UiSlots } from "../slots.tsx";
 import {
   CORE_SEAT_TYPE_COPY,
   UiSlot,
@@ -31,7 +31,7 @@ const inertHost = {
   navigate: vi.fn(),
 };
 
-function withSlots(slots: UiSlotsPort, children: ReactNode) {
+function withSlots(slots: UiSlots, children: ReactNode) {
   return (
     <UiCapabilityContextProvider value={{ ...createUiCapabilitiesFromHost(inertHost), slots }}>
       {children}

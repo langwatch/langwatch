@@ -1,5 +1,5 @@
 import type {
-  GatewaySpendEventsPort,
+  GatewaySpendEvents,
   SpendBucket,
   SpendEventsPageCursor,
   SpendGroupByKey,
@@ -8,9 +8,9 @@ import type {
 import type { SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
 
 export class GatewaySpendEventsService {
-  private constructor(private readonly repository: GatewaySpendEventsPort) {}
+  private constructor(private readonly repository: GatewaySpendEvents) {}
 
-  static create(repository: GatewaySpendEventsPort): GatewaySpendEventsService {
+  static create(repository: GatewaySpendEvents): GatewaySpendEventsService {
     return new GatewaySpendEventsService(repository);
   }
 

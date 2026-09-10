@@ -56,8 +56,8 @@ import {
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { parseOtlpLogs, parseOtlpMetrics, parseOtlpTraces, readOtlpBody } from "@langwatch/otlp";
-import type { GovernanceDirectoryPort } from "../../repositories/directory/governance-directory.repository.ts";
-import type { GovernanceProjectPort } from "../../ports/governance-project.port.ts";
+import type { GovernanceDirectory } from "../../repositories/directory/governance-directory.repository.ts";
+import type { GovernanceProjectDirectory } from "../../app/governance.infrastructure.ts";
 import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,
@@ -66,7 +66,7 @@ import type {
 } from "@opentelemetry/otlp-transformer";
 import type { Context } from "hono";
 
-import { GovernanceIngestRateLimitPort } from "../../ports/governance-ingest-rate-limit.port.ts";
+import { GovernanceIngestRateLimiter } from "../../services/governance-ingest-rate-limit.service.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ingest");
@@ -82,20 +82,20 @@ const logger = createLogger("langwatch:ingest");
  * fixed once where the collection is built, rather than a per-request choice a
  * transport gets to make.
  */
-export type GovernanceIngestTraceCollectionPort = (input: {
+export type GovernanceIngestTraceCollection = (input: {
   tenantId: string;
   traceRequest: IExportTraceServiceRequest;
 }) => Promise<{ rejectedSpans?: number } | undefined>;
 
 /** The log pipeline the webhook and `/v1/logs` receivers hand records to. */
-export type GovernanceIngestLogCollectionPort = (input: {
+export type GovernanceIngestLogCollectionChannel = (input: {
   tenantId: string;
   organizationId: string;
   logRequest: IExportLogsServiceRequest;
 }) => Promise<unknown>;
 
 /** The metric pipeline `/v1/metrics` hands data points to. */
-export type GovernanceIngestMetricCollectionPort = (input: {
+export type GovernanceIngestMetricCollectionChannel = (input: {
   tenantId: string;
   organizationId: string;
   metricRequest: IExportMetricsServiceRequest;
@@ -117,7 +117,7 @@ export type GovernanceIngestMetricCollectionPort = (input: {
  * is reported in the acknowledgement, but nothing is priced — which is what a
  * deployment with no gateway spend store can honestly say.
  */
-export type GovernanceIngestSpendPort = Readonly<{
+export type GovernanceIngestSpend = Readonly<{
   insertDebit: (rows: ReadonlyArray<Record<string, unknown>>) => Promise<unknown>;
   resolveApplicableBudgets: (scopes: {
     organizationId: string;
@@ -155,15 +155,15 @@ export type GovernanceIngestRestPorts = Readonly<{
    * Lazily ensured and idempotent, so a race-created project resolves cleanly
    * rather than splitting one organization's ingestion across two tenants.
    */
-  projects: () => Pick<GovernanceProjectPort, "ensureInternal">;
+  projects: () => Pick<GovernanceProjectDirectory, "ensureInternal">;
   /** The trace pipeline. Required — without it there is no receiver at all. */
-  traceCollection: GovernanceIngestTraceCollectionPort;
+  traceCollection: GovernanceIngestTraceCollection;
   /** The log pipeline, where this process folds logs. */
-  logCollection?: GovernanceIngestLogCollectionPort | undefined;
+  logCollection?: GovernanceIngestLogCollectionChannel | undefined;
   /** The metric pipeline, where this process folds metrics. */
-  metricCollection?: GovernanceIngestMetricCollectionPort | undefined;
+  metricCollection?: GovernanceIngestMetricCollectionChannel | undefined;
   /** The spend ledger a cost event is priced into, where one is composed. */
-  spend?: GovernanceIngestSpendPort | undefined;
+  spend?: GovernanceIngestSpend | undefined;
   /**
    * The typed client the principal resolution reads.
    *
@@ -172,9 +172,9 @@ export type GovernanceIngestRestPorts = Readonly<{
    * organization. A non-member resolves to no principal and the spend still
    * rolls up at organization, team and project scope.
    */
-  directory: () => GovernanceDirectoryPort;
+  directory: () => GovernanceDirectory;
   /** The per-caller throttle, where this deployment composed a counter. */
-  rateLimit?: GovernanceIngestRateLimitPort | undefined;
+  rateLimit?: GovernanceIngestRateLimiter | undefined;
 }>;
 
 /**
@@ -437,7 +437,7 @@ export function createGovernanceIngestRestApp(options: {
   const refuseRateLimited = async (c: Context): Promise<Response | null> => {
     const limiter = ports.rateLimit;
     if (!limiter) return null;
-    const ip = GovernanceIngestRateLimitPort.extractClientIp(c.req.raw.headers);
+    const ip = GovernanceIngestRateLimiter.extractClientIp(c.req.raw.headers);
     const decision = await limiter.check({ ip });
     if (decision.allowed) return null;
     logger.warn(
@@ -940,8 +940,8 @@ function countMetricDataPoints(request: IExportMetricsServiceRequest): number {
 async function priceCostEvents(input: {
   events: readonly CanonicalCostEvent[];
   source: GovernanceIngestionSource;
-  spend: GovernanceIngestSpendPort;
-  directory: GovernanceDirectoryPort;
+  spend: GovernanceIngestSpend;
+  directory: GovernanceDirectory;
   governanceProjectId: string;
 }): Promise<number> {
   const { events, source, spend, directory, governanceProjectId } = input;

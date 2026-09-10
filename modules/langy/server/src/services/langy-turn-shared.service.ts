@@ -5,22 +5,22 @@ import {
   type LangyMessagePart,
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
-import type { LangyPromptPort } from "./langy-prompt-registry.service.ts";
+import type { LangyPrompt } from "./langy-prompt-registry.service.ts";
 import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
 import {
-  LangyGithubPermitPort,
-  LangyHarnessPort,
-  LangyModelPort,
-  LangySessionKeyPort,
+  LangyGithubPermit,
+  LangyHarness,
+  LangyModel,
+  LangySessionKey,
   LangyTurnContextPort,
-  LangyTurnMetricsPort,
-  LangyUiActionSurfacePort,
+  LangyTurnMetrics,
+  LangyUiActionSurface,
   type LangyWorkerProbeInput,
-  LangyWorkerPort,
-} from "../ports/langy-turn-runtime.port.ts";
+  LangyWorker,
+} from "../app/langy.infrastructure.ts";
 import type { LangyTurnAccessPort } from "../repositories/langy-live-turn.repository.ts";
 import type { LangyTurnHandoffPort } from "../repositories/langy-live-turn.repository.ts";
-import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import { LangyConversationService } from "./langy-conversation.service.ts";
 import { LangyCredentialService } from "./langy-credential.service.ts";
 import { LangyMessageRepository } from "../repositories/langy-message.repository.ts";
@@ -49,18 +49,18 @@ export interface LangyTurnServiceDeps {
   finalParts?: LangyFinalPartsService;
   conversations: LangyConversationService;
   credentials: LangyCredentialService;
-  prompts?: LangyPromptPort;
+  prompts?: LangyPrompt;
   promptProjectId?: string;
-  models: LangyModelPort;
-  worker: LangyWorkerPort | null;
-  tokenBuffer: LangyTokenBufferPort | null;
-  permits: LangyGithubPermitPort;
-  harness?: LangyHarnessPort;
+  models: LangyModel;
+  worker: LangyWorker | null;
+  tokenBuffer: LangyTokenBuffer | null;
+  permits: LangyGithubPermit;
+  harness?: LangyHarness;
   perDayPrCap: number;
-  sessionKeys: LangySessionKeyPort;
+  sessionKeys: LangySessionKey;
   context: LangyTurnContextPort;
-  uiActionSurface: LangyUiActionSurfacePort;
-  metrics: LangyTurnMetricsPort;
+  uiActionSurface: LangyUiActionSurface;
+  metrics: LangyTurnMetrics;
   admission: LangyTurnAdmissionRepository;
   accessStore: LangyTurnAccessPort | null;
   handoffStore: LangyTurnHandoffPort | null;
@@ -73,18 +73,18 @@ export type LangyTurnServiceDependencies = LangyTurnServiceDeps & {
 
 export type LangyTurnTechnicalPorts = {
   finalParts?: LangyFinalPartsService;
-  prompts?: LangyPromptPort;
+  prompts?: LangyPrompt;
   promptProjectId?: string;
-  models: LangyModelPort;
-  worker: LangyWorkerPort | null;
-  tokenBuffer: LangyTokenBufferPort | null;
-  permits: LangyGithubPermitPort;
-  harness?: LangyHarnessPort;
+  models: LangyModel;
+  worker: LangyWorker | null;
+  tokenBuffer: LangyTokenBuffer | null;
+  permits: LangyGithubPermit;
+  harness?: LangyHarness;
   perDayPrCap: number;
-  sessionKeys: LangySessionKeyPort;
+  sessionKeys: LangySessionKey;
   context: LangyTurnContextPort;
-  uiActionSurface: LangyUiActionSurfacePort;
-  metrics: LangyTurnMetricsPort;
+  uiActionSurface: LangyUiActionSurface;
+  metrics: LangyTurnMetrics;
   accessStore: LangyTurnAccessPort | null;
   handoffStore: LangyTurnHandoffPort | null;
 };
@@ -170,7 +170,7 @@ export class LangyTurnSharedService {
   }
 
   async reconstructPartialAnswer(
-    tokenBuffer: LangyTokenBufferPort,
+    tokenBuffer: LangyTokenBuffer,
     { conversationId, turnId }: { conversationId: string; turnId: string },
   ): Promise<string> {
     const { reads } = await tokenBuffer.readTail({ conversationId, turnId });

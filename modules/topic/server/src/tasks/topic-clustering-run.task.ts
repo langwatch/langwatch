@@ -3,7 +3,7 @@ import { Task } from "@langwatch/task";
 import { nowInstant } from "@langwatch/time";
 import type {
   TopicClusteringPageOutcome,
-  TopicClusteringRunPort,
+  TopicClusteringRun,
 } from "../intents/topic-clustering.intent.ts";
 
 const logger = createLogger("langwatch:tasks:topic-clustering-run");
@@ -17,11 +17,11 @@ export class TopicClusteringRunTask extends Task {
   readonly name = "topic-clustering-run";
   readonly description = "Runs a manual topic-clustering walk for one project.";
 
-  private constructor(private readonly runPage: () => TopicClusteringRunPort) {
+  private constructor(private readonly runPage: () => TopicClusteringRun) {
     super();
   }
 
-  static create({ runPage }: { runPage: () => TopicClusteringRunPort }): TopicClusteringRunTask {
+  static create({ runPage }: { runPage: () => TopicClusteringRun }): TopicClusteringRunTask {
     return new TopicClusteringRunTask(runPage);
   }
 

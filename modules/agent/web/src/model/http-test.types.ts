@@ -15,7 +15,7 @@ export type HttpTestResult = {
   warnings?: string[];
 };
 
-export type HttpTestErrorExplanationPort = (input: { errorCode?: string; error?: string }) => {
+export type HttpTestErrorExplanation = (input: { errorCode?: string; error?: string }) => {
   title: string;
   description?: string;
 };

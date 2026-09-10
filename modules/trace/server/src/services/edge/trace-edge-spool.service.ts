@@ -1,6 +1,6 @@
 import type { Logger } from "@langwatch/observability";
 import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
-import { TraceIngressPayloadPort } from "../ingestion/trace-ingestion.service.ts";
+import { TraceIngressPayload } from "../ingestion/trace-ingestion.service.ts";
 import type { TraceSpoolService } from "../ingestion/trace-spool.service.ts";
 
 /**
@@ -12,7 +12,7 @@ import type { TraceSpoolService } from "../ingestion/trace-spool.service.ts";
 // FAIL-OPEN, deliberately. This is oversize PROTECTION, not the durability
 // boundary, so an unreachable spool degrades to the inline route rather than
 // refusing the span. The warning names what was skipped.
-export class TraceEdgeSpoolService extends TraceIngressPayloadPort {
+export class TraceEdgeSpoolService extends TraceIngressPayload {
   static create(options: {
     spool: Pick<TraceSpoolService, "putSpool">;
     logger: Logger;

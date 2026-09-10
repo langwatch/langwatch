@@ -1,10 +1,10 @@
 import type { Logger } from "@langwatch/observability";
 import { describe, expect, it } from "vitest";
-import { MigrationLockPort, UnlockedMigrationLock } from "../migration-lock.port.ts";
+import { MigrationLock, UnlockedMigrationLock } from "../migration-lock.port.ts";
 import { isMigrationTask, MigrationLockService } from "../migration-lock.service.ts";
 
 /** Records what happened to the lock, and whether the first attempt was free. */
-class FakeMigrationLock extends MigrationLockPort {
+class FakeMigrationLock extends MigrationLock {
   readonly calls: string[] = [];
 
   constructor(private readonly free: boolean) {

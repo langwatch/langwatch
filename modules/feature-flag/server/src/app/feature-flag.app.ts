@@ -28,7 +28,7 @@ import { nowInstant } from "@langwatch/time";
 import type { FeatureFlagRepositories } from "../repositories/feature-flag.repositories.ts";
 import { FeatureFlagService } from "../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../services/organization-created-at-cache.service.ts";
-import { CachedFeatureFlagRowAdapter } from "../adapters/cached.feature-flag-row.adapter.ts";
+import { CachedFeatureFlagRowAdapter } from "../services/cached-feature-flag-row.service.ts";
 
 /** The operator row as the cache carries it. */
 export type FeatureFlagRow = { enabled: boolean; rules: FeatureFlagRules };

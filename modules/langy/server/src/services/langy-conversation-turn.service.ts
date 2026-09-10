@@ -11,9 +11,9 @@ import type {
 import { langyJsonValueSchema } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
-import { mintRunToken } from "../ports/langy-frame-auth.port.ts";
+import { mintRunToken } from "./langy-frame-auth.service.ts";
 import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
-import { LANGY_ID_RESOURCES } from "../ports/langy-ids.port.ts";
+import { LANGY_ID_RESOURCES } from "../processes/langy-conversation-process.types.ts";
 import {} from "@langwatch/langy-contract";
 import { LangyFinalPartsService, type LangyFinalToolCall } from "./langy-final-parts.service.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";

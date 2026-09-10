@@ -16,7 +16,7 @@ import {
   buildExecuteCommand,
   buildExecutionDeps,
   buildMonitor,
-} from "../ports/__tests__/support/evaluation-execution.fixtures.ts";
+} from "./support/evaluation-execution.fixtures.ts";
 
 const AZURE_EVALUATOR_TYPES = [
   "azure/content_safety",

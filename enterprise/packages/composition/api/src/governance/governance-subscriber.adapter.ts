@@ -5,10 +5,10 @@ import {
   GovernanceKpisSubscriber,
   GovernanceOcsfEventPort,
   GovernanceOcsfSubscriber,
-  GovernanceSubscriberDiagnosticsPort,
-  TraceAlertMetricsPort,
+  GovernanceSubscriberDiagnostics,
+  TraceAlertMetrics,
   TraceAlertOriginGuardPort,
-  TraceAlertTriggerMatchPort,
+  TraceAlertTriggerMatch,
   TraceAlertTriggerMatchSubscriber,
   TraceAlertTriggerPort,
   type GovernanceKpiContribution,
@@ -40,7 +40,7 @@ export abstract class GovernanceSubscriberRuntime {
   abstract countAutomationMatchRecords(count: number): void;
 }
 
-class AppGovernanceSubscriberDiagnostics extends GovernanceSubscriberDiagnosticsPort {
+class AppGovernanceSubscriberDiagnostics extends GovernanceSubscriberDiagnostics {
   private readonly logger = createLogger("langwatch:trace-processing:governance-subscribers");
 
   warn(input: { code: string; tenantId: string; traceId: string }): void {
@@ -57,13 +57,13 @@ class AppGovernanceSubscriberDiagnostics extends GovernanceSubscriberDiagnostics
   }
 }
 
-class AppGovernanceKpiContributionPort extends GovernanceKpiContributionPort {
+class AppGovernanceKpiContribution extends GovernanceKpiContributionPort {
   private constructor(private readonly writer: GovernanceKpiContributionPort) {
     super();
   }
 
-  static create(writer: GovernanceKpiContributionPort): AppGovernanceKpiContributionPort {
-    return new AppGovernanceKpiContributionPort(writer);
+  static create(writer: GovernanceKpiContributionPort): AppGovernanceKpiContribution {
+    return new AppGovernanceKpiContribution(writer);
   }
 
   insertContribution(row: GovernanceKpiContribution): Promise<void> {
@@ -71,13 +71,13 @@ class AppGovernanceKpiContributionPort extends GovernanceKpiContributionPort {
   }
 }
 
-class AppGovernanceOcsfEventPort extends GovernanceOcsfEventPort {
+class AppGovernanceOcsfEvent extends GovernanceOcsfEventPort {
   private constructor(private readonly writer: GovernanceOcsfEventPort) {
     super();
   }
 
-  static create(writer: GovernanceOcsfEventPort): AppGovernanceOcsfEventPort {
-    return new AppGovernanceOcsfEventPort(writer);
+  static create(writer: GovernanceOcsfEventPort): AppGovernanceOcsfEvent {
+    return new AppGovernanceOcsfEvent(writer);
   }
 
   insertEvent(row: GovernanceOcsfEvent): Promise<void> {
@@ -85,13 +85,13 @@ class AppGovernanceOcsfEventPort extends GovernanceOcsfEventPort {
   }
 }
 
-class AppTraceAlertTriggerPort extends TraceAlertTriggerPort {
+class AppTraceAlertTrigger extends TraceAlertTriggerPort {
   private constructor(private readonly triggers: TraceAlertTriggerPort) {
     super();
   }
 
-  static create(triggers: TraceAlertTriggerPort): AppTraceAlertTriggerPort {
-    return new AppTraceAlertTriggerPort(triggers);
+  static create(triggers: TraceAlertTriggerPort): AppTraceAlertTrigger {
+    return new AppTraceAlertTrigger(triggers);
   }
 
   activeForProject(projectId: string) {
@@ -99,13 +99,13 @@ class AppTraceAlertTriggerPort extends TraceAlertTriggerPort {
   }
 }
 
-class AppTraceAlertTriggerMatchPort extends TraceAlertTriggerMatchPort {
-  private constructor(private readonly matches: TraceAlertTriggerMatchPort) {
+class AppTraceAlertTriggerMatch extends TraceAlertTriggerMatch {
+  private constructor(private readonly matches: TraceAlertTriggerMatch) {
     super();
   }
 
-  static create(matches: TraceAlertTriggerMatchPort): AppTraceAlertTriggerMatchPort {
-    return new AppTraceAlertTriggerMatchPort(matches);
+  static create(matches: TraceAlertTriggerMatch): AppTraceAlertTriggerMatch {
+    return new AppTraceAlertTriggerMatch(matches);
   }
 
   async send(input: TraceAlertTriggerMatchInput): Promise<void> {
@@ -113,7 +113,7 @@ class AppTraceAlertTriggerMatchPort extends TraceAlertTriggerMatchPort {
   }
 }
 
-class AppTraceAlertOriginGuardPort extends TraceAlertOriginGuardPort {
+class AppTraceAlertOriginGuard extends TraceAlertOriginGuardPort {
   constructor(private readonly runtime: GovernanceSubscriberRuntime) {
     super();
   }
@@ -123,7 +123,7 @@ class AppTraceAlertOriginGuardPort extends TraceAlertOriginGuardPort {
   }
 }
 
-class AppTraceAlertMetricsPort extends TraceAlertMetricsPort {
+class AppTraceAlertMetrics extends TraceAlertMetrics {
   constructor(private readonly runtime: GovernanceSubscriberRuntime) {
     super();
   }
@@ -135,7 +135,7 @@ class AppTraceAlertMetricsPort extends TraceAlertMetricsPort {
 
 export class AppGovernanceSubscriberAdapter {
   private constructor(
-    private readonly diagnostics: GovernanceSubscriberDiagnosticsPort,
+    private readonly diagnostics: GovernanceSubscriberDiagnostics,
     private readonly runtime: GovernanceSubscriberRuntime,
   ) {}
 
@@ -148,27 +148,27 @@ export class AppGovernanceSubscriberAdapter {
 
   kpis(writer: GovernanceKpiContributionPort): GovernanceKpisSubscriber {
     return GovernanceKpisSubscriber.create({
-      contributions: AppGovernanceKpiContributionPort.create(writer),
+      contributions: AppGovernanceKpiContribution.create(writer),
       diagnostics: this.diagnostics,
     });
   }
 
   ocsf(writer: GovernanceOcsfEventPort): GovernanceOcsfSubscriber {
     return GovernanceOcsfSubscriber.create({
-      events: AppGovernanceOcsfEventPort.create(writer),
+      events: AppGovernanceOcsfEvent.create(writer),
       diagnostics: this.diagnostics,
     });
   }
 
   traceAlerts(
     triggers: TraceAlertTriggerPort,
-    matches: TraceAlertTriggerMatchPort,
+    matches: TraceAlertTriggerMatch,
   ): (event: GovernanceTraceEvent, context: GovernanceTraceContext) => Promise<void> {
     const subscriber = TraceAlertTriggerMatchSubscriber.create({
-      triggers: AppTraceAlertTriggerPort.create(triggers),
-      matches: AppTraceAlertTriggerMatchPort.create(matches),
-      originGuard: new AppTraceAlertOriginGuardPort(this.runtime),
-      metrics: new AppTraceAlertMetricsPort(this.runtime),
+      triggers: AppTraceAlertTrigger.create(triggers),
+      matches: AppTraceAlertTriggerMatch.create(matches),
+      originGuard: new AppTraceAlertOriginGuard(this.runtime),
+      metrics: new AppTraceAlertMetrics(this.runtime),
     });
 
     return (event, context) => subscriber.handle(event, context);

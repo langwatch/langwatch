@@ -23,7 +23,7 @@ import { TraceEditOverlayService } from "../services/edit-overlay/trace-edit-ove
 import { TraceEventDerivationService } from "../services/ingestion/trace-event-derivation.service.ts";
 import { TraceFullIo } from "./trace.infrastructure.ts";
 import { TraceIOExtractionService } from "../services/content/trace-io-extraction.service.ts";
-import { TraceService as TraceLegacyReadService } from "../services/read/trace-legacy-read.service.ts";
+import { TraceLegacyReadService as TraceLegacyReadService } from "../services/read/trace-legacy-read.service.ts";
 import { TraceListService } from "../services/read/trace-list-read.service.ts";
 import { TraceQueryClassificationAdapter } from "../services/trace-query-classification.service.ts";
 import {

@@ -66,7 +66,7 @@ export type ProjectHomeDeployment = {
   baseHost?: string;
 };
 
-export abstract class ProjectHomeHostPort {
+export abstract class ProjectHomeHost {
   /** The project in scope, or nothing before one resolves. */
   abstract project(): ProjectHomeProject | undefined;
 
@@ -106,12 +106,12 @@ export abstract class ProjectHomeHostPort {
   abstract navigate(to: string): void;
 }
 
-const ProjectHomeHostContext = createContext<ProjectHomeHostPort | undefined>(void 0);
+const ProjectHomeHostContext = createContext<ProjectHomeHost | undefined>(void 0);
 
 export const ProjectHomeHostProvider = ProjectHomeHostContext.Provider;
 
 /** The host the composing application mounted above this screen. */
-export function useProjectHomeHost(): ProjectHomeHostPort {
+export function useProjectHomeHost(): ProjectHomeHost {
   const host = useContext(ProjectHomeHostContext);
   if (!host) {
     throw new Error("The project home must be mounted inside a ProjectHomeHostProvider.");

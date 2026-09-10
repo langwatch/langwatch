@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { pickTargetName, type TargetConfig } from "@langwatch/experiment-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { ExperimentTargetEntityNamesPort } from "../ports/experiment-target-entity-names.port.ts";
+import type { ExperimentTargetEntityNames } from "../ports/experiment-target-entity-names.port.ts";
 
 const logger = createLogger("langwatch:experiment:workbench-target-names");
 
@@ -28,7 +28,7 @@ export class ExperimentWorkbenchTargetNamesService {
      */
     prompts: PromptApi;
     /** Agent and evaluator names, which are rows this feature does not own. */
-    entities: ExperimentTargetEntityNamesPort;
+    entities: ExperimentTargetEntityNames;
   }): Promise<Record<string, string>> {
     try {
       const [prompts, agents, evaluators] = await Promise.all([

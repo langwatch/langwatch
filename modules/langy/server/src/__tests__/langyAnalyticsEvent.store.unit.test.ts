@@ -1,7 +1,7 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import {
-  LangyAnalyticsEventSinkPort,
+  LangyAnalyticsEventSink,
   LangyAnalyticsEventStorageAdapter,
   type LangyAnalyticsEventProjectionRecord,
 } from "@langwatch/langy-server";
@@ -22,7 +22,7 @@ const record: LangyAnalyticsEventProjectionRecord = {
   acceptedAtMs: 1_100,
 };
 
-class FakeLangyAnalyticsEventSink extends LangyAnalyticsEventSinkPort {
+class FakeLangyAnalyticsEventSink extends LangyAnalyticsEventSink {
   readonly insert = vi.fn().mockResolvedValue(undefined);
   readonly insertBatch = vi.fn().mockResolvedValue(undefined);
 }

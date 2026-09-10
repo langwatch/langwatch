@@ -9,11 +9,11 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import {
   AppGovernanceSignalsService,
-  GovernanceSignalDeliveryPort,
-  GovernanceSignalStoragePort,
+  GovernanceSignalDelivery,
+  GovernanceSignalStorage,
 } from "../../src/governance/governance-signals.adapter.ts";
 
-class RecordingStorage extends GovernanceSignalStoragePort {
+class RecordingStorage extends GovernanceSignalStorage {
   readonly crossings: GovernanceResolvedBudgetCrossing[];
   readonly resolveBudgetCrossings = vi.fn(
     async (): Promise<GovernanceResolvedBudgetCrossing[]> => this.crossings,
@@ -29,7 +29,7 @@ class RecordingStorage extends GovernanceSignalStoragePort {
   }
 }
 
-class RecordingDelivery extends GovernanceSignalDeliveryPort {
+class RecordingDelivery extends GovernanceSignalDelivery {
   readonly crossings: GovernanceBudgetCrossingData[] = [];
 
   available(): boolean {

@@ -17,7 +17,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import { IdentityEventingPort } from "../app/identity.infrastructure.ts";
+import { IdentityEventing } from "../app/identity.infrastructure.ts";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
 import type { IdentityEvent } from "../projections/identity-state.projection.ts";
@@ -55,7 +55,7 @@ export interface IdentityLedgerWriterDeps {
    * the pipeline handle is resolved when a ceremony actually commits, which is what lets a ceremony
    * composed before the process finished wiring its eventing still append.
    */
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
   /** A test hands the sender in directly rather than composing a port for it. */
   stagedSender?: (name: string) => Promise<IdentityStagedSender | null>;
   /** The read-your-writes window; production uses the constants above. */

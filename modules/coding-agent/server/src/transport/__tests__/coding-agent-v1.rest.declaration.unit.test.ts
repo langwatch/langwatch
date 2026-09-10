@@ -18,7 +18,7 @@ describe("the coding-agent v1 REST family", () => {
     });
 
     it("opens the organization door, so no project id is sent anywhere", () => {
-      expect(declaration.credential).toBe("organizationKey");
+      expect(declaration.credential).toBe("organization");
     });
 
     it("keeps the address and the operation id", () => {

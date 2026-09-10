@@ -1,5 +1,5 @@
 import type { ScimSyncPipeline } from "@langwatch/identity-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** Directory sync's worker-facing capability: the built pipeline definition. */
@@ -31,7 +31,7 @@ export interface ScimSyncWorkerCapability {
  * unchanged. Whoever makes the worker composition the live one drops the
  * legacy registration in the same change.
  */
-export class ScimSyncWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class ScimSyncWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: ScimSyncWorkerCapability;
     eventing: WorkerEventingRuntime;

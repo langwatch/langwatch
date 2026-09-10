@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ModelCostProjectPort } from "../ports/model-provider.port.ts";
+import type { ModelCostProject } from "../app/model-provider.infrastructure.ts";
 import { PrismaModelProviderEvidenceRepository } from "../repositories/prisma/prisma.model-provider-evidence.repository.ts";
 import { ModelProviderEvidenceService } from "./model-provider-evidence.service.ts";
 import { ModelProviderProjectScopeService } from "./model-provider-project-scope.service.ts";
@@ -26,12 +26,12 @@ export type ModelProviderEvidenceDatabase = Pick<PrismaClient, "modelProvider">;
 export class PostgresModelProviderEvidenceAdapter {
   private constructor(
     private readonly database: ModelProviderEvidenceDatabase,
-    private readonly projects: ModelCostProjectPort,
+    private readonly projects: ModelCostProject,
   ) {}
 
   static create(options: {
     database: ModelProviderEvidenceDatabase;
-    projects: ModelCostProjectPort;
+    projects: ModelCostProject;
   }): PostgresModelProviderEvidenceAdapter {
     return new PostgresModelProviderEvidenceAdapter(options.database, options.projects);
   }

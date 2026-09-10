@@ -7,7 +7,7 @@ import { LiteMemberRestrictedError, type AuthzService } from "@langwatch/authz-c
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 
-import { ApiTrpcFeaturesPort, type ApiTrpcFeatureMount } from "../api.application.ts";
+import { ApiTrpcFeatures, type ApiTrpcFeatureMount } from "../api.application.ts";
 import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ComposedApiFeatures } from "../app-trpc/app-trpc.composed.ts";
 import {
@@ -50,7 +50,7 @@ class MembershipDisabledError extends HandledError {
   }
 }
 
-export class ApiTrpcFeaturesComposition extends ApiTrpcFeaturesPort {
+export class ApiTrpcFeaturesComposition extends ApiTrpcFeatures {
   /**
    * Composes the record only when this process has BOTH halves of it. The
    * INFRASTRUCTURE is not negotiable.

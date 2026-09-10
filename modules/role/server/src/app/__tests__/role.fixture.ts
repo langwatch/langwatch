@@ -4,35 +4,34 @@ import type { RoleBindingScopeType } from "@langwatch/role-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import {
-  RoleBindingIdPort,
-  RoleCustomRolePlanPort,
-  RoleScopePort,
-} from "../../ports/role.port.ts";
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
-import { RoleApp } from "../role.app.ts";
+import { RoleApp, type RoleInfrastructure } from "../role.app.ts";
+
+type RoleScope = RoleInfrastructure["scope"];
+type RolePlan = RoleInfrastructure["plan"];
+type RoleBindingIds = RoleInfrastructure["bindingIds"];
 
 /** Lets every binding through: the fence has its own suite in the owning feature. */
-export class AllowingTestRoleScope extends RoleScopePort {
+export class AllowingTestRoleScope implements RoleScope {
   async assertNoPersonalTeamScope(_input: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<void> {}
 }
 
 /** A deployment whose plan carries custom roles. */
-export class AllowingTestRolePlan extends RoleCustomRolePlanPort {
+export class AllowingTestRolePlan implements RolePlan {
   async assertCustomRolesAllowed(_input: { organizationId: string }): Promise<void> {}
 }
 
 /** A deployment whose plan does not, refusing by the sentence the process owns. */
-export class RefusingTestRolePlan extends RoleCustomRolePlanPort {
+export class RefusingTestRolePlan implements RolePlan {
   async assertCustomRolesAllowed(_input: { organizationId: string }): Promise<void> {
     throw new Error("Custom roles require an Enterprise plan");
   }
 }
 
 /** Counting binding ids, so a test can assert which one was attached. */
-export class CountingTestRoleBindingIds extends RoleBindingIdPort {
+export class CountingTestRoleBindingIds implements RoleBindingIds {
   #next = 0;
 
   newBindingId(): string {
@@ -69,8 +68,8 @@ export function createRoleTestApp(
     permissions?: Partial<AuthzApi>;
     organizations?: Partial<OrganizationApi>;
     users?: Partial<UserApi>;
-    plan?: RoleCustomRolePlanPort;
-    scope?: RoleScopePort;
+    plan?: RolePlan;
+    scope?: RoleScope;
   }> = {},
 ): { app: RoleApp; roles: MemoryRoleRepository } {
   const roles = input.roles ?? MemoryRoleRepository.create();

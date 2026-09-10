@@ -25,7 +25,7 @@ import type {
   TraceSpanPiiRedaction,
   TraceSpanTokenEstimation,
 } from "../app/trace.infrastructure.ts";
-import type { TraceSpanSpool as TraceSpanSpoolPort } from "../app/trace.infrastructure.ts";
+import type { TraceSpanSpool as TraceSpanSpool } from "../app/trace.infrastructure.ts";
 import { clonePayload } from "../rules/payload-clone.rules.ts";
 import { TraceAttributeCapService } from "./attribute/trace-attribute-cap.service.ts";
 
@@ -50,7 +50,7 @@ export type RecordSpanCommandOptions = {
   costEnrichment: TraceSpanCostEnrichment;
   tokenEstimation: TraceSpanTokenEstimation;
   contentDrop: TraceSpanContentDrop;
-  spool?: TraceSpanSpoolPort;
+  spool?: TraceSpanSpool;
 };
 
 /** Turns one prepared raw span into Trace's one durable aggregate event. */
@@ -81,7 +81,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
 
   async handle(command: Command<RecordSpanCommandData>): Promise<SpanReceivedEvent[]> {
     return await this.tracer.withActiveSpan(
-      "RecordSpanCommand.handle",
+      "EventingRecordSpanAdapter.handle",
       {
         kind: SpanKind.INTERNAL,
         attributes: {

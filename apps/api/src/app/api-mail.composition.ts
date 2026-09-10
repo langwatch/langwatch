@@ -1,5 +1,5 @@
-import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
-import { EmailDeliveryAdapter, type EmailDeliveryPort } from "@langwatch/notification-server";
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
+import { EmailDeliveryAdapter, type EmailDelivery } from "@langwatch/notification-server";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { ApiConfig } from "../platform/config/api.config.ts";
 
@@ -13,7 +13,7 @@ import type { ApiConfig } from "../platform/config/api.config.ts";
  * the settlement digest leaving the worker would fail one SPF policy and pass
  * the other.
  *
- * There is no `MailRenderPort` here, and that is the one shape difference.
+ * There is no `MailRender` here, and that is the one shape difference.
  * The worker renders WORDS for envelopes it assembles itself — the BCC fan-out,
  * the no-reply `To`, the signed unsubscribe footer — so it holds a renderer and
  * writes the envelope. Every message this process sends is a WHOLE send that
@@ -28,7 +28,7 @@ import type { ApiConfig } from "../platform/config/api.config.ts";
  * and the walk stops on entry to it.
  */
 export type ApiMailComposition = Readonly<{
-  delivery: EmailDeliveryPort;
+  delivery: EmailDelivery;
   baseHost: string;
 }>;
 
@@ -78,7 +78,7 @@ function ownedAwsRuntime(resources: ResourceScope): AwsClientProcessRuntime {
 }
 
 /** No outbound proxy, for the reason `ApiNoOutboundProxy` already gives. */
-class ApiMailNoOutboundProxy extends OutboundProxyResolverPort {
+class ApiMailNoOutboundProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {
     return undefined;
   }

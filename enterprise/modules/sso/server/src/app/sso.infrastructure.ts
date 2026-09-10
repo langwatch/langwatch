@@ -46,7 +46,7 @@ export interface SsoConnectionLedgerPort {
  * Where the gate says what it decided. An operator whose single sign-on is off
  * reads these lines to learn why, so the process supplies its own logger.
  */
-export interface SsoGateLoggerPort {
+export interface SsoGateLogger {
   info(context: object, message: string): void;
   warn(context: object, message: string): void;
 }

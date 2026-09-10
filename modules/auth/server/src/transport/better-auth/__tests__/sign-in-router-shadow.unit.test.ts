@@ -14,7 +14,7 @@ import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract
 import {
   runSignInRouterShadow,
   type SignInRouterMode,
-  type SignInRouterShadowPort,
+  type SignInRouterShadow,
 } from "../sign-in-router-shadow.api.ts";
 
 const PASSWORD: SignInMethod = {
@@ -42,10 +42,10 @@ const redirect: RoutingDecision = {
 };
 
 let mode: SignInRouterMode = "shadow";
-const routeMock = vi.fn<SignInRouterShadowPort["route"]>();
-const resolveAuthProviderMock = vi.fn<SignInRouterShadowPort["resolveAuthProvider"]>();
+const routeMock = vi.fn<SignInRouterShadow["route"]>();
+const resolveAuthProviderMock = vi.fn<SignInRouterShadow["resolveAuthProvider"]>();
 
-const shadow: SignInRouterShadowPort = {
+const shadow: SignInRouterShadow = {
   mode: () => mode,
   route: routeMock,
   resolveAuthProvider: resolveAuthProviderMock,

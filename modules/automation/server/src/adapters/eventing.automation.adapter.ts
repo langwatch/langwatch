@@ -37,9 +37,9 @@ import {
 } from "../processes/webhook-delivery-prune.process.ts";
 import { runWebhookDeliveryPrune } from "../intents/webhook-delivery-prune.intent.ts";
 import { z } from "zod";
-import type { AutomationIntentRetentionPort } from "../ports/automation-intent-retention.port.ts";
-import type { AutomationScheduledIntentPort } from "../ports/automation-scheduled-intent.port.ts";
-import type { AutomationSettlementExecutorPort } from "../ports/automation-settlement.port.ts";
+import type { AutomationIntentRetention } from "../ports/automation-intent-retention.port.ts";
+import type { AutomationScheduledIntent } from "../ports/automation-scheduled-intent.port.ts";
+import type { AutomationSettlementExecutor } from "../ports/automation-settlement.port.ts";
 
 const AUTOMATIONS_EVENT_TYPES = [TRIGGER_MATCH_RECORDED_EVENT_TYPE] as const;
 
@@ -72,9 +72,9 @@ export type AutomationEvent = TriggerMatchRecordedEvent;
  *  topology itself (states, intents, evolve/wake handlers, outbox tuning)
  *  is defined inline below, ADR-052 "Approved builder API". */
 export interface AutomationsPipelineDeps {
-  scheduledIntents: AutomationScheduledIntentPort;
-  settlement: AutomationSettlementExecutorPort;
-  retention: AutomationIntentRetentionPort;
+  scheduledIntents: AutomationScheduledIntent;
+  settlement: AutomationSettlementExecutor;
+  retention: AutomationIntentRetention;
 }
 
 export class AutomationsPipelineAdapter {

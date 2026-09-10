@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AutomationClockPort } from "../../ports/automation-clock.port.ts";
+import type { AutomationClock } from "../../app/automation.infrastructure.ts";
 import type { AutomationRepositories } from "../automation.repositories.ts";
 
 /** The client the automation rows live in, as a process hands it over. */
@@ -21,7 +21,7 @@ export class PostgresAutomationRepositories {
   static readonly requires = ["prisma", "clock"] as const;
 
   static create(
-    infrastructure: Readonly<{ prisma: PrismaClient; clock: AutomationClockPort }>,
+    infrastructure: Readonly<{ prisma: PrismaClient; clock: AutomationClock }>,
   ): AutomationRepositories {
     const database = infrastructure.prisma;
 

@@ -5,7 +5,7 @@
 import type {
   GovernanceCliCaller,
   GovernanceCliRestPorts,
-  GovernanceDirectoryPort,
+  GovernanceDirectory,
 } from "@langwatch/enterprise-governance-server";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
@@ -185,7 +185,7 @@ function ingestionKeyWorld(
 
   // Only the caller's own organization holds a project. The other tenant's
   // project is deliberately absent from what an org-scoped lookup can see.
-  const directory: GovernanceDirectoryPort = {
+  const directory: GovernanceDirectory = {
     membershipStatus: () => Promise.resolve("active"),
     tryFindPersonProfile: () => Promise.resolve({ name: "Jane", email: "j@e.test" }),
     tryFindOrganizationIdByProjectApiKey: () => Promise.resolve(null),

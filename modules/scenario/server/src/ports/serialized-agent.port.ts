@@ -37,7 +37,7 @@ function jsonByteLength(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value ?? null), "utf8");
 }
 
-export abstract class SerializedAgentPort extends AgentAdapter {
+export abstract class SerializedAgent extends AgentAdapter {
   private readonly sessions = new Map<string, unknown>();
 
   /** The session the agent last returned for a thread, or nothing yet. */

@@ -8,7 +8,7 @@ import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
-  GatewayDebitPort,
+  GatewayBudgetLedger,
   type GatewaySpendAdmittedData,
   type GatewaySpendAttribution,
   type GatewaySpendFailedData,
@@ -53,7 +53,7 @@ const INITIAL_STATE: GatewayDebitsState = {
 export class GatewayDebitProcess {
   private constructor(private readonly intent: GatewayDebitIntent) {}
 
-  static create(port: GatewayDebitPort): GatewayDebitProcess {
+  static create(port: GatewayBudgetLedger): GatewayDebitProcess {
     return new GatewayDebitProcess(GatewayDebitIntent.create(port));
   }
 

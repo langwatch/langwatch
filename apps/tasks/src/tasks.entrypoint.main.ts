@@ -8,7 +8,7 @@ import {
 import { runTask, TaskCatalogue } from "@langwatch/task";
 import { resolveTasksConfig } from "./platform/config/tasks.config.ts";
 import { PostgresMigrationLockAdapter } from "./platform/infrastructure/postgres-migration-lock.adapter.ts";
-import { type MigrationLockPort, UnlockedMigrationLock } from "./platform/migration-lock.port.ts";
+import { type MigrationLock, UnlockedMigrationLock } from "./platform/migration-lock.port.ts";
 import { isMigrationTask, MigrationLockService } from "./platform/migration-lock.service.ts";
 import { parseTaskInvocation } from "./platform/task-invocation.ts";
 import { runTasksInOrder } from "./platform/task-sequence.ts";
@@ -92,7 +92,7 @@ async function main(): Promise<number> {
 }
 
 /** Nothing to contend for without a database: the tasks refuse by name instead. */
-function migrationLock(databaseUrl: string | undefined): MigrationLockPort {
+function migrationLock(databaseUrl: string | undefined): MigrationLock {
   return databaseUrl
     ? PostgresMigrationLockAdapter.create({ databaseUrl })
     : new UnlockedMigrationLock();

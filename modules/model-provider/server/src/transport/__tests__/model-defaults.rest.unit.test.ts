@@ -79,7 +79,7 @@ function mount(
     },
   }).mount(modelDefaultsRest.router(), {
     app: () => app,
-    credential: "projectKey",
+    credential: "project",
     onError: renderHandled,
     facts: [bindRestMiddleware(modelDefaultsRestCredential, () => credential)],
   });

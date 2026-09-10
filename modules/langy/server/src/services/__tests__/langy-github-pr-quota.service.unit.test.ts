@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   LANGY_GITHUB_PRS_PER_DAY,
-  LangyGithubPrCounterPort,
+  LangyGithubPrCounter,
   LangyGithubPrQuotaService,
 } from "../langy-github-pr-quota.service.ts";
 
@@ -17,7 +17,7 @@ const decr = vi.fn();
 const expire = vi.fn();
 
 /** The composed counter, when a deployment has one. */
-class FakeCounter extends LangyGithubPrCounterPort {
+class FakeCounter extends LangyGithubPrCounter {
   tryGet(key: string) {
     return get(key) as Promise<string | null>;
   }

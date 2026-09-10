@@ -49,7 +49,7 @@ export type SpanDedupRef = {
  * throw nothing — dedup is an optimisation, so a failure to tidy up after
  * one span must not fail the span.
  */
-export abstract class TraceSpanDedupPort {
+export abstract class TraceSpanDedup {
   abstract tryAcquireProcessingLock(span: SpanDedupRef): Promise<boolean | null>;
 
   abstract confirmProcessed(span: SpanDedupRef): Promise<void>;
@@ -58,12 +58,12 @@ export abstract class TraceSpanDedupPort {
 }
 
 /** The Trace pipeline's one named command handoff. */
-export abstract class TraceIngressCommandPort {
+export abstract class TraceIngressCommand {
   abstract recordSpan(data: RecordSpanCommandData): Promise<void>;
 }
 
 /** Optional edge/blob preparation, composed by the application when enabled. */
-export abstract class TraceIngressPayloadPort {
+export abstract class TraceIngressPayload {
   abstract prepare(data: RecordSpanCommandData): Promise<RecordSpanCommandData>;
 }
 
@@ -128,9 +128,9 @@ export class TraceIngestionService {
   static create(options: {
     codingAgents: CodingAgentIngestFilter;
     codingAgentSpanFilterEnabled: boolean;
-    dedup: TraceSpanDedupPort;
-    commands: TraceIngressCommandPort;
-    payloads?: TraceIngressPayloadPort;
+    dedup: TraceSpanDedup;
+    commands: TraceIngressCommand;
+    payloads?: TraceIngressPayload;
   }): TraceIngestionService {
     return new TraceIngestionService(
       options.codingAgents,
@@ -325,16 +325,16 @@ export class TraceSpanCollectionService {
 
   private constructor(
     private readonly options: {
-      dedup: TraceSpanDedupPort;
-      commands: TraceIngressCommandPort;
-      payloads?: TraceIngressPayloadPort;
+      dedup: TraceSpanDedup;
+      commands: TraceIngressCommand;
+      payloads?: TraceIngressPayload;
     },
   ) {}
 
   static create(options: {
-    dedup: TraceSpanDedupPort;
-    commands: TraceIngressCommandPort;
-    payloads?: TraceIngressPayloadPort;
+    dedup: TraceSpanDedup;
+    commands: TraceIngressCommand;
+    payloads?: TraceIngressPayload;
   }): TraceSpanCollectionService {
     return new TraceSpanCollectionService(options);
   }

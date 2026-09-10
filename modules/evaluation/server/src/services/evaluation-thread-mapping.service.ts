@@ -10,7 +10,7 @@ import {
   type TRACE_MAPPINGS,
 } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
-import type { EvaluationSpanDigestPort } from "../ports/evaluation-execution.port.ts";
+import type { EvaluationSpanDigest } from "../app/evaluation.infrastructure.ts";
 
 /**
  * Callback that fetches all traces belonging to a thread.
@@ -49,7 +49,7 @@ export class EvaluationThreadMappingService {
     trace: Trace;
     mappings: MappingState;
     getThreadTraces: GetThreadTraces;
-    spanDigest: EvaluationSpanDigestPort;
+    spanDigest: EvaluationSpanDigest;
   }): Promise<void> {
     const { data, trace, mappings, getThreadTraces, spanDigest } = params;
     const threadId = trace.metadata?.thread_id;

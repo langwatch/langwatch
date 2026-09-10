@@ -9,7 +9,7 @@ import { dspyStepsCaller, experimentDspyStepsRest } from "@langwatch/experiment-
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import type {
-  ApiHandlerManagedCredentialPort,
+  ApiHandlerManagedCredential,
   ApiRestRuntime,
 } from "../../app-rest/api-rest.runtime.ts";
 
@@ -27,7 +27,7 @@ export function mountExperimentDspyStepsRest(
   runtime: ApiRestRuntime,
   options: Readonly<{
     experiments: () => ExperimentApi;
-    credential: ApiHandlerManagedCredentialPort;
+    credential: ApiHandlerManagedCredential;
     errors: RestErrorHandler;
   }>,
 ): MountableRestApp {

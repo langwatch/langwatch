@@ -6,7 +6,7 @@ import {
   DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_ROW_LIMIT,
 } from "../databricks-genie-puller.service.ts";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
+import { GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
 
 const workspaceUrl = "https://workspace.example.test";
 const warehouseId = "warehouse-1";
@@ -47,8 +47,8 @@ function hour(ms: number): string {
   return new Date(Math.floor(ms / 3_600_000) * 3_600_000).toISOString();
 }
 
-class GenieWorkspace implements GovernanceHttpPort {
-  readonly calls: Array<{ url: URL; init: Parameters<GovernanceHttpPort["fetch"]>[1] }> = [];
+class GenieWorkspace implements GovernanceHttpClient {
+  readonly calls: Array<{ url: URL; init: Parameters<GovernanceHttpClient["fetch"]>[1] }> = [];
   readonly costRequests: Array<Record<string, unknown>> = [];
   readonly costReplies: CostReply[] = [];
   messageCreatedAt = Date.now() - 60_000;
@@ -57,7 +57,7 @@ class GenieWorkspace implements GovernanceHttpPort {
 
   async fetch(
     rawUrl: string,
-    init: Parameters<GovernanceHttpPort["fetch"]>[1],
+    init: Parameters<GovernanceHttpClient["fetch"]>[1],
   ): Promise<GovernanceHttpResponse> {
     const url = new URL(rawUrl);
     this.calls.push({ url, init });

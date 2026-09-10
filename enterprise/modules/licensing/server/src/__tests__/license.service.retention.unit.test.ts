@@ -3,7 +3,7 @@ import {
   LicenseRetention,
   LicenseService,
   LicenseServiceConfiguration,
-  LicenseStoragePort,
+  LicenseStorage,
   NodeLicenseCryptographyAdapter,
   type StoredLicense,
 } from "../index.ts";
@@ -13,7 +13,7 @@ const ORGANIZATION_ID = "org_123";
 const RETENTION_CATEGORIES = ["traces", "scenarios", "experiments"] as const;
 const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
 
-class MemoryLicenseRepository extends LicenseStoragePort {
+class MemoryLicenseRepository implements LicenseStorage {
   readonly organizations = new Set([ORGANIZATION_ID]);
   readonly stored = new Map<string, StoredLicense>();
 

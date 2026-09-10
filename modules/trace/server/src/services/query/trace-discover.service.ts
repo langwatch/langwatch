@@ -10,7 +10,7 @@ import type {
   DiscoverResult,
   DiscreteFacetResult,
   FacetDescriptor,
-  TraceListReadPort,
+  TraceListRead,
 } from "@langwatch/trace-contract";
 import type {
   ExpressionCategoricalDef,
@@ -157,7 +157,7 @@ function collectDiscoverOutcomes(settled: PromiseSettledResult<Outcome>[]): {
 
 export class TraceDiscoverService {
   private constructor(
-    private readonly repository: TraceListReadPort,
+    private readonly repository: TraceListRead,
     private readonly descriptors: TraceFacetDescriptorService,
   ) {}
 
@@ -165,7 +165,7 @@ export class TraceDiscoverService {
     repository,
     topicNaming,
   }: {
-    repository: TraceListReadPort;
+    repository: TraceListRead;
     topicNaming: TraceTopicNamingService;
   }): TraceDiscoverService {
     return new TraceDiscoverService(

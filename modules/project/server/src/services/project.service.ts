@@ -41,10 +41,10 @@ import {
 } from "@langwatch/project-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
-  type ProjectCredentialsPort,
-  type ProjectDiagnosticsPort,
-  type ProjectKeyMapPort,
-  type ProjectStoredObjectsPort,
+  type ProjectCredentials,
+  type ProjectDiagnostics,
+  type ProjectKeyMap,
+  type ProjectStoredObjects,
 } from "../ports/project.port.ts";
 import { codingAgentActivityStaleBefore } from "../repositories/coding-agent-activity.repository.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
@@ -59,20 +59,20 @@ export class ProjectService {
   private constructor(
     private readonly metadata: ProjectMetadataService,
     private readonly repository: ProjectRepository,
-    private readonly credentials: ProjectCredentialsPort,
+    private readonly credentials: ProjectCredentials,
     private readonly organizations: OrganizationApi,
-    private readonly keyMap?: ProjectKeyMapPort,
-    private readonly storedObjects?: ProjectStoredObjectsPort,
-    private readonly diagnostics?: ProjectDiagnosticsPort,
+    private readonly keyMap?: ProjectKeyMap,
+    private readonly storedObjects?: ProjectStoredObjects,
+    private readonly diagnostics?: ProjectDiagnostics,
   ) {}
 
   static create(options: {
     repository: ProjectRepository;
-    credentials: ProjectCredentialsPort;
+    credentials: ProjectCredentials;
     organizations: OrganizationApi;
-    keyMap?: ProjectKeyMapPort;
-    storedObjects?: ProjectStoredObjectsPort;
-    diagnostics?: ProjectDiagnosticsPort;
+    keyMap?: ProjectKeyMap;
+    storedObjects?: ProjectStoredObjects;
+    diagnostics?: ProjectDiagnostics;
   }): ProjectService {
     return new ProjectService(
       ProjectMetadataService.create({

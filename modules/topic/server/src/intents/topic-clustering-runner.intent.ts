@@ -9,24 +9,24 @@ import {
   type TopicClusteringTopic,
   type TopicClusteringTrace,
 } from "@langwatch/topic-contract";
-import type { TopicClusteringModelsPort } from "@langwatch/topic-contract";
-import type { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
+import type { TopicClusteringModels } from "@langwatch/topic-contract";
+import type { TraceTopicAssignment } from "@langwatch/trace-contract";
 import { z } from "zod";
 import type {
-  TopicClusteringClickHousePort,
+  TopicClusteringClickHouse,
   TopicClusteringClickHouseResolver,
-} from "../ports/topic-clustering-clickhouse.port.ts";
-import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
+} from "../app/topic.infrastructure.ts";
+import type { TopicClusteringCommands } from "../app/topic.infrastructure.ts";
 import type {
   TopicClusteringLangevalsKind,
-  TopicClusteringLangevalsPort,
-} from "../ports/topic-clustering-langevals.port.ts";
+  TopicClusteringLangevals,
+} from "../app/topic.infrastructure.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
 import {
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
   type TopicClusteringPageOutcome,
-  type TopicClusteringRunPort,
+  type TopicClusteringRun,
 } from "./topic-clustering.intent.ts";
 
 const logger = createLogger("langwatch:topicClustering");
@@ -117,8 +117,8 @@ export interface TopicClusteringWritePathSeed {
  */
 export interface TopicClusteringRunnerDeps {
   resolveClickHouseClient: TopicClusteringClickHouseResolver;
-  models: TopicClusteringModelsPort;
-  langevals: TopicClusteringLangevalsPort;
+  models: TopicClusteringModels;
+  langevals: TopicClusteringLangevals;
   /**
    * The deployment's langevals base URL, or null when no clustering endpoint
    * is configured — the caller warns and the run skips as `not_configured`.
@@ -127,14 +127,14 @@ export interface TopicClusteringRunnerDeps {
   repository: TopicClusteringRepository;
   /** The legacy import, for the write-path topic-model seed guard. */
   migration: TopicClusteringWritePathSeed;
-  commands: TopicClusteringCommandsPort;
-  traceAssignments: TraceTopicAssignmentPort;
+  commands: TopicClusteringCommands;
+  traceAssignments: TraceTopicAssignment;
   /** Payload-size histogram observation per langevals call kind. */
   observePayloadSize: (kind: TopicClusteringLangevalsKind, sizeBytes: number) => void;
 }
 
 /** One process-owned runner instance for Eventing intents and manual tasks. */
-export class TopicClusteringRunner implements TopicClusteringRunPort {
+export class TopicClusteringRunner implements TopicClusteringRun {
   static create(deps: TopicClusteringRunnerDeps): TopicClusteringRunner {
     return new TopicClusteringRunner(deps);
   }
@@ -181,7 +181,7 @@ export const clusterTopicsForProject = async (
     throw new Error("Project not found");
   }
 
-  let clickhouse: TopicClusteringClickHousePort;
+  let clickhouse: TopicClusteringClickHouse;
   try {
     clickhouse = await deps.resolveClickHouseClient(projectId);
   } catch {
@@ -359,7 +359,7 @@ export async function fetchCountsFromClickHouse({
   clickhouse,
   projectId,
 }: {
-  clickhouse: TopicClusteringClickHousePort;
+  clickhouse: TopicClusteringClickHouse;
   projectId: string;
 }): Promise<TraceCounts> {
   const thirtyDaysAgo = nowInstant().epochMilliseconds - 30 * 24 * 60 * 60 * 1000;
@@ -413,7 +413,7 @@ export async function fetchCountsFromClickHouse({
 }
 
 export async function fetchTracesFromClickHouse(
-  clickhouse: TopicClusteringClickHousePort,
+  clickhouse: TopicClusteringClickHouse,
   projectId: string,
   isIncrementalProcessing: boolean,
   topicIds: string[],

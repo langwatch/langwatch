@@ -8,11 +8,11 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UiCapabilityContextProvider, UiSessionPort } from "@langwatch/ui-host/capabilities";
-import { UiRpcContextProvider, type UiRpcPort } from "../ui-rpc";
+import { UiCapabilityContextProvider, UiSession } from "@langwatch/ui-host/capabilities";
+import { UiRpcContextProvider, type UiRpc } from "../ui-rpc";
 import { useUiOrganizationFacts } from "../ui-organization-facts";
 
-class StubSession extends UiSessionPort {
+class StubSession extends UiSession {
   currentUser() {
     return null;
   }
@@ -30,16 +30,16 @@ class StubSession extends UiSessionPort {
   }
 }
 
-function stubSession(): UiSessionPort {
+function stubSession(): UiSession {
   return new StubSession();
 }
 
-function stubRpc(planQuery: () => Promise<unknown>): UiRpcPort {
+function stubRpc(planQuery: () => Promise<unknown>): UiRpc {
   return {
     query: (path: string) => (path === "limits.getUsage" ? planQuery() : Promise.resolve([])),
     mutate: vi.fn(),
     subscribe: vi.fn(),
-  } as unknown as UiRpcPort;
+  } as unknown as UiRpc;
 }
 
 function wrapper({ children }: { children: ReactNode }) {

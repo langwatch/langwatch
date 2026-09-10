@@ -1,8 +1,8 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
-  TenantBroadcastPort,
-  TenantBroadcastPublisherPort,
+  TenantBroadcast,
+  TenantBroadcastPublisher,
   type TenantBroadcastEventType,
   type TenantBroadcastMessage,
 } from "../tenant-broadcast.repository.ts";
@@ -11,9 +11,9 @@ import {
  * One publish onto the tenant's channel, and nothing else. The application's `BroadcastAdapter`
  * does three things — publish, subscribe, and emit locally to the tabs this process is serving.
  */
-export class RedisTenantBroadcastRepository extends TenantBroadcastPort {
+export class RedisTenantBroadcastRepository extends TenantBroadcast {
   static create(options: {
-    publisher: TenantBroadcastPublisherPort;
+    publisher: TenantBroadcastPublisher;
     logger?: Logger;
   }): RedisTenantBroadcastRepository {
     return new RedisTenantBroadcastRepository(
@@ -25,7 +25,7 @@ export class RedisTenantBroadcastRepository extends TenantBroadcastPort {
 
   /** Composed with an explicit clock so the twin test can pin the body's bytes. */
   static createWithClock(options: {
-    publisher: TenantBroadcastPublisherPort;
+    publisher: TenantBroadcastPublisher;
     logger?: Logger;
     now: () => number;
   }): RedisTenantBroadcastRepository {
@@ -37,7 +37,7 @@ export class RedisTenantBroadcastRepository extends TenantBroadcastPort {
   }
 
   private constructor(
-    private readonly publisher: TenantBroadcastPublisherPort,
+    private readonly publisher: TenantBroadcastPublisher,
     private readonly logger: Logger,
     private readonly now: () => number,
   ) {
@@ -49,7 +49,7 @@ export class RedisTenantBroadcastRepository extends TenantBroadcastPort {
     event: string;
     eventType: TenantBroadcastEventType;
   }): Promise<void> {
-    const channel = TenantBroadcastPort.channelFor(input.eventType);
+    const channel = TenantBroadcast.channelFor(input.eventType);
     const message: TenantBroadcastMessage = {
       tenantId: input.tenantId,
       event: input.event,

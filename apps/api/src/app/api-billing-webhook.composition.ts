@@ -19,9 +19,9 @@ import {
   type SubscriptionNotificationPayload,
 } from "@langwatch/enterprise-billing-contract";
 import {
-  BillingSubscriptionNotifierPort,
+  BillingSubscriptionNotifier,
   BillingSubscriptionService,
-  BillingWebhookHostPort,
+  BillingWebhookHost,
   CurrencyService,
   CustomerService,
   EEWebhookService,
@@ -277,7 +277,7 @@ function composeBillingWriteHalf(
 function composeBillingWebhookHost(options: {
   notifications: NotificationService;
   dataRetention: DataRetentionApi | undefined;
-}): BillingWebhookHostPort {
+}): BillingWebhookHost {
   if (!options.dataRetention) {
     logger.warn(
       "No data-retention service composed: a first paid seat subscription will not be given the platform retention default.",
@@ -291,7 +291,7 @@ function composeBillingWebhookHost(options: {
 }
 
 /** The operators' Slack channel and the retention cascade, as the webhook reaches them. */
-class ApiBillingWebhookHost extends BillingWebhookHostPort {
+class ApiBillingWebhookHost extends BillingWebhookHost {
   static create(options: {
     notifications: NotificationService;
     dataRetention: DataRetentionApi;
@@ -337,7 +337,7 @@ class ApiBillingWebhookHost extends BillingWebhookHostPort {
 }
 
 /** A subscription notice, over the same Slack channel the webhook alerts on. */
-class ApiBillingSubscriptionNotifier extends BillingSubscriptionNotifierPort {
+class ApiBillingSubscriptionNotifier extends BillingSubscriptionNotifier {
   static create(notifications: NotificationService): ApiBillingSubscriptionNotifier {
     return new ApiBillingSubscriptionNotifier(notifications);
   }

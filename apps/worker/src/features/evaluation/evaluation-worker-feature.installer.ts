@@ -6,7 +6,7 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
@@ -60,7 +60,7 @@ export interface EvaluationWorkerCapability<TEvent extends Event = Event> {
  * actually been registered, so a mis-ordered graph fails loudly at boot
  * instead of dispatching into a pipeline that does not exist yet.
  */
-export class EvaluationWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class EvaluationWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create<TEvent extends Event>(options: {
     installer: EvaluationWorkerCapability<TEvent>;
     eventing: WorkerEventingRuntime;

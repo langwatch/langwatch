@@ -11,7 +11,7 @@ export type RetentionFamily = "dispatched_outbox" | "dead_outbox" | "inbox";
  * and the sweep would go on running while its metrics stopped moving — the
  * exact failure this sweep exists to make visible.
  */
-export abstract class ProcessRetentionMetricsPort {
+export abstract class ProcessRetentionMetrics {
   abstract recordSweptRows(family: RetentionFamily, rows: number): void;
 
   abstract recordFailure(family: RetentionFamily): void;

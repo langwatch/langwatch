@@ -14,14 +14,14 @@ import {
   CodexOAuthModelProviderTokenRefresherAdapter,
   EncryptedModelProviderCredentialAdapter,
   HttpModelProviderCredentialProbeAdapter,
-  ModelProviderManagedGatewayPort,
-  ModelProviderRateLimitPort,
+  ModelProviderManagedGateway,
+  ModelProviderRateLimit,
   type CodexTokenRefresher,
   type ModelProviderCatalog,
   type ModelProviderConnectionRateLimiter,
   type ModelProviderCredentialCodec,
   type ModelProviderIdService,
-  type ModelTranslationPort,
+  type ModelTranslation,
   PostgresModelProviderAdapter,
   PrefixedModelProviderIdAdapter,
   RegistryModelProviderCatalogAdapter,
@@ -34,7 +34,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import { nanoid } from "nanoid";
 import type {
@@ -57,7 +57,7 @@ export type ApiModelProviderCompositionOptions = Readonly<{
    * read a single stored credential, and every provider would look configured-but-unusable. The
    * process gates on it rather than composing a gateway that answers nothing.
    */
-  encryption: SecretEncryptionPort;
+  encryption: SecretEncryption;
   /** The process's fixed-window counter, shared with every other metered path. */
   rateLimit: (request: ApiRateLimitRequest) => Promise<ApiRateLimitResult>;
   /** The process configuration a SYSTEM provider's credential is read from. */
@@ -90,7 +90,7 @@ export type ApiModelProviderCompositionOptions = Readonly<{
 export function apiModelProviderParts(options: ApiModelProviderCompositionOptions): Readonly<{
   credentials: ModelProviderCredentialCodec;
   catalog: ModelProviderCatalog;
-  translation: ModelTranslationPort;
+  translation: ModelTranslation;
   ids: ModelProviderIdService;
   codexTokenRefresher: CodexTokenRefresher;
   connectionRateLimiter: ModelProviderConnectionRateLimiter;
@@ -193,7 +193,7 @@ class ApiManagedProviderConfigurationReporter extends ManagedProviderConfigurati
  * narrow adapter rather than the service itself, because the model-provider package is not
  * Enterprise and may not name an Enterprise contract.
  */
-class ApiManagedModelProviderGatewayAdapter extends ModelProviderManagedGatewayPort {
+class ApiManagedModelProviderGatewayAdapter extends ModelProviderManagedGateway {
   static create(input: { service: ManagedProviderApi }): ApiManagedModelProviderGatewayAdapter {
     return new ApiManagedModelProviderGatewayAdapter(input.service);
   }
@@ -222,7 +222,7 @@ class ApiManagedModelProviderGatewayAdapter extends ModelProviderManagedGatewayP
 }
 
 /** The connection-test windows, counted where this process counts everything else. */
-class ApiModelProviderRateLimitAdapter extends ModelProviderRateLimitPort {
+class ApiModelProviderRateLimitAdapter extends ModelProviderRateLimit {
   static create(input: {
     consume: (request: ApiRateLimitRequest) => Promise<ApiRateLimitResult>;
   }): ApiModelProviderRateLimitAdapter {

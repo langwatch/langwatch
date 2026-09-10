@@ -38,7 +38,7 @@ export type CodingAgentFailure = {
   id?: string;
 };
 
-export abstract class CodingAgentActivityHostPort {
+export abstract class CodingAgentActivityHost {
   /** Fails closed: an answer that has not arrived reads as no. */
   abstract hasPermission(permission: string): boolean;
 
@@ -57,7 +57,7 @@ export abstract class CodingAgentActivityHostPort {
   abstract failed(failure: CodingAgentFailure): void;
 }
 
-const CodingAgentActivityHostContext = createContext<CodingAgentActivityHostPort | undefined>(
+const CodingAgentActivityHostContext = createContext<CodingAgentActivityHost | undefined>(
   void 0,
 );
 
@@ -71,7 +71,7 @@ export const CodingAgentActivityHostProvider = CodingAgentActivityHostContext.Pr
  * which is a composition fault rather than something the table can degrade
  * around.
  */
-export function useCodingAgentActivityHost(): CodingAgentActivityHostPort {
+export function useCodingAgentActivityHost(): CodingAgentActivityHost {
   const host = useContext(CodingAgentActivityHostContext);
   if (!host) {
     throw new Error(

@@ -50,13 +50,13 @@ export type GovernanceActivityMonitorCapability = {
   }): Promise<SourceHealthMetrics>;
 };
 
-class AppGovernanceClickHouseClientPort extends GovernanceClickHouseClientPort {
+class AppGovernanceClickHouseClient extends GovernanceClickHouseClientPort {
   private constructor(private readonly client: ClickHouseClient) {
     super();
   }
 
-  static create(client: ClickHouseClient): AppGovernanceClickHouseClientPort {
-    return new AppGovernanceClickHouseClientPort(client);
+  static create(client: ClickHouseClient): AppGovernanceClickHouseClient {
+    return new AppGovernanceClickHouseClient(client);
   }
 
   query(input: GovernanceClickHouseQuery) {
@@ -64,7 +64,7 @@ class AppGovernanceClickHouseClientPort extends GovernanceClickHouseClientPort {
   }
 }
 
-class AppGovernanceClickHouseResolverPort extends GovernanceClickHouseResolverPort {
+class AppGovernanceClickHouseResolver extends GovernanceClickHouseResolverPort {
   private constructor(
     private readonly resolveClient: (organizationId: string) => Promise<ClickHouseClient | null>,
   ) {
@@ -73,13 +73,13 @@ class AppGovernanceClickHouseResolverPort extends GovernanceClickHouseResolverPo
 
   static create(
     resolveClient: (organizationId: string) => Promise<ClickHouseClient | null>,
-  ): AppGovernanceClickHouseResolverPort {
-    return new AppGovernanceClickHouseResolverPort(resolveClient);
+  ): AppGovernanceClickHouseResolver {
+    return new AppGovernanceClickHouseResolver(resolveClient);
   }
 
   async tryResolve(organizationId: string): Promise<GovernanceClickHouseClientPort | null> {
     const client = await this.resolveClient(organizationId);
-    return client ? AppGovernanceClickHouseClientPort.create(client) : null;
+    return client ? AppGovernanceClickHouseClient.create(client) : null;
   }
 }
 
@@ -99,7 +99,7 @@ export class AppIngestionSourceActivityAdapter {
     return new AppIngestionSourceActivityAdapter(options);
   }
 
-  clickhouse(): AppGovernanceClickHouseResolverPort {
-    return AppGovernanceClickHouseResolverPort.create(this.options.resolveClient);
+  clickhouse(): AppGovernanceClickHouseResolver {
+    return AppGovernanceClickHouseResolver.create(this.options.resolveClient);
   }
 }

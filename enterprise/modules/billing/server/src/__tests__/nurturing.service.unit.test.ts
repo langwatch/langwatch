@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BillingErrorReporterPort, NurturingService } from "../index.ts";
+import { BillingErrorReporter, NurturingService } from "../index.ts";
 import type { CioBatchCall } from "@langwatch/enterprise-billing-contract";
 
 // Suppress logger output and captureException in tests
@@ -12,7 +12,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
   createWarnThrottle: () => ({ claim: () => 0, reset: () => {} }),
 }));
-class FakeErrorReporter extends BillingErrorReporterPort {
+class FakeErrorReporter extends BillingErrorReporter {
   private constructor(readonly capture = vi.fn()) {
     super();
   }

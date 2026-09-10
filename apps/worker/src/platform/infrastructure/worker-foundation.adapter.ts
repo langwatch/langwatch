@@ -1,9 +1,9 @@
-import { AwsClientProcessRuntime, type OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { AwsClientProcessRuntime, type OutboundProxyResolver } from "@langwatch/aws-client";
 import {
   GroupQueueDependenciesAdapter,
   type GroupQueueDependencies,
   type GroupQueuePolicy,
-  type GroupQueueStoragePort,
+  type GroupQueueStorage,
 } from "@langwatch/group-queue";
 import {
   RedisConnectionService,
@@ -17,16 +17,16 @@ import { WorkerStoredObjectStorageRuntimeFactory } from "./worker-stored-object-
 
 /** Named construction port for the storage implementation owned by a host. */
 export type WorkerStorageLease = {
-  storage: GroupQueueStoragePort;
+  storage: GroupQueueStorage;
   close(): Promise<void>;
 };
 
-export abstract class WorkerStorageFactoryPort {
+export abstract class WorkerStorageFactory {
   abstract create(options: { aws: AwsClientProcessRuntime }): WorkerStorageLease;
 }
 
 /** Adapts the canonical Stored Object project view to Group Queue's port. */
-export class WorkerStoredObjectStorageFactory extends WorkerStorageFactoryPort {
+export class WorkerStoredObjectStorageFactory extends WorkerStorageFactory {
   static create(options: {
     runtime: StoredObjectStorageRuntimeAdapter;
   }): WorkerStoredObjectStorageFactory {
@@ -54,8 +54,8 @@ export type WorkerInfrastructureAdapterOptions = {
   redis: RedisConfigResolution;
   redisLogger?: RedisLogger;
   queuePolicy?: GroupQueuePolicy;
-  outboundProxy: OutboundProxyResolverPort;
-  storage?: WorkerStorageFactoryPort;
+  outboundProxy: OutboundProxyResolver;
+  storage?: WorkerStorageFactory;
   storageRuntime?: StoredObjectStorageRuntimeAdapter;
   storedObjectStorage?: WorkerStoredObjectStorageRuntimeFactory;
 };

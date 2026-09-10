@@ -1,8 +1,7 @@
-import { GatewaySettlementPolicyPort } from "../ports/gateway-settlement-policy.port.ts";
+import { GatewaySettlementPolicy } from "../app/gateway.infrastructure.ts";
 
-export class FixedGatewaySettlementPolicyAdapter extends GatewaySettlementPolicyPort {
+export class FixedGatewaySettlementPolicyAdapter implements GatewaySettlementPolicy {
   private constructor(private readonly value: number) {
-    super();
   }
 
   static create(graceMs: number): FixedGatewaySettlementPolicyAdapter {

@@ -13,7 +13,7 @@ import {
   type ExecutionSummary,
 } from "@langwatch/experiment-contract";
 import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
-import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port.ts";
+import type { ExperimentRunErrorReporting } from "../ports/experiment-run-error-reporting.port.ts";
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process.ts";
 import {
@@ -37,7 +37,7 @@ export type StartPollingRunInput = Omit<OrchestratorInput, "runId" | "scope" | "
    * Where an unexpected failure is reported beyond the log line. Optional: a
    * deployment that composes none loses nothing the customer can see.
    */
-  errorReporting?: ExperimentRunErrorReportingPort;
+  errorReporting?: ExperimentRunErrorReporting;
   /** Defaults to a full run when omitted. */
   scope?: ExecutionScope;
   /**
@@ -76,7 +76,7 @@ const reportFailedRun = async ({
   experimentSlug: string;
   projectId: string;
   progress: ExperimentRunProgressRepository;
-  errorReporting?: ExperimentRunErrorReportingPort;
+  errorReporting?: ExperimentRunErrorReporting;
 }): Promise<void> => {
   const failure = mapThrownErrorEvent({ error });
   const code = failure.type === "error" ? failure.message : UNNAMED_FAILURE;
@@ -115,7 +115,7 @@ const runExecution = async ({
   experimentSlug: string;
   persistResults?: RunResultsPersistence;
   progress: ExperimentRunProgressRepository;
-  errorReporting?: ExperimentRunErrorReportingPort;
+  errorReporting?: ExperimentRunErrorReporting;
 }): Promise<void> => {
   const draft = emptyRunResultsDraft();
 

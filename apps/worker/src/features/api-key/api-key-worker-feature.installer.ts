@@ -1,9 +1,9 @@
 import { EventingAgentSandboxMaintenanceAdapter } from "@langwatch/api-key-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** The revoke half of the sweep, so a caller can supply one without a database. */
-export abstract class WorkerAgentSandboxKeyReapPort {
+export abstract class WorkerAgentSandboxKeyReap {
   /** Revokes every elapsed, unrevoked sandbox key; answers how many. */
   abstract reap(): Promise<number>;
 }
@@ -23,10 +23,10 @@ export abstract class WorkerAgentSandboxKeyReapPort {
  * the ones this graph's own process store prunes, and a definition built against
  * another store prunes another process's rows.
  */
-export class ApiKeyWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class ApiKeyWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     eventing: WorkerEventingRuntime;
-    sandboxKeyReap: WorkerAgentSandboxKeyReapPort;
+    sandboxKeyReap: WorkerAgentSandboxKeyReap;
   }): ApiKeyWorkerFeatureInstaller {
     return new ApiKeyWorkerFeatureInstaller(options.eventing, options.sandboxKeyReap);
   }
@@ -36,7 +36,7 @@ export class ApiKeyWorkerFeatureInstaller implements WorkerFeatureInstallerPort 
 
   private constructor(
     private readonly eventing: WorkerEventingRuntime,
-    private readonly sandboxKeyReap: WorkerAgentSandboxKeyReapPort,
+    private readonly sandboxKeyReap: WorkerAgentSandboxKeyReap,
   ) {}
 
   async install(): Promise<WorkerFeatureCloser | undefined> {

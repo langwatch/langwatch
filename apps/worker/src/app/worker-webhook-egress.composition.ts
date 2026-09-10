@@ -1,7 +1,7 @@
 import type { WebhookDeliveryTransport } from "@langwatch/automation-server";
 import {
   InMemoryWebhookDispatchRateLimiterAdapter,
-  WebhookDispatchRateLimiterPort,
+  WebhookDispatchRateLimiter,
   WebhookEgressService,
   type WebhookDispatchRateLimitResult,
 } from "@langwatch/egress";
@@ -48,7 +48,7 @@ export type WorkerWebhookEgressCompositionOptions = Readonly<{
  */
 export function createWorkerWebhookDispatchRateLimiter(
   options: WorkerWebhookEgressCompositionOptions,
-): WebhookDispatchRateLimiterPort {
+): WebhookDispatchRateLimiter {
   return options.redis
     ? new WorkerWebhookDispatchRateLimiter(options.redis)
     : InMemoryWebhookDispatchRateLimiterAdapter.create();
@@ -65,7 +65,7 @@ export function createWorkerWebhookDispatchRateLimiter(
 export function createWorkerWebhookEgress(
   options: WorkerWebhookEgressCompositionOptions & {
     /** The process's own counter, where one has already been composed. */
-    rateLimiter?: WebhookDispatchRateLimiterPort;
+    rateLimiter?: WebhookDispatchRateLimiter;
   },
 ): WebhookEgressService {
   return WebhookEgressService.create({
@@ -94,7 +94,7 @@ export function createWorkerWebhookTransport(
  * pipelines are twinned, and a process counting under a different key spends a
  * budget the other was protecting.
  */
-class WorkerWebhookDispatchRateLimiter extends WebhookDispatchRateLimiterPort {
+class WorkerWebhookDispatchRateLimiter extends WebhookDispatchRateLimiter {
   constructor(private readonly connection: RedisConnection) {
     super();
   }

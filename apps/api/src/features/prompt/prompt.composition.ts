@@ -24,7 +24,7 @@ import type { ComposedPromptFeature } from "./prompt.composition.types.ts";
  * The product signal a project's new prompt fires, for a deployment that has
  * one. Fire and forget: it may never fail a create.
  */
-export abstract class ApiPromptNurturingPort {
+export abstract class ApiPromptNurturing {
   abstract afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
 }
 
@@ -37,7 +37,7 @@ export type PromptPeers = Readonly<{
   /** The model gateway a stored prompt's model reference is resolved against. */
   modelProviders?: ModelProviderApi;
   /** The nurturing sink, where the deployment composed one. */
-  nurturing?: ApiPromptNurturingPort;
+  nurturing?: ApiPromptNurturing;
 }>;
 
 /** Installs `prompts.*`, `promptTags.*` and `/api/prompts` over this process's own graph. */
@@ -84,7 +84,7 @@ export async function installApiPrompt(options: {
  * product-analytics sink. Logged rather than refused: it is a marketing
  * signal, and refusing it would cost somebody the prompt they just wrote.
  */
-class LoggedApiPromptNurturing extends ApiPromptNurturingPort {
+class LoggedApiPromptNurturing extends ApiPromptNurturing {
   static create(logger: Logger): LoggedApiPromptNurturing {
     return new LoggedApiPromptNurturing(logger);
   }

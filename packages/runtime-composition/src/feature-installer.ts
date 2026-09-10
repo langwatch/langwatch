@@ -19,7 +19,7 @@ import {
 } from "./repository-registry.ts";
 
 /** Which process is booting. A role hosts only the work that role owns. */
-export type ServerRole = "api" | "worker" | "task";
+export type ServerRole = "api" | "worker" | "tasks";
 
 /** As much of Zod as a feature's config needs, so this package depends on none. */
 export interface FeatureConfigSchema<Config> {
@@ -186,6 +186,10 @@ export interface InstallableServerFeature<Infrastructure> {
   readonly transportDependencies: TokenMap;
   readonly providers: readonly FeatureProvider<never>[];
   readonly contributesWorkerWork: boolean;
+  /** Background work the worker role starts, declared with `withWorkers`. */
+  readonly workers?: readonly unknown[];
+  /** One-shot work the tasks role exposes, declared with `withTasks`. */
+  readonly tasks?: readonly unknown[];
   /**
    * The pool members this module named with `needs`. Types erase, so this is
    * what boot reads to refuse a process whose pool supplies one as undefined.
@@ -833,18 +837,26 @@ class RepositoryAppBuilder<
 
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
-  ): Readonly<{
-    build: () => ReturnType<
+  ): ModuleContributions<
+    ReturnType<
       RepositoryAppBuilder<Name, Definitions, Dependencies, Infrastructure, Config, App>["build"]
-    > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> };
-  }> {
-    return {
-      build: () => ({
-        ...this.build(),
-        transports,
-        namespace: publicNamespace(this.name),
-      }),
-    };
+    > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> }
+  > {
+    return withContributions(
+      { ...this.build(), transports, namespace: publicNamespace(this.name) },
+      [],
+      [],
+    );
+  }
+
+  /** Background work this module contributes to the worker role. */
+  withWorkers(...workers: readonly unknown[]) {
+    return withContributions(this.build(), workers, []);
+  }
+
+  /** One-shot work this module contributes to the tasks role. */
+  withTasks(...tasks: readonly unknown[]) {
+    return withContributions(this.build(), [], tasks);
   }
 
   build(): ServerFeatureDeclaration<
@@ -950,6 +962,16 @@ class ConfiguredAppBuilder<
     return new ConfiguredAppWithTransportsBuilder(this.name, this.app, transports, this.needs);
   }
 
+  /** Background work this module contributes to the worker role. */
+  withWorkers(...workers: readonly unknown[]) {
+    return withContributions(this.build(), workers, []);
+  }
+
+  /** One-shot work this module contributes to the tasks role. */
+  withTasks(...tasks: readonly unknown[]) {
+    return withContributions(this.build(), [], tasks);
+  }
+
   build(): ServerFeatureDeclaration<
     Config,
     Infrastructure,
@@ -1002,6 +1024,16 @@ class UnconfiguredAppBuilder<
     return new UnconfiguredAppWithTransportsBuilder(this.name, this.app, transports, this.needs);
   }
 
+  /** Background work this module contributes to the worker role. */
+  withWorkers(...workers: readonly unknown[]) {
+    return withContributions(this.build(), workers, []);
+  }
+
+  /** One-shot work this module contributes to the tasks role. */
+  withTasks(...tasks: readonly unknown[]) {
+    return withContributions(this.build(), [], tasks);
+  }
+
   build(): ServerFeatureDeclaration<
     undefined,
     Infrastructure,
@@ -1051,6 +1083,16 @@ class ConfiguredAppWithTransportsBuilder<
     private readonly needs: readonly string[] = [],
   ) {}
 
+  /** Background work this module contributes to the worker role. */
+  withWorkers(...workers: readonly unknown[]) {
+    return withContributions(this.build(), workers, []);
+  }
+
+  /** One-shot work this module contributes to the tasks role. */
+  withTasks(...tasks: readonly unknown[]) {
+    return withContributions(this.build(), [], tasks);
+  }
+
   build(): ServerFeatureDeclaration<
     Config,
     Infrastructure,
@@ -1085,6 +1127,16 @@ class UnconfiguredAppWithTransportsBuilder<
     private readonly needs: readonly string[] = [],
   ) {}
 
+  /** Background work this module contributes to the worker role. */
+  withWorkers(...workers: readonly unknown[]) {
+    return withContributions(this.build(), workers, []);
+  }
+
+  /** One-shot work this module contributes to the tasks role. */
+  withTasks(...tasks: readonly unknown[]) {
+    return withContributions(this.build(), [], tasks);
+  }
+
   build(): ServerFeatureDeclaration<
     undefined,
     Infrastructure,
@@ -1103,6 +1155,37 @@ class UnconfiguredAppWithTransportsBuilder<
       namespace: publicNamespace(this.name),
     };
   }
+}
+
+/**
+ * A declaration that is already installable and still accepts the work a role
+ * other than the api owns. Every call answers a declaration, so a module can
+ * never be left half-declared (ADR-144 s1).
+ */
+export type ModuleContributions<Declaration> = Declaration &
+  Readonly<{
+    readonly workers: readonly unknown[];
+    readonly tasks: readonly unknown[];
+    withWorkers(...workers: readonly unknown[]): ModuleContributions<Declaration>;
+    withTasks(...tasks: readonly unknown[]): ModuleContributions<Declaration>;
+    build(): Declaration & Readonly<{ workers: readonly unknown[]; tasks: readonly unknown[] }>;
+  }>;
+
+/** Adds the worker and task halves to a built declaration. */
+function withContributions<Declaration extends object>(
+  declaration: Declaration,
+  workers: readonly unknown[],
+  tasks: readonly unknown[],
+): ModuleContributions<Declaration> {
+  const contributed = { ...declaration, workers, tasks };
+  return {
+    ...contributed,
+    withWorkers: (...next: readonly unknown[]) =>
+      withContributions(declaration, [...workers, ...next], tasks),
+    withTasks: (...next: readonly unknown[]) =>
+      withContributions(declaration, workers, [...tasks, ...next]),
+    build: () => contributed,
+  } as ModuleContributions<Declaration>;
 }
 
 function parseFeatureConfig<Config>(

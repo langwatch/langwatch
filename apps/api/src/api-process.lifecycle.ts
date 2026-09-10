@@ -8,7 +8,7 @@ import { Hono } from "hono";
  * A boot-time dependency probe. It runs before the API listener accepts
  * traffic; the public health route remains an inexpensive liveness probe.
  */
-export abstract class ApiReadinessPort {
+export abstract class ApiReadiness {
   abstract assertReady(): Promise<void>;
 }
 
@@ -16,7 +16,7 @@ export abstract class ApiReadinessPort {
  * Process-owned metrics transport. It owns its own authentication and metric
  * registry so API composition never imports a platform-global registry.
  */
-export abstract class ApiMetricsPort {
+export abstract class ApiMetrics {
   abstract respond(request: Request): Promise<Response>;
 }
 
@@ -26,12 +26,12 @@ export type ApiRequestFailure = Readonly<{
 }>;
 
 /** Records an uncaught HTTP failure without changing its client response. */
-export abstract class ApiRequestFailureCapturePort {
+export abstract class ApiRequestFailureCapture {
   abstract capture(failure: ApiRequestFailure): Promise<void>;
 }
 
 /** Binds request failures to the API process's configured logger and tracer. */
-export class ObservabilityApiRequestFailureCaptureAdapter extends ApiRequestFailureCapturePort {
+export class ObservabilityApiRequestFailureCaptureAdapter extends ApiRequestFailureCapture {
   static create(options: {
     logger: Pick<Logger, "error">;
     tracer: Tracer;
@@ -70,7 +70,7 @@ export class ObservabilityApiRequestFailureCaptureAdapter extends ApiRequestFail
  * and HEAD return an empty 204 after boot completed its readiness gate.
  */
 export class ApiProcessLifecycleRoutes {
-  static create(options: { metrics?: ApiMetricsPort; rest?: Hono }): Hono {
+  static create(options: { metrics?: ApiMetrics; rest?: Hono }): Hono {
     const routes = new Hono();
     // Process-owned, so they carry no builder chain — but the boot assertion
     // reads the registry, and a route missing from it is indistinguishable

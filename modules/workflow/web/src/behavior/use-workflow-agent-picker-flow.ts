@@ -12,7 +12,7 @@ export type AgentPickerCallbacks = {
   onClose: () => void;
 };
 
-export type AgentPickerPort = {
+export type AgentPicker = {
   register: (callbacks: AgentPickerCallbacks) => void;
   registerCreation: (onSave: (agent: AgentWithFields) => void) => void;
   openList: () => void;
@@ -21,7 +21,7 @@ export type AgentPickerPort = {
 };
 
 /** Workflow-owned state transition for selecting an agent after a canvas drop. */
-export function useWorkflowAgentPickerFlow(port: AgentPickerPort) {
+export function useWorkflowAgentPickerFlow(port: AgentPicker) {
   const { setNode, deleteNode, setSelectedNode } = useWorkflowStore((state) => ({
     setNode: state.setNode,
     deleteNode: state.deleteNode,

@@ -3,11 +3,11 @@
  */
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import {
-  WorkflowNlpRuntimePort,
+  WorkflowNlpRuntime,
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
-} from "../ports/workflow.port.ts";
-import type { NlpLambdaInvokePort, NlpPayloadStagingPort } from "../ports/workflow-nlp-lambda.port.ts";
+} from "../app/workflow.app.ts";
+import type { NlpLambdaInvoke, NlpPayloadStaging } from "../app/workflow.app.ts";
 import {
   NlpInvokeTransportAdapter,
   type NlpInvokeStagingConfig,
@@ -74,7 +74,7 @@ export type NlpDispatchRequest = Readonly<{
  * the Go implementation under the `/go` prefix, so a caller's `path` (`/studio/execute_sync`)
  * is rewritten to `/go/studio/execute_sync`.
  */
-export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
+export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
   /** {@link formatTraceparent}, as the adapter's own surface. */
   static formatTraceparent(
     parent: { traceId: string; parentSpanId: string },
@@ -97,13 +97,13 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
     /** Injected so a test drives the wire without a listener. */
     fetch?: typeof fetch;
     /** Composed only where the engine is reached by ARN; see the transport. */
-    lambda?: NlpLambdaInvokePort | undefined;
+    lambda?: NlpLambdaInvoke | undefined;
     /**
      * Where an oversized invoke body is parked. REQUIRED: a deployment with no
      * object storage composes the refusing adapter, so an over-threshold
      * payload is named rather than posted into the Lambda body cap.
      */
-    staging: NlpPayloadStagingPort;
+    staging: NlpPayloadStaging;
     stagingConfig?: NlpInvokeStagingConfig | undefined;
   }): HttpWorkflowNlpRuntimeAdapter {
     return new HttpWorkflowNlpRuntimeAdapter(options);
@@ -115,8 +115,8 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
     private readonly options: {
       serviceUrl: string;
       fetch?: typeof fetch;
-      lambda?: NlpLambdaInvokePort | undefined;
-      staging: NlpPayloadStagingPort;
+      lambda?: NlpLambdaInvoke | undefined;
+      staging: NlpPayloadStaging;
       stagingConfig?: NlpInvokeStagingConfig | undefined;
     },
   ) {
@@ -197,7 +197,7 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
 /**
  * The engine this deployment did not configure.
  */
-export class UnconfiguredWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
+export class UnconfiguredWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
   static create(): UnconfiguredWorkflowNlpRuntimeAdapter {
     return new UnconfiguredWorkflowNlpRuntimeAdapter();
   }

@@ -1,7 +1,7 @@
 import type { AssignTopicCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { EventingTraceTopicAssignmentPort } from "../eventing.trace-topic-assignment.service.ts";
+import { EventingTraceTopicAssignment } from "../eventing.trace-topic-assignment.service.ts";
 import { TraceTopicAssignmentCommand } from "../../app/trace.infrastructure.ts";
 
 class Commands implements TraceTopicAssignmentCommand {
@@ -12,10 +12,10 @@ class Commands implements TraceTopicAssignmentCommand {
   }
 }
 
-describe("EventingTraceTopicAssignmentPort", () => {
+describe("EventingTraceTopicAssignment", () => {
   it("validates and sends Trace-owned topic assignments through the named command port", async () => {
     const commands = new Commands();
-    const assignments = EventingTraceTopicAssignmentPort.create(commands);
+    const assignments = EventingTraceTopicAssignment.create(commands);
     const input: AssignTopicCommandData = {
       tenantId: "tenant_1",
       traceId: "trace_1",

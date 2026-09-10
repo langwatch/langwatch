@@ -12,9 +12,9 @@ import {
   uiActionKeys,
 } from "../langy-ui-action.service.ts";
 import {
-  LangyUiActionCatalogPort,
+  LangyUiActionCatalog,
   type LangyUiActionDefinition,
-} from "../../ports/langy-ui-action-catalog.port.ts";
+} from "../../app/langy.infrastructure.ts";
 
 const duplicateTargetSchema = z.object({ targetId: z.string() });
 const runSchema = z.object({});
@@ -34,7 +34,7 @@ const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
   },
 };
 
-class FakeUiActionCatalog extends LangyUiActionCatalogPort {
+class FakeUiActionCatalog implements LangyUiActionCatalog {
   tryFind(kind: string): LangyUiActionDefinition | null {
     return FAKE_DEFINITIONS[kind] ?? null;
   }

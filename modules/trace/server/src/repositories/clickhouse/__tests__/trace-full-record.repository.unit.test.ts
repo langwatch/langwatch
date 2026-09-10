@@ -5,12 +5,12 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceClickHousePort, type TraceClickHouseClient } from "../../trace-clickhouse-client.repository.ts";
+import { TraceClickHouse, type TraceClickHouseClient } from "../../trace-clickhouse-client.repository.ts";
 import { TracePayloadReaderRepository } from "../../read/trace-payload-reader.repository.ts";
 import { TraceFullIo } from "../../../app/trace.infrastructure.ts";
 import { ClickHouseTraceFullRecordRepository } from "../trace-full-record.repository.ts";
 
-class ClientPort extends TraceClickHousePort {
+class ClientPort extends TraceClickHouse {
   readonly tenants: string[] = [];
 
   constructor(private readonly client: TraceClickHouseClient) {

@@ -33,6 +33,7 @@ export const FEATURE_SHAPE_LEGACY_KINDS = [
   "nested-transport",
   "legacy-transport-runtime",
   "unregistered-repositories",
+  "unregistered-channels",
   "postgres-without-memory",
   "memory-twin-untested",
   "no-installer",
@@ -68,6 +69,8 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
     "A transport is a declaration the process mounts on its runtime: defineRestRouter(<Feature>Api) mounted with createRestRuntime, defineTrpcRouter mounted with createTrpcRuntime. The legacy builders (createVersionedApp, createTrpcService, mountProjectTransport and their kin) are deleted when the last family leaves them.",
   "unregistered-repositories":
     "Add repositories/<feature>-repositories.registry.ts with defineRepositories({ postgres, memory }) and select it with .withRepositories() in <feature>.server.ts.",
+  "unregistered-channels":
+    "A channel carries messages the module does not own the state of. Add channels/<feature>-channels.registry.ts with defineChannels({ live, memory }) and a memory twin under channels/memory/ for every live tier.",
   "postgres-without-memory":
     "Every Prisma repository has a memory twin under repositories/memory/, bundled by memory.<feature>.repositories.ts, so the app is tested without a database.",
   "memory-twin-untested":
@@ -236,6 +239,18 @@ function serverFindings(
       isDirectory(join(memory, "__tests__")) ||
       files(join(repositories, "__tests__")).some((name) => name.endsWith(".contract.test.ts"));
     if (isDirectory(memory) && !contractTested) add("memory-twin-untested", memory);
+  }
+
+  const channels = join(src, "channels");
+
+  if (isDirectory(channels)) {
+    const registered = files(channels).some((name) => name.endsWith(".registry.ts"));
+    if (!registered) add("unregistered-channels", channels);
+
+    const tiers = subdirectories(channels).filter((name) => !TEST_DIRECTORIES.has(name));
+    const live = tiers.filter((name) => name !== "memory");
+    const twinMissing = live.length > 0 && !tiers.includes("memory");
+    if (twinMissing) add("unregistered-channels", join(channels, live[0]));
   }
 
   return findings;

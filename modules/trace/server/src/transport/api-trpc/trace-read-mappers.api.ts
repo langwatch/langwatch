@@ -31,7 +31,7 @@ import { TraceAttributeRedactionService } from "../../services/attribute/trace-a
 // ---------------------------------------------------------------------------
 
 /** How a span's captured input/output becomes the text the drawer renders. */
-export type TraceSpanDisplayPort = Readonly<{
+export type TraceSpanDisplay = Readonly<{
   buildDisplayInput(span: Pick<Span, "input" | "params">): string | null;
   stringifySpanIO(io: SpanInputOutput | null | undefined): string | null;
 }>;
@@ -41,7 +41,7 @@ export type TraceSpanDisplayPort = Readonly<{
  * input/output, strips its metrics behind `cost:view`, and scrubs hidden
  * content wherever it rides along inside `params` and events.
  */
-export type TraceSpanProtectionPort = Readonly<{
+export type TraceSpanProtection = Readonly<{
   applySpanProtections(span: Span, protections: Protections, redactions: Set<string>): Span;
   extractRedactionsFromAllSpanInputs(spans: Span[]): string[];
   extractRedactionsFromAllSpanOutputs(spans: Span[]): string[];
@@ -57,7 +57,7 @@ export type TraceSpanProtectionPort = Readonly<{
  * each content category, the per-span markers ingestion stamps, and the
  * conversation rewriter that removes hidden chat turns.
  */
-export type TraceContentPrivacyPort = Readonly<{
+export type TraceContentPrivacy = Readonly<{
   /** Built-in span-attribute keys per content category. */
   contentKeyCatalog: Record<ContentCategory, readonly string[]>;
   /** Attribute naming the categories ingestion dropped from this span. */
@@ -81,9 +81,9 @@ export type TraceContentPrivacyPort = Readonly<{
 
 /** The three application capabilities the trace-view mappers take. */
 export type TraceReadMapperPorts = Readonly<{
-  spanDisplay: TraceSpanDisplayPort;
-  spanProtection: TraceSpanProtectionPort;
-  contentPrivacy: TraceContentPrivacyPort;
+  spanDisplay: TraceSpanDisplay;
+  spanProtection: TraceSpanProtection;
+  contentPrivacy: TraceContentPrivacy;
 }>;
 
 // ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ export function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader 
 export async function deriveTraceDropPrivacy(
   rawHeader: Pick<TraceHeader, "input" | "output">,
   projectId: string,
-  contentPrivacy: TraceContentPrivacyPort,
+  contentPrivacy: TraceContentPrivacy,
 ): Promise<TraceHeader["privacy"]> {
   try {
     const policy = await contentPrivacy.getResolvedPolicyForProject({ projectId });
@@ -218,7 +218,7 @@ export function mapSpanToDetail(
     timeUnixMs: number;
     attributes: Record<string, unknown>;
   }>,
-  spanDisplay: TraceSpanDisplayPort,
+  spanDisplay: TraceSpanDisplay,
 ): SpanDetail {
   let status: SpanDetail["status"] = "unset";
   if (span.error) status = "error";
@@ -265,7 +265,7 @@ export function buildSpanContentRedactions(
     canSeeCapturedInput?: boolean | null;
     canSeeCapturedOutput?: boolean | null;
   },
-  spanProtection: TraceSpanProtectionPort,
+  spanProtection: TraceSpanProtection,
 ): Set<string> {
   return new Set<string>([
     ...(protections.canSeeCapturedInput !== true
@@ -375,7 +375,7 @@ export function contentSearchTermsForViewer({
  */
 function hiddenCategoryAttributeRules(
   protections: V2Protections,
-  contentPrivacy: TraceContentPrivacyPort,
+  contentPrivacy: TraceContentPrivacy,
 ): Array<{ pattern: string; visibleTo: string }> {
   const cats = protections.contentCategories;
   if (!cats) return [];
@@ -400,7 +400,7 @@ function stripHiddenChatTurnsFromArray(
   node: unknown[],
   roles: ReadonlySet<string>,
   stripToolCalls: boolean,
-  contentPrivacy: TraceContentPrivacyPort,
+  contentPrivacy: TraceContentPrivacy,
 ): unknown[] {
   const out: unknown[] = [];
   for (const item of node) {
@@ -416,7 +416,7 @@ function stripHiddenChatTurnsFromObject(
   node: object,
   roles: ReadonlySet<string>,
   stripToolCalls: boolean,
-  contentPrivacy: TraceContentPrivacyPort,
+  contentPrivacy: TraceContentPrivacy,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(node)) {
@@ -431,7 +431,7 @@ function stripHiddenChatTurnsDeep(
   node: unknown,
   roles: ReadonlySet<string>,
   stripToolCalls: boolean,
-  contentPrivacy: TraceContentPrivacyPort,
+  contentPrivacy: TraceContentPrivacy,
 ): unknown {
   if (Array.isArray(node)) {
     return stripHiddenChatTurnsFromArray(node, roles, stripToolCalls, contentPrivacy);
@@ -491,7 +491,7 @@ function redactHiddenAttributes<T extends RedactableV2Dto>(
   redacted: T & V2RedactionFlags,
   dto: T,
   protections: V2Protections,
-  contentPrivacy: TraceContentPrivacyPort,
+  contentPrivacy: TraceContentPrivacy,
 ): void {
   const hidden = [
     ...(protections.hiddenAttributes ?? []),
@@ -526,7 +526,7 @@ function stripHiddenTurnsFromCarriers<T extends RedactableV2Dto>(
   redacted: T & V2RedactionFlags,
   roles: ReadonlySet<string>,
   stripToolCalls: boolean,
-  contentPrivacy: TraceContentPrivacyPort,
+  contentPrivacy: TraceContentPrivacy,
 ): void {
   if (roles.size === 0 && !stripToolCalls) return;
 
@@ -551,7 +551,7 @@ function stripHiddenTurnsFromCarriers<T extends RedactableV2Dto>(
 export function redactV2Content<T extends RedactableV2Dto>(
   dto: T,
   protections: V2Protections,
-  contentPrivacy: TraceContentPrivacyPort,
+  contentPrivacy: TraceContentPrivacy,
 ): T & V2RedactionFlags {
   // A field is redacted only when there WAS content the viewer may not see, so a
   // genuinely empty input never renders the placeholder. The audience label
@@ -596,7 +596,7 @@ export function toConversationContextTurn({
 }: {
   trace: TraceListItem;
   protections: V2Protections;
-  contentPrivacy: TraceContentPrivacyPort;
+  contentPrivacy: TraceContentPrivacy;
 }) {
   const { input, output, inputRedacted, outputRedacted, inputVisibleTo, outputVisibleTo } =
     redactV2Content(
@@ -657,7 +657,7 @@ function readNestedString(
  */
 export function readDroppedFromParams(
   params: Record<string, unknown> | null | undefined,
-  contentPrivacy: TraceContentPrivacyPort,
+  contentPrivacy: TraceContentPrivacy,
 ): Set<string> {
   const value = readNestedString(params, contentPrivacy.droppedMarkerAttribute);
   if (value == null) return new Set();
@@ -672,7 +672,7 @@ export function readDroppedFromParams(
 /** Whether a span carries the incomplete-strict-PII marker. */
 export function readPiiIncompleteFromParams(
   params: Record<string, unknown> | null | undefined,
-  contentPrivacy: TraceContentPrivacyPort,
+  contentPrivacy: TraceContentPrivacy,
 ): boolean {
   return readNestedString(params, contentPrivacy.piiIncompleteMarkerAttribute) != null;
 }

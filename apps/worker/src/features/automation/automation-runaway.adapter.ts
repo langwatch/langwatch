@@ -1,13 +1,13 @@
 import {
-  AutomationHeartbeatPort,
+  AutomationHeartbeat,
   AutomationRunawayMetricsSink,
-  AutomationRunawayPort,
+  AutomationRunaway,
   type ClaimLease,
 } from "@langwatch/automation-server";
 import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { sendAutomationLimitEmail } from "@langwatch/mail";
-import type { EmailDeliveryPort } from "@langwatch/notification-server";
+import type { EmailDelivery } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -29,7 +29,7 @@ export type WorkerAutomationRunawayDirectories = Readonly<{
 }>;
 
 /** The routed client a project's traces are counted on. */
-export type WorkerRunawayClickHouseResolver = AutomationHeartbeatPort["tryResolveClickHouseClient"];
+export type WorkerRunawayClickHouseResolver = AutomationHeartbeat["tryResolveClickHouseClient"];
 
 /** Which addresses this project has already asked not to hear from again. */
 export type WorkerAutomationRunawaySuppression = Readonly<{
@@ -64,12 +64,12 @@ export type WorkerAutomationNextStepResolver = Readonly<{
  * from the interactive one — the same ClickHouse count, the same ADMIN-only
  * roll, the same suppression fall-open, the same claim keys.
  */
-export class WorkerAutomationRunawayAdapter extends AutomationRunawayPort {
+export class WorkerAutomationRunawayAdapter extends AutomationRunaway {
   static create(input: {
     redis: RedisConnection | null;
     directories: WorkerAutomationRunawayDirectories;
     suppression: WorkerAutomationRunawaySuppression;
-    mailer: EmailDeliveryPort;
+    mailer: EmailDelivery;
     resolveClickHouseClient: WorkerRunawayClickHouseResolver;
     metrics: AutomationRunawayMetricsSink;
     baseHost: string;
@@ -88,7 +88,7 @@ export class WorkerAutomationRunawayAdapter extends AutomationRunawayPort {
       redis: RedisConnection | null;
       directories: WorkerAutomationRunawayDirectories;
       suppression: WorkerAutomationRunawaySuppression;
-      mailer: EmailDeliveryPort;
+      mailer: EmailDelivery;
       resolveClickHouseClient: WorkerRunawayClickHouseResolver;
       metrics: AutomationRunawayMetricsSink;
       baseHost: string;

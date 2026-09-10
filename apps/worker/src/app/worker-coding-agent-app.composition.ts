@@ -1,10 +1,10 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
-  CodingAgentCallerScopeDirectoryPort,
-  CodingAgentScopePermissionsPort,
+  CodingAgentCallerScopeDirectory,
+  CodingAgentScopePermissions,
   codingAgentServer,
-  type CodingAgentBillingPolicyPort,
-  type CodingAgentClickHousePort,
+  type CodingAgentBillingPolicy,
+  type CodingAgentClickHouse,
   type CodingAgentScopeCaller,
   type CodingAgentScopePermission,
   type CodingAgentScopeProject,
@@ -44,8 +44,8 @@ export async function createWorkerCodingAgentApp(options: {
   organizations: OrganizationApi;
   projects: ProjectApi;
   authorization: AuthzApi;
-  billing: CodingAgentBillingPolicyPort;
-  clickHouse: CodingAgentClickHousePort | null;
+  billing: CodingAgentBillingPolicy;
+  clickHouse: CodingAgentClickHouse | null;
   defaultTraceRetentionDays: number;
   redis: WorkerGithubRedisConnection | null;
   github: GithubServerConfig;
@@ -109,7 +109,7 @@ export async function createWorkerCodingAgentApp(options: {
   return { app: runtime.module(codingAgentServer).provided, github };
 }
 
-class WorkerCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectoryPort {
+class WorkerCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectory {
   constructor(private readonly database: PrismaConnection["client"]) {
     super();
   }
@@ -142,7 +142,7 @@ class WorkerCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectoryPor
   }
 }
 
-class WorkerCodingAgentScopePermissions extends CodingAgentScopePermissionsPort {
+class WorkerCodingAgentScopePermissions extends CodingAgentScopePermissions {
   constructor(private readonly authorization: AuthzApi) {
     super();
   }

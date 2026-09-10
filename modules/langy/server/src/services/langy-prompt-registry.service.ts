@@ -9,7 +9,7 @@ import { LANGY_PROMPT_DEFAULT_TAG, type LangyPromptHandle } from "@langwatch/lan
 const logger = createLogger("langwatch:langy:prompt-registry");
 
 /** Narrow technical port over the external Prompt feature. */
-export abstract class LangyPromptPort {
+export abstract class LangyPrompt {
   abstract tryGetPromptByIdOrHandle(input: {
     idOrHandle: string;
     projectId: string;
@@ -38,13 +38,13 @@ export interface ResolvedLangyPrompt {
 }
 
 export class LangyPromptRegistryService {
-  static create(options: { prompts: LangyPromptPort }): LangyPromptRegistryService {
+  static create(options: { prompts: LangyPrompt }): LangyPromptRegistryService {
     return new LangyPromptRegistryService(options);
   }
 
-  private readonly prompts: LangyPromptPort;
+  private readonly prompts: LangyPrompt;
 
-  private constructor(options: { prompts: LangyPromptPort }) {
+  private constructor(options: { prompts: LangyPrompt }) {
     this.prompts = options.prompts;
   }
 

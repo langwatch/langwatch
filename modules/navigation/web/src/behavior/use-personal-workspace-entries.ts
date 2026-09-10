@@ -4,7 +4,7 @@
  */
 
 import { navigationApi } from "./navigation-api.ts";
-import type { NavigationHostPort } from "../model/navigation-host.ts";
+import type { NavigationHost } from "../model/navigation-host.ts";
 
 const GOVERNANCE_FLAG = "release_ui_ai_governance_enabled";
 const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
@@ -15,7 +15,7 @@ export type PersonalWorkspaceEntry = {
   label: "My Workspace";
 };
 
-export function usePersonalWorkspaceEntries(host: NavigationHostPort): {
+export function usePersonalWorkspaceEntries(host: NavigationHost): {
   entries: PersonalWorkspaceEntry[];
   isLoading: boolean;
 } {

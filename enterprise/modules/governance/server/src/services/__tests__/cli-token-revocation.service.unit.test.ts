@@ -3,10 +3,10 @@
  * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
  */
 import { describe, expect, it } from "vitest";
-import { CliTokenStorePort } from "../../app/governance.infrastructure.ts";
+import { CliTokenStore } from "../../app/governance.infrastructure.ts";
 import { DefaultGovernanceCliTokenRevocationService } from "../cli-token-revocation.service.ts";
 
-class InMemoryCliTokenStore implements CliTokenStorePort {
+class InMemoryCliTokenStore implements CliTokenStore {
   private readonly values = new Map<string, string>();
   private readonly sets = new Map<string, Set<string>>();
 

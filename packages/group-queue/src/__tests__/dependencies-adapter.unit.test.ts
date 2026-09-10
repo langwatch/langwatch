@@ -1,8 +1,8 @@
 import IORedis from "ioredis";
 import { describe, expect, it } from "vitest";
-import { GroupQueueDependenciesAdapter, type GroupQueueStoragePort } from "../dependencies-adapter.ts";
+import { GroupQueueDependenciesAdapter, type GroupQueueStorage } from "../dependencies-adapter.ts";
 
-function storage(): GroupQueueStoragePort {
+function storage(): GroupQueueStorage {
   return {
     objectStoreFor: () => ({
       put: async () => undefined,

@@ -4,12 +4,12 @@
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
-  CodingAgentBillingPolicyPort,
-  CodingAgentCallerScopeDirectoryPort,
-  CodingAgentScopePermissionsPort,
+  CodingAgentBillingPolicy,
+  CodingAgentCallerScopeDirectory,
+  CodingAgentScopePermissions,
   CodingAgentUnavailableError,
   codingAgentServer,
-  type CodingAgentClickHousePort,
+  type CodingAgentClickHouse,
   type CodingAgentScopeCaller,
   type CodingAgentScopePermission,
   type CodingAgentAuditPort,
@@ -23,7 +23,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { createApp } from "@langwatch/runtime-composition";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
-import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections.ts";
+import type { ApiViewerProtections } from "../trace/trace-viewer-protections.ts";
 import { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount.ts";
 import type { ComposedCodingAgentFeature } from "./coding-agent.composition.types.ts";
 
@@ -34,9 +34,9 @@ export type CodingAgentPeers = Readonly<{
   /** The GitHub App this deployment registered, blank where it registered none. */
   github: GithubApi;
   /** This process's ClickHouse, where the sessions are projected. */
-  clickHouse: CodingAgentClickHousePort | null;
+  clickHouse: CodingAgentClickHouse | null;
   /** The protections resolver, where the deployment composed one. */
-  viewerProtections?: ApiViewerProtectionsPort | undefined;
+  viewerProtections?: ApiViewerProtections | undefined;
 }>;
 
 /** Where a coding-agent read that names people is written down. */
@@ -99,7 +99,7 @@ export async function composeCodingAgentFeature(options: {
  * through, so a session list and the traces behind it cannot disagree.
  */
 function apiCodingAgentVisibility(
-  protections: ApiViewerProtectionsPort | undefined,
+  protections: ApiViewerProtections | undefined,
 ): CodingAgentViewerVisibilityPort {
   return {
     readVisibility: async (input): Promise<CodingAgentViewerVisibility> => {
@@ -142,7 +142,7 @@ function apiCodingAgentAudit(audit: CodingAgentAudit | undefined): CodingAgentAu
 }
 
 /** Whether a project's traces may be persisted into a dataset without charge. */
-class ApiCodingAgentBilling extends CodingAgentBillingPolicyPort {
+class ApiCodingAgentBilling extends CodingAgentBillingPolicy {
   isSourceNonBillable(): Promise<boolean> {
     return Promise.resolve(false);
   }
@@ -152,7 +152,7 @@ class ApiCodingAgentBilling extends CodingAgentBillingPolicyPort {
  * The organization's projects and the person behind each personal workspace, over this
  * process's own connection.
  */
-export class ApiCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectoryPort {
+export class ApiCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectory {
   constructor(private readonly prisma: PrismaClient) {
     super();
   }
@@ -197,7 +197,7 @@ export class ApiCodingAgentScopeDirectory extends CodingAgentCallerScopeDirector
  * batched ask. `canBatchPermissionsByIds` collects the principal's grant snapshot once
  * and decides every (project, permission) pair against it in memory.
  */
-export class ApiCodingAgentScopePermissions extends CodingAgentScopePermissionsPort {
+export class ApiCodingAgentScopePermissions extends CodingAgentScopePermissions {
   constructor(private readonly authz: AuthzService) {
     super();
   }

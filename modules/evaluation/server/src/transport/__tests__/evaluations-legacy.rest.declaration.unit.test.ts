@@ -26,7 +26,7 @@ describe("the public evaluation REST family", () => {
     });
 
     it("answers behind a project API key", () => {
-      expect(declaration.credential).toBe("projectKey");
+      expect(declaration.credential).toBe("project");
     });
 
     it("keeps every path, method and operation id", () => {

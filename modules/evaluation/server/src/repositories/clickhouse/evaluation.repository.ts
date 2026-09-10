@@ -8,10 +8,8 @@ import type {
   TraceEvaluationData,
   TraceEvaluationsQuery,
 } from "@langwatch/evaluation-contract";
-import type {
-  EvaluationClickHouseResolver,
-  EvaluationRetentionFloorPort,
-} from "../../ports/evaluation.port.ts";
+import type { EvaluationRetentionFloor } from "../../app/evaluation.infrastructure.ts";
+import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 import { EvaluationRunRepository } from "../evaluation.repository.ts";
 import { EvaluationRunClickHouseReadRepository } from "./evaluation-run-read.repository.ts";
 import { EvaluationRunClickHouseWriteRepository } from "./evaluation-run-write.repository.ts";
@@ -20,7 +18,7 @@ import { EvaluationRunClickHouseWriteRepository } from "./evaluation-run-write.r
 export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
   static create(options: {
     resolveClient: EvaluationClickHouseResolver;
-    retentionFloor: EvaluationRetentionFloorPort;
+    retentionFloor: EvaluationRetentionFloor;
   }): ClickHouseEvaluationRepository {
     return new ClickHouseEvaluationRepository(options);
   }
@@ -30,7 +28,7 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
 
   private constructor(options: {
     resolveClient: EvaluationClickHouseResolver;
-    retentionFloor: EvaluationRetentionFloorPort;
+    retentionFloor: EvaluationRetentionFloor;
   }) {
     super();
     this.reader = EvaluationRunClickHouseReadRepository.create(options);

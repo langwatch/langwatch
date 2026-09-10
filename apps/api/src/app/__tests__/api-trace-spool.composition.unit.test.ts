@@ -3,7 +3,7 @@
  * the size check behind it, and what a deployment with no object store does
  * instead.
  */
-import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import type {
   FeatureFlagApi,
   FeatureFlagKey,
@@ -12,7 +12,7 @@ import type {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import {
-  StoredObjectProjectDestinationResolverPort,
+  StoredObjectProjectDestinationResolver,
   StoredObjectStorageRuntimeAdapter,
   type StoredObjectStorageDriver,
 } from "@langwatch/stored-object-server";
@@ -158,13 +158,13 @@ function spoolWorld(input: { enabled: boolean | Error }) {
   };
 }
 
-class NoOutboundProxy extends OutboundProxyResolverPort {
+class NoOutboundProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {
     return undefined;
   }
 }
 
-class TestDestinations extends StoredObjectProjectDestinationResolverPort {
+class TestDestinations extends StoredObjectProjectDestinationResolver {
   resolve(): Promise<StoredObjectStorageDestination> {
     return Promise.resolve({ kind: "s3", bucket: "spool-bucket" });
   }

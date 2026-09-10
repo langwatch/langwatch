@@ -5,7 +5,7 @@ import {
   type ProjectWithTeam,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
-import type { ProjectDiagnosticsPort } from "../ports/project.port.ts";
+import type { ProjectDiagnostics } from "../ports/project.port.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
 /**
@@ -17,7 +17,7 @@ import type { ProjectRepository } from "../repositories/project.repository.ts";
  * process that only ingests can now compose these WITHOUT the write graph.
  *
  * That distinction is the whole reason this class exists. `ProjectService`
- * requires a `ProjectCredentialsPort` and an `OrganizationService` because
+ * requires a `ProjectCredentials` and an `OrganizationService` because
  * `create` mints an id and an ingestion key and `ensureInternal` resolves a
  * team, and it takes a key map and a stored-object deleter because `create`
  * syncs the LWQL column mapping and `archive` removes a project's blobs. Not
@@ -35,12 +35,12 @@ import type { ProjectRepository } from "../repositories/project.repository.ts";
 export class ProjectMetadataService {
   private constructor(
     private readonly repository: ProjectRepository,
-    private readonly diagnostics?: ProjectDiagnosticsPort,
+    private readonly diagnostics?: ProjectDiagnostics,
   ) {}
 
   static create(options: {
     repository: ProjectRepository;
-    diagnostics?: ProjectDiagnosticsPort;
+    diagnostics?: ProjectDiagnostics;
   }): ProjectMetadataService {
     return new ProjectMetadataService(options.repository, options.diagnostics);
   }

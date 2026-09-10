@@ -23,14 +23,14 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import {
-  BillingErrorReporterPort,
+  BillingErrorReporter,
   NotificationService,
   UsageLimitEmailPort,
   type UsageLimitEmailData,
 } from "../index.ts";
 import { Temporal } from "@langwatch/time";
 
-class FakeErrorReporter extends BillingErrorReporterPort {
+class FakeErrorReporter extends BillingErrorReporter {
   private constructor(readonly capture = vi.fn()) {
     super();
   }

@@ -11,10 +11,10 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
-import { AlertRedactionPort } from "../../ports/alert-redaction.port.ts";
-import { PlatformUrlPort } from "../../ports/platform-url.port.ts";
-import { WorkbenchAccessPort } from "../../ports/workbench-access.port.ts";
-import { WorkbenchCallerPort } from "../../ports/workbench-caller.port.ts";
+import { AlertRedaction } from "../dashboard.infrastructure.ts";
+import { PlatformUrl } from "../dashboard.infrastructure.ts";
+import { WorkbenchAccess } from "../dashboard.infrastructure.ts";
+import { WorkbenchCaller } from "../dashboard.infrastructure.ts";
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
 import { DashboardApp, type DashboardInfrastructure } from "../dashboard.app.ts";
@@ -27,9 +27,8 @@ export const FULLY_PERMITTED: LangWatchQLProtections = {
 };
 
 /** The workbench switched on, and nothing else. */
-export class TestWorkbenchAccess extends WorkbenchAccessPort {
+export class TestWorkbenchAccess implements WorkbenchAccess {
   constructor(private readonly enabled = true) {
-    super();
   }
 
   async isWorkbenchEnabled(): Promise<boolean> {
@@ -37,9 +36,8 @@ export class TestWorkbenchAccess extends WorkbenchAccessPort {
   }
 }
 
-export class TestWorkbenchCaller extends WorkbenchCallerPort {
+export class TestWorkbenchCaller implements WorkbenchCaller {
   constructor(private readonly protections: LangWatchQLProtections = FULLY_PERMITTED) {
-    super();
   }
 
   async resolveProtections(): Promise<LangWatchQLProtections> {
@@ -55,7 +53,7 @@ export class TestWorkbenchCaller extends WorkbenchCallerPort {
 }
 
 /** Drops one provider secret, the way the composed redaction drops several. */
-export class TestAlertRedaction extends AlertRedactionPort {
+export class TestAlertRedaction implements AlertRedaction {
   redactActionParams(
     _action: Trigger["action"],
     actionParams: Record<string, unknown>,
@@ -65,7 +63,7 @@ export class TestAlertRedaction extends AlertRedactionPort {
   }
 }
 
-export class TestPlatformUrl extends PlatformUrlPort {
+export class TestPlatformUrl implements PlatformUrl {
   linkTo(input: { projectSlug: string; path: string }): string {
     return `https://app.test/${input.projectSlug}${input.path}`;
   }

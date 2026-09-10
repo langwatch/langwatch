@@ -66,7 +66,7 @@ function makeInsertRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Same window strategy as `SimulationWindowedReadPort`'s production adapter, minus caching. */
+/** Same window strategy as `SimulationWindowedRead`'s production adapter, minus caching. */
 class HintWindowedRead extends SimulationWindowedRepository {
   async query<Result>(input: {
     hintMs: number | null;

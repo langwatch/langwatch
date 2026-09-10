@@ -1,4 +1,4 @@
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
@@ -40,7 +40,7 @@ export interface GovernanceIngestionWorkerCapability {
  * deliberately not awaited: a Governance installation whose reconcile pass
  * fails logs and retries next boot rather than refusing to start the worker.
  */
-export class GovernanceIngestionWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class GovernanceIngestionWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: GovernanceIngestionWorkerCapability;
     eventing: WorkerEventingRuntime;

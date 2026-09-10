@@ -5,7 +5,7 @@
  */
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
-import { ApiQueueAbsenceReportPort, ApiQueueInfrastructure } from "../api-queue.infrastructure.ts";
+import { ApiQueueAbsenceReport, ApiQueueInfrastructure } from "../api-queue.infrastructure.ts";
 
 const { connections } = vi.hoisted(() => ({ connections: [] as FakeConnection[] }));
 
@@ -34,7 +34,7 @@ vi.mock("@langwatch/redis-client", async (importOriginal) => {
   };
 });
 
-class RecordingAbsence extends ApiQueueAbsenceReportPort {
+class RecordingAbsence extends ApiQueueAbsenceReport {
   readonly reasons: string[] = [];
 
   absent(reason: "disabled" | "unconfigured"): void {

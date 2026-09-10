@@ -1,5 +1,5 @@
 import type { DataPrivacyPolicy, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyProjectPort } from "../ports/data-privacy.port.ts";
+import type { DataPrivacyProject } from "../app/data-privacy.infrastructure.ts";
 import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
 import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service.ts";
 
@@ -11,12 +11,12 @@ export class DataPrivacyResolutionService {
   private constructor(
     private readonly repository: DataPrivacyPolicyRepository,
     private readonly cache: DataPrivacyPolicyCacheService,
-    private readonly projects: DataPrivacyProjectPort,
+    private readonly projects: DataPrivacyProject,
   ) {}
 
   static create(options: {
     repository: DataPrivacyPolicyRepository;
-    projects: DataPrivacyProjectPort;
+    projects: DataPrivacyProject;
     cache?: DataPrivacyPolicyCacheService;
     ttlMs?: number;
     now?: () => number;

@@ -6,7 +6,7 @@ import { getLangWatchTracer } from "langwatch";
 import {
   assignTopicCommandDataSchema,
   type AssignTopicCommandData,
-  TraceTopicAssignmentPort,
+  TraceTopicAssignment,
 } from "@langwatch/trace-contract";
 import {
   ASSIGN_TOPIC_COMMAND_TYPE,
@@ -110,9 +110,9 @@ export class EventingTraceTopicAdapter implements CommandHandler<
 }
 
 /** Thin Eventing transport adapter for another feature's Trace contract port. */
-export class EventingTraceTopicAssignmentPort extends TraceTopicAssignmentPort {
-  static create(command: TraceTopicAssignmentCommand): EventingTraceTopicAssignmentPort {
-    return new EventingTraceTopicAssignmentPort(command);
+export class EventingTraceTopicAssignment extends TraceTopicAssignment {
+  static create(command: TraceTopicAssignmentCommand): EventingTraceTopicAssignment {
+    return new EventingTraceTopicAssignment(command);
   }
 
   private constructor(private readonly command: TraceTopicAssignmentCommand) {

@@ -8,7 +8,7 @@ import {
 } from "@langwatch/trace-contract";
 import { EventUtils } from "@langwatch/eventing";
 
-import type { TraceClickHouseClient, TraceClickHousePort } from "../trace-clickhouse-client.repository.ts";
+import type { TraceClickHouseClient, TraceClickHouse } from "../trace-clickhouse-client.repository.ts";
 import { TraceFullRecordRepository } from "../read/trace-full-record.repository.ts";
 import type { TraceFullIo } from "../../app/trace.infrastructure.ts";
 import type { TracePayloadReaderRepository } from "../read/trace-payload-reader.repository.ts";
@@ -46,7 +46,7 @@ type PayloadReference = { traceId: string; eventId: string; field: string };
 /** Full-record reader with package-owned normalized mapping and bounded recall. */
 export class ClickHouseTraceFullRecordRepository extends TraceFullRecordRepository {
   private constructor(
-    private readonly clickhouse: TraceClickHousePort,
+    private readonly clickhouse: TraceClickHouse,
     private readonly payloads: TracePayloadReaderRepository,
     private readonly io: TraceFullIo,
   ) {
@@ -54,7 +54,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
   }
 
   static create(
-    clickhouse: TraceClickHousePort,
+    clickhouse: TraceClickHouse,
     payloads: TracePayloadReaderRepository,
     io: TraceFullIo,
   ): ClickHouseTraceFullRecordRepository {

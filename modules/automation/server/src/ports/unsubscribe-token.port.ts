@@ -3,6 +3,6 @@ export type UnsubscribeTokenPayload = {
   triggerId: string | null;
   email: string;
 };
-export abstract class UnsubscribeTokenVerifierPort {
+export abstract class UnsubscribeTokenVerifier {
   abstract tryVerify(token: string): UnsubscribeTokenPayload | null;
 }

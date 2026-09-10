@@ -1,24 +1,24 @@
 import { SoftWarnPercent } from "@langwatch/enterprise-governance-contract";
 import type { GatewayBudgetCrossingCandidate } from "../app/governance.infrastructure.ts";
-import type { GovernanceBudgetCrossingData } from "../ports/governance-webhook.port.ts";
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
-import { NullGovernanceDiagnosticsAdapter } from "../ports/governance-diagnostics.port.ts";
+import type { GovernanceBudgetCrossingData } from "../app/governance.infrastructure.ts";
+import type { GovernanceDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 import {
-  GovernanceSignalPort,
+  GovernanceSignalChannel,
   type GovernanceResolvedBudgetCrossing,
   type GovernanceVirtualKeyLifecycleSignal,
-} from "../ports/governance-signal.port.ts";
+} from "../app/governance.infrastructure.ts";
 import { type Instant } from "@langwatch/time";
 
 export class GovernanceSignalService {
   private constructor(
-    private readonly port: GovernanceSignalPort,
-    private readonly diagnostics: GovernanceDiagnosticsPort,
+    private readonly port: GovernanceSignalChannel,
+    private readonly diagnostics: GovernanceDiagnosticsSink,
   ) {}
 
   static create(
-    port: GovernanceSignalPort,
-    diagnostics: GovernanceDiagnosticsPort = new NullGovernanceDiagnosticsAdapter(),
+    port: GovernanceSignalChannel,
+    diagnostics: GovernanceDiagnosticsSink = new NullGovernanceDiagnosticsAdapter(),
   ): GovernanceSignalService {
     return new GovernanceSignalService(port, diagnostics);
   }

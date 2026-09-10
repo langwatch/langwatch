@@ -1,5 +1,5 @@
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
-import type { BillingSubscriptionPort } from "@langwatch/enterprise-billing-server";
+import type { BillingSubscription } from "@langwatch/enterprise-billing-server";
 import { OrganizationLicense } from "@langwatch/enterprise-licensing-server";
 import {
   ENTERPRISE_LICENSE_KEY,
@@ -10,7 +10,7 @@ import {
   OrganizationNotFoundForTeamError,
   PrismaUsageMembershipRepository,
   UsageStatsService,
-  type UsageCounterPort,
+  type UsageCounter,
 } from "@langwatch/entitlement-server";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import {
@@ -50,7 +50,7 @@ async function notificationsOver(prisma: ApiUsageStatsOptions["prisma"]) {
  * disagreeing with the table it stands for.
  */
 type BillingSubscriptionRecord = NonNullable<
-  Awaited<ReturnType<BillingSubscriptionPort["tryFindActive"]>>
+  Awaited<ReturnType<BillingSubscription["tryFindActive"]>>
 >;
 
 /** Records which plan sources the composition said it did not hold. */
@@ -81,10 +81,10 @@ const subscription = (
 });
 
 /** The one read the subscription source makes; nothing else is exercised. */
-function subscriptions(active: BillingSubscriptionRecord | null): BillingSubscriptionPort {
+function subscriptions(active: BillingSubscriptionRecord | null): BillingSubscription {
   return {
     tryFindActive: async () => active,
-  } as unknown as BillingSubscriptionPort;
+  } as unknown as BillingSubscription;
 }
 
 /**
@@ -322,7 +322,7 @@ const CALLER = { id: "user-1", email: "member@acme.test" } as never;
 function readUsageStats(options: {
   prisma: ApiUsageStatsOptions["prisma"];
   plans: PlanProvider;
-  counter: UsageCounterPort;
+  counter: UsageCounter;
 }) {
   return UsageStatsService.create({
     membership: PrismaUsageMembershipRepository.create(options.prisma),

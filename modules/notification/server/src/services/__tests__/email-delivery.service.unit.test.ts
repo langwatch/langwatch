@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  EmailGatewayPort,
+  EmailGateway,
   type EmailContent,
   type EmailProviderName,
   type MailerConfiguration,
@@ -14,7 +14,7 @@ import { SmtpEmailGatewayAdapter } from "../smtp.email-gateway.service.ts";
 /**
  * Spec: modules/notification/specs/packaged-mail-delivery.feature
  */
-class RecordingGateway extends EmailGatewayPort {
+class RecordingGateway extends EmailGateway {
   readonly sent: EmailContent[] = [];
   closeCalls = 0;
 
@@ -83,7 +83,7 @@ describe("given a mailer configuration naming one provider", () => {
     ])("sends both through one %s transport", async (name, mailer, adapter) => {
       const gateway = new RecordingGateway(name);
       const create = vi
-        .spyOn(adapter as unknown as { create: () => EmailGatewayPort }, "create")
+        .spyOn(adapter as unknown as { create: () => EmailGateway }, "create")
         .mockReturnValue(gateway);
 
       const delivery = compose(mailer);
@@ -130,7 +130,7 @@ describe("given a delivery capability that has sent a message", () => {
     it("releases the gateway once and refuses a later send", async () => {
       const gateway = new RecordingGateway("smtp");
       vi.spyOn(
-        SmtpEmailGatewayAdapter as unknown as { create: () => EmailGatewayPort },
+        SmtpEmailGatewayAdapter as unknown as { create: () => EmailGateway },
         "create",
       ).mockReturnValue(gateway);
 

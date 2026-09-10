@@ -1,23 +1,23 @@
 import { Deferred } from "@langwatch/eventing";
 import {
-  TraceProcessingInstallerPort,
+  TraceProcessingInstaller,
   type TraceProcessingCommands,
 } from "@langwatch/trace-server";
 import {
   type AssignTopicCommandData,
   type RecordSpanCommandData,
-  TraceTopicAssignmentPort,
+  TraceTopicAssignment,
 } from "@langwatch/trace-contract";
 import type {
   WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
+  WorkerFeatureInstaller,
 } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
-class WorkerTraceTopicAssignments extends TraceTopicAssignmentPort {
-  private delegate: TraceTopicAssignmentPort | undefined;
+class WorkerTraceTopicAssignments extends TraceTopicAssignment {
+  private delegate: TraceTopicAssignment | undefined;
 
-  connect(delegate: TraceTopicAssignmentPort): void {
+  connect(delegate: TraceTopicAssignment): void {
     this.delegate = delegate;
   }
 
@@ -30,9 +30,9 @@ class WorkerTraceTopicAssignments extends TraceTopicAssignmentPort {
 }
 
 /** Worker-owned mounting point for Trace's complete processing registration. */
-export class TraceWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class TraceWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
-    installer: TraceProcessingInstallerPort;
+    installer: TraceProcessingInstaller;
     eventing: WorkerEventingRuntime;
   }): TraceWorkerFeatureInstaller {
     return new TraceWorkerFeatureInstaller(options.installer, options.eventing);
@@ -73,7 +73,7 @@ export class TraceWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   private installed = false;
 
   private constructor(
-    private readonly installer: TraceProcessingInstallerPort,
+    private readonly installer: TraceProcessingInstaller,
     private readonly eventing: WorkerEventingRuntime,
   ) {}
 

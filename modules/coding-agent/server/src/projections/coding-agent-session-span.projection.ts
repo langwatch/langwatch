@@ -4,7 +4,7 @@ import {
   LOGS_ONLY_AGENT_IDS,
   detectCodingAgent,
 } from "@langwatch/coding-agent-contract";
-import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port.ts";
+import type { CodingAgentCostEstimator } from "../app/coding-agent.infrastructure.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
   type CodingAgentSessionData,
@@ -66,13 +66,13 @@ export class CodingAgentSessionSpanProjection {
   private constructor(
     private readonly stateProjection: CodingAgentSessionStateProjection,
     private readonly traceCanonicalisation: TraceCanonicalisationService,
-    private readonly modelProviders: CodingAgentCostEstimatorPort,
+    private readonly modelProviders: CodingAgentCostEstimator,
   ) {}
 
   static create(deps: {
     stateProjection: CodingAgentSessionStateProjection;
     traceCanonicalisation: TraceCanonicalisationService;
-    modelProviders: CodingAgentCostEstimatorPort;
+    modelProviders: CodingAgentCostEstimator;
   }): CodingAgentSessionSpanProjection {
     return new CodingAgentSessionSpanProjection(
       deps.stateProjection,
@@ -186,7 +186,7 @@ export class CodingAgentSessionSpanProjection {
 
   private pricedFromTokens(
     facts: Record<string, unknown>,
-    modelProviders: CodingAgentCostEstimatorPort,
+    modelProviders: CodingAgentCostEstimator,
   ): number {
     return modelProviders.estimateCost({
       attrs: facts,

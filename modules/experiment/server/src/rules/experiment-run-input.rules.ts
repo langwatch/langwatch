@@ -21,13 +21,13 @@ import type {
 } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
-import type { ExperimentEvaluationReportingPort } from "../ports/experiment-evaluation-reporting.port.ts";
-import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port.ts";
+import type { ExperimentEvaluationReporting } from "../ports/experiment-evaluation-reporting.port.ts";
+import type { ExperimentModelCost } from "../ports/experiment-model-cost.port.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
-import type { ExperimentSandboxCredentialPort } from "../ports/experiment-sandbox-credential.port.ts";
-import type { ExperimentConnectedDispatchPort } from "../ports/experiment-connected-dispatch.port.ts";
-import type { ExperimentConnectedAgentOwnershipPort } from "../ports/experiment-connected-agent-ownership.port.ts";
-import type { ExperimentStudioDispatchPort } from "../ports/experiment-studio-dispatch.port.ts";
+import type { ExperimentSandboxCredential } from "../ports/experiment-sandbox-credential.port.ts";
+import type { ExperimentConnectedDispatch } from "../ports/experiment-connected-dispatch.port.ts";
+import type { ExperimentConnectedAgentOwnership } from "../ports/experiment-connected-agent-ownership.port.ts";
+import type { ExperimentStudioDispatch } from "../ports/experiment-studio-dispatch.port.ts";
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
 import type { LoadedWorkflow } from "../services/experiment-execution-data.service.ts";
 
@@ -37,21 +37,21 @@ import type { LoadedWorkflow } from "../services/experiment-execution-data.servi
  */
 export type ExperimentRunPorts = {
   /** The studio engine each cell is dispatched to. */
-  studio: ExperimentStudioDispatchPort;
+  studio: ExperimentStudioDispatch;
   /** The deployment's price table, for cells the engine reports untariffed. */
-  cost: ExperimentModelCostPort;
+  cost: ExperimentModelCost;
   /** The stop signal and the owner record this run's abort is authorized against. */
   abort: ExperimentRunAbortRepository;
   /** The Eventing command surface a run's results are dispatched through. */
   experiments: ExperimentService;
   /** Where a cell's evaluator result is reported as an evaluation. */
-  evaluationReporting: ExperimentEvaluationReportingPort;
+  evaluationReporting: ExperimentEvaluationReporting;
   /** The scoped key a run lends to the code it executes. */
-  sandboxCredentials: ExperimentSandboxCredentialPort;
+  sandboxCredentials: ExperimentSandboxCredential;
   /** One turn to a connected agent, through the runtime a live SDK registered on. */
-  connectedDispatch: ExperimentConnectedDispatchPort;
+  connectedDispatch: ExperimentConnectedDispatch;
   /** Refuses a run against someone else's personal development agent. */
-  connectedAgentOwnership: ExperimentConnectedAgentOwnershipPort;
+  connectedAgentOwnership: ExperimentConnectedAgentOwnership;
 };
 
 /**

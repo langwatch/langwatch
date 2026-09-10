@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import type { TopicClusteringCommandsPort } from "../../ports/topic-clustering-commands.port.ts";
+import type { TopicClusteringCommands } from "../../app/topic.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:topic-clustering:bootstrap-gate");
@@ -45,13 +45,13 @@ function buildKey(projectId: string): string {
 export class RedisTopicClusteringBootstrapRepository {
   private constructor(
     private readonly redis: Redis | Cluster,
-    private readonly commands: TopicClusteringCommandsPort,
+    private readonly commands: TopicClusteringCommands,
     private readonly ttlSeconds: number,
   ) {}
 
   static create(options: {
     redis: Redis | Cluster;
-    commands: TopicClusteringCommandsPort;
+    commands: TopicClusteringCommands;
     ttlSeconds?: number;
   }): RedisTopicClusteringBootstrapRepository {
     return new RedisTopicClusteringBootstrapRepository(

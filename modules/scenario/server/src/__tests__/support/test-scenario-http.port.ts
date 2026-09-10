@@ -14,13 +14,13 @@ export const mockScenarioHttpFetch = vi.fn(
   },
 );
 
-class TestScenarioHttpPort implements ScenarioHttpPort {
+class TestScenarioHttp implements ScenarioHttpPort {
   fetch(input: ScenarioHttpRequest): Promise<ScenarioHttpResponse> {
     return mockScenarioHttpFetch(input.url, input.init);
   }
 }
 
-class NativeScenarioHttpPort implements ScenarioHttpPort {
+class NativeScenarioHttp implements ScenarioHttpPort {
   fetch(input: ScenarioHttpRequest): Promise<ScenarioHttpResponse> {
     return fetch(input.url, input.init);
   }
@@ -31,7 +31,7 @@ export function createMockHttpAgentAdapter(
 ): SerializedHttpAgentAdapter {
   return new SerializedHttpAgentAdapter({
     ...options,
-    httpPort: new TestScenarioHttpPort(),
+    httpPort: new TestScenarioHttp(),
   });
 }
 
@@ -40,6 +40,6 @@ export function createNativeHttpAgentAdapter(
 ): SerializedHttpAgentAdapter {
   return new SerializedHttpAgentAdapter({
     ...options,
-    httpPort: new NativeScenarioHttpPort(),
+    httpPort: new NativeScenarioHttp(),
   });
 }

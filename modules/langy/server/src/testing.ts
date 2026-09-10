@@ -31,8 +31,8 @@ export type { LangySessionKeyService } from "./services/langy-session-key.servic
 import type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
-} from "./ports/langy-conversation-process.port.ts";
-import type { LangyEffectPorts } from "./ports/langy-effect.port.ts";
+} from "./app/langy.infrastructure.ts";
+import type { LangyEffectPorts } from "./app/langy.infrastructure.ts";
 
 export interface StubLangyEffectCalls {
   dispatchedTurns: Array<LangyWorkerDispatchIntent & { projectId: string }>;

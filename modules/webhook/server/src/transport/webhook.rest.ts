@@ -338,7 +338,7 @@ function deliveriesCursorOf(cursor: string | undefined): { firedAt: Instant; id:
 export const webhookRest = defineRestRouter(WebhookApi)
   .withNamespace("webhooks")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("organizationKey")
+  .withCredential("organization")
   // The generation is the contract: `/api/webhooks/v1` has been live since
   // 2026-08, so it answers exactly where it answers today, names its own
   // generation in the path and so has no `/api/v1` twin to declare.

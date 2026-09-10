@@ -40,11 +40,11 @@ export abstract class AiToolCatalogRepository {
   abstract reorder(input: ReorderAiToolEntriesInput): Promise<void>;
 }
 
-export abstract class AiToolSlugPort {
+export abstract class AiToolSlug {
   abstract generate(displayName: string): string;
 }
 
-export abstract class AiToolProviderCatalogPort {
+export abstract class AiToolProviderCatalog {
   abstract list(): Array<{
     providerKey: string;
     displayName: string;

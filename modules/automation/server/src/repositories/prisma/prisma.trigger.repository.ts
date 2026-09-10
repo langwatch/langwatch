@@ -8,7 +8,7 @@ import {
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { TriggerRepository, type ReportScheduleTarget } from "../trigger.repository.ts";
 import { mapTriggerRow } from "./prisma.trigger.mapper.ts";
-import type { AutomationClockPort } from "../../ports/automation-clock.port.ts";
+import type { AutomationClock } from "../../app/automation.infrastructure.ts";
 
 function toPrismaJsonValue(value: unknown): Prisma.InputJsonValue | null {
   if (value === null) return null;
@@ -43,11 +43,11 @@ export type TriggerDatabase = Pick<PrismaClient, "trigger" | "triggerSent" | "$q
 export class PrismaTriggerRepository extends TriggerRepository {
   private constructor(
     private readonly database: TriggerDatabase,
-    private readonly clock: AutomationClockPort,
+    private readonly clock: AutomationClock,
   ) {
     super();
   }
-  static create(database: TriggerDatabase, clock: AutomationClockPort): PrismaTriggerRepository {
+  static create(database: TriggerDatabase, clock: AutomationClock): PrismaTriggerRepository {
     return new PrismaTriggerRepository(database, clock);
   }
   async findActiveForProject(projectId: string): Promise<TriggerSummary[]> {

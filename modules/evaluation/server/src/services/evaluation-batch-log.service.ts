@@ -17,7 +17,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { EvaluationReportPort } from "../ports/evaluation-rescore.port.ts";
+import type { EvaluationReport } from "../app/evaluation.infrastructure.ts";
 import { gatedVerdictFields, processTargets } from "../rules/evaluation-dispatch.rules.ts";
 
 const logger = createLogger("langwatch:evaluation:batch-log");
@@ -92,7 +92,7 @@ export interface EvaluationExperimentRunWriter {
 export type EvaluationBatchLogDeps = Readonly<{
   experiments: EvaluationExperimentDirectory;
   runs: EvaluationExperimentRunWriter;
-  report: EvaluationReportPort;
+  report: EvaluationReport;
 }>;
 
 export class EvaluationBatchLogService {

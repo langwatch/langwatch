@@ -3,9 +3,9 @@
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import {
-  GovernanceDiagnosticsPort,
-  QuarantineTenantPort,
-  QuarantineTraceActivityPort,
+  GovernanceDiagnostics,
+  QuarantineTenant,
+  QuarantineTraceActivity,
 } from "@langwatch/enterprise-governance-server";
 import type { AppGovernanceTraceActivityAdapter } from "./governance-trace-activity.clickhouse.repository.ts";
 
@@ -16,13 +16,13 @@ type QuarantineSpanCountsQuery = {
   sinceMs: number;
 };
 
-export class AppQuarantineTenantPort extends QuarantineTenantPort {
+export class AppQuarantineTenant extends QuarantineTenant {
   private constructor(private readonly projects: ProjectApi) {
     super();
   }
 
-  static create(projects: ProjectApi): AppQuarantineTenantPort {
-    return new AppQuarantineTenantPort(projects);
+  static create(projects: ProjectApi): AppQuarantineTenant {
+    return new AppQuarantineTenant(projects);
   }
 
   async resolveTenantId(organizationId: string): Promise<string> {
@@ -35,13 +35,13 @@ export class AppQuarantineTenantPort extends QuarantineTenantPort {
   }
 }
 
-export class AppQuarantineTraceActivityPort extends QuarantineTraceActivityPort {
+export class AppQuarantineTraceActivity extends QuarantineTraceActivity {
   private constructor(private readonly repository: AppGovernanceTraceActivityAdapter) {
     super();
   }
 
-  static create(repository: AppGovernanceTraceActivityAdapter): AppQuarantineTraceActivityPort {
-    return new AppQuarantineTraceActivityPort(repository);
+  static create(repository: AppGovernanceTraceActivityAdapter): AppQuarantineTraceActivity {
+    return new AppQuarantineTraceActivity(repository);
   }
 
   findSpanCountsBySource(input: QuarantineSpanCountsQuery) {
@@ -49,7 +49,7 @@ export class AppQuarantineTraceActivityPort extends QuarantineTraceActivityPort 
   }
 }
 
-export class AppQuarantineDiagnosticsPort extends GovernanceDiagnosticsPort {
+export class AppQuarantineDiagnostics extends GovernanceDiagnostics {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }
@@ -70,17 +70,17 @@ export class AppQuarantineFillEvaluatorAdapter {
     return new AppQuarantineFillEvaluatorAdapter(options);
   }
 
-  tenant(): AppQuarantineTenantPort {
-    return AppQuarantineTenantPort.create(this.options.projects);
+  tenant(): AppQuarantineTenant {
+    return AppQuarantineTenant.create(this.options.projects);
   }
 
-  traceActivity(): AppQuarantineTraceActivityPort | undefined {
+  traceActivity(): AppQuarantineTraceActivity | undefined {
     return this.options.traceActivity
-      ? AppQuarantineTraceActivityPort.create(this.options.traceActivity)
+      ? AppQuarantineTraceActivity.create(this.options.traceActivity)
       : undefined;
   }
 
-  diagnostics(): AppQuarantineDiagnosticsPort {
-    return new AppQuarantineDiagnosticsPort();
+  diagnostics(): AppQuarantineDiagnostics {
+    return new AppQuarantineDiagnostics();
   }
 }

@@ -5,7 +5,7 @@ import {
   type WorkflowVersion,
 } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
-import { WorkflowAgentMappingPort, WorkflowStudioDslPort } from "../../ports/workflow.port.ts";
+import { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
 import { WorkflowStudioVersionService } from "../workflow-studio-version.service.ts";
 
 const graph = (name: string): StudioWorkflow =>
@@ -22,7 +22,7 @@ const graph = (name: string): StudioWorkflow =>
   });
 
 /** Answers a graph that is visibly not the one it was given. */
-class RenamingDslPort extends WorkflowStudioDslPort {
+class RenamingDsl implements WorkflowStudioDsl {
   readonly seen: { projectId: string; dsl: StudioWorkflow }[] = [];
 
   prepare(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow> {
@@ -31,7 +31,7 @@ class RenamingDslPort extends WorkflowStudioDslPort {
   }
 }
 
-class RecordingAgentMappingPort extends WorkflowAgentMappingPort {
+class RecordingAgentMapping implements WorkflowAgentMapping {
   readonly recomputed: { projectId: string; workflowId: string; dsl: StudioWorkflow }[] = [];
 
   constructor(private readonly outcome: Promise<void> = Promise.resolve()) {
@@ -53,10 +53,10 @@ class RecordingWorkflowService {
   }
 }
 
-function build(options: { agentMappings?: RecordingAgentMappingPort } = {}) {
+function build(options: { agentMappings?: RecordingAgentMapping } = {}) {
   const workflows = new RecordingWorkflowService();
-  const studioDsl = new RenamingDslPort();
-  const agentMappings = options.agentMappings ?? new RecordingAgentMappingPort();
+  const studioDsl = new RenamingDsl();
+  const agentMappings = options.agentMappings ?? new RecordingAgentMapping();
   const service = WorkflowStudioVersionService.create({
     workflows: workflows as never,
     studioDsl,
@@ -121,7 +121,7 @@ describe("WorkflowStudioVersionService", () => {
 
     describe("when the mapping recompute fails", () => {
       it("still answers the version that was written", async () => {
-        const agentMappings = new RecordingAgentMappingPort(
+        const agentMappings = new RecordingAgentMapping(
           Promise.reject(new Error("agent rows unavailable")),
         );
         const { service } = build({ agentMappings });

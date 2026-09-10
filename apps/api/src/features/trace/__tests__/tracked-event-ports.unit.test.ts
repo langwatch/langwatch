@@ -12,9 +12,9 @@
  */
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
-  TraceIngressCommandPort,
+  TraceIngressCommand,
   TraceSpanCollectionService,
-  TraceSpanDedupPort,
+  TraceSpanDedup,
   TrackedEventSpanService,
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
@@ -181,7 +181,7 @@ function build(logger: { error: (...args: never[]) => void } = { error: () => {}
   };
 }
 
-class GrantingDedup extends TraceSpanDedupPort {
+class GrantingDedup extends TraceSpanDedup {
   async tryAcquireProcessingLock(): Promise<boolean> {
     return true;
   }
@@ -191,7 +191,7 @@ class GrantingDedup extends TraceSpanDedupPort {
   async releaseOnFailure(): Promise<void> {}
 }
 
-class RecordingCommands extends TraceIngressCommandPort {
+class RecordingCommands extends TraceIngressCommand {
   constructor(private readonly sent: RecordSpanCommandData[]) {
     super();
   }

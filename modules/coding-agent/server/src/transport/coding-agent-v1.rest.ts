@@ -39,7 +39,7 @@ const AUTHORIZED_BY_THE_CALLER_CUT =
 export const codingAgentV1Rest = defineRestRouter(CodingAgentApi)
   .withNamespace("coding-agent-v1")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("organizationKey")
+  .withCredential("organization")
   // At exactly the address it has always answered, which names its own
   // generation and so has no twin to declare.
   .withAddressing("literal", { v1Twin: false })

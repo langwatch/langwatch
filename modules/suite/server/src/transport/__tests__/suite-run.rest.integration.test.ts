@@ -75,7 +75,7 @@ function buildApi(run: (...args: never[]) => unknown) {
       .router(),
     {
       app: () => suites,
-      credential: "projectKey",
+      credential: "project",
       onError: suitesAliasErrorHandler(boundaryErrorHandler),
       facts: [
         bindRestMiddleware(projectRestFacts, () => ({

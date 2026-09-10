@@ -128,7 +128,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withVersion(MANAGEMENT_API_VERSION)
   // No derived twin: `/api/v1/projects` belongs to the LangWatch-QL family.
   .withAddressing("dated", { v1Twin: false })
-  .withCredential("organizationKey")
+  .withCredential("organization")
 
   .get("/", "listProjects")
   .withQuery(paginationQuerySchema)

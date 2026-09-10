@@ -75,7 +75,7 @@ export {
   type ProcessRetentionSweepDeps,
 } from "./maintenance/process-retention-sweep.intent.ts";
 export {
-  ProcessRetentionMetricsPort,
+  ProcessRetentionMetrics,
   type RetentionFamily,
 } from "./maintenance/retention-metrics.port.ts";
 export {

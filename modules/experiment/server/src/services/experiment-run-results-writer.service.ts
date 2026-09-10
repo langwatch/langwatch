@@ -18,7 +18,7 @@ import {
   type WorkbenchActor,
 } from "@langwatch/experiment-contract";
 import type { ExperimentService } from "./experiment.service.ts";
-import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port.ts";
+import type { ExperimentRunErrorReporting } from "../ports/experiment-run-error-reporting.port.ts";
 
 const logger = createLogger("langwatch:experiment:run-results-writer");
 
@@ -56,7 +56,7 @@ export class ExperimentRunResultsWriterService implements RunResultsWriter {
       projectId: string;
       experimentId: string;
       scope: ExecutionScope;
-      errorReporting?: ExperimentRunErrorReportingPort;
+      errorReporting?: ExperimentRunErrorReporting;
     },
   ) {}
 
@@ -66,7 +66,7 @@ export class ExperimentRunResultsWriterService implements RunResultsWriter {
     projectId: string;
     experimentId: string;
     scope: ExecutionScope;
-    errorReporting?: ExperimentRunErrorReportingPort;
+    errorReporting?: ExperimentRunErrorReporting;
   }): ExperimentRunResultsWriterService {
     return new ExperimentRunResultsWriterService(options);
   }
@@ -89,7 +89,7 @@ export class ExperimentRunResultsWriterService implements RunResultsWriter {
     data?: Array<Record<string, unknown>> | undefined;
     datasetId?: string | undefined;
     parameters?: Record<string, string | number | boolean> | undefined;
-    errorReporting?: ExperimentRunErrorReportingPort;
+    errorReporting?: ExperimentRunErrorReporting;
   }): ExperimentRunResultsWriterService | undefined {
     if (!experimentId) {
       return undefined;
@@ -129,7 +129,7 @@ export class ExperimentRunResultsWriterService implements RunResultsWriter {
     runId: string;
     scope: ExecutionScope;
     draft: RunResultsDraft;
-    errorReporting?: ExperimentRunErrorReportingPort;
+    errorReporting?: ExperimentRunErrorReporting;
     isRetry?: boolean;
   }): Promise<void> {
     if (runResultsAreEmpty(draft)) {

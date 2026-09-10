@@ -12,7 +12,7 @@ import {
   type ModelDefaultScope,
   type ModelProvider,
 } from "@langwatch/model-provider-contract";
-import type { ModelProviderCredentialCodec } from "../../ports/model-provider.port.ts";
+import type { ModelProviderCredentialCodec } from "../../app/model-provider.infrastructure.ts";
 import type { ModelProviderRepository } from "../model-provider.repository.ts";
 
 type Database = Pick<PrismaClient, "modelProvider" | "gatewayChangeEvent" | "$transaction">;

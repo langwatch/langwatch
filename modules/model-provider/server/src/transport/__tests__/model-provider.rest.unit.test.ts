@@ -77,7 +77,7 @@ function mount(modelProviders: Partial<ModelProviderApi>) {
     },
   }).mount(modelProviderRest.router(), {
     app: () => app,
-    credential: "projectKey",
+    credential: "project",
     onError: renderHandled,
   });
 

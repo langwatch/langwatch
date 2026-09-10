@@ -4,11 +4,11 @@ import type {
   AutomationPersistCapBreach,
   AutomationRunawayTrigger,
 } from "@langwatch/automation-contract";
-import { AutomationRunawayPort } from "../../ports/automation-runaway.port.ts";
+import { AutomationRunaway } from "../../ports/automation-runaway.port.ts";
 import { RunawayContainmentService, RUNAWAY_PAUSE_REASON } from "../runaway-containment.service.ts";
 import { Temporal } from "@langwatch/time";
 
-class TestRunawayPort extends AutomationRunawayPort {
+class TestRunawayPort extends AutomationRunaway {
   readonly paused = vi.fn();
   readonly emailed = vi.fn<
     (input: { kind: "ceiling_reached" | "paused"; nextStep?: unknown }) => Promise<void>

@@ -26,8 +26,8 @@
 
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 import { type S3PollingConfig, S3PollingPullerAdapter } from "./s3-puller.service.ts";
-import type { GovernanceObjectStoragePort } from "../app/governance.infrastructure.ts";
-import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port.ts";
+import type { GovernanceObjectStore } from "../app/governance.infrastructure.ts";
+import type { IngestionPullDiagnosticsSink } from "../app/governance.infrastructure.ts";
 
 /**
  * Locked reference config for OpenAI's enterprise compliance dump.
@@ -71,15 +71,15 @@ export class OpenAiComplianceReferencePullerAdapter extends S3PollingPullerAdapt
   override readonly id: string = "openai_compliance";
 
   private constructor(options: {
-    objects: GovernanceObjectStoragePort;
-    diagnostics?: IngestionPullDiagnosticsPort;
+    objects: GovernanceObjectStore;
+    diagnostics?: IngestionPullDiagnosticsSink;
   }) {
     super(options.objects, options.diagnostics);
   }
 
   static override create(options: {
-    objects: GovernanceObjectStoragePort;
-    diagnostics?: IngestionPullDiagnosticsPort;
+    objects: GovernanceObjectStore;
+    diagnostics?: IngestionPullDiagnosticsSink;
   }): OpenAiComplianceReferencePullerAdapter {
     return new OpenAiComplianceReferencePullerAdapter(options);
   }

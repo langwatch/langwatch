@@ -1,6 +1,6 @@
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
 
-export abstract class ManagedProviderConfigurationPort {
+export abstract class ManagedProviderConfiguration {
   abstract tryForOrganization(organizationId: string): ManagedBedrockConfig | null;
 }
 

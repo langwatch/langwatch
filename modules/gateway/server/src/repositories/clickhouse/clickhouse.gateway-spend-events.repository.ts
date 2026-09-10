@@ -4,7 +4,7 @@ import { Temporal } from "@langwatch/time";
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port.ts";
+import type { GatewayClickHouseResolver } from "../../app/gateway.infrastructure.ts";
 import type { GatewaySpendState } from "../../projections/gateway-spend.projection.ts";
 import {
   EMPTY_SPEND_USAGE,
@@ -28,7 +28,7 @@ import {
   type GatewaySpendEventsCursor,
 } from "../../adapters/gateway-spend-cursor.adapter.ts";
 import {
-  GatewaySpendEventsPort,
+  GatewaySpendEvents,
   type SpendBucket,
   type SpendEventsPageCursor,
   type SpendGroupByKey,
@@ -62,7 +62,7 @@ interface SummaryDimension {
 const spendFilters = GatewaySpendFiltersAdapter.create();
 const spendGrouping = GatewaySpendGroupingAdapter.create();
 
-export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
+export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   static create(resolveClient: GatewayClickHouseResolver): GatewaySpendEventsRepository {
     return new GatewaySpendEventsRepository(resolveClient);
   }

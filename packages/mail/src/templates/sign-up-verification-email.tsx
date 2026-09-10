@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDeliveryPort } from "../providers/types.ts";
+import type { EmailDelivery } from "../providers/types.ts";
 import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout.tsx";
 import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
@@ -79,7 +79,7 @@ export const signUpVerificationEmailTemplate = defineTemplate({
 export const sendSignUpVerificationEmail = async ({
   mailer,
   ...props
-}: SignUpVerificationEmailProps & { mailer: EmailDeliveryPort }) => {
+}: SignUpVerificationEmailProps & { mailer: EmailDelivery }) => {
   const { subject, html } = await renderMailTemplate(signUpVerificationEmailTemplate, props);
   await sendEmail({ mailer, content: { to: props.email, subject, html } });
 };

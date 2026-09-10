@@ -39,7 +39,7 @@ export type ScenarioRunExportRequestFields = Readonly<{
 type ScenarioRunExportProgress = Readonly<{ exported: number; total: number }>;
 
 /** The export, as this route uses it. */
-export interface ScenarioRunExportPort<TRequest> {
+export interface ScenarioRunExport<TRequest> {
   /** How many runs the sweep will visit, for the caller's progress bar. */
   getTotalCount(input: Readonly<{ request: TRequest }>): Promise<number>;
   /** The serialized export, one chunk at a time. */
@@ -88,7 +88,7 @@ export interface ScenarioRunExportRestPorts<
     args: Record<string, unknown>;
   }): Promise<void>;
   /** The export itself. Resolved per request, never constructed at mount. */
-  exports(): ScenarioRunExportPort<TRequest>;
+  exports(): ScenarioRunExport<TRequest>;
   /** Fans one progress event out to every pod serving this tenant. */
   broadcast(): AppRestBroadcast;
   /** The correlation handle the browser subscribes to progress under. */
@@ -250,7 +250,7 @@ function buildExportStream<TRequest extends ScenarioRunExportRequestFields>({
   signal,
   broadcast,
 }: {
-  service: ScenarioRunExportPort<TRequest>;
+  service: ScenarioRunExport<TRequest>;
   request: TRequest;
   exportId: string;
   totalCount: number;

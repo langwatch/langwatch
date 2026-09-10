@@ -3,7 +3,7 @@ import { NodeHttpHandler } from "@smithy/node-http-handler";
 import type { HttpHandlerOptions, HttpRequest, HttpResponse } from "@smithy/core/protocols";
 import { HttpsProxyAgent } from "https-proxy-agent";
 
-export abstract class OutboundProxyResolverPort {
+export abstract class OutboundProxyResolver {
   abstract tryResolveForHost(hostname: string): string | undefined;
 }
 
@@ -124,7 +124,7 @@ export function staticCredentialsOrUndefined(
 const DEFAULT_ASSUME_ROLE_DURATION_SECONDS = 900;
 
 export class AwsClientConfiguration {
-  static create(options: { outboundProxy: OutboundProxyResolverPort }): AwsClientConfiguration {
+  static create(options: { outboundProxy: OutboundProxyResolver }): AwsClientConfiguration {
     return new AwsClientConfiguration(options.outboundProxy);
   }
 
@@ -134,7 +134,7 @@ export class AwsClientConfiguration {
 
   private closePromise: Promise<void> | undefined;
 
-  private constructor(outboundProxy: OutboundProxyResolverPort) {
+  private constructor(outboundProxy: OutboundProxyResolver) {
     this.transport = new AwsTransportPolicy(outboundProxy, this.requestHandlers);
   }
 
@@ -252,7 +252,7 @@ class BorrowedAwsRequestHandler implements AwsClientRequestHandler {
 
 class AwsTransportPolicy {
   constructor(
-    private readonly outboundProxy: OutboundProxyResolverPort,
+    private readonly outboundProxy: OutboundProxyResolver,
     private readonly requestHandlers: AwsRequestHandlerPool,
   ) {}
 

@@ -29,7 +29,7 @@ import {
   JoinRequestPipelineDefinitionAdapter,
   type JoinRequestPipeline,
 } from "./join-request-pipeline-definition.service.ts";
-import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process.ts";
+import type { JoinRequestLifecycle } from "../processes/join-request-lifecycle.process.ts";
 import type { JoinRequestFoldState } from "../projections/join-request-state.projection.ts";
 import {
   ScimSyncPipelineDefinitionAdapter,
@@ -37,7 +37,7 @@ import {
 } from "./scim-sync-pipeline-definition.service.ts";
 import type { ScimSyncFoldState } from "../projections/scim-sync-state.projection.ts";
 import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.service.ts";
-import type { ConnectionTeardownPort } from "../processes/connection-teardown.process.ts";
+import type { ConnectionTeardown } from "../processes/connection-teardown.process.ts";
 import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection.ts";
 import { CryptoIdentifierIdentityAdapter } from "./crypto-identifier-identity.service.ts";
 
@@ -97,7 +97,7 @@ function producerOnlyReads<TRepository extends object>(input: {
 }
 
 /** The reminder and the lapse notice, refused: this process sends no mail here. */
-class ProducerOnlyJoinRequestLifecycle implements JoinRequestLifecyclePort {
+class ProducerOnlyJoinRequestLifecycle implements JoinRequestLifecycle {
   constructor(private readonly processName: string) {}
 
   remindAdmins(): Promise<void> {
@@ -122,7 +122,7 @@ class ProducerOnlyJoinRequestLifecycle implements JoinRequestLifecyclePort {
 }
 
 /** The teardown completion, refused: only the draining process advances it. */
-class ProducerOnlyConnectionTeardown implements ConnectionTeardownPort {
+class ProducerOnlyConnectionTeardown implements ConnectionTeardown {
   constructor(private readonly processName: string) {}
 
   completeTeardown(): Promise<void> {

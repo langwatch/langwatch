@@ -82,7 +82,7 @@ import type { ExecutionJobData } from "../services/scenario-execution-pool.servi
 import type { Logger } from "@langwatch/observability";
 import {
   SilentScenarioActivity,
-  type ScenarioActivityPort,
+  type ScenarioActivity,
 } from "../ports/scenario-activity.port.ts";
 
 /**
@@ -108,7 +108,7 @@ export interface ScenarioAppDependencies {
   /** The run dialog's configuration history. */
   runConfigurations: RunConfigurationsService;
   /** Product analytics and lifecycle nurturing, both fire-and-forget. */
-  activity: ScenarioActivityPort;
+  activity: ScenarioActivity;
 }
 
 /**
@@ -137,7 +137,7 @@ export interface ScenarioAppInfrastructure {
    * Where a created scenario is reported to, for a process that composed
    * product analytics and the lifecycle sender. Absent reports nothing.
    */
-  activity?: ScenarioActivityPort;
+  activity?: ScenarioActivity;
   agentAdapterFactory: AgentAdapterFactory;
   cancellationPublisher: CancellationPublisher;
   cancellationSubscriber: CancellationSubscriber;

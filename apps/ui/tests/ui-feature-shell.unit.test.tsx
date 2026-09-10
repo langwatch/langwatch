@@ -12,7 +12,7 @@ import {
   createUiScopeHost,
   useOrganizationTeamProject,
 } from "@langwatch/ui-host/use-organization-team-project";
-import { UiSessionPort, useUiCapabilities } from "@langwatch/ui-host/capabilities";
+import { UiSession, useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import type {
   UiFeatureApiBinding,
   UiFeatureApiTransport,
@@ -20,7 +20,7 @@ import type {
 import { createUiFeatureShell } from "../src/ui/sections/ui-feature-shell";
 import type { UiProviderShell } from "../src/ui/sections/ui-outer-providers";
 
-class StubSession extends UiSessionPort {
+class StubSession extends UiSession {
   currentUser() {
     return { id: "user_1", name: "Ada", email: "ada@example.com", image: null };
   }

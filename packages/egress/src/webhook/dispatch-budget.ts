@@ -1,5 +1,5 @@
 import { DispatchError } from "@langwatch/eventing";
-import type { WebhookDispatchRateLimiterPort } from "../ports/webhook-dispatch-rate-limiter.port.ts";
+import type { WebhookDispatchRateLimiter } from "../ports/webhook-dispatch-rate-limiter.port.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
@@ -45,7 +45,7 @@ export async function assertDispatchBudget({
   scopeId,
   label,
 }: {
-  rateLimiter: WebhookDispatchRateLimiterPort;
+  rateLimiter: WebhookDispatchRateLimiter;
   scopeId: string;
   label: string;
 }): Promise<void> {

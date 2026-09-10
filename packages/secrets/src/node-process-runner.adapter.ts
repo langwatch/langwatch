@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import { ProcessRunnerPort, type ProcessResult } from "./process-runner.port.ts";
+import { ProcessRunner, type ProcessResult } from "./process-runner.port.ts";
 
 /** The real child process. Never constructed in production — see `SecretChain`. */
-export class NodeProcessRunner extends ProcessRunnerPort {
+export class NodeProcessRunner extends ProcessRunner {
   static create(): NodeProcessRunner {
     return new NodeProcessRunner();
   }

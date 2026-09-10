@@ -22,8 +22,8 @@ import {
 } from "@langwatch/coding-agent-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port.ts";
-import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
+import type { CodingAgentBillingPolicy } from "../app/coding-agent.infrastructure.ts";
+import type { CodingAgentClock } from "../app/coding-agent.infrastructure.ts";
 import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository.ts";
@@ -81,8 +81,8 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
     sessionEvents: CodingAgentSessionEventRepository;
     github: GithubApi;
     projects: ProjectApi;
-    billing: CodingAgentBillingPolicyPort;
-    clock: CodingAgentClockPort;
+    billing: CodingAgentBillingPolicy;
+    clock: CodingAgentClock;
   }): CodingAgentFeatureService {
     const sessionReads = CodingAgentSessionReadService.create({
       sessions: options.sessions,

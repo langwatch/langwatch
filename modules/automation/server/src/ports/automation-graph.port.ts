@@ -21,12 +21,12 @@ export type GraphAlertDispatchResult = {
 };
 
 /** Technical delivery boundary owned by the process composition root. */
-export abstract class AutomationGraphNotifierPort {
+export abstract class AutomationGraphNotifier {
   abstract dispatch(input: GraphAlertDispatchInput): Promise<GraphAlertDispatchResult>;
 }
 
 /** Process logger used by graph evaluation and heartbeat isolation. */
-export abstract class AutomationLoggerPort {
+export abstract class AutomationLogger {
   abstract error(fields: Record<string, unknown>, message: string): void;
   abstract debug(fields: Record<string, unknown>, message: string): void;
   abstract info(fields: Record<string, unknown>, message: string): void;
@@ -34,17 +34,17 @@ export abstract class AutomationLoggerPort {
 }
 
 /** Technical ClickHouse resolver used only by the heartbeat recency query. */
-export abstract class AutomationHeartbeatPort {
+export abstract class AutomationHeartbeat {
   abstract tryResolveClickHouseClient(projectId: string): Promise<ClickHouseClient | null>;
 }
 
 /** Host crypto boundary for stored Slack bot credentials. */
-export abstract class AutomationSlackBotTokenDecryptorPort {
+export abstract class AutomationSlackBotTokenDecryptor {
   abstract tryDecrypt(params: SlackActionParams): string | null;
 }
 
 /** Host transport semantics for retryable and terminal delivery failures. */
-export abstract class AutomationDispatchErrorPort {
+export abstract class AutomationDispatchError {
   abstract isTerminal(error: unknown): boolean;
   abstract createTerminal(message: string): unknown;
 }

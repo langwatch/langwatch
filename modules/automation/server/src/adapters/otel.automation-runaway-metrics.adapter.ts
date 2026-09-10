@@ -3,7 +3,7 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 /**
  * The three containment series, and a sink that records nothing.
  *
- * `AutomationRunawayPort` mixes infrastructure the policy needs (email,
+ * `AutomationRunaway` mixes infrastructure the policy needs (email,
  * leases, project reads) with three pure observations. Only the observations
  * are declared here, so a composition root can delegate `onCeilingBreach`,
  * `onAutoPaused` and `onContainmentFailed` to this sink without the sink

@@ -2,7 +2,7 @@ import {
   AdminEmailPlatformOperatorsRepository,
   type PrismaSsoPlatformOperatorDatabase,
 } from "./prisma.sso-platform-operators.repository.ts";
-import type { PlatformOperatorPort } from "../../app/identity.infrastructure.ts";
+import type { PlatformOperator } from "../../app/identity.infrastructure.ts";
 import { LocalDoorBreakGlassBindingAdapter } from "../../services/local-door-break-glass-binding.service.ts";
 import { SsoConnectionGuardsService } from "../../services/sso-connection-guards.service.ts";
 import { SsoConnectionService } from "../../services/sso-connection.service.ts";
@@ -16,7 +16,7 @@ import {
 } from "../../services/eventing-sso-connection-ledger.service.ts";
 import {
   EventingSsoConnectionTeardownAdapter,
-  SsoConnectionDirectoryRevocationPort,
+  SsoConnectionDirectoryRevocation,
   UnrevokedSsoConnectionDirectory,
 } from "../../services/eventing-sso-connection-teardown.service.ts";
 import {
@@ -48,9 +48,9 @@ export type PostgresSsoConnectionPipelineOptions = {
    * decides who reaches the back office, and deliberately not `ops:*` — if that permission ever
    * widens, "who may attest a customer's domain" must not widen with it silently.
    */
-  operators: PlatformOperatorPort;
+  operators: PlatformOperator;
   /** How a torn-down connection's directory tokens are retired, if at all. */
-  directory?: SsoConnectionDirectoryRevocationPort;
+  directory?: SsoConnectionDirectoryRevocation;
 };
 
 /** The one graph the definition and the back office both command through. */

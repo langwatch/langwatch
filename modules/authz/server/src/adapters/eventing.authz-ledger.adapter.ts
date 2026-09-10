@@ -13,7 +13,7 @@ import {
   roleKeyForTeamRole,
 } from "@langwatch/authz-contract";
 import { HandledError, remediation } from "@langwatch/handled-error";
-import { AuthzGrantsCommandDispatcherPort } from "../ports/authz-grants-command-dispatcher.port.ts";
+import { AuthzGrantsCommandDispatcher } from "../ports/authz-grants-command-dispatcher.port.ts";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { AuthzCompatibilityLedger } from "../app/authz.app.ts";
@@ -104,7 +104,7 @@ export type AuthzLedgerDatabase = Omit<
 
 export type EventingAuthzLedgerAdapterOptions = {
   database: AuthzLedgerDatabase;
-  dispatcher: AuthzGrantsCommandDispatcherPort;
+  dispatcher: AuthzGrantsCommandDispatcher;
   cutover: AuthzCutoverGateService;
   epoch: AuthzEpochRepository;
   revocation: PrismaAuthzRevocationRepository;

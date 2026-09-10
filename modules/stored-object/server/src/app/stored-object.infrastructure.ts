@@ -29,7 +29,7 @@ export interface StoredObjectOwnerLookupTelemetry {
  * Where one project's S3 bytes actually go: the endpoint, region and
  * credentials its objects are written and read through.
  *
- * Separate from {@link StoredObjectProjectS3ConfigPort}, which answers only
+ * Separate from {@link StoredObjectProjectS3Config}, which answers only
  * the BUCKET a destination is minted against. This one answers the CONNECTION,
  * and the two are different questions: a BYOC tenant's bucket lives on the
  * tenant's own endpoint with the tenant's own credentials, and a URI minted
@@ -109,7 +109,7 @@ export type StoredObjectUploadTokenClaims = Readonly<{
 }>;
 
 /** Existing application storage drivers are adapted to this narrow boundary. */
-export abstract class StoredObjectStoragePort {
+export abstract class StoredObjectStorage {
   abstract write(input: {
     projectId: StoredObjectProjectId;
     objectId: StoredObjectId;
@@ -150,7 +150,7 @@ export abstract class StoredObjectUploadTokenPort {
   abstract decode(token: string): Promise<StoredObjectUploadTokenClaims>;
 }
 
-export abstract class StoredObjectDeliveryPort {
+export abstract class StoredObjectDelivery {
   abstract mint(input: {
     projectId: StoredObjectProjectId;
     id: StoredObjectId;

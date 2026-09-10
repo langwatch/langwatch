@@ -12,20 +12,20 @@
  */
 import { createLogger } from "@langwatch/observability";
 import { WorkflowExecutionFailedError } from "@langwatch/workflow-contract";
-import { NlpLambdaFunctionPort } from "../ports/nlp-lambda-arn.port.ts";
+import { NlpLambdaFunctionPort } from "../app/workflow.app.ts";
 import {
-  NlpLambdaStreamInvokePort,
+  NlpLambdaStreamInvoke,
   type NlpLambdaStreamChunk,
-} from "../ports/nlp-lambda-stream.port.ts";
+} from "../app/workflow.app.ts";
 import {
-  NlpPayloadStagingPort,
+  NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type StagedNlpPayload,
-} from "../ports/workflow-nlp-lambda.port.ts";
+} from "../app/workflow.app.ts";
 import {
-  WorkflowStudioStreamPort,
+  WorkflowStudioStream,
   type WorkflowStudioStreamInput,
-} from "../ports/workflow.port.ts";
+} from "../app/workflow.app.ts";
 import { STUDIO_STAGING_PREFIX } from "../rules/nlp-lambda-config.rules.ts";
 import { LambdaWebAdapterStreamService } from "../services/lambda-web-adapter-stream.service.ts";
 
@@ -36,26 +36,24 @@ const STUDIO_EXECUTE_PATH = "/go/studio/execute";
 
 export type LambdaWorkflowStudioStreamOptions = Readonly<{
   functions: NlpLambdaFunctionPort;
-  invoke: NlpLambdaStreamInvokePort;
+  invoke: NlpLambdaStreamInvoke;
   /**
    * Where an oversized body is parked. Absent is a supported composition — a
    * deployment with no object storage runs every studio graph that fits under
    * the cap — and an oversized run then refuses by name instead of posting
    * over the cap and reporting AWS's byte count.
    */
-  staging?: NlpPayloadStagingPort | undefined;
+  staging?: NlpPayloadStaging | undefined;
   stagingThresholdBytes: number;
   stagingTtlSeconds: number;
 }>;
 
-export class LambdaWorkflowStudioStreamAdapter extends WorkflowStudioStreamPort {
+export class LambdaWorkflowStudioStreamAdapter implements WorkflowStudioStream {
   static create(options: LambdaWorkflowStudioStreamOptions): LambdaWorkflowStudioStreamAdapter {
     return new LambdaWorkflowStudioStreamAdapter(options);
   }
 
-  private constructor(private readonly options: LambdaWorkflowStudioStreamOptions) {
-    super();
-  }
+  private constructor(private readonly options: LambdaWorkflowStudioStreamOptions) {}
 
   async open(input: WorkflowStudioStreamInput): Promise<ReadableStreamDefaultReader<Uint8Array>> {
     const functionArn = await this.options.functions.arnFor({ projectId: input.projectId });

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GovernanceDiagnosticsPort,
+  GovernanceDiagnostics,
   IngestionSourceEntitlementsPort,
-  IngestionSourceLifecyclePort,
+  IngestionSourceLifecycle,
 } from "@langwatch/enterprise-governance-server";
 import { createLogger } from "@langwatch/observability";
 import {
-  AppGovernanceEncryptionPort,
+  AppGovernanceEncryption,
   type GovernanceEncryption,
 } from "./governance-infrastructure.adapter.ts";
 
@@ -17,13 +17,13 @@ type PlanProvider = {
 
 const logger = createLogger("langwatch:governance:ingestion-source");
 
-class AppIngestionSourceEntitlementsPort extends IngestionSourceEntitlementsPort {
+class AppIngestionSourceEntitlements extends IngestionSourceEntitlementsPort {
   private constructor(private readonly plans: PlanProvider) {
     super();
   }
 
-  static create(plans: PlanProvider): AppIngestionSourceEntitlementsPort {
-    return new AppIngestionSourceEntitlementsPort(plans);
+  static create(plans: PlanProvider): AppIngestionSourceEntitlements {
+    return new AppIngestionSourceEntitlements(plans);
   }
 
   async hasEnterprisePlan(organizationId: string): Promise<boolean> {
@@ -31,13 +31,13 @@ class AppIngestionSourceEntitlementsPort extends IngestionSourceEntitlementsPort
   }
 }
 
-class AppIngestionSourceDiagnosticsPort extends GovernanceDiagnosticsPort {
+class AppIngestionSourceDiagnostics extends GovernanceDiagnostics {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }
 }
 
-class DisabledIngestionSourceLifecyclePort extends IngestionSourceLifecyclePort {
+class DisabledIngestionSourceLifecycle extends IngestionSourceLifecycle {
   async sync(): Promise<void> {}
 }
 
@@ -46,7 +46,7 @@ export class AppIngestionSourceAdapter {
   private constructor(
     private readonly options: {
       plans: PlanProvider;
-      lifecycle: IngestionSourceLifecyclePort;
+      lifecycle: IngestionSourceLifecycle;
       secretPepper: string;
       encryption: GovernanceEncryption;
     },
@@ -54,34 +54,34 @@ export class AppIngestionSourceAdapter {
 
   static create(options: {
     plans: PlanProvider;
-    lifecycle: IngestionSourceLifecyclePort;
+    lifecycle: IngestionSourceLifecycle;
     secretPepper: string;
     encryption: GovernanceEncryption;
   }): AppIngestionSourceAdapter {
     return new AppIngestionSourceAdapter(options);
   }
 
-  static disabledLifecycle(): IngestionSourceLifecyclePort {
-    return new DisabledIngestionSourceLifecyclePort();
+  static disabledLifecycle(): IngestionSourceLifecycle {
+    return new DisabledIngestionSourceLifecycle();
   }
 
   entitlements(): IngestionSourceEntitlementsPort {
-    return AppIngestionSourceEntitlementsPort.create(this.options.plans);
+    return AppIngestionSourceEntitlements.create(this.options.plans);
   }
 
-  lifecycle(): IngestionSourceLifecyclePort {
+  lifecycle(): IngestionSourceLifecycle {
     return this.options.lifecycle;
   }
 
-  encryption(): AppGovernanceEncryptionPort {
-    return AppGovernanceEncryptionPort.create(this.options.encryption);
+  encryption(): AppGovernanceEncryption {
+    return AppGovernanceEncryption.create(this.options.encryption);
   }
 
   secretPepper(): string {
     return this.options.secretPepper;
   }
 
-  diagnostics(): GovernanceDiagnosticsPort {
-    return new AppIngestionSourceDiagnosticsPort();
+  diagnostics(): GovernanceDiagnostics {
+    return new AppIngestionSourceDiagnostics();
   }
 }

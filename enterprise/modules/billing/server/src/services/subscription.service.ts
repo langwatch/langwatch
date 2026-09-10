@@ -16,9 +16,9 @@ import {
   SubscriptionStatus,
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
-import type { StripeErrorTranslatorPort } from "../ports/stripe-error-translator.port.ts";
-import type { BillingOrganizationPort } from "../ports/organization.port.ts";
-import type { BillingSubscriptionNotifierPort } from "../ports/subscription-notifier.port.ts";
+import type { StripeErrorTranslator } from "../ports/stripe-error-translator.port.ts";
+import type { BillingOrganization } from "../ports/organization.port.ts";
+import type { BillingSubscriptionNotifier } from "../ports/subscription-notifier.port.ts";
 import type {
   BillingSubscriptionRecord,
   SubscriptionRepository,
@@ -41,23 +41,23 @@ export const RECENT_INVOICES_LIMIT = 4;
 export class BillingSubscriptionService {
   private constructor(
     private readonly repository: SubscriptionRepository,
-    private readonly organizationRepository: BillingOrganizationPort,
+    private readonly organizationRepository: BillingOrganization,
     private readonly stripe: Stripe,
     private readonly itemCalculator: SubscriptionItemCalculatorService,
     private readonly seatEventService: SeatEventSubscriptionService | undefined,
-    private readonly notifier: BillingSubscriptionNotifierPort,
-    private readonly stripeErrors: StripeErrorTranslatorPort,
+    private readonly notifier: BillingSubscriptionNotifier,
+    private readonly stripeErrors: StripeErrorTranslator,
   ) {}
 
   static create(options: {
     repository: SubscriptionRepository;
-    organizationRepository: BillingOrganizationPort;
+    organizationRepository: BillingOrganization;
     stripe: Stripe;
     itemCalculator: SubscriptionItemCalculatorService;
     seatEventService?: SeatEventSubscriptionService;
-    notifier: BillingSubscriptionNotifierPort;
+    notifier: BillingSubscriptionNotifier;
     /** Classifies a payment-provider failure; the process supplies Stripe's. */
-    stripeErrors: StripeErrorTranslatorPort;
+    stripeErrors: StripeErrorTranslator;
   }): BillingSubscriptionService {
     return new BillingSubscriptionService(
       options.repository,

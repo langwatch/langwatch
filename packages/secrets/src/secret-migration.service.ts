@@ -1,6 +1,6 @@
 import { classOf } from "./keys.ts";
 import { referenceFor, writeFields, type VaultItem } from "./one-password-item.ts";
-import type { ProcessRunnerPort } from "./process-runner.port.ts";
+import type { ProcessRunner } from "./process-runner.port.ts";
 
 /** What a migration did, by key name. No value is ever carried out of here. */
 export type SecretMigrationReport = Readonly<{
@@ -34,14 +34,14 @@ export class SecretMigrationService {
     runner,
   }: {
     item: VaultItem;
-    runner: ProcessRunnerPort;
+    runner: ProcessRunner;
   }): SecretMigrationService {
     return new SecretMigrationService(item, runner);
   }
 
   private constructor(
     private readonly item: VaultItem,
-    private readonly runner: ProcessRunnerPort,
+    private readonly runner: ProcessRunner,
   ) {}
 
   async push({

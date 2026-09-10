@@ -24,7 +24,7 @@ import {
   type TRACE_MAPPINGS,
 } from "@langwatch/dataset-contract";
 import { type Trace } from "@langwatch/trace-contract";
-import type { EvaluationTraceProtections } from "../ports/evaluation-execution.port.ts";
+import type { EvaluationTraceProtections } from "../app/evaluation.infrastructure.ts";
 import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service.ts";
 import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service.ts";
 import { EvaluatorAvailabilityService } from "./evaluator-availability.service.ts";

@@ -2,10 +2,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import {
   PrismaProjectRepository,
   ProjectService,
-  type ProjectCredentialsPort,
-  type ProjectDiagnosticsPort,
-  type ProjectKeyMapPort,
-  type ProjectStoredObjectsPort,
+  type ProjectCredentials,
+  type ProjectDiagnostics,
+  type ProjectKeyMap,
+  type ProjectStoredObjects,
   type PrismaProjectDatabase,
 } from "@langwatch/project-server";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -13,11 +13,11 @@ import { toDate } from "@langwatch/time";
 
 export interface PostgresProjectAdapterOptions {
   database: PrismaProjectDatabase;
-  credentials: ProjectCredentialsPort;
+  credentials: ProjectCredentials;
   organizations: OrganizationApi;
-  keyMap?: ProjectKeyMapPort;
-  storedObjects?: ProjectStoredObjectsPort;
-  diagnostics?: ProjectDiagnosticsPort;
+  keyMap?: ProjectKeyMap;
+  storedObjects?: ProjectStoredObjects;
+  diagnostics?: ProjectDiagnostics;
 }
 
 /**

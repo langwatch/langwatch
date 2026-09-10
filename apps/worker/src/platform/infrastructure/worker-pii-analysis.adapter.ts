@@ -1,6 +1,6 @@
 /**
  * The Google DLP and Presidio clients this process talks to, answering
- * `PiiAnalysisPort`.
+ * `PiiAnalysis`.
  *
  * Harvested from the application's `AppPiiRedactionTransport` and its module
  * functions in `platform/app/src/server/tracer/collector/piiCheck.ts`, which
@@ -12,11 +12,11 @@
  *
  * FOUR MECHANICAL DIFFERENCES from the twin, and no others:
  *
- *  - the class extends `PiiAnalysisPort` instead of implementing the
+ *  - the class extends `PiiAnalysis` instead of implementing the
  *    application's `PiiRedactionTransport` interface, and takes its metrics
  *    port alongside its config;
  *  - the three `prom-client` instruments become calls on
- *    `PiiAnalysisMetricsPort`, whose OTel adapter writes the same three series
+ *    `PiiAnalysisMetrics`, whose OTel adapter writes the same three series
  *    under the same names with the same labels;
  *  - `PRESIDIO_STRICT_ENTITIES` is imported from `@langwatch/redaction` rather
  *    than declared here, because the custom picker has to read it too;
@@ -34,7 +34,7 @@
 import type { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos.js";
 import type { BatchEvaluationResult } from "@langwatch/evaluator-contract";
-import { type PiiAnalysisMetricsPort, PiiAnalysisPort } from "@langwatch/data-privacy-server";
+import { type PiiAnalysisMetrics, PiiAnalysis } from "@langwatch/data-privacy-server";
 import { normalizePresidioMarkers, PRESIDIO_STRICT_ENTITIES } from "@langwatch/redaction";
 import {
   compilePiiExceptPatterns,
@@ -51,10 +51,10 @@ type DlpClient = DlpServiceClient & { close?: () => Promise<void> };
  * Process-owned Google DLP and Presidio transport. The DLP SDK is kept lazy:
  * no import or gRPC channel is created until a credentialed DLP check runs.
  */
-export class WorkerPiiAnalysisAdapter extends PiiAnalysisPort {
+export class WorkerPiiAnalysisAdapter implements PiiAnalysis {
   static create(options: {
     config: WorkerTracePrivacyConfig;
-    metrics: PiiAnalysisMetricsPort;
+    metrics: PiiAnalysisMetrics;
   }): WorkerPiiAnalysisAdapter {
     return new WorkerPiiAnalysisAdapter(options.config, options.metrics);
   }
@@ -63,10 +63,8 @@ export class WorkerPiiAnalysisAdapter extends PiiAnalysisPort {
 
   private constructor(
     private readonly config: WorkerTracePrivacyConfig,
-    readonly metrics: PiiAnalysisMetricsPort,
-  ) {
-    super();
-  }
+    readonly metrics: PiiAnalysisMetrics,
+  ) {}
 
   // Lazy DLP client - created only when getDlpClient() is called. The
   // @google-cloud/dlp SDK (generated protos via google-gax/grpc) is one of the
@@ -343,7 +341,7 @@ function presidioEntitiesSetting(
  */
 const clearPresidio = async (
   config: WorkerTracePrivacyConfig,
-  metrics: PiiAnalysisMetricsPort,
+  metrics: PiiAnalysisMetrics,
   texts: string[],
   piiRedactionLevel: PIIRedactionLevel,
   entities?: readonly string[],

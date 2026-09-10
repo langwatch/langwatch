@@ -15,12 +15,12 @@ import {
   type Secret,
   type UpdateSecretInput,
 } from "@langwatch/secret-contract";
-import type { SecretEncryptionPort } from "../ports/secret.port.ts";
+import type { SecretEncryption } from "../app/secret.app.ts";
 import type { SecretRepository } from "../repositories/secret.repository.ts";
 
 export interface SecretServiceOptions {
   repository: SecretRepository;
-  encryption: SecretEncryptionPort;
+  encryption: SecretEncryption;
   reservedNames: readonly string[];
   maximumPerProject?: number;
 }

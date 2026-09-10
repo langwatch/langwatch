@@ -1,5 +1,5 @@
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
-import { OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { OutboundProxyResolver } from "@langwatch/aws-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
 
@@ -43,22 +43,22 @@ import { TopicServerInstallerAdapter } from "@langwatch/topic-server";
 import { WorkerProductionComposition } from "../worker-production.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "../../platform/lifecycle/worker-runtime.port.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
-class NoProxy extends OutboundProxyResolverPort {
+class NoProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {
     return undefined;
   }
 }
 
-class Lifecycle extends WorkerLifecyclePort {
+class Lifecycle extends WorkerLifecycle {
   async close() {}
 }
 
-class Transport extends WorkerTransportPort {
+class Transport extends WorkerTransport {
   async start() {
     return {
       shutdown: async () => {},

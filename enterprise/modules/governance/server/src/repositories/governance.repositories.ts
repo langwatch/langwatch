@@ -3,7 +3,7 @@
 import type { AdminWorkspaceViewAuditRepository } from "./audit/admin-workspace-view-audit.repository.ts";
 import type { AnomalyRulePort } from "./policy/anomaly-rule.repository.ts";
 import type { DepartmentPort } from "./directory/department.repository.ts";
-import type { GovernanceDirectoryPort } from "./directory/governance-directory.repository.ts";
+import type { GovernanceDirectory } from "./directory/governance-directory.repository.ts";
 import type { GovernanceOcsfExportRepository } from "./audit/governance-setup-state.repository.ts";
 import type { GovernanceSetupStateRepository } from "./audit/governance-setup-state.repository.ts";
 import type { OrganizationSessionPolicyPort } from "./policy/session-policy.repository.ts";
@@ -25,7 +25,7 @@ export interface GovernanceRepositories {
   readonly adminWorkspaceViewAudit: AdminWorkspaceViewAuditRepository;
   readonly anomalyRules: AnomalyRulePort;
   readonly departments: DepartmentPort;
-  readonly directory: GovernanceDirectoryPort;
+  readonly directory: GovernanceDirectory;
   readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly personalVirtualKeys: PersonalVirtualKeyRepository;
   readonly routingPolicies: RoutingPolicyPort;

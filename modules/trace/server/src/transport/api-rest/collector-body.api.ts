@@ -21,7 +21,7 @@ import {
   type Span,
 } from "@langwatch/trace-contract";
 
-import type { CollectorErrorReportPort } from "./collector.api.ts";
+import type { CollectorErrorReport } from "./collector.api.ts";
 
 const logger = createLogger("langwatch.collector");
 
@@ -220,7 +220,7 @@ function splitMetadata(metadata: Record<string, unknown>): CollectorMetadata {
 
 export function parseCollectorMetadata(
   params: CollectorRESTParamsValidator,
-  input: Readonly<{ projectId: string; reportError?: CollectorErrorReportPort | undefined }>,
+  input: Readonly<{ projectId: string; reportError?: CollectorErrorReport | undefined }>,
 ): CollectorMetadata | CollectorRejection {
   if (!params.metadata) return { reservedTraceMetadata: {}, customMetadata: {} };
 
@@ -384,7 +384,7 @@ function findSpanValidationRejection(
   input: Readonly<{
     projectId: string;
     traceId: string;
-    reportError?: CollectorErrorReportPort | undefined;
+    reportError?: CollectorErrorReport | undefined;
   }>,
 ): CollectorRejection | null {
   const { projectId, traceId } = input;
@@ -418,7 +418,7 @@ export function findSpanRejection(
   input: Readonly<{
     projectId: string;
     traceId: string;
-    reportError?: CollectorErrorReportPort | undefined;
+    reportError?: CollectorErrorReport | undefined;
   }>,
 ): CollectorRejection | null {
   for (const [index, span] of spans.entries()) {

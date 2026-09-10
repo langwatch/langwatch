@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
-  TraceAlertMetricsPort,
-  TraceAlertOriginGuardPort,
-  TraceAlertTriggerMatchPort,
-  TraceAlertTriggerPort,
+  TraceAlertMetricsSink,
+  TraceAlertOriginGuard,
+  TraceAlertTriggerMatchChannel,
+  TraceAlertTriggerReader,
   type TraceAlertTrigger,
-} from "../../ports/governance-subscriber.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
 import {
   governanceTraceContext,
   governanceTraceEvent,
-} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures.ts";
+} from "./governance-subscriber.fixtures.ts";
 
 function trigger(overrides: Partial<TraceAlertTrigger> = {}): TraceAlertTrigger {
   return {
@@ -24,7 +24,7 @@ function trigger(overrides: Partial<TraceAlertTrigger> = {}): TraceAlertTrigger 
   };
 }
 
-class ManyTriggers extends TraceAlertTriggerPort {
+class ManyTriggers implements TraceAlertTriggerReader {
   activeForProject(): Promise<TraceAlertTrigger[]> {
     return Promise.resolve([
       trigger({ id: "trigger-1" }),
@@ -34,22 +34,22 @@ class ManyTriggers extends TraceAlertTriggerPort {
   }
 }
 
-class RecordingMatchCommands extends TraceAlertTriggerMatchPort {
-  readonly sent: Array<Parameters<TraceAlertTriggerMatchPort["send"]>[0]> = [];
+class RecordingMatchCommands implements TraceAlertTriggerMatchChannel {
+  readonly sent: Array<Parameters<TraceAlertTriggerMatchChannel["send"]>[0]> = [];
 
-  send(input: Parameters<TraceAlertTriggerMatchPort["send"]>[0]): Promise<void> {
+  send(input: Parameters<TraceAlertTriggerMatchChannel["send"]>[0]): Promise<void> {
     this.sent.push(input);
     return Promise.resolve();
   }
 }
 
-class PassingOrigin extends TraceAlertOriginGuardPort {
+class PassingOrigin implements TraceAlertOriginGuard {
   passes(): boolean {
     return true;
   }
 }
 
-class RecordingMetrics extends TraceAlertMetricsPort {
+class RecordingMetrics implements TraceAlertMetricsSink {
   readonly counted: number[] = [];
   countRecorded(count: number): void {
     this.counted.push(count);

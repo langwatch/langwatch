@@ -14,7 +14,7 @@ import type {
   GatewayVirtualKeyScope,
   ResourceMetadata,
 } from "@langwatch/gateway-contract";
-import type { GatewayPersistenceTransaction } from "./gateway-change-events.port.ts";
+import type { GatewayPersistenceTransaction } from "../app/gateway.infrastructure.ts";
 
 
 export type CreateGatewayVirtualKeyInput = {
@@ -63,7 +63,7 @@ export type SetGatewayVirtualKeyDisabledInput = {
   reason: string | null;
 };
 
-export abstract class GatewayVirtualKeysPort {
+export abstract class GatewayVirtualKeys {
   abstract tryFindById(
     input: { id: string; organizationId: string },
     transaction?: GatewayPersistenceTransaction,

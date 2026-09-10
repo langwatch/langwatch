@@ -11,7 +11,7 @@ import { PersonalSourceTypeNotAllowedError } from "@langwatch/enterprise-governa
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createGovernanceCliRestApp, type GovernanceCliRestPorts } from "../governance-cli.api.ts";
+import { createGovernanceCliRestApp, type GovernanceCliRestDependencies } from "../governance-cli.api.ts";
 
 const CALLER = {
   user_id: "user_1",
@@ -36,7 +36,7 @@ function mountCli(governance: Record<string, unknown>) {
     plans: () => ({}),
     permittedOnOrganization: vi.fn().mockResolvedValue(true),
     permittedOnProject: vi.fn().mockResolvedValue(true),
-  } as unknown as GovernanceCliRestPorts;
+  } as unknown as GovernanceCliRestDependencies;
 
   const app = createGovernanceCliRestApp({ security: passThroughSecurity(), ports });
   return {

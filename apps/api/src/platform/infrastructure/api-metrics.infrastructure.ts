@@ -1,5 +1,5 @@
 import { collectDefaultMetrics, register } from "prom-client";
-import type { ApiMetricsPort } from "../../api-process.lifecycle.ts";
+import type { ApiMetrics } from "../../api-process.lifecycle.ts";
 import {
   PrometheusApiMetricsAdapter,
   type ApiMetricsAccess,
@@ -20,7 +20,7 @@ export type ApiMetricsInfrastructureOptions = {
 };
 
 /** Reports the composition decision an unconfigured key would otherwise hide. */
-export abstract class ApiMetricsAbsenceReportPort {
+export abstract class ApiMetricsAbsenceReport {
   abstract absent(): void;
 }
 
@@ -55,7 +55,7 @@ export class ApiMetricsInfrastructure {
    *    rather than one per tier.
    */
   static tryCreate(
-    options: ApiMetricsInfrastructureOptions & { report?: ApiMetricsAbsenceReportPort },
+    options: ApiMetricsInfrastructureOptions & { report?: ApiMetricsAbsenceReport },
   ): ApiMetricsInfrastructure | undefined {
     const key = options.key?.trim();
     if (key) {
@@ -77,5 +77,5 @@ export class ApiMetricsInfrastructure {
     );
   }
 
-  private constructor(readonly metrics: ApiMetricsPort) {}
+  private constructor(readonly metrics: ApiMetrics) {}
 }

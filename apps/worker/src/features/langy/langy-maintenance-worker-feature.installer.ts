@@ -1,9 +1,9 @@
 import { EventingLangyMaintenanceAdapter } from "@langwatch/langy-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** The revoke half of the sweep, so a caller can supply one without a database. */
-export abstract class WorkerLangySessionKeyReapPort {
+export abstract class WorkerLangySessionKeyReap {
   /** Revokes every elapsed, unrevoked Langy session key; answers how many. */
   abstract reap(): Promise<number>;
 }
@@ -22,10 +22,10 @@ export abstract class WorkerLangySessionKeyReapPort {
  * graph's own process store prunes, and a definition built against another
  * store prunes another process's rows.
  */
-export class LangyMaintenanceWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class LangyMaintenanceWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     eventing: WorkerEventingRuntime;
-    sessionKeyReap: WorkerLangySessionKeyReapPort;
+    sessionKeyReap: WorkerLangySessionKeyReap;
   }): LangyMaintenanceWorkerFeatureInstaller {
     return new LangyMaintenanceWorkerFeatureInstaller(options.eventing, options.sessionKeyReap);
   }
@@ -35,7 +35,7 @@ export class LangyMaintenanceWorkerFeatureInstaller implements WorkerFeatureInst
 
   private constructor(
     private readonly eventing: WorkerEventingRuntime,
-    private readonly sessionKeyReap: WorkerLangySessionKeyReapPort,
+    private readonly sessionKeyReap: WorkerLangySessionKeyReap,
   ) {}
 
   async install(): Promise<WorkerFeatureCloser | undefined> {

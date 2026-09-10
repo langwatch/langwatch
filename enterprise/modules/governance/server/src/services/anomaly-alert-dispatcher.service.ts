@@ -7,11 +7,9 @@ import {
   safeParseDestinationConfig,
   type WebhookDestination,
 } from "@langwatch/enterprise-governance-contract";
-import type { AnomalyAlertHttpPort } from "../app/governance.infrastructure.ts";
-import {
-  GovernanceDiagnosticsPort,
-  NullGovernanceDiagnosticsAdapter,
-} from "../ports/governance-diagnostics.port.ts";
+import type { AnomalyAlertHttpClient } from "../app/governance.infrastructure.ts";
+import type { GovernanceDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_MAX_RETRIES = 2;
@@ -19,16 +17,16 @@ const DEFAULT_RETRY_BACKOFF_MS = 250;
 
 export class AnomalyAlertDispatcherService {
   private constructor(
-    private readonly http: AnomalyAlertHttpPort,
-    private readonly diagnostics: GovernanceDiagnosticsPort,
+    private readonly http: AnomalyAlertHttpClient,
+    private readonly diagnostics: GovernanceDiagnosticsSink,
     private readonly timeoutMs: number,
     private readonly maxRetries: number,
     private readonly retryBackoffMs: number,
   ) {}
 
   static create(options: {
-    http: AnomalyAlertHttpPort;
-    diagnostics?: GovernanceDiagnosticsPort;
+    http: AnomalyAlertHttpClient;
+    diagnostics?: GovernanceDiagnosticsSink;
     timeoutMs?: number;
     maxRetries?: number;
     retryBackoffMs?: number;

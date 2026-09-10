@@ -20,7 +20,7 @@ export type GovernanceMembershipStatus =
   | "user_deactivated"
   | "not_org_member";
 
-export abstract class GovernanceDirectoryPort {
+export abstract class GovernanceDirectory {
   abstract membershipStatus(params: {
     userId: string;
     organizationId: string;

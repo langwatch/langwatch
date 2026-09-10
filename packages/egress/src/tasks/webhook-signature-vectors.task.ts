@@ -12,7 +12,7 @@ import { serializeVectors, VECTORS_RELATIVE_PATH } from "../webhook/signature-ve
  * matching what is committed. This task is only the write: it lives beside
  * webhook delivery so the write is a thin runner over the package's own
  * generator rather than a standalone tool with a second copy of the
- * algorithm in it. It needs no infrastructure — no `TaskHostPort` handle —
+ * algorithm in it. It needs no infrastructure — no `TaskHost` handle —
  * so it is the task the launcher's smoke test runs.
  */
 export class WebhookSignatureVectorsTask extends Task {

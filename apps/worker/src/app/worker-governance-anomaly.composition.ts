@@ -58,7 +58,7 @@ export interface WorkerGovernanceAnomalySchedule {
  * a transport that answered every address, this graph would deliver a
  * customer's spend figures to `169.254.169.254` and record it as a success.
  */
-export abstract class WorkerAnomalyAlertTransportPort {
+export abstract class WorkerAnomalyAlertTransport {
   abstract send(destination: SsrfValidationResult, init: RequestInit): Promise<Response>;
 }
 
@@ -75,7 +75,7 @@ export abstract class WorkerAnomalyAlertTransportPort {
  * leaf `createWorkerWebhookEgress` reads it from: an on-prem receiver commonly
  * carries a self-signed certificate while private addresses stay refused.
  */
-export class FencedAnomalyAlertTransport extends WorkerAnomalyAlertTransportPort {
+export class FencedAnomalyAlertTransport extends WorkerAnomalyAlertTransport {
   static create(tls: EgressTlsPolicy): FencedAnomalyAlertTransport {
     return new FencedAnomalyAlertTransport(tls);
   }
@@ -100,7 +100,7 @@ export type WorkerGovernanceAnomalyOptions = Readonly<{
   /** The deployment's tenant-keyed ClickHouse client, for `governance_kpis`. */
   resolveClickHouseClient: EventingClickHouseClientResolver;
   /** How an admitted destination is reached. */
-  transport: WorkerAnomalyAlertTransportPort;
+  transport: WorkerAnomalyAlertTransport;
 }>;
 
 /**
@@ -153,6 +153,6 @@ export function createWorkerGovernanceAnomalySchedule(
 /** The transport a deployment sends anomaly alerts through, TLS answer included. */
 export function createWorkerAnomalyAlertTransport(
   config: WorkerConfig,
-): WorkerAnomalyAlertTransportPort {
+): WorkerAnomalyAlertTransport {
   return FencedAnomalyAlertTransport.create({ rejectUnauthorized: config.deployment.saas });
 }

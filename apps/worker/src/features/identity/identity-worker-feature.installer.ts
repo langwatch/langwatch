@@ -1,5 +1,5 @@
 import type { IdentityPipeline } from "@langwatch/identity-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** Identity's worker-facing capability: the built pipeline definition. */
@@ -33,7 +33,7 @@ export interface IdentityWorkerCapability {
  * opens only for a user whose backfill is finalized. Whoever makes the worker
  * composition the live one drops the legacy registration in the same change.
  */
-export class IdentityWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class IdentityWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: IdentityWorkerCapability;
     eventing: WorkerEventingRuntime;

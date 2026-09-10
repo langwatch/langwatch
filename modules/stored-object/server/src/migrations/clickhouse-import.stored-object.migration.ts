@@ -10,13 +10,13 @@ import {
   type StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
-import { StoredObjectLegacyLocationPort } from "../repositories/stored-object-legacy-location.repository.ts";
+import { StoredObjectLegacyLocation } from "../repositories/stored-object-legacy-location.repository.ts";
 import {
-  StoredObjectLegacySourcePort,
+  StoredObjectLegacySource,
   type LegacyStoredObjectRow,
 } from "../repositories/stored-object-legacy-source.repository.ts";
-import { StoredObjectLegacyWriterDrainPort } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
-import { StoredObjectProjectSourcePort } from "../repositories/stored-object-project-source.repository.ts";
+import { StoredObjectLegacyWriterDrain } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
+import { StoredObjectProjectSource } from "../repositories/stored-object-project-source.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
@@ -27,10 +27,10 @@ export const STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME =
   "stored-objects-clickhouse-import-v0" as const;
 
 export type ClickHouseImportStoredObjectMigrationOptions = Readonly<{
-  projects: StoredObjectProjectSourcePort;
-  legacy: StoredObjectLegacySourcePort;
-  locations: StoredObjectLegacyLocationPort;
-  drain: StoredObjectLegacyWriterDrainPort;
+  projects: StoredObjectProjectSource;
+  legacy: StoredObjectLegacySource;
+  locations: StoredObjectLegacyLocation;
+  drain: StoredObjectLegacyWriterDrain;
   records: StoredObjectRecordRepository;
   pageSize?: number;
   now?: () => Instant;

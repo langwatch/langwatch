@@ -58,7 +58,7 @@ const createTokenSchema = z.object({
 export const scimTokenRest = defineRestRouter(ScimApi)
   .withNamespace("scim-tokens")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("organizationKey")
+  .withCredential("organization")
 
   .get("/", "listScimTokens")
   .withPermission("organization:manage")

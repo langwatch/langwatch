@@ -21,7 +21,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import type { WorkflowApp, WorkflowNlpRuntimePort, WorkflowService,} from "@langwatch/workflow-server";
+import type { WorkflowApp, WorkflowNlpRuntime, WorkflowService,} from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
@@ -215,7 +215,7 @@ async function composeApplication(options: { planType?: string } = {}) {
     infrastructure,
     peers: {
       workflows: createApiFixture<WorkflowService>(),
-      nlpRuntime: createApiFixture<WorkflowNlpRuntimePort>(),
+      nlpRuntime: createApiFixture<WorkflowNlpRuntime>(),
       workflowApp: () => createApiFixture<WorkflowApp>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       permissions: createApiFixture<AuthzApi>({ hasPermission: async () => true }),

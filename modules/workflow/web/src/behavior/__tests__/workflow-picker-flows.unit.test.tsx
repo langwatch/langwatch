@@ -10,12 +10,12 @@ import type { Component, NodeWithOptionalPosition } from "@langwatch/workflow-co
 
 import {
   type AgentPickerCallbacks,
-  type AgentPickerPort,
+  type AgentPicker,
   useWorkflowAgentPickerFlow,
 } from "../use-workflow-agent-picker-flow.ts";
 import {
   type EvaluatorPickerCallbacks,
-  type EvaluatorPickerPort,
+  type EvaluatorPicker,
   useWorkflowEvaluatorPickerFlow,
 } from "../use-workflow-evaluator-picker-flow.ts";
 import {
@@ -178,7 +178,7 @@ describe("Workflow prompt picker flow", () => {
 describe("Workflow evaluator picker flow", () => {
   it("maps selected evaluator fields and removes a cancelled placeholder", () => {
     let callbacks: EvaluatorPickerCallbacks | undefined;
-    const port: EvaluatorPickerPort = {
+    const port: EvaluatorPicker = {
       register: (registered) => {
         callbacks = registered;
       },
@@ -210,7 +210,7 @@ describe("Workflow evaluator picker flow", () => {
     let onSave:
       | ((saved: { id: string; name: string; evaluatorType?: string }) => boolean | undefined)
       | undefined;
-    const port: EvaluatorPickerPort = {
+    const port: EvaluatorPicker = {
       register: (registered) => {
         callbacks = registered;
       },
@@ -248,7 +248,7 @@ describe("Workflow evaluator picker flow", () => {
     let onSave:
       | ((saved: { id: string; name: string; evaluatorType?: string }) => boolean | undefined)
       | undefined;
-    const port: EvaluatorPickerPort = {
+    const port: EvaluatorPicker = {
       register: (registered) => {
         callbacks = registered;
       },
@@ -296,7 +296,7 @@ describe("Workflow agent picker flow", () => {
   it("maps a selected agent and registers app-owned creation effects", () => {
     let callbacks: AgentPickerCallbacks | undefined;
     const registerCreation = vi.fn();
-    const port: AgentPickerPort = {
+    const port: AgentPicker = {
       register: (registered) => {
         callbacks = registered;
       },
@@ -332,7 +332,7 @@ describe("Workflow agent picker flow", () => {
 
   it("opens agent creation and removes a cancelled placeholder", () => {
     let callbacks: AgentPickerCallbacks | undefined;
-    const port: AgentPickerPort = {
+    const port: AgentPicker = {
       register: (registered) => {
         callbacks = registered;
       },

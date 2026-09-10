@@ -28,14 +28,14 @@ import {
   isAuditLogExempt,
   redactAuditArgs,
   type AppTrpcPolicyMiddlewares,
-  type TrpcAuditPort,
+  type TrpcAudit,
   type TrpcAuthorizationDecisions,
-  type TrpcAuthorizationDenialPort,
-  type TrpcAuthorizationPort,
-  type TrpcCauseTranslationPort,
-  type TrpcErrorReportingPort,
+  type TrpcAuthorizationDenial,
+  type TrpcAuthorization,
+  type TrpcCauseTranslation,
+  type TrpcErrorReporting,
   type TrpcDeclaredAuthzContext,
-  type TrpcIdentityPort,
+  type TrpcIdentity,
   type TrpcPolicyContext,
   type TrpcRoot,
   type TrpcRuntimeContext,
@@ -52,11 +52,11 @@ import { declaredCheckFrom } from "./app-trpc.declared-check.ts";
  */
 export type ApiTrpcPolicyPorts<TContext, TAuthenticatedContext extends object> = Readonly<{
   authz: TrpcAuthorizationDecisions;
-  identity: TrpcIdentityPort<TContext, TAuthenticatedContext>;
-  audit: TrpcAuditPort;
-  errorReporting: TrpcErrorReportingPort;
-  causes: TrpcCauseTranslationPort;
-  denials: TrpcAuthorizationDenialPort;
+  identity: TrpcIdentity<TContext, TAuthenticatedContext>;
+  audit: TrpcAudit;
+  errorReporting: TrpcErrorReporting;
+  causes: TrpcCauseTranslation;
+  denials: TrpcAuthorizationDenial;
 }>;
 
 /**
@@ -82,7 +82,7 @@ export function createApiTrpcPolicy<
     causes: ports.causes,
   });
 
-  const authorization: TrpcAuthorizationPort<TContext> = {
+  const authorization: TrpcAuthorization<TContext> = {
     forRequest: () => ports.authz,
   };
 

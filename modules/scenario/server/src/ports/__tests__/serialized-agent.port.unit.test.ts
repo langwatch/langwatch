@@ -10,11 +10,11 @@ import { SESSION_MAX_BYTES } from "@langwatch/agent-contract";
 import {
   AgentSessionTooLargeError,
   SESSION_TOO_LARGE_PREFIX,
-  SerializedAgentPort,
+  SerializedAgent,
 } from "../serialized-agent.port.ts";
 
 /** The smallest adapter that exposes the store: no transport, no call. */
-class StoreOnlyAdapter extends SerializedAgentPort {
+class StoreOnlyAdapter extends SerializedAgent {
   role = AgentRole.AGENT;
 
   async call(): Promise<string> {
@@ -30,7 +30,7 @@ class StoreOnlyAdapter extends SerializedAgentPort {
   }
 }
 
-describe("SerializedAgentPort", () => {
+describe("SerializedAgent", () => {
   describe("when no turn has answered yet", () => {
     /** @scenario "A thread has no session before its first turn answers" */
     it("reads nothing for a thread", () => {

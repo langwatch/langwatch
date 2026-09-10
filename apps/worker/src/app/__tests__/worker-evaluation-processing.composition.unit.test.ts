@@ -2,17 +2,17 @@ import type { WorkflowService } from "@langwatch/workflow-server";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import {
-  EvaluationCostRecorderPort,
-  EvaluationLangevalsPort,
-  EvaluationModelEnvPort,
-  EvaluationSpanDigestPort,
-  EvaluationTraceReadPort,
-  EvaluationWorkflowExecutorPort,
-  type EvaluationAzureSafetyCredentialsPort,
-  type EvaluationInputsOffloadPort,
-  type EvaluationMonitorLookupPort,
-  type EvaluationSettingsRecoveryPort,
-  type EvaluationTraceEvidencePort,
+  EvaluationCostRecorder,
+  EvaluationLangevals,
+  EvaluationModelEnv,
+  EvaluationSpanDigest,
+  EvaluationTraceRead,
+  EvaluationWorkflowExecutor,
+  type EvaluationAzureSafetyCredentials,
+  type EvaluationInputsOffload,
+  type EvaluationMonitorLookup,
+  type EvaluationSettingsRecovery,
+  type EvaluationTraceEvidence,
   type LangevalsEvaluateParams,
 } from "@langwatch/evaluation-server";
 import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";
@@ -21,7 +21,7 @@ import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   createWorkerEvaluationProcessing,
-  WorkerEvaluationAbsenceReportPort,
+  WorkerEvaluationAbsenceReport,
   type WorkerEvaluationExecutionCollaborators,
 } from "../worker-evaluation-processing.composition.ts";
 
@@ -50,7 +50,7 @@ function traceFixture(): Trace {
   } as unknown as Trace;
 }
 
-class FakeTraceReads extends EvaluationTraceReadPort {
+class FakeTraceReads extends EvaluationTraceRead {
   async getTracesWithSpans(): Promise<Trace[]> {
     return [traceFixture()];
   }
@@ -64,25 +64,25 @@ class FakeTraceReads extends EvaluationTraceReadPort {
   }
 }
 
-class RefusingSpanDigest extends EvaluationSpanDigestPort {
+class RefusingSpanDigest extends EvaluationSpanDigest {
   format(): Promise<string> {
     return Promise.reject(new Error("no span digest in this test"));
   }
 }
 
-class StatedModelEnv extends EvaluationModelEnvPort {
+class StatedModelEnv extends EvaluationModelEnv {
   async resolveForEvaluator(): Promise<Record<string, string>> {
     return { OPENAI_API_KEY: "sk-test" };
   }
 }
 
-class RefusingWorkflowExecutor extends EvaluationWorkflowExecutorPort {
+class RefusingWorkflowExecutor extends EvaluationWorkflowExecutor {
   runEvaluationWorkflow(): Promise<never> {
     return Promise.reject(new Error("no workflow runtime in this test"));
   }
 }
 
-class RecordingLangevals extends EvaluationLangevalsPort {
+class RecordingLangevals extends EvaluationLangevals {
   readonly calls: LangevalsEvaluateParams[] = [];
 
   async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
@@ -97,7 +97,7 @@ class RecordingLangevals extends EvaluationLangevalsPort {
   }
 }
 
-class RecordingCosts extends EvaluationCostRecorderPort {
+class RecordingCosts extends EvaluationCostRecorder {
   readonly written: Array<{ idempotencyKey: string; amount: number }> = [];
 
   async recordCost(params: { idempotencyKey: string; amount: number }): Promise<string> {
@@ -113,7 +113,7 @@ const evaluators = {
   augmentResult: vi.fn(async (input: { result: SingleEvaluationResult }) => input.result),
 } as unknown as EvaluatorApi;
 
-const monitors: EvaluationMonitorLookupPort = {
+const monitors: EvaluationMonitorLookup = {
   tryGetMonitorById: async () => ({
     id: "monitor-1",
     projectId: "project-1",
@@ -127,24 +127,24 @@ const monitors: EvaluationMonitorLookupPort = {
     level: "trace",
     evaluator: null,
   }),
-} as unknown as EvaluationMonitorLookupPort;
+} as unknown as EvaluationMonitorLookup;
 
-const evidence: EvaluationTraceEvidencePort = {
+const evidence: EvaluationTraceEvidence = {
   getEvaluationSpans: async () => [],
   getEvaluationEvents: async () => [],
-} as unknown as EvaluationTraceEvidencePort;
+} as unknown as EvaluationTraceEvidence;
 
 const azureSafetyCredentials = {
   tryGetForTenant: async () => null,
-} as unknown as EvaluationAzureSafetyCredentialsPort;
+} as unknown as EvaluationAzureSafetyCredentials;
 
 const settingsRecovery = {
   isDisabled: async () => false,
-} as unknown as EvaluationSettingsRecoveryPort;
+} as unknown as EvaluationSettingsRecovery;
 
 const inputsOffload = {
   offload: async (input: { inputs: Record<string, unknown> }) => input.inputs,
-} as unknown as EvaluationInputsOffloadPort;
+} as unknown as EvaluationInputsOffload;
 
 const analytics = {
   recordEvaluation: vi.fn(),
@@ -224,7 +224,7 @@ describe("given the worker composes evaluation processing", () => {
   describe("when the online execution collaborators are absent", () => {
     it("reports the absence and refuses the execute command by name", async () => {
       const reported: string[] = [];
-      class Reporter extends WorkerEvaluationAbsenceReportPort {
+      class Reporter extends WorkerEvaluationAbsenceReport {
         withoutEvaluatorExecution(): void {
           reported.push("execution");
         }
@@ -290,7 +290,7 @@ describe("given the worker composes evaluation processing", () => {
 
     it("names the receipt ledger it did not compose", () => {
       const reported: string[] = [];
-      class Reporter extends WorkerEvaluationAbsenceReportPort {
+      class Reporter extends WorkerEvaluationAbsenceReport {
         withoutEvaluatorExecution(): void {
           reported.push("execution");
         }

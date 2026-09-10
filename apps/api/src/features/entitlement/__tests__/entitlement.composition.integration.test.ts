@@ -4,7 +4,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { UsageUnit } from "@langwatch/entitlement-contract";
-import { UsageCounterPort, UsageWarningPort } from "@langwatch/entitlement-server";
+import { UsageCounter, UsageWarning } from "@langwatch/entitlement-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
@@ -23,7 +23,7 @@ const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test",
 const ORGANIZATION_ID = "organization-1";
 
 /** The month's volume, as the reading asks for it. */
-class TestUsageCounter extends UsageCounterPort {
+class TestUsageCounter implements UsageCounter {
   async getCurrentMonthCountForDisplay(): Promise<number> {
     return 1_234;
   }
@@ -34,7 +34,7 @@ class TestUsageCounter extends UsageCounterPort {
 }
 
 /** The approaching-limit mail, recorded rather than delivered. */
-class TestUsageWarnings extends UsageWarningPort {
+class TestUsageWarnings implements UsageWarning {
   async sendWarning(): Promise<{ sent: boolean }> {
     return { sent: false };
   }

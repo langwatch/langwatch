@@ -23,8 +23,8 @@ import {
   CodexTokenRefresher,
   ModelProviderConnectionRateLimiter,
   ModelProviderIdService,
-  ModelTranslationPort,
-} from "../../ports/model-provider.port.ts";
+  ModelTranslation,
+} from "../../app/model-provider.infrastructure.ts";
 import type { ModelCostRepository } from "../../repositories/model-cost.repository.ts";
 import type {
   ModelDefaultConfigSaveInput,
@@ -673,7 +673,7 @@ class ManagedCatalog extends Catalog {
     return Promise.resolve(input.parameters);
   }
 }
-class Translator extends ModelTranslationPort {
+class Translator extends ModelTranslation {
   model: string | null = null;
   translate(input: { model: string }): Promise<string> {
     this.model = input.model;

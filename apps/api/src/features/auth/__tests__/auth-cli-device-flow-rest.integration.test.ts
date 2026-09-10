@@ -6,7 +6,7 @@ import {
   CliDeviceSessionService,
   type CliDeviceSessionRepository,
   type AuthCliDeviceFlowRestPorts,
-  type AuthDirectoryPort,
+  type AuthDirectory,
 } from "@langwatch/auth-server";
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import { Hono } from "hono";
@@ -362,7 +362,7 @@ function deviceFlowWorld(
     ports: undefined as unknown as AuthCliDeviceFlowRestPorts,
   };
 
-  const directory: AuthDirectoryPort = {
+  const directory: AuthDirectory = {
     tryFindOrganizationIdBySsoDomain: () => Promise.resolve(null),
     tryFindPerson: () => Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" }),
     tryFindOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),

@@ -1,6 +1,6 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { SuiteRunProcessingPipeline } from "@langwatch/suite-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
@@ -39,7 +39,7 @@ export interface SuiteWorkerCapability {
  * simulation side — so this installer has no ordering requirement of its own
  * beyond preceding the pipeline that dispatches to it.
  */
-export class SuiteWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class SuiteWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: SuiteWorkerCapability;
     eventing: WorkerEventingRuntime;

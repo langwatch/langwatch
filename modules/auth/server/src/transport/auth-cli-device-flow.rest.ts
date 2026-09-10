@@ -17,7 +17,7 @@ import { moduleApi } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { AuthDirectoryPort } from "./auth-directory.ts";
+import type { AuthDirectory } from "./auth-directory.ts";
 import {
   DEVICE_CODE_TTL_SECONDS,
   MIN_POLL_INTERVAL_SECONDS,
@@ -63,7 +63,7 @@ export interface AuthCliDeviceFlowApi {
    * re-derived from rows, not trusted from the record: an admin can disable a
    * seat between approve and exchange.
    */
-  directory: () => AuthDirectoryPort;
+  directory: () => AuthDirectory;
   /** The person a browser cookie names, for the three approval-page routes. */
   session: (request: Request) => Promise<CliBrowserSession | null>;
   /**

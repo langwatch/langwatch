@@ -25,15 +25,13 @@ export {
   type LicenseLogger,
   type LicenseRetention,
   type LicenseRetentionRule,
+  type LicenseStorage,
   type LicenseUsage,
   type LicenseUsageCount,
   type OrganizationLicense,
-} from "./app/licensing.infrastructure.ts";
-export {
-  LicenseStoragePort,
   type OrganizationLicenseCandidate,
   type StoredLicense,
-} from "./ports/license-storage.port.ts";
+} from "./app/licensing.infrastructure.ts";
 export { LicenseGenerationService } from "./services/license-generation.service.ts";
 export {
   LicensePlanSourceService,

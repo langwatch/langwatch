@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { EMAIL_RX, type AlertType, type SlackPayload } from "@langwatch/automation-contract";
 import {
-  AutomationNotificationDeliveryPort,
+  AutomationNotificationDelivery,
   SlackWebApiDeliveryAdapter,
   SlackWebhookClientAdapter,
   SlackWebhookDeliveryAdapter,
   TEST_FIRE_TRIGGER_ID_SENTINEL,
   TriggerNoReplyService,
-  TriggerNoReplyWarningPort,
+  TriggerNoReplyWarning,
   UnsubscribeTokenService,
   WebhookDeliveryAdapter,
   type SlackApiTransport,
@@ -16,9 +16,9 @@ import {
   type WebhookSendResult,
 } from "@langwatch/automation-server";
 import { toDispatchError } from "@langwatch/eventing";
-import type { MailRenderPort, TriggerDigestEntry } from "@langwatch/mail";
+import type { MailRender, TriggerDigestEntry } from "@langwatch/mail";
 import type { TraceRecord } from "@langwatch/trace-contract";
-import type { EmailDeliveryPort } from "@langwatch/notification-server";
+import type { EmailDelivery } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { WorkerSlackWebApiTransportAdapter } from "./slack-web-api.transport.adapter.ts";
 import { Temporal } from "@langwatch/time";
@@ -89,14 +89,14 @@ function toDigestEntry(entry: SettlementDigestEntry): TriggerDigestEntry {
  * fences end up disagreeing. So the transport is INJECTED: a process that has
  * one supplies it, and a process that does not refuses webhook alerts by name.
  */
-export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotificationDeliveryPort {
+export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotificationDelivery {
   static create(options: {
-    mailer: EmailDeliveryPort;
+    mailer: EmailDelivery;
     /**
      * Renders the default digest. `@langwatch/mail` holds the words; this
      * adapter holds the envelope they leave in.
      */
-    renderer: MailRenderPort;
+    renderer: MailRender;
     /** The deployment's own origin; every unsubscribe link is built from it. */
     baseHost: string;
     /** `NEXTAUTH_SECRET`, as the application spells it. */
@@ -133,8 +133,8 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
   }
 
   private constructor(
-    private readonly mailer: EmailDeliveryPort,
-    private readonly renderer: MailRenderPort,
+    private readonly mailer: EmailDelivery,
+    private readonly renderer: MailRender,
     private readonly baseHost: string,
     private readonly unsubscribeTokens: UnsubscribeTokenService,
     private readonly noReply: TriggerNoReplyService,
@@ -403,7 +403,7 @@ export function injectFooterIntoBody(html: string, footerHtml: string): string {
     : `${html}${footerHtml}`;
 }
 
-class LoggedNoReplyWarning extends TriggerNoReplyWarningPort {
+class LoggedNoReplyWarning extends TriggerNoReplyWarning {
   constructor(private readonly logger: Logger) {
     super();
   }

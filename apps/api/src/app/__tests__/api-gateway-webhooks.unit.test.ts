@@ -15,7 +15,7 @@
 // @vitest-environment node
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
 
 import { composeApiGatewaySpendRest } from "../api-gateway-spend-rest.composition.ts";
@@ -42,11 +42,11 @@ function testDatabase(): PrismaClient {
 }
 
 /** The stored-secret cipher, as the endpoint registry holds it. */
-function testCipher(): SecretEncryptionPort {
+function testCipher(): SecretEncryption {
   return {
     encrypt: (value: string) => `enc:${value}`,
     decrypt: (value: string) => value.replace(/^enc:/, ""),
-  } as SecretEncryptionPort;
+  } as SecretEncryption;
 }
 
 const testClickHouse = async () => ({ query: async () => ({ json: async () => ({}) }) });

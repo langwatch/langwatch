@@ -15,7 +15,7 @@ import { z } from "zod";
 
 import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session.ts";
-import type { ApiTraceReadStackPort } from "../trace/trace-read-stack.port.ts";
+import type { ApiTraceReadStack } from "../trace/trace-read-stack.port.ts";
 
 /**
  * A download request as a caller sends it: the trace package's own shape plus
@@ -58,7 +58,7 @@ class TraceExportFailedError extends HandledError {
 
 export type ApiTraceExportRestOptions = Readonly<{
   /** The one read stack every trace surface on this process redacts through. */
-  reads: ApiTraceReadStackPort;
+  reads: ApiTraceReadStack;
   /** The one session port every handler-managed family on this process reads. */
   session: ApiHandlerManagedSessionPort;
   /** Fan-out to every browser watching this tenant, for the progress relay. */

@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { GatewayDebitIntent, writeGatewayDebitsSchema } from "../gateway-debit.intent.ts";
-import { GatewayDebitPort, type GatewayResolvedBudget } from "../../app/governance.infrastructure.ts";
+import { GatewayBudgetLedger, type GatewayResolvedBudget } from "../../app/governance.infrastructure.ts";
 
 function budget(onBreach: "BLOCK" | "WARN", id = `budget-${onBreach}`): GatewayResolvedBudget {
   return {
@@ -64,7 +64,7 @@ function harness({
     detectCrossings: vi.fn().mockResolvedValue(undefined),
     shouldEmitBudgetUpdated: shouldEmit ?? vi.fn().mockResolvedValue(true),
     emitBudgetUpdated,
-  } as unknown as GatewayDebitPort;
+  } as unknown as GatewayBudgetLedger;
 
   return {
     intent: GatewayDebitIntent.create(port),

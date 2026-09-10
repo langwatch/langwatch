@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
-import type { ScimGroupRecord, ScimRepositoryPort } from "../repositories/scim.repository.ts";
+import type { ScimGroupRecord, ScimRepository } from "../repositories/scim.repository.ts";
 
 const logger = createLogger("langwatch:scim:group");
 
@@ -25,7 +25,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** The five writes and reads a membership diff makes. */
 export type ScimGroupMembershipRepository = Pick<
-  ScimRepositoryPort,
+  ScimRepository,
   "addGroupMember" | "groupSlugExists" | "listGroupMemberIds" | "removeGroupMembers" | "renameGroup"
 >;
 

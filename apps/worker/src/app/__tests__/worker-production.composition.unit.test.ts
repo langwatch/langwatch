@@ -24,7 +24,7 @@ import { EmailDeliveryAdapter } from "@langwatch/notification-server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { TestProjectApi } from "./support/test-project-api.ts";
 import {
-  TraceTopicAssignmentPort,
+  TraceTopicAssignment,
   type AnnotationAddedEventData,
   type AnnotationRemovedEventData,
   type AssignTopicCommandData,
@@ -45,9 +45,9 @@ import { AbsentJoinRequestMail } from "../../features/identity/join-request-mail
 import { TraceWorkerFeatureInstaller } from "../../features/trace/trace-worker-feature.installer.ts";
 import { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 import {
-  WorkerHandlePort,
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerHandle,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "../../platform/lifecycle/worker-runtime.port.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 import { createWorkerProcessRedis } from "./support/worker-redis.double.ts";
@@ -59,16 +59,16 @@ class Queue implements EventSourcedQueueProcessor<Record<string, unknown>> {
   readonly waitUntilReady = vi.fn(async () => undefined);
 }
 
-class Handle extends WorkerHandlePort {
+class Handle extends WorkerHandle {
   readonly shutdown = vi.fn(async () => undefined);
 }
 
-class Transport extends WorkerTransportPort {
+class Transport extends WorkerTransport {
   readonly handle = new Handle();
   readonly start = vi.fn(async () => this.handle);
 }
 
-class Lifecycle extends WorkerLifecyclePort {
+class Lifecycle extends WorkerLifecycle {
   readonly close = vi.fn(async () => undefined);
 }
 
@@ -96,7 +96,7 @@ class EventingTopicCapability implements TopicWorkerCapability {
   }
 }
 
-class TraceAssignments extends TraceTopicAssignmentPort {
+class TraceAssignments extends TraceTopicAssignment {
   readonly assignTopic = vi.fn(async (_input: AssignTopicCommandData) => undefined);
 }
 
@@ -116,7 +116,7 @@ class TraceInstaller {
     },
   }));
 
-  constructor(private readonly traceAssignments: TraceTopicAssignmentPort) {}
+  constructor(private readonly traceAssignments: TraceTopicAssignment) {}
 }
 
 function traceRecordSpan(): RecordSpanCommandData {

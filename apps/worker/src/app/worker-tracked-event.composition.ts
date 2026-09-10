@@ -5,9 +5,9 @@ import type {
   TrackEventRESTParamsValidator,
 } from "@langwatch/trace-contract";
 import {
-  TraceIngressCommandPort,
+  TraceIngressCommand,
   TraceSpanCollectionService,
-  TraceSpanDedupPort,
+  TraceSpanDedup,
   TrackedEventSpanService,
   TrackedEventSync,
   type SpanDedupRef,
@@ -73,7 +73,7 @@ export function createWorkerTrackedEvents(options: {
   };
 }
 
-class WorkerTraceIngressCommandAdapter extends TraceIngressCommandPort {
+class WorkerTraceIngressCommandAdapter extends TraceIngressCommand {
   private delegate: ((data: RecordSpanCommandData) => Promise<unknown>) | undefined;
 
   connect(delegate: (data: RecordSpanCommandData) => Promise<unknown>): void {
@@ -111,7 +111,7 @@ const CONFIRMED_TTL_SECONDS = 3600;
 export function createWorkerTraceSpanDedup(options: {
   redis?: RedisConnection | null;
   logger?: Logger;
-}): TraceSpanDedupPort {
+}): TraceSpanDedup {
   if (!options.redis) return new WorkerNullTraceSpanDedupAdapter();
   return new WorkerRedisTraceSpanDedupAdapter(
     options.redis,
@@ -119,7 +119,7 @@ export function createWorkerTraceSpanDedup(options: {
   );
 }
 
-class WorkerRedisTraceSpanDedupAdapter extends TraceSpanDedupPort {
+class WorkerRedisTraceSpanDedupAdapter extends TraceSpanDedup {
   constructor(
     private readonly redis: RedisConnection,
     private readonly logger: Logger,
@@ -165,7 +165,7 @@ class WorkerRedisTraceSpanDedupAdapter extends TraceSpanDedupPort {
 }
 
 /** No Redis: every claim answers "I don't know", so nothing is ever skipped. */
-class WorkerNullTraceSpanDedupAdapter extends TraceSpanDedupPort {
+class WorkerNullTraceSpanDedupAdapter extends TraceSpanDedup {
   async tryAcquireProcessingLock(_span: SpanDedupRef): Promise<null> {
     return null;
   }

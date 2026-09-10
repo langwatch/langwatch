@@ -17,9 +17,9 @@
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 import type {
-  CodingAgentCallerScopeDirectoryPort,
+  CodingAgentCallerScopeDirectory,
   CodingAgentScopeCaller,
-  CodingAgentScopePermissionsPort,
+  CodingAgentScopePermissions,
 } from "#ports/coding-agent-caller-scope.port";
 
 /** How one permitted project is named to a reader. */
@@ -55,8 +55,8 @@ export interface CallerProjectScope {
 }
 
 export interface CodingAgentCallerScopeDependencies {
-  directory: CodingAgentCallerScopeDirectoryPort;
-  permissions: CodingAgentScopePermissionsPort;
+  directory: CodingAgentCallerScopeDirectory;
+  permissions: CodingAgentScopePermissions;
 }
 
 /** Resolves one caller's reach across an organization's projects. */

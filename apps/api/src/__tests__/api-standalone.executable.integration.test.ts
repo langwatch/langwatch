@@ -9,8 +9,8 @@ import { OrganizationService } from "@langwatch/organization-contract";
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
-  ApiAuthSessionCompositionPort,
-  ApiBrowserSessionTransportPort,
+  ApiAuthSessionComposition,
+  ApiBrowserSessionTransport,
 } from "../app/api-auth.composition.ts";
 import type { ApiProductionCompositionOptions } from "../app/api-production.composition.ts";
 import {
@@ -260,7 +260,7 @@ function hostProducts(): ApiProductionCompositionOptions {
   };
 }
 
-class HostAuthComposition extends ApiAuthSessionCompositionPort {
+class HostAuthComposition extends ApiAuthSessionComposition {
   compose() {
     return {
       auth: new HostAuthService(),
@@ -280,7 +280,7 @@ class HostAuthService implements BrowserSessionApi {
   async revokeOtherBrowserSessions(): Promise<void> {}
 }
 
-class HostSessionTransport extends ApiBrowserSessionTransportPort {
+class HostSessionTransport extends ApiBrowserSessionTransport {
   async tryResolveVerifiedSession() {
     return null;
   }

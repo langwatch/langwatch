@@ -7,7 +7,7 @@ import type { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import { HandledError } from "@langwatch/handled-error";
 import {
-  LangyConversationProducerAdapter,
+  RedisLangyConversationProducerRepository,
   type LangyConversationCommands,
 } from "@langwatch/langy-server";
 import {
@@ -26,7 +26,7 @@ import type {
   SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
 import {
-  SuiteRunCommandsPort,
+  SuiteRunCommands,
   SuiteRunProcessingProducerAdapter,
   type QueueSimulationRunCommandData,
   type StartSuiteRunCommandData,
@@ -87,7 +87,7 @@ export type ApiAgentPipelines = Readonly<{
   /** The eight simulation writes, as the scenario application dispatches them. */
   simulations: SimulationExecutionRepository;
   /** The two writes a suite run is started and fanned out by. */
-  suiteRuns: SuiteRunCommandsPort;
+  suiteRuns: SuiteRunCommands;
   /** All sixteen conversation writes. */
   langyConversations: LangyConversationCommands;
 }>;
@@ -120,7 +120,7 @@ export function composeApiAgentPipelines(options: ApiAgentPipelinesOptions): Api
   });
   const langy = commandLookup({
     pipeline: "langy_conversation_processing",
-    registered: eventing.register(LangyConversationProducerAdapter.create({ processName }).build()),
+    registered: eventing.register(RedisLangyConversationProducerRepository.create({ processName }).build()),
   });
 
   return {
@@ -271,13 +271,11 @@ class UnqueuedApiSimulationExecution extends SimulationExecutionRepository {
 // ---------------------------------------------------------------------------
 
 /** A suite run's start, and the simulation run each of its cases becomes. */
-class EventingApiSuiteRunCommands extends SuiteRunCommandsPort {
+class EventingApiSuiteRunCommands implements SuiteRunCommands {
   constructor(
     private readonly startSuiteRunCommand: Dispatch,
     private readonly queueSimulationRunCommand: Dispatch,
-  ) {
-    super();
-  }
+  ) {}
 
   startSuiteRun(data: StartSuiteRunCommandData): Promise<void> {
     return this.startSuiteRunCommand(data);
@@ -289,7 +287,7 @@ class EventingApiSuiteRunCommands extends SuiteRunCommandsPort {
 }
 
 /** Both suite writes, refused by name where there is no queue. */
-class UnqueuedApiSuiteRunCommands extends SuiteRunCommandsPort {
+class UnqueuedApiSuiteRunCommands implements SuiteRunCommands {
   startSuiteRun(): Promise<void> {
     return Promise.reject(new ApiAgentPipelineUnavailableError("Running a suite"));
   }

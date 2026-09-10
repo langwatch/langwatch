@@ -1,14 +1,14 @@
 import type { Protections } from "@langwatch/trace-contract";
 import {
-  AutomationHeartbeatPort,
-  AutomationSettlementEvaluationReaderPort,
-  AutomationSettlementTraceReaderPort,
+  AutomationHeartbeat,
+  AutomationSettlementEvaluationReader,
+  AutomationSettlementTraceReader,
   AutomationTraceRecordUnavailableError,
 } from "@langwatch/automation-server";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import {
   ClickHouseEvaluationRepository,
-  EvaluationRetentionFloorPort,
+  EvaluationRetentionFloor,
   type EvaluationClickHouseResolver,
 } from "@langwatch/evaluation-server";
 import {
@@ -17,7 +17,7 @@ import {
   isContentVisibleToPublic,
   type ResolvedCategory,
 } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyResolutionPort } from "@langwatch/data-privacy-server";
+import type { DataPrivacyResolution } from "@langwatch/data-privacy-server";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
@@ -41,7 +41,7 @@ import {
   VisibilityWindowService,
   type TraceClickHouseWriteResolver,
 } from "@langwatch/trace-server";
-import type { WorkerAutomationSettlementAbsenceReportPort } from "./worker-automation-settlement.composition.ts";
+import type { WorkerAutomationSettlementAbsenceReport } from "./worker-automation-settlement.composition.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
@@ -49,7 +49,7 @@ import { nowInstant } from "@langwatch/time";
  */
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export class WorkerAutomationSettlementTraceReader extends AutomationSettlementTraceReaderPort {
+export class WorkerAutomationSettlementTraceReader extends AutomationSettlementTraceReader {
   static create(options: {
     /** The fold this process writes, read back at the same key it wrote. */
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
@@ -61,7 +61,7 @@ export class WorkerAutomationSettlementTraceReader extends AutomationSettlementT
      */
     records?: WorkerTraceRecordReader | undefined;
     /** Where the missing record read is named, once, at composition. */
-    absence?: Pick<WorkerAutomationSettlementAbsenceReportPort, "withoutTraceRecordRead">;
+    absence?: Pick<WorkerAutomationSettlementAbsenceReport, "withoutTraceRecordRead">;
   }): WorkerAutomationSettlementTraceReader {
     if (!options.records) options.absence?.withoutTraceRecordRead();
 
@@ -135,7 +135,7 @@ export class WorkerTraceRecordReader {
     connection: PrismaConnection;
     resolveClickHouseClient: TraceClickHouseWriteResolver;
     /** The project's resolved content policy, from this process's own graph. */
-    dataPrivacy: DataPrivacyResolutionPort;
+    dataPrivacy: DataPrivacyResolution;
     /**
      * Which plan the project's organization is on, and the directory that answers which
      * organization that is.
@@ -163,7 +163,7 @@ export class WorkerTraceRecordReader {
 
   private constructor(
     private readonly reads: TraceLegacyReadClickHouseRepository,
-    private readonly dataPrivacy: DataPrivacyResolutionPort,
+    private readonly dataPrivacy: DataPrivacyResolution,
     private readonly window: VisibilityWindowService,
     private readonly projects: Pick<ProjectApi, "getOrganizationId">,
     private readonly logger: Logger,
@@ -263,7 +263,7 @@ export class WorkerTraceRecordReader {
 /**
  * The one evaluation read a settled match's filters are checked against.
  */
-export class WorkerAutomationSettlementEvaluationReader extends AutomationSettlementEvaluationReaderPort {
+export class WorkerAutomationSettlementEvaluationReader extends AutomationSettlementEvaluationReader {
   static create(options: {
     resolveClickHouse: EvaluationClickHouseResolver;
     /** The event store's own retention default, so both write the same day. */
@@ -295,7 +295,7 @@ export class WorkerAutomationSettlementEvaluationReader extends AutomationSettle
  * configures its event store with. A second number here would let a settled match be confirmed
  * against runs the writer had already expired, or refuse runs the writer still holds.
  */
-class RetentionFloorFromDefault extends EvaluationRetentionFloorPort {
+class RetentionFloorFromDefault extends EvaluationRetentionFloor {
   constructor(private readonly defaultRetentionDays: number) {
     super();
   }
@@ -310,7 +310,7 @@ class RetentionFloorFromDefault extends EvaluationRetentionFloorPort {
  * tenant's ClickHouse client — because the query it runs is the heartbeat service's own: one
  * batched `max(OccurredAt)` against the slim analytics table per project per sweep.
  */
-export class WorkerAutomationHeartbeat extends AutomationHeartbeatPort {
+export class WorkerAutomationHeartbeat extends AutomationHeartbeat {
   static create(
     resolveClient: (projectId: string) => Promise<AutomationClickHouseClient | null>,
   ): WorkerAutomationHeartbeat {
@@ -331,5 +331,5 @@ export class WorkerAutomationHeartbeat extends AutomationHeartbeatPort {
 }
 
 type AutomationClickHouseClient = Awaited<
-  ReturnType<AutomationHeartbeatPort["tryResolveClickHouseClient"]>
+  ReturnType<AutomationHeartbeat["tryResolveClickHouseClient"]>
 >;

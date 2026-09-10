@@ -8,8 +8,8 @@ import type { ScopeInput } from "@langwatch/gateway-contract";
 
 import {
   type BudgetSpendTarget,
-  GatewayBudgetSpendPort,
-} from "../ports/gateway-budget-spend.port.ts";
+  GatewayBudgetSpend,
+} from "../app/gateway.infrastructure.ts";
 import {
   budgetPeriodFloorMs,
   scopeTargetKey,
@@ -79,7 +79,7 @@ export class GatewayApplicableBudgetsService {
   async resolveApplicableBudgetsForDraftKey(
     projects: ProjectApi,
     draft: DraftVirtualKey,
-    chRepo?: GatewayBudgetSpendPort,
+    chRepo?: GatewayBudgetSpend,
   ): Promise<ApplicableBudget[]> {
     // Where this key's traces land decides whether team/project-scoped
     // budgets reach it. An existing key's stored destination is the same
@@ -117,7 +117,7 @@ export class GatewayApplicableBudgetsService {
    */
   async resolveApplicableBudgetsForTarget(
     target: GatewayBudgetResolutionTarget,
-    chRepo?: GatewayBudgetSpendPort,
+    chRepo?: GatewayBudgetSpend,
   ): Promise<ApplicableBudget[]> {
     const resolved = await this.budgetDecisions.resolveApplicableBudgets(target);
     if (resolved.length === 0) {
@@ -185,7 +185,7 @@ async function loadSpend(
   budgetDecisions: GatewayService,
   organizationId: string,
   resolved: GatewayResolvedBudget[],
-  chRepo?: GatewayBudgetSpendPort,
+  chRepo?: GatewayBudgetSpend,
 ): Promise<Map<string, string>> {
   if (!chRepo) {
     return new Map();

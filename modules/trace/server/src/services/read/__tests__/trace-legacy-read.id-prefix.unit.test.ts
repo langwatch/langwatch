@@ -23,7 +23,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import { AmbiguousTraceIdPrefixError, TraceService } from "../trace-legacy-read.service.ts";
+import { AmbiguousTraceIdPrefixError, TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 import type { TraceLegacyReadRepository } from "../../../repositories/trace-legacy-read.repository.ts";
 import type { TraceEditOverlayService } from "../../edit-overlay/trace-edit-overlay.service.ts";
 
@@ -62,8 +62,8 @@ function trace(traceId: string): Trace {
   } as unknown as Trace;
 }
 
-function makeService(): TraceService {
-  return TraceService.create({
+function makeService(): TraceLegacyReadService {
+  return TraceLegacyReadService.create({
     traceCanonicalisation: {} as TraceCanonicalisationService,
     traceRead: {
       getTracesWithSpans: mockGetTracesWithSpans,

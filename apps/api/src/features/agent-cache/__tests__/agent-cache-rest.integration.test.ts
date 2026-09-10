@@ -10,7 +10,7 @@ import {
   MAX_AGENT_CACHE_VALUE_BYTES,
   MIN_AGENT_CACHE_TTL_SECONDS,
 } from "@langwatch/gateway-contract/gateway-agent-cache-schemas";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
@@ -27,7 +27,7 @@ const PROJECT = {
   ownerUserId: null,
 };
 
-const encryption: SecretEncryptionPort = {
+const encryption: SecretEncryption = {
   encrypt: (value: string) => `sealed:${value}`,
   decrypt: (value: string) => {
     if (!value.startsWith("sealed:")) {

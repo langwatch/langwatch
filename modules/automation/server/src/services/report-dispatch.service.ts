@@ -13,8 +13,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Cron } from "croner";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
-import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
-import type { AutomationSlackProviderPort } from "../ports/automation-provider.port.ts";
+import type { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
+import type { AutomationSlackProvider } from "../ports/automation-provider.port.ts";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:report-dispatch");
@@ -27,9 +27,9 @@ export interface ReportDispatchDeps {
    * goes through, so a report email carries the ADR-031 unsubscribe footer and
    * a report Slack message rides the same fenced transport.
    */
-  delivery: AutomationNotificationDeliveryPort;
+  delivery: AutomationNotificationDelivery;
   /** Reads the stored bot token off the trigger's Slack action parameters. */
-  slackProvider: AutomationSlackProviderPort;
+  slackProvider: AutomationSlackProvider;
   filterSuppressedRecipients: (params: {
     projectId: string;
     triggerId: string;

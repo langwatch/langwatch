@@ -13,16 +13,16 @@ import { describe, expect, it } from "vitest";
 import type {
   GovernanceBudgetCrossingData,
   GovernanceVkLifecycleData,
-} from "../../ports/governance-webhook.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import type {
   GatewayBudgetCrossingCandidate,
   GatewayBudgetScope,
   GatewayBudgetWindow,
 } from "../../app/governance.infrastructure.ts";
 import {
-  GovernanceSignalPort,
+  GovernanceSignalChannel,
   type GovernanceResolvedBudgetCrossing,
-} from "../../ports/governance-signal.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { GovernanceSignalService } from "../governance-signal.service.ts";
 import { type Instant, Temporal } from "@langwatch/time";
 
@@ -52,7 +52,7 @@ function resolved(
   };
 }
 
-class FakeGovernanceSignalPort extends GovernanceSignalPort {
+class FakeGovernanceSignal implements GovernanceSignalChannel {
   appendedCrossings: GovernanceBudgetCrossingData[] = [];
   private readonly resolvedRows: GovernanceResolvedBudgetCrossing[];
   private readonly resolveError: Error | null;
@@ -91,7 +91,7 @@ describe("GovernanceSignalService.detectBudgetCrossings", () => {
   describe("given a bucket below the threshold, one above it, and one past the limit", () => {
     /** @scenario Crossing detection reads the boundary-aware figure */
     it("appends a threshold crossing only above the threshold and a breach only past the limit", async () => {
-      const port = new FakeGovernanceSignalPort([
+      const port = new FakeGovernanceSignal([
         resolved("b_low", "10.000000"),
         resolved("b_warn", "85.000000"),
         resolved("b_over", "120.000000"),
@@ -116,7 +116,7 @@ describe("GovernanceSignalService.detectBudgetCrossings", () => {
     });
 
     it("never fails the debit that triggered it when detection itself fails", async () => {
-      const port = new FakeGovernanceSignalPort([], new Error("boom"));
+      const port = new FakeGovernanceSignal([], new Error("boom"));
       const service = GovernanceSignalService.create(port);
 
       await expect(

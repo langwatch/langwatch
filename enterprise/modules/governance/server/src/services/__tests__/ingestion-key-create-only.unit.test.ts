@@ -5,11 +5,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  IngestionKeyIssuerPort,
+  IngestionKeyIssuer,
   IngestionKeyRepository,
   type StoredIngestionKey,
-} from "../../ports/ingestion-source-key.port.ts";
-import { TestOrganizationService } from "../../ports/__tests__/support/test-organization-service.ts";
+} from "../../app/governance.infrastructure.ts";
+import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 import { IngestionKeyService } from "../ingestion-source-key.service.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -46,7 +46,7 @@ class KeyLedger {
   }
 }
 
-class LedgerRepository extends IngestionKeyRepository {
+class LedgerRepository implements IngestionKeyRepository {
   constructor(private readonly ledger: KeyLedger) {
     super();
   }
@@ -78,7 +78,7 @@ class LedgerRepository extends IngestionKeyRepository {
   }
 }
 
-class LedgerIssuer extends IngestionKeyIssuerPort {
+class LedgerIssuer implements IngestionKeyIssuer {
   constructor(private readonly ledger: KeyLedger) {
     super();
   }

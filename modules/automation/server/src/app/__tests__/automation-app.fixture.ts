@@ -10,16 +10,16 @@ import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
 import { AutomationApp, type AutomationInfrastructure } from "../automation.app.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
-import type { AutomationClockPort } from "../../ports/automation-clock.port.ts";
+import type { AutomationClock } from "../automation.infrastructure.ts";
 import type {
-  AutomationGraphNotifierPort,
-  AutomationLoggerPort,
-} from "../../ports/automation-graph.port.ts";
-import type { SchedulerWakePort } from "../../ports/scheduler-wake.port.ts";
+  AutomationGraphNotifier,
+  AutomationLogger,
+} from "../automation.infrastructure.ts";
+import type { SchedulerWake } from "../../ports/scheduler-wake.port.ts";
 import type { ScheduledJobStorePort } from "../../ports/scheduled-jobs.port.ts";
-import type { UnsubscribeTokenVerifierPort } from "../../ports/unsubscribe-token.port.ts";
-import type { AutomationRunawayPort } from "../../ports/automation-runaway.port.ts";
-import type { AutomationTestFirePort } from "../../ports/automation-test-fire.port.ts";
+import type { UnsubscribeTokenVerifier } from "../../ports/unsubscribe-token.port.ts";
+import type { AutomationRunaway } from "../../ports/automation-runaway.port.ts";
+import type { AutomationTestFire } from "../../ports/automation-test-fire.port.ts";
 
 export function createCanonicalAutomationApp(): {
   app: AutomationApp;
@@ -53,7 +53,7 @@ export function createCanonicalAutomationApp(): {
     traceDebounceMs: 0,
     customGraphId: null,
   } satisfies PrismaTrigger);
-  const verifier: UnsubscribeTokenVerifierPort = {
+  const verifier: UnsubscribeTokenVerifier = {
     tryVerify: vi.fn(() => null),
   };
   const jobs: ScheduledJobStorePort = {
@@ -61,25 +61,25 @@ export function createCanonicalAutomationApp(): {
     deactivateForTarget: vi.fn(async () => undefined),
     findAllForProject: vi.fn(async () => []),
   };
-  const clock: AutomationClockPort = {
+  const clock: AutomationClock = {
     now: vi.fn<() => Instant>(() => nowInstant()),
   };
-  const wake: SchedulerWakePort = { publish: vi.fn() };
-  const notifier: AutomationGraphNotifierPort = {
-    dispatch: vi.fn<AutomationGraphNotifierPort["dispatch"]>(async () => ({
+  const wake: SchedulerWake = { publish: vi.fn() };
+  const notifier: AutomationGraphNotifier = {
+    dispatch: vi.fn<AutomationGraphNotifier["dispatch"]>(async () => ({
       channel: "none",
       didSend: false,
       missingVariables: [],
       renderErrors: [],
     })),
   };
-  const logger: AutomationLoggerPort = {
+  const logger: AutomationLogger = {
     error: vi.fn(),
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
   };
-  const runaway: AutomationRunawayPort = {
+  const runaway: AutomationRunaway = {
     countProjectTraces24h: vi.fn(async () => 0),
     notificationRecipients: vi.fn(async () => []),
     sendLimitEmail: vi.fn(async () => undefined),
@@ -94,7 +94,7 @@ export function createCanonicalAutomationApp(): {
     error: vi.fn(),
     info: vi.fn(),
   };
-  const testFire: AutomationTestFirePort = {
+  const testFire: AutomationTestFire = {
     sendEmail: vi.fn(async () => undefined),
     sendSlack: vi.fn(async () => undefined),
     sendSlackBot: vi.fn(async () => undefined),

@@ -1,7 +1,7 @@
 import { Ksuid } from "@langwatch/ksuid";
 import { z } from "zod";
 import {
-  TraceClickHousePort,
+  TraceClickHouse,
   type TraceClickHouseClient,
   type TraceClickHouseResolver,
 } from "../trace-clickhouse-client.repository.ts";
@@ -17,7 +17,7 @@ import {
 export const TRACE_PAYLOAD_AGGREGATE_TYPE = "trace";
 
 /** The tenant-keyed resolver a composition root holds, as the port the repository names. */
-class ResolvedTraceClickHousePort extends TraceClickHousePort {
+class ResolvedTraceClickHouse extends TraceClickHouse {
   constructor(private readonly resolveClient: TraceClickHouseResolver) {
     super();
   }
@@ -134,7 +134,7 @@ const eventPayloadSchema = z.object({
  * cross-tenant reads.
  */
 export class ClickHouseTraceEventPayloadRepository {
-  static create(clickhouse: TraceClickHousePort): ClickHouseTraceEventPayloadRepository {
+  static create(clickhouse: TraceClickHouse): ClickHouseTraceEventPayloadRepository {
     return new ClickHouseTraceEventPayloadRepository(clickhouse);
   }
 
@@ -143,11 +143,11 @@ export class ClickHouseTraceEventPayloadRepository {
     resolveClient: TraceClickHouseResolver;
   }): ClickHouseTraceEventPayloadRepository {
     return new ClickHouseTraceEventPayloadRepository(
-      new ResolvedTraceClickHousePort(options.resolveClient),
+      new ResolvedTraceClickHouse(options.resolveClient),
     );
   }
 
-  private constructor(private readonly clickhouse: TraceClickHousePort) {}
+  private constructor(private readonly clickhouse: TraceClickHouse) {}
 
   /**
    * The event_log claim-check read behind the narrow port Trace declares.

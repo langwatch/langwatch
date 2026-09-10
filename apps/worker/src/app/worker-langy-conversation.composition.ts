@@ -13,9 +13,9 @@ import {
   type LangyBroadcastPort,
   type LangyDatabase,
   type LangyTitleGenerator,
-  type LangyTitleModelPort,
+  type LangyTitleModel,
 } from "@langwatch/langy-server";
-import type { TenantBroadcastPort } from "@langwatch/notification-server";
+import type { TenantBroadcast } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
@@ -26,7 +26,7 @@ export type WorkerLangyConversationDatabase = LangyDatabase;
 /**
  * Reports the composition decisions Langy's conversation pipeline would otherwise hide.
  */
-export abstract class WorkerLangyAbsenceReportPort {
+export abstract class WorkerLangyAbsenceReport {
   /** No agent manager: every dispatched turn is answered `unavailable`. */
   abstract withoutAgentManager(): void;
 
@@ -46,12 +46,12 @@ export type WorkerLangyConversationCompositionInput = Readonly<{
   resolveClickHouseClient: LangyAnalyticsClickHouseClientResolver;
   defaultRetentionDays: number;
   /** The one tenant publisher this process holds; absent without Redis. */
-  broadcast?: TenantBroadcastPort;
+  broadcast?: TenantBroadcast;
   /**
    * Where a title call's model handle comes from, when this process composed a model gateway.
    */
-  titleModels?: LangyTitleModelPort;
-  absence?: WorkerLangyAbsenceReportPort;
+  titleModels?: LangyTitleModel;
+  absence?: WorkerLangyAbsenceReport;
   logger?: Logger;
 }>;
 
@@ -107,7 +107,7 @@ export function createWorkerLangyConversation(
  * Renames the shared publisher onto Langy's own port, or drops the broadcast.
  */
 class WorkerLangyTenantBroadcastAdapter implements LangyBroadcastPort {
-  constructor(private readonly broadcast: TenantBroadcastPort | undefined) {}
+  constructor(private readonly broadcast: TenantBroadcast | undefined) {}
 
   async broadcastToTenant(
     tenantId: string,

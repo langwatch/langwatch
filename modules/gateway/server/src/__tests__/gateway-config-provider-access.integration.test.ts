@@ -16,7 +16,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
+import type { GatewayModelProviderCredentials } from "../app/gateway.infrastructure.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
@@ -70,7 +70,7 @@ class SuiteProjectService extends TestProjectApi {
 }
 
 /** Stored provider keys arrive already decrypted in these fixtures. */
-const credentials: GatewayModelProviderCredentialsPort = {
+const credentials: GatewayModelProviderCredentials = {
   readCustomKeys: (stored: unknown) => stored as Record<string, unknown>,
 };
 

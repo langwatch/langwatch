@@ -1,9 +1,9 @@
 import { Deferred } from "@langwatch/eventing";
 import type { TopicClusteringCommandsPort } from "@langwatch/topic-server";
-import type { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
+import type { TraceTopicAssignment } from "@langwatch/trace-contract";
 import type {
   WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
+  WorkerFeatureInstaller,
 } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 import { nowInstant } from "@langwatch/time";
@@ -13,17 +13,17 @@ export interface TopicWorkerCapability {
   readonly commandDispatch: TopicClusteringCommandsPort;
   install(options: {
     eventSourcing: WorkerEventingRuntime["eventSourcing"];
-    traceAssignments: TraceTopicAssignmentPort;
+    traceAssignments: TraceTopicAssignment;
   }): { claimAndBootstrap: (projectId: string) => Promise<void> };
   startBootSeeds(): void;
 }
 
 /** Worker consumer, boot-seed, and manual-task wiring for the Topic installer. */
-export class TopicWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class TopicWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: TopicWorkerCapability;
     eventing: WorkerEventingRuntime;
-    traceAssignments: TraceTopicAssignmentPort;
+    traceAssignments: TraceTopicAssignment;
   }): TopicWorkerFeatureInstaller {
     return new TopicWorkerFeatureInstaller(
       options.installer,
@@ -61,7 +61,7 @@ export class TopicWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   private constructor(
     private readonly installer: TopicWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-    private readonly traceAssignments: TraceTopicAssignmentPort,
+    private readonly traceAssignments: TraceTopicAssignment,
   ) {}
 
   async install(): Promise<WorkerFeatureCloser | undefined> {

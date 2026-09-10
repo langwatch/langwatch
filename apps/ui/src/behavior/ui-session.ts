@@ -7,12 +7,12 @@
 import { permissionSatisfiedBy } from "@langwatch/authz-contract";
 import {
   createUiScopeHost,
-  type UiScopeHostPort,
+  type UiScopeHost,
 } from "@langwatch/ui-host/use-organization-team-project";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import type { UiActiveScope, UiActor, UiFeedbackPort } from "@langwatch/ui-host/capabilities";
-import { UiSessionPort } from "@langwatch/ui-host/capabilities";
+import type { UiActiveScope, UiActor, UiFeedback } from "@langwatch/ui-host/capabilities";
+import { UiSession } from "@langwatch/ui-host/capabilities";
 import type { UiSessionSnapshot } from "@langwatch/ui-host/session";
 import type { UiResolvedScope, UiScopeProject } from "../model/ui-scope";
 import { useUiAddress } from "./ui-address";
@@ -45,8 +45,8 @@ import {
 export type UiSessionSource = (input: {
   transport: UiFeatureApiTransport;
   /** Where a refused session read is told, since nobody else sees it. */
-  feedback: UiFeedbackPort;
-}) => UiSessionPort;
+  feedback: UiFeedback;
+}) => UiSession;
 
 /** The screen a visitor with no session is sent to. */
 export const UI_SIGN_IN_PATH = "/auth/signin";
@@ -123,7 +123,7 @@ export class UiFeatureFlagRequests {
 export type BrowserUiSessionState = {
   readonly flags: ReadonlyMap<string, boolean>;
   readonly askFlag: (flag: string) => void;
-  readonly scopeHost: UiScopeHostPort | undefined;
+  readonly scopeHost: UiScopeHost | undefined;
 } & (
   | { readonly snapshot: UiSessionSnapshot }
   | {
@@ -135,7 +135,7 @@ export type BrowserUiSessionState = {
 );
 
 /** The port over one render's worth of answers. */
-export class BrowserUiSession extends UiSessionPort {
+export class BrowserUiSession extends UiSession {
   static create(state: BrowserUiSessionState): BrowserUiSession {
     return new BrowserUiSession(state);
   }
@@ -185,7 +185,7 @@ export class BrowserUiSession extends UiSessionPort {
     return this.state.snapshot;
   }
 
-  override scopeHost(): UiScopeHostPort | undefined {
+  override scopeHost(): UiScopeHost | undefined {
     return this.state.scopeHost;
   }
 
@@ -210,10 +210,10 @@ export function useBrowserUiSession({
   authClient,
 }: {
   transport: UiFeatureApiTransport;
-  feedback: UiFeedbackPort;
+  feedback: UiFeedback;
   /** The deployment's own client unless a test answers with a recorded session. */
   authClient?: UiAuthClient;
-}): UiSessionPort {
+}): UiSession {
   const route = useUiRouteReading();
   const address = useUiAddress();
   const memory = useUiScopeMemory();
@@ -426,7 +426,7 @@ function legacyScopeHost(
   snapshot: UiSessionSnapshot,
   organizationRole: string | undefined,
   isDemo: boolean,
-): UiScopeHostPort | undefined {
+): UiScopeHost | undefined {
   if (snapshot.scope.status === "loading") return void 0;
   return createUiScopeHost({
     project: () => snapshot.scope.project,

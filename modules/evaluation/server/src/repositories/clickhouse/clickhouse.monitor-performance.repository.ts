@@ -1,4 +1,4 @@
-import type { EvaluationClickHouseResolver } from "../../ports/evaluation.port.ts";
+import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 import { ClickHouseMonitorPerformanceRepository } from "./monitor-performance.repository.ts";
 import { MonitorPerformanceService } from "../../services/monitor-performance.service.ts";
 

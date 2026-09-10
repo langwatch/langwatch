@@ -7,12 +7,12 @@ import {
 import {
   GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
   GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
-  GovernanceWebhookPort,
+  GovernanceWebhookChannel,
   type GovernanceBudgetCrossingData,
   type GovernanceEventsProcessingEvent,
   type GovernanceVkLifecycleData,
   type GovernanceWebhookEnvelope,
-} from "../ports/governance-webhook.port.ts";
+} from "../app/governance.infrastructure.ts";
 import { Temporal } from "@langwatch/time";
 
 export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as const;
@@ -20,7 +20,7 @@ export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as cons
 export class GovernanceEventDeliveryProcess {
   private constructor(private readonly intent: GovernanceEventDeliveryIntent) {}
 
-  static create(port: GovernanceWebhookPort): GovernanceEventDeliveryProcess {
+  static create(port: GovernanceWebhookChannel): GovernanceEventDeliveryProcess {
     return new GovernanceEventDeliveryProcess(GovernanceEventDeliveryIntent.create(port));
   }
 

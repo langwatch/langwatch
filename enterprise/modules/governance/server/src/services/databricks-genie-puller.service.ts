@@ -57,7 +57,7 @@ import { createLogger } from "@langwatch/observability";
 import { Buffer } from "node:buffer";
 import { z } from "zod";
 
-import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceHttpClient } from "../app/governance.infrastructure.ts";
 import { DATABRICKS_GENIE_ADAPTER_ID } from "./pull-destination.service.ts";
 import { TERMINAL_MESSAGE_STATUSES } from "./genie-trace-mapper.service.ts";
 import { DatabricksWarehouseCostService } from "./puller-databricks-warehouse-cost.service.ts";
@@ -907,7 +907,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
   private readonly maxRequests: number;
 
   private constructor(
-    private readonly http: GovernanceHttpPort,
+    private readonly http: GovernanceHttpClient,
     private readonly warehouseCosts: DatabricksWarehouseCostService,
     options?: { maxRequests?: number },
   ) {
@@ -915,7 +915,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
   }
 
   static create(
-    http: GovernanceHttpPort,
+    http: GovernanceHttpClient,
     options?: { maxRequests?: number },
     warehouseCosts: DatabricksWarehouseCostService = DatabricksWarehouseCostService.create(),
   ): DatabricksGeniePullerAdapter {
@@ -2340,7 +2340,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     credentials: Record<string, string> | undefined;
     workspaceUrl: string;
     signal?: AbortSignal;
-    http: GovernanceHttpPort;
+    http: GovernanceHttpClient;
   }): Promise<string> {
     const { credentials, workspaceUrl, signal, http } = params;
 

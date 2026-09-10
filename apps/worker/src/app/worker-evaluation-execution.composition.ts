@@ -1,15 +1,15 @@
 import { AZURE_SAFETY_PROVIDER_KEY } from "@langwatch/evaluation-contract";
 import {
-  EvaluationAzureSafetyCredentialsPort,
-  EvaluationInputsOffloadPort,
-  EvaluationMonitorLookupPort,
+  EvaluationAzureSafetyCredentials,
+  EvaluationInputsOffload,
+  EvaluationMonitorLookup,
   type EvaluationInputsOffloadService,
-  EvaluationSettingsRecoveryPort,
-  EvaluationSpanDigestPort,
-  EvaluationTraceEvidencePort,
-  EvaluationTraceReadPort,
+  EvaluationSettingsRecovery,
+  EvaluationSpanDigest,
+  EvaluationTraceEvidence,
+  EvaluationTraceRead,
   type EvaluationTraceProtections,
-  EvaluationWorkflowExecutorPort,
+  EvaluationWorkflowExecutor,
   HttpLangevalsEvaluatorAdapter,
   OtelEvaluationExecutionMetricsAdapter,
   EvaluationCostService,
@@ -22,8 +22,8 @@ import { PrismaEvaluationCostRepository } from "@langwatch/evaluation-server/com
 import type { MonitorApi, MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import {
   monitorServer,
-  MonitorEvaluatorPort,
-  MonitorPerformancePort,
+  MonitorEvaluator,
+  MonitorPerformance,
   type MonitorReplicationReader,
 } from "@langwatch/monitor-server";
 import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
@@ -142,7 +142,7 @@ export async function createWorkerMonitorApp(options: {
 }
 
 /** A monitor read this process makes, over the one monitor application. */
-class WorkerEvaluationMonitorLookup extends EvaluationMonitorLookupPort {
+class WorkerEvaluationMonitorLookup extends EvaluationMonitorLookup {
   constructor(private readonly monitors: MonitorApi) {
     super();
   }
@@ -155,7 +155,7 @@ class WorkerEvaluationMonitorLookup extends EvaluationMonitorLookupPort {
 const uncomposedInWorker = (capability: string): Error =>
   new Error(`The worker composed no ${capability}, so this monitor operation cannot answer.`);
 
-class UncomposedMonitorEvaluators extends MonitorEvaluatorPort {
+class UncomposedMonitorEvaluators implements MonitorEvaluator {
   getById(): Promise<never> {
     return Promise.reject(uncomposedInWorker("evaluator directory"));
   }
@@ -165,7 +165,7 @@ class UncomposedMonitorEvaluators extends MonitorEvaluatorPort {
   }
 }
 
-class UncomposedMonitorPerformance extends MonitorPerformancePort {
+class UncomposedMonitorPerformance implements MonitorPerformance {
   getMonitorPerformance(): Promise<never> {
     return Promise.reject(uncomposedInWorker("online-evaluation trend"));
   }
@@ -185,7 +185,7 @@ class UncomposedMonitorReplication implements MonitorReplicationReader {
   }
 }
 
-class WorkerEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCredentialsPort {
+class WorkerEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCredentials {
   static create(input: {
     modelProviders: ModelProviderApi;
   }): WorkerEvaluationAzureSafetyCredentials {
@@ -217,7 +217,7 @@ class WorkerEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCreden
 }
 
 /** Evaluation's full-content trace reads through Trace's composed API. */
-class WorkerEvaluationTraceReads extends EvaluationTraceReadPort {
+class WorkerEvaluationTraceReads extends EvaluationTraceRead {
   static create(traces: TraceApi): WorkerEvaluationTraceReads {
     return new WorkerEvaluationTraceReads(traces);
   }
@@ -268,7 +268,7 @@ class WorkerEvaluationTraceReads extends EvaluationTraceReadPort {
   }
 }
 
-class WorkerEvaluationTraceEvidence extends EvaluationTraceEvidencePort {
+class WorkerEvaluationTraceEvidence extends EvaluationTraceEvidence {
   static create(traces: TraceApi): WorkerEvaluationTraceEvidence {
     return new WorkerEvaluationTraceEvidence(traces);
   }
@@ -289,7 +289,7 @@ class WorkerEvaluationTraceEvidence extends EvaluationTraceEvidencePort {
   }
 }
 
-class WorkerEvaluationSettingsRecovery extends EvaluationSettingsRecoveryPort {
+class WorkerEvaluationSettingsRecovery extends EvaluationSettingsRecovery {
   static create(flags: FeatureFlagApi): WorkerEvaluationSettingsRecovery {
     return new WorkerEvaluationSettingsRecovery(flags);
   }
@@ -306,7 +306,7 @@ class WorkerEvaluationSettingsRecovery extends EvaluationSettingsRecoveryPort {
   }
 }
 
-class WorkerEvaluationInputsOffload extends EvaluationInputsOffloadPort {
+class WorkerEvaluationInputsOffload extends EvaluationInputsOffload {
   static create(input: {
     inputs: EvaluationInputsOffloadService;
     flags: FeatureFlagApi;
@@ -335,7 +335,7 @@ class WorkerEvaluationInputsOffload extends EvaluationInputsOffloadPort {
   }
 }
 
-class WorkerEvaluationSpanDigest extends EvaluationSpanDigestPort {
+class WorkerEvaluationSpanDigest extends EvaluationSpanDigest {
   static create(): WorkerEvaluationSpanDigest {
     return new WorkerEvaluationSpanDigest();
   }
@@ -349,7 +349,7 @@ class WorkerEvaluationSpanDigest extends EvaluationSpanDigestPort {
   }
 }
 
-class WorkerEvaluationWorkflowExecutor extends EvaluationWorkflowExecutorPort {
+class WorkerEvaluationWorkflowExecutor extends EvaluationWorkflowExecutor {
   static create(workflows: WorkerEvaluationWorkflows): WorkerEvaluationWorkflowExecutor {
     return new WorkerEvaluationWorkflowExecutor(
       WorkflowEvaluationAdapter.create(workflows.workflows),

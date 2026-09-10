@@ -9,7 +9,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type {
   AppRestBroadcast,
-  AppRestManagementAuditPort,
+  AppRestManagementAudit,
   PlatformUrlBuilder,
   RestErrorHandler,
 } from "@langwatch/api/rest";
@@ -29,7 +29,7 @@ import type {
   OrganizationLedgerActor,
   OrganizationService,
 } from "@langwatch/organization-contract";
-import type { OrganizationProvisioningPort } from "@langwatch/organization-server";
+import type { OrganizationProvisioning } from "@langwatch/organization-server";
 import type { ProjectManagementDirectory } from "@langwatch/project-server";
 import type {
   ScenarioApi,
@@ -53,7 +53,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ApiErrorBody } from "@langwatch/api/rest";
 
-import type { ApiHandlerManagedCredentialPort } from "./api-rest.runtime.ts";
+import type { ApiHandlerManagedCredential } from "./api-rest.runtime.ts";
 
 /**
  * The product services this process may or may not have composed.
@@ -94,7 +94,7 @@ export type ApiPackagedRestServices = Readonly<{
   /**
    * The SAME directory in the shape `/api/organizations` takes.
    */
-  organizationProvisioning?: (() => OrganizationService & OrganizationProvisioningPort) | undefined;
+  organizationProvisioning?: (() => OrganizationService & OrganizationProvisioning) | undefined;
   /** Reading effective permissions and the bindings that confer them. */
   permissions?: (() => AuthzService) | undefined;
   projects?: (() => ProjectManagementDirectory) | undefined;
@@ -150,7 +150,7 @@ export type ApiPackagedRestPorts = Readonly<{
    */
   organizationMiddleware: MiddlewareHandler;
   /** Audit emission for management API writes; the write has already committed. */
-  managementAudit: AppRestManagementAuditPort;
+  managementAudit: AppRestManagementAudit;
   /** Who an organization-authenticated REST write is attributed to (ADR-092). */
   organizationLedgerActor: (c: Context<any>) => OrganizationLedgerActor;
   /** The process's own error envelope, which every declared family answers in. */
@@ -168,7 +168,7 @@ export type ApiPackagedRestPorts = Readonly<{
    * The declared families bind their own identity through it rather than
    * through the security object the hand-written ones take.
    */
-  handlerManagedCredential: ApiHandlerManagedCredentialPort;
+  handlerManagedCredential: ApiHandlerManagedCredential;
   /**
    * The API-key ceiling for one permission, as a middleware. A route needing a
    * SECOND permission beyond its access policy installs one of these.

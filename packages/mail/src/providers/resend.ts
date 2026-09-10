@@ -5,7 +5,7 @@ import { sanitizeHeaders } from "./mime.ts";
 import {
   type EmailContent,
   EmailProviderConfigurationError,
-  type EmailProviderPort,
+  type EmailProvider,
   type MailerConfiguration,
   toArray,
 } from "./types.ts";
@@ -60,7 +60,7 @@ const buildPayload = (content: EmailContent, defaultFrom: string) => {
   };
 };
 
-export class ResendEmailProvider implements EmailProviderPort {
+export class ResendEmailProvider implements EmailProvider {
   readonly name = "resend" as const;
 
   static create(input: {

@@ -13,7 +13,7 @@ import type { ApiTrpcSession } from "./app-trpc/app-trpc.context.ts";
  * Authenticates a web request without coupling the API process to a session
  * implementation.
  */
-export abstract class ApiAuthenticationPort {
+export abstract class ApiAuthentication {
   abstract authenticate(request: Request): Promise<ApiTrpcSession | null>;
 }
 
@@ -23,7 +23,7 @@ export abstract class ApiAuditPort {
 }
 
 /** The small, named request adapter over the complete composed AuthZ service. */
-export abstract class ApiAuthorizationPort {
+export abstract class ApiAuthorization {
   abstract can(input: {
     userId: string;
     permission: AuthzPermission;
@@ -40,7 +40,7 @@ export abstract class ApiAuthorizationPort {
 }
 
 /** Adapts the complete AuthZ contract for the API process's request policy. */
-export class AuthzApiAuthorizationAdapter extends ApiAuthorizationPort {
+export class AuthzApiAuthorizationAdapter extends ApiAuthorization {
   static create(service: AuthzService): AuthzApiAuthorizationAdapter {
     return new AuthzApiAuthorizationAdapter(service);
   }
@@ -73,16 +73,16 @@ export class AuthzApiAuthorizationAdapter extends ApiAuthorizationPort {
  */
 export class ApiRequestPolicy {
   static create(options: {
-    authentication: ApiAuthenticationPort;
-    authorization: ApiAuthorizationPort;
+    authentication: ApiAuthentication;
+    authorization: ApiAuthorization;
     audit?: ApiAuditPort;
   }): ApiRequestPolicy {
     return new ApiRequestPolicy(options.authentication, options.authorization, options.audit);
   }
 
   private constructor(
-    private readonly authentication: ApiAuthenticationPort,
-    private readonly authorization: ApiAuthorizationPort,
+    private readonly authentication: ApiAuthentication,
+    private readonly authorization: ApiAuthorization,
     private readonly audit: ApiAuditPort | undefined,
   ) {}
 

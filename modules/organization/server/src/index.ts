@@ -119,7 +119,7 @@ export { organizationsProvisioningRest } from "./transport/organizations.rest.ts
 // family stays exported for the same four out-of-path consumers.
 export {
   createOrganizationsRestApp,
-  type OrganizationProvisioningPort,
+  type OrganizationProvisioning,
   type OrganizationProvisioningSummary,
   verifyInstanceAdminKey,
 } from "./transport/api-rest/organization-provisioning.api.ts";
@@ -148,7 +148,7 @@ export {
   InviteSendThrottleService,
 } from "./services/invite-send-throttle.service.ts";
 export {
-  OrganizationInviteMailPort,
-  OrganizationInviteRateLimitPort,
-  OrganizationInviteSeatCensusPort,
+  OrganizationInviteMail,
+  OrganizationInviteRateLimit,
+  OrganizationInviteSeatCensus,
 } from "./app/organization.infrastructure.ts";

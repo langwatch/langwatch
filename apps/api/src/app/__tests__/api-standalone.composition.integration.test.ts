@@ -8,11 +8,11 @@ import { OrganizationService } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { ApiMetricsPort, ApiReadinessPort } from "../../api-process.lifecycle.ts";
-import { ApiFeatureDrainPort, ApiProcessGraphPort } from "../../api.process.ts";
+import { ApiMetrics, ApiReadiness } from "../../api-process.lifecycle.ts";
+import { ApiFeatureDrain, ApiProcessGraph } from "../../api.process.ts";
 import {
-  ApiAuthSessionCompositionPort,
-  ApiBrowserSessionTransportPort,
+  ApiAuthSessionComposition,
+  ApiBrowserSessionTransport,
 } from "../api-auth.composition.ts";
 import type { ApiProductionCompositionOptions } from "../api-production.composition.ts";
 import { ApiStandaloneComposition } from "../api-standalone.composition.ts";
@@ -252,7 +252,7 @@ function testProducts(): ApiProductionCompositionOptions {
   };
 }
 
-class TestAuthComposition extends ApiAuthSessionCompositionPort {
+class TestAuthComposition extends ApiAuthSessionComposition {
   compose() {
     return {
       auth: new TestAuthService(),
@@ -272,17 +272,17 @@ class TestAuthService implements BrowserSessionApi {
   async revokeOtherBrowserSessions(): Promise<void> {}
 }
 
-class TestSessionTransport extends ApiBrowserSessionTransportPort {
+class TestSessionTransport extends ApiBrowserSessionTransport {
   async tryResolveVerifiedSession() {
     return null;
   }
 }
 
-class TestGraph extends ApiProcessGraphPort {
+class TestGraph extends ApiProcessGraph {
   async close(): Promise<void> {}
 }
 
-class RecordingGraph extends ApiProcessGraphPort {
+class RecordingGraph extends ApiProcessGraph {
   constructor(private readonly phases: string[]) {
     super();
   }
@@ -296,7 +296,7 @@ class RecordingGraph extends ApiProcessGraphPort {
   }
 }
 
-class RecordingFeatureDrain extends ApiFeatureDrainPort {
+class RecordingFeatureDrain extends ApiFeatureDrain {
   constructor(private readonly phases: string[]) {
     super();
   }
@@ -306,13 +306,13 @@ class RecordingFeatureDrain extends ApiFeatureDrainPort {
   }
 }
 
-class TestMetrics extends ApiMetricsPort {
+class TestMetrics extends ApiMetrics {
   async respond(): Promise<Response> {
     return new Response("langwatch_api_up 1", { status: 200 });
   }
 }
 
-class FailingReadiness extends ApiReadinessPort {
+class FailingReadiness extends ApiReadiness {
   assertReady(): Promise<void> {
     return Promise.reject(new Error("Redis is unreachable"));
   }
@@ -326,7 +326,7 @@ class FailingReadiness extends ApiReadinessPort {
  * connection afterwards means the listener is closed BEHIND the gate rather
  * than that the test simply got there first.
  */
-class LatchedReadiness extends ApiReadinessPort {
+class LatchedReadiness extends ApiReadiness {
   private release: (() => void) | undefined;
   private arrive: (() => void) | undefined;
 

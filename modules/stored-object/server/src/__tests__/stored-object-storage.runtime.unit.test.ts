@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  StoredObjectAzureDestinationPort,
+  StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
-  StoredObjectProjectS3ConfigPort,
+  StoredObjectProjectS3Config,
   StoredObjectStorageRegistryAdapter,
 } from "../index.ts";
 
-class ProjectConfig extends StoredObjectProjectS3ConfigPort {
+class ProjectConfig extends StoredObjectProjectS3Config {
   constructor(private readonly bucket: string | null) {
     super();
   }
@@ -16,7 +16,7 @@ class ProjectConfig extends StoredObjectProjectS3ConfigPort {
   }
 }
 
-class AzureDestination extends StoredObjectAzureDestinationPort {
+class AzureDestination extends StoredObjectAzureDestination {
   calls = 0;
 
   resolve(): Readonly<{ accountName: string; container: string }> {

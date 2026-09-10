@@ -17,8 +17,8 @@ import {
 } from "../../api-rest.doors.ts";
 import {
   createApiRestRuntime,
-  type ApiOrganizationCredentialPort,
-  type ApiScimDirectoryCredentialPort,
+  type ApiOrganizationCredential,
+  type ApiScimDirectoryCredential,
 } from "../../api-rest.runtime.ts";
 import type {
   ApiPackagedRestCollaborators,
@@ -175,9 +175,9 @@ export function mountRestFamily(options: {
   /** Process-level ports a family reads instead of a service (`scim`, ...). */
   processPorts?: Record<string, unknown> | undefined;
   /** The directory bearer, for a suite driving the SCIM 2.0 protocol family. */
-  directoryCredential?: ApiScimDirectoryCredentialPort | undefined;
+  directoryCredential?: ApiScimDirectoryCredential | undefined;
   /** The organization door, for a suite driving a family that answers behind one. */
-  organizationCredential?: ApiOrganizationCredentialPort | undefined;
+  organizationCredential?: ApiOrganizationCredential | undefined;
   caller?: RestFamilyCaller | undefined;
   absence?: ApiRestAbsenceReport | undefined;
 }): MountedRestFamily {

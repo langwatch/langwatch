@@ -16,7 +16,7 @@ import type {
   ProcessWakeRow,
 } from "@langwatch/ops-contract";
 import type { ProcessOpsRepository } from "../repositories/process/process-ops.repository.ts";
-import type { OpsEventingIntrospectionPort } from "../app/ops.app.ts";
+import type { OpsEventingIntrospection } from "../app/ops.app.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
@@ -39,13 +39,13 @@ export class ManagerExplorerService {
   private readonly fleet: ProcessOpsRepository;
   private readonly audit: ProcessAuditRepository;
   /** The live pipeline surface, supplied by the process composition. */
-  private readonly introspection: OpsEventingIntrospectionPort;
+  private readonly introspection: OpsEventingIntrospection;
 
   static create(params: {
     store: ProcessStore;
     fleet: ProcessOpsRepository;
     audit: ProcessAuditRepository;
-    introspection: OpsEventingIntrospectionPort;
+    introspection: OpsEventingIntrospection;
   }): ManagerExplorerService {
     return new ManagerExplorerService(params);
   }
@@ -54,7 +54,7 @@ export class ManagerExplorerService {
     store: ProcessStore;
     fleet: ProcessOpsRepository;
     audit: ProcessAuditRepository;
-    introspection: OpsEventingIntrospectionPort;
+    introspection: OpsEventingIntrospection;
   }) {
     this.store = params.store;
     this.fleet = params.fleet;

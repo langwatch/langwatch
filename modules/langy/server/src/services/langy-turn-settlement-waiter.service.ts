@@ -5,7 +5,7 @@ import {
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
 } from "@langwatch/langy-contract";
-import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 
 export type TurnSettlement =
   | {
@@ -34,7 +34,7 @@ export type LangyTurnSettlementReader = {
  * Redis adapter, and which connection it duplicates for its blocking read is the composing
  * process's business, not this waiter's. `release` gives that connection back.
  */
-export type LangyTurnBufferWatch = { buffer: LangyTokenBufferPort; release: () => void };
+export type LangyTurnBufferWatch = { buffer: LangyTokenBuffer; release: () => void };
 export type OpenLangyTurnBuffer = () => LangyTurnBufferWatch | null;
 
 const bufferedPollMs = 5_000;
@@ -177,7 +177,7 @@ export class LangyTurnSettlementWaiterService {
   }
 
   private static async watchBufferForTerminal(
-    buffer: LangyTokenBufferPort,
+    buffer: LangyTokenBuffer,
     input: { conversationId: string; turnId: string; signal: AbortSignal },
   ): Promise<void> {
     const { reads, lastId } = await buffer.readTail({

@@ -10,10 +10,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import {
   USAGE_UNKNOWN,
-  UsageCounterPort,
+  UsageCounter,
   type UsageCount,
-} from "../../ports/usage-counter.port.ts";
-import { UsageWarningPort } from "../../ports/usage-warning.port.ts";
+} from "../entitlement.infrastructure.ts";
+import { UsageWarning } from "../entitlement.infrastructure.ts";
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
 import { EntitlementApp, type EntitlementInfrastructure } from "../entitlement.app.ts";
@@ -24,7 +24,7 @@ export function fixedEntitlementSource(plan: Plan | null): EntitlementSource {
 }
 
 /** A counter that answers one figure, or {@link USAGE_UNKNOWN}. */
-export class TestUsageCounter extends UsageCounterPort {
+export class TestUsageCounter implements UsageCounter {
   static create(
     count: UsageCount = USAGE_UNKNOWN,
     usageUnit: UsageUnit = "traces",
@@ -36,7 +36,6 @@ export class TestUsageCounter extends UsageCounterPort {
     private readonly count: UsageCount,
     private readonly usageUnit: UsageUnit,
   ) {
-    super();
   }
 
   async getCurrentMonthCountForDisplay(): Promise<UsageCount> {
@@ -49,7 +48,7 @@ export class TestUsageCounter extends UsageCounterPort {
 }
 
 /** A warning sender that records what it was asked and answers what it was told to. */
-export class TestUsageWarnings extends UsageWarningPort {
+export class TestUsageWarnings implements UsageWarning {
   readonly sent: SendUsageLimitWarningInput[] = [];
 
   static create(answer: UsageLimitWarning = { sent: false }): TestUsageWarnings {
@@ -57,7 +56,6 @@ export class TestUsageWarnings extends UsageWarningPort {
   }
 
   private constructor(private readonly answer: UsageLimitWarning) {
-    super();
   }
 
   async sendWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {

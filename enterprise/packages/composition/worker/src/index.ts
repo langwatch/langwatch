@@ -1,7 +1,7 @@
 import { EnterpriseCatalogue } from "@langwatch/enterprise";
 
 import type {
-  ManagedProviderConfigurationPort,
+  ManagedProviderConfiguration,
   ManagedProviderCredentialsPort,
 } from "@langwatch/enterprise-managed-provider-server";
 import { ManagedProviderService } from "@langwatch/enterprise-managed-provider-server";
@@ -10,7 +10,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 export type EnterpriseWorkerCompositionOptions = {
   managedProvider: {
     projects: ProjectApi;
-    configuration: ManagedProviderConfigurationPort;
+    configuration: ManagedProviderConfiguration;
     credentials: ManagedProviderCredentialsPort;
   };
 };
@@ -40,8 +40,8 @@ export class EnterpriseWorkerComposition {
 }
 
 export {
-  GovernanceIngestionAwsPort,
-  GovernanceIngestionEgressPort,
+  GovernanceIngestionAws,
+  GovernanceIngestionEgress,
   INGESTION_PULL_DURATION_METRIC_NAME,
   INGESTION_PULL_TOTAL_METRIC_NAME,
   OtelGovernanceIngestionPullMetrics,

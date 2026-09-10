@@ -15,15 +15,15 @@ import {
   ModelCatalogGatewaySpendRatingAdapter,
   PrismaGatewayInternalStoreAdapter,
   type GatewayRealtimeSessionCollaborators,
-  type GatewaySpendConfirmationPort,
-  type GatewaySpendRatingPort,
+  type GatewaySpendConfirmation,
+  type GatewaySpendRating,
 } from "@langwatch/gateway-server";
 import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
 import { PrismaGatewayGuardrailRepository } from "@langwatch/gateway-server/composition/gateway-guardrails";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { ApiGatewayModelProviderCredentials } from "../features/gateway/gateway-model-provider-credentials.adapter.ts";
 
 import type { ApiGatewayComposition } from "./api-gateway.composition.ts";
@@ -56,7 +56,7 @@ export type ApiGatewayInternalRestOptions = Readonly<{
   /** The key the credentials handed to the data plane are signed under. */
   jwtSecret: string | undefined;
   /** The cipher a provider row's stored keys were written under, if any. */
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
   /** The monitor directory a guardrail attachment names, if composed. */
   monitors?: MonitorService | undefined;
   /** Runs one evaluator for a guardrail check, if this process can. */
@@ -69,7 +69,7 @@ export type ApiGatewayInternalRestOptions = Readonly<{
    * The confirmation a settled voice session is reported through, if this process
    * registered the spend pipeline.
    */
-  spendConfirmation?: GatewaySpendConfirmationPort | undefined;
+  spendConfirmation?: GatewaySpendConfirmation | undefined;
 }>;
 
 type GatewayInternalRestPortsGuardrails = ReturnType<
@@ -148,8 +148,8 @@ export function composeApiGatewayInternalRest(
  */
 export function composeApiGatewayRealtimeSessions(options: {
   prisma: PrismaClient;
-  spendConfirmation: GatewaySpendConfirmationPort | undefined;
-  rating?: GatewaySpendRatingPort | undefined;
+  spendConfirmation: GatewaySpendConfirmation | undefined;
+  rating?: GatewaySpendRating | undefined;
 }): GatewayRealtimeSessionCollaborators | undefined {
   if (!options.spendConfirmation) return undefined;
 

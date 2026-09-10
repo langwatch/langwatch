@@ -2,7 +2,7 @@ import type { FoldProjectionStore, TriggerContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
-import { createEvaluationProcessingPipeline } from "../adapters/evaluation-processing.adapter.ts";
+import { createEvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
 import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent.ts";
 import type { EvaluationAnalyticsData } from "../projections/evaluation-analytics-row.projection.ts";
 import {

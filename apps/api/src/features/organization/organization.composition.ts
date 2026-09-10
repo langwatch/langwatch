@@ -21,7 +21,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import {
   EmailJoinRequestNotifierAdapter,
-  IdentityEventingPort,
+  IdentityEventing,
   JoinRequestGuardsService,
   JoinRequestLedgerWriterAdapter,
   JoinRequestService,
@@ -52,7 +52,7 @@ import {
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
   type OrganizationPlanUser,
-  type OrganizationProvisioningPort,
+  type OrganizationProvisioning,
   type OrganizationRestService,
   organizationServer,
   type OrganizationCeremony,
@@ -69,7 +69,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { RoleApi } from "@langwatch/role-contract";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
 
@@ -77,8 +77,8 @@ import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import { createOrganizationTrpcRouters } from "./organization-trpc.mount.ts";
 import { ApiOrganizationSettingsSecretAdapter } from "../../app/api-organization-settings-secret.adapter.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
-import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
-import type { ApiEnterpriseApplicationPort } from "../enterprise/enterprise.composition.ts";
+import type { ApiPersonMail } from "../../app/api-person-mail.port.ts";
+import type { ApiEnterpriseApplication } from "../enterprise/enterprise.composition.ts";
 import type { ComposedOrganizationFeature } from "./organization.composition.types.ts";
 
 /**
@@ -91,7 +91,7 @@ export const signUpDataSchema = z.object({}).passthrough();
 /**
  * The invitation half of `organization.*`, for a deployment that composed one.
  */
-export abstract class ApiOrganizationInvitePort {
+export abstract class ApiOrganizationInvite {
   /**
    * Everything the organization application asks the invitation service. The
    * first argument every member takes is the request context the deleted
@@ -161,11 +161,11 @@ export type OrganizationPeers = Readonly<{
    */
   roles?: RoleApi | undefined;
   /** The deployment's cipher, for the organization's stored settings. */
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
   /** The Enterprise application, where the deployment composed one. */
-  enterprise?: ApiEnterpriseApplicationPort | undefined;
+  enterprise?: ApiEnterpriseApplication | undefined;
   /** The invitation service, where the deployment composed one. */
-  invites?: ApiOrganizationInvitePort | undefined;
+  invites?: ApiOrganizationInvite | undefined;
   /**
    * The membership graph the four tenant-shaped namespaces are served over, where this
    * process composed one.
@@ -201,9 +201,9 @@ export type OrganizationMembershipPeers = Readonly<{
    */
   users: Pick<UserApi, "ensurePersonalWorkspace">;
   /** The event stack the join-request ledger appends and stages through. */
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
   /** The messages this half sends, where the deployment composed a gateway. */
-  mail?: ApiPersonMailPort | undefined;
+  mail?: ApiPersonMail | undefined;
   /** Names this process in every refusal the membership half raises. */
   processName: string;
 }>;
@@ -296,7 +296,7 @@ export class ApiOrganizationUnavailableError extends HandledError {
 type OrganizationMembership = Readonly<{
   app: OrganizationApi;
   rest: OrganizationRestService;
-  provisioning: OrganizationProvisioningPort &
+  provisioning: OrganizationProvisioning &
     Pick<OrganizationService, "getBillingProfile" | "claimBillingCustomerId">;
 }>;
 
@@ -310,14 +310,14 @@ async function composeMembershipHalf(options: {
   plans: Pick<PlanProvider, "getActivePlan">;
   peers: OrganizationMembershipPeers;
   /** The invitation service, where the deployment composed one. */
-  invites: ApiOrganizationInvitePort | undefined;
+  invites: ApiOrganizationInvite | undefined;
   /** The Enterprise application, where the deployment composed one. */
-  enterprise: ApiEnterpriseApplicationPort | undefined;
+  enterprise: ApiEnterpriseApplication | undefined;
   rateLimit(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<Readonly<{ allowed: boolean; resetAt: number }>>;
   logger: Logger;
-  encryption: SecretEncryptionPort;
+  encryption: SecretEncryption;
   /** This deployment's public origin, for a lapsed requester's personal project link. */
   baseHost: string;
   /** The demo project every caller may read, where a deployment names one. */
@@ -473,7 +473,7 @@ async function composeMembershipHalf(options: {
     setMemberDisabled: (input, by) => app.setMemberDisabled(input, by),
     deleteMember: (input, by) => app.deleteMember(input, by),
   };
-  const provisioning: OrganizationProvisioningPort &
+  const provisioning: OrganizationProvisioning &
     Pick<OrganizationService, "getBillingProfile" | "claimBillingCustomerId"> = {
     createForProvisioning: (input) => app.createForProvisioning(input),
     deleteProvisionedOrganization: (input) => app.deleteProvisionedOrganization(input),
@@ -517,10 +517,10 @@ function createOrganizationRouters(mount: ApiTrpcFeatureMount) {
  * none gets `null`, and the application refuses each invitation door by name.
  */
 function apiOrganizationInvitations(options: {
-  invites: ApiOrganizationInvitePort | undefined;
+  invites: ApiOrganizationInvite | undefined;
   prisma: PrismaClient;
   baseHost: string;
-  enterprise: ApiEnterpriseApplicationPort | undefined;
+  enterprise: ApiEnterpriseApplication | undefined;
   logger: Logger;
 }): OrganizationInvitations | null {
   const invites = options.invites;
@@ -576,7 +576,7 @@ function apiOrganizationInvitations(options: {
  */
 function apiOrganizationJoinRequests(options: {
   joinRequests: JoinRequestsService;
-  invites: ApiOrganizationInvitePort | undefined;
+  invites: ApiOrganizationInvite | undefined;
 }): OrganizationJoinRequests {
   const { joinRequests, invites } = options;
   const unavailable = (): Promise<never> =>

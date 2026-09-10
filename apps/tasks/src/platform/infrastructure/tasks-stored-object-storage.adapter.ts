@@ -1,9 +1,9 @@
-import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import { parseDataplaneS3RoutingTable } from "@langwatch/config";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   StoredObjectDestinationPolicyAdapter,
-  StoredObjectProjectS3ConfigPort,
+  StoredObjectProjectS3Config,
 } from "@langwatch/stored-object-server";
 import type { TasksConfig } from "../config/tasks.config.ts";
 
@@ -33,7 +33,7 @@ export type TasksProjectS3Target = Readonly<{
  * (`host.requirePrisma()`'s own error) if a lookup is ever attempted without
  * `DATABASE_URL` configured, rather than failing every task at boot.
  */
-export class TasksProjectS3SourcePort extends StoredObjectProjectS3ConfigPort {
+export class TasksProjectS3Source extends StoredObjectProjectS3Config {
   constructor(
     private readonly getPrisma: () => Pick<PrismaClient, "project">,
     private readonly routes: ReadonlyMap<
@@ -65,7 +65,7 @@ export class TasksProjectS3SourcePort extends StoredObjectProjectS3ConfigPort {
 }
 
 /** `apps/tasks` has no outbound proxy configuration of its own yet, matching `object-storage-migrate.composition.ts`. */
-class TasksNoOutboundProxy extends OutboundProxyResolverPort {
+class TasksNoOutboundProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {
     return undefined;
   }
@@ -87,7 +87,7 @@ class TasksNoOutboundProxy extends OutboundProxyResolverPort {
 export type TasksObjectStorage = Readonly<{
   aws: AwsClientProcessRuntime;
   destination: StoredObjectDestinationPolicyAdapter;
-  projects: TasksProjectS3SourcePort;
+  projects: TasksProjectS3Source;
   globalS3?: TasksProjectS3Target;
 }>;
 
@@ -99,7 +99,7 @@ export function createTasksObjectStorage(options: {
   const { storage } = options.config;
   const aws = AwsClientProcessRuntime.create({ outboundProxy: new TasksNoOutboundProxy() });
   const routes = parseDataplaneS3RoutingTable(options.source).routes;
-  const projects = new TasksProjectS3SourcePort(options.getPrisma, routes);
+  const projects = new TasksProjectS3Source(options.getPrisma, routes);
 
   const globalS3: TasksProjectS3Target | undefined = storage.s3.bucket?.trim()
     ? {

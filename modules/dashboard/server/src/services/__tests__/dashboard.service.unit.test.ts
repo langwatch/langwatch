@@ -11,13 +11,12 @@ import {
 } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
-import { WorkbenchAccessPort } from "../../ports/workbench-access.port.ts";
+import { WorkbenchAccess } from "../../app/dashboard.infrastructure.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
 import { DashboardService } from "../dashboard.service.ts";
 
-class FixedWorkbenchAccess extends WorkbenchAccessPort {
+class FixedWorkbenchAccess implements WorkbenchAccess {
   constructor(private readonly enabled: boolean) {
-    super();
   }
 
   async isWorkbenchEnabled(): Promise<boolean> {

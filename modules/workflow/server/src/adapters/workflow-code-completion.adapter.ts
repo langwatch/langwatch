@@ -18,7 +18,7 @@ import { generateText, type LanguageModel } from "ai";
 import { CompletionCopilot } from "monacopilot";
 
 /** The model a feature key resolves to, on this deployment, for this project. */
-export type WorkflowModelResolverPort = (input: {
+export type WorkflowModelResolver = (input: {
   projectId: string;
   featureKey: string;
 }) => Promise<LanguageModel>;
@@ -28,12 +28,12 @@ export const WORKFLOW_CODE_COMPLETION_FEATURE_KEY = "studio.autocomplete";
 
 export class WorkflowCodeCompletionAdapter {
   static create(options: {
-    resolveModel: WorkflowModelResolverPort;
+    resolveModel: WorkflowModelResolver;
   }): WorkflowCodeCompletionAdapter {
     return new WorkflowCodeCompletionAdapter(options.resolveModel);
   }
 
-  private constructor(private readonly resolveModel: WorkflowModelResolverPort) {}
+  private constructor(private readonly resolveModel: WorkflowModelResolver) {}
 
   async complete(input: { projectId: string; body: unknown }): Promise<unknown> {
     const model = await this.resolveModel({

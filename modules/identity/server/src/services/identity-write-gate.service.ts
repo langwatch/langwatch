@@ -7,7 +7,7 @@ import { createLogger } from "@langwatch/observability";
 import { Counter, register } from "prom-client";
 import { PerSubjectCachedGateService } from "./per-subject-cached-gate.service.ts";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../rules/identity-migration-names.rules.ts";
-import type { IdentityWriteGateStatePort } from "../app/identity.infrastructure.ts";
+import type { IdentityWriteGateState } from "../app/identity.infrastructure.ts";
 
 const logger = createLogger("langwatch:identity:write-gate");
 
@@ -44,7 +44,7 @@ const anyoneGate = PerSubjectCachedGateService.create({
 });
 
 export class IdentityWriteGateService {
-  static create({ state }: { state: IdentityWriteGateStatePort }): IdentityWriteGateService {
+  static create({ state }: { state: IdentityWriteGateState }): IdentityWriteGateService {
     return new IdentityWriteGateService(state);
   }
 
@@ -66,7 +66,7 @@ export class IdentityWriteGateService {
     anyoneGate.resetForTesting();
   }
 
-  private constructor(private readonly state: IdentityWriteGateStatePort) {}
+  private constructor(private readonly state: IdentityWriteGateState) {}
 
   /**
    * Whether ANY user has finalized, fleet-wide — the short-circuit above, on its own.

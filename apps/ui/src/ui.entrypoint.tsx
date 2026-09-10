@@ -12,7 +12,7 @@ import { configureDocsRuntime } from "@langwatch/config/docs-url";
 import { registerChunkReloadListener } from "./behavior/chunk-reload";
 import { readPublicAppConfig } from "./behavior/public-config";
 import { toPublicEnvironment } from "./behavior/public-environment";
-import { UiShellPort } from "./behavior/ui-runtime.port";
+import { UiShell } from "./behavior/ui-runtime.port";
 import { UiRuntime } from "./behavior/ui.runtime";
 import { createUiApplication } from "./features/installed-ui-features.composition";
 import { parseUiFeatureConfig } from "./behavior/ui-feature-config";
@@ -75,7 +75,7 @@ function UiBootPageError() {
   );
 }
 
-class BrowserUiShell extends UiShellPort {
+class BrowserUiShell extends UiShell {
   static create(): BrowserUiShell {
     return new BrowserUiShell(
       createUiApplication({

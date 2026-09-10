@@ -13,15 +13,15 @@ import {
   createPresenceTestProjects,
   RecordingPresenceDiagnostics,
 } from "../../app/__tests__/presence.fixture.ts";
-import { PresenceBroadcastPort } from "../../ports/presence.port.ts";
+import type { PresenceBroadcast } from "../../app/presence.app.ts";
 import { MemoryPresenceRepository } from "../../repositories/memory/memory.presence.repository.ts";
 import { PRESENCE_TTL_SECONDS, PresenceService } from "../presence.service.ts";
 
 const PROJECT = "project-a";
 
-type PublishInput = Parameters<PresenceBroadcastPort["publish"]>[0];
+type PublishInput = Parameters<PresenceBroadcast["publish"]>[0];
 
-class RecordingBroadcast extends PresenceBroadcastPort {
+class RecordingBroadcast implements PresenceBroadcast {
   readonly publish = vi.fn<(input: PublishInput) => Promise<void>>(async () => undefined);
 
   events(): PresenceEvent[] {

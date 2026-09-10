@@ -7,12 +7,12 @@ import {
   type StoredObjectByteStream,
 } from "@langwatch/stored-object-contract";
 import {
-  StoredObjectStoragePort,
+  StoredObjectStorage,
   type StoredObjectStorageAddress,
 } from "../app/stored-object.infrastructure.ts";
 import { StoredObjectStorageRuntimeAdapter } from "./stored-object-storage-runtime.service.ts";
 
-export class StoredObjectStoragePortAdapter extends StoredObjectStoragePort {
+export class StoredObjectStoragePortAdapter extends StoredObjectStorage {
   static create(input: {
     runtime: StoredObjectStorageRuntimeAdapter;
     aws: AwsClientProcessRuntime;

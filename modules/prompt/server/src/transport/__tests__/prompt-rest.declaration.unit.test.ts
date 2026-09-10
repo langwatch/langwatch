@@ -42,7 +42,7 @@ describe("the prompts REST declaration", () => {
   it("answers behind a project key, at its own paths and their /api/v1 twins", () => {
     const declaration = promptRest.router();
 
-    expect(declaration.credential).toBe("projectKey");
+    expect(declaration.credential).toBe("project");
     expect(declaration.addressing).toBe("literal");
     expect(declaration.v1Twin).toBe(true);
   });

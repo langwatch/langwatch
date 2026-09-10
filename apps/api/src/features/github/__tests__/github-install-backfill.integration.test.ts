@@ -4,7 +4,7 @@
  * @see specs/coding-agent/project-menu-links.feature
  */
 import {
-  CodingAgentClockPort,
+  CodingAgentClock,
   CodingAgentPullRequestMappingBackfillService,
 } from "@langwatch/coding-agent-server";
 import type { CodingAgentSessionReads } from "@langwatch/coding-agent-server";
@@ -190,7 +190,7 @@ function sessionReadsOf(sessions: readonly CodingAgentSession[]): CodingAgentSes
   };
 }
 
-class TestClock extends CodingAgentClockPort {
+class TestClock extends CodingAgentClock {
   nowMs(): number {
     return Date.now();
   }

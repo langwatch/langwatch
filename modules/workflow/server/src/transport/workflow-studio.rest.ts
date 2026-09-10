@@ -95,7 +95,7 @@ function postedJson(raw: string): Record<string, unknown> | null {
 export const workflowStudioRest = defineRestRouter(WorkflowApi)
   .withNamespace("workflow-studio")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("session")
+  .withCredential("browser")
   .withAddressing("literal", { v1Twin: false })
 
   // The project is read off the query rather than declared as one: a route

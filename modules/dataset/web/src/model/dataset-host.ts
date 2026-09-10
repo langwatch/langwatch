@@ -12,7 +12,7 @@
  * the React context they travel in, depending on nothing but React.
  *
  * THE SIXTH FAMILY TO DECLARE THIS SHAPE, after `GovernanceHostPort`,
- * `GatewayHostPort`, `PersonalWorkspaceHostPort`, `AutomationHostPort`,
+ * `GatewayHostPort`, `PersonalWorkspaceHostPort`, `AutomationHost`,
  * `OpsHostPort` and `AgentManagementHostPort`. Each of those recorded that a
  * repeat is the signal to promote the shape into one place, and each left it,
  * for the same reason: promotion changes packages a page-family move does not

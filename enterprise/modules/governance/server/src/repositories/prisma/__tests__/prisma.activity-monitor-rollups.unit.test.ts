@@ -1,10 +1,10 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  GovernanceClickHouseClientPort,
+  GovernanceClickHouseClient,
   type GovernanceClickHouseResult,
-  GovernanceClickHouseResolverPort,
-} from "../../../ports/ingestion-source-activity.port.ts";
+  GovernanceClickHouseResolver,
+} from "../../../app/governance.infrastructure.ts";
 import {
   PrismaActivityMonitorRepository,
   type SortDir,
@@ -18,7 +18,7 @@ type ClickHouseQuery = {
   format: "JSONEachRow";
 };
 
-class RecordedClickHouseClient extends GovernanceClickHouseClientPort {
+class RecordedClickHouseClient implements GovernanceClickHouseClient {
   readonly queries: ClickHouseQuery[] = [];
 
   constructor(private readonly rowsForQuery: (query: ClickHouseQuery) => unknown) {
@@ -31,14 +31,14 @@ class RecordedClickHouseClient extends GovernanceClickHouseClientPort {
   }
 }
 
-class RecordedClickHouseResolver extends GovernanceClickHouseResolverPort {
+class RecordedClickHouseResolver implements GovernanceClickHouseResolver {
   readonly organizationIds: string[] = [];
 
-  constructor(private readonly client: GovernanceClickHouseClientPort | null) {
+  constructor(private readonly client: GovernanceClickHouseClient | null) {
     super();
   }
 
-  async tryResolve(organizationId: string): Promise<GovernanceClickHouseClientPort | null> {
+  async tryResolve(organizationId: string): Promise<GovernanceClickHouseClient | null> {
     this.organizationIds.push(organizationId);
     return this.client;
   }

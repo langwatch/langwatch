@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AwsClientConfig, AwsClientConfigInput } from "@langwatch/aws-client";
-import { WEBHOOK_SIGNATURE_HEADER, type WebhookDispatchRateLimiterPort } from "@langwatch/egress";
+import { WEBHOOK_SIGNATURE_HEADER, type WebhookDispatchRateLimiter } from "@langwatch/egress";
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import {
   SQS_MAX_MESSAGE_BYTES,
@@ -12,8 +12,8 @@ import type { WebhookDispatchRequest } from "../../app/webhook.app.ts";
 // The queue client and the rate limiter are the two boundaries; everything
 // else in these tests is the real envelope, the real signature and the real
 // classification.
-const limitMock = vi.fn<WebhookDispatchRateLimiterPort["limit"]>();
-const rateLimiter: WebhookDispatchRateLimiterPort = { limit: limitMock };
+const limitMock = vi.fn<WebhookDispatchRateLimiter["limit"]>();
+const rateLimiter: WebhookDispatchRateLimiter = { limit: limitMock };
 
 /** Builds a client config the way the process would, minus the socket pool. */
 const awsClientConfig = (input: AwsClientConfigInput): AwsClientConfig => ({

@@ -18,12 +18,12 @@ const logger = createLogger("langwatch:lwql-key-map-service");
 /**
  * Where a failed sync is reported beyond the log line.
  */
-export abstract class LwqlKeyMapErrorSinkPort {
+export abstract class LwqlKeyMapErrorSink {
   abstract capture(error: Error, context: Readonly<{ projectId: string; cause: unknown }>): void;
 }
 
 /** Reports nothing beyond the log line, for a deployment that wired no sink. */
-class SilentLwqlKeyMapErrorSink extends LwqlKeyMapErrorSinkPort {
+class SilentLwqlKeyMapErrorSink extends LwqlKeyMapErrorSink {
   capture(): void {}
 }
 
@@ -32,7 +32,7 @@ export class LwqlKeyMapService {
     private readonly repository: LwqlKeyMapRepository,
     private readonly sourceDatabase: string,
     private readonly connection: LangWatchQLConnection | null,
-    private readonly errors: LwqlKeyMapErrorSinkPort,
+    private readonly errors: LwqlKeyMapErrorSink,
   ) {}
 
   /**
@@ -45,7 +45,7 @@ export class LwqlKeyMapService {
     sourceDatabase: string;
     /** The restricted identity, or `null` where a deployment provisioned none. */
     connection: LangWatchQLConnection | null;
-    errors?: LwqlKeyMapErrorSinkPort;
+    errors?: LwqlKeyMapErrorSink;
   }): LwqlKeyMapService {
     return new LwqlKeyMapService(
       options.repository,

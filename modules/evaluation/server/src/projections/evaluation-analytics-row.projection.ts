@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { EvaluationAnalyticsAttributePolicy } from "../ports/evaluation.port.ts";
+import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.infrastructure.ts";
 
 const logger = createLogger(
   "langwatch:event-sourcing:evaluation-processing:evaluation-analytics-fold",

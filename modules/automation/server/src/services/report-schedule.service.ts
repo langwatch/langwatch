@@ -6,23 +6,23 @@ import {
   type ReportSchedule,
   type ReportScheduleInput,
 } from "@langwatch/automation-contract";
-import { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import { AutomationClock } from "../app/automation.infrastructure.ts";
 import { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
-import { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
+import { SchedulerWake } from "../ports/scheduler-wake.port.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 export class ReportScheduleService {
   private constructor(
     private readonly jobs: ScheduledJobStorePort,
-    private readonly clock: AutomationClockPort,
-    private readonly wake: SchedulerWakePort,
+    private readonly clock: AutomationClock,
+    private readonly wake: SchedulerWake,
     private readonly triggers: TriggerRepository,
   ) {}
 
   static create(deps: {
     jobs: ScheduledJobStorePort;
-    clock: AutomationClockPort;
-    wake: SchedulerWakePort;
+    clock: AutomationClock;
+    wake: SchedulerWake;
     triggers: TriggerRepository;
   }): ReportScheduleService {
     return new ReportScheduleService(deps.jobs, deps.clock, deps.wake, deps.triggers);

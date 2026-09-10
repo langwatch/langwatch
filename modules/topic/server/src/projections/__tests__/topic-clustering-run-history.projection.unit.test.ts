@@ -9,7 +9,7 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../../adapters/eventing.topic-events.adapter.ts";
+} from "../../services/topic-events.service.ts";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,

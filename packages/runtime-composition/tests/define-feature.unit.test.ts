@@ -45,10 +45,9 @@ const directoryWithTransports = defineModule("annotation")
 
 describe("defineModule", () => {
   it("constructs the declared app once during boot and publishes its contract", async () => {
-    const runtime = await createApp({ name: "test" })
-      .withInfrastructure({ prefix: "tenant-" })
-      .withModule(directoryServer)
-      .boot({ role: "api", config: { annotation: { suffix: "directory" } } });
+    const runtime = await createApp({ role: "api", config: { annotation: { suffix: "directory" } }, infrastructure: { prefix: "tenant-" } })
+      .withModules([directoryServer])
+      .boot();
 
     expect(runtime.service(DirectoryApp).name).toBe("tenant-directory");
     expect(runtime.module(directoryServer).provided).toBe(runtime.service(DirectoryApp));
@@ -73,10 +72,9 @@ describe("defineModule", () => {
     }
 
     const declaration = defineModule("presence").withApp(ResourceApp).build();
-    const runtime = await createApp({ name: "test" })
-      .withInfrastructure({ prefix: "unused" })
-      .withModule(declaration)
-      .boot({ role: "api" });
+    const runtime = await createApp({ role: "api", infrastructure: { prefix: "unused" } })
+      .withModules([declaration])
+      .boot();
 
     await runtime.stop();
     expect(own).toHaveBeenCalledOnce();
@@ -88,10 +86,9 @@ describe("defineModule", () => {
     const declaration = defineModule("annotation").withApp(app).build();
 
     await expect(
-      createApp({ name: "test" })
-        .withInfrastructure({ prefix: "unused" })
-        .withModule(declaration)
-        .boot({ role: "api", config: { annotation: {} } }),
+      createApp({ role: "api", config: { annotation: {} }, infrastructure: { prefix: "unused" } })
+        .withModules([declaration])
+        .boot(),
     ).rejects.toThrow("suffix is required");
     expect(create).not.toHaveBeenCalled();
   });

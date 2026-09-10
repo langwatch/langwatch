@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HttpPollingPullerAdapter } from "../http-poller.service.ts";
 import { S3PollingPullerAdapter } from "../s3-puller.service.ts";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
-import { GovernanceObjectStoragePort } from "../../app/governance.infrastructure.ts";
+import { GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
+import { GovernanceObjectStore } from "../../app/governance.infrastructure.ts";
 
 const httpConfig = {
   adapter: "http_polling",
@@ -71,16 +71,16 @@ function event(id: string) {
   };
 }
 
-class FakeHttp implements GovernanceHttpPort {
+class FakeHttp implements GovernanceHttpClient {
   readonly calls: Array<{
     url: string;
-    init: Parameters<GovernanceHttpPort["fetch"]>[1];
+    init: Parameters<GovernanceHttpClient["fetch"]>[1];
   }> = [];
   readonly responses: Array<GovernanceHttpResponse | Error> = [];
 
   async fetch(
     url: string,
-    init: Parameters<GovernanceHttpPort["fetch"]>[1],
+    init: Parameters<GovernanceHttpClient["fetch"]>[1],
   ): Promise<GovernanceHttpResponse> {
     this.calls.push({ url, init });
     const next = this.responses.shift();
@@ -90,12 +90,12 @@ class FakeHttp implements GovernanceHttpPort {
   }
 }
 
-class FakeObjects implements GovernanceObjectStoragePort {
+class FakeObjects implements GovernanceObjectStore {
   readonly list = vi.fn(
-    async (_input: Parameters<GovernanceObjectStoragePort["list"]>[0]): Promise<string[]> => [],
+    async (_input: Parameters<GovernanceObjectStore["list"]>[0]): Promise<string[]> => [],
   );
   readonly readText = vi.fn(
-    async (_input: Parameters<GovernanceObjectStoragePort["readText"]>[0]) => "",
+    async (_input: Parameters<GovernanceObjectStore["readText"]>[0]) => "",
   );
 }
 

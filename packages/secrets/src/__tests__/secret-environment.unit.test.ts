@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ProcessRunnerPort, type ProcessResult } from "../process-runner.port.ts";
+import { ProcessRunner, type ProcessResult } from "../process-runner.port.ts";
 import {
   SecretEnvironmentService,
   secretResolutionSummary,
 } from "../secret-environment.service.ts";
 
-class CountingRunner extends ProcessRunnerPort {
+class CountingRunner extends ProcessRunner {
   runs = 0;
 
   run(): Promise<ProcessResult> {

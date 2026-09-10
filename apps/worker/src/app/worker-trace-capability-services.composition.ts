@@ -1,4 +1,4 @@
-import type { DataPrivacyResolutionPort } from "@langwatch/data-privacy-server";
+import type { DataPrivacyResolution } from "@langwatch/data-privacy-server";
 import {
   PostgresModelCostCatalogAdapter,
   type ModelCostCatalogDatabase,
@@ -8,7 +8,7 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
   PrismaProjectRepository,
   ProjectMetadataService,
-  type ProjectDiagnosticsPort,
+  type ProjectDiagnostics,
   type ProjectMetadataDatabase,
 } from "@langwatch/project-server";
 
@@ -18,7 +18,7 @@ import {
  * the privacy resolution taken from the Data Privacy application it booted.
  *
  * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `RecordSpanCommand` and all fifteen subscribers — so nothing in this process
+ * `EventingRecordSpanAdapter` and all fifteen subscribers — so nothing in this process
  * reads a project or a policy yet. What has to be true today is that this
  * composition root CAN build all four from a database and nothing else. That
  * was the halt: the four staged record-time compositions each took a capability
@@ -43,7 +43,7 @@ import {
  *
  *     ProjectMetadataService        tryGetById, tryGetWithTeam, getWithTeam,
  *                                   updateMetadata, resolveOrgAdmin
- *     DataPrivacyResolutionPort     getResolvedForProject
+ *     DataPrivacyResolution     getResolvedForProject
  *     ModelCostCatalogService       listCosts
  *     MonitorApi                    getEnabledOnMessageMonitors
  *
@@ -66,13 +66,13 @@ export function createWorkerTraceCapabilityServices(options: {
    * that triggered it, so without this the only trace of a broken read is a
    * first-trace notification that silently never goes out.
    */
-  diagnostics?: ProjectDiagnosticsPort;
+  diagnostics?: ProjectDiagnostics;
   /**
    * The resolved privacy policy the record path redacts by. Taken rather than
    * built: the booted Data Privacy application is the one resolution this
    * process has, and a second would answer a different policy for one project.
    */
-  dataPrivacy: DataPrivacyResolutionPort;
+  dataPrivacy: DataPrivacyResolution;
   /**
    * The monitors enabled on every message. Taken rather than built: the ONE
    * monitor application this process installs answers the same listing the
@@ -109,7 +109,7 @@ export type WorkerTraceCapabilityDatabase = ProjectMetadataDatabase & ModelCostC
 /** The four read-side capability services, each the feature's own. */
 export type WorkerTraceCapabilityServices = Readonly<{
   projects: ProjectMetadataService;
-  dataPrivacy: DataPrivacyResolutionPort;
+  dataPrivacy: DataPrivacyResolution;
   modelCosts: ModelCostCatalogService;
   monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
 }>;

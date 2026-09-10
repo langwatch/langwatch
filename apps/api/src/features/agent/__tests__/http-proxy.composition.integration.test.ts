@@ -8,9 +8,9 @@ import {
   HttpWorkflowStudioStreamAdapter,
   WorkflowApp,
   WorkflowStudioDispatchService,
-  type WorkflowAgentMappingPort,
+  type WorkflowAgentMapping,
   type WorkflowRowRepository,
-  type WorkflowStudioDslPort, type WorkflowService,} from "@langwatch/workflow-server";
+  type WorkflowStudioDsl, type WorkflowService,} from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 
 const input: ExecuteWorkflowComponentInput = {
@@ -40,8 +40,8 @@ function workflowApp(studioDispatch?: WorkflowStudioDispatchService): WorkflowAp
       workflows: createApiFixture<WorkflowService>(),
       datasets: createApiFixture<DatasetService>(),
       evaluators: createApiFixture<EvaluatorApi>(),
-      studioDsl: createApiFixture<WorkflowStudioDslPort>(),
-      agentMappings: createApiFixture<WorkflowAgentMappingPort>(),
+      studioDsl: createApiFixture<WorkflowStudioDsl>(),
+      agentMappings: createApiFixture<WorkflowAgentMapping>(),
       workflowRows: createApiFixture<WorkflowRowRepository>(),
     },
     dependencies: {},

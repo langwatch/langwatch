@@ -4,9 +4,9 @@ import type Stripe from "stripe";
 import { type StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import { BestEffortService } from "./best-effort.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
-import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port.ts";
-import type { BillingWebhookOrganizationPort } from "../repositories/billing-webhook-organization.repository.ts";
-import type { BillingWebhookSubscriptionPort } from "../repositories/billing-webhook-subscription.repository.ts";
+import type { BillingWebhookHost } from "../ports/billing-webhook-host.port.ts";
+import type { BillingWebhookOrganization } from "../repositories/billing-webhook-organization.repository.ts";
+import type { BillingWebhookSubscription } from "../repositories/billing-webhook-subscription.repository.ts";
 import { BillingSubscriptionLifecycleService } from "./billing-subscription-lifecycle.service.ts";
 import {
   BillingCheckoutCompletionService,
@@ -71,8 +71,8 @@ export type WebhookService = {
 };
 
 export class EEWebhookService implements WebhookService {
-  private readonly subscriptionRepository: BillingWebhookSubscriptionPort;
-  private readonly organizationRepository: BillingWebhookOrganizationPort;
+  private readonly subscriptionRepository: BillingWebhookSubscription;
+  private readonly organizationRepository: BillingWebhookOrganization;
   private readonly stripe: Stripe;
   private readonly itemCalculator: ItemCalculator;
   private readonly inviteApprover?: InviteApprover;
@@ -80,7 +80,7 @@ export class EEWebhookService implements WebhookService {
   private readonly licensePaymentLinkId?: string;
   private readonly licensePrivateKey?: string;
   private readonly getPostHog?: () => PostHog | null;
-  private readonly host: BillingWebhookHostPort;
+  private readonly host: BillingWebhookHost;
   private readonly bestEffort = BestEffortService.create();
   private readonly lifecycle: BillingSubscriptionLifecycleService;
   private readonly checkout: BillingCheckoutCompletionService;
@@ -97,8 +97,8 @@ export class EEWebhookService implements WebhookService {
     getPostHog,
     host,
   }: {
-    subscriptionRepository: BillingWebhookSubscriptionPort;
-    organizationRepository: BillingWebhookOrganizationPort;
+    subscriptionRepository: BillingWebhookSubscription;
+    organizationRepository: BillingWebhookOrganization;
     stripe: Stripe;
     itemCalculator: ItemCalculator;
     inviteApprover?: InviteApprover;
@@ -106,7 +106,7 @@ export class EEWebhookService implements WebhookService {
     licensePaymentLinkId?: string;
     licensePrivateKey?: string;
     getPostHog?: () => PostHog | null;
-    host: BillingWebhookHostPort;
+    host: BillingWebhookHost;
   }) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
@@ -137,8 +137,8 @@ export class EEWebhookService implements WebhookService {
   }
 
   static create(options: {
-    subscriptionRepository: BillingWebhookSubscriptionPort;
-    organizationRepository: BillingWebhookOrganizationPort;
+    subscriptionRepository: BillingWebhookSubscription;
+    organizationRepository: BillingWebhookOrganization;
     stripe: Stripe;
     itemCalculator: ItemCalculator;
     inviteApprover?: InviteApprover;
@@ -146,7 +146,7 @@ export class EEWebhookService implements WebhookService {
     licensePaymentLinkId?: string;
     licensePrivateKey?: string;
     getPostHog?: () => PostHog | null;
-    host: BillingWebhookHostPort;
+    host: BillingWebhookHost;
   }): EEWebhookService {
     return new EEWebhookService(options);
   }

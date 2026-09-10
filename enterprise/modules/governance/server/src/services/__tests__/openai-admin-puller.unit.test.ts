@@ -11,9 +11,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
-import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts";
+import type { PulledUsageRateInput } from "../../app/governance.infrastructure.ts";
 import {
-  GovernanceHttpPort,
+  GovernanceHttpClient,
   type GovernanceHttpResponse,
 } from "../../app/governance.infrastructure.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
@@ -36,16 +36,16 @@ import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 import { Temporal } from "@langwatch/time";
 
-class StubHttp implements GovernanceHttpPort {
+class StubHttp implements GovernanceHttpClient {
   async fetch(
     url: string,
-    init: Parameters<GovernanceHttpPort["fetch"]>[1],
+    init: Parameters<GovernanceHttpClient["fetch"]>[1],
   ): Promise<GovernanceHttpResponse> {
     return fetchMock(url, init);
   }
 }
 
-class TestRatePort {
+class TestRate {
   rate(input: PulledUsageRateInput) {
     return {
       costNanoUsd: input.quantities.tokensInput + input.quantities.tokensOutput > 0 ? 1 : 0,
@@ -59,7 +59,7 @@ function makePuller(): OpenAiAdminPullerAdapter {
 }
 
 const usageRecords = PulledUsageRecordService.create(
-  PulledUsagePricingService.create(new TestRatePort()),
+  PulledUsagePricingService.create(new TestRate()),
 );
 const buildPulledUsageRecord = usageRecords.findBuilt.bind(usageRecords);
 

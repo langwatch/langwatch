@@ -6,11 +6,11 @@ import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
   EVAL_INPUTS_INLINE_MAX_BYTES,
   EVAL_INPUTS_PREVIEW_BYTES,
-  EvaluationExecutionPort,
-  EvaluationInputStoragePort,
+  EvaluationExecution,
+  EvaluationInputStorage,
   EvaluationInputsOffloadService,
-  type EvaluationInputsResolutionPort,
-  EvaluationRetentionFloorPort,
+  type EvaluationInputsResolution,
+  EvaluationRetentionFloor,
   type EvaluationClickHouseClient,
   type EvaluationClickHouseResolver,
 } from "@langwatch/evaluation-server";
@@ -21,18 +21,18 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
-  NlpPayloadStagingPort,
+  NlpPayloadStaging,
   StudioEventPreparerService,
   UnconfiguredWorkflowNlpRuntimeAdapter,
-  WorkflowIdPort,
-  WorkflowLlmParametersPort,
+  WorkflowId,
+  WorkflowLlmParameters,
   WorkflowNlpExecutionService,
   WorkflowProjectEnvironmentService,
   WorkflowService,
   workflowRepositories,
   type WorkflowEnvironmentDecryptor,
   type WorkflowLlmParameterResolution,
-  type WorkflowNlpRuntimePort,} from "@langwatch/workflow-server";
+  type WorkflowNlpRuntime,} from "@langwatch/workflow-server";
 import { instantiateRepositories } from "@langwatch/runtime-composition";
 import { nanoid } from "nanoid";
 import type { LLMConfig, WorkflowApi } from "@langwatch/workflow-contract";
@@ -53,23 +53,21 @@ export type WorkerEvaluationWorkflowCompositionInput = Readonly<{
   modelProviders: ModelProviderApi;
   secretDecryptor: WorkflowEnvironmentDecryptor;
   nlpServiceUrl: string | undefined;
-  payloadStaging: NlpPayloadStagingPort;
+  payloadStaging: NlpPayloadStaging;
 }>;
 
 export type WorkerEvaluationWorkflows = Readonly<{
   workflows: WorkflowService;
-  nlpRuntime: WorkflowNlpRuntimePort;
+  nlpRuntime: WorkflowNlpRuntime;
 }>;
 
 /** The worker's own workflow-id generator, over the same nanoid the module used. */
-class WorkerNanoidWorkflowIdPort extends WorkflowIdPort {
-  static create(): WorkerNanoidWorkflowIdPort {
-    return new WorkerNanoidWorkflowIdPort();
+class WorkerNanoidWorkflowId implements WorkflowId {
+  static create(): WorkerNanoidWorkflowId {
+    return new WorkerNanoidWorkflowId();
   }
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   next(): string {
     return nanoid();
@@ -106,7 +104,7 @@ export function createWorkerEvaluationWorkflows(
     projectEnvironment,
     llmParameters,
   });
-  const ids = WorkerNanoidWorkflowIdPort.create();
+  const ids = WorkerNanoidWorkflowId.create();
   const workflows = WorkflowService.create({
     repository: repositories.workflows,
     datasets: input.datasets,
@@ -132,10 +130,10 @@ export function createWorkerEvaluationWorkflows(
 export function createWorkerEvaluationApp(input: {
   resolveClickHouseClient: EventingClickHouseClientResolver;
   defaultRetentionDays: number;
-  execution: EvaluationExecutionPort;
+  execution: EvaluationExecution;
   workflows: WorkflowApi;
   traces: TraceApi;
-  inputResolution: EvaluationInputsResolutionPort;
+  inputResolution: EvaluationInputsResolution;
   resources: ResourceOwnership;
 }): WorkerEvaluationAppComposition {
   return {
@@ -205,7 +203,7 @@ function numericClickHouseSettings(
   );
 }
 
-class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloorPort {
+class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloor {
   static create(defaultRetentionDays: number): WorkerEvaluationRetentionFloor {
     return new WorkerEvaluationRetentionFloor(defaultRetentionDays);
   }
@@ -223,7 +221,7 @@ class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloorPort {
 }
 
 /** Persists evaluation input blobs under the same tenant-routed object store as trace blobs. */
-class WorkerEvaluationInputStorage extends EvaluationInputStoragePort {
+class WorkerEvaluationInputStorage extends EvaluationInputStorage {
   static create(input: {
     runtime: StoredObjectStorageRuntimeAdapter;
     aws: AwsClientProcessRuntime;
@@ -287,7 +285,7 @@ class WorkerEvaluationInputStorage extends EvaluationInputStoragePort {
   }
 }
 
-class WorkerEvaluationWorkflowLlmParameters extends WorkflowLlmParametersPort {
+class WorkerEvaluationWorkflowLlmParameters implements WorkflowLlmParameters {
   static create(input: {
     modelProviders: ModelProviderApi;
   }): WorkerEvaluationWorkflowLlmParameters {
@@ -297,7 +295,6 @@ class WorkerEvaluationWorkflowLlmParameters extends WorkflowLlmParametersPort {
   #modelProviders: ModelProviderApi;
 
   private constructor(modelProviders: ModelProviderApi) {
-    super();
     this.#modelProviders = modelProviders;
   }
 

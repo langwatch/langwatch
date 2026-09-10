@@ -1,7 +1,7 @@
 import process from "node:process";
 import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
 import { processFailureLine } from "@langwatch/observability";
-import { ApiBootFailurePort, startApiExecutable } from "../api.executable.ts";
+import { ApiBootFailure, startApiExecutable } from "../api.executable.ts";
 import type { ApiRuntimeBootstrap } from "../api.main.ts";
 import type { ApiShutdownSignal, ApiSignalHost } from "../api.signal-handlers.ts";
 import type { ApiProductionCompositionOptions } from "./api-production.composition.ts";
@@ -90,7 +90,7 @@ export async function startStandaloneApi(
  * the operator must be able to read what was wrong without decoding a raw
  * unhandled rejection.
  */
-export class WrittenApiBootFailure extends ApiBootFailurePort {
+export class WrittenApiBootFailure extends ApiBootFailure {
   static create(host: Pick<ApiExecutableHost, "write">): WrittenApiBootFailure {
     return new WrittenApiBootFailure(host);
   }

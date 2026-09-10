@@ -16,11 +16,11 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
-  IngestionKeyIssuerPort,
+  IngestionKeyIssuer,
   IngestionKeyRepository,
   type StoredIngestionKey,
   type StoredIngestionKeyOwnership,
-} from "../../ports/ingestion-source-key.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { IngestionKeyService } from "../ingestion-source-key.service.ts";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
@@ -83,7 +83,7 @@ class KeyLedger {
   }
 }
 
-class LedgerRepository extends IngestionKeyRepository {
+class LedgerRepository implements IngestionKeyRepository {
   constructor(private readonly ledger: KeyLedger) {
     super();
   }
@@ -101,7 +101,7 @@ class LedgerRepository extends IngestionKeyRepository {
   }
 }
 
-class LedgerIssuer extends IngestionKeyIssuerPort {
+class LedgerIssuer implements IngestionKeyIssuer {
   constructor(private readonly ledger: KeyLedger) {
     super();
   }

@@ -6,9 +6,9 @@ import {
   BillingSubscriptionService,
   SeatEventSubscriptionService,
   RECENT_INVOICES_LIMIT,
-  type BillingSubscriptionPort,
-  type BillingOrganizationPort,
-  type BillingSubscriptionNotifierPort,
+  type BillingSubscription,
+  type BillingOrganization,
+  type BillingSubscriptionNotifier,
   type SubscriptionItemCalculatorService,
 } from "../index.ts";
 
@@ -36,7 +36,7 @@ const createMockStripe = () => ({
 });
 
 const createMockRepository = (): {
-  [K in keyof BillingSubscriptionPort]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingSubscription]: ReturnType<typeof vi.fn>;
 } => ({
   tryFindActive: vi.fn(),
   tryFindLastNonCancelled: vi.fn(),
@@ -60,7 +60,7 @@ const createMockItemCalculator = () => ({
 });
 
 const createMockOrganizationRepository = (): {
-  [K in keyof BillingOrganizationPort]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingOrganization]: ReturnType<typeof vi.fn>;
 } => ({
   tryGetPricingModel: vi.fn(),
   tryGetStripeCustomerId: vi.fn(),
@@ -68,7 +68,7 @@ const createMockOrganizationRepository = (): {
   tryFindFirstTeamId: vi.fn(),
 });
 
-const createMockNotifier = (): BillingSubscriptionNotifierPort => ({
+const createMockNotifier = (): BillingSubscriptionNotifier => ({
   send: mockSendSlackSubscriptionEvent,
 });
 
@@ -94,8 +94,8 @@ const createServiceWithSeatEventFns = ({
   seatEventService: ReturnType<typeof createMockSeatEventService>;
 }) =>
   BillingSubscriptionService.create({
-    repository: repository as unknown as BillingSubscriptionPort,
-    organizationRepository: orgRepo as unknown as BillingOrganizationPort,
+    repository: repository as unknown as BillingSubscription,
+    organizationRepository: orgRepo as unknown as BillingOrganization,
     stripe: stripeInstance as unknown as Stripe,
     itemCalculator: calc as unknown as SubscriptionItemCalculatorService,
     seatEventService,
@@ -114,9 +114,9 @@ describe("BillingSubscriptionService", () => {
     /** @scenario "New class implements the same interface as old factory" */
     it("implements the SubscriptionService app-layer interface", () => {
       const localService = BillingSubscriptionService.create({
-        repository: createMockRepository() as unknown as BillingSubscriptionPort,
+        repository: createMockRepository() as unknown as BillingSubscription,
         organizationRepository:
-          createMockOrganizationRepository() as unknown as BillingOrganizationPort,
+          createMockOrganizationRepository() as unknown as BillingOrganization,
         stripe: createMockStripe() as unknown as Stripe,
         itemCalculator: createMockItemCalculator() as unknown as SubscriptionItemCalculatorService,
         notifier: createMockNotifier(),
@@ -138,8 +138,8 @@ describe("BillingSubscriptionService", () => {
     itemCalculator = createMockItemCalculator();
     organizationRepository = createMockOrganizationRepository();
     service = BillingSubscriptionService.create({
-      repository: repository as unknown as BillingSubscriptionPort,
-      organizationRepository: organizationRepository as unknown as BillingOrganizationPort,
+      repository: repository as unknown as BillingSubscription,
+      organizationRepository: organizationRepository as unknown as BillingOrganization,
       stripe: stripe as unknown as Stripe,
       itemCalculator: itemCalculator as unknown as SubscriptionItemCalculatorService,
       notifier: createMockNotifier(),

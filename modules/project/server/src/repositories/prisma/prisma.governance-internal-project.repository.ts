@@ -3,7 +3,7 @@ import { ProjectCredentialsAdapter } from "../../adapters/project-credentials.ad
 import { PrismaProjectRepository } from "./prisma.project.repository.ts";
 import {
   GovernanceInternalProjectService,
-  ProjectOldestTeamPort,
+  ProjectOldestTeam,
 } from "../../services/governance-internal-project.service.ts";
 
 /**
@@ -23,13 +23,13 @@ import {
 export class PrismaGovernanceInternalProjectRepository {
   static create(options: {
     database: PrismaClient;
-    teams: ProjectOldestTeamPort;
+    teams: ProjectOldestTeam;
   }): PrismaGovernanceInternalProjectRepository {
     return new PrismaGovernanceInternalProjectRepository(options);
   }
 
   private constructor(
-    private readonly options: { database: PrismaClient; teams: ProjectOldestTeamPort },
+    private readonly options: { database: PrismaClient; teams: ProjectOldestTeam },
   ) {}
 
   build(): GovernanceInternalProjectService {

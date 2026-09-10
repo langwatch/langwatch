@@ -9,7 +9,7 @@ import type {
   StudioWorkflow,
   WorkflowRunOrigin,
 } from "@langwatch/workflow-contract";
-import type { WorkflowStudioStreamPort } from "../ports/workflow.port.ts";
+import type { WorkflowStudioStream } from "../app/workflow.app.ts";
 import { WorkflowNlpExecutionService } from "./workflow-nlp-execution.service.ts";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -43,7 +43,7 @@ export type WorkflowStudioDispatchInput = Readonly<{
 
 export class WorkflowStudioDispatchService {
   static create(options: {
-    stream: WorkflowStudioStreamPort;
+    stream: WorkflowStudioStream;
     modelProviders: ModelProviderApi;
   }): WorkflowStudioDispatchService {
     return new WorkflowStudioDispatchService(options);
@@ -51,7 +51,7 @@ export class WorkflowStudioDispatchService {
 
   private constructor(
     private readonly options: {
-      stream: WorkflowStudioStreamPort;
+      stream: WorkflowStudioStream;
       modelProviders: ModelProviderApi;
     },
   ) {}

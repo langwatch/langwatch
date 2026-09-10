@@ -3,7 +3,7 @@ import { HttpRequest, HttpResponse, type HttpHandlerOptions } from "@smithy/core
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AwsClientConfiguration,
-  OutboundProxyResolverPort,
+  OutboundProxyResolver,
   staticCredentialsOrUndefined,
   type AwsClientConfigInput,
 } from "../aws-client.ts";
@@ -115,7 +115,7 @@ function handlerOptions(handler: unknown): HandlerOptions {
  * built from unset environment variables reaches the SDK as `{accessKeyId: "", secretAccessKey:
  * ""}`, which the SDK treats as a real answer and stops looking with.
  */
-class RecordingProxyResolver extends OutboundProxyResolverPort {
+class RecordingProxyResolver extends OutboundProxyResolver {
   readonly hosts: string[] = [];
 
   constructor(private readonly proxyForHost: (hostname: string) => string | undefined) {

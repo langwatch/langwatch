@@ -6,7 +6,7 @@
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type {
-  AppRestManagementAuditPort,
+  AppRestManagementAudit,
   PlatformUrlBuilder,
   RestErrorHandler,
 } from "@langwatch/api/rest";
@@ -62,7 +62,7 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { PlatformHealthApi } from "@langwatch/platform-health-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
-import type { ApiHandlerManagedCredentialPort } from "./api-rest.runtime.ts";
+import type { ApiHandlerManagedCredential } from "./api-rest.runtime.ts";
 
 /**
  * The product services this process may or may not have composed. Each is a
@@ -178,7 +178,7 @@ export type ApiRestPorts = Readonly<{
    * Resolves a project API key and enforces one permission as a key ceiling,
    * answering the legacy refusal bodies the handler-managed families publish.
    */
-  handlerManagedCredential: ApiHandlerManagedCredentialPort;
+  handlerManagedCredential: ApiHandlerManagedCredential;
   /**
    * The process's own error envelope, which a family that names none of its
    * own answers every refusal in.

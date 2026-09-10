@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { createHash } from "node:crypto";
-import type { EvaluationClickHouseResolver } from "../../ports/evaluation.port.ts";
+import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 
 /** A moment as a ClickHouse statement carries it. The client serialises this into
  *  `DateTime64(3)`; an instant serialises to `{}`, so the conversion is here. */

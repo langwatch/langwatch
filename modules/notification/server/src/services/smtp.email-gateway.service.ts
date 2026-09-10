@@ -3,7 +3,7 @@ import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import {
   type EmailContent,
-  EmailGatewayPort,
+  EmailGateway,
   EmailProviderConfigurationError,
   type MailerConfiguration,
 } from "./email-gateway.service.ts";
@@ -23,7 +23,7 @@ const SMTP_TIMEOUTS = {
 } as const;
 
 /** A process-owned SMTP connection pool, reused across notification deliveries. */
-export class SmtpEmailGatewayAdapter extends EmailGatewayPort {
+export class SmtpEmailGatewayAdapter extends EmailGateway {
   static create(configuration: MailerConfiguration["smtp"]): SmtpEmailGatewayAdapter {
     return new SmtpEmailGatewayAdapter(configuration);
   }
@@ -92,10 +92,10 @@ export class SmtpEmailGatewayAdapter extends EmailGatewayPort {
       SmtpEmailGatewayAdapter.buildTransportOptions(this.configuration),
     ));
 
-    const bccAddresses = EmailGatewayPort.recipients(content.bcc);
+    const bccAddresses = EmailGateway.recipients(content.bcc);
     const sanitizedHeaders = this.mime.trySanitizeHeaders(content.headers);
     const from = content.from ?? defaultFrom;
-    const toAddresses = EmailGatewayPort.recipients(content.to);
+    const toAddresses = EmailGateway.recipients(content.to);
 
     try {
       // Blind addresses go only into the SMTP envelope. nodemailer would also

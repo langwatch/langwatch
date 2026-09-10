@@ -11,7 +11,7 @@ import { createLogger } from "@langwatch/observability";
  * package's to resolve, and a shadow run that resolved them for itself would
  * be comparing two answers the live path never gave.
  */
-export abstract class SignInRouterShadowPort {
+export abstract class SignInRouterShadow {
   /** `IDENTITY_ROUTER_V2` as this deployment set it. */
   abstract mode(): SignInRouterMode;
 
@@ -107,7 +107,7 @@ export async function runSignInRouterShadow({
   pathname: string;
   url: string;
   body: unknown;
-  shadow: SignInRouterShadowPort;
+  shadow: SignInRouterShadow;
 }): Promise<ShadowRun> {
   if (shadow.mode() !== "shadow") return DID_NOT_RUN;
   if (!isSignInInitiationPath(pathname)) return DID_NOT_RUN;

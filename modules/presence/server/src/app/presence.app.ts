@@ -12,20 +12,41 @@ import {
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
-import type {
-  PresenceBroadcastPort,
-  PresenceDiagnosticsPort,
-  PresenceEmitterPort,
-} from "../ports/presence.port.ts";
+import type { EventEmitter } from "node:events";
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";
 import { PresenceService } from "../services/presence.service.ts";
 import { PresenceStreamService } from "../services/presence-stream.service.ts";
 
+export interface PresenceBroadcast {
+  publish(input: {
+    projectId: string;
+    event: string;
+    channel: "presence_updated" | "presence_cursor";
+    rateLimited: boolean;
+  }): Promise<void>;
+}
+
+export interface PresenceDiagnostics {
+  warn(message: string, context: Record<string, unknown>): void;
+}
+
+/**
+ * The read side of the broadcast fabric: a per-tenant emitter a subscriber
+ * listens on, and the release the subscriber owes when it disconnects. Kept
+ * apart from {@link PresenceBroadcast} because publishing and subscribing
+ * are wired by different callers — the service publishes, the transport
+ * subscribes.
+ */
+export interface PresenceEmitter {
+  getTenantEmitter(tenantId: string): EventEmitter;
+  cleanupTenantEmitter(tenantId: string): void;
+}
+
 /** The tenant fan-out the process owns, and the sink its warnings go to. */
 export type PresenceInfrastructure = Readonly<{
-  broadcast: PresenceBroadcastPort;
-  emitters: PresenceEmitterPort;
-  diagnostics: PresenceDiagnosticsPort;
+  broadcast: PresenceBroadcast;
+  emitters: PresenceEmitter;
+  diagnostics: PresenceDiagnostics;
 }>;
 
 type PresenceSetup = FeatureSetup<

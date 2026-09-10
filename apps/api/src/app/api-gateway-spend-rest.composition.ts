@@ -25,7 +25,7 @@ import type { ApiGatewayComposition } from "./api-gateway.composition.ts";
 /**
  * The Enterprise webhook platform, as the replay route reads it.
  */
-export type ApiGatewaySpendWebhookPort = Readonly<{
+export type ApiGatewaySpendWebhook = Readonly<{
   webhooks: WebhookApi;
   eventsAvailable: boolean;
   delivery: GatewaySpendWebhookDelivery | undefined;
@@ -41,7 +41,7 @@ export type ApiGatewaySpendRestOptions = Readonly<{
   /** How long after a request an outcome may still arrive, in milliseconds. */
   settlementGraceMs: number;
   /** The Enterprise webhook platform, where this process composed one. */
-  webhooks?: ApiGatewaySpendWebhookPort | undefined;
+  webhooks?: ApiGatewaySpendWebhook | undefined;
 }>;
 
 export type ApiGatewaySpendRestComposition = Readonly<{

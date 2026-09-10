@@ -1,7 +1,7 @@
-import { BillingOrganizationPort } from "../ports/organization.port.ts";
+import { BillingOrganization } from "../ports/organization.port.ts";
 
 /** Answers every organization read as absent where no directory is composed. */
-export class NullBillingOrganizationAdapter extends BillingOrganizationPort {
+export class NullBillingOrganizationAdapter extends BillingOrganization {
   private constructor() {
     super();
   }

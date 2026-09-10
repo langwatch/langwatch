@@ -6,7 +6,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { toDate, type Instant } from "@langwatch/time";
 
-import type { DatasetRow } from "../../ports/dataset.port.ts";
+import type { DatasetRow } from "../dataset.repository.ts";
 import type {
   DatasetCreateInput,
   DatasetRepository,

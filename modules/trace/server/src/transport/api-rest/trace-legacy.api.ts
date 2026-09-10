@@ -40,7 +40,7 @@ export type TraceLegacyCredentialPort = (input: {
 }) => Promise<TraceLegacyCredential>;
 
 /** The trace reads these five routes answer from. */
-export interface TraceLegacyReadsPort {
+export interface TraceLegacyReads {
   readTrace(
     input: Readonly<{ projectId: string; traceId: string; protections: unknown }>,
   ): Promise<Trace | undefined>;
@@ -60,7 +60,7 @@ export interface TraceLegacyReadsPort {
 }
 
 /** The public-link ledger the share pair writes to. */
-export interface TraceLegacySharePort {
+export interface TraceLegacyShare {
   createShare(
     input: Readonly<{ projectId: string; resourceType: "TRACE"; resourceId: string }>,
   ): Promise<Readonly<{ id: string }>>;
@@ -73,9 +73,9 @@ export interface TraceLegacySharePort {
 export interface TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw> {
   credential: TraceLegacyCredentialPort;
   /** The reads. Resolved per request, never constructed at mount. */
-  traces(): TraceLegacyReadsPort;
+  traces(): TraceLegacyReads;
   /** The share ledger, resolved the same way. */
-  shares(): TraceLegacySharePort;
+  shares(): TraceLegacyShare;
   /**
    * The API KEY caller's read-time redactions for one project. Same resolution the v1 family uses — a key is not a person, so content categories resolve as they do for a caller with no session, and costs are visible because a project key carries full project access.
    */

@@ -17,7 +17,7 @@ import {
 
 import { TraceCollectorSpanService } from "#services/span/trace-collector-span.service";
 
-import type { CollectorEvaluationReportPort, CollectorSpanIngestPort } from "./collector.api.ts";
+import type { CollectorEvaluationReport, CollectorSpanIngest } from "./collector.api.ts";
 import type { CollectorMetadata } from "./collector-body.api.ts";
 
 const logger = createLogger("langwatch.collector");
@@ -95,7 +95,7 @@ async function fanOutSpans(
     projectId: string;
     metadata: CollectorMetadata;
     expectedOutput: string | null | undefined;
-    ingestSpan: CollectorSpanIngestPort;
+    ingestSpan: CollectorSpanIngest;
   }>,
 ): Promise<string[]> {
   const resource = TraceCollectorSpanService.buildResource({
@@ -131,7 +131,7 @@ export async function dispatchSpans(
     droppedOldSpans: number;
     metadata: CollectorMetadata;
     expectedOutput: string | null | undefined;
-    ingestSpan: CollectorSpanIngestPort;
+    ingestSpan: CollectorSpanIngest;
   }>,
 ): Promise<SpanDispatchOutcome> {
   const { projectId, traceId, droppedOldSpans } = input;
@@ -187,7 +187,7 @@ async function reportOneEvaluation(
     traceId: string;
     occurredAt: number;
     deriveEvaluatorId: (name: string) => string;
-    reportEvaluation: CollectorEvaluationReportPort;
+    reportEvaluation: CollectorEvaluationReport;
   }>,
 ): Promise<void> {
   const { projectId, traceId } = input;
@@ -234,7 +234,7 @@ export async function dispatchEvaluations(
     projectId: string;
     traceId: string;
     deriveEvaluatorId: (name: string) => string;
-    reportEvaluation?: CollectorEvaluationReportPort | undefined;
+    reportEvaluation?: CollectorEvaluationReport | undefined;
   }>,
 ): Promise<EvaluationDispatchOutcome> {
   const { projectId, traceId, reportEvaluation } = input;

@@ -5,7 +5,7 @@ import type { TraceTokenCounter } from "../app/trace.infrastructure.ts";
 import { OtlpSpanTokenEstimationService } from "./span/span-token-estimation.service.ts";
 
 /**
- * Renames the estimator onto the narrow port `RecordSpanCommand` names.
+ * Renames the estimator onto the narrow port `EventingRecordSpanAdapter` names.
  *
  * The service is not a subclass of the port and must not become one: it takes a
  * named-argument object and the port takes positional arguments, and the port

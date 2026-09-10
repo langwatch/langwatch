@@ -35,19 +35,19 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type {
-  EvaluationClickHouseResolver,
-  EvaluationExecutionPort,
-  EvaluationInputsResolutionPort,
-  EvaluationRetentionFloorPort,
-} from "../ports/evaluation.port.ts";
+  EvaluationExecution,
+  EvaluationInputsResolution,
+  EvaluationRetentionFloor,
+} from "./evaluation.infrastructure.ts";
+import type { EvaluationClickHouseResolver } from "../repositories/clickhouse/evaluation-clickhouse-client.ts";
 import type {
-  EvaluationCustomEvaluatorsPort,
-  EvaluationInstallEnvironmentPort,
-  EvaluationReportPort,
-  EvaluationRescorePort,
-  EvaluationRunAnalyticsPort,
+  EvaluationCustomEvaluators,
+  EvaluationInstallEnvironment,
+  EvaluationReport,
+  EvaluationRescore,
+  EvaluationRunAnalytics,
   EvaluationWarmupPort,
-} from "../ports/evaluation-rescore.port.ts";
+} from "../app/evaluation.infrastructure.ts";
 import { ClickHouseEvaluationRepository } from "../repositories/clickhouse/evaluation.repository.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
@@ -62,15 +62,15 @@ import { EvaluationService } from "../services/evaluation.service.ts";
 
 export type EvaluationInfrastructure = Readonly<{
   resolveClickHouse: EvaluationClickHouseResolver;
-  retentionFloor: EvaluationRetentionFloorPort;
-  execution: EvaluationExecutionPort;
-  inputResolution: EvaluationInputsResolutionPort;
-  environment: EvaluationInstallEnvironmentPort;
-  customEvaluators: EvaluationCustomEvaluatorsPort;
-  rescore: EvaluationRescorePort;
+  retentionFloor: EvaluationRetentionFloor;
+  execution: EvaluationExecution;
+  inputResolution: EvaluationInputsResolution;
+  environment: EvaluationInstallEnvironment;
+  customEvaluators: EvaluationCustomEvaluators;
+  rescore: EvaluationRescore;
   warmup: EvaluationWarmupPort;
-  analytics: EvaluationRunAnalyticsPort;
-  report: EvaluationReportPort;
+  analytics: EvaluationRunAnalytics;
+  report: EvaluationReport;
   // What the public evaluation doors reach beyond the module: the experiment
   // an SDK batch is written into, the rows a slug names, the saved-evaluator
   // directory, the model cascade, the cost ledger and the evaluator runtime.
@@ -153,12 +153,12 @@ export class EvaluationApp implements EvaluationApiContract {
 
   readonly #service: EvaluationService;
   readonly #modelProviders: ModelProviderApi;
-  readonly #environment: EvaluationInstallEnvironmentPort;
-  readonly #customEvaluators: EvaluationCustomEvaluatorsPort;
-  readonly #rescore: EvaluationRescorePort;
+  readonly #environment: EvaluationInstallEnvironment;
+  readonly #customEvaluators: EvaluationCustomEvaluators;
+  readonly #rescore: EvaluationRescore;
   readonly #warmup: EvaluationWarmupPort;
-  readonly #analytics: EvaluationRunAnalyticsPort;
-  readonly #report: EvaluationReportPort;
+  readonly #analytics: EvaluationRunAnalytics;
+  readonly #report: EvaluationReport;
   readonly #batchLog: EvaluationBatchLogService;
   readonly #autoslug: EvaluationNameAutoslugService;
   readonly #experiments: EvaluationExperimentDirectory;

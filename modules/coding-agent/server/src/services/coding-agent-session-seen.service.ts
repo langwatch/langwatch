@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
-import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port.ts";
-import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
+import type { CodingAgentProjectActivity } from "../app/coding-agent.infrastructure.ts";
+import type { CodingAgentClock } from "../app/coding-agent.infrastructure.ts";
 
 const logger = createLogger("langwatch:coding-agent-processing:session-seen-touch");
 export const CODING_AGENT_SESSION_SEEN_WINDOW_MS = 5 * 60 * 1000;
@@ -12,13 +12,13 @@ export class CodingAgentSessionSeenService {
   private readonly heldUntil = new Map<string, number>();
 
   private constructor(
-    private readonly projects: CodingAgentProjectActivityPort,
-    private readonly clock: CodingAgentClockPort,
+    private readonly projects: CodingAgentProjectActivity,
+    private readonly clock: CodingAgentClock,
   ) {}
 
   static create(input: {
-    projects: CodingAgentProjectActivityPort;
-    clock: CodingAgentClockPort;
+    projects: CodingAgentProjectActivity;
+    clock: CodingAgentClock;
   }): CodingAgentSessionSeenService {
     return new CodingAgentSessionSeenService(input.projects, input.clock);
   }

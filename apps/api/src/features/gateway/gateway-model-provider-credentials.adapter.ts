@@ -1,14 +1,14 @@
-import { GatewayModelProviderCredentialsPort } from "@langwatch/gateway-server";
+import { GatewayModelProviderCredentials } from "@langwatch/gateway-server";
 import { EncryptedModelProviderCredentialAdapter } from "@langwatch/model-provider-server";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 
 /** Reads gateway provider keys through the model-provider feature's cipher. */
-export class ApiGatewayModelProviderCredentials extends GatewayModelProviderCredentialsPort {
-  static create(encryption: SecretEncryptionPort): ApiGatewayModelProviderCredentials {
+export class ApiGatewayModelProviderCredentials extends GatewayModelProviderCredentials {
+  static create(encryption: SecretEncryption): ApiGatewayModelProviderCredentials {
     return new ApiGatewayModelProviderCredentials(encryption);
   }
 
-  private constructor(private readonly encryption: SecretEncryptionPort) {
+  private constructor(private readonly encryption: SecretEncryption) {
     super();
   }
 

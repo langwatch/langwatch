@@ -20,7 +20,7 @@
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpPollingPullerAdapter } from "../http-poller.service.ts";
-import { TestHttpPort, createWorkerService } from "../../__tests__/support/puller-test-ports.ts";
+import { TestHttp, createWorkerService } from "../../__tests__/support/puller-test-ports.ts";
 
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();
@@ -42,7 +42,7 @@ afterEach(() => vi.clearAllMocks());
 async function runIngestionPull(input: { sourceId: string; cursor: string | null }) {
   const source = await sourceFindUnique(input.sourceId);
   const adapter = HttpPollingPullerAdapter.create({
-    http: new TestHttpPort(async (url, init) => {
+    http: new TestHttp(async (url, init) => {
       const response = await fetchStub(url, init);
       return {
         ok: response.ok,

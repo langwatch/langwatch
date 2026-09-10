@@ -1,17 +1,17 @@
 import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import {
-  BetterAuthAnnouncementsPort,
-  BetterAuthFederationPort,
-  BetterAuthIdentityCeremoniesPort,
-  BetterAuthPendingInvitePort,
-  BetterAuthStoragePort,
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+  BetterAuthIdentityCeremonies,
+  BetterAuthPendingInvite,
+  BetterAuthStorage,
   createBetterAuthTransport,
   isEmailPasswordEnabled,
   PrismaBetterAuthHooksRepository,
-  SignInRouterShadowPort,
+  SignInRouterShadow,
   type BetterAuthAccountRow,
   type PendingOrganizationInvite,
-  type SignUpVerificationPort,
+  type SignUpVerification,
 } from "@langwatch/auth-server";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
@@ -35,7 +35,7 @@ import {
   SignInMethodPolicyService,
 } from "@langwatch/identity-server";
 import { BetterAuthIdentityBirthAdapter } from "@langwatch/identity-server/adapters/better-auth-identity-birth";
-import type { IdentityEventingPort } from "@langwatch/identity-server";
+import type { IdentityEventing } from "@langwatch/identity-server";
 import { PrismaSystemMigrationStateRepository } from "@langwatch/ops-server";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -54,7 +54,7 @@ import type { ApiMailComposition } from "./api-mail.composition.ts";
  * Better Auth's storage engine: the stock Prisma adapter over this process's own guarded
  * client.
  */
-export class ApiPrismaBetterAuthStorage extends BetterAuthStoragePort {
+export class ApiPrismaBetterAuthStorage extends BetterAuthStorage {
   static create(database: PrismaClient): ApiPrismaBetterAuthStorage {
     return new ApiPrismaBetterAuthStorage(database);
   }
@@ -71,7 +71,7 @@ export class ApiPrismaBetterAuthStorage extends BetterAuthStoragePort {
 /**
  * ADR-027's licence questions, answered from the licence this deployment holds.
  */
-export class ApiBetterAuthFederation extends BetterAuthFederationPort {
+export class ApiBetterAuthFederation extends BetterAuthFederation {
   private licensed: Promise<boolean> | null = null;
 
   static create(options: {
@@ -144,7 +144,7 @@ export class ApiBetterAuthFederation extends BetterAuthFederationPort {
  * ran: a user delete erases no identifier, an account write is not restated as an attach,
  * and its id is Better Auth's own.
  */
-export class AbsentApiBetterAuthIdentityCeremonies extends BetterAuthIdentityCeremoniesPort {
+export class AbsentApiBetterAuthIdentityCeremonies extends BetterAuthIdentityCeremonies {
   static create(): AbsentApiBetterAuthIdentityCeremonies {
     return new AbsentApiBetterAuthIdentityCeremonies();
   }
@@ -162,7 +162,7 @@ export class AbsentApiBetterAuthIdentityCeremonies extends BetterAuthIdentityCer
  * The pending-invitation lookup, absent. Answers "no pending invite", which sends an SSO
  * auto-join down its default membership path.
  */
-export class AbsentApiBetterAuthPendingInvites extends BetterAuthPendingInvitePort {
+export class AbsentApiBetterAuthPendingInvites extends BetterAuthPendingInvite {
   static create(logger: Logger): AbsentApiBetterAuthPendingInvites {
     return new AbsentApiBetterAuthPendingInvites(logger);
   }
@@ -190,7 +190,7 @@ export class AbsentApiBetterAuthPendingInvites extends BetterAuthPendingInvitePo
 /**
  * The announcements, over what this process actually holds.
  */
-export class LoggedApiBetterAuthAnnouncements extends BetterAuthAnnouncementsPort {
+export class LoggedApiBetterAuthAnnouncements extends BetterAuthAnnouncements {
   static create(logger: Logger): LoggedApiBetterAuthAnnouncements {
     return new LoggedApiBetterAuthAnnouncements(logger);
   }
@@ -227,7 +227,7 @@ export class LoggedApiBetterAuthAnnouncements extends BetterAuthAnnouncementsPor
  * before the comparison reads, computes or logs anything, so this absence costs exactly
  * what the flag being off costs.
  */
-export class OffApiSignInRouterShadow extends SignInRouterShadowPort {
+export class OffApiSignInRouterShadow extends SignInRouterShadow {
   static create(): OffApiSignInRouterShadow {
     return new OffApiSignInRouterShadow();
   }
@@ -252,14 +252,14 @@ export class OffApiSignInRouterShadow extends SignInRouterShadowPort {
 /**
  * Sends the password-reset link.
  */
-export abstract class ApiPasswordResetMailPort {
+export abstract class ApiPasswordResetMail {
   abstract sendResetPassword(input: { email: string; token: string }): Promise<void>;
 }
 
 /**
  * Password-reset mail, over this process's own gateway.
  */
-export class ApiComposedPasswordResetMail extends ApiPasswordResetMailPort {
+export class ApiComposedPasswordResetMail extends ApiPasswordResetMail {
   static create(mail: ApiMailComposition): ApiComposedPasswordResetMail {
     return new ApiComposedPasswordResetMail(mail);
   }
@@ -281,7 +281,7 @@ export class ApiComposedPasswordResetMail extends ApiPasswordResetMailPort {
  * Password-reset mail on a deployment that configured none. No longer a gap in this
  * process — {@link ApiComposedPasswordResetMail} is what a configured deployment gets.
  */
-export class UnconfiguredApiPasswordResetMail extends ApiPasswordResetMailPort {
+export class UnconfiguredApiPasswordResetMail extends ApiPasswordResetMail {
   static create(): UnconfiguredApiPasswordResetMail {
     return new UnconfiguredApiPasswordResetMail();
   }
@@ -299,7 +299,7 @@ export class UnconfiguredApiPasswordResetMail extends ApiPasswordResetMailPort {
  * Sign-up's address confirmation, absent. Reached only from the passkey sign-up ceremony,
  * and only when the passkey plugin is mounted.
  */
-export class AbsentApiSignUpVerification implements SignUpVerificationPort {
+export class AbsentApiSignUpVerification implements SignUpVerification {
   static create(logger: Logger): AbsentApiSignUpVerification {
     return new AbsentApiSignUpVerification(logger);
   }
@@ -346,7 +346,7 @@ export class UnavailableApiBetterAuthGrants {
 export class ApiBetterAuthIdentityBranch {
   static compose(options: {
     database: PrismaClient;
-    eventing: IdentityEventingPort;
+    eventing: IdentityEventing;
     identity: IdentityApi;
   }): ApiBetterAuthIdentityBranch {
     const { database, eventing } = options;
@@ -416,11 +416,11 @@ export class ApiBetterAuthIdentityBranch {
     private readonly ceremonies: IdentityCeremoniesAdapter,
   ) {}
 
-  storage(): BetterAuthStoragePort {
+  storage(): BetterAuthStorage {
     return ApiIdentityBetterAuthStorage.create(this.storageAdapter);
   }
 
-  identity(): BetterAuthIdentityCeremoniesPort {
+  identity(): BetterAuthIdentityCeremonies {
     return ApiIdentityBetterAuthCeremonies.create({
       bridge: this.bridge,
       ceremonies: this.ceremonies,
@@ -429,7 +429,7 @@ export class ApiBetterAuthIdentityBranch {
 }
 
 /** Better Auth's `database:` entry, as the identity storage adapter answers it. */
-export class ApiIdentityBetterAuthStorage extends BetterAuthStoragePort {
+export class ApiIdentityBetterAuthStorage extends BetterAuthStorage {
   static create(adapter: BetterAuthIdentityStorageAdapter): ApiIdentityBetterAuthStorage {
     return new ApiIdentityBetterAuthStorage(adapter);
   }
@@ -447,7 +447,7 @@ export class ApiIdentityBetterAuthStorage extends BetterAuthStoragePort {
  * The three `databaseHooks` ceremonies. The account pair goes through the bridge and the
  * user erasure does not: nothing else states an erasure, so there is nothing to defer to.
  */
-export class ApiIdentityBetterAuthCeremonies extends BetterAuthIdentityCeremoniesPort {
+export class ApiIdentityBetterAuthCeremonies extends BetterAuthIdentityCeremonies {
   static create(deps: {
     bridge: BetterAuthCeremonyBridgeAdapter;
     ceremonies: IdentityCeremoniesAdapter;
@@ -502,16 +502,16 @@ export type ApiBetterAuthCompositionOptions = Readonly<{
   /** The grant ledger an SSO domain auto-join writes its membership through. */
   authzGrants?: AuthzGrantsService | undefined;
   /** The gateway a password-reset link leaves through. */
-  mail?: ApiPasswordResetMailPort | undefined;
+  mail?: ApiPasswordResetMail | undefined;
   /** Sign-up's address confirmation, for the passkey ceremony. */
-  signUpVerification?: SignUpVerificationPort | undefined;
+  signUpVerification?: SignUpVerification | undefined;
   /**
    * The identity pipeline this process produces commands on. With it, Better Auth's
    * storage and its three account ceremonies are the identity branch (ADR-116); without
    * it there is nothing to append to, so the stock Prisma engine and the no-op ceremonies
    * stand in and this composition says so once at boot.
    */
-  identityEventing?: IdentityEventingPort | undefined;
+  identityEventing?: IdentityEventing | undefined;
   /** The identity app the identity branch's guards and address lock read. Required together with `identityEventing`. */
   identity?: IdentityApi | undefined;
   logger: Logger;

@@ -1,9 +1,9 @@
 import type {
-  IngestionPullMetricsPort,
-  IngestionPullOutcomePort,
+  IngestionPullMetricsSink,
+  IngestionPullOutcomeChannel,
   IngestionPullRun,
-  IngestionPullRunPort,
-} from "../ports/ingestion-pull.port.ts";
+  IngestionPullRunner,
+} from "../app/governance.infrastructure.ts";
 
 export const INGESTION_PULL_MAX_ATTEMPTS = 3;
 export const INGESTION_PULL_LEASE_DURATION_MS = 10 * 60 * 1000;
@@ -20,9 +20,9 @@ export class IngestionPullService {
   private readonly clock: () => number;
 
   private constructor(
-    private readonly runPort: IngestionPullRunPort,
-    private readonly outcomePort: IngestionPullOutcomePort,
-    private readonly metrics: IngestionPullMetricsPort,
+    private readonly runPort: IngestionPullRunner,
+    private readonly outcomePort: IngestionPullOutcomeChannel,
+    private readonly metrics: IngestionPullMetricsSink,
     options: { maxAttempts?: number; clock?: () => number } = {},
   ) {
     this.maxAttempts = options.maxAttempts ?? INGESTION_PULL_MAX_ATTEMPTS;
@@ -30,9 +30,9 @@ export class IngestionPullService {
   }
 
   static create(
-    runPort: IngestionPullRunPort,
-    outcomePort: IngestionPullOutcomePort,
-    metrics: IngestionPullMetricsPort,
+    runPort: IngestionPullRunner,
+    outcomePort: IngestionPullOutcomeChannel,
+    metrics: IngestionPullMetricsSink,
     options: { maxAttempts?: number; clock?: () => number } = {},
   ): IngestionPullService {
     return new IngestionPullService(runPort, outcomePort, metrics, options);
@@ -40,7 +40,7 @@ export class IngestionPullService {
 
   async execute(input: IngestionPullExecution): Promise<void> {
     const startedAt = this.clock();
-    let result: Awaited<ReturnType<IngestionPullRunPort["run"]>>;
+    let result: Awaited<ReturnType<IngestionPullRunner["run"]>>;
     try {
       result = await this.runPort.run({
         sourceId: input.pull.sourceId,

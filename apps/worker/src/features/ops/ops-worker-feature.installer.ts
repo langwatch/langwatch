@@ -1,7 +1,7 @@
-import type { OpsWorkerPort, StorageStatsCollectionService } from "@langwatch/ops-server";
+import type { OpsWorker, StorageStatsCollectionService } from "@langwatch/ops-server";
 import type {
   WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
+  WorkerFeatureInstaller,
 } from "../worker-feature.installer.ts";
 
 /**
@@ -9,9 +9,9 @@ import type {
  * they share a single condition — a process that owns them owns every one — and because each is a
  * timer rather than a routing key, so nothing about their order relative to a pipeline matters.
  */
-export class OpsWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class OpsWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
-    workers: OpsWorkerPort;
+    workers: OpsWorker;
     storageStats: StorageStatsCollectionService | undefined;
   }): OpsWorkerFeatureInstaller {
     return new OpsWorkerFeatureInstaller(options);
@@ -21,7 +21,7 @@ export class OpsWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
 
   private constructor(
     private readonly options: {
-      workers: OpsWorkerPort;
+      workers: OpsWorker;
       storageStats: StorageStatsCollectionService | undefined;
     },
   ) {}

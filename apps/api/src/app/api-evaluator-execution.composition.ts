@@ -10,12 +10,12 @@ import {
   EvaluatorConfigError,
 } from "@langwatch/evaluation-contract";
 import {
-  EvaluationAzureSafetyCredentialsPort,
+  EvaluationAzureSafetyCredentials,
   EvaluationExecutionService,
-  EvaluationModelEnvPort,
-  EvaluationSpanDigestPort,
-  EvaluationTraceReadPort,
-  EvaluationWorkflowExecutorPort,
+  EvaluationModelEnv,
+  EvaluationSpanDigest,
+  EvaluationTraceRead,
+  EvaluationWorkflowExecutor,
   HttpLangevalsEvaluatorAdapter,
   OtelEvaluationExecutionMetricsAdapter,
   type EvaluationRunOutcome,
@@ -72,7 +72,7 @@ export type ApiEvaluatorExecution = Readonly<{
 }>;
 
 /** Reports what this process could not compose, at boot rather than at a call. */
-export abstract class ApiEvaluatorExecutionAbsenceReportPort {
+export abstract class ApiEvaluatorExecutionAbsenceReport {
   /** No `LANGEVALS_ENDPOINT`: no evaluator runs on this process at all. */
   abstract withoutEvaluatorService(): void;
 }
@@ -83,7 +83,7 @@ export type ApiEvaluatorExecutionOptions = Readonly<{
    * thunk because the observability half composes AFTER the execution half that publishes
    * the evaluator service, and this runtime needs both.
    */
-  traceReads: () => EvaluationTraceReadPort | undefined;
+  traceReads: () => EvaluationTraceRead | undefined;
   /** The evaluator directory the studio publishes evaluators through. */
   evaluators: EvaluatorApi;
   /** The studio a custom (workflow) evaluator runs on. */
@@ -96,7 +96,7 @@ export type ApiEvaluatorExecutionOptions = Readonly<{
   environment?: Readonly<Record<string, string | undefined>>;
   /** Names this process in the log line an absence is reported under. */
   processName: string;
-  report?: ApiEvaluatorExecutionAbsenceReportPort;
+  report?: ApiEvaluatorExecutionAbsenceReport;
 }>;
 
 /**
@@ -218,40 +218,40 @@ function asRunOutcome(
  * The three legacy trace reads, resolved through the process's own stack when a read is
  * actually made.
  */
-class ApiEvaluationTraceReads extends EvaluationTraceReadPort {
+class ApiEvaluationTraceReads extends EvaluationTraceRead {
   static create(
-    resolve: () => EvaluationTraceReadPort | undefined,
+    resolve: () => EvaluationTraceRead | undefined,
     processName: string,
   ): ApiEvaluationTraceReads {
     return new ApiEvaluationTraceReads(resolve, processName);
   }
 
   private constructor(
-    private readonly resolve: () => EvaluationTraceReadPort | undefined,
+    private readonly resolve: () => EvaluationTraceRead | undefined,
     private readonly processName: string,
   ) {
     super();
   }
 
   getTracesWithSpans(
-    ...args: Parameters<EvaluationTraceReadPort["getTracesWithSpans"]>
-  ): ReturnType<EvaluationTraceReadPort["getTracesWithSpans"]> {
+    ...args: Parameters<EvaluationTraceRead["getTracesWithSpans"]>
+  ): ReturnType<EvaluationTraceRead["getTracesWithSpans"]> {
     return this.require().getTracesWithSpans(...args);
   }
 
   getEvaluationsMultiple(
-    ...args: Parameters<EvaluationTraceReadPort["getEvaluationsMultiple"]>
-  ): ReturnType<EvaluationTraceReadPort["getEvaluationsMultiple"]> {
+    ...args: Parameters<EvaluationTraceRead["getEvaluationsMultiple"]>
+  ): ReturnType<EvaluationTraceRead["getEvaluationsMultiple"]> {
     return this.require().getEvaluationsMultiple(...args);
   }
 
   getTracesWithSpansByThreadIds(
-    ...args: Parameters<EvaluationTraceReadPort["getTracesWithSpansByThreadIds"]>
-  ): ReturnType<EvaluationTraceReadPort["getTracesWithSpansByThreadIds"]> {
+    ...args: Parameters<EvaluationTraceRead["getTracesWithSpansByThreadIds"]>
+  ): ReturnType<EvaluationTraceRead["getTracesWithSpansByThreadIds"]> {
     return this.require().getTracesWithSpansByThreadIds(...args);
   }
 
-  private require(): EvaluationTraceReadPort {
+  private require(): EvaluationTraceRead {
     const reads = this.resolve();
     if (!reads) {
       throw new Error(
@@ -267,7 +267,7 @@ class ApiEvaluationTraceReads extends EvaluationTraceReadPort {
  * The trace package's own formatter, because the digest an evaluator is shown and the
  * digest a scenario judge is shown have to be the same text.
  */
-class ApiEvaluationSpanDigest extends EvaluationSpanDigestPort {
+class ApiEvaluationSpanDigest extends EvaluationSpanDigest {
   static create(): ApiEvaluationSpanDigest {
     return new ApiEvaluationSpanDigest();
   }
@@ -278,7 +278,7 @@ class ApiEvaluationSpanDigest extends EvaluationSpanDigestPort {
 }
 
 /** A custom (workflow) evaluator, run on the studio this process composed. */
-class ApiEvaluationWorkflowExecutor extends EvaluationWorkflowExecutorPort {
+class ApiEvaluationWorkflowExecutor extends EvaluationWorkflowExecutor {
   static create(workflows: WorkflowService): ApiEvaluationWorkflowExecutor {
     return new ApiEvaluationWorkflowExecutor(WorkflowEvaluationAdapter.create(workflows));
   }
@@ -310,7 +310,7 @@ class ApiEvaluationWorkflowExecutor extends EvaluationWorkflowExecutorPort {
  * The Azure Content Safety credentials, read off the project's own `azure_safety`
  * provider row.
  */
-export class ApiEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCredentialsPort {
+export class ApiEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCredentials {
   static create(modelProviders: ModelProviderApi): ApiEvaluationAzureSafetyCredentials {
     return new ApiEvaluationAzureSafetyCredentials(modelProviders);
   }
@@ -340,10 +340,10 @@ export class ApiEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCr
  * The environment an evaluator executes with, resolved from the project's own model
  * providers.
  */
-class ApiEvaluationModelEnv extends EvaluationModelEnvPort {
+class ApiEvaluationModelEnv extends EvaluationModelEnv {
   static create(deps: {
     modelProviders: ModelProviderApi;
-    azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
+    azureSafetyCredentials: EvaluationAzureSafetyCredentials;
     environment: Readonly<Record<string, string | undefined>>;
   }): ApiEvaluationModelEnv {
     return new ApiEvaluationModelEnv(deps);
@@ -352,7 +352,7 @@ class ApiEvaluationModelEnv extends EvaluationModelEnvPort {
   private constructor(
     private readonly deps: {
       modelProviders: ModelProviderApi;
-      azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
+      azureSafetyCredentials: EvaluationAzureSafetyCredentials;
       environment: Readonly<Record<string, string | undefined>>;
     },
   ) {
@@ -518,7 +518,7 @@ const GENERATION_PARAMS = [
 ] as const;
 
 /** Writes each absence down once, under this process's own logger name. */
-export class LoggedApiEvaluatorExecutionAbsence extends ApiEvaluatorExecutionAbsenceReportPort {
+export class LoggedApiEvaluatorExecutionAbsence extends ApiEvaluatorExecutionAbsenceReport {
   static create(logger: Pick<Logger, "info">): LoggedApiEvaluatorExecutionAbsence {
     return new LoggedApiEvaluatorExecutionAbsence(logger);
   }

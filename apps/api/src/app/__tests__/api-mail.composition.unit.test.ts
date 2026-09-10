@@ -1,4 +1,4 @@
-import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
+import { EmailDelivery, type EmailContent } from "@langwatch/notification-server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
 import { ApiComposedPasswordResetMail } from "../api-better-auth.composition.ts";
@@ -16,7 +16,7 @@ import { resolveApiConfig } from "../../platform/config/api.config.ts";
  * carrying the link they would click. A test that stopped at "the adapter
  * called something" would have passed against the refusing stub too.
  */
-class RecordingGateway extends EmailDeliveryPort {
+class RecordingGateway extends EmailDelivery {
   readonly sent: EmailContent[] = [];
 
   override defaultFrom(): string {
@@ -29,7 +29,7 @@ class RecordingGateway extends EmailDeliveryPort {
   }
 }
 
-function composedMail(gateway: EmailDeliveryPort): ApiMailComposition {
+function composedMail(gateway: EmailDelivery): ApiMailComposition {
   return { delivery: gateway, baseHost: "https://app.example.test" };
 }
 

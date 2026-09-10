@@ -1,6 +1,6 @@
 import { Ksuid, generate } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
-import { TraceClickHousePort, type TraceClickHouseClient } from "../../trace-clickhouse-client.repository.ts";
+import { TraceClickHouse, type TraceClickHouseClient } from "../../trace-clickhouse-client.repository.ts";
 import {
   ClickHouseTraceEventPayloadRepository,
   TraceEventPayloadFieldNotFoundError,
@@ -9,7 +9,7 @@ import {
 
 type Query = { query: string; query_params?: Record<string, unknown> };
 
-class RecordingClickHouse extends TraceClickHousePort {
+class RecordingClickHouse extends TraceClickHouse {
   readonly queries: Query[] = [];
   rows: unknown[] = [];
 

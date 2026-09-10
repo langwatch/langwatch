@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import type { DatasetStorage } from "../../ports/dataset-storage.port.ts";
+import type { DatasetStorage } from "../../app/dataset.app.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import { DatasetChunkService } from "../dataset-chunk.service.ts";
 import { type DatasetMutationRecord } from "../../rules/dataset-chunk-lines.rules.ts";

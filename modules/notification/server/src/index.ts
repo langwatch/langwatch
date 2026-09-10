@@ -9,8 +9,8 @@ export {
 export { SmtpEmailGatewayAdapter } from "./services/smtp.email-gateway.service.ts";
 export {
   EMAIL_PROVIDER_NAMES,
-  EmailDeliveryPort,
-  EmailGatewayPort,
+  EmailDelivery,
+  EmailGateway,
   EmailProviderConfigurationError,
   type EmailAttachment,
   type EmailContent,
@@ -23,8 +23,8 @@ export { EmailProviderService } from "./services/email-provider.service.ts";
 export { RedisTenantBroadcastRepository as RedisTenantBroadcastAdapter } from "./repositories/redis/redis.tenant-broadcast.repository.ts";
 export {
   TENANT_BROADCAST_EVENT_TYPES,
-  TenantBroadcastPort,
-  TenantBroadcastPublisherPort,
+  TenantBroadcast,
+  TenantBroadcastPublisher,
   type TenantBroadcastEventType,
   type TenantBroadcastMessage,
 } from "./repositories/tenant-broadcast.repository.ts";

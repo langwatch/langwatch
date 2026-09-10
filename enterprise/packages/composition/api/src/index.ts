@@ -8,22 +8,22 @@ import type { ScimService } from "@langwatch/enterprise-scim-contract";
 // reason.
 export {
   AppGatewayDebitAdapter,
-  AppGatewayGovernancePort,
-  GatewayGovernancePort,
+  AppGatewayGovernance,
+  GatewayGovernance,
   type GovernanceBudgetResolutionInput,
 } from "./governance/gateway-debit.adapter.ts";
 export {
   AppGovernanceSignalsService,
-  GovernanceSignalDeliveryPort,
-  GovernanceSignalStoragePort,
+  GovernanceSignalDelivery,
+  GovernanceSignalStorage,
 } from "./governance/governance-signals.adapter.ts";
 /**
  * How a personal key is minted: the Governance issuer port over the gateway's own virtual-key
  * writes.
  */
 export {
-  AppPersonalVirtualKeyIssuerPort,
-  type GovernanceVirtualKeyPort,
+  AppPersonalVirtualKeyIssuer,
+  type GovernanceVirtualKey,
 } from "./governance/governance-products.adapter.ts";
 /**
  * The governance REST family, reached through this composition rather than
@@ -71,7 +71,7 @@ export class EnterpriseApiComposition {
 export {
   scimServer,
   type ScimInfrastructure,
-  type ScimManagementAuditPort,
+  type ScimManagementAudit,
   type ScimPlanProvider,
 } from "@langwatch/enterprise-scim-server";
 /**
@@ -123,7 +123,7 @@ export { EnterpriseApiSso, type EnterpriseApiSsoPeers } from "./sso.composition.
 export {
   ssoConnectionTrpcTransport,
   SsoConnectionLedgerPort,
-  SsoGateLoggerPort,
+  SsoGateLogger,
   type SsoInfrastructure,
 } from "@langwatch/enterprise-sso-server";
 export {

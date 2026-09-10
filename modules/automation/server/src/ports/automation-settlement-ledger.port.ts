@@ -13,7 +13,7 @@ import type { Instant } from "@langwatch/time";
  * methods over report schedules, template test fires, unsubscribe views and the
  * automation CRUD — to reach these ten. A process that wanted to settle a match
  * therefore had to compose all of it or none, which is the same cycle
- * `AutomationGraphActivityPort` broke for the real-time graph path and it is
+ * `AutomationGraphActivity` broke for the real-time graph path and it is
  * broken here the same way: the published `AutomationService` satisfies this
  * port structurally, so the application passes exactly what it passed before,
  * while a background process composes the ten over its own repositories.
@@ -22,7 +22,7 @@ import type { Instant } from "@langwatch/time";
  * trigger catalogue and the per-recipient send claims, the daily persist
  * ceiling, and the webhook delivery log.
  */
-export abstract class AutomationSettlementLedgerPort {
+export abstract class AutomationSettlementLedger {
   /** The project's active trace automations, as the settled digest re-reads them. */
   abstract getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]>;
 
@@ -94,6 +94,6 @@ export type AutomationSettlementPersistCap =
   | { readonly kind: "fixed"; readonly cap: number }
   | { readonly kind: "resolved"; resolve(projectId: string): Promise<number> };
 
-export abstract class AutomationSettlementBreachPort {
+export abstract class AutomationSettlementBreach {
   abstract handle(input: AutomationPersistCapBreach): Promise<void>;
 }

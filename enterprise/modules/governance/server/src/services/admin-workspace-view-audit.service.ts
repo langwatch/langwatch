@@ -6,8 +6,8 @@ import {
   recordWorkspaceViewInputSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
-import type { AdminWorkspaceViewOcsfPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import type { AdminWorkspaceViewOcsfChannel } from "../app/governance.infrastructure.ts";
 import type { AdminWorkspaceViewAuditRepository } from "../repositories/audit/admin-workspace-view-audit.repository.ts";
 
 const skipped = (): RecordWorkspaceViewResult => ({
@@ -20,8 +20,8 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
     private readonly repository: AdminWorkspaceViewAuditRepository,
     private readonly options: {
       projects?: ProjectApi;
-      ocsf?: AdminWorkspaceViewOcsfPort;
-      diagnostics?: GovernanceDiagnosticsPort;
+      ocsf?: AdminWorkspaceViewOcsfChannel;
+      diagnostics?: GovernanceDiagnosticsSink;
       clock: () => number;
     },
   ) {}
@@ -29,8 +29,8 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
   static create(options: {
     repository: AdminWorkspaceViewAuditRepository;
     projects?: ProjectApi;
-    ocsf?: AdminWorkspaceViewOcsfPort;
-    diagnostics?: GovernanceDiagnosticsPort;
+    ocsf?: AdminWorkspaceViewOcsfChannel;
+    diagnostics?: GovernanceDiagnosticsSink;
     clock?: () => number;
   }): DefaultGovernanceAdminWorkspaceViewAuditService {
     return new DefaultGovernanceAdminWorkspaceViewAuditService(options.repository, {

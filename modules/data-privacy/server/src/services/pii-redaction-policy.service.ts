@@ -4,7 +4,7 @@
  */
 
 import type { PiiLevel, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyResolutionPort } from "../ports/data-privacy.port.ts";
+import type { DataPrivacyResolution } from "../app/data-privacy.infrastructure.ts";
 import type { TenantId } from "@langwatch/eventing";
 import { STRICT_ONLY_PII_ENTITIES } from "@langwatch/redaction";
 import {
@@ -12,7 +12,7 @@ import {
   compilePolicySecretPatterns,
   nativePiiEntitiesForPolicy,
 } from "@langwatch/redaction/pii";
-import { type PIICheckOptions, PiiAnalysisPort } from "../ports/pii-analysis.port.ts";
+import { type PIICheckOptions, PiiAnalysis } from "../app/data-privacy.infrastructure.ts";
 
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -38,7 +38,7 @@ export type BatchClearPIIFunction = (
  * Dependencies for OtlpSpanPiiRedactionService that can be injected for testing.
  */
 export interface OtlpSpanPiiRedactionServiceDependencies {
-  transport: PiiAnalysisPort;
+  transport: PiiAnalysis;
   isLangevalsConfigured: boolean;
   isProduction: boolean;
   nativePolicyEnforced: boolean;
@@ -49,7 +49,7 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
    * lazily defaulted to the process-wide service, so callers that never pass a
    * tenant (and most tests) don't need to provide it.
    */
-  dataPrivacy: DataPrivacyResolutionPort;
+  dataPrivacy: DataPrivacyResolution;
   featureFlags?: FeatureFlagApi;
 }
 
@@ -57,7 +57,7 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
  * Default batch PII clearing: uses Presidio batch API, falls back to individual Google DLP calls.
  */
 const runGoogleDlpBatch = (
-  transport: PiiAnalysisPort,
+  transport: PiiAnalysis,
   texts: string[],
   piiRedactionLevel: PIIRedactionLevel,
   exceptPatterns?: readonly string[],
@@ -73,7 +73,7 @@ const runGoogleDlpBatch = (
   );
 
 const batchClearPII = async (
-  transport: PiiAnalysisPort,
+  transport: PiiAnalysis,
   texts: string[],
   options: PIICheckOptions,
 ): Promise<(string | null)[]> => {

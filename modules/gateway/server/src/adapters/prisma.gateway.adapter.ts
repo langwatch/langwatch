@@ -1,9 +1,9 @@
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
-import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
-import type { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
+import type { GatewayAudit } from "../app/gateway.infrastructure.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
+import type { GatewayChangeEvents } from "../app/gateway.infrastructure.ts";
 import {
   PrismaGatewayBudgetRepository,
   type GatewayBudgetDatabase,
@@ -36,9 +36,9 @@ export class PrismaGatewayAdapter {
     projects: ProjectApi;
     evaluators: EvaluatorApi;
     monitors: MonitorApi;
-    changes: GatewayChangeEventsPort;
-    audit: GatewayAuditPort;
-    budgetSpend?: GatewayBudgetSpendPort;
+    changes: GatewayChangeEvents;
+    audit: GatewayAudit;
+    budgetSpend?: GatewayBudgetSpend;
   }): PrismaGatewayAdapter {
     const budgetRepository = PrismaGatewayBudgetRepository.create(
       options.database,

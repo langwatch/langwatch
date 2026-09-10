@@ -16,16 +16,16 @@ import {
   CodexOAuthModelProviderTokenRefresherAdapter,
   EncryptedModelProviderCredentialAdapter,
   HttpModelProviderCredentialProbeAdapter,
-  ModelProviderManagedGatewayPort,
-  ModelProviderRateLimitPort,
-  ModelTranslationPort,
+  ModelProviderManagedGateway,
+  ModelProviderRateLimit,
+  ModelTranslation,
   PostgresModelProviderAdapter,
   PrefixedModelProviderIdAdapter,
   RegistryModelProviderCatalogAdapter,
   SsrfModelProviderEgressAdapter,
   VercelAiModelTranslationAdapter,
   WindowedModelProviderConnectionRateLimiterAdapter,
-  type ModelProviderCredentialCipherPort,
+  type ModelProviderCredentialCipher,
   type ModelProviderCredentialCodec,
   type ModelProviderInfrastructure,
   type PostgresModelProviderAdapterOptions,
@@ -41,7 +41,7 @@ import { nowInstant } from "@langwatch/time";
 /**
  * Reports the two composition decisions the model gateway would otherwise hide.
  */
-export abstract class WorkerModelProviderAbsenceReportPort {
+export abstract class WorkerModelProviderAbsenceReport {
   /**
    * Why this process composed no gateway AT ALL, when it composed none.
    */
@@ -74,11 +74,11 @@ export type WorkerModelProviderCompositionOptions = Readonly<{
    * without one could not read a single stored credential, and every provider would look
    * configured-but-unusable.
    */
-  encryption: ModelProviderCredentialCipherPort;
+  encryption: ModelProviderCredentialCipher;
   config: WorkerConfig;
   /** The queue's own Redis, or nothing on a deployment that configured none. */
   redis?: RedisConnection | null;
-  absence?: WorkerModelProviderAbsenceReportPort;
+  absence?: WorkerModelProviderAbsenceReport;
 }>;
 
 /**
@@ -120,7 +120,7 @@ export function tryCreateWorkerModelProviders(
     WorkerModelProviderCompositionOptions,
     "encryption" | "projects" | "organizations" | "authorization"
   > & {
-    encryption: ModelProviderCredentialCipherPort | undefined;
+    encryption: ModelProviderCredentialCipher | undefined;
     tenancy: WorkerModelProviderTenancy | undefined;
   },
 ): WorkerModelProviders | undefined {
@@ -261,7 +261,7 @@ class WorkerManagedProviderConfigurationReporter extends ManagedProviderConfigur
  * narrow adapter rather than the service itself, because the model-provider package is not
  * Enterprise and may not name an Enterprise contract.
  */
-class WorkerManagedModelProviderGatewayAdapter extends ModelProviderManagedGatewayPort {
+class WorkerManagedModelProviderGatewayAdapter extends ModelProviderManagedGateway {
   static create(input: {
     service: ManagedProviderApi;
   }): WorkerManagedModelProviderGatewayAdapter {
@@ -294,7 +294,7 @@ class WorkerManagedModelProviderGatewayAdapter extends ModelProviderManagedGatew
 /**
  * The connection-test windows, counted where this process counts every other shared ceiling.
  */
-class WorkerModelProviderRateLimit extends ModelProviderRateLimitPort {
+class WorkerModelProviderRateLimit extends ModelProviderRateLimit {
   constructor(private readonly connection: RedisConnection) {
     super();
   }
@@ -326,7 +326,7 @@ class WorkerModelProviderRateLimit extends ModelProviderRateLimitPort {
 /**
  * The window a deployment with no Redis cannot count. It refuses rather than allowing.
  */
-class AbsentWorkerModelProviderRateLimit extends ModelProviderRateLimitPort {
+class AbsentWorkerModelProviderRateLimit extends ModelProviderRateLimit {
   consume(input: { key: string; windowSeconds: number; max: number }): Promise<never> {
     return Promise.reject(new WorkerConnectionWindowUnavailableError(input.key));
   }
@@ -348,7 +348,7 @@ export class WorkerConnectionWindowUnavailableError extends Error {
  * MODEL CALL executed against the OpenAI-compatible proxy that hangs off the engine's address,
  * and `LANGWATCH_NLP_SERVICE` is what names it.
  */
-class AbsentWorkerModelTranslation extends ModelTranslationPort {
+class AbsentWorkerModelTranslation extends ModelTranslation {
   translate(input: { projectId: string; text: string; model: string }): Promise<never> {
     return Promise.reject(new WorkerModelTranslationUnavailableError(input.projectId));
   }

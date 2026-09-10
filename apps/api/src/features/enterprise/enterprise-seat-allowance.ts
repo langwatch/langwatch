@@ -11,7 +11,7 @@ import type {
   LimitCheckResult,
   LimitType,
 } from "@langwatch/enterprise-licensing-contract";
-import { ApiSeatAllowancePort } from "./enterprise.composition.ts";
+import { ApiSeatAllowance } from "./enterprise.composition.ts";
 
 /** The one decision this adapter takes off the organization half's seat gate. */
 export type ApiSeatGate = Readonly<{
@@ -22,7 +22,7 @@ export type ApiSeatGate = Readonly<{
   }): Promise<LimitCheckResult>;
 }>;
 
-export class ApiEnterpriseSeatAllowance extends ApiSeatAllowancePort {
+export class ApiEnterpriseSeatAllowance extends ApiSeatAllowance {
   static create(gate: ApiSeatGate): ApiEnterpriseSeatAllowance {
     return new ApiEnterpriseSeatAllowance(gate);
   }

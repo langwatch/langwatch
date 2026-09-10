@@ -29,9 +29,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { afterUserCreate } from "../better-auth-hooks.api.ts";
 import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository.ts";
 import type {
-  BetterAuthAnnouncementsPort,
-  BetterAuthFederationPort,
-  BetterAuthPendingInvitePort,
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+  BetterAuthPendingInvite,
 } from "../better-auth.collaborators.ts";
 
 /** Minimal grants ledger double: nothing in these scenarios reads its output. */
@@ -71,7 +71,7 @@ class StubAuthzGrantsService extends AuthzGrantsService {
   );
 }
 
-class StubFederationPort implements BetterAuthFederationPort {
+class StubFederation implements BetterAuthFederation {
   constructor(private readonly ssoAllowed: boolean) {}
   federationCapable(): boolean {
     return true;
@@ -84,7 +84,7 @@ class StubFederationPort implements BetterAuthFederationPort {
   }
 }
 
-class StubInvitesPort implements BetterAuthPendingInvitePort {
+class StubInvites implements BetterAuthPendingInvite {
   tryFindPendingByOrganizationAndEmail(): Promise<null> {
     return Promise.resolve(null);
   }
@@ -93,17 +93,17 @@ class StubInvitesPort implements BetterAuthPendingInvitePort {
   }
 }
 
-class StubAnnouncementsPort implements BetterAuthAnnouncementsPort {
+class StubAnnouncements implements BetterAuthAnnouncements {
   readonly trackServerEvent = vi.fn();
   readonly reportError = vi.fn();
   announceSignup(): never {
-    throw new Error("StubAnnouncementsPort.announceSignup is not used by this test");
+    throw new Error("StubAnnouncements.announceSignup is not used by this test");
   }
   ssoAutoAddNurturing(): never {
-    throw new Error("StubAnnouncementsPort.ssoAutoAddNurturing is not used by this test");
+    throw new Error("StubAnnouncements.ssoAutoAddNurturing is not used by this test");
   }
   sessionNurturing(): never {
-    throw new Error("StubAnnouncementsPort.sessionNurturing is not used by this test");
+    throw new Error("StubAnnouncements.sessionNurturing is not used by this test");
   }
 }
 
@@ -117,16 +117,16 @@ function organizationRepo(
 }
 
 describe("afterUserCreate", () => {
-  let announcements: StubAnnouncementsPort;
+  let announcements: StubAnnouncements;
 
   beforeEach(() => {
-    announcements = new StubAnnouncementsPort();
+    announcements = new StubAnnouncements();
   });
 
   function collaborators(options: { ssoAllowed?: boolean } = {}) {
     return {
-      federation: new StubFederationPort(options.ssoAllowed ?? true),
-      invites: new StubInvitesPort(),
+      federation: new StubFederation(options.ssoAllowed ?? true),
+      invites: new StubInvites(),
       announcements,
       authzGrants: new StubAuthzGrantsService(),
     };

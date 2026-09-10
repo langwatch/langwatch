@@ -1,6 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createAgentWebSocketProtocol } from "@langwatch/agent-server";
-import type { ConnectUpgradeRouterPort } from "@langwatch/api";
+import type { ConnectUpgradeRouter } from "@langwatch/api";
 
 export class ApiConnectedAgentsComposition {
   readonly #agents: AgentApi;
@@ -18,7 +18,7 @@ export class ApiConnectedAgentsComposition {
     this.#protocol = createAgentWebSocketProtocol(options.relayMaxPayloadMb);
   }
 
-  mount(router: ConnectUpgradeRouterPort): void {
+  mount(router: ConnectUpgradeRouter): void {
     this.#protocol.mount(router, this.#agents);
   }
 

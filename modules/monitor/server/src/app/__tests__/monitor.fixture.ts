@@ -13,19 +13,18 @@ import { EvaluatorNotFoundError } from "@langwatch/evaluator-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { MonitorEvaluatorPort } from "../../ports/monitor-evaluator.port.ts";
-import { MonitorPerformancePort } from "../../ports/monitor-performance.port.ts";
+import { MonitorEvaluator } from "../monitor.app.ts";
+import { MonitorPerformance } from "../monitor.app.ts";
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import type { MonitorRepositories } from "../../repositories/monitor.repositories.ts";
 import { MonitorApp, type MonitorReplicationReader } from "../monitor.app.ts";
 
 /** The evaluators a project holds, named by id. */
-export class FakeMonitorEvaluators extends MonitorEvaluatorPort {
+export class FakeMonitorEvaluators implements MonitorEvaluator {
   readonly archived: { id: string; projectId: string }[] = [];
   #known = new Set<string>();
 
   constructor(known: readonly string[] = ["evaluator_1"]) {
-    super();
     this.#known = new Set(known);
   }
 
@@ -43,11 +42,10 @@ export class FakeMonitorEvaluators extends MonitorEvaluatorPort {
 }
 
 /** The trend, answered from whatever the test seeded. */
-export class FakeMonitorPerformance extends MonitorPerformancePort {
+export class FakeMonitorPerformance implements MonitorPerformance {
   readonly queries: MonitorPerformanceQuery[] = [];
 
   constructor(private readonly rows: OnlineEvaluationPerformance[] = []) {
-    super();
   }
 
   async getMonitorPerformance(query: MonitorPerformanceQuery) {
@@ -97,8 +95,8 @@ export function createMonitorTestApp(
   input: Readonly<{
     repositories?: MonitorRepositories;
     permissions?: AuthzApi;
-    evaluators?: MonitorEvaluatorPort;
-    performance?: MonitorPerformancePort;
+    evaluators?: MonitorEvaluator;
+    performance?: MonitorPerformance;
     replication?: MonitorReplicationReader;
     generateId?: () => string;
   }> = {},

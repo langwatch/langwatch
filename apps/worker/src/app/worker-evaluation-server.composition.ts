@@ -10,16 +10,16 @@ import { defineModule, type FeatureSetup } from "@langwatch/runtime-composition"
 import { TraceApi } from "@langwatch/trace-contract";
 import type {
   WorkflowEnvironmentDecryptor,
-  NlpPayloadStagingPort,
+  NlpPayloadStaging,
 } from "@langwatch/workflow-server";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type {
-  AutomationEvaluationQueryClassificationPort,
-  AutomationEvaluationTraceSummaryPort,
-  AutomationGraphActivityPort,
-  AutomationTraceTriggerCataloguePort,
-  AutomationTriggerMatchRecorderPort,
+  AutomationEvaluationQueryClassification,
+  AutomationEvaluationTraceSummary,
+  AutomationGraphActivity,
+  AutomationTraceTriggerCatalogue,
+  AutomationTriggerMatchRecorder,
 } from "@langwatch/automation-server";
 import type { WorkerModelProviders } from "./worker-model-provider.composition.ts";
 import type { WorkerObjectStorage } from "./worker-object-storage.composition.ts";
@@ -47,7 +47,7 @@ export type WorkerEvaluationInfrastructure = Readonly<{
   models: WorkerModelProviders;
   secretDecryptor: WorkflowEnvironmentDecryptor;
   nlpServiceUrl: string | undefined;
-  payloadStaging: NlpPayloadStagingPort;
+  payloadStaging: NlpPayloadStaging;
   featureFlags: FeatureFlagApi;
   storage: WorkerObjectStorage;
   langevalsEndpoint: string | undefined;
@@ -55,11 +55,11 @@ export type WorkerEvaluationInfrastructure = Readonly<{
   resolveClickHouseClient: EventingClickHouseClientResolver;
   defaultRetentionDays: number;
   analytics: AnalyticsService;
-  traces: AutomationEvaluationTraceSummaryPort & AutomationEvaluationQueryClassificationPort;
+  traces: AutomationEvaluationTraceSummary & AutomationEvaluationQueryClassification;
   automation: Readonly<{
-    triggers: AutomationTraceTriggerCataloguePort;
-    graphActivity: AutomationGraphActivityPort;
-    triggerMatches: AutomationTriggerMatchRecorderPort;
+    triggers: AutomationTraceTriggerCatalogue;
+    graphActivity: AutomationGraphActivity;
+    triggerMatches: AutomationTriggerMatchRecorder;
   }>;
   redis?: RedisConnection | null;
   foldCacheTtlSeconds?: number;

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { ScimWriteOutsideConnectionError } from "@langwatch/enterprise-scim-contract";
-import type { ScimRepositoryPort } from "../repositories/scim.repository.ts";
+import type { ScimRepository } from "../repositories/scim.repository.ts";
 
 /** Resolves a directory identity only within the connection that asserted it. */
 export class ScimDirectoryIdentityService {
-  private constructor(private readonly repository: ScimRepositoryPort) {}
+  private constructor(private readonly repository: ScimRepository) {}
 
-  static create(repository: ScimRepositoryPort): ScimDirectoryIdentityService {
+  static create(repository: ScimRepository): ScimDirectoryIdentityService {
     return new ScimDirectoryIdentityService(repository);
   }
 

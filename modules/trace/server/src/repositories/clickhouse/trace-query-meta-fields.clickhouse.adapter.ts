@@ -473,7 +473,7 @@ export class TraceQueryMetaFieldsAdapter {
   }
 
   /**
-   * Which auxiliary collection a has:<value>/none:<value> reads, or null if answered from the trace summary alone. has is value-polymorphic so it carries no static FieldDef.needs; TraceQueryEvaluationAdapter.needs consults this instead.
+   * Which auxiliary collection a has:<value>/none:<value> reads, or null if answered from the trace summary alone. has is value-polymorphic so it carries no static FieldDef.needs; ClickhouseTraceQueryEvaluationRepository.needs consults this instead.
    */
   static existenceNeeds(value: string): "evaluations" | "events" | null {
     if (value === "eval") return "evaluations";

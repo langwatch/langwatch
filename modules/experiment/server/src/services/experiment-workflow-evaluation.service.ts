@@ -9,9 +9,9 @@ import {
   type TargetConfig,
 } from "@langwatch/experiment-contract";
 import type { Entry, Field, StudioWorkflow as WorkflowDSL } from "@langwatch/workflow-contract";
-import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port.ts";
+import type { ExperimentRunErrorReporting } from "../ports/experiment-run-error-reporting.port.ts";
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
-import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port.ts";
+import type { ExperimentWorkflowDsl } from "../ports/experiment-workflow-dsl.port.ts";
 import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 import type {
@@ -71,7 +71,7 @@ const WORKFLOW_DATASET_ID = "workflow-dataset";
 export type WorkflowEvaluationDependencies = {
   experiments: ExperimentService;
   /** The workflow rows and versions this run reads, which it does not own. */
-  workflowSource: ExperimentWorkflowDslPort;
+  workflowSource: ExperimentWorkflowDsl;
   /** Everything the run loop reaches outside itself. */
   ports: ExperimentRunPorts;
   workflows: WorkflowService;
@@ -82,7 +82,7 @@ export type WorkflowEvaluationDependencies = {
   /** The deployment's public base URL, for the shareable results link. */
   baseUrl: string;
   defaultConcurrency: number;
-  errorReporting?: ExperimentRunErrorReportingPort;
+  errorReporting?: ExperimentRunErrorReporting;
 };
 
 export class WorkflowEvaluationService {

@@ -1,5 +1,5 @@
 import type { Logger } from "@langwatch/observability";
-import type { MigrationLockPort } from "./migration-lock.port.ts";
+import type { MigrationLock } from "./migration-lock.port.ts";
 
 /**
  * The tasks that change a schema, and so must not run beside a copy of
@@ -25,11 +25,11 @@ export function isMigrationTask(name: string): boolean {
  */
 export class MigrationLockService {
   private constructor(
-    private readonly lock: MigrationLockPort,
+    private readonly lock: MigrationLock,
     private readonly logger: Logger,
   ) {}
 
-  static create({ lock, logger }: { lock: MigrationLockPort; logger: Logger }) {
+  static create({ lock, logger }: { lock: MigrationLock; logger: Logger }) {
     return new MigrationLockService(lock, logger);
   }
 

@@ -3,9 +3,9 @@ export {
   type LangyCredentialComposition,
   type LangyServiceCompositionOptions,
   LangyEventingPorts,
-  LangyTrustedMessagePort,
+  LangyTrustedMessage,
   type PostgresLangyAdapterOptions,
-} from "./adapters/langy.langy.adapter.ts";
+} from "./services/langy-postgres.service.ts";
 /**
  * The Langy feature's conversation-and-turn service, folded out of the
  * contract package (ADR-133: no standalone contract-service class). Peer
@@ -16,27 +16,27 @@ export { LangyService } from "./services/langy.service.ts";
 export type { LangyInfrastructure } from "./app/langy.app.ts";
 export { langyServer } from "./langy.server.ts";
 export { LangyNavigateFallbackService } from "./services/langy-navigate-fallback.service.ts";
-export { LangyNavigateProjectPort } from "./ports/langy-navigate-project.port.ts";
-export { LangyNavigateResourcePort } from "./ports/langy-navigate-resource.port.ts";
+export { LangyNavigateProject } from "./app/langy.infrastructure.ts";
+export { LangyNavigateResource } from "./app/langy.infrastructure.ts";
 export {
   LANGY_NAVIGATE_RESOURCE_KINDS,
   type LangyNavigateResourceKind,
   navigateResourceKindFor,
 } from "./rules/langy-navigate-resources.rules.ts";
-export type { LangyRelayCompositionOptions } from "./adapters/langy.langy.adapter.ts";
+export type { LangyRelayCompositionOptions } from "./services/langy-postgres.service.ts";
 export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper.ts";
 export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service.ts";
 export {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyService,
 } from "./services/langy-session-key.service.ts";
-export { LangySessionKeyMetricsPort } from "./ports/langy-session-key-metrics.port.ts";
+export { LangySessionKeyMetrics } from "./app/langy.infrastructure.ts";
 export { LangySessionKeyReapService } from "./services/langy-session-key-reap.service.ts";
 export { LangySessionKeyReapRepository } from "./repositories/langy-session-key-reap.repository.ts";
 export {
   OtelLangySessionKeyMetricsAdapter,
   LANGY_SESSION_KEYS_METRIC_NAME,
-} from "./adapters/otel.langy-session-key-metrics.adapter.ts";
+} from "./services/langy-session-key-metrics-otel.service.ts";
 export {
   PrismaLangySessionKeyReapRepository,
   type PrismaLangySessionKeyReapDatabase,
@@ -66,7 +66,7 @@ export { SetupSkillsService, type SetupSkillId } from "./services/setup-skills.s
 export { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 // The agent-to-page UI-action channel. Moved here whole from the application
 // that used to hold it; the one thing it could not bring is the workbench's
-// action manifest, which arrives as {@link LangyUiActionCatalogPort}.
+// action manifest, which arrives as {@link LangyUiActionCatalog}.
 export {
   LangyUiActionService,
   uiActionKeys,
@@ -82,16 +82,16 @@ export {
 } from "./services/langy-ui-action.service.ts";
 export {
   type LangyUiActionBackendMode,
-  LangyUiActionCatalogPort,
+  LangyUiActionCatalog,
   type LangyUiActionDefinition,
-} from "./ports/langy-ui-action-catalog.port.ts";
+} from "./app/langy.infrastructure.ts";
 export {
   type LangyBackendActor,
   type LangyBackendRunResult,
   type LangyBackendSaveResult,
   type LangyBackendStateRead,
-  LangyUiActionBackendPort,
-} from "./ports/langy-ui-action-backend.port.ts";
+  LangyUiActionBackend,
+} from "./app/langy.infrastructure.ts";
 export { LangyUiActionBackendService } from "./services/langy-ui-action-backend.service.ts";
 
 // Application-facing Langy orchestration primitives. These are deliberately
@@ -107,47 +107,47 @@ export {
   newFrameNonce,
   signFrame,
   verifyFrame,
-} from "./ports/langy-frame-auth.port.ts";
-export { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "./ports/langy-effect.port.ts";
+} from "./services/langy-frame-auth.service.ts";
+export { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "./processes/langy-conversation-process.types.ts";
 export {
   AGENT_DISPATCH_TIMEOUT_MS,
   LangyWorkerHttpAdapter,
-} from "./adapters/langy-worker-http.adapter.ts";
+} from "./services/langy-worker-http.service.ts";
 export type {
   LangyDispatchOutcome,
   LangyWorkerAdapterConfig,
   LangyWorkerHttpConfig,
-} from "./adapters/langy-worker-http.adapter.ts";
-export { NullLangyWorkerMetricsAdapter } from "./adapters/null-langy-worker-metrics.adapter.ts";
-export { NullLangyBlockMetricsAdapter } from "./adapters/null-langy-block-metrics.adapter.ts";
-export { UnavailableLangyWorkerAdapter } from "./adapters/unavailable-langy-worker.adapter.ts";
+} from "./services/langy-worker-http.service.ts";
+export { NullLangyWorkerMetricsAdapter } from "./services/langy-worker-metrics-null.service.ts";
+export { NullLangyBlockMetricsAdapter } from "./services/langy-block-metrics-null.service.ts";
+export { UnavailableLangyWorkerAdapter } from "./services/langy-worker-unavailable.service.ts";
 export {
   LANGY_UI_ACTIONS_FLAG,
-  LangyBlockMetricsPort,
-  LangyGithubPermitPort,
-  LangyUiActionSurfacePort,
-  LangyWorkerMetricsPort,
-  LangyWorkerPort,
-} from "./ports/langy-turn-runtime.port.ts";
+  LangyBlockMetrics,
+  LangyGithubPermit,
+  LangyUiActionSurface,
+  LangyWorkerMetrics,
+  LangyWorker,
+} from "./app/langy.infrastructure.ts";
 export type {
   LangyWorkerCancelInput,
   LangyWorkerDispatchInput,
   LangyWorkerProbeInput,
   LangyWorkerWarmInput,
-} from "./ports/langy-turn-runtime.port.ts";
-export { FeatureFlagLangyUiActionSurfaceAdapter } from "./adapters/feature-flag.langy-ui-action-surface.adapter.ts";
-export { LangyConversationPipelineAdapter } from "./adapters/eventing.langy-conversation.adapter.ts";
-export type { LangyConversationProcessingPipelineDeps } from "./adapters/eventing.langy-conversation.adapter.ts";
+} from "./app/langy.infrastructure.ts";
+export { FeatureFlagLangyUiActionSurfaceAdapter } from "./services/langy-ui-action-surface.service.ts";
+export { LangyConversationPipelineAdapter } from "./services/langy-conversation-pipeline.service.ts";
+export type { LangyConversationProcessingPipelineDeps } from "./services/langy-conversation-pipeline.service.ts";
 export {
   EventingLangyConversationAdapter,
   type EventingLangyConversationAdapterOptions,
-  type RedisLangyConversationRuntimeRepository as LangyConversationRuntimeCommands,
+  type RedisLangyConversationRuntimeRepository,
 } from "./repositories/redis/redis.langy-conversation-runtime.repository.ts";
-export { RedisLangyConversationProducerRepository as LangyConversationProducerAdapter } from "./repositories/redis/redis.langy-conversation-producer.repository.ts";
+export { RedisLangyConversationProducerRepository } from "./repositories/redis/redis.langy-conversation-producer.repository.ts";
 export {
   EventingLangyMaintenanceAdapter,
   type LangyMaintenancePipelineDeps,
-} from "./adapters/eventing.langy-maintenance.adapter.ts";
+} from "./services/langy-maintenance.service.ts";
 export {
   LANGY_SESSION_KEY_REAP_INTERVAL_MS,
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,
@@ -159,7 +159,7 @@ export {
   type LangySessionKeyReapDeps,
 } from "./intents/langy-session-key-reap.intent.ts";
 export type { LangyAnalyticsEventProjectionRecord } from "./projections/langy-analytics-event.projection.ts";
-export { LangyAnalyticsEventStorageAdapter } from "./adapters/langy-analytics-event-storage.adapter.ts";
+export { LangyAnalyticsEventStorageAdapter } from "./services/langy-analytics-event-storage.service.ts";
 export { LangyAnalyticsEventMemoryRepository } from "./repositories/memory/memory.langy-analytics-event.repository.ts";
 export { LangyMemoryStore } from "./repositories/memory/langy-memory.store.ts";
 export { langyRepositories } from "./repositories/langy-repositories.registry.ts";
@@ -171,18 +171,18 @@ export {
   type LangyAnalyticsClickHouseClientResolver,
   type LangyAnalyticsClickHouseWriteClient,
 } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
-export { LangyAnalyticsEventSinkPort } from "./repositories/langy-analytics-event.repository.ts";
+export { LangyAnalyticsEventSink } from "./repositories/langy-analytics-event.repository.ts";
 export type { LangyAnalyticsEventRecord } from "./repositories/langy-analytics-event.repository.ts";
-export type { LangyEffectPorts } from "./ports/langy-effect.port.ts";
-export type { LangyTitleGenerator } from "./ports/langy-effect.port.ts";
-export { LangyTitleModelPort } from "./ports/langy-title-model.port.ts";
+export type { LangyEffectPorts } from "./app/langy.infrastructure.ts";
+export type { LangyTitleGenerator } from "./app/langy.infrastructure.ts";
+export { LangyTitleModel } from "./app/langy.infrastructure.ts";
 export {
   LANGY_TITLE_FEATURE_KEY,
   LangyTitleGeneratorService,
   type LangyTitleGeneratorDeps,
 } from "./services/langy-title-generator.service.ts";
 export {
-  RedisLangyEffectRepository as LangyEffectPortsAdapter,
+  RedisLangyEffectRepository,
   type CreateLangyEffectPortsOptions,
 } from "./repositories/redis/redis.langy-effect.repository.ts";
 export {
@@ -199,12 +199,12 @@ export type {
   LangyConversationLivenessRecord,
   LangyBroadcastPort,
   LangyConversationUpdateBroadcastSubscriberDeps,
-  LangyFailTurnCommandPort,
+  LangyFailTurnCommand,
 } from "./subscribers/langy-conversation.subscriber.ts";
 export type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
-} from "./ports/langy-conversation-process.port.ts";
+} from "./app/langy.infrastructure.ts";
 export { LangyFrameDedupRedisRepository } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
 export type { LangyFrameDedupRedis } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
 export type {
@@ -231,7 +231,7 @@ export {
   type LangyStreamRead,
   type LangyStreamRedis,
   type LangyTokenBufferConnection,
-  LangyTokenBufferPort,
+  LangyTokenBuffer,
 } from "./repositories/langy-token-buffer.repository.ts";
 export { LANGY_EMPTY_TURN_FALLBACK } from "./rules/langy-empty-turn.rules.ts";
 export { LangyTurnSettlementWaiterService } from "./services/langy-turn-settlement-waiter.service.ts";
@@ -250,12 +250,12 @@ export {
 } from "./transport/api-rest/langy-turns.api.ts";
 export {
   createLangyUiActionsRestApp,
-  LangyUiActionRestCatalogPort,
+  LangyUiActionRestCatalog,
   type LangyUiActionsRestPorts,
 } from "./transport/api-rest/langy-ui-actions.api.ts";
 export {
   createLangyInternalRestApp,
-  type LangyInternalMetricsPort,
+  type LangyInternalMetrics,
   type LangyInternalRestPorts,
 } from "./transport/api-rest/langy-internal.api.ts";
 export {
@@ -267,7 +267,7 @@ export {
   resolveLangyRestActor,
   resolveLangyRestCaller,
   type LangyRestCaller,
-  type LangyRestCeilingPort,
+  type LangyRestCeiling,
   type LangyRestCredentialPorts,
   type LangyRestCredentialReader,
 } from "./transport/api-rest/langy-rest-credentials.api.ts";
@@ -289,17 +289,17 @@ export {
 export {
   type GithubPrLimitResult,
   LANGY_GITHUB_PRS_PER_DAY,
-  LangyGithubPrCounterPort,
+  LangyGithubPrCounter,
   LangyGithubPrQuotaService,
 } from "./services/langy-github-pr-quota.service.ts";
 export {
   LANGY_DISPATCH_METRIC_NAME,
   OtelLangyWorkerMetricsAdapter,
-} from "./adapters/otel.langy-worker-metrics.adapter.ts";
+} from "./services/langy-worker-metrics-otel.service.ts";
 export {
   LANGY_BLOCKS_METRIC_NAME,
   LangyBlockOtelMetricsAdapter,
-} from "./adapters/otel.langy-block-metrics.adapter.ts";
+} from "./services/langy-block-metrics-otel.service.ts";
 
 // ADR-129 local control: the developer's own folder, and the cards that wait
 // for the developer. One runtime per process, two transports over it, and the

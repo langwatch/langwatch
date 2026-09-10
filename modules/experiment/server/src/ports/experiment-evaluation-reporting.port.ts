@@ -7,6 +7,6 @@ import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract
  * server may not import another feature's server, so the run dispatches
  * through here and the process binds it to the Evaluation application.
  */
-export abstract class ExperimentEvaluationReportingPort {
+export abstract class ExperimentEvaluationReporting {
   abstract reportEvaluation(data: ReportEvaluationCommandData): Promise<unknown>;
 }

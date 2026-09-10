@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
-  GovernanceKpiContributionPort,
+  GovernanceKpiContributionWriter,
   type GovernanceKpiContribution,
-} from "../../ports/governance-subscriber.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber.ts";
 import {
   governanceTraceContext,
   governanceTraceEvent,
   SilentSubscriberDiagnostics,
-} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures.ts";
+} from "./governance-subscriber.fixtures.ts";
 
-class ReplacingKpiContributions extends GovernanceKpiContributionPort {
+class ReplacingKpiContributions implements GovernanceKpiContributionWriter {
   readonly rows = new Map<string, GovernanceKpiContribution>();
 
   insertContribution(row: GovernanceKpiContribution): Promise<void> {

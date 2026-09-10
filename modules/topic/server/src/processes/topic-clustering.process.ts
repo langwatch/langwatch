@@ -13,7 +13,7 @@ import {
 import { Temporal, toDate } from "@langwatch/time";
 import crypto from "crypto";
 import { z } from "zod";
-import type { TopicClusteringProcessingEvent } from "../adapters/eventing.topic-events.adapter.ts";
+import type { TopicClusteringProcessingEvent } from "../services/topic-events.service.ts";
 import {
   createTopicClusteringRunHandler,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,

@@ -15,7 +15,7 @@ import {
   composeApiTraceIngest,
   type ApiTraceIngestAllowance,
 } from "../../../app/api-trace-ingest.composition.ts";
-import type { ApiTraceReadStackPort } from "../trace-read-stack.port.ts";
+import type { ApiTraceReadStack } from "../trace-read-stack.port.ts";
 
 const PROJECT = {
   id: "project-1",
@@ -364,7 +364,7 @@ function mount(overrides: MountOverrides) {
 }
 
 /** The read stack, holding only what these three families call. */
-function readStackStub(read: Partial<Record<string, unknown>>): ApiTraceReadStackPort {
+function readStackStub(read: Partial<Record<string, unknown>>): ApiTraceReadStack {
   const readers = {
     read: {
       getAllTracesForProject: async () => ({ groups: [], traceChecks: {}, totalHits: 0 }),
@@ -382,7 +382,7 @@ function readStackStub(read: Partial<Record<string, unknown>>): ApiTraceReadStac
       canSeeCapturedInput: false,
       canSeeCapturedOutput: false,
     }),
-  } as unknown as ApiTraceReadStackPort;
+  } as unknown as ApiTraceReadStack;
 }
 
 /** One stored trace, as the reads answer with it. */

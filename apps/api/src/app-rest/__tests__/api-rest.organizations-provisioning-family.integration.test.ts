@@ -7,7 +7,7 @@ import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
 import type { ApiKey, ApiKeyApi, CreateApiKeyInput } from "@langwatch/api-key-contract";
 import {
   OrganizationSlugTakenError,
-  type OrganizationProvisioningPort,
+  type OrganizationProvisioning,
   type OrganizationProvisioningSummary,
 } from "@langwatch/organization-server";
 import { describe, expect, it } from "vitest";
@@ -271,7 +271,7 @@ describe("given a cloud deployment with an instance administrator credential con
 function inMemoryDirectory() {
   const rows: OrganizationProvisioningSummary[] = [];
 
-  const implemented: OrganizationProvisioningPort & { all(): OrganizationProvisioningSummary[] } = {
+  const implemented: OrganizationProvisioning & { all(): OrganizationProvisioningSummary[] } = {
     all: () => rows,
     createForProvisioning: async ({ name, slug }) => {
       const claimed = slug ?? name.toLowerCase().replace(/[^a-z0-9]+/g, "-");

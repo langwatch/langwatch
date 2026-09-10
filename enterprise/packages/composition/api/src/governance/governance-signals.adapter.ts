@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GovernanceDiagnosticsPort,
-  GovernanceSignalPort,
+  GovernanceDiagnostics,
+  GovernanceSignal,
   GovernanceSignalService,
   type GatewayBudgetCrossingCandidate,
   type GovernanceBudgetCrossingData,
@@ -16,7 +16,7 @@ import { type Instant, nowInstant } from "@langwatch/time";
 const logger = createLogger("langwatch:governance:signals");
 
 /** Complete storage capability supplied by API composition. */
-export abstract class GovernanceSignalStoragePort {
+export abstract class GovernanceSignalStorage {
   abstract tryResolveLifecycleTenant(input: {
     organizationId: string;
     preferredProjectId: string | null;
@@ -28,19 +28,19 @@ export abstract class GovernanceSignalStoragePort {
 }
 
 /** Complete delivery capability owned by the Governance events pipeline. */
-export abstract class GovernanceSignalDeliveryPort {
+export abstract class GovernanceSignalDelivery {
   abstract available(): boolean;
   abstract appendVirtualKeyLifecycle(data: GovernanceVkLifecycleData): Promise<void>;
   abstract appendBudgetCrossing(data: GovernanceBudgetCrossingData): Promise<void>;
 }
 
-class AppGovernanceSignalDiagnostics extends GovernanceDiagnosticsPort {
+class AppGovernanceSignalDiagnostics extends GovernanceDiagnostics {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }
 }
 
-class DisabledGovernanceSignalStoragePort extends GovernanceSignalStoragePort {
+class DisabledGovernanceSignalStorage extends GovernanceSignalStorage {
   async tryResolveLifecycleTenant(): Promise<string | null> {
     return null;
   }
@@ -50,7 +50,7 @@ class DisabledGovernanceSignalStoragePort extends GovernanceSignalStoragePort {
   }
 }
 
-class DisabledGovernanceSignalDeliveryPort extends GovernanceSignalDeliveryPort {
+class DisabledGovernanceSignalDelivery extends GovernanceSignalDelivery {
   available(): boolean {
     return false;
   }
@@ -60,19 +60,19 @@ class DisabledGovernanceSignalDeliveryPort extends GovernanceSignalDeliveryPort 
   async appendBudgetCrossing(): Promise<void> {}
 }
 
-class AppGovernanceSignalPort extends GovernanceSignalPort {
+class AppGovernanceSignal extends GovernanceSignal {
   private constructor(
-    private readonly storage: GovernanceSignalStoragePort,
-    private readonly delivery: GovernanceSignalDeliveryPort,
+    private readonly storage: GovernanceSignalStorage,
+    private readonly delivery: GovernanceSignalDelivery,
   ) {
     super();
   }
 
   static create(
-    storage: GovernanceSignalStoragePort,
-    delivery: GovernanceSignalDeliveryPort,
-  ): AppGovernanceSignalPort {
-    return new AppGovernanceSignalPort(storage, delivery);
+    storage: GovernanceSignalStorage,
+    delivery: GovernanceSignalDelivery,
+  ): AppGovernanceSignal {
+    return new AppGovernanceSignal(storage, delivery);
   }
 
   available(): boolean {
@@ -108,15 +108,15 @@ class AppGovernanceSignalPort extends GovernanceSignalPort {
 
 export class AppGovernanceSignalsService {
   private constructor(
-    private readonly port: AppGovernanceSignalPort,
+    private readonly port: AppGovernanceSignal,
     private readonly service: GovernanceSignalService,
   ) {}
 
   static create(
-    storage: GovernanceSignalStoragePort,
-    delivery: GovernanceSignalDeliveryPort,
+    storage: GovernanceSignalStorage,
+    delivery: GovernanceSignalDelivery,
   ): AppGovernanceSignalsService {
-    const port = AppGovernanceSignalPort.create(storage, delivery);
+    const port = AppGovernanceSignal.create(storage, delivery);
     return new AppGovernanceSignalsService(
       port,
       GovernanceSignalService.create(port, new AppGovernanceSignalDiagnostics()),
@@ -125,8 +125,8 @@ export class AppGovernanceSignalsService {
 
   static disabled(): AppGovernanceSignalsService {
     return AppGovernanceSignalsService.create(
-      new DisabledGovernanceSignalStoragePort(),
-      new DisabledGovernanceSignalDeliveryPort(),
+      new DisabledGovernanceSignalStorage(),
+      new DisabledGovernanceSignalDelivery(),
     );
   }
 

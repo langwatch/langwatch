@@ -12,7 +12,7 @@ import {
   buildExecutionDeps,
   buildMonitor,
   type EvaluationExecutionFixtureOptions,
-} from "../ports/__tests__/support/evaluation-execution.fixtures.ts";
+} from "./support/evaluation-execution.fixtures.ts";
 
 function buildDeps(overrides: EvaluationExecutionFixtureOptions = {}) {
   return buildExecutionDeps({

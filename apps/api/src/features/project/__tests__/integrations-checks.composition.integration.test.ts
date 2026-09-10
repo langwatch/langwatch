@@ -4,7 +4,7 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import { PostgresModelProviderEvidenceAdapter } from "@langwatch/model-provider-server";
-import type { ModelCostProjectPort } from "@langwatch/model-provider-server";
+import type { ModelCostProject } from "@langwatch/model-provider-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -92,7 +92,7 @@ function testProviderEvidence() {
         teamId: TEAM_ID,
         team: { organizationId: ORGANIZATION_ID },
       }),
-    } as unknown as ModelCostProjectPort,
+    } as unknown as ModelCostProject,
   }).build();
 
   return { port, findFirst };

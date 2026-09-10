@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { BillingWebhookOrganizationPort } from "../billing-webhook-organization.repository.ts";
+import { BillingWebhookOrganization } from "../billing-webhook-organization.repository.ts";
 import type { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /**
@@ -8,7 +8,7 @@ import type { MemoryBillingStore } from "./memory-billing.store.ts";
  * store the account facts answer from: a currency written here is what a later
  * account read reports.
  */
-export class MemoryBillingWebhookOrganizationRepository extends BillingWebhookOrganizationPort {
+export class MemoryBillingWebhookOrganizationRepository extends BillingWebhookOrganization {
   private constructor(private readonly store: MemoryBillingStore) {
     super();
   }

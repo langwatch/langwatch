@@ -1,5 +1,5 @@
 /** Narrow organization reads needed by the billing lifecycle services. */
-export abstract class BillingOrganizationPort {
+export abstract class BillingOrganization {
   abstract tryGetPricingModel(organizationId: string): Promise<string | null>;
   abstract tryGetStripeCustomerId(organizationId: string): Promise<string | null>;
   abstract tryFindName(organizationId: string): Promise<{ id: string; name: string } | null>;

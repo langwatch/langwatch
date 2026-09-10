@@ -6,7 +6,7 @@ import {
 } from "@langwatch/authz-contract";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
-  LangySessionKeyMetricsPort,
+  LangySessionKeyMetrics,
   LangySessionKeyService,
 } from "@langwatch/langy-server";
 import { describe, expect, it, vi } from "vitest";
@@ -40,7 +40,7 @@ class SessionKeyRepository extends LangySessionKeyRepository {
   }
 }
 
-class SessionKeyMetrics extends LangySessionKeyMetricsPort {
+class SessionKeyMetrics implements LangySessionKeyMetrics {
   readonly record = vi.fn();
 }
 

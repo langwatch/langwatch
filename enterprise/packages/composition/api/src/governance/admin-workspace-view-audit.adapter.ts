@@ -9,8 +9,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  AdminWorkspaceViewOcsfPort,
-  GovernanceDiagnosticsPort,
+  AdminWorkspaceViewOcsf,
+  GovernanceDiagnostics,
 } from "@langwatch/enterprise-governance-server";
 import {
   type AppGovernanceOcsfEventsAdapter,
@@ -30,13 +30,13 @@ export interface AdminWorkspaceViewAuditDeps {
   ocsfRepository?: AppGovernanceOcsfEventsAdapter;
 }
 
-export class AppAdminWorkspaceViewDiagnostics extends GovernanceDiagnosticsPort {
+export class AppAdminWorkspaceViewDiagnostics extends GovernanceDiagnostics {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }
 }
 
-export class AppAdminWorkspaceViewOcsf extends AdminWorkspaceViewOcsfPort {
+export class AppAdminWorkspaceViewOcsf extends AdminWorkspaceViewOcsf {
   constructor(private readonly repository: AppGovernanceOcsfEventsAdapter) {
     super();
   }

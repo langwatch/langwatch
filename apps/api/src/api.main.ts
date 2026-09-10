@@ -15,7 +15,7 @@ import {
   secretLogRedactPaths,
   secretResolutionSummary,
 } from "@langwatch/secrets";
-import { ApiProcessGraphPort } from "./api.process.ts";
+import { ApiProcessGraph } from "./api.process.ts";
 import {
   apiObservabilityConfiguration,
   apiLoggerConfiguration,
@@ -28,7 +28,7 @@ import { installApiSignalHandlers, type ApiSignalHandlerOptions } from "./api.si
 export type ApiListenerAddress = Readonly<{ host: string; port: number }>;
 
 /** The closed API process built by a runtime composition root. */
-export abstract class ApiRuntimeProcessPort {
+export abstract class ApiRuntimeProcess {
   /**
    * The bound address, or nothing for a process composed without a listener.
    *
@@ -48,18 +48,18 @@ export abstract class ApiRuntimeProcessPort {
  */
 export type ApiRuntimeCompositionOptions = {
   config: ApiConfig;
-  graph: ApiProcessGraphPort;
+  graph: ApiProcessGraph;
   observability: ProcessObservabilityOptions;
   resources: ResourceScope;
 };
 
-export abstract class ApiRuntimeCompositionPort {
-  abstract compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort>;
+export abstract class ApiRuntimeComposition {
+  abstract compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcess>;
 }
 
 export type ApiRuntimeBootstrapOptions = {
   source: Readonly<Record<string, unknown>>;
-  composition: ApiRuntimeCompositionPort;
+  composition: ApiRuntimeComposition;
   observability?: Omit<ProcessObservabilityOptions, "serviceName" | "loggerName">;
   signals?: false | Omit<ApiSignalHandlerOptions, "close" | "logger">;
 };
@@ -146,7 +146,7 @@ export class ApiRuntimeBootstrap {
 
   private constructor(
     readonly config: ApiConfig,
-    readonly process: ApiRuntimeProcessPort,
+    readonly process: ApiRuntimeProcess,
     private readonly logger: Pick<Logger, "error" | "info">,
     private readonly graph: ScopedApiProcessGraph,
   ) {}
@@ -193,7 +193,7 @@ export class ApiRuntimeBootstrap {
 }
 
 async function closeGraphAfterCompositionFailure(
-  graph: ApiProcessGraphPort,
+  graph: ApiProcessGraph,
   bootError: unknown,
   logger: Pick<Logger, "error">,
 ): Promise<void> {
@@ -207,7 +207,7 @@ async function closeGraphAfterCompositionFailure(
   }
 }
 
-class ScopedApiProcessGraph extends ApiProcessGraphPort {
+class ScopedApiProcessGraph extends ApiProcessGraph {
   private lifecycle: RuntimeLifecycle | undefined;
   private closing: Promise<void> | undefined;
 

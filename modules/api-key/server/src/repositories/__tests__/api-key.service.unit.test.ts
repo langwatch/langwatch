@@ -19,9 +19,9 @@ import { ApiKeyTokenAdapter } from "../memory/memory.api-key-token.repository.ts
 import { ApiKeyBindingId } from "../../app/api-key.app.ts";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
-class TestApiKeyBindingIdPort implements ApiKeyBindingId {
-  static create(): TestApiKeyBindingIdPort {
-    return new TestApiKeyBindingIdPort();
+class TestApiKeyBindingId implements ApiKeyBindingId {
+  static create(): TestApiKeyBindingId {
+    return new TestApiKeyBindingId();
   }
 
   private constructor() {
@@ -260,7 +260,7 @@ function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDepend
       getBillingProfile: vi.fn().mockResolvedValue({ name: "Organization" }),
     } as unknown as OrganizationService,
     projects: projectPeer(new MemoryProjects()),
-    bindingIds: TestApiKeyBindingIdPort.create(),
+    bindingIds: TestApiKeyBindingId.create(),
     legacyGrants: {
       mint: vi.fn(),
     } as unknown as ApiKeyDependencies["legacyGrants"],

@@ -2,7 +2,7 @@ import type { DatasetActionParams } from "@langwatch/automation-contract";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import type { TraceRecord } from "@langwatch/trace-contract";
 
-export abstract class AutomationDatasetMapperPort {
+export abstract class AutomationDatasetMapper {
   abstract map(input: {
     trace: TraceRecord;
     mapping: DatasetActionParams["datasetMapping"]["mapping"];
@@ -10,7 +10,7 @@ export abstract class AutomationDatasetMapperPort {
   }): Array<Record<string, string | number>>;
 }
 
-export abstract class AutomationPersistActionWriterPort {
+export abstract class AutomationPersistActionWriter {
   abstract addToAnnotationQueue(input: {
     traceIds: string[];
     projectId: string;

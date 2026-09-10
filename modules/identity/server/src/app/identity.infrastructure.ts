@@ -21,7 +21,7 @@ export interface IdentityNewborn {
  * application, where the event store, Postgres and the migration-state table
  * are; the adapter only decides that this write is a birth.
  */
-export abstract class IdentityBirthPort {
+export abstract class IdentityBirth {
   /**
    * Run ADR-116 §3's sequence and answer the `User` row better-auth must be
    */
@@ -40,7 +40,7 @@ export type DeriveIdentifierIdInput = {
 /**
  * Where an identifier fact's identity comes from.
  */
-export interface IdentifierIdentityPort {
+export interface IdentifierIdentity {
   /** The deterministic id this fact always derives, on any pass. */
   deriveIdentifierId(fact: DeriveIdentifierIdInput): string;
 }
@@ -50,7 +50,7 @@ export interface IdentifierIdentityPort {
  * `IdentityLedger`: that interface's `commit` is stage-then- wait in one call,
  * transaction between (ADR-116 §3).
  */
-export interface IdentityBirthLedgerPort {
+export interface IdentityBirthLedger {
   /** Hand the command to the engine. Refusing here fails the sign-up. */
   stage(input: { command: IdentityCommand }): Promise<void>;
 
@@ -89,7 +89,7 @@ export interface IdentityBirthLedgerPort {
  * written — so it records the loss at `error`, naming the missing
  * registration, and lets the push through.
  */
-export interface IdentityEventingPort {
+export interface IdentityEventing {
   /**
    * The named command sender on one pipeline, or `null` when this process
    * composed no event stack (or the pipeline is not registered on it).
@@ -105,7 +105,7 @@ export interface IdentityEventingPort {
  * state repository itself: the gate asks two questions of one row family, the runtime composes
  * whichever store answers them, and nothing here needs the runner's writes.
  */
-export interface IdentityWriteGateStatePort {
+export interface IdentityWriteGateState {
   /** One tenant's record for a migration, or null when it has none. */
   tryFindRecord(input: {
     migrationName: string;
@@ -129,7 +129,7 @@ export interface IdentityWriteGateStatePort {
  * told is this package's job, and WHAT they read is the composition root's,
  * beside the mail gateway and the deployment host every link is built from.
  */
-export interface JoinRequestMailPort {
+export interface JoinRequestMail {
   /** The one nudge, on the seventh day. Sent to one organization admin. */
   sendStillWaiting(input: {
     adminEmail: string;
@@ -154,7 +154,7 @@ export interface JoinRequestMailPort {
  * Every method takes resolved names and addresses. Nothing here is asked to
  * look anything up.
  */
-export interface JoinRequestNotificationMailPort {
+export interface JoinRequestNotificationMail {
   /** Somebody is asking. Sent to one organization admin. */
   sendRequestArrived(input: {
     adminEmail: string;
@@ -231,7 +231,7 @@ export interface JoinRequestNotificationMailPort {
  * Who this deployment counts as a LangWatch platform operator, by address. The answer is
  * `ADMIN_EMAILS`, and the ops feature owns both the variable and the comparison.
  */
-export interface PlatformOperatorPort {
+export interface PlatformOperator {
   /** Whether this address is on the deployment's operator list. */
   isPlatformOperatorEmail(input: { email: string | null }): boolean;
 }

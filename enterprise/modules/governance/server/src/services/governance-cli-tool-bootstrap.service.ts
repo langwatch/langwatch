@@ -6,9 +6,9 @@ import {
   type PlatformToolPolicyMap,
 } from "@langwatch/enterprise-governance-contract";
 import type {
-  CliAdminContactPort,
+  CliAdminContactReader,
   CliBudgetOverview,
-  CliBudgetOverviewPort,
+  CliBudgetOverviewReader,
 } from "../app/governance.infrastructure.ts";
 
 type AiToolCliCatalogReader = {
@@ -19,15 +19,15 @@ type AiToolCliCatalogReader = {
 export class DefaultGovernanceCliBootstrapService {
   private constructor(
     private readonly catalog: AiToolCliCatalogReader,
-    private readonly budgets: CliBudgetOverviewPort,
-    private readonly contacts: CliAdminContactPort,
+    private readonly budgets: CliBudgetOverviewReader,
+    private readonly contacts: CliAdminContactReader,
     private readonly gatewayUrl: string,
   ) {}
 
   static create(options: {
     catalog: AiToolCliCatalogReader;
-    budgets: CliBudgetOverviewPort;
-    contacts: CliAdminContactPort;
+    budgets: CliBudgetOverviewReader;
+    contacts: CliAdminContactReader;
     gatewayUrl: string;
   }): DefaultGovernanceCliBootstrapService {
     return new DefaultGovernanceCliBootstrapService(

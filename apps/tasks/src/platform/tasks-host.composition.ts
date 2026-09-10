@@ -14,7 +14,7 @@ import {
   RedisShutdownService,
   type RedisConnection,
 } from "@langwatch/redis-client";
-import { TaskHostPort, TaskInfrastructureUnavailableError } from "@langwatch/task";
+import { TaskHost, TaskInfrastructureUnavailableError } from "@langwatch/task";
 import type { TasksConfig } from "./config/tasks.config.ts";
 import {
   createTasksObjectStorage,
@@ -29,13 +29,13 @@ function loggedAbsence(handle: string): undefined {
 }
 
 /**
- * The real `TaskHostPort` this process builds: whatever infrastructure the
+ * The real `TaskHost` this process builds: whatever infrastructure the
  * environment actually configured, each handle composed once and closed
  * once. An absent leaf is logged by name at boot rather than stubbed —
- * exactly the vocabulary `TaskHostPort.require*` refuses by name at the call
+ * exactly the vocabulary `TaskHost.require*` refuses by name at the call
  * site when a task reaches for a handle this environment never built.
  */
-export class TasksHost extends TaskHostPort<
+export class TasksHost extends TaskHost<
   TasksConfig,
   PrismaClient,
   ClickHouseClient,

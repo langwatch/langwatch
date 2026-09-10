@@ -22,17 +22,17 @@ import {
 import { z } from "zod";
 import type {
   WorkflowExecutionInput,
-  WorkflowIdPort,
-  WorkflowNlpRuntimePort,
-} from "../ports/workflow.port.ts";
+  WorkflowId,
+  WorkflowNlpRuntime,
+} from "../app/workflow.app.ts";
 import type { StudioEventPreparer } from "./studio-event-preparer.service.ts";
 
 const logger = createLogger("langwatch:workflows:execution");
 
 type WorkflowNlpExecutionServiceOptions = {
-  ids: WorkflowIdPort;
+  ids: WorkflowId;
   modelProviders: ModelProviderApi;
-  nlpRuntime: WorkflowNlpRuntimePort;
+  nlpRuntime: WorkflowNlpRuntime;
   studioEvents: StudioEventPreparer;
 };
 

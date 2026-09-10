@@ -19,8 +19,8 @@ import {
   type GithubApi,
 } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port.ts";
-import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
+import type { CodingAgentBillingPolicy } from "../app/coding-agent.infrastructure.ts";
+import type { CodingAgentClock } from "../app/coding-agent.infrastructure.ts";
 import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import {
@@ -57,8 +57,8 @@ export class CodingAgentPullRequestReadService {
     sessionReads: CodingAgentSessionReadService;
     github: GithubApi;
     projects: ProjectApi;
-    billing: CodingAgentBillingPolicyPort;
-    clock: CodingAgentClockPort;
+    billing: CodingAgentBillingPolicy;
+    clock: CodingAgentClock;
     assignments: CodingAgentPullRequestAssignmentService;
     shares: CodingAgentPullRequestShareService;
     usage: CodingAgentPullRequestUsageService;
@@ -83,8 +83,8 @@ export class CodingAgentPullRequestReadService {
       sessionReads: CodingAgentSessionReadService;
       github: GithubApi;
       projects: ProjectApi;
-      billing: CodingAgentBillingPolicyPort;
-      clock: CodingAgentClockPort;
+      billing: CodingAgentBillingPolicy;
+      clock: CodingAgentClock;
       assignments: CodingAgentPullRequestAssignmentService;
       shares: CodingAgentPullRequestShareService;
       usage: CodingAgentPullRequestUsageService;

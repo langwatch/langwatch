@@ -40,8 +40,8 @@ import type { WorkflowApp, WorkflowService,} from "@langwatch/workflow-server";
 import { ProjectCredentialsAdapter } from "@langwatch/project-server";
 import { createPrismaProjectApi } from "../../../app/__tests__/support/prisma-project-api.ts";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import type { WorkflowNlpRuntimePort } from "@langwatch/workflow-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
+import type { WorkflowNlpRuntime } from "@langwatch/workflow-server";
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -102,11 +102,11 @@ const project: RestAuthProject = {
  * A marker cipher. No provider credential is read on the default-resolution
  * path, and the real algorithm has its own suite.
  */
-function testCipher(): SecretEncryptionPort {
+function testCipher(): SecretEncryption {
   return {
     encrypt: (value: string) => `enc:${value}`,
     decrypt: (value: string) => (value.startsWith("enc:") ? value.slice(4) : null),
-  } as unknown as SecretEncryptionPort;
+  } as unknown as SecretEncryption;
 }
 
 /** A workflow graph is never reached: this evaluator is a catalogue type. */
@@ -120,8 +120,8 @@ function unreachedWorkflows(): WorkflowService {
 }
 
 /** No code evaluator runs here, so the engine is never dialled. */
-function unreachedNlpRuntime(): WorkflowNlpRuntimePort {
-  return new Proxy({} as WorkflowNlpRuntimePort, {
+function unreachedNlpRuntime(): WorkflowNlpRuntime {
+  return new Proxy({} as WorkflowNlpRuntime, {
     get: (_target, property) => () => {
       throw new Error(`the NLP engine was dialled at ${String(property)}`);
     },
@@ -249,7 +249,7 @@ async function mountEvaluatorsFamily() {
     ).router(),
     {
       app: () => app,
-      credential: "projectKey",
+      credential: "project",
       onError: (error, c) =>
         HandledError.isHandled(error)
           ? c.json({ error: error.code, message: error.message }, error.httpStatus as 400)

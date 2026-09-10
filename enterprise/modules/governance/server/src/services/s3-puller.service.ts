@@ -26,12 +26,10 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type { GovernanceObjectStoragePort } from "../app/governance.infrastructure.ts";
+import type { GovernanceObjectStore } from "../app/governance.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
-import {
-  NullIngestionPullDiagnosticsAdapter,
-  type IngestionPullDiagnosticsPort,
-} from "../ports/ingestion-pull-worker.port.ts";
+import type { IngestionPullDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import { NullIngestionPullDiagnosticsAdapter } from "./ingestion-pull-diagnostics.service.ts";
 
 import type {
   GovernancePuller as PullerAdapter,
@@ -73,13 +71,13 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
   readonly id: string = "s3_polling";
 
   protected constructor(
-    private readonly objects: GovernanceObjectStoragePort,
-    private readonly diagnostics: IngestionPullDiagnosticsPort = new NullIngestionPullDiagnosticsAdapter(),
+    private readonly objects: GovernanceObjectStore,
+    private readonly diagnostics: IngestionPullDiagnosticsSink = new NullIngestionPullDiagnosticsAdapter(),
   ) {}
 
   static create(options: {
-    objects: GovernanceObjectStoragePort;
-    diagnostics?: IngestionPullDiagnosticsPort;
+    objects: GovernanceObjectStore;
+    diagnostics?: IngestionPullDiagnosticsSink;
   }): S3PollingPullerAdapter {
     return new S3PollingPullerAdapter(options.objects, options.diagnostics);
   }

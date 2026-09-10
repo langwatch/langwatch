@@ -2,12 +2,12 @@ import { defineAggregate, defineEvents, definePipeline, EventSourcing } from "@l
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
   type DatasetNormalizePayload,
-  DatasetNormalizationWorkerPort,
+  DatasetNormalizationWorker,
 } from "@langwatch/dataset-contract";
 import { TRACE_PROCESSING_EVENT_TYPES, type TraceProcessingEvent } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventingTraceOriginAdapter } from "../eventing.trace-origin.service.ts";
-import { type TraceDeferredOriginScheduler as TraceDeferredOriginSchedulerPort } from "../../app/trace.infrastructure.ts";
+import { type TraceDeferredOriginScheduler as TraceDeferredOriginScheduler } from "../../app/trace.infrastructure.ts";
 import { EventingTraceTopicAdapter } from "../eventing.trace-topic-assignment.service.ts";
 import { TraceProcessingServerInstallerAdapter } from "../eventing.trace-processing-installer.service.ts";
 import {
@@ -15,7 +15,7 @@ import {
   type TraceProcessingPipelineDefinition,
 } from "../../app/trace.infrastructure.ts";
 
-class TestDatasetNormalization extends DatasetNormalizationWorkerPort {
+class TestDatasetNormalization extends DatasetNormalizationWorker {
   readonly process = vi.fn(async (_payload: DatasetNormalizePayload) => {});
   readonly connect = vi.fn();
 }
@@ -23,15 +23,15 @@ class TestDatasetNormalization extends DatasetNormalizationWorkerPort {
 /**
  * Two of Trace's nine commands — all the installer's routing/durable-job
  * registration needs. Return type is the port's own, not widened, so the
- * narrowing cast lives here rather than loosening `TraceProcessingPipelinePort`
+ * narrowing cast lives here rather than loosening `TraceProcessingPipeline`
  * and costing the real builder its typing. Building the real nine would mean
  * four store-backed projections the installer never looks at.
  */
 class TestTracePipeline implements TraceProcessingPipeline {
-  deferredOrigins: TraceDeferredOriginSchedulerPort | undefined;
+  deferredOrigins: TraceDeferredOriginScheduler | undefined;
 
   build(options: {
-    deferredOrigins: TraceDeferredOriginSchedulerPort;
+    deferredOrigins: TraceDeferredOriginScheduler;
   }): TraceProcessingPipelineDefinition {
     this.deferredOrigins = options.deferredOrigins;
     return definePipeline<TraceProcessingEvent>({

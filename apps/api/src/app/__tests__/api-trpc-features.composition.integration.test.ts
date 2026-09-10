@@ -20,7 +20,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ApiApplication, NoApiTrpcFeatures } from "../../api.application.ts";
-import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy.ts";
+import { ApiAuditPort, ApiAuthorization, ApiRequestPolicy } from "../../api-request.policy.ts";
 import type { UserApi } from "@langwatch/user-contract";
 import { composeAuthFeature } from "../../features/auth/auth.composition.ts";
 import { testAuthApi } from "../../features/auth/__tests__/support/test-auth-api.ts";
@@ -491,7 +491,7 @@ class SessionResolvingAuthService implements BrowserSessionApi {
 }
 
 /** Permits everything: the refusal path is the declared check's own suite. */
-class PermittingAuthorization extends ApiAuthorizationPort {
+class PermittingAuthorization extends ApiAuthorization {
   async can(_input: {
     userId: string;
     permission: AuthzPermission;

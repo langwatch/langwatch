@@ -22,9 +22,9 @@ import {
  * tenant-keyed ClickHouse client it already holds.
  *
  * Both are driven through the ports the conversion will actually call —
- * `TraceSpanSpoolPort` and `TracePayloadReaderRepository` — rather than through the
+ * `TraceSpanSpool` and `TracePayloadReaderRepository` — rather than through the
  * service and repository underneath them: a graph that resolves correctly but
- * cannot be handed to `RecordSpanCommand` would pass a service-level test and
+ * cannot be handed to `EventingRecordSpanAdapter` would pass a service-level test and
  * still be unusable here.
  */
 

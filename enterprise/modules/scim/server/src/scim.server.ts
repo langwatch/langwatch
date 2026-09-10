@@ -15,7 +15,7 @@ import { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
 
 export type {
   ScimInfrastructure,
-  ScimManagementAuditPort,
+  ScimManagementAudit,
   ScimPlanProvider,
 } from "./app/scim.app.ts";
 

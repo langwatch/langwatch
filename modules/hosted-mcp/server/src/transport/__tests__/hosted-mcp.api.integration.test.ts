@@ -19,9 +19,9 @@ import {
 import {
   createMcpHandler,
   HeaderMcpClientAddressAdapter,
-  McpApiKeyCipherPort,
-  McpProjectLookupPort,
-  McpSessionGrantPort,
+  McpApiKeyCipher,
+  McpProjectLookup,
+  McpSessionGrant,
   type HostedMcpRedis,
   type McpHandler,
 } from "../../index.ts";
@@ -52,7 +52,7 @@ const mockRedis = {
  * takes each of them as a parameter now, so a test states what it gave the
  * handler instead of intercepting what the handler reached for.
  */
-class FakeProjectLookup extends McpProjectLookupPort {
+class FakeProjectLookup extends McpProjectLookup {
   tryFindLiveProjectByApiKey({ apiKey }: { apiKey: string }) {
     return mockPrisma.project.findUnique({ where: { apiKey, archivedAt: null } }) as Promise<{
       id: string;
@@ -62,7 +62,7 @@ class FakeProjectLookup extends McpProjectLookupPort {
 }
 
 /** The grant behind an OAuth bearer, answered by whatever a test set. */
-class FakeSessionGrant extends McpSessionGrantPort {
+class FakeSessionGrant extends McpSessionGrant {
   granted = true;
   readonly asked: Array<{ userId: string; projectId: string }> = [];
   stillGranted(input: { userId: string; projectId: string }): Promise<boolean> {
@@ -74,7 +74,7 @@ class FakeSessionGrant extends McpSessionGrantPort {
 const sessionGrant = new FakeSessionGrant();
 
 /** Identity "encryption", so a test can read the value it expected to be stored. */
-class ReversibleTestCipher extends McpApiKeyCipherPort {
+class ReversibleTestCipher extends McpApiKeyCipher {
   encrypt(text: string): string {
     return `encrypted:${text}`;
   }

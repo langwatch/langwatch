@@ -3,8 +3,8 @@ import { EventEmitter } from "events";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { BroadcasterNotActiveError } from "@langwatch/presence-contract";
-import { BroadcastTenantRateLimiterAdapter } from "../../adapters/broadcast-tenant-rate-limiter.adapter.ts";
-import { PresenceBroadcastPort, type PresenceEmitterPort } from "../../ports/presence.port.ts";
+import { BroadcastTenantRateLimiterAdapter } from "../../services/broadcast-tenant-rate-limiter.service.ts";
+import type { PresenceBroadcast, PresenceEmitter } from "../../app/presence.app.ts";
 
 export type BroadcastEventType =
   | "trace_updated"
@@ -50,7 +50,7 @@ function redisChannel(eventType: BroadcastEventType): string {
  * available, uses Redis pub/sub for high availability across multiple server instances. If no
  * redis, it will not orchestrate but send directly.
  */
-export class RedisBroadcastRepository extends PresenceBroadcastPort implements PresenceEmitterPort {
+export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmitter {
   private static readonly DRAIN_DELAY_MS = 2000;
 
   private eventEmitters = new Map<string, EventEmitter>();
@@ -68,9 +68,7 @@ export class RedisBroadcastRepository extends PresenceBroadcastPort implements P
     return new RedisBroadcastRepository(redis);
   }
 
-  private constructor(private readonly redis: Cluster | IORedis | null) {
-    super();
-  }
+  private constructor(private readonly redis: Cluster | IORedis | null) {}
 
   /** Activates Redis delivery and stale-emitter cleanup when the host starts serving. */
   async start(): Promise<void> {

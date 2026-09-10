@@ -10,7 +10,7 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
-import type { ScimRepositoryPort } from "../repositories/scim.repository.ts";
+import type { ScimRepository } from "../repositories/scim.repository.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
 import {
   ScimCostCenterService,
@@ -42,7 +42,7 @@ import {
 } from "../rules/scim-user.rules.ts";
 
 export class ScimProvisioningService {
-  private readonly prisma: ScimRepositoryPort;
+  private readonly prisma: ScimRepository;
   private readonly writer: AuthzGrantsService;
   private readonly userService: ScimUserProvisioning;
   private readonly grants: ScimGrantsService;
@@ -62,7 +62,7 @@ export class ScimProvisioningService {
     lifecycle,
     provenOffboarding,
   }: {
-    prisma: ScimRepositoryPort;
+    prisma: ScimRepository;
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: ScimUserProvisioning;
@@ -92,7 +92,7 @@ export class ScimProvisioningService {
   }
 
   static create(options: {
-    prisma: ScimRepositoryPort;
+    prisma: ScimRepository;
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: ScimUserProvisioning;

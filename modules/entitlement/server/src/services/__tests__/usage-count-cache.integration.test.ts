@@ -7,12 +7,12 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "@langwatch/entitlement-contract";
-import { InProcessUsageCache } from "../../ports/usage-cache.port.ts";
-import { UsageOrganizationPort } from "../../ports/usage-organization.port.ts";
+import { InProcessUsageCache } from "../usage-cache.service.ts";
+import { UsageOrganization } from "../../app/entitlement.infrastructure.ts";
 import {
-  UsageVolumeCounterPort,
+  UsageVolumeCounter,
   type ProjectUsageCounts,
-} from "../../ports/usage-volume-counter.port.ts";
+} from "../../app/entitlement.infrastructure.ts";
 import { UsageService } from "../usage-enforcement.service.ts";
 
 const PLAN: PlanInfo = {
@@ -27,7 +27,7 @@ const PLAN: PlanInfo = {
   prices: { USD: 0, EUR: 0 },
 };
 
-class TestOrganizations extends UsageOrganizationPort {
+class TestOrganizations implements UsageOrganization {
   tryGetOrganizationIdByTeamId(): Promise<string | null> {
     return Promise.resolve("org-1");
   }
@@ -39,7 +39,7 @@ class TestOrganizations extends UsageOrganizationPort {
   }
 }
 
-class CountingCounter extends UsageVolumeCounterPort {
+class CountingCounter implements UsageVolumeCounter {
   readonly getCountByProjects = vi.fn(async (): Promise<ProjectUsageCounts> => [
     { projectId: "project-1", count: 5_000 },
   ]);

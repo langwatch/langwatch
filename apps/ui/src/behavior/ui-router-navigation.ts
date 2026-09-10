@@ -1,7 +1,7 @@
 /**
  * The navigation capability, over the router this package already owns —
  * `react-router` is sealed off from a frontend feature (ADR-004), so a
- * screen gets a `UiNavigationPort` instead, which a test can record.
+ * screen gets a `UiNavigation` instead, which a test can record.
  */
 
 import { useMemo } from "react";
@@ -13,12 +13,12 @@ import {
   type NavigateFunction,
 } from "react-router";
 import {
-  UiNavigationPort,
-  UiRoutePort,
+  UiNavigation,
+  UiRoute,
   type UiRouteReadingValues,
 } from "@langwatch/ui-host/capabilities";
 
-class RouterUiNavigation extends UiNavigationPort {
+class RouterUiNavigation extends UiNavigation {
   constructor(private readonly navigateTo: NavigateFunction) {
     super();
   }
@@ -41,7 +41,7 @@ export function createRouterUiNavigation({
   navigate,
 }: {
   navigate: NavigateFunction;
-}): UiNavigationPort {
+}): UiNavigation {
   return new RouterUiNavigation(navigate);
 }
 
@@ -49,7 +49,7 @@ export function createRouterUiNavigation({
  * Only valid below `RouterProvider` — the application shell mounts it
  * inside the root layout, where every routed screen renders.
  */
-export function useRouterUiNavigation(): UiNavigationPort {
+export function useRouterUiNavigation(): UiNavigation {
   const navigate = useNavigate();
   return useMemo(() => createRouterUiNavigation({ navigate }), [navigate]);
 }
@@ -59,7 +59,7 @@ export function useRouterUiNavigation(): UiNavigationPort {
  * multi-valued map; a repeated key collapses to its last value, since a
  * screen writing `?tab=sources` is asking a single-valued question.
  */
-class RouterUiRoute extends UiRoutePort {
+class RouterUiRoute extends UiRoute {
   constructor(
     private readonly values: UiRouteReadingValues,
     private readonly write: (
@@ -92,12 +92,12 @@ export function createUiRoute({
     next: Readonly<Record<string, string | undefined>>,
     options?: { replace?: boolean },
   ) => void;
-}): UiRoutePort {
+}): UiRoute {
   return new RouterUiRoute(values, setQuery);
 }
 
 /** The route capability of the router this render is inside. */
-export function useRouterUiRoute(): UiRoutePort {
+export function useRouterUiRoute(): UiRoute {
   const params = useParams();
   const { pathname } = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();

@@ -6,9 +6,9 @@
 import { describe, expect, it } from "vitest";
 
 import { OpsWorkerFeatureInstaller } from "../../features/ops/ops-worker-feature.installer.ts";
-import { createWorkerOps, WorkerOpsAbsenceReportPort } from "../worker-ops.composition.ts";
+import { createWorkerOps, WorkerOpsAbsenceReport } from "../worker-ops.composition.ts";
 
-class RecordingAbsence extends WorkerOpsAbsenceReportPort {
+class RecordingAbsence extends WorkerOpsAbsenceReport {
   readonly reasons: string[] = [];
 
   withoutAnomalyDetection(): void {

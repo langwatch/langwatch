@@ -5,7 +5,7 @@
  * between processes, so the cipher arrives with the connection.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ModelProviderCredentialCodec } from "../../ports/model-provider.port.ts";
+import type { ModelProviderCredentialCodec } from "../../app/model-provider.infrastructure.ts";
 import type { ModelProviderRepositories } from "../model-provider.repositories.ts";
 import { PrismaModelCostRepository } from "./prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "./prisma.model-default.repository.ts";

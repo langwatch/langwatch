@@ -1,5 +1,5 @@
 import {
-  AuthzGrantsCommandDispatcherPort,
+  AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
   AuthzLedgerUnavailableError,
   LEDGER_APP_HANDLE_WAIT_MS,
@@ -35,7 +35,7 @@ function isSender(value: unknown): value is UntypedSender {
  * two producers for one aggregate — and it throws. Connecting the same senders
  * twice is idempotent, so an installer that runs again finds nothing to do.
  */
-export class EventingAuthzCommandDispatcherAdapter extends AuthzGrantsCommandDispatcherPort {
+export class EventingAuthzCommandDispatcherAdapter extends AuthzGrantsCommandDispatcher {
   static create(options: { waitMs?: number } = {}): EventingAuthzCommandDispatcherAdapter {
     return new EventingAuthzCommandDispatcherAdapter(options.waitMs ?? LEDGER_APP_HANDLE_WAIT_MS);
   }

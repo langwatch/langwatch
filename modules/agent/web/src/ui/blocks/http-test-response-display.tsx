@@ -2,7 +2,7 @@ import { Alert, Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, Clock } from "lucide-react";
 import { CollapsibleSection, CopyButton } from "../elements/http-test-components.tsx";
 import {
-  type HttpTestErrorExplanationPort,
+  type HttpTestErrorExplanation,
   type HttpTestResult,
 } from "../../model/http-test.types.ts";
 
@@ -23,7 +23,7 @@ function TestFailure({
   explainError,
 }: {
   result: HttpTestResult;
-  explainError?: HttpTestErrorExplanationPort;
+  explainError?: HttpTestErrorExplanation;
 }) {
   const explanation = explainError?.({
     errorCode: result.errorCode,
@@ -60,7 +60,7 @@ export function HttpTestResponseDisplay({
   explainError,
 }: {
   result: HttpTestResult;
-  explainError?: HttpTestErrorExplanationPort;
+  explainError?: HttpTestErrorExplanation;
 }) {
   const responseString =
     typeof result.response === "string"

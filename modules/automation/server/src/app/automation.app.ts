@@ -53,20 +53,20 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
-import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { AutomationClock } from "./automation.infrastructure.ts";
 import type {
-  AutomationDispatchErrorPort,
-  AutomationGraphNotifierPort,
-  AutomationHeartbeatPort,
-  AutomationLoggerPort,
-  AutomationSlackBotTokenDecryptorPort,
-} from "../ports/automation-graph.port.ts";
+  AutomationDispatchError,
+  AutomationGraphNotifier,
+  AutomationHeartbeat,
+  AutomationLogger,
+  AutomationSlackBotTokenDecryptor,
+} from "./automation.infrastructure.ts";
 import type { AutomationWebhookStoredParams } from "../ports/automation-provider.port.ts";
-import type { AutomationRunawayPort } from "../ports/automation-runaway.port.ts";
-import type { AutomationTestFirePort } from "../ports/automation-test-fire.port.ts";
+import type { AutomationRunaway } from "../ports/automation-runaway.port.ts";
+import type { AutomationTestFire } from "../ports/automation-test-fire.port.ts";
 import type { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
-import type { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
-import type { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port.ts";
+import type { SchedulerWake } from "../ports/scheduler-wake.port.ts";
+import type { UnsubscribeTokenVerifier } from "../ports/unsubscribe-token.port.ts";
 import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
 import { AutomationService } from "../services/automation.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
@@ -77,7 +77,7 @@ import {
   type AutomationProjectIdentity,
 } from "../services/automation-rules.service.ts";
 import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
-import type { AutomationPersistCapRedisPort } from "../services/persist-cap.service.ts";
+import type { AutomationPersistCapRedis } from "../services/persist-cap.service.ts";
 
 export type { AutomationWebhookStoredParams };
 export type { AutomationProjectIdentity };
@@ -170,18 +170,18 @@ export interface AutomationAuditSink {
 }
 
 export type AutomationInfrastructure = Readonly<{
-  verifier: UnsubscribeTokenVerifierPort;
+  verifier: UnsubscribeTokenVerifier;
   jobs: ScheduledJobStorePort;
-  clock: AutomationClockPort;
-  wake: SchedulerWakePort;
-  notifier: AutomationGraphNotifierPort;
-  logger: AutomationLoggerPort;
-  slackTokens: AutomationSlackBotTokenDecryptorPort;
-  dispatchErrors: AutomationDispatchErrorPort;
-  heartbeat: AutomationHeartbeatPort;
-  runaway: AutomationRunawayPort;
-  testFire: AutomationTestFirePort;
-  redis: AutomationPersistCapRedisPort | null;
+  clock: AutomationClock;
+  wake: SchedulerWake;
+  notifier: AutomationGraphNotifier;
+  logger: AutomationLogger;
+  slackTokens: AutomationSlackBotTokenDecryptor;
+  dispatchErrors: AutomationDispatchError;
+  heartbeat: AutomationHeartbeat;
+  runaway: AutomationRunaway;
+  testFire: AutomationTestFire;
+  redis: AutomationPersistCapRedis | null;
   providers: AutomationProviderSecrets;
   slackChannels: AutomationSlackDirectory;
   traceFilters: AutomationTraceFilterCompiler;

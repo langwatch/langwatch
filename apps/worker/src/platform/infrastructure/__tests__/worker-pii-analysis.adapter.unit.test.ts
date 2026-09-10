@@ -1,4 +1,4 @@
-import { PiiAnalysisMetricsPort, type PiiAnalysisOutcome } from "@langwatch/data-privacy-server";
+import { PiiAnalysisMetrics, type PiiAnalysisOutcome } from "@langwatch/data-privacy-server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WorkerTracePrivacyConfig } from "../../config/worker.config.ts";
@@ -21,7 +21,7 @@ vi.mock("@google-cloud/dlp", () => ({
   },
 }));
 
-class RecordingMetrics extends PiiAnalysisMetricsPort {
+class RecordingMetrics implements PiiAnalysisMetrics {
   readonly calls: string[] = [];
   readonly durations: number[] = [];
   readonly outcomes: PiiAnalysisOutcome[] = [];

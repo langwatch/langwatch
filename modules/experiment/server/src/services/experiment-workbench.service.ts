@@ -33,7 +33,7 @@ import {
   isPostgresUniqueConflict,
   postgresUniqueConflictTargets,
 } from "../rules/postgres-unique-conflict.rules.ts";
-import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port.ts";
+import type { ExperimentWorkbenchUpdates } from "../ports/experiment-workbench-updates.port.ts";
 import type { ExperimentRepository } from "../repositories/experiment.repository.ts";
 import type { ExperimentSlugService } from "./experiment-slug.service.ts";
 import type { ExperimentWorkbenchReferencesService } from "./experiment-workbench-references.service.ts";
@@ -49,7 +49,7 @@ export type ExperimentDraftNames = {
 export type ExperimentWorkbenchServiceOptions = {
   repository: ExperimentRepository;
   newId: () => string;
-  updates: ExperimentWorkbenchUpdatesPort;
+  updates: ExperimentWorkbenchUpdates;
   slugs: ExperimentSlugService;
   references: ExperimentWorkbenchReferencesService;
   draftNames: ExperimentDraftNames;
@@ -58,7 +58,7 @@ export type ExperimentWorkbenchServiceOptions = {
 export class ExperimentWorkbenchService {
   private readonly repository: ExperimentRepository;
   private readonly newId: () => string;
-  private readonly updates: ExperimentWorkbenchUpdatesPort;
+  private readonly updates: ExperimentWorkbenchUpdates;
   private readonly slugs: ExperimentSlugService;
   private readonly references: ExperimentWorkbenchReferencesService;
   private readonly draftNames: ExperimentDraftNames;

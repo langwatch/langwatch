@@ -9,12 +9,12 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-088 (Decisions 6 and 7).
  */
-import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts";
+import type { PulledUsageRateInput } from "../../app/governance.infrastructure.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.service.ts";
 import {
-  GovernanceHttpPort,
+  GovernanceHttpClient,
   type GovernanceHttpResponse,
 } from "../../app/governance.infrastructure.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
@@ -23,16 +23,16 @@ import { Temporal } from "@langwatch/time";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 
-class TestHttpPort implements GovernanceHttpPort {
+class TestHttp implements GovernanceHttpClient {
   async fetch(
     url: string,
-    init: Parameters<GovernanceHttpPort["fetch"]>[1],
+    init: Parameters<GovernanceHttpClient["fetch"]>[1],
   ): Promise<GovernanceHttpResponse> {
     return fetchMock(url, init);
   }
 }
 
-class TestRatePort {
+class TestRate {
   rate(input: PulledUsageRateInput) {
     return {
       costNanoUsd: input.quantities.tokensInput + input.quantities.tokensOutput > 0 ? 1 : 0,
@@ -42,12 +42,12 @@ class TestRatePort {
 }
 
 const pulledUsageRecords = PulledUsageRecordService.create(
-  PulledUsagePricingService.create(new TestRatePort()),
+  PulledUsagePricingService.create(new TestRate()),
 );
 const buildPulledUsageRecord = pulledUsageRecords.findBuilt.bind(pulledUsageRecords);
 
 function makePuller(): AnthropicAdminPullerAdapter {
-  return AnthropicAdminPullerAdapter.create(new TestHttpPort());
+  return AnthropicAdminPullerAdapter.create(new TestHttp());
 }
 
 const SOURCE = {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ScenarioSecretCipherPort } from "../../index.ts";
 import { ScenarioRunSecretsService } from "../scenario-run-secrets.service.ts";
 
-class ReversibleCipherPort implements ScenarioSecretCipherPort {
+class ReversibleCipher implements ScenarioSecretCipherPort {
   encrypt(plaintext: string): string {
     return `cipher:${plaintext}`;
   }
@@ -15,7 +15,7 @@ class ReversibleCipherPort implements ScenarioSecretCipherPort {
 
 describe("ScenarioRunSecretsService", () => {
   it("keeps ciphertext durable while restoring the target-facing plaintext", () => {
-    const secrets = ScenarioRunSecretsService.create(new ReversibleCipherPort());
+    const secrets = ScenarioRunSecretsService.create(new ReversibleCipher());
     const encrypted = secrets.encrypt({ apiToken: "tok-live-abc" });
 
     expect(encrypted).toEqual({ apiToken: "cipher:tok-live-abc" });
@@ -23,7 +23,7 @@ describe("ScenarioRunSecretsService", () => {
   });
 
   it("names the secret key without exposing an unreadable ciphertext", () => {
-    const secrets = ScenarioRunSecretsService.create(new ReversibleCipherPort());
+    const secrets = ScenarioRunSecretsService.create(new ReversibleCipher());
 
     expect(() => secrets.decrypt({ apiToken: "invalid:tok-live-abc" })).toThrow(
       'Secret parameter "apiToken" could not be decrypted for this run',

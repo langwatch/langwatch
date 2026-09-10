@@ -58,11 +58,11 @@ import { navigationApi } from "@langwatch/navigation-web/navigation";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
 import {
   UiCapabilityContextProvider,
-  UiDocumentTitlePort,
-  UiFeedbackPort,
-  UiNavigationPort,
-  UiRoutePort,
-  UiSessionPort,
+  UiDocumentTitle,
+  UiFeedback,
+  UiNavigation,
+  UiRoute,
+  UiSession,
   type UiActiveScope,
   type UiActor,
   type UiCapabilities,
@@ -70,7 +70,7 @@ import {
 import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
 import { NavigationHostSection } from "../src/features/navigation";
 
-class RecordingNavigation extends UiNavigationPort {
+class RecordingNavigation extends UiNavigation {
   readonly visited: string[] = [];
   navigate(to: string): void {
     this.visited.push(to);
@@ -81,26 +81,26 @@ class RecordingNavigation extends UiNavigationPort {
   back(): void {}
 }
 
-class SilentRoute extends UiRoutePort {
+class SilentRoute extends UiRoute {
   reading() {
     return { params: {}, query: {} };
   }
   setQuery(): void {}
 }
 
-class SilentFeedback extends UiFeedbackPort {
+class SilentFeedback extends UiFeedback {
   succeeded(): void {}
   failed(): void {}
 }
 
-class SilentTitle extends UiDocumentTitlePort {
+class SilentTitle extends UiDocumentTitle {
   set(): () => void {
     return () => {};
   }
 }
 
 /** A member of the team that holds the project on screen, with no Langy. */
-class ShellSession extends UiSessionPort {
+class ShellSession extends UiSession {
   currentUser(): UiActor {
     return { id: "user-1", name: "Ada", email: "ada@example.com", image: null };
   }

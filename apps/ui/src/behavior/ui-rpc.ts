@@ -21,7 +21,7 @@ export type UiRpcSubscriptionHandlers = {
 export type UiRpcSubscription = { unsubscribe: () => void };
 
 /** A procedure call addressed by path rather than by a typed hook. */
-export abstract class UiRpcPort {
+export abstract class UiRpc {
   abstract query(path: string, input: unknown): Promise<unknown>;
 
   abstract mutate(path: string, input: unknown): Promise<unknown>;
@@ -38,7 +38,7 @@ export abstract class UiRpcPort {
   ): UiRpcSubscription;
 }
 
-export class BrowserUiRpc extends UiRpcPort {
+export class BrowserUiRpc extends UiRpc {
   static create(input: {
     transport: UiFeatureApiTransport;
     queryClient: QueryClient;
@@ -76,7 +76,7 @@ export class BrowserUiRpc extends UiRpcPort {
 }
 
 /** The composition never mounted a shell, and something asked to dispatch. */
-class UnavailableUiRpc extends UiRpcPort {
+class UnavailableUiRpc extends UiRpc {
   query(): never {
     throw new Error(
       "No UI transport is mounted above this screen; render it inside the application shell.",
@@ -96,12 +96,12 @@ class UnavailableUiRpc extends UiRpcPort {
   }
 }
 
-const UiRpcContext = createContext<UiRpcPort>(new UnavailableUiRpc());
+const UiRpcContext = createContext<UiRpc>(new UnavailableUiRpc());
 
 /** Publishes the shell's dispatcher to every routed page. */
 export const UiRpcContextProvider = UiRpcContext.Provider;
 
 /** The by-path dispatcher of the process this screen is running in. */
-export function useUiRpc(): UiRpcPort {
+export function useUiRpc(): UiRpc {
   return useContext(UiRpcContext);
 }

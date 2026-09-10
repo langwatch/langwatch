@@ -4,7 +4,7 @@
  */
 // @vitest-environment node
 import type { ApiKeyApi, ApiKeyDetail } from "@langwatch/api-key-contract";
-import type { AppRestManagementAuditPort } from "@langwatch/api/rest";
+import type { AppRestManagementAudit } from "@langwatch/api/rest";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
@@ -16,7 +16,7 @@ const API_KEY_ID = "api-key-credential";
 const CALLER_USER_ID = "user-caller";
 const TARGET_KEY_ID = "api-key-target";
 
-type AuditRow = Parameters<AppRestManagementAuditPort>[0];
+type AuditRow = Parameters<AppRestManagementAudit>[0];
 
 describe("given a member's credential on the api-keys family", () => {
   describe("when one key is read by id", () => {

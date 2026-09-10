@@ -40,20 +40,20 @@ import type {
 } from "@langwatch/coding-agent-contract";
 import type { CodingAgentScopeCaller } from "#ports/coding-agent-caller-scope.port";
 import type { CodingAgentSessionService } from "../services/coding-agent.service.ts";
-import type { CodingAgentBillingPolicyPort } from "#ports/coding-agent-billing.port";
+import type { CodingAgentBillingPolicy } from "#ports/coding-agent-billing.port";
 import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
   gateSessionListTitles,
 } from "../rules/coding-agent-gates.rules.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
-import { SystemCodingAgentClockAdapter } from "../adapters/coding-agent-clock.adapter.ts";
+import { SystemCodingAgentClockAdapter } from "../services/coding-agent-clock.service.ts";
 import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
 import { CodingAgentFeatureService } from "../services/coding-agent.service.ts";
 import type {
-  CodingAgentCallerScopeDirectoryPort,
-  CodingAgentScopePermissionsPort,
-} from "../ports/coding-agent-caller-scope.port.ts";
+  CodingAgentCallerScopeDirectory,
+  CodingAgentScopePermissions,
+} from "./coding-agent.infrastructure.ts";
 
 /**
  * The caller's permission cut over an organization: which of its projects they
@@ -127,9 +127,9 @@ export interface CodingAgentAuditPort {
 
 /** What the process composes this feature's application from. */
 export type CodingAgentInfrastructure = Readonly<{
-  billing: CodingAgentBillingPolicyPort;
-  scopeDirectory: CodingAgentCallerScopeDirectoryPort;
-  scopePermissions: CodingAgentScopePermissionsPort;
+  billing: CodingAgentBillingPolicy;
+  scopeDirectory: CodingAgentCallerScopeDirectory;
+  scopePermissions: CodingAgentScopePermissions;
   /** What one viewer may read of one project's captured content and spend. */
   visibility: CodingAgentViewerVisibilityPort;
   /** Where a read that names people is written down. */

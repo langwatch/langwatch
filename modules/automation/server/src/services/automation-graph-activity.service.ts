@@ -5,18 +5,18 @@ import type {
   TriggerSummary,
 } from "@langwatch/automation-contract";
 import {
-  AutomationGraphActivityPort,
+  AutomationGraphActivity,
   type AutomationProjectIdentityPort,
-} from "../ports/automation-graph-activity.port.ts";
-import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+} from "../app/automation.infrastructure.ts";
+import type { AutomationClock } from "../app/automation.infrastructure.ts";
 import {
-  type AutomationDispatchErrorPort,
-  type AutomationLoggerPort,
-  type AutomationSlackBotTokenDecryptorPort,
+  type AutomationDispatchError,
+  type AutomationLogger,
+  type AutomationSlackBotTokenDecryptor,
 } from "../ports/automation-graph.port.ts";
-import type { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port.ts";
-import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
-import type { AutomationWebhookProviderPort } from "../ports/automation-provider.port.ts";
+import type { AutomationGraphDelivery } from "../app/automation.infrastructure.ts";
+import type { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
+import type { AutomationWebhookProvider } from "../ports/automation-provider.port.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
@@ -34,23 +34,23 @@ import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.
  * chose. Deliberately NOT here: the heartbeat sweep and persist-cap breach
  * containment, which need collaborators this path never reaches.
  */
-export class AutomationGraphActivityService extends AutomationGraphActivityPort {
+export class AutomationGraphActivityService implements AutomationGraphActivity {
   static create(input: {
     triggers: TriggerRepository;
     customGraphs: CustomGraphRepository;
     graphTriggerSent: GraphTriggerSentRepository;
     /** The suppression, send-claim and webhook-log half a dispatched alert writes. */
-    persistence: AutomationGraphDeliveryPort;
-    clock: AutomationClockPort;
+    persistence: AutomationGraphDelivery;
+    clock: AutomationClock;
     projects: AutomationProjectIdentityPort;
     analytics: AnalyticsService;
     /** The process's outbound transports: mail, Slack, webhook. */
-    delivery: AutomationNotificationDeliveryPort;
-    webhooks: AutomationWebhookProviderPort;
-    slackTokens: AutomationSlackBotTokenDecryptorPort;
+    delivery: AutomationNotificationDelivery;
+    webhooks: AutomationWebhookProvider;
+    slackTokens: AutomationSlackBotTokenDecryptor;
     emailCaps: AutomationEmailCapService;
-    logger: AutomationLoggerPort;
-    dispatchErrors: AutomationDispatchErrorPort;
+    logger: AutomationLogger;
+    dispatchErrors: AutomationDispatchError;
     baseHost: string;
     emailHourlyCap: number;
     tenantDailyCap: number;
@@ -85,7 +85,6 @@ export class AutomationGraphActivityService extends AutomationGraphActivityPort 
     private readonly active: ActiveTriggerCacheService,
     private readonly evaluator: GraphTriggerEvaluatorService,
   ) {
-    super();
   }
 
   getActiveGraphTriggersForProject(projectId: string): Promise<TriggerSummary[]> {

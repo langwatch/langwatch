@@ -10,11 +10,11 @@ import {
   type NlpInvokeStagingConfig,
 } from "../workflow-nlp-lambda.adapter.ts";
 import {
-  NlpLambdaInvokePort,
-  NlpPayloadStagingPort,
+  NlpLambdaInvoke,
+  NlpPayloadStaging,
   type NlpLambdaInvokeResult,
   type StagedNlpPayload,
-} from "../../ports/workflow-nlp-lambda.port.ts";
+} from "../../app/workflow.app.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:nlpgo-project";
 
@@ -25,7 +25,7 @@ type StageCall = {
   ttlSeconds: number;
 };
 
-class RecordingLambda extends NlpLambdaInvokePort {
+class RecordingLambda implements NlpLambdaInvoke {
   readonly payloads: string[] = [];
   rejectWith: Error | null = null;
 
@@ -36,7 +36,7 @@ class RecordingLambda extends NlpLambdaInvokePort {
   }
 }
 
-class RecordingStaging extends NlpPayloadStagingPort {
+class RecordingStaging implements NlpPayloadStaging {
   readonly calls: StageCall[] = [];
   readonly discarded: string[] = [];
 

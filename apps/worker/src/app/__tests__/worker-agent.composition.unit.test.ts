@@ -13,7 +13,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import type { NlpPayloadStagingPort } from "@langwatch/workflow-server";
+import type { NlpPayloadStaging } from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import { createWorkerAgentApps } from "../worker-agent-apps.composition.ts";
@@ -103,7 +103,7 @@ describe("createWorkerAgentApps", () => {
         langwatchEndpoint: "https://langwatch.test",
         nlpServiceUrl: "https://nlp.langwatch.test",
         encryptionKey: "0".repeat(64),
-        payloadStaging: createApiFixture<NlpPayloadStagingPort>(),
+        payloadStaging: createApiFixture<NlpPayloadStaging>(),
       },
       foundation: createApiFixture<WorkerFoundationApps>({
         auditLog: peers.auditLog,

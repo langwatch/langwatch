@@ -11,10 +11,10 @@ import {
   LambdaWorkflowStudioStreamAdapter,
   NlpLambdaFunctionPort,
   NlpLambdaRuntimeService,
-  NlpPayloadStagingPort,
+  NlpPayloadStaging,
   UnconfiguredWorkflowStudioStreamAdapter,
   WorkflowStudioDispatchService,
-  WorkflowStudioStreamPort,
+  WorkflowStudioStream,
   type NlpLambdaArnCache,
   type StudioLambdaConfig,
 } from "@langwatch/workflow-server";
@@ -28,7 +28,7 @@ import { MemoryNlpLambdaArnCache } from "./nlp-lambda-arn-cache.ts";
 export function composeApiWorkflowStudioDispatch(options: {
   nlpServiceUrl: string | undefined;
   modelProviders: ModelProviderApi;
-  payloadStaging?: NlpPayloadStagingPort | undefined;
+  payloadStaging?: NlpPayloadStaging | undefined;
   arnCache?: NlpLambdaArnCache | undefined;
   nlpLambdaFleet?: StudioLambdaConfig | undefined;
   nlpLambdaFleetNamed?: boolean;
@@ -42,11 +42,11 @@ export function composeApiWorkflowStudioDispatch(options: {
 /** A configured fleet uses each project's function; invalid fleet config never falls back. */
 export function composeApiWorkflowStudioStream(options: {
   nlpServiceUrl: string | undefined;
-  payloadStaging?: NlpPayloadStagingPort | undefined;
+  payloadStaging?: NlpPayloadStaging | undefined;
   arnCache?: NlpLambdaArnCache | undefined;
   nlpLambdaFleet?: StudioLambdaConfig | undefined;
   nlpLambdaFleetNamed?: boolean;
-}): WorkflowStudioStreamPort {
+}): WorkflowStudioStream {
   const { nlpLambdaFleet: fleet } = options;
   if (fleet) {
     return composeLambdaStudioStream({ fleet, ...options });
@@ -64,9 +64,9 @@ export function composeApiWorkflowStudioStream(options: {
 /** The per-project fleet, from its credentials down to its shared ARN cache. */
 function composeLambdaStudioStream(options: {
   fleet: StudioLambdaConfig;
-  payloadStaging?: NlpPayloadStagingPort | undefined;
+  payloadStaging?: NlpPayloadStaging | undefined;
   arnCache?: NlpLambdaArnCache | undefined;
-}): WorkflowStudioStreamPort {
+}): WorkflowStudioStream {
   const { fleet } = options;
   const credentials = {
     accessKeyId: fleet.accessKeyId,
@@ -90,7 +90,7 @@ function composeLambdaStudioStream(options: {
   });
 
   return LambdaWorkflowStudioStreamAdapter.create({
-    functions: new (class extends NlpLambdaFunctionPort {
+    functions: new (class implements NlpLambdaFunctionPort {
       arnFor(input: { projectId: string }): Promise<string> {
         return runtime.resolveArn(input.projectId);
       }
@@ -103,14 +103,12 @@ function composeLambdaStudioStream(options: {
 }
 
 /** Prevent a malformed fleet configuration from silently switching execution hosts. */
-class MisconfiguredFleetStudioStreamAdapter extends WorkflowStudioStreamPort {
+class MisconfiguredFleetStudioStreamAdapter implements WorkflowStudioStream {
   static create(): MisconfiguredFleetStudioStreamAdapter {
     return new MisconfiguredFleetStudioStreamAdapter();
   }
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   open(): Promise<ReadableStreamDefaultReader<Uint8Array>> {
     return Promise.reject(new ApiStudioLambdaFleetMisconfiguredError());

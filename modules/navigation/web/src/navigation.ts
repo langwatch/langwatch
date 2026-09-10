@@ -36,7 +36,7 @@ export type NavigationScreenName = keyof typeof navigationScreens;
 export { navigationApi, type NavigationApiMap } from "./behavior/navigation-api.ts";
 export { useLandingRedirect } from "./behavior/use-landing-redirect.ts";
 export {
-  NavigationHostPort,
+  NavigationHost,
   NavigationHostProvider,
   useNavigationHost,
   useOptionalNavigationHost,

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { OrganizationUserRole } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { JoinRequestNotificationMailPort } from "../app/identity.infrastructure.ts";
+import type { JoinRequestNotificationMail } from "../app/identity.infrastructure.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 
 const logger = createLogger("langwatch:identity:join-request-adapters");
@@ -26,7 +26,7 @@ export type JoinRequestNotifierMemberships = {
 export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
   static create(options: {
     prisma: PrismaClient;
-    mail: JoinRequestNotificationMailPort;
+    mail: JoinRequestNotificationMail;
     /** This deployment's public origin, for a lapsed requester's personal project link. */
     baseHost: string;
     /** Read for the seat census a domain-auto-join notice carries. Absent omits it. */
@@ -44,7 +44,7 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
 
   private constructor(
     private readonly prisma: PrismaClient,
-    private readonly mail: JoinRequestNotificationMailPort,
+    private readonly mail: JoinRequestNotificationMail,
     private readonly baseHost: string,
     private readonly plans: JoinRequestNotifierPlans | undefined,
     private readonly memberships: JoinRequestNotifierMemberships | undefined,

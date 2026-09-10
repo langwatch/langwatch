@@ -5,17 +5,16 @@
  */
 import { InvokeWithResponseStreamCommand, type LambdaClient } from "@aws-sdk/client-lambda";
 import {
-  NlpLambdaStreamInvokePort,
+  NlpLambdaStreamInvoke,
   type NlpLambdaStreamChunk,
-} from "../ports/nlp-lambda-stream.port.ts";
+} from "../app/workflow.app.ts";
 
-export class AwsNlpLambdaStreamInvokeAdapter extends NlpLambdaStreamInvokePort {
+export class AwsNlpLambdaStreamInvokeAdapter implements NlpLambdaStreamInvoke {
   static create(options: { lambda: LambdaClient }): AwsNlpLambdaStreamInvokeAdapter {
     return new AwsNlpLambdaStreamInvokeAdapter(options.lambda);
   }
 
   private constructor(private readonly lambda: LambdaClient) {
-    super();
   }
 
   async invokeStream(input: {

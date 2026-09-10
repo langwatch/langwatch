@@ -19,7 +19,7 @@ import {
   UNAVAILABLE_UI_FEEDBACK,
   UNAVAILABLE_UI_SESSION,
   type UiCapabilityInstall,
-  type UiSessionPort,
+  type UiSession,
 } from "@langwatch/ui-host/capabilities";
 import { shouldRetryQuery } from "@langwatch/ui-host/query-retry";
 import { UiSlot } from "@langwatch/ui-host/slots";
@@ -85,7 +85,7 @@ export function createUiFeatureShell({
     // The installed feedback port, resolved ahead of the session rather than
     // read back out of the resolution: a refused session read is told through
     // it, and it is the only failure with nobody else to tell.
-    const sessionPort: UiSessionPort = useSessionCapability({
+    const sessionPort: UiSession = useSessionCapability({
       transport: sessionTransport,
       feedback: capabilities.feedback ?? UNAVAILABLE_UI_FEEDBACK,
     });

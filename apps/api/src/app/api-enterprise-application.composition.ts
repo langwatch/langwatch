@@ -1,7 +1,7 @@
 /**
  * The Enterprise application slot, composed MEMBER BY MEMBER over this process's own graph.
  *
- * `ApiEnterpriseApplicationPort` carries eight independent members and nothing composed any
+ * `ApiEnterpriseApplication` carries eight independent members and nothing composed any
  * of them, so every Enterprise surface on this process refused. Three of the eight are
  * reachable from what the API already holds, and they are what this module builds:
  *
@@ -38,13 +38,13 @@ import {
 import { PostgresSessionPolicyAdapter } from "@langwatch/enterprise-governance-server";
 import type { EventSourcing } from "@langwatch/eventing";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
-import { PlatformOperatorPort } from "@langwatch/identity-server";
+import { PlatformOperator } from "@langwatch/identity-server";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 
-import type { ApiEnterpriseApplicationPort } from "../features/enterprise/enterprise.composition.ts";
+import type { ApiEnterpriseApplication } from "../features/enterprise/enterprise.composition.ts";
 import {
   composeApiWebhookPlatform,
   type ApiWebhookClickHouseResolver,
@@ -66,7 +66,7 @@ export type ApiEnterpriseApplicationOptions = Readonly<{
   /** The one guarded connection every member here runs on. */
   prisma: PrismaClient | undefined;
   /** The cipher an endpoint's signing secret is written under, or none. */
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
   /** This process's ClickHouse, where the emitted webhook envelopes are projected. */
   resolveClickHouseClient: ApiWebhookClickHouseResolver | null;
   /**
@@ -78,7 +78,7 @@ export type ApiEnterpriseApplicationOptions = Readonly<{
   /** This process's producer-only eventing, where it composed a queue. */
   eventSourcing: EventSourcing | undefined;
   /** Who this deployment counts as a platform operator, for the connection guards. */
-  operators: PlatformOperatorPort;
+  operators: PlatformOperator;
   /** The identity app, over the SAME graph the pipeline commands through. */
   identity: IdentityApi;
   report?: ApiEnterpriseApplicationAbsenceReport;
@@ -92,7 +92,7 @@ export type ApiEnterpriseApplicationOptions = Readonly<{
  */
 export function composeApiEnterpriseApplication(
   options: ApiEnterpriseApplicationOptions,
-): ApiEnterpriseApplicationPort {
+): ApiEnterpriseApplication {
   const { prisma, report } = options;
   report?.withoutUnbuiltMembers();
   if (!prisma) {

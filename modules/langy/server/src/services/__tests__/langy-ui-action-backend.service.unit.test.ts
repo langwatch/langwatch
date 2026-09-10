@@ -9,9 +9,9 @@ import {
   type LangyBackendRunResult,
   type LangyBackendSaveResult,
   type LangyBackendStateRead,
-  LangyUiActionBackendPort,
-} from "../../ports/langy-ui-action-backend.port.ts";
-import type { LangyUiActionDefinition } from "../../ports/langy-ui-action-catalog.port.ts";
+  LangyUiActionBackend,
+} from "../../app/langy.infrastructure.ts";
+import type { LangyUiActionDefinition } from "../../app/langy.infrastructure.ts";
 import { LangyUiActionBackendService } from "../langy-ui-action-backend.service.ts";
 
 /** A saved board with one column, small enough to read in a diff. */
@@ -28,7 +28,7 @@ class TransformError extends Error {
   }
 }
 
-class FakeBackend extends LangyUiActionBackendPort {
+class FakeBackend implements LangyUiActionBackend {
   version = 4;
   staleSaves = 0;
   readonly saves: Array<{

@@ -11,7 +11,7 @@ import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
-  LangWatchQLExecutorPort,
+  LangWatchQLExecutor,
 } from "../langwatch-ql-executor.repository.ts";
 import {
   isClickHouseObjectUnavailableError,
@@ -59,7 +59,7 @@ function refusalFor({ error, durationMs }: { error: unknown; durationMs: number 
 }
 
 /** An executor that runs LangWatchQL as the restricted identity. */
-export class ClickHouseLangWatchQLExecutorAdapter extends LangWatchQLExecutorPort {
+export class ClickHouseLangWatchQLExecutorAdapter extends LangWatchQLExecutor {
   static create({
     connection,
   }: {

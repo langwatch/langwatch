@@ -1,14 +1,14 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { AutomationClock } from "../app/automation.infrastructure.ts";
 import type {
-  AutomationSettlementBreachPort,
+  AutomationSettlementBreach,
   AutomationSettlementPersistCap,
 } from "../ports/automation-settlement-ledger.port.ts";
 import { PrismaEmailSuppressionRepository } from "../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository.ts";
 import { PrismaWebhookDeliveryRepository } from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { AutomationSettlementLedgerService } from "../services/automation-settlement-ledger.service.ts";
-import type { AutomationPersistCapRedisPort } from "../services/persist-cap.service.ts";
+import type { AutomationPersistCapRedis } from "../services/persist-cap.service.ts";
 
 /** The four tables settlement's ledger touches, named here and nowhere above it. */
 export type AutomationSettlementLedgerDatabase = Pick<
@@ -28,15 +28,15 @@ export class PostgresAutomationSettlementLedgerAdapter {
   static create(options: {
     /** The one database client the composing process opened. */
     prisma: AutomationSettlementLedgerDatabase;
-    clock: AutomationClockPort;
+    clock: AutomationClock;
     /**
      * The shared Redis the daily ceiling counts in. Absent falls back to
      * per-process counters, which is the application's own behaviour when Redis
      * is down: a ceiling enforced per pod rather than per fleet.
      */
-    redis?: AutomationPersistCapRedisPort | null;
+    redis?: AutomationPersistCapRedis | null;
     persistCap: AutomationSettlementPersistCap;
-    breach: AutomationSettlementBreachPort;
+    breach: AutomationSettlementBreach;
   }): AutomationSettlementLedgerService {
     const triggers = PrismaTriggerRepository.create(options.prisma, options.clock);
 

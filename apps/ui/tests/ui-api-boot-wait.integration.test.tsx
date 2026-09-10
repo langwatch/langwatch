@@ -20,7 +20,7 @@ vi.mock("../src/behavior/ui-departure", () => ({
 }));
 
 import {
-  UiFeedbackPort,
+  UiFeedback,
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "@langwatch/ui-host/capabilities";
@@ -71,7 +71,7 @@ function bootingApi(): { client: UiAuthClient; comeUp: () => void } {
   };
 }
 
-class RecordingFeedback extends UiFeedbackPort {
+class RecordingFeedback extends UiFeedback {
   readonly failures: UiFailureNotice[] = [];
 
   succeeded(_notice: UiSuccessNotice): void {
@@ -114,7 +114,7 @@ function renderShell({
 }: {
   path: string;
   authClient: UiAuthClient;
-  feedback: UiFeedbackPort;
+  feedback: UiFeedback;
   page: ReactNode;
 }) {
   const Shell = createUiFeatureShell({

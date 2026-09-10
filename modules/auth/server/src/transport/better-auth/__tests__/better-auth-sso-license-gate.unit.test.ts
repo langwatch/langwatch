@@ -8,17 +8,17 @@ import { APIError } from "better-auth/api";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
-  BetterAuthFederationPort,
-  BetterAuthIdentityCeremoniesPort,
-  BetterAuthStoragePort,
+  BetterAuthFederation,
+  BetterAuthIdentityCeremonies,
+  BetterAuthStorage,
 } from "../better-auth.collaborators.ts";
 import { createAuthOptions, type BetterAuthDeploymentConfiguration } from "../better-auth.api.ts";
-import type { SignInRouterShadowPort } from "../sign-in-router-shadow.api.ts";
+import type { SignInRouterShadow } from "../sign-in-router-shadow.api.ts";
 
 const PASSWORD: SignInMethod = { id: "password", kind: "password", connectionId: null };
 const OKTA: SignInMethod = { id: "okta", kind: "federated", connectionId: "org_acme" };
 
-class StubFederationPort implements BetterAuthFederationPort {
+class StubFederation implements BetterAuthFederation {
   federationCapableValue = true;
   policy: SignInMethodPolicy = {
     defaultMethods: [PASSWORD],
@@ -39,7 +39,7 @@ class StubFederationPort implements BetterAuthFederationPort {
   }
 }
 
-class StubShadowPort implements SignInRouterShadowPort {
+class StubShadow implements SignInRouterShadow {
   mode() {
     return "off" as const;
   }
@@ -51,13 +51,13 @@ class StubShadowPort implements SignInRouterShadowPort {
   }
 }
 
-class StubStoragePort implements BetterAuthStoragePort {
+class StubStorage implements BetterAuthStorage {
   adapter(): unknown {
     return {};
   }
 }
 
-class StubIdentityPort implements BetterAuthIdentityCeremoniesPort {
+class StubIdentity implements BetterAuthIdentityCeremonies {
   beforeUserDelete(): Promise<void> {
     return Promise.reject(new Error("unused"));
   }
@@ -80,14 +80,14 @@ const deployment: BetterAuthDeploymentConfiguration = {
   genericOAuthConfigs: [],
 };
 
-function buildHook(federation: StubFederationPort) {
+function buildHook(federation: StubFederation) {
   const authOptions = createAuthOptions({
     repo: {} as never,
     deployment,
-    storage: new StubStoragePort(),
+    storage: new StubStorage(),
     federation,
-    identity: new StubIdentityPort(),
-    shadow: new StubShadowPort(),
+    identity: new StubIdentity(),
+    shadow: new StubShadow(),
     hooks: {} as never,
   });
   const before = authOptions.hooks?.before;
@@ -100,7 +100,7 @@ describe("the SSO license-gate request hook", () => {
   describe("given an unlicensed deployment with an enterprise IdP configured", () => {
     /** @scenario "SSO sign-in routes are refused while the deployment is unlicensed" */
     it("refuses SSO initiation and the legacy callback paths", async () => {
-      const federation = new StubFederationPort();
+      const federation = new StubFederation();
       federation.policy = { ...federation.policy, federationLicensed: false };
       const run = buildHook(federation);
 
@@ -112,7 +112,7 @@ describe("the SSO license-gate request hook", () => {
   describe("given a genuinely licensed deployment whose configured IdP this build cannot mount", () => {
     /** @scenario "The form a misconfigured deployment offers actually accepts a sign-in" */
     it("accepts the email/password form instead of refusing it as identity-provider managed", async () => {
-      const federation = new StubFederationPort();
+      const federation = new StubFederation();
       federation.policy = {
         defaultMethods: [PASSWORD],
         localMethods: [PASSWORD],
@@ -128,7 +128,7 @@ describe("the SSO license-gate request hook", () => {
   describe("given a deployment whose identity provider mounted successfully", () => {
     /** @scenario "A deployment that really does federate still refuses password accounts" */
     it("refuses the email/password form because the identity provider owns the password", async () => {
-      const federation = new StubFederationPort();
+      const federation = new StubFederation();
       federation.policy = {
         defaultMethods: [OKTA],
         localMethods: [PASSWORD],
@@ -145,7 +145,7 @@ describe("the SSO license-gate request hook", () => {
     /** @scenario "No password can be attached to an SSO account without inbox proof" */
     it("refuses a direct password-mutation attempt regardless of license state", async () => {
       for (const licensed of [true, false]) {
-        const federation = new StubFederationPort();
+        const federation = new StubFederation();
         federation.policy = { ...federation.policy, federationLicensed: licensed };
         const run = buildHook(federation);
 
@@ -158,7 +158,7 @@ describe("the SSO license-gate request hook", () => {
   describe("given a signed-in user's browser reading its own session", () => {
     /** @scenario "Existing sessions keep working across a gate change" */
     it("answers without consulting the license gate at all", async () => {
-      const federation = new StubFederationPort();
+      const federation = new StubFederation();
       const run = buildHook(federation);
 
       await expect(run("/api/auth/get-session")).resolves.toBeUndefined();
@@ -167,7 +167,7 @@ describe("the SSO license-gate request hook", () => {
 
     /** @scenario "A slow licensing store does not hold up signed-in users" */
     it("does not wait on the licensing store even when it never answers", async () => {
-      const federation = new StubFederationPort();
+      const federation = new StubFederation();
       federation.resolvePolicy.mockImplementation(() => new Promise(() => {}));
       const run = buildHook(federation);
 

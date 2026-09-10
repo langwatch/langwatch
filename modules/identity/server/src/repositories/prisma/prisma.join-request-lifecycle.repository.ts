@@ -2,7 +2,7 @@ import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { JoinRequestService } from "../../services/join-request.service.ts";
 import { newJoinRequestCommandId } from "../../rules/join-request-id.rules.ts";
 import type { JoinRequestNotificationService } from "../../services/join-request-notification.service.ts";
-import type { JoinRequestLifecyclePort } from "../../processes/join-request-lifecycle.process.ts";
+import type { JoinRequestLifecycle } from "../../processes/join-request-lifecycle.process.ts";
 import type { PrismaJoinRequestReadRepository } from "./prisma.join-request.repository.ts";
 
 export type EventingJoinRequestLifecycleOptions = {
@@ -22,7 +22,7 @@ export type EventingJoinRequestLifecycleOptions = {
  * process manager decides WHEN, the guard still decides WHETHER. It re-reads
  * the folded deadline, so a wake that fires early expires nothing.
  */
-export class PrismaJoinRequestLifecycleRepository implements JoinRequestLifecyclePort {
+export class PrismaJoinRequestLifecycleRepository implements JoinRequestLifecycle {
   static create(options: EventingJoinRequestLifecycleOptions): PrismaJoinRequestLifecycleRepository {
     return new PrismaJoinRequestLifecycleRepository(options);
   }

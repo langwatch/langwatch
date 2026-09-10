@@ -7,7 +7,7 @@ import {
   type ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
-import { EvaluationInputsOffloadPort } from "../ports/evaluation.port.ts";
+import { EvaluationInputsOffload } from "../app/evaluation.infrastructure.ts";
 
 export type EvaluationReportedResult = {
   status: "processed" | "error" | "skipped";
@@ -22,11 +22,11 @@ export type EvaluationReportedResult = {
 };
 
 export class EvaluationReportedEventService {
-  static create(inputsOffload: EvaluationInputsOffloadPort): EvaluationReportedEventService {
+  static create(inputsOffload: EvaluationInputsOffload): EvaluationReportedEventService {
     return new EvaluationReportedEventService(inputsOffload);
   }
 
-  private constructor(private readonly inputsOffload: EvaluationInputsOffloadPort) {}
+  private constructor(private readonly inputsOffload: EvaluationInputsOffload) {}
 
   async emit(
     data: ExecuteEvaluationCommandData,

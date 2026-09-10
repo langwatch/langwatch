@@ -1,10 +1,10 @@
 import {
-  GovernanceBudgetOverviewPort,
+  GovernanceBudgetOverview,
   GovernanceClickHouseResolverPort,
-  GovernanceEventingPort,
-  GovernanceSetupActivityPort,
+  GovernanceEventing,
+  GovernanceSetupActivity,
   IngestionSourceEntitlementsPort,
-  IngestionSourceLifecyclePort,
+  IngestionSourceLifecycle,
   PostgresGovernanceInstallationAdapter,
   type GovernanceInstallationOptions,
 } from "@langwatch/enterprise-governance-server";
@@ -20,13 +20,13 @@ import { AppGovernanceOttlGateway } from "./ottl-gateway.client.ts";
 import { AppPersonalUsageReader } from "./personal-usage.adapter.ts";
 import type { AppPersonalUsageReadAdapter } from "./personal-usage.clickhouse.repository.ts";
 import {
-  AppAiToolProviderCatalogPort,
-  AppAiToolSlugPort,
-  AppCliAdminContactPort,
-  AppPersonalVirtualKeyIssuerPort,
-  type GovernanceModelProviderCatalogPort,
-  type GovernanceOrganizationContactPort,
-  type GovernanceVirtualKeyPort,
+  AppAiToolProviderCatalog,
+  AppAiToolSlug,
+  AppCliAdminContact,
+  AppPersonalVirtualKeyIssuer,
+  type GovernanceModelProviderCatalog,
+  type GovernanceOrganizationContact,
+  type GovernanceVirtualKey,
 } from "./governance-products.adapter.ts";
 import type { AppGovernanceOcsfEventsAdapter } from "./governance-ocsf-events.clickhouse.repository.ts";
 import type { AppGovernanceTraceActivityAdapter } from "./governance-trace-activity.clickhouse.repository.ts";
@@ -40,14 +40,14 @@ type GovernanceRuntimeOptions = {
   projects: ProjectApi;
   apiKeys: ApiKeyApi;
   gatewayBaseUrl: string;
-  virtualKeys: GovernanceVirtualKeyPort;
-  budgetOverview: GovernanceBudgetOverviewPort;
-  providers: GovernanceModelProviderCatalogPort;
-  contacts: GovernanceOrganizationContactPort;
-  eventing: GovernanceEventingPort;
+  virtualKeys: GovernanceVirtualKey;
+  budgetOverview: GovernanceBudgetOverview;
+  providers: GovernanceModelProviderCatalog;
+  contacts: GovernanceOrganizationContact;
+  eventing: GovernanceEventing;
   activityClickhouse: GovernanceClickHouseResolverPort;
   ingestionSourceEntitlements: IngestionSourceEntitlementsPort;
-  ingestionSourceLifecycle: IngestionSourceLifecyclePort;
+  ingestionSourceLifecycle: IngestionSourceLifecycle;
   ingestionEncryption: GovernanceInstallationOptions["ingestionEncryption"];
   ingestionSecretPepper: string;
   ingestionDiagnostics: GovernanceInstallationOptions["ingestionDiagnostics"];
@@ -60,13 +60,13 @@ type GovernanceRuntimeOptions = {
   };
 };
 
-class AppGovernanceSetupActivityPort extends GovernanceSetupActivityPort {
+class AppGovernanceSetupActivity extends GovernanceSetupActivity {
   private constructor(private readonly activity: AppGovernanceTraceActivityAdapter) {
     super();
   }
 
-  static create(activity: AppGovernanceTraceActivityAdapter): AppGovernanceSetupActivityPort {
-    return new AppGovernanceSetupActivityPort(activity);
+  static create(activity: AppGovernanceTraceActivityAdapter): AppGovernanceSetupActivity {
+    return new AppGovernanceSetupActivity(activity);
   }
 
   hasRecentActivity(input: { tenantId: string; sinceMs: number }): Promise<boolean> {
@@ -109,11 +109,11 @@ export class AppGovernanceRuntime {
       personalUsageReader: options.personalUsage
         ? AppPersonalUsageReader.create(options.personalUsage)
         : undefined,
-      personalVirtualKeyIssuer: AppPersonalVirtualKeyIssuerPort.create(options.virtualKeys),
+      personalVirtualKeyIssuer: AppPersonalVirtualKeyIssuer.create(options.virtualKeys),
       budgetOverview: options.budgetOverview,
-      aiToolSlugs: new AppAiToolSlugPort(),
-      aiToolProviders: AppAiToolProviderCatalogPort.create(options.providers),
-      cliContacts: AppCliAdminContactPort.create(options.contacts),
+      aiToolSlugs: new AppAiToolSlug(),
+      aiToolProviders: AppAiToolProviderCatalog.create(options.providers),
+      cliContacts: AppCliAdminContact.create(options.contacts),
       cliTokenStore: cliTokens.tokenStore(),
       diagnostics: cliTokens.diagnostics(),
       adminWorkspaceOcsf: adminWorkspace.ocsf(),
@@ -122,7 +122,7 @@ export class AppGovernanceRuntime {
       quarantineTraceActivity: quarantine.traceActivity(),
       quarantineDiagnostics: quarantine.diagnostics(),
       setupActivity: options.setupActivity
-        ? AppGovernanceSetupActivityPort.create(options.setupActivity)
+        ? AppGovernanceSetupActivity.create(options.setupActivity)
         : undefined,
       ocsfEvents: options.ocsfEvents,
       ingestionKeyRepository: ingestionKeys.repository(),

@@ -5,8 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BrowserUiDocumentTitle,
   UiCapabilityContextProvider,
-  UiNavigationPort,
-  UiRoutePort,
+  UiNavigation,
+  UiRoute,
   UNAVAILABLE_UI_FEEDBACK,
   UNAVAILABLE_UI_SESSION,
   type UiCapabilities,
@@ -18,7 +18,7 @@ const navigated: { to: string; replace: boolean }[] = [];
 const queries: { next: Record<string, string | undefined>; replace: boolean }[] = [];
 const backs = vi.fn<() => void>();
 
-class RecordingNavigation extends UiNavigationPort {
+class RecordingNavigation extends UiNavigation {
   navigate(to: string): void {
     navigated.push({ to, replace: false });
   }
@@ -32,7 +32,7 @@ class RecordingNavigation extends UiNavigationPort {
   }
 }
 
-class RecordingRoute extends UiRoutePort {
+class RecordingRoute extends UiRoute {
   constructor(private readonly values: UiRouteReadingValues) {
     super();
   }

@@ -14,7 +14,7 @@ import {
   ScimGroupMembershipService,
   type ScimGroupMembershipRepository,
 } from "./scim-group-membership.service.ts";
-import type { ScimGroupRecord, ScimRepositoryPort } from "../repositories/scim.repository.ts";
+import type { ScimGroupRecord, ScimRepository } from "../repositories/scim.repository.ts";
 
 /**
  * Handles SCIM 2.0 Group resources backed by the Group / GroupMembership tables.
@@ -27,7 +27,7 @@ import type { ScimGroupRecord, ScimRepositoryPort } from "../repositories/scim.r
  * what forced every group-only double in this package to cast.
  */
 export type ScimDirectoryRepository = Pick<
-  ScimRepositoryPort,
+  ScimRepository,
   | "createGroup"
   | "deleteGroup"
   | "listGroupMemberIds"

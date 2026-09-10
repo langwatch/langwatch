@@ -6,14 +6,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
 import { PostgresModelProviderEvidenceAdapter } from "../services/model-provider-evidence-service.composition.ts";
-import { ModelCostProjectPort } from "../ports/model-provider.port.ts";
+import { ModelCostProject } from "../app/model-provider.infrastructure.ts";
 
 const PROJECT_ID = "project-1";
 const TEAM_ID = "team-1";
 const ORGANIZATION_ID = "organization-1";
 
 /** One project, read with its team, as the scope derivation asks for it. */
-class TestProjects extends ModelCostProjectPort {
+class TestProjects extends ModelCostProject {
   constructor(private readonly project: ProjectWithTeam | null) {
     super();
   }

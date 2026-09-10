@@ -1,4 +1,4 @@
-import { MailRenderPort } from "../ports/mail-render.port.ts";
+import { MailRender } from "../ports/mail-render.port.ts";
 import {
   renderJoinRequestExpiredEmail,
   renderJoinRequestReminderEmail,
@@ -18,7 +18,7 @@ import {
  * composition root names it, the walk stops, and React stays off the graph of
  * every process that merely sends mail.
  */
-export class ReactEmailMailRenderer extends MailRenderPort {
+export class ReactEmailMailRenderer extends MailRender {
   static create(): ReactEmailMailRenderer {
     return new ReactEmailMailRenderer();
   }

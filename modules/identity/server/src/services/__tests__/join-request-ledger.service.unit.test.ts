@@ -18,7 +18,7 @@ import type {
 } from "@langwatch/eventing";
 import type { JoinRequestFoldState } from "../../projections/join-request-state.projection.ts";
 import { describe, expect, it, vi } from "vitest";
-import { IdentityEventingPort } from "../../app/identity.infrastructure.ts";
+import { IdentityEventing } from "../../app/identity.infrastructure.ts";
 import { JoinRequestLedgerWriterAdapter } from "../join-request-ledger.service.ts";
 
 const ORGANIZATION = "org_acme";
@@ -64,7 +64,7 @@ class ConvergedProjection implements StateProjectionStore<JoinRequestFoldState> 
  * port now; what remains is the command handle, and this records what the
  * ledger asked for.
  */
-class RecordingEventing implements IdentityEventingPort {
+class RecordingEventing implements IdentityEventing {
   readonly asked: Array<{ pipeline: string; command: string }> = [];
   readonly staged: unknown[] = [];
 

@@ -6,7 +6,7 @@
 
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import type { ExperimentSandboxCredentialPort } from "../ports/experiment-sandbox-credential.port.ts";
+import type { ExperimentSandboxCredential } from "../ports/experiment-sandbox-credential.port.ts";
 import type { LoadedWorkflow } from "./experiment-execution-data.service.ts";
 
 export class ExperimentRunSandboxKeyService {
@@ -49,7 +49,7 @@ export class ExperimentRunSandboxKeyService {
     loadedAgents,
     loadedWorkflows,
   }: {
-    sandboxCredentials: ExperimentSandboxCredentialPort;
+    sandboxCredentials: ExperimentSandboxCredential;
     projectId: string;
     loadedAgents: Map<string, TypedAgent>;
     loadedWorkflows?: Map<string, LoadedWorkflow>;

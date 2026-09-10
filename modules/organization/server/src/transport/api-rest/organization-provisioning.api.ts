@@ -10,7 +10,7 @@ import { z } from "zod";
 
 import { internalSecret } from "@langwatch/api";
 import {
-  type AppRestManagementAuditPort,
+  type AppRestManagementAudit,
   type AppRestSecurity,
   handWrittenDocs,
   MANAGEMENT_API_VERSION,
@@ -35,7 +35,7 @@ export interface OrganizationProvisioningSummary {
  * The organization capability this family needs, which is not the one the
  * `OrganizationService` contract publishes.
  */
-export interface OrganizationProvisioningPort {
+export interface OrganizationProvisioning {
   createForProvisioning(input: {
     name: string;
     slug?: string;
@@ -150,13 +150,13 @@ export function createOrganizationsRestApp(options: {
    * mounting a family must not force its services to be constructed, which is
    * what lets the OpenAPI spec generator build this app with none.
    */
-  organizations: () => OrganizationProvisioningPort;
+  organizations: () => OrganizationProvisioning;
   apiKeys: () => ApiKeyApi;
   /** The configured instance credential, or undefined when unset or blank. */
   instanceAdminKey: () => string | undefined;
   /** Whether this deployment is the hosted product rather than self-hosted. */
   isSaas: () => boolean;
-  audit: AppRestManagementAuditPort;
+  audit: AppRestManagementAudit;
   /**
    * A compensation that itself failed. The caller must see the ORIGINAL
    * failure, so this one is only reported — never raised over the top of it.

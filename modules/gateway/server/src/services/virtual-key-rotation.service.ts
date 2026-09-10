@@ -6,12 +6,12 @@
 
 import { nowInstant } from "@langwatch/time";
 import { TRPCError } from "@trpc/server";
-import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
-import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
-import type { GatewayTransactionPort } from "../ports/gateway-transaction.port.ts";
-import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port.ts";
-import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port.ts";
-import type { GatewayVirtualKeysPort } from "../ports/gateway-virtual-key.port.ts";
+import { GatewayAudit } from "../app/gateway.infrastructure.ts";
+import { GatewayChangeEvents } from "../app/gateway.infrastructure.ts";
+import type { GatewayTransaction } from "../app/gateway.infrastructure.ts";
+import { GatewayVirtualKeyCrypto } from "../app/gateway.infrastructure.ts";
+import type { GatewayGovernanceSignals } from "../app/gateway.infrastructure.ts";
+import type { GatewayVirtualKeys } from "../ports/gateway-virtual-key.port.ts";
 import {
   ROTATION_GRACE_MS,
   VirtualKeyValidationService,
@@ -21,23 +21,23 @@ import {
 
 export class VirtualKeyRotationService {
   private constructor(
-    private readonly transactions: GatewayTransactionPort,
-    private readonly repository: GatewayVirtualKeysPort,
-    private readonly changeEvents: GatewayChangeEventsPort,
-    private readonly auditLog: GatewayAuditPort,
-    private readonly crypto: GatewayVirtualKeyCryptoPort,
+    private readonly transactions: GatewayTransaction,
+    private readonly repository: GatewayVirtualKeys,
+    private readonly changeEvents: GatewayChangeEvents,
+    private readonly auditLog: GatewayAudit,
+    private readonly crypto: GatewayVirtualKeyCrypto,
     private readonly validation: VirtualKeyValidationService,
-    private readonly governanceSignals?: GatewayGovernanceSignalsPort,
+    private readonly governanceSignals?: GatewayGovernanceSignals,
   ) {}
 
   static create(input: {
-    transactions: GatewayTransactionPort;
-    repository: GatewayVirtualKeysPort;
-    changeEvents: GatewayChangeEventsPort;
-    auditLog: GatewayAuditPort;
-    crypto: GatewayVirtualKeyCryptoPort;
+    transactions: GatewayTransaction;
+    repository: GatewayVirtualKeys;
+    changeEvents: GatewayChangeEvents;
+    auditLog: GatewayAudit;
+    crypto: GatewayVirtualKeyCrypto;
     validation: VirtualKeyValidationService;
-    governanceSignals?: GatewayGovernanceSignalsPort;
+    governanceSignals?: GatewayGovernanceSignals;
   }): VirtualKeyRotationService {
     return new VirtualKeyRotationService(
       input.transactions,

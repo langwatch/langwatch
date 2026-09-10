@@ -7,16 +7,14 @@
  * the process could decide whether to run it, and every process runs it.
  */
 import { migrateDSLVersion, type WorkflowDsl } from "@langwatch/workflow-contract";
-import { WorkflowDslMigrationPort } from "../ports/workflow.port.ts";
+import { WorkflowDslMigration } from "../app/workflow.app.ts";
 
-export class ContractWorkflowDslMigrationAdapter extends WorkflowDslMigrationPort {
+export class ContractWorkflowDslMigrationAdapter implements WorkflowDslMigration {
   static create(): ContractWorkflowDslMigrationAdapter {
     return new ContractWorkflowDslMigrationAdapter();
   }
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   migrate(dsl: WorkflowDsl): WorkflowDsl {
     return migrateDSLVersion(dsl);

@@ -22,7 +22,7 @@ import {
   type FunctionConfiguration,
 } from "@aws-sdk/client-lambda";
 import type { Logger } from "@langwatch/observability";
-import { NlpLambdaArnResolverPort } from "../ports/nlp-lambda-arn.port.ts";
+import { NlpLambdaArnResolver } from "../app/workflow.app.ts";
 import {
   LAMBDA_INVOCATION_TIMEOUT_SECONDS,
   NLP_LAMBDA_MEMORY_SIZE_MB,
@@ -36,7 +36,7 @@ const LOG_RETENTION_DAYS = 365;
 const READY_POLL_ATTEMPTS = 60;
 const READY_POLL_INTERVAL_MS = 500;
 
-export class AwsNlpLambdaArnResolverAdapter extends NlpLambdaArnResolverPort {
+export class AwsNlpLambdaArnResolverAdapter implements NlpLambdaArnResolver {
   static create(options: {
     lambda: LambdaClient;
     logs: CloudWatchLogsClient;
@@ -57,7 +57,6 @@ export class AwsNlpLambdaArnResolverAdapter extends NlpLambdaArnResolverPort {
       wait?: (ms: number) => Promise<void>;
     },
   ) {
-    super();
   }
 
   async resolve(input: { projectId: string }): Promise<string> {

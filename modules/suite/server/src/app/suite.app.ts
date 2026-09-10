@@ -13,24 +13,9 @@ import type {
   SimulationExternalSetSummary,
   SimulationProjectDateRangeInput,
 } from "@langwatch/scenario-contract";
-import {
-  SuiteApi,
-  SuiteNotFoundError,
-  SuiteScopeNotAllowedError,
-  type CreateSuiteCommand,
-  type Suite,
-  type SuiteArchivedNamesInput,
-  type SuiteIdInput,
-  type SuiteRunAllInput,
-  type SuiteRunAllResult,
-  type SuiteRunInput,
-  type SuiteRunResult,
-  type SuiteRunPlanInput,
-  type SuiteRunPlanResult,
-  type UpdateSuiteCommand,
-} from "@langwatch/suite-contract";
+import { SuiteApi, SuiteNotFoundError, SuiteRunParameters, SuiteRunResult, SuiteScopeNotAllowedError, SuiteTarget, type CreateSuiteCommand, type Suite, type SuiteArchivedNamesInput, type SuiteIdInput, type SuiteRunAllInput, type SuiteRunAllResult, type SuiteRunInput, type SuiteRunPlanInput, type SuiteRunPlanResult, type UpdateSuiteCommand } from "@langwatch/suite-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { SuiteExecutionPort } from "../ports/suite-execution.port.ts";
+import type { SuiteExecution } from "./suite.app.ts";
 import type { SuiteClickHouseClient } from "../repositories/clickhouse-client.repository.ts";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
@@ -65,12 +50,14 @@ export type SuiteOrTestSuite =
 
 /** Technical ports supplied by the process root. Peer features arrive as API tokens. */
 export interface SuiteAppInfrastructure {
-  execution: SuiteExecutionPort;
+  execution: SuiteExecution;
   connectedPresence?: ConnectedPresenceReader;
   resolveClickHouseClient: ((projectId: string) => Promise<SuiteClickHouseClient>) | null;
   defaultRetentionDays: number;
   generateId?: () => string;
   now?: () => Instant;
+  suiteRunCommands: SuiteRunCommands;
+  suiteRunId: SuiteRunId;
 }
 
 export interface SuiteAppDependencies {
@@ -348,4 +335,62 @@ function refuseExecutionSettings(input: UpdateSuiteCommand): void {
   throw new ValidationError("A test suite holds no execution settings", {
     meta: { fieldErrors },
   });
+}
+
+export type QueueSimulationRunCommandData = {
+  tenantId: string;
+  scenarioRunId: string;
+  scenarioId: string;
+  batchRunId: string;
+  scenarioSetId: string;
+  name?: string;
+  metadata?: Record<string, unknown>;
+  secretParameters?: Record<string, string>;
+  target?: {
+    type: "prompt" | "http" | "code" | "workflow" | "connected";
+    referenceId: string;
+  };
+  occurredAt: number;
+};
+
+/**
+ * The application-specific boundary for turning a validated suite run into
+ * durable events and queued work. Event sourcing remains application
+ * composition; suite policy does not depend on its repositories.
+ */
+export interface SuiteExecution {
+  execute(input: {
+    suiteId: string;
+    projectId: string;
+    activeScenarioIds: string[];
+    scenarioNames: Map<string, string>;
+    scenarioVersions: Map<string, number>;
+    scenarioConfigs: ScenarioRunConfig[];
+    activeTargets: SuiteTarget[];
+    repeatCount: number;
+    skippedArchived: SuiteRunResult["skippedArchived"];
+    idempotencyKey: string;
+    batchRunId?: string;
+    parameters?: SuiteRunParameters;
+    note?: string;
+    actor?: RunActor;
+    /**
+     * The simulation models the plan was configured with, stamped on every
+     * run of the batch beside the models they resolved to.
+     */
+    simulatorModel?: string | null;
+    judgeModel?: string | null;
+  }): Promise<SuiteRunResult>;
+}
+
+/** Durable Eventing commands supplied by the process composition root. */
+export interface SuiteRunCommands {
+  startSuiteRun(data: StartSuiteRunCommandData): Promise<void>;
+
+  queueSimulationRun(data: QueueSimulationRunCommandData): Promise<void>;
+}
+
+
+export interface SuiteRunId {
+  next(): string;
 }

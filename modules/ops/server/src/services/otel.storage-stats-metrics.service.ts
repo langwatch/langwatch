@@ -1,12 +1,12 @@
 import { observableGauge } from "@langwatch/observability/metrics";
 
-import { StorageStatsMetricsPort } from "../app/ops.app.ts";
+import { StorageStatsMetrics } from "../app/ops.app.ts";
 
 /**
  * The storage gauges, published on the export interval from the last tick's
  * readings.
  */
-export class OtelStorageStatsMetricsAdapter implements StorageStatsMetricsPort {
+export class OtelStorageStatsMetricsAdapter implements StorageStatsMetrics {
   static create(): OtelStorageStatsMetricsAdapter {
     return new OtelStorageStatsMetricsAdapter();
   }

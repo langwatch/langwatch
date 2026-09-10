@@ -7,7 +7,7 @@ import {
 } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { JoinMembershipPort } from "../../rules/join-requests-contract.rules.ts";
+import type { JoinMembership } from "../../rules/join-requests-contract.rules.ts";
 
 /**
  * The KSUID resource an organization-scoped grant is born under. Spelled as a
@@ -22,7 +22,7 @@ const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
  * the organization-scoped grant, the SAME two-step shape invitation
  * acceptance and SSO auto-join already use (ADR-092).
  */
-export class PrismaJoinMembershipRepository implements JoinMembershipPort {
+export class PrismaJoinMembershipRepository implements JoinMembership {
   static create(
     prisma: PrismaClient,
     writer: AuthzGrantsService,

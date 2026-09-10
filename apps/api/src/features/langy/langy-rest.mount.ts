@@ -8,9 +8,9 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   LangyUiActionBackendService,
   type LangyActorUserReader,
-  type LangyInternalMetricsPort,
+  type LangyInternalMetrics,
   type LangyInternalRestPorts,
-  type LangyRestCeilingPort,
+  type LangyRestCeiling,
   type LangyRestCredentialPorts,
   type LangyRelayRestPorts,
   type LangyTurnsRestPorts,
@@ -81,7 +81,7 @@ export type ApiLangyRestOptions = Readonly<{
   /** The user directory a key's owning person is read from. */
   actors: LangyActorUserReader | undefined;
   /** Enforces one permission as an already-resolved key's ceiling. */
-  enforceCeiling: LangyRestCeilingPort;
+  enforceCeiling: LangyRestCeiling;
   redis: RedisConnection | undefined;
   /** The shared bearer the agent presents on its callbacks, or none. */
   internalSecret: string | undefined;
@@ -98,7 +98,7 @@ export type ApiLangyRestOptions = Readonly<{
 
 /** The counters the internal doors publish, as this process registers them. */
 export type LangyRestMetricsPorts = Readonly<{
-  internal: LangyInternalMetricsPort;
+  internal: LangyInternalMetrics;
   relayFrames: LangyRelayRestPorts["metrics"];
 }>;
 

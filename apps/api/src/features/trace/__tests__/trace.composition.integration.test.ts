@@ -5,7 +5,7 @@ import { EventEmitter } from "node:events";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { PresenceEmitterPort } from "@langwatch/presence-server";
+import type { PresenceEmitter } from "@langwatch/presence-server";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import {
@@ -26,7 +26,7 @@ import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-brows
 import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import { composeTraceFeature, LoggedApiTraceAbsence } from "../trace.composition.ts";
-import type { ApiTraceReadStackPort } from "../trace-read-stack.port.ts";
+import type { ApiTraceReadStack } from "../trace-read-stack.port.ts";
 import type { ApiTracePorts } from "../trace.composition.types.ts";
 import {
   stubCollaborators,
@@ -45,7 +45,7 @@ import {
 import { installApiNotification } from "../../notification/notification.composition.ts";
 import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "../traces-v2-trpc.mount.ts";
 import { installApiEntitlement } from "../../entitlement/entitlement.composition.ts";
-import { UsageCounterPort, type UsageWarningPort } from "@langwatch/entitlement-server";
+import { UsageCounter, type UsageWarning } from "@langwatch/entitlement-server";
 import type { UsageUnit } from "@langwatch/entitlement-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { ComposedTraceFeature } from "../trace.composition.types.ts";
@@ -93,8 +93,8 @@ function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
 }
 
 /** The month's volume, as the installed reading asks for it. */
-function testUsageCounter(count: number): UsageCounterPort {
-  return new (class extends UsageCounterPort {
+function testUsageCounter(count: number): UsageCounter {
+  return new (class implements UsageCounter {
     async getCurrentMonthCountForDisplay(): Promise<number> {
       return count;
     }
@@ -140,11 +140,11 @@ function testBroadcast() {
       return created;
     },
     cleanupTenantEmitter: () => undefined,
-  } as unknown as PresenceEmitterPort;
+  } as unknown as PresenceEmitter;
   return { broadcast, emitterFor: (tenantId: string) => broadcast.getTenantEmitter(tenantId) };
 }
 
-function testTraceApp(broadcast: PresenceEmitterPort): TraceApp {
+function testTraceApp(broadcast: PresenceEmitter): TraceApp {
   return TraceApp.create({
     traces: testTraceReaders(),
     topics: { getAll: async () => [{ id: "topic-1", name: "Refunds", parentId: null }] },
@@ -225,7 +225,7 @@ function testAuthz(): AuthzService {
  * real mounts over those ports, so calls below go through the process's own
  * root rather than a stub.
  */
-function testTraceGroupHalf(broadcast: PresenceEmitterPort): ComposedTraceFeature {
+function testTraceGroupHalf(broadcast: PresenceEmitter): ComposedTraceFeature {
   const ports = testTraceGroupPorts();
   return {
     routers: (mount: ApiTrpcFeatureMount) => ({
@@ -298,7 +298,7 @@ async function composeApplication() {
         entitlement: {
           ...composeApiPlanSources({ isSaas: false }),
           counter: testUsageCounter(3),
-          warnings: stub<UsageWarningPort>("warnings"),
+          warnings: stub<UsageWarning>("warnings"),
         },
         peers: { users: createApiFixture<UserApi>({ tryFindById: async () => null }) },
       }),
@@ -923,8 +923,8 @@ describe("given the anonymous share read composed on this process", () => {
    * viewer's redactions and the mapper ports — and refuses everything else by
    * name. The ClickHouse fan-out itself is not what this suite is about.
    */
-  function shareReadStack(): ApiTraceReadStackPort {
-    return stub<ApiTraceReadStackPort>("traceReads", {
+  function shareReadStack(): ApiTraceReadStack {
+    return stub<ApiTraceReadStack>("traceReads", {
       readers: () => testTraceReaders(),
       legacyPorts: () => ({
         listInputSchema: anySchema,
@@ -1188,8 +1188,8 @@ describe("given the anonymous share read assembles its payload", () => {
   const CUTOFF_MS = 1_600_000_000_000;
 
   /** A read stack answering the viewer's redactions with a retention window. */
-  function shareReadStack(): ApiTraceReadStackPort {
-    return stub<ApiTraceReadStackPort>("traceReads", {
+  function shareReadStack(): ApiTraceReadStack {
+    return stub<ApiTraceReadStack>("traceReads", {
       readers: () => testTraceReaders(),
       legacyPorts: () => ({
         listInputSchema: anySchema,

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   StoredObjectOwnerLookupRuntimeAdapter,
-  StoredObjectOwnerInstanceDirectoryPort,
+  StoredObjectOwnerInstanceDirectory,
   StoredObjectOwnerLookupTelemetry,
   type StoredObjectOwnerLookupSpan,
 } from "../index.ts";
@@ -24,7 +24,7 @@ class RecordingTelemetry implements StoredObjectOwnerLookupTelemetry {
   }
 }
 
-class TestInstanceDirectory extends StoredObjectOwnerInstanceDirectoryPort {
+class TestInstanceDirectory extends StoredObjectOwnerInstanceDirectory {
   async listInstances() {
     return await resolveInstances();
   }

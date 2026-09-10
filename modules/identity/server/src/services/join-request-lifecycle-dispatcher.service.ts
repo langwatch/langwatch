@@ -1,7 +1,7 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { newJoinRequestCommandId } from "../rules/join-request-id.rules.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process.ts";
+import type { JoinRequestLifecycle } from "../processes/join-request-lifecycle.process.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 import type { JoinRequestService } from "./join-request.service.ts";
 
@@ -10,7 +10,7 @@ import type { JoinRequestService } from "./join-request.service.ts";
  * `expireJoin` command. A command rather than a projection write, and that is the point — the
  * process manager decides WHEN, the guard still decides WHETHER.
  */
-export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecyclePort {
+export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecycle {
   static create(
     prisma: PrismaClient,
     notifier: JoinRequestNotifier,

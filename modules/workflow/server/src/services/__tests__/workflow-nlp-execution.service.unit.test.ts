@@ -7,21 +7,21 @@ import {
 } from "@langwatch/workflow-contract";
 import { z } from "zod";
 import {
-  WorkflowIdPort,
-  WorkflowNlpRuntimePort,
+  WorkflowId,
+  WorkflowNlpRuntime,
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
-} from "../../ports/workflow.port.ts";
+} from "../../app/workflow.app.ts";
 import { WorkflowNlpExecutionService } from "../workflow-nlp-execution.service.ts";
 import { TestModelProviderService } from "./model-provider.service.fake.ts";
 
-class FixedWorkflowIdPort extends WorkflowIdPort {
+class FixedWorkflowId implements WorkflowId {
   next(): string {
     return "generated";
   }
 }
 
-class TestWorkflowNlpRuntimePort extends WorkflowNlpRuntimePort {
+class TestWorkflowNlpRuntime implements WorkflowNlpRuntime {
   constructor(
     private readonly dispatchNlp: (
       input: WorkflowNlpDispatchInput,
@@ -75,9 +75,9 @@ describe("WorkflowNlpExecutionService", () => {
       json: async () => ({ result: {}, status: "success" }),
     });
     const runtime = {
-      ids: new FixedWorkflowIdPort(),
+      ids: new FixedWorkflowId(),
       modelProviders: new TestModelProviderService(),
-      nlpRuntime: new TestWorkflowNlpRuntimePort(dispatchNlp),
+      nlpRuntime: new TestWorkflowNlpRuntime(dispatchNlp),
     };
     const studioEvents = {
       enrich: async (event: { event: StudioClientEvent }) => event.event,
@@ -138,9 +138,9 @@ describe("WorkflowNlpExecutionService", () => {
       embeddingsUnsupported: false,
     });
     const executor = WorkflowNlpExecutionService.create({
-      ids: new FixedWorkflowIdPort(),
+      ids: new FixedWorkflowId(),
       modelProviders: new TestModelProviderService({ openai: provider }),
-      nlpRuntime: new TestWorkflowNlpRuntimePort(dispatchNlp),
+      nlpRuntime: new TestWorkflowNlpRuntime(dispatchNlp),
       studioEvents: {
         enrich: async (event) => event.event,
         prepare: async (event) => event.event,

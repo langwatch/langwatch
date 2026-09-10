@@ -1,4 +1,4 @@
-import { EvaluationCostRecorderPort } from "../ports/evaluation.port.ts";
+import { EvaluationCostRecorder } from "../app/evaluation.infrastructure.ts";
 import {
   EvaluationCostAlreadyRecordedError,
   type EvaluationCostRepository,
@@ -13,11 +13,10 @@ function costIdOf(idempotencyKey: string): string {
  * Writes what a completed evaluation run cost, once. A redelivery of the same
  * run reuses the row already there rather than billing the project twice.
  */
-export class EvaluationCostService extends EvaluationCostRecorderPort {
+export class EvaluationCostService implements EvaluationCostRecorder {
   readonly #repository: EvaluationCostRepository;
 
   private constructor(repository: EvaluationCostRepository) {
-    super();
     this.#repository = repository;
   }
 

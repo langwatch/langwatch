@@ -61,9 +61,9 @@ import {
 import { instantiateRepositories } from "@langwatch/runtime-composition";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 
-import type { ApiGatewaySpendWebhookPort } from "./api-gateway-spend-rest.composition.ts";
+import type { ApiGatewaySpendWebhook } from "./api-gateway-spend-rest.composition.ts";
 
 /** One tenant's ClickHouse, as the emitted-envelope log reads it. */
 export type ApiWebhookClickHouseResolver = WebhookClickHouseClientResolver;
@@ -72,7 +72,7 @@ export type ApiGatewayWebhooksOptions = Readonly<{
   /** The one guarded connection the registry and the outbox run on. */
   database: PrismaClient | undefined;
   /** The cipher an endpoint's signing secret was written under, or none. */
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
   /** This process's ClickHouse, where the emitted envelopes are projected. */
   resolveClickHouseClient: ApiWebhookClickHouseResolver | null;
 }>;
@@ -89,7 +89,7 @@ export type ApiGatewayWebhooksOptions = Readonly<{
  */
 export function composeApiGatewayWebhooks(
   options: ApiGatewayWebhooksOptions,
-): ApiGatewaySpendWebhookPort | undefined {
+): ApiGatewaySpendWebhook | undefined {
   const { database, encryption } = options;
   if (!database || !encryption) return undefined;
   const platform = composeApiWebhookPlatform(options);
@@ -215,11 +215,11 @@ class ApiWebhookIds implements WebhookId {
  * longer decrypt would see every delivery fail verification.
  */
 class ApiWebhookSecrets implements WebhookSecret {
-  static create(cipher: SecretEncryptionPort): ApiWebhookSecrets {
+  static create(cipher: SecretEncryption): ApiWebhookSecrets {
     return new ApiWebhookSecrets(cipher);
   }
 
-  private constructor(private readonly cipher: SecretEncryptionPort) {}
+  private constructor(private readonly cipher: SecretEncryption) {}
 
   encrypt(value: string): string {
     return this.cipher.encrypt(value);

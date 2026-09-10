@@ -29,7 +29,7 @@ export {
   apiErrorSchema,
   apiErrorType,
   type AppRestBroadcast,
-  type AppRestManagementAuditPort,
+  type AppRestManagementAudit,
   type AppRestOrganizationVariables,
   type AppRestProjectVariables,
   type AppRestRbacVocabulary,

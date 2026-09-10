@@ -4,9 +4,9 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication, NoApiTrpcFeatures } from "../api.application.ts";
 import {
-  ApiMetricsPort,
+  ApiMetrics,
   ApiProcessLifecycleRoutes,
-  ApiRequestFailureCapturePort,
+  ApiRequestFailureCapture,
 } from "../api-process.lifecycle.ts";
 
 describe("ApiProcessLifecycleRoutes", () => {
@@ -95,11 +95,11 @@ describe("ApiApplication HTTP failures", () => {
   });
 });
 
-class TestMetrics extends ApiMetricsPort {
+class TestMetrics extends ApiMetrics {
   readonly respond = vi.fn(async () => new Response("api_requests_total 1\n"));
 }
 
-class TestFailureCapture extends ApiRequestFailureCapturePort {
+class TestFailureCapture extends ApiRequestFailureCapture {
   readonly capture = vi.fn(async () => undefined);
 }
 

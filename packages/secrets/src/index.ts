@@ -30,7 +30,7 @@ export {
   OnePasswordSecretSource,
   OnePasswordUnavailableError,
 } from "./one-password.secret-source.ts";
-export { ProcessRunnerPort, type ProcessResult } from "./process-runner.port.ts";
+export { ProcessRunner, type ProcessResult } from "./process-runner.port.ts";
 export { REDACTED, redactForLog, secretLogRedactPaths } from "./redact.ts";
 export { MissingSecretsError, RefusingSecretSource } from "./refusing.secret-source.ts";
 export { SecretMigrationService, type SecretMigrationReport } from "./secret-migration.service.ts";

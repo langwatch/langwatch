@@ -59,7 +59,7 @@ export type ScimPlanProvider = Readonly<{
  * imported: it is the process's, and this feature only ever appends the two
  * entries its management door has always written.
  */
-export type ScimManagementAuditPort = (entry: {
+export type ScimManagementAudit = (entry: {
   userId: string;
   organizationId: string;
   action: `management.${string}.${string}`;
@@ -76,7 +76,7 @@ export type ScimInfrastructure = Readonly<{
    * absence is what makes the intake answer 404 rather than 401.
    */
   webhookSecret: () => string | undefined;
-  managementAudit: ScimManagementAuditPort;
+  managementAudit: ScimManagementAudit;
 }>;
 
 type ScimSetup = FeatureSetup<Record<never, never>, ScimInfrastructure, undefined>;
@@ -107,7 +107,7 @@ export class ScimApp implements ScimApiContract {
 
   readonly #scim: ScimService;
   readonly #plans: ScimPlanProvider;
-  readonly #audit: ScimManagementAuditPort;
+  readonly #audit: ScimManagementAudit;
   readonly #webhook: ScimDirectoryStreamService;
 
   private constructor(infrastructure: ScimInfrastructure) {

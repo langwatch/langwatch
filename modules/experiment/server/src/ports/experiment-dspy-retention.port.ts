@@ -1,3 +1,3 @@
-export abstract class ExperimentDspyRetentionPort {
+export abstract class ExperimentDspyRetention {
   abstract getTraceRetentionDays(tenantId: string): Promise<number>;
 }

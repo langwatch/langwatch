@@ -1,6 +1,6 @@
-import { EmailDeliveryPort, type EmailContent } from "../providers/types.ts";
+import { EmailDelivery, type EmailContent } from "../providers/types.ts";
 
-export class TestMailer extends EmailDeliveryPort {
+export class TestMailer extends EmailDelivery {
   defaultFrom(): string {
     return "LangWatch <contact@langwatch.ai>";
   }

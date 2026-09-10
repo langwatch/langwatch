@@ -20,11 +20,11 @@ import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.
  * Whether one seat allowance still admits another member, over the process's OWN plan
  * provider and membership counts.
  *
- * Separate from {@link ApiEnterpriseApplicationPort} because it is not Enterprise-only: an
+ * Separate from {@link ApiEnterpriseApplication} because it is not Enterprise-only: an
  * unlicensed deployment has seat allowances too, and `/settings/members` asks about them on
  * every open. A deployment with no Enterprise application still answers this.
  */
-export abstract class ApiSeatAllowancePort {
+export abstract class ApiSeatAllowance {
   abstract checkLimit(
     input: Readonly<{ organizationId: string; limitType: LimitType; user: LicensingCaller }>,
   ): Promise<LimitCheckResult>;
@@ -44,7 +44,7 @@ export abstract class ApiSeatAllowancePort {
  * name when it is missing, so a customer is told which capability this deployment does not
  * have rather than that Enterprise is off.
  */
-export abstract class ApiEnterpriseApplicationPort {
+export abstract class ApiEnterpriseApplication {
   /** Reading and writing this instance's licence. */
   abstract readonly licensing?: ApiTrpcFeatureApplication["licensing"] | undefined;
   /** Where a resource-limit notification is reported. */
@@ -66,9 +66,9 @@ import type { ComposedEnterpriseFeature } from "./enterprise.composition.types.t
 /** Composes the Enterprise tenant surfaces over this deployment's graph. */
 export function composeEnterpriseFeature(options: {
   /** The Enterprise application, where the deployment composed one. */
-  enterprise?: ApiEnterpriseApplicationPort | undefined;
+  enterprise?: ApiEnterpriseApplication | undefined;
   /** The seat allowances this deployment answers without an Enterprise application. */
-  seats?: ApiSeatAllowancePort | undefined;
+  seats?: ApiSeatAllowance | undefined;
   /** The process-owned licence store used for enforcement on an unlicensed deployment. */
   licensingStore?: LicenseStorage | undefined;
   /** Optional rotated public key for validating activated licences. */
@@ -98,7 +98,7 @@ export function refusingEnterpriseFeature(): ComposedEnterpriseFeature {
  * The two Enterprise `ctx.app` slices, or a refusal per capability.
  */
 function enterpriseApplication(
-  enterprise: ApiEnterpriseApplicationPort | undefined,
+  enterprise: ApiEnterpriseApplication | undefined,
   options: Pick<
     Parameters<typeof composeEnterpriseFeature>[0],
     "seats" | "licensingStore" | "licensePublicKey"
@@ -174,7 +174,7 @@ function unreportableUsageLimits(): ApiTrpcFeatureApplication["usageLimits"] {
  * deployment that has seat allowances whether or not it is licensed.
  */
 function unlicensedLicensing(options: {
-  seats: ApiSeatAllowancePort;
+  seats: ApiSeatAllowance;
   logger: Logger;
   /** Where a reached ceiling is reported, as this deployment composed it. */
   notifier: ApiTrpcFeatureApplication["usageLimits"];

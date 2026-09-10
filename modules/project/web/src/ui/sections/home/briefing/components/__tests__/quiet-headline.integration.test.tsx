@@ -13,14 +13,14 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", () => ({
 
 import {
   ProjectHomeHostProvider,
-  ProjectHomeHostPort,
+  ProjectHomeHost,
   type ProjectHomeProject,
 } from "../../../../../../model/project-home-host.ts";
 import { QuietHeadline } from "../quiet-headline.tsx";
 
 const navigate = vi.fn();
 
-class StubProjectHomeHost extends ProjectHomeHostPort {
+class StubProjectHomeHost extends ProjectHomeHost {
   constructor(private readonly canAsk: boolean) {
     super();
   }

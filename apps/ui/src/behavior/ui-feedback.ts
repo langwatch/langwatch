@@ -12,7 +12,7 @@ import {
 } from "@langwatch/handled-error/presentation";
 import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
-  UiFeedbackPort,
+  UiFeedback,
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "@langwatch/ui-host/capabilities";
@@ -162,7 +162,7 @@ export type UiToaster = {
   }) => unknown;
 };
 
-export class BrowserUiFeedback extends UiFeedbackPort {
+export class BrowserUiFeedback extends UiFeedback {
   static create(target: UiToaster = toaster): BrowserUiFeedback {
     return new BrowserUiFeedback(target);
   }

@@ -5,7 +5,7 @@ import {
   type EventSourcingOptions,
   type EventStore,
   type ExecutionTarget,
-  type KillSwitchPort,
+  type KillSwitch,
   type ProcessStore,
   type ReplayMarkerChecker,
   type RetentionPolicyResolver,
@@ -50,7 +50,7 @@ export interface WorkerEventingDependencies {
   consumers?: WorkerEventingConsumerOptions;
   retentionPolicyResolver?: RetentionPolicyResolver;
   /** Per-tenant operator stop for every component the pipelines mount. */
-  killSwitch?: KillSwitchPort;
+  killSwitch?: KillSwitch;
   /**
    * Projections that span pipelines, configured before any of them exist.
    *
@@ -76,7 +76,7 @@ export interface WorkerEventingProductionOptions {
   /** Consumer ownership for this runtime. Absent leaves it producer-only. */
   consumers?: WorkerEventingConsumerOptions;
   /** Per-tenant operator stop for every component the pipelines mount. */
-  killSwitch?: KillSwitchPort;
+  killSwitch?: KillSwitch;
 }
 
 /**

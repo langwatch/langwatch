@@ -4,11 +4,11 @@ import { startWorkerMetricsServer } from "../platform/liveness/worker-metrics.se
 import { WorkerClickHouseInfrastructure } from "../platform/infrastructure/worker-clickhouse.infrastructure.ts";
 import { WorkerDatabaseInfrastructure } from "../platform/infrastructure/worker-database.infrastructure.ts";
 import {
-  WorkerHandlePort,
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerHandle,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "../platform/lifecycle/worker-runtime.port.ts";
-import { WorkerExecutableCompositionPort } from "../worker.executable.ts";
+import { WorkerExecutableComposition } from "../worker.executable.ts";
 import type { WorkerProcessComposition, WorkerProcessFactoryContext } from "../worker.process.ts";
 import { createWorkerPrivateInfrastructureComposition } from "./worker-private-infrastructure.composition.ts";
 import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
@@ -20,7 +20,7 @@ import {
 /**
  * The standalone worker graph: the ONE consumer of `event-sourcing/jobs`.
  */
-export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort {
+export class WorkerStandaloneComposition extends WorkerExecutableComposition {
   static create(): WorkerStandaloneComposition {
     return new WorkerStandaloneComposition();
   }
@@ -104,7 +104,7 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
  * executable used to run inside one; here every client the graph opened is owned by the boot
  * `ResourceScope`, which `WorkerProcess` closes after the application has drained.
  */
-class NoApplicationLifecycle extends WorkerLifecyclePort {
+class NoApplicationLifecycle extends WorkerLifecycle {
   async close(): Promise<void> {}
 }
 
@@ -113,7 +113,7 @@ class NoApplicationLifecycle extends WorkerLifecyclePort {
  * unauthenticated `/healthz`. It is the TRANSPORT because it is the only thing this process listens
  * on. Everything else it does is driven by the queue.
  */
-class WorkerMetricsTransport extends WorkerTransportPort {
+class WorkerMetricsTransport extends WorkerTransport {
   static create(options: {
     config: WorkerProcessFactoryContext["config"];
     observability: WorkerProcessFactoryContext["observability"];
@@ -130,7 +130,7 @@ class WorkerMetricsTransport extends WorkerTransportPort {
     super();
   }
 
-  async start(): Promise<WorkerHandlePort> {
+  async start(): Promise<WorkerHandle> {
     const server = await startWorkerMetricsServer({
       port: this.options.config.liveness.metricsPort,
       // The bearer gate the App applies to its own `/metrics`. Unset means the
@@ -149,7 +149,7 @@ class WorkerMetricsTransport extends WorkerTransportPort {
   }
 }
 
-class WorkerMetricsHandle extends WorkerHandlePort {
+class WorkerMetricsHandle extends WorkerHandle {
   constructor(private readonly server: { close(): Promise<void> }) {
     super();
   }

@@ -8,7 +8,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   EvaluationAdapter,
-  EvaluationExecutionPort,
+  EvaluationExecution,
   type EvaluationClickHouseResolver,
   type EvaluationService,
 } from "@langwatch/evaluation-server";
@@ -20,7 +20,7 @@ function refuse(processName: string, capability: string): Error {
   return new Error(`${processName} composes no ${capability}`);
 }
 
-class UnavailableEvaluationExecution extends EvaluationExecutionPort {
+class UnavailableEvaluationExecution extends EvaluationExecution {
   constructor(private readonly processName: string) {
     super();
   }

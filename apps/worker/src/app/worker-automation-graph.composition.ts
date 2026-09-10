@@ -1,11 +1,11 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import {
-  AutomationClockPort,
-  AutomationDispatchErrorPort,
+  AutomationClock,
+  AutomationDispatchError,
   AutomationEmailCapService,
-  type AutomationEmailCapStorePort,
-  AutomationGraphActivityPort,
-  AutomationLoggerPort,
+  type AutomationEmailCapStore,
+  AutomationGraphActivity,
+  AutomationLogger,
   AutomationProjectIdentityPort,
   PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,
@@ -169,7 +169,7 @@ export type WorkerAutomationGraphCompositionOptions = Readonly<{
  */
 export function tryCreateWorkerAutomationGraphComposition(
   options: WorkerAutomationGraphCompositionOptions,
-): AutomationGraphActivityPort | undefined {
+): AutomationGraphActivity | undefined {
   const { config, mail } = options;
   if (!config.mail) return undefined;
 
@@ -240,13 +240,13 @@ class UnconfiguredAutomationCrypto implements AutomationSecretCrypto {
  * and two clocks in one process is how a cache expires against a time the
  * evaluator has not reached.
  */
-export class WorkerAutomationClock extends AutomationClockPort {
+export class WorkerAutomationClock extends AutomationClock {
   now() {
     return nowInstant();
   }
 }
 
-class WorkerAutomationLogger extends AutomationLoggerPort {
+class WorkerAutomationLogger extends AutomationLogger {
   constructor(private readonly logger: Logger) {
     super();
   }
@@ -271,7 +271,7 @@ class WorkerAutomationLogger extends AutomationLoggerPort {
  * as the application's does — a misread here would retry a dead payload forever
  * or dead-letter a transient one.
  */
-class WorkerAutomationDispatchErrors extends AutomationDispatchErrorPort {
+class WorkerAutomationDispatchErrors extends AutomationDispatchError {
   isTerminal(error: unknown): boolean {
     return error instanceof DispatchError && !error.retryable;
   }
@@ -288,7 +288,7 @@ class WorkerAutomationDispatchErrors extends AutomationDispatchErrorPort {
  */
 function createWorkerAutomationEmailCapStore(
   connection: RedisConnection,
-): AutomationEmailCapStorePort {
+): AutomationEmailCapStore {
   return {
     trySet: (key, value, expiry, seconds, condition) =>
       connection.set(key, value, expiry, seconds, condition),

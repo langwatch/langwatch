@@ -1,6 +1,6 @@
 import {
   AwsClientConfiguration,
-  OutboundProxyResolverPort,
+  OutboundProxyResolver,
   type AwsClientConfig,
   type AwsClientConfigInput,
 } from "./aws-client.ts";
@@ -15,7 +15,7 @@ import {
  * environment state or constructs clients in a request/job handler.
  */
 export class AwsClientProcessRuntime {
-  static create(options: { outboundProxy: OutboundProxyResolverPort }): AwsClientProcessRuntime {
+  static create(options: { outboundProxy: OutboundProxyResolver }): AwsClientProcessRuntime {
     return new AwsClientProcessRuntime(
       AwsClientConfiguration.create({ outboundProxy: options.outboundProxy }),
     );

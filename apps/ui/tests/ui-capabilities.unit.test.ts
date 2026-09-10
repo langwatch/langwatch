@@ -3,15 +3,15 @@ import {
   BrowserUiDocumentTitle,
   resolveUiCapabilities,
   UiCapabilityUnavailableError,
-  UiFeedbackPort,
-  UiNavigationPort,
-  UiRoutePort,
-  UiSessionPort,
+  UiFeedback,
+  UiNavigation,
+  UiRoute,
+  UiSession,
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "@langwatch/ui-host/capabilities";
 
-class RecordingNavigation extends UiNavigationPort {
+class RecordingNavigation extends UiNavigation {
   readonly moves: string[] = [];
 
   navigate(to: string): void {
@@ -27,7 +27,7 @@ class RecordingNavigation extends UiNavigationPort {
   }
 }
 
-class RecordingRoute extends UiRoutePort {
+class RecordingRoute extends UiRoute {
   readonly writes: Readonly<Record<string, string | undefined>>[] = [];
 
   reading() {
@@ -39,9 +39,9 @@ class RecordingRoute extends UiRoutePort {
   }
 }
 
-const recordingRoute = (): UiRoutePort => new RecordingRoute();
+const recordingRoute = (): UiRoute => new RecordingRoute();
 
-class RecordingFeedback extends UiFeedbackPort {
+class RecordingFeedback extends UiFeedback {
   readonly notices: (UiSuccessNotice | UiFailureNotice)[] = [];
 
   succeeded(notice: UiSuccessNotice): void {
@@ -54,7 +54,7 @@ class RecordingFeedback extends UiFeedbackPort {
 }
 
 /** A live session that must never be reached when an install outranks it. */
-class UnusableSession extends UiSessionPort {
+class UnusableSession extends UiSession {
   currentUser(): never {
     throw new Error("the installed session should have answered");
   }
@@ -76,7 +76,7 @@ class UnusableSession extends UiSessionPort {
   }
 }
 
-class StubSession extends UiSessionPort {
+class StubSession extends UiSession {
   currentUser() {
     return { id: "user_1", name: "Ada", email: "ada@example.com", image: null };
   }

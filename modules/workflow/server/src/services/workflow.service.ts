@@ -25,10 +25,10 @@ import {
 import { nowInstant, toDate } from "@langwatch/time";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type {
-  WorkflowDslMigrationPort,
-  WorkflowExecutionPort,
-  WorkflowIdPort,
-} from "../ports/workflow.port.ts";
+  WorkflowDslMigration,
+  WorkflowExecution,
+  WorkflowId,
+} from "../app/workflow.app.ts";
 import type {
   PersistWorkflowVersionInput,
   WorkflowRepository,
@@ -41,10 +41,10 @@ import { WorkflowDslService } from "./workflow-dsl.service.ts";
 export type WorkflowServiceOptions = {
   repository: WorkflowRepository;
   datasets: DatasetApi;
-  execution: WorkflowExecutionPort;
+  execution: WorkflowExecution;
   studioEvents: StudioEventPreparer;
-  dslMigration: WorkflowDslMigrationPort;
-  ids: WorkflowIdPort;
+  dslMigration: WorkflowDslMigration;
+  ids: WorkflowId;
 };
 
 /** Canonical Workflow lifecycle. Persistence and cross-feature capabilities are injected. */

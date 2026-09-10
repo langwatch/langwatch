@@ -10,7 +10,7 @@ import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
   TraceEdgeSpoolService,
-  TraceIngressPayloadPort,
+  TraceIngressPayload,
   TraceSpoolService,
 } from "@langwatch/trace-server";
 
@@ -34,7 +34,7 @@ export type ApiTraceSpoolOptions = Readonly<{
  */
 export function composeApiTraceSpool(
   options: ApiTraceSpoolOptions,
-): TraceIngressPayloadPort | undefined {
+): TraceIngressPayload | undefined {
   const { storage } = options;
   if (!storage) {
     options.logger.warn(
@@ -65,10 +65,10 @@ export function composeApiTraceSpool(
  * The per-project switch. FAIL-OPEN: a flag store that cannot answer leaves
  * the span on the inline route rather than refusing it, and says so.
  */
-class ApiFlagGatedTraceEdgeSpool extends TraceIngressPayloadPort {
+class ApiFlagGatedTraceEdgeSpool extends TraceIngressPayload {
   static create(options: {
     featureFlags: FeatureFlagApi;
-    spool: TraceIngressPayloadPort;
+    spool: TraceIngressPayload;
     logger: Logger;
   }): ApiFlagGatedTraceEdgeSpool {
     return new ApiFlagGatedTraceEdgeSpool(options);
@@ -77,7 +77,7 @@ class ApiFlagGatedTraceEdgeSpool extends TraceIngressPayloadPort {
   private constructor(
     private readonly options: {
       featureFlags: FeatureFlagApi;
-      spool: TraceIngressPayloadPort;
+      spool: TraceIngressPayload;
       logger: Logger;
     },
   ) {

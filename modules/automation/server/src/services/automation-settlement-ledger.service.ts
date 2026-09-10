@@ -5,10 +5,10 @@ import type {
   WebhookDeliveryInput,
 } from "@langwatch/automation-contract";
 import { type Instant, fromDate } from "@langwatch/time";
-import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { AutomationClock } from "../app/automation.infrastructure.ts";
 import {
-  AutomationSettlementLedgerPort,
-  type AutomationSettlementBreachPort,
+  AutomationSettlementLedger,
+  type AutomationSettlementBreach,
   type AutomationSettlementPersistCap,
 } from "../ports/automation-settlement-ledger.port.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
@@ -17,7 +17,7 @@ import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import {
   AutomationPersistCapService,
-  type AutomationPersistCapRedisPort,
+  type AutomationPersistCapRedis,
 } from "./persist-cap.service.ts";
 
 /**
@@ -30,15 +30,15 @@ import {
  * already seen deleted. One minute of staleness is inherited, not introduced —
  * it was already true of every pod in a multi-pod deployment.
  */
-export class AutomationSettlementLedgerService extends AutomationSettlementLedgerPort {
+export class AutomationSettlementLedgerService extends AutomationSettlementLedger {
   static create(input: {
     triggers: TriggerRepository;
     suppressions: EmailSuppressionRepository;
     webhookDeliveries: WebhookDeliveryRepository;
-    clock: AutomationClockPort;
-    redis?: AutomationPersistCapRedisPort | null;
+    clock: AutomationClock;
+    redis?: AutomationPersistCapRedis | null;
     persistCap: AutomationSettlementPersistCap;
-    breach: AutomationSettlementBreachPort;
+    breach: AutomationSettlementBreach;
   }): AutomationSettlementLedgerService {
     return new AutomationSettlementLedgerService(
       input.triggers,
@@ -56,9 +56,9 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
     private readonly active: ActiveTriggerCacheService,
     private readonly suppressions: EmailSuppressionRepository,
     private readonly webhookDeliveries: WebhookDeliveryRepository,
-    private readonly redis: AutomationPersistCapRedisPort | null,
+    private readonly redis: AutomationPersistCapRedis | null,
     private readonly persistCap: AutomationSettlementPersistCap,
-    private readonly breach: AutomationSettlementBreachPort,
+    private readonly breach: AutomationSettlementBreach,
   ) {
     super();
   }

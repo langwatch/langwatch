@@ -1,12 +1,12 @@
 import {
   type ConnectedWorkspace,
-  LangyLocalPresencePort,
+  LangyLocalPresence,
   type PresenceHeartbeat,
 } from "../langy-local-presence.repository.ts";
 import type { LangyMemoryStore } from "./langy-memory.store.ts";
 
 /** Which folder is shared with which conversation, for a process without Redis. */
-export class LangyLocalPresenceMemoryRepository extends LangyLocalPresencePort {
+export class LangyLocalPresenceMemoryRepository extends LangyLocalPresence {
   private constructor(private readonly store: LangyMemoryStore) {
     super();
   }

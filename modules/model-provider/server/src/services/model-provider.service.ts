@@ -44,8 +44,8 @@ import type {
   ModelProviderConnectionRateLimiter,
   ModelProviderCredentialPolicy,
   ModelProviderIdService,
-  ModelTranslationPort
-} from "../ports/model-provider.port.ts";
+  ModelTranslation
+} from "../app/model-provider.infrastructure.ts";
 import type {
   ModelCostRepository
 } from "../repositories/model-cost.repository.ts";
@@ -79,7 +79,7 @@ export interface ModelProviderServiceOptions {
   costs: ModelCostRepository;
   catalog: ModelProviderCatalog;
   authorization: AuthzApi;
-  translation: ModelTranslationPort;
+  translation: ModelTranslation;
   ids: ModelProviderIdService;
 }
 

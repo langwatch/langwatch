@@ -11,9 +11,9 @@ import type { RoleApi } from "@langwatch/role-contract";
 export type InviteAssignableRoles = Pick<RoleApi, "filterAssignableRoles">;
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import type {
-  OrganizationInviteMailPort,
-  OrganizationInviteSeatCensusPort,
-  OrganizationInviteWorkspaceCensusPort,
+  OrganizationInviteMail,
+  OrganizationInviteSeatCensus,
+  OrganizationInviteWorkspaceCensus,
 } from "../app/organization.infrastructure.ts";
 import type { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
 
@@ -101,7 +101,7 @@ export type InviteServiceDependencies = Readonly<{
   /** The invitations, and what an invitation is validated and settled against. */
   invites: OrganizationInviteRepository;
   /** The organization's seat census and the lite-seat rule. */
-  seats: OrganizationInviteSeatCensusPort;
+  seats: OrganizationInviteSeatCensus;
   /** Which plan the organization is on, and therefore how many seats it holds. */
   plans: PlanProvider;
   /**
@@ -125,13 +125,13 @@ export type InviteServiceDependencies = Readonly<{
    * every invitation still gets written and carries its accept URL, and the
    * caller is told `emailNotSent`.
    */
-  mail?: OrganizationInviteMailPort | undefined;
+  mail?: OrganizationInviteMail | undefined;
   /**
    * How many projects the organization already has, where the process composed
    * the read. Absent means the invitation says nothing about it rather than
    * saying zero.
    */
-  workspace?: OrganizationInviteWorkspaceCensusPort | undefined;
+  workspace?: OrganizationInviteWorkspaceCensus | undefined;
 }>;
 
 /**

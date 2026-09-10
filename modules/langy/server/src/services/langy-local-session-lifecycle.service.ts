@@ -18,7 +18,7 @@ function safeNudge(raw: string) {
     return null;
   }
 }
-import type { LangyLocalPresencePort } from "../repositories/langy-local-presence.repository.ts";
+import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
 import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
 import type { ControlRequestService } from "./langy-local-control-request.service.ts";
 import type {
@@ -35,7 +35,7 @@ type LocalControlLifecycleOptions = {
   conversations: () => ControlConversations;
   events: () => ControlEvents;
   dispatcher: LocalCallDispatcherService;
-  presence: LangyLocalPresencePort;
+  presence: LangyLocalPresence;
   requests: ControlRequestService;
   now: () => number;
   /** The core's own staleness check, so both seams answer it the same way. */

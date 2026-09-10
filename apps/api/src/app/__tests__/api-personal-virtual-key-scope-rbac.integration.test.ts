@@ -10,8 +10,8 @@ import {
   PostgresAuthzAdapter,
 } from "@langwatch/authz-server";
 import {
-  AppPersonalVirtualKeyIssuerPort,
-  type GovernanceVirtualKeyPort,
+  AppPersonalVirtualKeyIssuer,
+  type GovernanceVirtualKey,
 } from "@langwatch/enterprise-api";
 import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import {
@@ -147,8 +147,8 @@ async function buildGovernanceApp(): Promise<GovernanceApp> {
     repository: PrismaPersonalVirtualKeyRepository.create(prisma),
     // The gateway's own write service is what mints the key; the issuer is the
     // process's mapping between the two shapes, taken rather than restated.
-    issuer: AppPersonalVirtualKeyIssuerPort.create(
-      gateway.virtualKeys as unknown as GovernanceVirtualKeyPort,
+    issuer: AppPersonalVirtualKeyIssuer.create(
+      gateway.virtualKeys as unknown as GovernanceVirtualKey,
     ),
     organizations,
     policies: DefaultGovernanceRoutingPolicyService.create({

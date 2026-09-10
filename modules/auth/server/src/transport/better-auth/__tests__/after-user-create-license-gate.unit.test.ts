@@ -7,13 +7,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository.ts";
 import type {
-  BetterAuthAnnouncementsPort,
-  BetterAuthFederationPort,
-  BetterAuthPendingInvitePort,
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+  BetterAuthPendingInvite,
 } from "../better-auth.collaborators.ts";
 import { afterUserCreate } from "../better-auth-hooks.api.ts";
 
-class StubFederationPort implements BetterAuthFederationPort {
+class StubFederation implements BetterAuthFederation {
   constructor(private readonly ssoAllowed: boolean) {}
   federationCapable(): boolean {
     return true;
@@ -26,7 +26,7 @@ class StubFederationPort implements BetterAuthFederationPort {
   }
 }
 
-class StubInvitesPort implements BetterAuthPendingInvitePort {
+class StubInvites implements BetterAuthPendingInvite {
   tryFindPendingByOrganizationAndEmail(): Promise<null> {
     return Promise.resolve(null);
   }
@@ -35,7 +35,7 @@ class StubInvitesPort implements BetterAuthPendingInvitePort {
   }
 }
 
-class StubAnnouncementsPort implements BetterAuthAnnouncementsPort {
+class StubAnnouncements implements BetterAuthAnnouncements {
   readonly trackServerEvent = vi.fn();
   readonly reportError = vi.fn();
   announceSignup(): never {
@@ -61,7 +61,7 @@ function organizationRepo(
 describe("the ssoDomain auto-join on an unlicensed deployment", () => {
   /** @scenario "Unlicensed-mode signup does not auto-join a domain-matched organization" */
   it("creates the account and skips the domain-matched organization entirely", async () => {
-    const federation = new StubFederationPort(false);
+    const federation = new StubFederation(false);
     const repo = organizationRepo({ id: "org_1", ssoDomain: "acme.com" });
 
     await afterUserCreate({
@@ -69,8 +69,8 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
       user: { id: "user_1", email: "new@acme.com", name: "New User" },
       collaborators: {
         federation,
-        invites: new StubInvitesPort(),
-        announcements: new StubAnnouncementsPort(),
+        invites: new StubInvites(),
+        announcements: new StubAnnouncements(),
         authzGrants: {} as never,
       },
     });

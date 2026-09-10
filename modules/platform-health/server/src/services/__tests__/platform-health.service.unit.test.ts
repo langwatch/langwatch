@@ -4,17 +4,16 @@ import { describe, expect, it } from "vitest";
 import {
   SubsystemProbeAdapter,
   type SubsystemProbeRunner,
-} from "../../adapters/subsystem-probe.adapter.ts";
-import { SubsystemProbePort, type SubsystemProbeResult } from "../../ports/subsystem-probe.port.ts";
+} from "../subsystem-probe-run.service.ts";
+import { SubsystemProbe, type SubsystemProbeResult } from "../../app/platform-health.infrastructure.ts";
 import { PlatformHealthService } from "../platform-health.service.ts";
 import type { SubsystemProbeOutcome } from "../subsystem-probe.service.ts";
 
-class StubProbe extends SubsystemProbePort {
+class StubProbe implements SubsystemProbe {
   constructor(
     readonly name: PlatformHealthCheckName,
     private readonly answer: () => Promise<SubsystemProbeResult>,
   ) {
-    super();
   }
 
   run(): Promise<SubsystemProbeResult> {

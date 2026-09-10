@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { PulledUsagePricingService, PulledUsageRatePort } from "../index.ts";
+import { PulledUsagePricingService, PulledUsageRateReader } from "../index.ts";
 import { IngestionPullRunStatusProjection } from "../projections/ingestion-pull-run-status.projection.ts";
 
-class FixedRate extends PulledUsageRatePort {
+class FixedRate implements PulledUsageRateReader {
   rate() {
     return { costNanoUsd: 17, rateVersion: "rates-v1" };
   }

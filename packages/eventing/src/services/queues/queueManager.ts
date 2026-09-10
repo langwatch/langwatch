@@ -12,7 +12,7 @@ import type {
   EventSourcedQueueProcessor,
   QueueSendOptions,
 } from "../../queues/index.ts";
-import { type KillSwitchPort } from "../../kill-switch/index.ts";
+import { type KillSwitch } from "../../kill-switch/index.ts";
 import { resolveDeduplicationStrategy } from "../../queues/index.ts";
 import type { JobDelivery } from "../../queues/queue.types.ts";
 import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
@@ -196,7 +196,7 @@ export class QueueManager<EventType extends Event = Event> {
   private readonly logger = createLogger("langwatch:event-sourcing:queue-manager");
   private readonly globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly globalJobRegistry?: Map<string, JobRegistryEntry>;
-  private readonly killSwitch?: KillSwitchPort;
+  private readonly killSwitch?: KillSwitch;
   private readonly queues = new Map<string, EventSourcedQueueProcessor<any>>();
   private handlerCount = 0;
   private subscriberCount = 0;
@@ -215,7 +215,7 @@ export class QueueManager<EventType extends Event = Event> {
     pipelineName: string;
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
     globalJobRegistry?: Map<string, JobRegistryEntry>;
-    killSwitch?: KillSwitchPort;
+    killSwitch?: KillSwitch;
   }) {
     this.aggregateType = aggregateType;
     this.pipelineName = pipelineName;

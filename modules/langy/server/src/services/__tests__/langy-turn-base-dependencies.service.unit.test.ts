@@ -4,7 +4,7 @@
  * payload, unset when no harness resolver is composed.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { LangyWorkerProbeInput } from "../../ports/langy-turn-runtime.port.ts";
+import type { LangyWorkerProbeInput } from "../../app/langy.infrastructure.ts";
 import {
   LangyTurnService,
   type LangyTurnServiceDeps,

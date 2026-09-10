@@ -10,7 +10,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import type {
   CodexTokenRefresher
-} from "../ports/model-provider.port.ts";
+} from "../app/model-provider.infrastructure.ts";
 import type {
   ModelProviderRepository
 } from "../repositories/model-provider.repository.ts";

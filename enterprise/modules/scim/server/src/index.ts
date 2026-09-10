@@ -6,7 +6,7 @@
 export {
   scimServer,
   type ScimInfrastructure,
-  type ScimManagementAuditPort,
+  type ScimManagementAudit,
   type ScimPlanProvider,
 } from "./scim.server.ts";
 

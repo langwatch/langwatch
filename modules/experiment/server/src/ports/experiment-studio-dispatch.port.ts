@@ -18,7 +18,7 @@ import type {
  * thrown — a run is watched, not awaited, and a rejected promise would leave a
  * lit node and a Stop button exactly as they were.
  */
-export abstract class ExperimentStudioDispatchPort {
+export abstract class ExperimentStudioDispatch {
   abstract postEvent(input: {
     projectId: string;
     event: StudioClientEvent;

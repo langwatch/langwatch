@@ -8,24 +8,24 @@ import {
   HeaderMcpClientAddressAdapter,
   hostedMcpRoutePolicies,
   HOSTED_MCP_FAMILY,
-  McpApiKeyCipherPort,
-  McpProjectLookupPort,
-  McpSessionGrantPort,
+  McpApiKeyCipher,
+  McpProjectLookup,
+  McpSessionGrant,
 } from "../../index.ts";
 
-class NoProjects extends McpProjectLookupPort {
+class NoProjects extends McpProjectLookup {
   tryFindLiveProjectByApiKey(): Promise<{ id: string; teamId: string } | null> {
     return Promise.resolve(null);
   }
 }
 
-class NoGrants extends McpSessionGrantPort {
+class NoGrants extends McpSessionGrant {
   stillGranted(): Promise<boolean> {
     return Promise.resolve(false);
   }
 }
 
-class PlainCipher extends McpApiKeyCipherPort {
+class PlainCipher extends McpApiKeyCipher {
   encrypt(value: string): string {
     return value;
   }

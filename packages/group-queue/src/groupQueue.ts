@@ -31,9 +31,9 @@ import {
 } from "./latency.ts";
 import type {
   DeduplicationConfig,
-  GroupQueueActivityPort,
+  GroupQueueActivity,
   GroupQueueContextMetadata,
-  GroupQueueContextPort,
+  GroupQueueContext,
   GroupQueueFailureClassifier,
   GroupQueuePolicy,
   GroupQueueRuntimeDefinition,
@@ -273,8 +273,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   private readonly blockingConnection: IORedis | Cluster;
   private readonly scripts: GroupStagingScripts;
   private readonly blobLifecycle: EnvelopeBlobLifecycle;
-  private readonly activity?: GroupQueueActivityPort<Payload>;
-  private readonly contextPort?: GroupQueueContextPort;
+  private readonly activity?: GroupQueueActivity<Payload>;
+  private readonly contextPort?: GroupQueueContext;
   private readonly failureClassifier?: GroupQueueFailureClassifier;
   private readonly identify: (payload: Payload) => string;
   private readonly shutdownTimeoutMs: number;
@@ -363,8 +363,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       consumerEnabled?: boolean;
       objectStoreFor?: (projectId: string) => ObjectStore;
       resolveStorageDestination?: (projectId: string) => Promise<ProjectStorageDestination>;
-      activity?: GroupQueueActivityPort<Payload>;
-      context?: GroupQueueContextPort;
+      activity?: GroupQueueActivity<Payload>;
+      context?: GroupQueueContext;
       failures?: GroupQueueFailureClassifier;
       drainTimeoutMs?: number;
       policy?: GroupQueuePolicy;

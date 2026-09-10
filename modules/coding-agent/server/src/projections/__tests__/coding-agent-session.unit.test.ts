@@ -29,7 +29,7 @@ import {
   type CodingAgentSessionState,
   CodingAgentSessionStateMapper,
 } from "../coding-agent-session.projection.ts";
-import { TestModelProviderService } from "../../adapters/__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 
 const SESSION_ID = "8f2c9a1e-4711-4e0f-9d2e-session";
 const TRACE_A = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";

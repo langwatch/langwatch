@@ -11,26 +11,25 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import {
-  EvaluationCustomEvaluatorsPort,
-  EvaluationInstallEnvironmentPort,
-  EvaluationReportPort,
-  EvaluationRescorePort,
-  EvaluationRunAnalyticsPort,
+  EvaluationCustomEvaluators,
+  EvaluationInstallEnvironment,
+  EvaluationReport,
+  EvaluationRescore,
+  EvaluationRunAnalytics,
   EvaluationWarmupPort,
-} from "../../ports/evaluation-rescore.port.ts";
+} from "../../app/evaluation.infrastructure.ts";
 import {
-  EvaluationExecutionPort,
-  EvaluationInputsResolutionPort,
-  EvaluationRetentionFloorPort,
-  type EvaluationClickHouseClient,
-} from "../../ports/evaluation.port.ts";
+  EvaluationExecution,
+  EvaluationInputsResolution,
+  EvaluationRetentionFloor,
+} from "../evaluation.infrastructure.ts";
+import type { EvaluationClickHouseClient } from "../../repositories/clickhouse/evaluation-clickhouse-client.ts";
 import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
 import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.ts";
 
 /** The environment a test names, with nothing inherited from the process. */
-export class TestEvaluationInstallEnvironment extends EvaluationInstallEnvironmentPort {
+export class TestEvaluationInstallEnvironment implements EvaluationInstallEnvironment {
   constructor(private readonly environment: Readonly<Record<string, string | undefined>> = {}) {
-    super();
   }
 
   read(): Readonly<Record<string, string | undefined>> {
@@ -38,11 +37,10 @@ export class TestEvaluationInstallEnvironment extends EvaluationInstallEnvironme
   }
 }
 
-export class TestEvaluationCustomEvaluators extends EvaluationCustomEvaluatorsPort {
+export class TestEvaluationCustomEvaluators implements EvaluationCustomEvaluators {
   readonly calls: { projectId: string }[] = [];
 
   constructor(private readonly evaluators: CustomEvaluator[] = []) {
-    super();
   }
 
   async findAll(input: Readonly<{ projectId: string }>): Promise<CustomEvaluator[]> {
@@ -52,11 +50,10 @@ export class TestEvaluationCustomEvaluators extends EvaluationCustomEvaluatorsPo
   }
 }
 
-export class TestEvaluationRescore extends EvaluationRescorePort {
+export class TestEvaluationRescore implements EvaluationRescore {
   readonly calls: RunTraceEvaluationInput[] = [];
 
   constructor(private readonly outcome: EvaluationRunOutcome) {
-    super();
   }
 
   async runForTrace(input: RunTraceEvaluationInput): Promise<EvaluationRunOutcome> {
@@ -66,11 +63,10 @@ export class TestEvaluationRescore extends EvaluationRescorePort {
   }
 }
 
-export class TestEvaluationWarmup extends EvaluationWarmupPort {
+export class TestEvaluationWarmup implements EvaluationWarmupPort {
   readonly probes: string[] = [];
 
   constructor(private readonly failing = false) {
-    super();
   }
 
   async probe(input: Readonly<{ projectId: string }>): Promise<void> {
@@ -79,7 +75,7 @@ export class TestEvaluationWarmup extends EvaluationWarmupPort {
   }
 }
 
-export class TestEvaluationRunAnalytics extends EvaluationRunAnalyticsPort {
+export class TestEvaluationRunAnalytics implements EvaluationRunAnalytics {
   readonly runs: { userId: string; projectId: string }[] = [];
 
   evaluationRan(input: Readonly<{ userId: string; projectId: string }>): void {
@@ -87,11 +83,10 @@ export class TestEvaluationRunAnalytics extends EvaluationRunAnalyticsPort {
   }
 }
 
-export class TestEvaluationReport extends EvaluationReportPort {
+export class TestEvaluationReport implements EvaluationReport {
   readonly reported: ReportEvaluationCommandData[] = [];
 
   constructor(private readonly failing = false) {
-    super();
   }
 
   async reportEvaluation(data: ReportEvaluationCommandData): Promise<unknown> {
@@ -102,19 +97,19 @@ export class TestEvaluationReport extends EvaluationReportPort {
   }
 }
 
-class UnreachableExecution extends EvaluationExecutionPort {
+class UnreachableExecution implements EvaluationExecution {
   execute(): never {
     throw new Error("This test composed no evaluator engine.");
   }
 }
 
-class UnreachableRetentionFloor extends EvaluationRetentionFloorPort {
+class UnreachableRetentionFloor implements EvaluationRetentionFloor {
   async getFloorMs(): Promise<number> {
     return 0;
   }
 }
 
-class PassThroughInputsResolution extends EvaluationInputsResolutionPort {
+class PassThroughInputsResolution implements EvaluationInputsResolution {
   async tryResolve(input: {
     tenantId: string;
     inputs: Record<string, unknown> | null;

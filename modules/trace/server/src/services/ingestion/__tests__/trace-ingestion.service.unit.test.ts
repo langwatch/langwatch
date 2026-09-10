@@ -18,13 +18,13 @@ import { SPAN_MAX_PAST_MS } from "@langwatch/trace-contract";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { describe, expect, it, vi } from "vitest";
 import {
-  TraceIngressCommandPort,
+  TraceIngressCommand,
   TraceIngestionService,
-  TraceSpanDedupPort,
+  TraceSpanDedup,
 } from "../trace-ingestion.service.ts";
 import { TestCodingAgentService } from "./support/coding-agent.service.fake.ts";
 
-class TestTraceIngressCommand extends TraceIngressCommandPort {
+class TestTraceIngressCommand extends TraceIngressCommand {
   readonly record = vi.fn(async (_data: RecordSpanCommandData) => void 0);
 
   recordSpan(data: RecordSpanCommandData): Promise<void> {
@@ -32,7 +32,7 @@ class TestTraceIngressCommand extends TraceIngressCommandPort {
   }
 }
 
-class TestTraceSpanDedup extends TraceSpanDedupPort {
+class TestTraceSpanDedup extends TraceSpanDedup {
   readonly acquire = vi.fn<() => Promise<boolean | null>>(async () => true);
   readonly confirm = vi.fn(async () => void 0);
   readonly release = vi.fn(async () => void 0);

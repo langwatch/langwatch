@@ -10,7 +10,7 @@ import {
 } from "@langwatch/automation-contract";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { AutomationTestFirePort } from "../../ports/automation-test-fire.port.ts";
+import { AutomationTestFire } from "../../ports/automation-test-fire.port.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
 
 const BASE_HOST = "https://app.langwatch.ai";
@@ -46,7 +46,7 @@ function makeNotifier() {
   // The endpoint's answer a webhook test fire surfaces to the author; tests
   // override to exercise a non-2xx failure.
   let webhookStatus = 200;
-  const notifier: AutomationTestFirePort = {
+  const notifier: AutomationTestFire = {
     sendEmail: async (args) => {
       sentEmails.push(args);
     },
@@ -73,7 +73,7 @@ function makeNotifier() {
   };
 }
 
-function makeService(delivery: AutomationTestFirePort) {
+function makeService(delivery: AutomationTestFire) {
   return AutomationTemplateService.create({
     baseHost: BASE_HOST,
     delivery,

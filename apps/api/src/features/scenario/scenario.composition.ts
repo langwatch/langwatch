@@ -8,7 +8,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { PresenceEmitterPort } from "@langwatch/presence-server";
+import type { PresenceEmitter } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
@@ -50,7 +50,7 @@ import {
   type SimulationWindowedReadInput,
 } from "@langwatch/scenario-server";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
@@ -59,7 +59,7 @@ import type { SuiteApi } from "@langwatch/suite-contract";
 import type { ConnectedPresenceReader, SuiteClickHouseClient } from "@langwatch/suite-server";
 import {
   SuiteExecutionService,
-  SuiteRunIdPort,
+  SuiteRunId,
   SuiteRunModelsService,
 } from "@langwatch/suite-server";
 
@@ -147,11 +147,11 @@ export type ScenarioFeatureCollaborators = Readonly<{
   /**
    * The broadcast fabric presence already publishes on.
    */
-  broadcast: PresenceEmitterPort;
+  broadcast: PresenceEmitter;
   /**
    * The deployment's cipher, as the stored-secret family composed it.
    */
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
   /** The same routed ClickHouse the charted reads run on; absent is a real shape. */
   resolveClickHouseClient:
     | ((projectId: string) => Promise<SimulationReadClient & SuiteClickHouseClient>)
@@ -360,7 +360,7 @@ class UnwindowedApiSimulationRead extends SimulationWindowedRepository {
 }
 
 /** The run id a suite run is recorded under, in the persisted ksuid format. */
-class KsuidSuiteRunId extends SuiteRunIdPort {
+class KsuidSuiteRunId implements SuiteRunId {
   next(): string {
     return generate(SCENARIO_RUN_KSUID_RESOURCE).toString();
   }
@@ -390,7 +390,7 @@ class SystemScenarioClock extends ScenarioClockPort {
  * A scenario's stored secret, under the deployment's own cipher.
  */
 class ApiScenarioSecretCipher extends ScenarioSecretCipherPort {
-  constructor(private readonly encryption: SecretEncryptionPort) {
+  constructor(private readonly encryption: SecretEncryption) {
     super();
   }
 

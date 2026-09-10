@@ -3,7 +3,7 @@ import type { GithubRepository } from "@langwatch/github-contract";
 
 import type { GithubHost } from "./github.infrastructure.ts";
 import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
-import type { GithubRedisPort } from "../repositories/redis/github-redis.connection.ts";
+import type { GithubRedis } from "../repositories/redis/github-redis.connection.ts";
 import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";
 import { GithubApiAdapter } from "../services/github-api.service.ts";
 import { GithubHostService } from "../services/github-host.service.ts";
@@ -28,7 +28,7 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
   static create(
     appId: string,
     privateKey: string,
-    redis: GithubRedisPort | null,
+    redis: GithubRedis | null,
     host: GithubHost = GithubHostService.create(),
   ): RedisGithubAppTokenCache {
     const api = GithubApiAdapter.create(appId, privateKey, host);

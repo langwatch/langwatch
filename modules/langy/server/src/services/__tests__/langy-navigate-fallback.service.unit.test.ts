@@ -3,25 +3,23 @@
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
 import { describe, expect, it } from "vitest";
-import { LangyNavigateProjectPort } from "../../ports/langy-navigate-project.port.ts";
-import { LangyNavigateResourcePort } from "../../ports/langy-navigate-resource.port.ts";
+import { LangyNavigateProject } from "../../app/langy.infrastructure.ts";
+import { LangyNavigateResource } from "../../app/langy.infrastructure.ts";
 import type { LangyNavigateResourceKind } from "../../rules/langy-navigate-resources.rules.ts";
 import { LangyNavigateFallbackService } from "../langy-navigate-fallback.service.ts";
 
-class FakeProjects extends LangyNavigateProjectPort {
+class FakeProjects implements LangyNavigateProject {
   constructor(private readonly slugs: Record<string, string>) {
-    super();
   }
   trySlugOf(projectId: string): Promise<string | null> {
     return Promise.resolve(this.slugs[projectId] ?? null);
   }
 }
 
-class FakeResources extends LangyNavigateResourcePort {
+class FakeResources implements LangyNavigateResource {
   readonly lookups: Array<{ kind: LangyNavigateResourceKind; resourceId: string }> = [];
 
   constructor(private readonly answer: (kind: LangyNavigateResourceKind) => string | null) {
-    super();
   }
 
   async tryLocate(input: {
@@ -36,7 +34,7 @@ class FakeResources extends LangyNavigateResourcePort {
 
 const service = (
   slugs: Record<string, string> = { "project-1": "acme" },
-  resources?: LangyNavigateResourcePort,
+  resources?: LangyNavigateResource,
 ) =>
   LangyNavigateFallbackService.create({
     projects: new FakeProjects(slugs),

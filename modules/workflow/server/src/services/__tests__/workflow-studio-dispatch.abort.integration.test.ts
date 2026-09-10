@@ -8,7 +8,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { WorkflowStudioStreamPort } from "../../ports/workflow.port.ts";
+import { WorkflowStudioStream } from "../../app/workflow.app.ts";
 import { WorkflowStudioDispatchService } from "../workflow-studio-dispatch.service.ts";
 
 const blockedCell = {
@@ -17,10 +17,8 @@ const blockedCell = {
 } as unknown as StudioClientEvent;
 
 /** A stream port answering with whichever reader a scenario hands it. */
-class FixedStream extends WorkflowStudioStreamPort {
-  constructor(private readonly reader: ReadableStreamDefaultReader<Uint8Array>) {
-    super();
-  }
+class FixedStream implements WorkflowStudioStream {
+  constructor(private readonly reader: ReadableStreamDefaultReader<Uint8Array>) {}
 
   open(): Promise<ReadableStreamDefaultReader<Uint8Array>> {
     return Promise.resolve(this.reader);

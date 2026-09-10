@@ -4,10 +4,10 @@ import type { QueueSendOptions } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   OtelTraceEvaluationLoopMetricsAdapter,
-  TraceEvaluationDispatchPort,
+  TraceEvaluationDispatch,
   createEvaluationTriggerSubscriber,
-  type TraceEvaluationLoopMetricsPort,
-  type TraceEvaluationMonitorPort,
+  type TraceEvaluationLoopMetrics,
+  type TraceEvaluationMonitor,
   type TraceSummarySubscriber,
 } from "@langwatch/trace-server";
 import {
@@ -27,11 +27,11 @@ import {
  *
  *     TraceSummarySubscriber "evaluationTrigger"   (trace-server owns it)
  *       ├─ FeatureFlagApi                      the loop-guard kill switch
- *       ├─ TraceEvaluationMonitorPort              the enabled on-message monitors
+ *       ├─ TraceEvaluationMonitor              the enabled on-message monitors
  *       │    └─ TraceEvaluationMonitorReader      narrowed to one listing
- *       ├─ TraceEvaluationLoopMetricsPort          the guard's own counter
+ *       ├─ TraceEvaluationLoopMetrics          the guard's own counter
  *       │    └─ OtelTraceEvaluationLoopMetricsAdapter
- *       └─ TraceEvaluationDispatchPort             one evaluation run
+ *       └─ TraceEvaluationDispatch             one evaluation run
  *            ├─ ExecuteEvaluationCommand.makeJobId the dedup identity
  *            └─ the process's evaluation queue     the transport
  *
@@ -65,7 +65,7 @@ export function createWorkerTraceEvaluationTrigger(options: {
     data: ExecuteEvaluationCommandData,
     sendOptions?: QueueSendOptions<ExecuteEvaluationCommandData>,
   ) => Promise<void>;
-  metrics?: TraceEvaluationLoopMetricsPort;
+  metrics?: TraceEvaluationLoopMetrics;
 }): WorkerTraceEvaluationTrigger {
   const monitors = createWorkerTraceEvaluationMonitorPort(options.monitors);
   const dispatch = new WorkerTraceEvaluationDispatchAdapter(options.sendEvaluation);
@@ -84,8 +84,8 @@ export function createWorkerTraceEvaluationTrigger(options: {
 /** One process-owned evaluation-trigger graph. */
 export class WorkerTraceEvaluationTrigger {
   constructor(
-    readonly monitors: TraceEvaluationMonitorPort,
-    readonly dispatch: TraceEvaluationDispatchPort,
+    readonly monitors: TraceEvaluationMonitor,
+    readonly dispatch: TraceEvaluationDispatch,
     private readonly built: TraceSummarySubscriber,
   ) {}
 
@@ -102,7 +102,7 @@ export class WorkerTraceEvaluationTrigger {
  * process's, and the key is the evaluation command's, so both graphs squash
  * against the same string while both are ingesting.
  */
-class WorkerTraceEvaluationDispatchAdapter extends TraceEvaluationDispatchPort {
+class WorkerTraceEvaluationDispatchAdapter extends TraceEvaluationDispatch {
   constructor(
     private readonly sendEvaluation: (
       data: ExecuteEvaluationCommandData,

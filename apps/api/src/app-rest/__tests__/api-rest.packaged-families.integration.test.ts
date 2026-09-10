@@ -7,9 +7,9 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
-  TraceIngressCommandPort,
+  TraceIngressCommand,
   TraceSpanCollectionService,
-  TraceSpanDedupPort,
+  TraceSpanDedup,
   TrackedEventSpanService,
 } from "@langwatch/trace-server";
 import type { TrackedEventPorts } from "@langwatch/trace-server";
@@ -525,7 +525,7 @@ function withTrackedEvents(): {
 }
 
 /** Every claim granted: dedup is not what these tests are about. */
-class GrantingDedup extends TraceSpanDedupPort {
+class GrantingDedup extends TraceSpanDedup {
   async tryAcquireProcessingLock(): Promise<boolean> {
     return true;
   }
@@ -536,7 +536,7 @@ class GrantingDedup extends TraceSpanDedupPort {
 }
 
 /** The one command handoff, recorded rather than enqueued. */
-class RecordingCommands extends TraceIngressCommandPort {
+class RecordingCommands extends TraceIngressCommand {
   constructor(private readonly sent: RecordSpanCommandData[]) {
     super();
   }

@@ -25,7 +25,7 @@ import {
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 
-import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
@@ -37,7 +37,7 @@ import {
   PostgresLangyAdapter,
   type LangyServiceCompositionOptions,
   type PostgresLangyAdapterOptions,
-} from "../adapters/langy.langy.adapter.ts";
+} from "../services/langy-postgres.service.ts";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a
@@ -83,7 +83,7 @@ export interface LangyEgressState {
 
 /** One live turn's durable buffer, plus the connection it borrowed. */
 export interface LangyTurnStream {
-  buffer: LangyTokenBufferPort;
+  buffer: LangyTokenBuffer;
   /** Releases the dedicated blocking connection. Always call it. */
   close(): void;
 }

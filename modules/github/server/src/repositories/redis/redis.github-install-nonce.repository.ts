@@ -1,4 +1,4 @@
-import type { GithubRedisPort } from "./github-redis.connection.ts";
+import type { GithubRedis } from "./github-redis.connection.ts";
 import { GithubInstallNonceRepository } from "../github-install-nonce.repository.ts";
 
 /**
@@ -9,12 +9,12 @@ import { GithubInstallNonceRepository } from "../github-install-nonce.repository
  */
 export class GithubInstallNonceRedisRepository extends GithubInstallNonceRepository {
   static create(parts: {
-    redis: GithubRedisPort | null;
+    redis: GithubRedis | null;
   }): GithubInstallNonceRedisRepository {
     return new GithubInstallNonceRedisRepository(parts.redis);
   }
 
-  private constructor(private readonly redis: GithubRedisPort | null) {
+  private constructor(private readonly redis: GithubRedis | null) {
     super();
   }
 

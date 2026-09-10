@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contract";
 import type {
-  AutomationEvaluationTraceSummaryPort,
-  AutomationEvaluationTriggerFilterPort,
-  AutomationTriggerMatchRecorderPort,
-} from "../ports/automation-evaluation-subscriber.port.ts";
+  AutomationEvaluationTraceSummary,
+  AutomationEvaluationTriggerFilter,
+  AutomationTriggerMatchRecorder,
+} from "../app/automation.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 
 const NOTIFY_TRIGGER_ACTIONS = new Set(["SEND_EMAIL", "SEND_SLACK_MESSAGE", "SEND_WEBHOOK"]);
@@ -32,9 +32,9 @@ interface ActiveTraceTriggerReader {
 
 type EvaluationAlertTriggerMatchDeps = {
   automation: ActiveTraceTriggerReader;
-  traces: AutomationEvaluationTraceSummaryPort;
-  triggerMatches: AutomationTriggerMatchRecorderPort;
-  evaluationFilters: AutomationEvaluationTriggerFilterPort;
+  traces: AutomationEvaluationTraceSummary;
+  triggerMatches: AutomationTriggerMatchRecorder;
+  evaluationFilters: AutomationEvaluationTriggerFilter;
 };
 
 export async function handleEvaluationAlertTriggerMatch(

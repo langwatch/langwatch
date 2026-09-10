@@ -15,12 +15,12 @@ import type {
 import { AgentNotFoundError, type AgentApi } from "@langwatch/agent-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { PresenceEmitterPort } from "@langwatch/presence-server";
+import type { PresenceEmitter } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import type { SecretApi } from "@langwatch/secret-contract";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
@@ -142,7 +142,7 @@ function testBroadcast() {
   const broadcast = {
     getTenantEmitter: (tenantId: string) => emitterFor(tenantId),
     cleanupTenantEmitter: noop,
-  } as unknown as PresenceEmitterPort;
+  } as unknown as PresenceEmitter;
   return { broadcast, emitterFor };
 }
 
@@ -244,7 +244,7 @@ function composeApplication(
         : ({
             encrypt: (plaintext: string) => `enc:${plaintext}`,
             decrypt: (ciphertext: string) => ciphertext.replace(/^enc:/, ""),
-          } as unknown as SecretEncryptionPort),
+          } as unknown as SecretEncryption),
     // No ClickHouse and no Redis, which is a real deployment shape: the run
     // reader answers the empty set and the live turn buffer is absent.
     resolveClickHouseClient: null,

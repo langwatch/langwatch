@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { AggregateSearchResult } from "@langwatch/ops-contract";
 import type { EventExplorerRepository } from "../repositories/observe/event-explorer.repository.ts";
-import type { OpsEventingIntrospectionPort } from "../app/ops.app.ts";
+import type { OpsEventingIntrospection } from "../app/ops.app.ts";
 import { toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:event-explorer");
@@ -12,14 +12,14 @@ export class EventExplorerService {
     introspection,
   }: {
     repo: EventExplorerRepository;
-    introspection: OpsEventingIntrospectionPort;
+    introspection: OpsEventingIntrospection;
   }): EventExplorerService {
     return new EventExplorerService(repo, introspection);
   }
 
   private constructor(
     readonly repo: EventExplorerRepository,
-    private readonly introspection: OpsEventingIntrospectionPort,
+    private readonly introspection: OpsEventingIntrospection,
   ) {}
 
   async discoverAggregates(params: {

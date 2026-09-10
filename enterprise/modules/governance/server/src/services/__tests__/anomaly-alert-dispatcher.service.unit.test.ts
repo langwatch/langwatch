@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
-  AnomalyAlertHttpPort,
+  AnomalyAlertHttpClient,
   type AnomalyAlertHttpResponse,
 } from "../../app/governance.infrastructure.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
@@ -12,7 +12,7 @@ type Call = {
   body: string;
 };
 
-class RecordingHttpPort implements AnomalyAlertHttpPort {
+class RecordingHttp implements AnomalyAlertHttpClient {
   readonly calls: Call[] = [];
 
   constructor(
@@ -56,7 +56,7 @@ function dispatchInput(destinationConfig: Record<string, unknown> = {}) {
   };
 }
 
-function createDispatcher(http: AnomalyAlertHttpPort) {
+function createDispatcher(http: AnomalyAlertHttpClient) {
   return AnomalyAlertDispatcherService.create({
     http,
     retryBackoffMs: 0,
@@ -65,7 +65,7 @@ function createDispatcher(http: AnomalyAlertHttpPort) {
 
 describe("AnomalyAlertDispatcherService", () => {
   it("posts the structured alert to an HTTPS destination", async () => {
-    const http = new RecordingHttpPort(() => ({
+    const http = new RecordingHttp(() => ({
       status: 200,
       ok: true,
       statusText: "OK",
@@ -86,7 +86,7 @@ describe("AnomalyAlertDispatcherService", () => {
   });
 
   it("signs the exact request body when a shared secret is configured", async () => {
-    const http = new RecordingHttpPort(() => ({
+    const http = new RecordingHttp(() => ({
       status: 200,
       ok: true,
       statusText: "OK",
@@ -109,12 +109,12 @@ describe("AnomalyAlertDispatcherService", () => {
   });
 
   it("retries 5xx responses but not 4xx responses", async () => {
-    const transient = new RecordingHttpPort((_call, index) => ({
+    const transient = new RecordingHttp((_call, index) => ({
       status: index === 0 ? 503 : 200,
       ok: index > 0,
       statusText: index === 0 ? "Unavailable" : "OK",
     }));
-    const permanent = new RecordingHttpPort(() => ({
+    const permanent = new RecordingHttp(() => ({
       status: 401,
       ok: false,
       statusText: "Unauthorized",
@@ -137,7 +137,7 @@ describe("AnomalyAlertDispatcherService", () => {
   });
 
   it("continues fan-out when one destination exhausts retries", async () => {
-    const http = new RecordingHttpPort((call) => ({
+    const http = new RecordingHttp((call) => ({
       status: call.url.includes("primary") ? 500 : 200,
       ok: !call.url.includes("primary"),
       statusText: call.url.includes("primary") ? "Failed" : "OK",
@@ -157,7 +157,7 @@ describe("AnomalyAlertDispatcherService", () => {
   });
 
   it("uses log-only delivery for empty or malformed configuration", async () => {
-    const http = new RecordingHttpPort(() => ({
+    const http = new RecordingHttp(() => ({
       status: 200,
       ok: true,
       statusText: "OK",

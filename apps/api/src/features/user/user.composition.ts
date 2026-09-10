@@ -9,7 +9,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   BetterAuthAccountQueriesAdapter,
   identityServer,
-  IdentityEventingPort,
+  IdentityEventing,
   IdentityLedgerWriterAdapter,
   IdentityService,
   PrismaIdentityHeadsRepository,
@@ -35,7 +35,7 @@ import {
   type UserPersonalUsageReader,
 } from "@langwatch/user-server";
 
-import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
+import type { ApiPersonMail } from "../../app/api-person-mail.port.ts";
 import { authServer } from "@langwatch/auth-server";
 import {
   apiAuthInfrastructure,
@@ -62,7 +62,7 @@ export async function installApiUser(options: {
   prisma: PrismaClient;
   peers: UserPeers;
   /** The event stack the identifier ledger appends and stages through. */
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
   /** Better Auth's own session cache, so a revocation clears what it reads. */
   redis?: RedisConnection | null | undefined;
   /** The shared counter the account throttles meter through. */
@@ -79,7 +79,7 @@ export async function installApiUser(options: {
   personalUsage?: (() => UserPersonalUsageReader | undefined) | undefined;
   /** The budget request this feature sends, where the deployment composed a gateway. */
   mail?:
-    | Pick<ApiPersonMailPort, "sendBudgetIncreaseRequest" | "sendSignUpVerificationLink">
+    | Pick<ApiPersonMail, "sendBudgetIncreaseRequest" | "sendSignUpVerificationLink">
     | undefined;
   /** Names this process in every refusal below. */
   processName: string;
@@ -189,11 +189,11 @@ function userInfrastructure(options: {
   projects: Pick<ProjectApi, "findIdentity">;
   peers: UserPeers;
   deployment: ApiPersonDeploymentFacts;
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
   avatarStorage: UserAvatarStorage;
   avatarObjects: UserAvatarObjects;
   personalUsage?: (() => UserPersonalUsageReader | undefined) | undefined;
-  mail?: Pick<ApiPersonMailPort, "sendBudgetIncreaseRequest"> | undefined;
+  mail?: Pick<ApiPersonMail, "sendBudgetIncreaseRequest"> | undefined;
   identity: IdentityApi;
   rateLimit(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
@@ -343,7 +343,7 @@ function userInfrastructure(options: {
 /** The identifier ledger, and the ceremony that spends a magic link. */
 function verificationCeremony(options: {
   prisma: PrismaClient;
-  eventing: IdentityEventingPort;
+  eventing: IdentityEventing;
   identity: IdentityApi;
 }): UserInfrastructure["verification"] {
   const { prisma, identity } = options;

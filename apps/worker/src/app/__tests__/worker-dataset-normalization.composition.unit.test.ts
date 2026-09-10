@@ -1,7 +1,7 @@
-import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import { AzureDatasetStorageAdapter, LocalDatasetStorageAdapter } from "@langwatch/dataset-server";
 import {
-  StoredObjectProjectDestinationResolverPort,
+  StoredObjectProjectDestinationResolver,
   StoredObjectStorageRuntimeAdapter,
 } from "@langwatch/stored-object-server";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
@@ -10,26 +10,26 @@ import {
   WorkerDatasetStorageResolver,
   type WorkerDatasetObjectStorage,
 } from "../worker-dataset-normalization.composition.ts";
-import { WorkerProjectS3SourcePort } from "../../platform/infrastructure/worker-stored-object-storage.adapter.ts";
+import { WorkerProjectS3Source } from "../../platform/infrastructure/worker-stored-object-storage.adapter.ts";
 import type { WorkerStorageConfig } from "../../platform/config/worker.config.ts";
 
 /**
  * Spec: specs/datasets/dataset-normalization-azure-storage.feature
  */
 
-class NoProxy extends OutboundProxyResolverPort {
+class NoProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {
     return undefined;
   }
 }
 
-class NoS3Routes extends WorkerProjectS3SourcePort {
+class NoS3Routes extends WorkerProjectS3Source {
   async tryGet() {
     return null;
   }
 }
 
-class FixedDestination extends StoredObjectProjectDestinationResolverPort {
+class FixedDestination extends StoredObjectProjectDestinationResolver {
   constructor(private readonly destination: StoredObjectStorageDestination) {
     super();
   }

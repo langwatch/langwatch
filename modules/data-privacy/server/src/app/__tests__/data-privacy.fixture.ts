@@ -6,14 +6,12 @@ import {
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
 } from "../data-privacy.app.ts";
-import { DataPrivacyResolutionPort } from "../../ports/data-privacy.port.ts";
-import { PiiAnalysisPort } from "../../ports/pii-analysis.port.ts";
+import { DataPrivacyResolution } from "../data-privacy.infrastructure.ts";
+import { PiiAnalysis } from "../data-privacy.infrastructure.ts";
 
 /** The policy source the redaction cases drive their PII cases over. */
-export class DataPrivacyResolutionFake extends DataPrivacyResolutionPort {
-  constructor(private readonly resolved: ResolvedDataPrivacy) {
-    super();
-  }
+export class DataPrivacyResolutionFake implements DataPrivacyResolution {
+  constructor(private readonly resolved: ResolvedDataPrivacy) {}
 
   async getResolvedForProject(): Promise<ResolvedDataPrivacy> {
     return this.resolved;
@@ -55,7 +53,7 @@ export class MemoryDataPrivacyDirectory implements DataPrivacyDirectoryReader {
 }
 
 /** An analysis transport that is composed but never reached by a test. */
-export class UnusedPiiAnalysis extends PiiAnalysisPort {
+export class UnusedPiiAnalysis implements PiiAnalysis {
   static create(): UnusedPiiAnalysis {
     return new UnusedPiiAnalysis();
   }

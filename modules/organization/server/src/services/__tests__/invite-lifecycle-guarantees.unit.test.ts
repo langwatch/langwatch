@@ -9,8 +9,8 @@ import { InviteThrottledError } from "@langwatch/organization-contract";
 import { InviteLifecycleService } from "../invite-lifecycle.service.ts";
 import { InviteSendThrottleService } from "../invite-send-throttle.service.ts";
 import {
-  FakeInviteMailPort,
-  FakeInviteRateLimitPort,
+  FakeInviteMail,
+  FakeInviteRateLimit,
   FakeOrganizationInviteRepository,
   makeInvite,
   makeInviteDeps,
@@ -41,14 +41,14 @@ describe("given an invitation already sent its fill of re-requests for this wind
       // Past the invite's expiry, so the re-request route is even open.
       await vi.advanceTimersByTimeAsync(2000);
 
-      const rateLimit = new FakeInviteRateLimitPort();
+      const rateLimit = new FakeInviteRateLimit();
       const throttle = InviteSendThrottleService.create(rateLimit);
       // The allowance this invitation already spent, moments ago.
       for (let i = 0; i < 3; i++) {
         await throttle.assertInviteSendAllowed({ inviteId: "invite-expired" });
       }
 
-      const mail = new FakeInviteMailPort();
+      const mail = new FakeInviteMail();
       const service = InviteLifecycleService.create(makeInviteDeps({ invites, throttle, mail }));
 
       await expect(
@@ -88,7 +88,7 @@ describe("given two PAYMENT_PENDING invites bought on the same subscription", ()
         }),
       );
 
-      const mail = new FakeInviteMailPort();
+      const mail = new FakeInviteMail();
       const service = InviteLifecycleService.create(makeInviteDeps({ invites, mail }));
 
       const approved = await service.approvePaymentPendingInvites({

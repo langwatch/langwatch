@@ -2,7 +2,7 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplicationPort,
-  ApiLifecyclePort,
+  ApiLifecycle,
   ApiRuntime,
   type ApiShutdownOptions,
 } from "../api.runtime.ts";
@@ -14,7 +14,7 @@ class TestApplication extends ApiApplicationPort<{ name: string }> {
   readonly close = vi.fn(async (_options?: ApiShutdownOptions) => undefined);
 }
 
-class TestLifecycle extends ApiLifecyclePort<{ composed: true }> {
+class TestLifecycle extends ApiLifecycle<{ composed: true }> {
   readonly compose = vi.fn(async (_resources: ResourceScope) => ({ composed: true }) as const);
 }
 

@@ -15,7 +15,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   type LangyStreamRead,
   type LangyStreamRedis,
-  LangyTokenBufferPort,
+  LangyTokenBuffer,
 } from "../langy-token-buffer.repository.ts";
 
 const PAYLOAD_FIELD = "p";
@@ -39,7 +39,7 @@ function decodeFields(fields: string[]): LangyStreamEntry | null {
   return null;
 }
 
-export class LangyTokenBufferRedisRepository extends LangyTokenBufferPort {
+export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
   private readonly redis: LangyStreamRedis;
   /** Per-turn token accumulator, flushed on the hybrid size/time policy. */
   private readonly pending = new Map<string, string>();

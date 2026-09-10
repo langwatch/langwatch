@@ -1,5 +1,5 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
-import type { GatewaySpendEventsPort } from "../../ports/gateway-spend-events.port.ts";
+import type { GatewaySpendEvents } from "../../ports/gateway-spend-events.port.ts";
 import type { GatewaySpendState } from "../../projections/gateway-spend.projection.ts";
 
 /**
@@ -8,11 +8,11 @@ import type { GatewaySpendState } from "../../projections/gateway-spend.projecti
  * `refoldOnStoreMiss` reintroduced, or it overwrites partial state from init().
  */
 export class GatewaySpendStore implements FoldProjectionStore<GatewaySpendState> {
-  static create(repo: GatewaySpendEventsPort): GatewaySpendStore {
+  static create(repo: GatewaySpendEvents): GatewaySpendStore {
     return new GatewaySpendStore(repo);
   }
 
-  private constructor(private readonly repo: GatewaySpendEventsPort) {}
+  private constructor(private readonly repo: GatewaySpendEvents) {}
 
   async tryGet(
     aggregateId: string,

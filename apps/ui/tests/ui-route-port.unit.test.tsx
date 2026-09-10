@@ -6,11 +6,11 @@
 import { render } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
-import type { UiRoutePort } from "@langwatch/ui-host/capabilities";
+import type { UiRoute } from "@langwatch/ui-host/capabilities";
 import { useRouterUiRoute } from "../src/behavior/ui-router-navigation";
 
-function readRouteAt(url: string): { port: UiRoutePort; search: () => string } {
-  let port: UiRoutePort | undefined;
+function readRouteAt(url: string): { port: UiRoute; search: () => string } {
+  let port: UiRoute | undefined;
 
   function Probe() {
     port = useRouterUiRoute();

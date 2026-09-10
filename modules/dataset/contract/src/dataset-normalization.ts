@@ -15,7 +15,7 @@ export type DatasetNormalizePayload = z.infer<typeof datasetNormalizePayloadSche
 export type DatasetNormalizationSender = (payload: DatasetNormalizePayload) => Promise<void>;
 
 /** Dataset-owned process port for the durable normalization worker lane. */
-export abstract class DatasetNormalizationWorkerPort {
+export abstract class DatasetNormalizationWorker {
   abstract process(payload: DatasetNormalizePayload): Promise<void>;
   abstract connect(sender: DatasetNormalizationSender): void;
 }

@@ -13,7 +13,7 @@ describe("the api-keys REST declaration", () => {
   describe("given the declaration a process mounts", () => {
     it("keeps the family's namespace, door, dated version and addressing", () => {
       expect(apiKeyRest.namespace).toBe("api-keys");
-      expect(declaration.credential).toBe("organizationKey");
+      expect(declaration.credential).toBe("organization");
       expect(declaration.version).toBe("2026-08-07");
       expect(declaration.addressing).toBe("dated");
       expect(declaration.v1Twin).toBe(true);

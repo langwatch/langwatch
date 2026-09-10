@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { ModelProviderCredentialCipherPort } from "../../ports/model-provider.port.ts";
+import { ModelProviderCredentialCipher } from "../../app/model-provider.infrastructure.ts";
 import { ModelProviderLegacyMigrationService } from "../model-provider-legacy-migration.service.ts";
 
 const migrations = ModelProviderLegacyMigrationService.create();
 
 /** The deployment's cipher, standing in with a readable transform. */
-class RecordingCipher extends ModelProviderCredentialCipherPort {
+class RecordingCipher extends ModelProviderCredentialCipher {
   encrypt(value: string): string {
     return `encrypted:${value}`;
   }

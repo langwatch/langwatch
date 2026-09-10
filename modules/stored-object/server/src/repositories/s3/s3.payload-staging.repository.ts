@@ -7,7 +7,7 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sd
 import type { S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Logger } from "@langwatch/observability";
-import { PayloadStagingPort, type StagedPayload } from "#repositories/payload-staging.repository";
+import { PayloadStaging, type StagedPayload } from "#repositories/payload-staging.repository";
 import { nowInstant } from "@langwatch/time";
 
 /** Which bucket, on which connection, one project's staged bodies belong in. */
@@ -17,7 +17,7 @@ export abstract class PayloadStagingS3TargetPort {
   abstract resolve(projectId: string): Promise<PayloadStagingS3Target>;
 }
 
-export class S3PayloadStagingAdapter extends PayloadStagingPort {
+export class S3PayloadStagingAdapter extends PayloadStaging {
   static create(options: {
     targets: PayloadStagingS3TargetPort;
     logger?: Pick<Logger, "debug" | "warn">;

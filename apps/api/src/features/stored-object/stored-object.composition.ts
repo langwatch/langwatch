@@ -4,7 +4,7 @@
  * are both still there, so a renderer tells "gone" from "never existed".
  */
 import { S3Client } from "@aws-sdk/client-s3";
-import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -20,17 +20,17 @@ import {
   AzureBlobCredentialsAdapter,
   AzureBlobStoredObjectDriverAdapter,
   StoredObjectBlobFilesystemRepository,
-  PayloadStagingPort,
+  PayloadStaging,
   PayloadStagingS3TargetPort,
   PrometheusStoredObjectsTelemetryAdapter,
   S3PayloadStagingAdapter,
   StoredObjectBlobS3Repository,
-  StoredObjectDeliveryPort,
+  StoredObjectDelivery,
   StoredObjectDestinationPolicyAdapter,
-  StoredObjectOwnerInstanceDirectoryPort,
+  StoredObjectOwnerInstanceDirectory,
   StoredObjectOwnerLookupRuntimeAdapter,
   StoredObjectOwnerLookupTelemetry,
-  StoredObjectProjectS3ConfigPort,
+  StoredObjectProjectS3Config,
   StoredObjectS3TargetPort,
   StoredObjectStoragePortAdapter,
   StoredObjectStorageRegistryAdapter,
@@ -243,7 +243,7 @@ class ApiStoredObjectUnavailableError extends HandledError {
  * this process composes no signer for, so the operation refuses by name rather
  * than answering a link nothing honours.
  */
-class ApiStoredObjectDelivery extends StoredObjectDeliveryPort {
+class ApiStoredObjectDelivery extends StoredObjectDelivery {
   static create(): ApiStoredObjectDelivery {
     return new ApiStoredObjectDelivery();
   }
@@ -273,18 +273,18 @@ class ApiStoredObjectUploadTokens extends StoredObjectUploadTokenPort {
  * execution graph is built ahead of the byte store, so the port is handed over
  * at composition time and resolved on first use rather than captured early.
  */
-export class DeferredPayloadStagingAdapter extends PayloadStagingPort {
-  static create(resolve: () => PayloadStagingPort): DeferredPayloadStagingAdapter {
+export class DeferredPayloadStagingAdapter extends PayloadStaging {
+  static create(resolve: () => PayloadStaging): DeferredPayloadStagingAdapter {
     return new DeferredPayloadStagingAdapter(resolve);
   }
 
-  private constructor(private readonly resolve: () => PayloadStagingPort) {
+  private constructor(private readonly resolve: () => PayloadStaging) {
     super();
   }
 
   stage(
-    input: Parameters<PayloadStagingPort["stage"]>[0],
-  ): ReturnType<PayloadStagingPort["stage"]> {
+    input: Parameters<PayloadStaging["stage"]>[0],
+  ): ReturnType<PayloadStaging["stage"]> {
     return this.resolve().stage(input);
   }
 }
@@ -314,7 +314,7 @@ function composeOwnerResolver(
 }
 
 /** The endpoints the lookup fans out across, read at the lookup rather than captured. */
-class ApiStoredObjectOwnerInstanceDirectory extends StoredObjectOwnerInstanceDirectoryPort {
+class ApiStoredObjectOwnerInstanceDirectory extends StoredObjectOwnerInstanceDirectory {
   static create(
     instances: () => readonly ApiStoredObjectOwnerInstance[],
   ): ApiStoredObjectOwnerInstanceDirectory {
@@ -357,7 +357,7 @@ class ApiStoredObjectOwnerLookupTelemetry extends StoredObjectOwnerLookupTelemet
  * process has no proxy configuration of its own yet, and inventing one from an unrelated
  * variable would route a tenant's bytes through a host nobody chose.
  */
-class ApiNoOutboundProxy extends OutboundProxyResolverPort {
+class ApiNoOutboundProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {
     return undefined;
   }
@@ -480,7 +480,7 @@ class ApiPayloadStagingS3Targets extends PayloadStagingS3TargetPort {
 }
 
 /** The bucket a BYOC project's new objects are minted against. */
-class ApiStoredObjectProjectBuckets extends StoredObjectProjectS3ConfigPort {
+class ApiStoredObjectProjectBuckets extends StoredObjectProjectS3Config {
   static create(targets: ApiStoredObjectS3Targets): ApiStoredObjectProjectBuckets {
     return new ApiStoredObjectProjectBuckets(targets);
   }

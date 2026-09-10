@@ -26,7 +26,7 @@ import { ConfigurationError, QueueError } from "./services/errorHandling.ts";
 import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 import { resolveCoalesceMaxBatch } from "./services/queues/queueManager.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
-import type { KillSwitchPort } from "./kill-switch/index.ts";
+import type { KillSwitch } from "./kill-switch/index.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:event-sourcing");
@@ -49,7 +49,7 @@ export interface EventSourcingOptions {
    * Per-tenant operator stop for every component the registered pipelines
    * mount. Absent means no switch is readable, so every component runs.
    */
-  killSwitch?: KillSwitchPort;
+  killSwitch?: KillSwitch;
   /** Enables warnings when projections run inline because no shared queue exists. */
   warnWhenProjectionsRunInline?: boolean;
   configureGlobalProjections?: (registry: ProjectionRegistry<Event>) => void;
@@ -129,7 +129,7 @@ export class EventSourcing {
   private readonly _executionTarget?: ExecutionTarget;
   private readonly _replayMarkerChecker?: ReplayMarkerChecker;
   private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
-  private readonly _killSwitch?: KillSwitchPort;
+  private readonly _killSwitch?: KillSwitch;
   private readonly _warnWhenProjectionsRunInline: boolean;
   private readonly _processStore?: ProcessStore;
   private readonly _processManagerMode: "run" | "producer-only";

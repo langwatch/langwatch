@@ -7,7 +7,7 @@ import type { TraceRecord } from "@langwatch/trace-contract";
 
 /** Outbound provider calls. Automation owns when and what to send; the process
  * adapter owns SDKs, HTTP policy, mail rendering infrastructure, and secrets. */
-export abstract class AutomationNotificationDeliveryPort {
+export abstract class AutomationNotificationDelivery {
   /** The established transactional-mail renderer remains a host delivery
    * adapter; Automation decides when a legacy digest is sent. */
   abstract sendLegacyEmail(input: {

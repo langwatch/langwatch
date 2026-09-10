@@ -5,7 +5,7 @@
 
 import { createLogger } from "@langwatch/observability";
 
-import type { StorageStatsMetricsPort } from "../app/ops.app.ts";
+import type { StorageStatsMetrics } from "../app/ops.app.ts";
 import { toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:storage-stats");
@@ -46,7 +46,7 @@ export interface StorageStatsCollectionHandle {
 
 export interface StorageStatsCollectionOptions {
   resolveInstances: () => Promise<readonly StorageStatsInstance[]>;
-  metrics: StorageStatsMetricsPort;
+  metrics: StorageStatsMetrics;
   /**
    * Whether the backup log is read at all.
    */

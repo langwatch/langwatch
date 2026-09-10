@@ -12,7 +12,7 @@ import type { GroupQueueDependencies } from "@langwatch/group-queue";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
 import {
-  ApiEventingAbsenceReportPort,
+  ApiEventingAbsenceReport,
   ApiEventingInfrastructure,
 } from "../api-eventing.infrastructure.ts";
 
@@ -21,7 +21,7 @@ function stubQueue(): { dependencies: GroupQueueDependencies<Record<string, unkn
   return { dependencies: { redis: redis as never } };
 }
 
-class RecordingAbsence extends ApiEventingAbsenceReportPort {
+class RecordingAbsence extends ApiEventingAbsenceReport {
   calls = 0;
 
   absent(): void {

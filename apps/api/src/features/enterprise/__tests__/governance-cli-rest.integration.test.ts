@@ -5,7 +5,7 @@
 import type {
   GovernanceCliCaller,
   GovernanceCliRestPorts,
-  GovernanceDirectoryPort,
+  GovernanceDirectory,
 } from "@langwatch/enterprise-governance-server";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
@@ -268,7 +268,7 @@ function governanceCliWorld(
     organization_id: ORGANIZATION_ID,
   };
 
-  const directory: GovernanceDirectoryPort = {
+  const directory: GovernanceDirectory = {
     membershipStatus: () => Promise.resolve(membershipStatusFor(options)),
     tryFindPersonProfile: () => Promise.resolve({ name: "Bob", email: "bob@example.test" }),
     tryFindOrganizationIdByProjectApiKey: () => Promise.resolve(null),

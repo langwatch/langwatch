@@ -1,12 +1,12 @@
 /**
  * The model handle a Langy conversation's title call runs on. `@langwatch/langy-server` owns the
- * prompt, the character budget and the transcript; it declares {@link LangyTitleModelPort} for the
+ * prompt, the character budget and the transcript; it declares {@link LangyTitleModel} for the
  * one thing it does not own, which is WHICH model a project's title call reaches.
  */
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
-import { LangyTitleModelPort } from "@langwatch/langy-server";
+import { LangyTitleModel } from "@langwatch/langy-server";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 
 /**
@@ -37,7 +37,7 @@ export type WorkerLangyTitleModelOptions = Readonly<{
  */
 export function tryCreateWorkerLangyTitleModel(
   options: WorkerLangyTitleModelOptions,
-): LangyTitleModelPort | undefined {
+): LangyTitleModel | undefined {
   const { modelProviders, projects, nlpServiceUrl } = options;
   if (!modelProviders || !projects || !nlpServiceUrl) return undefined;
   return WorkerLangyTitleModelAdapter.create({
@@ -51,7 +51,7 @@ export function tryCreateWorkerLangyTitleModel(
 }
 
 /** The cascade, then the named fallback, over one gateway instance. */
-class WorkerLangyTitleModelAdapter extends LangyTitleModelPort {
+class WorkerLangyTitleModelAdapter extends LangyTitleModel {
   static create(options: {
     modelProviders: ModelProviderApi;
     projects: WorkerLangyTitleProjectDirectory;

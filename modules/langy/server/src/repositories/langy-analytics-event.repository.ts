@@ -11,7 +11,7 @@ export type LangyAnalyticsEventRecord = {
  * The retention days travel with each write because the tenant's policy, not
  * the table, decides how long a row lives.
  */
-export abstract class LangyAnalyticsEventSinkPort {
+export abstract class LangyAnalyticsEventSink {
   /** One row, written on the tenant's retention. */
   abstract insert(record: LangyAnalyticsEventRecord, retentionDays: number): Promise<void>;
 

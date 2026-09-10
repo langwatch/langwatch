@@ -15,7 +15,7 @@ import {
 } from "@langwatch/experiment-contract";
 import type { ExperimentService } from "./experiment.service.ts";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type { ExperimentEvaluationReportingPort } from "../ports/experiment-evaluation-reporting.port.ts";
+import type { ExperimentEvaluationReporting } from "../ports/experiment-evaluation-reporting.port.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import type { SeededTargetOutput } from "./experiment-cell-plan.service.ts";
 import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service.ts";
@@ -35,7 +35,7 @@ export class ExperimentRunStorageService {
     seedTargetOutputs,
   }: {
     commands: ExperimentService;
-    evaluationReporting: ExperimentEvaluationReportingPort;
+    evaluationReporting: ExperimentEvaluationReporting;
     dispatches: ExperimentResultDispatchService;
     cells: ExecutionCell[];
     seedTargetOutputs?: Record<string, SeededTargetOutput>;
@@ -70,7 +70,7 @@ export class ExperimentRunStorageService {
 
   private constructor(
     private readonly commands: ExperimentService,
-    private readonly evaluationReporting: ExperimentEvaluationReportingPort,
+    private readonly evaluationReporting: ExperimentEvaluationReporting,
     private readonly dispatches: ExperimentResultDispatchService,
     private readonly cellTraceIds: Map<string, string>,
     private readonly completedTargetOutputs: Map<string, SeededTargetOutput>,

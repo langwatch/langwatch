@@ -13,7 +13,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import type {
   ModelProviderCatalog
-} from "../ports/model-provider.port.ts";
+} from "../app/model-provider.infrastructure.ts";
 import type {
   ModelDefaultRepository
 } from "../repositories/model-default.repository.ts";

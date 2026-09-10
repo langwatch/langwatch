@@ -1,4 +1,4 @@
-import { AesGcmSecretEncryptionAdapter, type SecretEncryptionPort } from "@langwatch/secret-server";
+import { AesGcmSecretEncryptionAdapter, type SecretEncryption } from "@langwatch/secret-server";
 
 export type ApiSecretEncryptionInfrastructureOptions = {
   /** The 32-byte hex key this process was configured with, if it was given one. */
@@ -6,7 +6,7 @@ export type ApiSecretEncryptionInfrastructureOptions = {
 };
 
 /** Reports the composition decision an unconfigured key would otherwise hide. */
-export abstract class ApiSecretEncryptionAbsenceReportPort {
+export abstract class ApiSecretEncryptionAbsenceReport {
   abstract absent(): void;
 }
 
@@ -36,7 +36,7 @@ export class ApiSecretEncryptionInfrastructure {
    */
   static tryCreate(
     options: ApiSecretEncryptionInfrastructureOptions & {
-      report?: ApiSecretEncryptionAbsenceReportPort;
+      report?: ApiSecretEncryptionAbsenceReport;
     },
   ): ApiSecretEncryptionInfrastructure | undefined {
     if (!options.key?.trim()) {
@@ -56,5 +56,5 @@ export class ApiSecretEncryptionInfrastructure {
     return new ApiSecretEncryptionInfrastructure(AesGcmSecretEncryptionAdapter.create({ key }));
   }
 
-  private constructor(readonly encryption: SecretEncryptionPort) {}
+  private constructor(readonly encryption: SecretEncryption) {}
 }

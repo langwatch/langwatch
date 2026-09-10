@@ -8,11 +8,11 @@ import {
   type AutomationsPipelineDeps,
   createAutomationsPipeline,
 } from "../../adapters/eventing.automation.adapter.ts";
-import { AutomationIntentRetentionPort } from "../automation-intent-retention.port.ts";
-import { AutomationScheduledIntentPort } from "../automation-scheduled-intent.port.ts";
-import { AutomationSettlementExecutorPort } from "../automation-settlement.port.ts";
+import { AutomationIntentRetention } from "../automation-intent-retention.port.ts";
+import { AutomationScheduledIntent } from "../automation-scheduled-intent.port.ts";
+import { AutomationSettlementExecutor } from "../automation-settlement.port.ts";
 
-class InertSettlementExecutor extends AutomationSettlementExecutorPort {
+class InertSettlementExecutor extends AutomationSettlementExecutor {
   async notifyDigest(): Promise<void> {}
 
   async persistMatch(): Promise<void> {}
@@ -20,7 +20,7 @@ class InertSettlementExecutor extends AutomationSettlementExecutorPort {
   async logOverflow(): Promise<void> {}
 }
 
-export class InertScheduledIntents extends AutomationScheduledIntentPort {
+export class InertScheduledIntents extends AutomationScheduledIntent {
   async decideGraphTriggerHeartbeat(): Promise<GraphTriggerSweepCandidate[]> {
     return [];
   }
@@ -38,7 +38,7 @@ export class InertScheduledIntents extends AutomationScheduledIntentPort {
   }
 }
 
-export class InertIntentRetention extends AutomationIntentRetentionPort {
+export class InertIntentRetention extends AutomationIntentRetention {
   async deleteDispatchedBefore(): Promise<number> {
     return 0;
   }
@@ -54,8 +54,8 @@ export function automationProcessDefinition({
   retention = new InertIntentRetention(),
 }: {
   name: "triggerSettlement" | "graphAlertSweep" | "webhookDeliveryPrune";
-  scheduledIntents?: AutomationScheduledIntentPort;
-  retention?: AutomationIntentRetentionPort;
+  scheduledIntents?: AutomationScheduledIntent;
+  retention?: AutomationIntentRetention;
 }): ProcessManagerDefinition {
   const dependencies: AutomationsPipelineDeps = {
     settlement: new InertSettlementExecutor(),

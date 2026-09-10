@@ -1,5 +1,5 @@
 import { customAlphabet, nanoid } from "nanoid";
-import { ProjectCredentialsPort } from "../ports/project.port.ts";
+import { ProjectCredentials } from "../ports/project.port.ts";
 
 /**
  * The identifier and the ingestion credential a project is born with.
@@ -22,7 +22,7 @@ const API_KEY_CHARS = 48;
 
 const randomApiKeyBody = customAlphabet(API_KEY_ALPHABET, API_KEY_CHARS);
 
-export class ProjectCredentialsAdapter extends ProjectCredentialsPort {
+export class ProjectCredentialsAdapter extends ProjectCredentials {
   static create(): ProjectCredentialsAdapter {
     return new ProjectCredentialsAdapter();
   }

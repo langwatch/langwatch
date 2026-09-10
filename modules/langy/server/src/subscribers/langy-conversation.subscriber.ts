@@ -40,7 +40,7 @@ export interface LangyConversationLivenessReader {
     conversationId: string;
   }): Promise<LangyConversationLivenessRecord | null>;
 }
-export interface LangyFailTurnCommandPort {
+export interface LangyFailTurnCommand {
   failTurn(params: {
     projectId: string;
     conversationId: string;
@@ -48,7 +48,7 @@ export interface LangyFailTurnCommandPort {
     error: string;
   }): Promise<void>;
 }
-export interface LangyLivenessBufferPort {
+export interface LangyLivenessBuffer {
   liveness(params: {
     conversationId: string;
     turnId: string;
@@ -58,7 +58,7 @@ export interface LangyLivenessBufferPort {
   appendStatus(params: { conversationId: string; turnId: string; status: string }): Promise<void>;
   markError(params: { conversationId: string; turnId: string; error: string }): Promise<void>;
 }
-export interface LangyWorkerDispatchPort {
+export interface LangyWorkerDispatch {
   dispatch(params: {
     intent: "create" | "revive" | "continue";
     conversationId: string;
@@ -91,10 +91,10 @@ export interface LangyTurnHandoffReader {
   read(params: { conversationId: string; turnId: string }): Promise<LangyTurnHandoffRecord | null>;
 }
 export interface AgentTurnLivenessSubscriberDeps {
-  buffer: LangyLivenessBufferPort;
+  buffer: LangyLivenessBuffer;
   conversations: LangyConversationLivenessReader;
-  failTurn: LangyFailTurnCommandPort;
-  worker: LangyWorkerDispatchPort;
+  failTurn: LangyFailTurnCommand;
+  worker: LangyWorkerDispatch;
   handoffStore: LangyTurnHandoffReader;
   clock?: () => number;
 }

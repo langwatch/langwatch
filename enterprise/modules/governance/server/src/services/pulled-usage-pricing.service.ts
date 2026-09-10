@@ -4,7 +4,7 @@ import {
   type PulledUsageCostBasis,
   type PulledUsageCostStatus,
 } from "@langwatch/enterprise-governance-contract";
-import type { PulledUsageRatePort } from "../ports/pulled-usage-rate.port.ts";
+import type { PulledUsageRateReader } from "../app/governance.infrastructure.ts";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
 export type PulledUsageQuantities = {
@@ -34,9 +34,9 @@ export type PulledUsagePrice = {
 };
 
 export class PulledUsagePricingService {
-  private constructor(private readonly rates: PulledUsageRatePort) {}
+  private constructor(private readonly rates: PulledUsageRateReader) {}
 
-  static create(rates: PulledUsageRatePort): PulledUsagePricingService {
+  static create(rates: PulledUsageRateReader): PulledUsagePricingService {
     return new PulledUsagePricingService(rates);
   }
 

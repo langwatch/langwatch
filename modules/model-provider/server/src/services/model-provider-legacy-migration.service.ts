@@ -3,7 +3,7 @@
  */
 
 import { isLegacyCustomModels, type CustomModelEntry } from "@langwatch/model-provider-contract";
-import type { ModelProviderCredentialCipherPort } from "../ports/model-provider.port.ts";
+import type { ModelProviderCredentialCipher } from "../app/model-provider.infrastructure.ts";
 
 // ============================================================================
 // Types
@@ -182,7 +182,7 @@ export class ModelProviderLegacyMigrationService {
     cipher,
   }: {
     row: ModelProviderCredentialRow;
-    cipher: ModelProviderCredentialCipherPort;
+    cipher: ModelProviderCredentialCipher;
   }): string | null {
     if (row.customKeys == null) {
       return null;

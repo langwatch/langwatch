@@ -29,21 +29,21 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type {
   AiToolCatalogRepository,
-  AiToolProviderCatalogPort,
-  AiToolSlugPort,
+  AiToolProviderCatalog,
+  AiToolSlug,
 } from "../repositories/ai-tool-catalog.repository.ts";
 
 export class DefaultGovernanceAiToolCatalogService {
   private constructor(
     private readonly repository: AiToolCatalogRepository,
-    private readonly slugs: AiToolSlugPort,
-    private readonly providers: AiToolProviderCatalogPort,
+    private readonly slugs: AiToolSlug,
+    private readonly providers: AiToolProviderCatalog,
   ) {}
 
   static create(options: {
     repository: AiToolCatalogRepository;
-    slugs: AiToolSlugPort;
-    providers: AiToolProviderCatalogPort;
+    slugs: AiToolSlug;
+    providers: AiToolProviderCatalog;
   }): DefaultGovernanceAiToolCatalogService {
     return new DefaultGovernanceAiToolCatalogService(
       options.repository,

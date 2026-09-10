@@ -3,7 +3,7 @@
  * @see specs/nlp-go/studio-lambda-cache.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { NlpLambdaArnResolverPort } from "../../ports/nlp-lambda-arn.port.ts";
+import { NlpLambdaArnResolver } from "../../app/workflow.app.ts";
 import type { NlpLambdaArnCache } from "../../app/workflow.app.ts";
 import {
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
@@ -40,7 +40,7 @@ class SharedCache implements NlpLambdaArnCache {
 
 function awsResolver(arn: string = ARN) {
   const resolve = vi.fn(async () => arn);
-  const resolver = new (class extends NlpLambdaArnResolverPort {
+  const resolver = new (class implements NlpLambdaArnResolver {
     resolve = resolve;
   })();
   return { resolver, resolve };
@@ -48,7 +48,7 @@ function awsResolver(arn: string = ARN) {
 
 function runtime(options: {
   cache: SharedCache;
-  resolver: NlpLambdaArnResolverPort;
+  resolver: NlpLambdaArnResolver;
   imageUri?: string;
 }) {
   return NlpLambdaRuntimeService.create({
@@ -112,7 +112,7 @@ describe("the per-project NLP Lambda runtime", () => {
         await gate;
         return ARN;
       });
-      const resolver = new (class extends NlpLambdaArnResolverPort {
+      const resolver = new (class implements NlpLambdaArnResolver {
         resolve = resolve;
       })();
       const engine = runtime({ cache, resolver });
@@ -157,7 +157,7 @@ describe("the per-project NLP Lambda runtime", () => {
       const resolve = vi.fn(async () => {
         throw new Error("Rate Exceeded.");
       });
-      const resolver = new (class extends NlpLambdaArnResolverPort {
+      const resolver = new (class implements NlpLambdaArnResolver {
         resolve = resolve as never;
       })();
       const engine = runtime({ cache, resolver });

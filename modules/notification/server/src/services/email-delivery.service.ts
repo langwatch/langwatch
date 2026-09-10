@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import {
   type EmailContent,
-  EmailDeliveryPort,
-  type EmailGatewayPort,
+  EmailDelivery,
+  type EmailGateway,
   type EmailOutboundProxyConfig,
   type EmailProviderName,
   type MailerConfiguration,
@@ -28,7 +28,7 @@ const logger = createLogger("langwatch:mailer:runtime");
  * gets is a throwing send its caller is expected to survive — the notification
  * fan-outs treat a failed send as a missing courtesy, never as a lost fact.
  */
-export class EmailDeliveryAdapter extends EmailDeliveryPort {
+export class EmailDeliveryAdapter extends EmailDelivery {
   static create(input: {
     configuration: MailerConfiguration;
     aws: SesAwsClientConfiguration;
@@ -37,7 +37,7 @@ export class EmailDeliveryAdapter extends EmailDeliveryPort {
     return new EmailDeliveryAdapter(input.configuration, input.aws, input.outboundProxy);
   }
 
-  private gateway: EmailGatewayPort | undefined;
+  private gateway: EmailGateway | undefined;
 
   private closePromise: Promise<void> | undefined;
 
@@ -68,7 +68,7 @@ export class EmailDeliveryAdapter extends EmailDeliveryPort {
     return this.closePromise;
   }
 
-  private resolveGateway(): EmailGatewayPort | undefined {
+  private resolveGateway(): EmailGateway | undefined {
     if (this.gateway) return this.gateway;
 
     const providerName = EmailProviderService.create(this.configuration).tryResolveName();
@@ -78,7 +78,7 @@ export class EmailDeliveryAdapter extends EmailDeliveryPort {
     return this.gateway;
   }
 
-  private createGateway(name: EmailProviderName): EmailGatewayPort {
+  private createGateway(name: EmailProviderName): EmailGateway {
     switch (name) {
       case "ses":
         return SesEmailGatewayAdapter.create({

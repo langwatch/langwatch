@@ -12,7 +12,7 @@ import { AzureBlobCredentialsAdapter } from "#services/azure-blob-credentials.se
 const { assertTokenModeTransportSafety } = AzureBlobCredentialsAdapter;
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import { z } from "zod";
-import type { ObjectStorageMigrationInventoryPort } from "#repositories/object-storage-migration-inventory.repository";
+import type { ObjectStorageMigrationInventory } from "#repositories/object-storage-migration-inventory.repository";
 import {
   ObjectStorageMigrationService,
   type ObjectStorageMigrationDeps,
@@ -207,7 +207,7 @@ export function createMigrationTask({
   s3Driver,
 }: {
   config: MigrationTaskConfig;
-  inventory: ObjectStorageMigrationInventoryPort;
+  inventory: ObjectStorageMigrationInventory;
   publishStoredObject: ObjectStorageMigrationDeps["publishStoredObject"];
   auditQueues: ObjectStorageMigrationDeps["auditQueues"];
   s3Driver: StoredObjectStorageDriver;

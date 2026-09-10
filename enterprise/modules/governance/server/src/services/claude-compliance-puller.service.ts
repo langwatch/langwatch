@@ -20,8 +20,8 @@
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
 import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http-poller.service.ts";
-import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
-import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port.ts";
+import type { GovernanceHttpClient } from "../app/governance.infrastructure.ts";
+import type { IngestionPullDiagnosticsSink } from "../app/governance.infrastructure.ts";
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
 /**
@@ -63,15 +63,15 @@ export class ClaudeComplianceReferencePullerAdapter extends HttpPollingPullerAda
   override readonly id: string = "claude_compliance";
 
   private constructor(options: {
-    http: GovernanceHttpPort;
-    diagnostics?: IngestionPullDiagnosticsPort;
+    http: GovernanceHttpClient;
+    diagnostics?: IngestionPullDiagnosticsSink;
   }) {
     super(options.http, options.diagnostics);
   }
 
   static override create(options: {
-    http: GovernanceHttpPort;
-    diagnostics?: IngestionPullDiagnosticsPort;
+    http: GovernanceHttpClient;
+    diagnostics?: IngestionPullDiagnosticsSink;
   }): ClaudeComplianceReferencePullerAdapter {
     return new ClaudeComplianceReferencePullerAdapter(options);
   }

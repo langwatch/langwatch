@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TraceListItem } from "@langwatch/trace-contract";
 import {
   toConversationContextTurn as toConversationContextTurnWithPorts,
-  type TraceContentPrivacyPort,
+  type TraceContentPrivacy,
   type V2Protections,
 } from "../trace-read-mappers.api.ts";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@langwatch/data-privacy-contract";
 
 /** The real data-privacy vocabulary, wired as the port the mapper now takes. */
-const contentPrivacy: TraceContentPrivacyPort = {
+const contentPrivacy: TraceContentPrivacy = {
   contentKeyCatalog: CONTENT_KEY_CATALOG,
   droppedMarkerAttribute: PRIVACY_DROPPED_MARKER_ATTR,
   piiIncompleteMarkerAttribute: PRIVACY_PII_INCOMPLETE_MARKER_ATTR,

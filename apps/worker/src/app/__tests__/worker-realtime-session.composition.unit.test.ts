@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../../features/gateway/gateway-realtime-session-worker-feature.installer.ts";
 import {
   tryCreateWorkerRealtimeSessionPoller,
-  WorkerRealtimeSessionAbsenceReportPort,
+  WorkerRealtimeSessionAbsenceReport,
 } from "../worker-realtime-session.composition.ts";
 
 /** A 32-byte key in the hex spelling the stored-secret cipher demands. */
@@ -22,7 +22,7 @@ function databaseDouble() {
   };
 }
 
-class RecordingAbsence extends WorkerRealtimeSessionAbsenceReportPort {
+class RecordingAbsence extends WorkerRealtimeSessionAbsenceReport {
   readonly reasons: string[] = [];
 
   withoutPoller(reason: string): void {

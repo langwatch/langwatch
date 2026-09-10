@@ -4,13 +4,13 @@
  * @see specs/coding-agent/session-aggregate.feature
  */
 import { describe, expect, it } from "vitest";
-import { NoopCodingAgentReadMetricsPort } from "../../adapters/coding-agent-read-metrics.adapter.ts";
+import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
 import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import type {
   CodingAgentClickHouseClient,
   CodingAgentClickHouseQueryResult,
-} from "../../ports/coding-agent-clickhouse.port.ts";
-import { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
+} from "../../app/coding-agent.infrastructure.ts";
+import { CodingAgentClickHouse } from "../../app/coding-agent.infrastructure.ts";
 import { parseClickHouseDateTimeMs } from "../clickhouse/clickhouse.mapper.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
 
@@ -31,8 +31,8 @@ function chTime(ms: number): string {
 
 const millis = (value: unknown): number => parseClickHouseDateTimeMs(String(value));
 
-function makePort(client: CodingAgentClickHouseClient): CodingAgentClickHousePort {
-  class Port extends CodingAgentClickHousePort {
+function makePort(client: CodingAgentClickHouseClient): CodingAgentClickHouse {
+  class Port implements CodingAgentClickHouse {
     async resolve(): Promise<CodingAgentClickHouseClient> {
       return client;
     }
@@ -44,7 +44,7 @@ function makeRepository(client: CodingAgentClickHouseClient) {
   return CodingAgentSessionClickHouseRepository.create({
     clickHouse: makePort(client),
     defaultTraceRetentionDays: 30,
-    metrics: NoopCodingAgentReadMetricsPort.create(),
+    metrics: NoopCodingAgentReadMetrics.create(),
     clock: new TestClock(),
   });
 }

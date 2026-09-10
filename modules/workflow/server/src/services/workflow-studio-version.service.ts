@@ -17,15 +17,15 @@
  */
 import { createLogger } from "@langwatch/observability";
 import type { StudioWorkflow, WorkflowVersion } from "@langwatch/workflow-contract";
-import type { WorkflowAgentMappingPort, WorkflowStudioDslPort } from "../ports/workflow.port.ts";
+import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../app/workflow.app.ts";
 import type { WorkflowService } from "./workflow.service.ts";
 
 const logger = createLogger("langwatch:workflows:auto-compute");
 
 export type WorkflowStudioVersionServiceOptions = {
   workflows: WorkflowService;
-  studioDsl: WorkflowStudioDslPort;
-  agentMappings: WorkflowAgentMappingPort;
+  studioDsl: WorkflowStudioDsl;
+  agentMappings: WorkflowAgentMapping;
 };
 
 export type SaveStudioWorkflowVersionInput = {

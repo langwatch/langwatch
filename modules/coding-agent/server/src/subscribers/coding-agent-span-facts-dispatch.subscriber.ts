@@ -25,7 +25,7 @@ import {
   resolveSpanConversationKey,
 } from "@langwatch/coding-agent-contract";
 import { CodingAgentSessionSpanProjection } from "../projections/coding-agent-session-span.projection.ts";
-import type { CodingAgentTraceProcessingPort } from "../ports/coding-agent-trace-processing.port.ts";
+import type { CodingAgentTraceProcessing } from "../app/coding-agent.infrastructure.ts";
 import { z } from "zod";
 
 const logger = createLogger("langwatch:coding-agent-processing:span-facts-dispatch");
@@ -55,7 +55,7 @@ const dedupDataSchema = z
  */
 export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
   contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
-  traces: CodingAgentTraceProcessingPort;
+  traces: CodingAgentTraceProcessing;
 }): EventSubscriberDefinition<TraceProcessingEvent> {
   const normalization = deps.traces;
 
@@ -177,7 +177,7 @@ async function handleFullEvent({
   contributeSpanFacts,
 }: {
   event: TraceProcessingEvent;
-  normalization: CodingAgentTraceProcessingPort;
+  normalization: CodingAgentTraceProcessing;
   isCodingAgentSpan: (event: TraceProcessingEvent) => event is SpanReceivedEvent;
   contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
 }): Promise<void> {
@@ -246,7 +246,7 @@ function normalizeOrReport({
   normalization,
 }: {
   event: SpanReceivedEvent;
-  normalization: CodingAgentTraceProcessingPort;
+  normalization: CodingAgentTraceProcessing;
 }): NormalizedSpan | null {
   try {
     return normalization.normalizeSpan({
@@ -297,7 +297,7 @@ function makeSpanFactsLiftedPayload({
   normalization,
 }: {
   event: SpanReceivedEvent;
-  normalization: CodingAgentTraceProcessingPort;
+  normalization: CodingAgentTraceProcessing;
 }): SpanFactsLiftedPayload | SpanReceivedEvent {
   let data: ContributeSpanFactsCommandData;
   try {
@@ -339,7 +339,7 @@ function makeSpanFactsLiftedPayload({
  */
 async function resolveClaimCheck(
   ref: SpanReferencedPayload,
-  deps: { traces: CodingAgentTraceProcessingPort },
+  deps: { traces: CodingAgentTraceProcessing },
 ): Promise<ContributeSpanFactsCommandData> {
   const span = await deps.traces.findNormalizedSpan({
     tenantId: ref.tenantId,

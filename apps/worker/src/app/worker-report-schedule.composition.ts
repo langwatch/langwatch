@@ -1,14 +1,14 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "@langwatch/automation-contract";
 import {
-  AutomationClockPort,
+  AutomationClock,
   PostgresAutomationGraphDeliveryAdapter,
   PrismaCustomGraphRepository,
   PrismaTriggerFireHistoryRepository,
   PrismaTriggerRepository,
   ReportScheduleService,
   ScheduledJobStorePort,
-  SchedulerWakePort,
+  SchedulerWake,
   SlackProviderAdapter,
   ReportChartService,
   ReportDispatchService,
@@ -25,7 +25,7 @@ import {
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import {
   ClickHouseEvaluationRepository,
-  EvaluationRetentionFloorPort,
+  EvaluationRetentionFloor,
 } from "@langwatch/evaluation-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaConnection } from "@langwatch/prisma-client";
@@ -41,7 +41,7 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 /**
  * What a scheduled report reads its traces through. Narrow on purpose.
  */
-export abstract class WorkerReportTraceListPort {
+export abstract class WorkerReportTraceList {
   abstract listReportTraces(input: {
     projectId: string;
     projectSlug: string;
@@ -55,7 +55,7 @@ export abstract class WorkerReportTraceListPort {
 /**
  * The traces a report lists, over a trace-list reader this process composes.
  */
-export class ComposedWorkerReportTraceList extends WorkerReportTraceListPort {
+export class ComposedWorkerReportTraceList extends WorkerReportTraceList {
   static create(input: {
     /** Reads a page of matching traces. `TraceListService`, narrowed. */
     traces: {
@@ -135,7 +135,7 @@ export function createWorkerReportTraceList(options: {
   /** The event store's own retention default, so both read to the same day. */
   defaultRetentionDays: number;
   baseHost: string;
-}): WorkerReportTraceListPort {
+}): WorkerReportTraceList {
   const evaluations = ClickHouseEvaluationRepository.create({
     resolveClient: options.resolveClickHouseClient,
     retentionFloor: new ReportRetentionFloor(options.defaultRetentionDays),
@@ -178,7 +178,7 @@ function refuseReportRead<T extends object>(capability: string): T {
  * The floor an evaluation read will not look below, from the one retention
  * default this process configures its event store with.
  */
-class ReportRetentionFloor extends EvaluationRetentionFloorPort {
+class ReportRetentionFloor extends EvaluationRetentionFloor {
   constructor(private readonly defaultRetentionDays: number) {
     super();
   }
@@ -192,7 +192,7 @@ export type WorkerReportScheduleCompositionOptions = Readonly<{
   /** The typed client this process opened; the calendar row lives in it. */
   connection: PrismaConnection;
   /** The process's own wall clock, as Automation reads time. */
-  clock: AutomationClockPort;
+  clock: AutomationClock;
   /** The transports and cipher both halves of Automation already share. */
   delivery: WorkerAutomationDeliveryComposition;
   /** The name and slug a report's links and headings are written with. */
@@ -200,7 +200,7 @@ export type WorkerReportScheduleCompositionOptions = Readonly<{
   /** The timeseries each chart panel is plotted from. */
   analytics: AnalyticsService;
   /** How a trace-query report reads the rows it sends. */
-  traces: WorkerReportTraceListPort;
+  traces: WorkerReportTraceList;
   /** This deployment's public origin. Every link in the message goes through it. */
   baseHost: string;
   /** Best-effort cross-pod wake. Absent leaves the poll backstop, never correctness. */
@@ -369,7 +369,7 @@ class WorkerReportScheduleJobs extends ScheduledJobStorePort {
  * layer: a dropped publish or an absent Redis costs only the time to the next poll backstop, never
  * a fire.
  */
-class WorkerSchedulerWake extends SchedulerWakePort {
+class WorkerSchedulerWake extends SchedulerWake {
   constructor(private readonly redis: RedisConnection | null) {
     super();
   }

@@ -1,5 +1,5 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
-import { ProcessRetentionMetricsPort, type RetentionFamily } from "./retention-metrics.port.ts";
+import { ProcessRetentionMetrics, type RetentionFamily } from "./retention-metrics.port.ts";
 
 /**
  * The two series names, pinned because two processes write them.
@@ -22,7 +22,7 @@ export const PROCESS_RETENTION_FAILURES_METRIC_NAME = "process_manager_retention
  * a family with nothing to sweep report the same zero, and silent retention
  * failure is the exact incident this sweep exists to prevent.
  */
-export class OtelProcessRetentionMetricsAdapter extends ProcessRetentionMetricsPort {
+export class OtelProcessRetentionMetricsAdapter extends ProcessRetentionMetrics {
   static create(): OtelProcessRetentionMetricsAdapter {
     return new OtelProcessRetentionMetricsAdapter(
       counter({

@@ -5,7 +5,7 @@ import { sanitizeHeaders } from "./mime.ts";
 import {
   type EmailContent,
   EmailProviderConfigurationError,
-  type EmailProviderPort,
+  type EmailProvider,
   type MailerConfiguration,
   toArray,
 } from "./types.ts";
@@ -71,7 +71,7 @@ export const buildSmtpTransportOptions = (
 };
 
 /** A process-owned SMTP connection pool, reused across notification deliveries. */
-export class SmtpEmailProvider implements EmailProviderPort {
+export class SmtpEmailProvider implements EmailProvider {
   readonly name = "smtp" as const;
 
   static create(configuration: MailerConfiguration["smtp"]): SmtpEmailProvider {

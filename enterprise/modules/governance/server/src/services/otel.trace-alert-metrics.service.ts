@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
-import { TraceAlertMetricsPort } from "../ports/governance-subscriber.port.ts";
+import { TraceAlertMetricsSink } from "../app/governance.infrastructure.ts";
 
 /**
  * The series name and its help text, pinned because two processes write them.
@@ -23,7 +23,7 @@ export const AUTOMATION_MATCH_RECORDS_METRIC_DESCRIPTION =
   "Trigger match records written before any filter is evaluated";
 
 /** Trigger match-record volume, pushed over OTLP. */
-export class OtelTraceAlertMetricsAdapter extends TraceAlertMetricsPort {
+export class OtelTraceAlertMetricsAdapter implements TraceAlertMetricsSink {
   static create(): OtelTraceAlertMetricsAdapter {
     return new OtelTraceAlertMetricsAdapter(
       counter({

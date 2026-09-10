@@ -5,7 +5,7 @@
 import { AuthzService, type AuthzServiceOptions } from "@langwatch/authz-server";
 import type { CollectedBinding } from "@langwatch/authz-contract";
 import {
-  CodingAgentCallerScopeDirectoryPort,
+  CodingAgentCallerScopeDirectory,
   CodingAgentCallerScopeService,
   type CodingAgentScopeProject,
 } from "@langwatch/coding-agent-server";
@@ -67,7 +67,7 @@ function reader(overrides: Partial<Reader> = {}): Reader {
 }
 
 /** The organization's two projects, and no personal workspace among them. */
-class TwoProjectDirectory extends CodingAgentCallerScopeDirectoryPort {
+class TwoProjectDirectory extends CodingAgentCallerScopeDirectory {
   async listOrganizationProjects(): Promise<readonly CodingAgentScopeProject[]> {
     return [BOUND, OTHER];
   }

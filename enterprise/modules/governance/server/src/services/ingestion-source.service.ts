@@ -12,13 +12,15 @@ import {
   type UpdateGovernanceIngestionSourceCommand,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
+import type { GovernanceDiagnosticsSink } from "../app/governance.infrastructure.ts";
 import type {
-  IngestionSourceEntitlementsPort,
-  IngestionSourceLifecyclePort,
+  IngestionSourceEntitlements,
+  IngestionSourceLifecycleChannel,
+} from "../app/governance.infrastructure.ts";
+import type {
   IngestionSourceRepository,
   UpdateIngestionSourceRecord,
-} from "../ports/ingestion-source.port.ts";
+} from "../repositories/ingestion-source.repository.ts";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
 import type { IngestionSecretService } from "./ingestion-source-secret.service.ts";
 import type { PullDestinationService } from "./pull-destination.service.ts";
@@ -31,12 +33,12 @@ export class IngestionSourceService {
   private constructor(
     private readonly repository: IngestionSourceRepository,
     private readonly projects: ProjectApi,
-    private readonly entitlements: IngestionSourceEntitlementsPort,
-    private readonly lifecycle: IngestionSourceLifecyclePort,
+    private readonly entitlements: IngestionSourceEntitlements,
+    private readonly lifecycle: IngestionSourceLifecycleChannel,
     private readonly credentials: IngestionCredentialsService,
     private readonly secrets: IngestionSecretService,
     private readonly destinations: PullDestinationService,
-    private readonly diagnostics: GovernanceDiagnosticsPort,
+    private readonly diagnostics: GovernanceDiagnosticsSink,
     private readonly now: () => number,
     private readonly validation: IngestionSourceValidationService,
   ) {}
@@ -44,12 +46,12 @@ export class IngestionSourceService {
   static create(options: {
     repository: IngestionSourceRepository;
     projects: ProjectApi;
-    entitlements: IngestionSourceEntitlementsPort;
-    lifecycle: IngestionSourceLifecyclePort;
+    entitlements: IngestionSourceEntitlements;
+    lifecycle: IngestionSourceLifecycleChannel;
     credentials: IngestionCredentialsService;
     secrets: IngestionSecretService;
     destinations: PullDestinationService;
-    diagnostics: GovernanceDiagnosticsPort;
+    diagnostics: GovernanceDiagnosticsSink;
     now?: () => number;
   }): IngestionSourceService {
     return new IngestionSourceService(

@@ -6,9 +6,9 @@
 import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { NoopCodingAgentReadMetricsPort } from "../../adapters/coding-agent-read-metrics.adapter.ts";
-import { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
-import { CodingAgentClockPort } from "../../ports/coding-agent-clock.port.ts";
+import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
+import { CodingAgentClickHouse } from "../../app/coding-agent.infrastructure.ts";
+import { CodingAgentClock } from "../../app/coding-agent.infrastructure.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-trace-session.repository.ts";
 import { SessionMetricSeriesClickHouseRepository } from "../clickhouse/clickhouse.session-metric-series.repository.ts";
@@ -20,9 +20,8 @@ import {
 
 const clickHouseUrl = testClickHouseUrl();
 
-class SingleClickHousePort extends CodingAgentClickHousePort {
+class SingleClickHouse implements CodingAgentClickHouse {
   constructor(private readonly client: ClickHouseClient) {
-    super();
   }
 
   async resolve() {
@@ -30,7 +29,7 @@ class SingleClickHousePort extends CodingAgentClickHousePort {
   }
 }
 
-class FixedClock extends CodingAgentClockPort {
+class FixedClock implements CodingAgentClock {
   nowMs(): number {
     return baseMs;
   }
@@ -49,17 +48,17 @@ beforeAll(() => {
   if (clickHouseUrl === null) return;
   ch = createTestClickHouseClient(clickHouseUrl);
   sessions = CodingAgentSessionClickHouseRepository.create({
-    clickHouse: new SingleClickHousePort(ch),
+    clickHouse: new SingleClickHouse(ch),
     defaultTraceRetentionDays: 30,
-    metrics: NoopCodingAgentReadMetricsPort.create(),
+    metrics: NoopCodingAgentReadMetrics.create(),
     clock: new FixedClock(),
   });
   traceSessions = CodingAgentTraceSessionClickHouseRepository.create({
-    clickHouse: new SingleClickHousePort(ch),
+    clickHouse: new SingleClickHouse(ch),
     defaultTraceRetentionDays: 30,
   });
   metricSeries = SessionMetricSeriesClickHouseRepository.create({
-    clickHouse: new SingleClickHousePort(ch),
+    clickHouse: new SingleClickHouse(ch),
     defaultTraceRetentionDays: 30,
   });
 });

@@ -26,8 +26,8 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
-import type { DataRetentionPlanPort } from "../ports/data-retention-plan.port.ts";
-import type { StorageMeterClickHouseClient } from "../ports/storage-meter-clickhouse.port.ts";
+import type { DataRetentionPlanPort } from "./data-retention.infrastructure.ts";
+import type { StorageMeterClickHouseClient } from "./data-retention.infrastructure.ts";
 import {
   ClickHouseRetroactiveRetentionRepository,
   type RetentionClickHouseClient,

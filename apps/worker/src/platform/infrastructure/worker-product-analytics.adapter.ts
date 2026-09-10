@@ -1,5 +1,5 @@
 import { createLogger, type Logger } from "@langwatch/observability";
-import { TraceProductAnalyticsPort, type TraceProductEvent } from "@langwatch/trace-server";
+import { TraceProductAnalytics, type TraceProductEvent } from "@langwatch/trace-server";
 import { PostHog } from "posthog-node";
 import type { WorkerProductAnalyticsConfig } from "../config/worker.config.ts";
 
@@ -37,7 +37,7 @@ import type { WorkerProductAnalyticsConfig } from "../config/worker.config.ts";
  * opposite reason — `tiktoken` is optional at runtime and stays external to the
  * production bundle — and that precedent does not reach here.
  */
-export class WorkerPostHogProductAnalyticsAdapter extends TraceProductAnalyticsPort {
+export class WorkerPostHogProductAnalyticsAdapter extends TraceProductAnalytics {
   static create(options: {
     config: WorkerProductAnalyticsConfig;
     logger?: Logger;

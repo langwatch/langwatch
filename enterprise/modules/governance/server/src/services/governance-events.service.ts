@@ -28,7 +28,7 @@ import {
   GOVERNANCE_EVENTS_PROCESS_NAME,
   GovernanceEventDeliveryProcess,
 } from "../processes/governance-event-delivery.process.ts";
-import type { GovernanceEventsProcessingEvent } from "../ports/governance-webhook.port.ts";
+import type { GovernanceEventsProcessingEvent } from "../app/governance.infrastructure.ts";
 
 type GovernanceVkLifecycleEvent = Extract<
   GovernanceEventsProcessingEvent,

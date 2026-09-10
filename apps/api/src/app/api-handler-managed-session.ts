@@ -24,7 +24,7 @@
 import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 
-import type { ApiBrowserSessionTransportPort } from "./api-auth.composition.ts";
+import type { ApiBrowserSessionTransport } from "./api-auth.composition.ts";
 
 /** The signed-in person a handler reads, or nothing. */
 export type HandlerManagedSession = Readonly<{ user: Readonly<{ id: string }> }>;
@@ -44,7 +44,7 @@ export type ApiHandlerManagedSessionPort = Readonly<{
 export class ApiHandlerManagedSession implements ApiHandlerManagedSessionPort {
   static create(options: {
     auth: BrowserSessionApi;
-    sessions: ApiBrowserSessionTransportPort;
+    sessions: ApiBrowserSessionTransport;
     authz: AuthzService;
   }): ApiHandlerManagedSession {
     return new ApiHandlerManagedSession(options.auth, options.sessions, options.authz);
@@ -52,7 +52,7 @@ export class ApiHandlerManagedSession implements ApiHandlerManagedSessionPort {
 
   private constructor(
     private readonly auth: BrowserSessionApi,
-    private readonly sessions: ApiBrowserSessionTransportPort,
+    private readonly sessions: ApiBrowserSessionTransport,
     private readonly authz: AuthzService,
   ) {}
 

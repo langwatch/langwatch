@@ -30,7 +30,7 @@ export {
   type ProjectPickItem,
 } from "../model/project-pick-items.ts";
 export {
-  NavigationHostPort,
+  NavigationHost,
   NavigationHostProvider,
   useNavigationHost,
   useOptionalNavigationHost,

@@ -3,7 +3,7 @@ import type {
   AutomationEvaluationActivityContext,
   AutomationEvaluationSubscriberEvent,
 } from "@langwatch/automation-contract";
-import type { AutomationGraphActivityPort } from "../ports/automation-graph-activity.port.ts";
+import type { AutomationGraphActivity } from "../app/automation.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automation:graph-trigger-activity-subscriber");
@@ -41,7 +41,7 @@ export function graphTriggerActivityGroupKey(event: { tenantId: string }): strin
  * sweep per window without starving under constant traffic.
  */
 export async function handleGraphTriggerActivity(
-  automation: AutomationGraphActivityPort,
+  automation: AutomationGraphActivity,
   event: AutomationEvaluationSubscriberEvent,
   context: AutomationEvaluationActivityContext,
 ): Promise<void> {
@@ -84,7 +84,7 @@ export async function handleGraphTriggerActivity(
 }
 
 export function createGraphTriggerActivityHandler(
-  automation: AutomationGraphActivityPort,
+  automation: AutomationGraphActivity,
 ): (
   event: AutomationEvaluationSubscriberEvent,
   context: AutomationEvaluationActivityContext,

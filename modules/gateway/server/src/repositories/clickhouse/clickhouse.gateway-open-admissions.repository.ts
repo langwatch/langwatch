@@ -1,6 +1,6 @@
-import type { GatewayClickHouseClient } from "../../ports/gateway-clickhouse.port.ts";
+import type { GatewayClickHouseClient } from "../../app/gateway.infrastructure.ts";
 import {
-  GatewayOpenAdmissionsPort,
+  GatewayOpenAdmissions,
   type OpenAdmission,
   type OpenAdmissionQuery,
 } from "../../ports/gateway-open-admissions.port.ts";
@@ -13,7 +13,7 @@ const TABLE_NAME = "gateway_spend" as const;
 /**
  * Every request still `admitted` whose grace has elapsed, across all tenants. Replacement-aware via the IN-tuple pattern (not max(EventTimestamp)) so a confirmed request's superseded `admitted` row is never re-settled; only key columns cross the subquery, keeping the scan memory-bounded. Cross-tenant BY DESIGN, so it omits the per-tenant WHERE TenantId= filter clickhouse-queries.md otherwise mandates — settlement is install-wide, TenantId is SELECTed not filtered, and every settle command downstream re-scopes to its own row's tenant.
  */
-export class ClickHouseGatewayOpenAdmissionsRepository extends GatewayOpenAdmissionsPort {
+export class ClickHouseGatewayOpenAdmissionsRepository extends GatewayOpenAdmissions {
   static create(client: GatewayClickHouseClient): ClickHouseGatewayOpenAdmissionsRepository {
     return new ClickHouseGatewayOpenAdmissionsRepository(client);
   }

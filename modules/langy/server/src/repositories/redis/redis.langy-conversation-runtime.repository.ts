@@ -11,10 +11,10 @@ import type {
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
 import { RedisLangyEffectRepository } from "./redis.langy-effect.repository.ts";
-import { LangyConversationPipelineAdapter } from "../../adapters/eventing.langy-conversation.adapter.ts";
+import { LangyConversationPipelineAdapter } from "../../services/langy-conversation-pipeline.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "../../projections/langy-analytics-event.projection.ts";
-import type { LangyTitleGenerator } from "../../ports/langy-effect.port.ts";
-import type { LangyWorkerPort } from "../../ports/langy-turn-runtime.port.ts";
+import type { LangyTitleGenerator } from "../../app/langy.infrastructure.ts";
+import type { LangyWorker } from "../../app/langy.infrastructure.ts";
 import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
 import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
@@ -60,7 +60,7 @@ export interface EventingLangyConversationAdapterOptions {
   admissions: Pick<LangyTurnAdmissionCapability, "confirmAccepted" | "release">;
   buffer: Pick<LangyTokenBufferRedisRepository, "liveness" | "appendStatus" | "markError">;
   handoffStore: Pick<LangyTurnHandoffRedisRepository, "read" | "stash" | "isStopped">;
-  worker: LangyWorkerPort;
+  worker: LangyWorker;
   titleGenerator: LangyTitleGenerator;
   sessionKeys: Pick<LangySessionKeyService, "mintForUser" | "revoke">;
 }

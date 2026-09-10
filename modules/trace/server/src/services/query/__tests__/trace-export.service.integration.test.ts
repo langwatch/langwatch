@@ -10,7 +10,7 @@ import type { Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { Evaluation, LLMSpan, Trace } from "@langwatch/trace-contract";
 
-import type { TraceService } from "../../read/trace-legacy-read.service.ts";
+import type { TraceLegacyReadService } from "../../read/trace-legacy-read.service.ts";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
 import { TraceExportService } from "../trace-export.service.ts";
 import type { ExportRequest } from "@langwatch/trace-contract";
@@ -86,7 +86,7 @@ function buildMockTraceService(options: {
   batches: Trace[][];
   totalHits: number;
   evaluations?: Record<string, Evaluation[]>;
-}): TraceService {
+}): TraceLegacyReadService {
   let callIndex = 0;
   return {
     getAllTracesForProject: vi.fn().mockImplementation(() => {
@@ -100,7 +100,7 @@ function buildMockTraceService(options: {
       callIndex++;
       return Promise.resolve(result);
     }),
-  } as unknown as TraceService;
+  } as unknown as TraceLegacyReadService;
 }
 
 // ---------------------------------------------------------------------------

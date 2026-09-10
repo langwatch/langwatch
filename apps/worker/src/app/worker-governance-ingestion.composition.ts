@@ -7,8 +7,8 @@ import {
 import { AppIngestionPullWorkerAdapter } from "@langwatch/enterprise-api/governance/ingestion-pull-worker.adapter";
 import { AppGovernanceOcsfEventsAdapter } from "@langwatch/enterprise-api/governance/governance-ocsf-events.adapter";
 import {
-  GovernanceIngestionAwsPort,
-  GovernanceIngestionEgressPort,
+  GovernanceIngestionAws,
+  GovernanceIngestionEgress,
   OtelGovernanceIngestionPullMetrics,
   UtcGovernanceIngestionPullSchedule,
   WorkerGovernanceIngestionPullHost,
@@ -24,7 +24,7 @@ import { createSsrfUrlValidator, fetchValidatedDestination } from "@langwatch/eg
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Logger } from "@langwatch/observability";
-import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
+import type { GovernanceInternalProject } from "@langwatch/project-server";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import type { GovernanceIngestionWorkerCapability } from "../features/governance/governance-ingestion-worker-feature.installer.ts";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
@@ -37,8 +37,8 @@ export type WorkerGovernanceIngestionOptions = Readonly<{
     IngestionPullRunProjectionDatabase;
   /** The deployment's tenant-keyed ClickHouse client. */
   resolveClickHouseClient: EventingClickHouseClientResolver;
-  /** The two project reads a pull makes; see GovernanceInternalProjectPort. */
-  projects: GovernanceInternalProjectPort;
+  /** The two project reads a pull makes; see GovernanceInternalProject. */
+  projects: GovernanceInternalProject;
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /** The AWS client runtime this process already built for stored objects. */
   aws: AwsClientProcessRuntime;
@@ -128,27 +128,27 @@ export function createWorkerGovernanceIngestion(
  * relaxation that makes local webhook endpoints testable has no counterpart
  * here.
  */
-class WorkerGovernanceIngestionEgress extends GovernanceIngestionEgressPort {
+class WorkerGovernanceIngestionEgress extends GovernanceIngestionEgress {
   private readonly validate = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
 
   async fetch(
     url: string,
-    init: Parameters<GovernanceIngestionEgressPort["fetch"]>[1],
-  ): Promise<Awaited<ReturnType<GovernanceIngestionEgressPort["fetch"]>>> {
+    init: Parameters<GovernanceIngestionEgress["fetch"]>[1],
+  ): Promise<Awaited<ReturnType<GovernanceIngestionEgress["fetch"]>>> {
     const validated = await this.validate(url);
     return fetchValidatedDestination(validated, init as never, {
       rejectUnauthorized: true,
-    }) as unknown as Awaited<ReturnType<GovernanceIngestionEgressPort["fetch"]>>;
+    }) as unknown as Awaited<ReturnType<GovernanceIngestionEgress["fetch"]>>;
   }
 }
 
 /** The AWS client factory this process already built, behind the pull's port. */
-class WorkerGovernanceIngestionAws extends GovernanceIngestionAwsPort {
+class WorkerGovernanceIngestionAws extends GovernanceIngestionAws {
   constructor(private readonly aws: AwsClientProcessRuntime) {
     super();
   }
 
-  build(input: Parameters<GovernanceIngestionAwsPort["build"]>[0]) {
-    return this.aws.build(input) as ReturnType<GovernanceIngestionAwsPort["build"]>;
+  build(input: Parameters<GovernanceIngestionAws["build"]>[0]) {
+    return this.aws.build(input) as ReturnType<GovernanceIngestionAws["build"]>;
   }
 }

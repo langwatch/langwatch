@@ -15,14 +15,14 @@ import {
   deferredScope,
   optionalCredential,
   securityRequirement,
-  type AccessDenialPort,
+  type AccessDenial,
   type AuthorizePort,
   type Caller,
 } from "../access.ts";
 
 const reviewer: Caller = { actor: { type: "user", id: "reviewer-1" } };
 
-const denials: AccessDenialPort = {
+const denials: AccessDenial = {
   membershipDisabled: () => new Error("membership disabled"),
   liteMemberRestricted: (resource) => new Error(`lite member: ${resource}`),
 };

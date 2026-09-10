@@ -1,5 +1,5 @@
 import { referenceFor, vaultItemFrom } from "./one-password-item.ts";
-import type { ProcessRunnerPort } from "./process-runner.port.ts";
+import type { ProcessRunner } from "./process-runner.port.ts";
 import { SecretSource } from "./secret-source.port.ts";
 
 /** A 1Password secret reference: `op://<vault>/<item>/<field>`. */
@@ -37,7 +37,7 @@ export class OnePasswordSecretSource extends SecretSource {
     environment,
     name = "1password",
   }: {
-    runner: ProcessRunnerPort;
+    runner: ProcessRunner;
     environment: Readonly<Record<string, unknown>>;
     name?: string;
   }): OnePasswordSecretSource {
@@ -45,7 +45,7 @@ export class OnePasswordSecretSource extends SecretSource {
   }
 
   private constructor(
-    private readonly runner: ProcessRunnerPort,
+    private readonly runner: ProcessRunner,
     private readonly environment: Readonly<Record<string, unknown>>,
     readonly name: string,
   ) {

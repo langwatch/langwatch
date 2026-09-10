@@ -12,7 +12,7 @@ import {
   spendSettlementPM,
 } from "../processes/gateway-spend-settlement.process.ts";
 import type { GatewaySpendState } from "../projections/gateway-spend.projection.ts";
-import type { GatewaySpendEventsPort } from "../ports/gateway-spend-events.port.ts";
+import type { GatewaySpendEvents } from "../ports/gateway-spend-events.port.ts";
 import { GatewaySpendStore } from "../stores/gateway-spend/gateway-spend.store.ts";
 import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
@@ -40,7 +40,7 @@ export interface EventingGatewaySpendAdapterOptions {
   /** The spend ledger the fold reads and writes. The `FoldProjectionStore`
    *  built over it stays private to this feature, which is what
    *  `private-runtime-export` requires of a feature server root. */
-  spendEvents: GatewaySpendEventsPort;
+  spendEvents: GatewaySpendEvents;
   /** Wraps this feature's own fold store before it is mounted, so the
    *  composition root can put its Redis read-through cache in front of a
    *  store it is never handed. Identity when absent. */

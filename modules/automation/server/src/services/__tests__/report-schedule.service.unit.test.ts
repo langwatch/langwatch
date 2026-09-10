@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { AutomationClockPort } from "../../ports/automation-clock.port.ts";
+import { AutomationClock } from "../../app/automation.infrastructure.ts";
 import { ScheduledJobStorePort, type ScheduledJobRecord } from "../../ports/scheduled-jobs.port.ts";
-import { SchedulerWakePort } from "../../ports/scheduler-wake.port.ts";
+import { SchedulerWake } from "../../ports/scheduler-wake.port.ts";
 import type {
   ReportScheduleTarget,
   TriggerRepository,
@@ -14,12 +14,12 @@ function reportTargets(rows: ReportScheduleTarget[]): TriggerRepository {
   return { findActiveReportTargets: async () => rows } as unknown as TriggerRepository;
 }
 
-class Clock extends AutomationClockPort {
+class Clock implements AutomationClock {
   now(): Instant {
     return Temporal.Instant.from("2026-01-01T08:00:00Z");
   }
 }
-class Wake extends SchedulerWakePort {
+class Wake extends SchedulerWake {
   count = 0;
   publish(): void {
     this.count++;

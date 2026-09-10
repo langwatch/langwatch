@@ -20,7 +20,7 @@ import {
   NlpFetchAdapter,
   type NlpFetchTimeouts,
 } from "./nlp-fetch.adapter.ts";
-import { SerializedAgentPort } from "../ports/serialized-agent.port.ts";
+import { SerializedAgent } from "../ports/serialized-agent.port.ts";
 
 /** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
 type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
@@ -51,7 +51,7 @@ const tracer = getLangWatchTracer("langwatch.scenarios.code-agent-adapter");
  * Serialized code agent adapter that uses pre-fetched configuration.
  * Sends code execution requests to the NLP service. No database access required.
  */
-export class SerializedCodeAgentAdapter extends SerializedAgentPort {
+export class SerializedCodeAgentAdapter extends SerializedAgent {
   static create(options: {
     config: CodeAgentData;
     nlpServiceUrl: string;

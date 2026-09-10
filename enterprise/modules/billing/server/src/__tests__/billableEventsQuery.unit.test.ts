@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type BillableEventsPort, BillableEventsQueryService } from "../index.ts";
+import { type BillableEvents, BillableEventsQueryService } from "../index.ts";
 import { Temporal } from "@langwatch/time";
 
 const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
@@ -8,7 +8,7 @@ const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
 
 let billableEvents: { findTraceSummariesTotalUniq: typeof findTraceSummariesTotalUniq } | undefined;
 const service = () =>
-  BillableEventsQueryService.create(billableEvents as unknown as BillableEventsPort);
+  BillableEventsQueryService.create(billableEvents as unknown as BillableEvents);
 
 describe("billingMonthDateRange", () => {
   describe("when given a mid-year billing month", () => {

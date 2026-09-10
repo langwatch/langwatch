@@ -2,7 +2,7 @@ import type { LangyStreamEntry } from "@langwatch/langy-contract";
 import { LANGY_EMPTY_TURN_FALLBACK } from "../../rules/langy-empty-turn.rules.ts";
 import {
   type LangyStreamRead,
-  LangyTokenBufferPort,
+  LangyTokenBuffer,
 } from "../langy-token-buffer.repository.ts";
 import type { LangyMemoryStore } from "./langy-memory.store.ts";
 
@@ -14,7 +14,7 @@ const LIVENESS_WINDOW_MS = 30_000;
  * stream, held in the shared memory store so a follow reads what an append
  * wrote.
  */
-export class LangyTokenBufferMemoryRepository extends LangyTokenBufferPort {
+export class LangyTokenBufferMemoryRepository extends LangyTokenBuffer {
   private constructor(private readonly store: LangyMemoryStore) {
     super();
   }

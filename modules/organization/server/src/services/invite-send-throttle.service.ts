@@ -2,7 +2,7 @@
  * How often one invitation may put mail in somebody's inbox (D11).
  */
 import { InviteThrottledError } from "@langwatch/organization-contract";
-import type { OrganizationInviteRateLimitPort } from "../app/organization.infrastructure.ts";
+import type { OrganizationInviteRateLimit } from "../app/organization.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 
 export const INVITE_SEND_WINDOW_SECONDS = 60 * 60;
@@ -12,9 +12,9 @@ export const INVITE_SENDS_PER_WINDOW = 3;
  * The window, spent against whichever counter the process composed.
  */
 export class InviteSendThrottleService {
-  private constructor(private readonly rateLimit: OrganizationInviteRateLimitPort) {}
+  private constructor(private readonly rateLimit: OrganizationInviteRateLimit) {}
 
-  static create(rateLimit: OrganizationInviteRateLimitPort): InviteSendThrottleService {
+  static create(rateLimit: OrganizationInviteRateLimit): InviteSendThrottleService {
     return new InviteSendThrottleService(rateLimit);
   }
 

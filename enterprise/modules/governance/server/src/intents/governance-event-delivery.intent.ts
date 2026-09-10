@@ -1,9 +1,9 @@
 import type { IntentContext, NewOutboxMessage } from "@langwatch/eventing";
 import { z } from "zod";
 import {
-  GovernanceWebhookPort,
+  GovernanceWebhookChannel,
   type GovernanceWebhookEnvelope,
-} from "../ports/governance-webhook.port.ts";
+} from "../app/governance.infrastructure.ts";
 
 export const governanceWebhookEnvelopeSchema = z.object({
   id: z.string(),
@@ -30,9 +30,9 @@ export const governanceSendBatchSchema = z.object({
 export type DeliverGovernancePayload = z.infer<typeof deliverGovernanceSchema>;
 
 export class GovernanceEventDeliveryIntent {
-  private constructor(private readonly port: GovernanceWebhookPort) {}
+  private constructor(private readonly port: GovernanceWebhookChannel) {}
 
-  static create(port: GovernanceWebhookPort): GovernanceEventDeliveryIntent {
+  static create(port: GovernanceWebhookChannel): GovernanceEventDeliveryIntent {
     return new GovernanceEventDeliveryIntent(port);
   }
 

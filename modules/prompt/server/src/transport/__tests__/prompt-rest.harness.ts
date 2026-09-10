@@ -53,7 +53,7 @@ export function mountPromptRest(options: {
 
   const hono = runtime.mount(promptRest.router(), {
     app: () => options.app,
-    credential: "projectKey",
+    credential: "project",
     onError: renderRefusal,
     facts: [
       bindRestMiddleware(promptRestFacts, () => ({

@@ -7,7 +7,7 @@ import {
   TraceSpoolService,
   type TracePayloadReaderRepository,
   type TraceClickHouseResolver,
-  type TraceSpanSpoolPort,
+  type TraceSpanSpool,
 } from "@langwatch/trace-server";
 import {
   WorkerTraceSpoolLegacyObjectAdapter,
@@ -18,7 +18,7 @@ import {
  * The ADR-022 claim check this process would resolve an oversized span through.
  *
  * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `RecordSpanCommand`'s adapters and still resolves every spooled span it
+ * `EventingRecordSpanAdapter`'s adapters and still resolves every spooled span it
  * ingests — so nothing in this process reads a spool object yet. What has to be
  * true today is that this composition root CAN build both halves of the claim
  * check from substrates it already holds: the stored-objects runtime the
@@ -28,9 +28,9 @@ import {
  *
  * The two halves are independent and are deliberately composed separately:
  *
- *     TraceSpanSpoolPort                (trace-server declares it)
+ *     TraceSpanSpool                (trace-server declares it)
  *       └─ TraceSpoolService            re-derives the object path from the
- *            └─ TraceSpoolStoragePort     command's own trusted ids, never
+ *            └─ TraceSpoolStorage     command's own trusted ids, never
  *                 └─ stored objects       from the reference it carries
  *
  *     TracePayloadReaderRepository            (trace-server declares it)
@@ -46,7 +46,7 @@ export function createWorkerTraceSpool(options: {
   aws: AwsClientProcessRuntime;
   azureRetentionConfirmed: boolean;
   logger?: Logger;
-}): TraceSpanSpoolPort {
+}): TraceSpanSpool {
   return TraceSpanSpoolAdapter.create(
     TraceSpoolService.create({
       storage: WorkerTraceSpoolStorageAdapter.create({

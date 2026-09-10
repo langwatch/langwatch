@@ -4,10 +4,10 @@ import type {
   RecordTargetResultInput,
   StartExperimentRunInput,
 } from "@langwatch/experiment-contract";
-import { ExperimentExecutionPort } from "../ports/experiment-execution.port.ts";
+import { ExperimentExecution } from "../ports/experiment-execution.port.ts";
 
 /** Refuses execution where the application composes no Eventing pipeline. */
-export class UnavailableExperimentExecutionAdapter extends ExperimentExecutionPort {
+export class UnavailableExperimentExecutionAdapter extends ExperimentExecution {
   static create(): UnavailableExperimentExecutionAdapter {
     return new UnavailableExperimentExecutionAdapter();
   }

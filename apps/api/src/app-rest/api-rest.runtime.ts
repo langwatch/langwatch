@@ -32,7 +32,7 @@ import type { ApiDualAuthVariables } from "../app/api-dual-credential-auth.ts";
  * with the answer because a family that asks a SECOND permission question of
  * its caller — costs, say — asks it of the credential, not of whoever holds it.
  */
-export type ApiHandlerManagedCredentialPort = (input: {
+export type ApiHandlerManagedCredential = (input: {
   request: Request;
   permission: AuthzPermission;
 }) => Promise<
@@ -50,7 +50,7 @@ export type ApiHandlerManagedCredentialPort = (input: {
  * travels with the answer because the api-keys family asks a SECOND question
  * of the KEY as well as of the member holding it.
  */
-export type ApiOrganizationCredentialPort = (input: {
+export type ApiOrganizationCredential = (input: {
   request: Request;
   permission: AuthzPermission;
 }) => Promise<
@@ -66,7 +66,7 @@ export type ApiOrganizationCredentialPort = (input: {
  * The same organization credential, resolved and asked nothing: a route that
  * answers any authenticated caller has no permission for the door to ask.
  */
-export type ApiOrganizationIdentityPort = (input: {
+export type ApiOrganizationIdentity = (input: {
   request: Request;
 }) => Promise<
   | Readonly<{ ok: true; resolved: ResolvedOrganizationApiKeyToken; markUsed: () => void }>
@@ -78,7 +78,7 @@ export type ApiOrganizationIdentityPort = (input: {
  * PROJECT a route's own path named — the second question a family whose door
  * is one tier wider than its resources asks.
  */
-export type ApiRestRouteAuthorizationPort = (input: {
+export type ApiRestRouteAuthorization = (input: {
   credential: ResolvedOrganizationApiKeyToken;
   permission: AuthzPermission;
   projectId: string;
@@ -89,7 +89,7 @@ export type ApiRestRouteAuthorizationPort = (input: {
  * names a TENANT and nobody inside it, which is why the answer is the
  * organization it may provision rather than a person.
  */
-export type ApiScimDirectoryCredentialPort = (input: {
+export type ApiScimDirectoryCredential = (input: {
   request: Request;
 }) => Promise<Readonly<{ organizationId: string }>>;
 
@@ -126,16 +126,16 @@ export type ApiRestBrowserCaller = Readonly<{
 /** What the runtime needs from the process to open its doors. */
 export type ApiRestRuntimePorts = Readonly<{
   /** Resolves a project API key and enforces one permission as a key ceiling. */
-  projectCredential: ApiHandlerManagedCredentialPort;
+  projectCredential: ApiHandlerManagedCredential;
   /**
    * Resolves an organization API key and enforces one permission at
    * organization scope.
    */
-  organizationCredential: ApiOrganizationCredentialPort;
+  organizationCredential: ApiOrganizationCredential;
   /** Resolves the same credential with no permission asked of it. */
-  organizationIdentity: ApiOrganizationIdentityPort;
+  organizationIdentity: ApiOrganizationIdentity;
   /** Answers the permission a route asks at the project its own path names. */
-  routeAuthorization: ApiRestRouteAuthorizationPort;
+  routeAuthorization: ApiRestRouteAuthorization;
   /** The envelope a family answers a refusal in unless it names its own. */
   errors: RestErrorHandler;
   /**
@@ -149,7 +149,7 @@ export type ApiRestRuntimePorts = Readonly<{
    * process opens no SCIM door and says so at the mount of the first family
    * that names one.
    */
-  directoryCredential?: ApiScimDirectoryCredentialPort | undefined;
+  directoryCredential?: ApiScimDirectoryCredential | undefined;
   /**
    * Constant-time bearer check against this deployment's instance
    * administrator key (`verifyInstanceAdminKey`): 404 where unconfigured or
@@ -416,7 +416,7 @@ function openDoorFor<Api>(
 }
 
 /** The directory verifier, or the wiring bug that this door was opened without one. */
-function directoryOf(ports: ApiRestRuntimePorts): ApiScimDirectoryCredentialPort {
+function directoryOf(ports: ApiRestRuntimePorts): ApiScimDirectoryCredential {
   const directory = ports.directoryCredential;
   if (!directory) throw new Error("The SCIM door was opened with no directory verifier");
 

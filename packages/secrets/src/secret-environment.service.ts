@@ -5,7 +5,7 @@ import { classOf, SECRET_REGISTRY } from "./keys.ts";
 import { NodeProcessRunner } from "./node-process-runner.adapter.ts";
 import { vaultItemFrom } from "./one-password-item.ts";
 import { OnePasswordSecretSource } from "./one-password.secret-source.ts";
-import type { ProcessRunnerPort } from "./process-runner.port.ts";
+import type { ProcessRunner } from "./process-runner.port.ts";
 import { RefusingSecretSource } from "./refusing.secret-source.ts";
 import type { SecretSource } from "./secret-source.port.ts";
 
@@ -29,14 +29,14 @@ export class SecretEnvironmentService {
     runner,
   }: {
     source: Readonly<Record<string, unknown>>;
-    runner?: ProcessRunnerPort;
+    runner?: ProcessRunner;
   }): SecretEnvironmentService {
     return new SecretEnvironmentService(source, runner);
   }
 
   private constructor(
     private readonly source: Readonly<Record<string, unknown>>,
-    private readonly runner: ProcessRunnerPort | undefined,
+    private readonly runner: ProcessRunner | undefined,
   ) {}
 
   async resolve(): Promise<SecretResolution> {

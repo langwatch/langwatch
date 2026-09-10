@@ -1,11 +1,11 @@
 import {
   useAgentManagement,
-  type AgentManagementFeedbackPort,
-  type AgentManagementLifecyclePort,
+  type AgentManagementFeedback,
+  type AgentManagementLifecycle,
 } from "../../behavior/use-agent-management.ts";
 export type {
-  AgentManagementFeedbackPort,
-  AgentManagementLifecyclePort,
+  AgentManagementFeedback,
+  AgentManagementLifecycle,
 } from "../../behavior/use-agent-management.ts";
 import { Button, Center, EmptyState, Grid, Skeleton, VStack } from "@chakra-ui/react";
 import type {
@@ -65,7 +65,7 @@ export type AgentPushDialogInput = {
 };
 
 /** Route-shell rendering kept outside reusable Agent browser behaviour. */
-export interface AgentPageCompositionPort {
+export interface AgentPageComposition {
   renderHeader(input: { onCreate: () => void }): ReactNode;
 
   renderArchiveDialog(input: AgentArchiveDialogInput): ReactNode;
@@ -83,7 +83,7 @@ export type AgentManagementData = {
   copyProjects: AgentCopyProject[];
 };
 
-export interface AgentManagementNavigationPort {
+export interface AgentManagementNavigation {
   openEditor(agent: AgentWithFields): void;
 
   openTypeSelector(): void;
@@ -106,7 +106,7 @@ export type AgentCardRenderInput = {
   onTest?: () => void;
 };
 
-export interface AgentManagementCardPort {
+export interface AgentManagementCard {
   render(input: AgentCardRenderInput): ReactNode;
 }
 
@@ -130,11 +130,11 @@ export type AgentManagementConnectedSection = {
 
 export type AgentManagementPageProps = {
   data: AgentManagementData;
-  navigation: AgentManagementNavigationPort;
-  feedback: AgentManagementFeedbackPort;
-  lifecycle: AgentManagementLifecyclePort;
-  composition: AgentPageCompositionPort;
-  card: AgentManagementCardPort;
+  navigation: AgentManagementNavigation;
+  feedback: AgentManagementFeedback;
+  lifecycle: AgentManagementLifecycle;
+  composition: AgentPageComposition;
+  card: AgentManagementCard;
   connectedSection?: AgentManagementConnectedSection;
   onTest?: (agentId: string) => void;
 };

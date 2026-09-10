@@ -1,5 +1,5 @@
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
+import { EmailDelivery, type EmailContent } from "@langwatch/notification-server";
 import { describe, expect, it } from "vitest";
 import {
   ApiEntitlementAbsenceReport,
@@ -29,7 +29,7 @@ async function notificationsOver(prisma: ApiUsageStatsOptions["prisma"]) {
  * "the only `UsageLimitEmailPort` in the tree sends nothing", and a test
  * that only checked `sent: true` would have passed against the null adapter.
  */
-class RecordingGateway extends EmailDeliveryPort {
+class RecordingGateway extends EmailDelivery {
   readonly sent: EmailContent[] = [];
 
   override defaultFrom(): string {
@@ -50,7 +50,7 @@ class RecordingEntitlementAbsence extends ApiEntitlementAbsenceReport {
   }
 }
 
-function composedMail(gateway: EmailDeliveryPort): ApiMailComposition {
+function composedMail(gateway: EmailDelivery): ApiMailComposition {
   return { delivery: gateway, baseHost: "https://app.example.test" };
 }
 

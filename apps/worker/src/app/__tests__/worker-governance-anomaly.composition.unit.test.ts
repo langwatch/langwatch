@@ -21,15 +21,15 @@ import { createEventingRetentionConfiguration } from "@langwatch/eventing/server
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createWorkerGovernanceAnomalySchedule,
-  WorkerAnomalyAlertTransportPort,
+  WorkerAnomalyAlertTransport,
 } from "../worker-governance-anomaly.composition.ts";
 import type { SpendSpikeAnomalyWorkerDependencies } from "@langwatch/enterprise-worker";
 import { WorkerProductionComposition } from "../worker-production.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
-  WorkerHandlePort,
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerHandle,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "../../platform/lifecycle/worker-runtime.port.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 import { createWorkerProcessRedis } from "./support/worker-redis.double.ts";
@@ -120,7 +120,7 @@ function spikeClickHouse() {
 }
 
 /** The network leaf, recorded rather than opened. */
-class RecordingTransport extends WorkerAnomalyAlertTransportPort {
+class RecordingTransport extends WorkerAnomalyAlertTransport {
   readonly calls: { hostname: string; path: string; init: RequestInit }[] = [];
 
   async send(
@@ -249,16 +249,16 @@ describe("createWorkerGovernanceAnomalySchedule", () => {
   });
 });
 
-class Handle extends WorkerHandlePort {
+class Handle extends WorkerHandle {
   readonly shutdown = vi.fn(async () => undefined);
 }
 
-class Transport extends WorkerTransportPort {
+class Transport extends WorkerTransport {
   readonly handle = new Handle();
   readonly start = vi.fn(async () => this.handle);
 }
 
-class Lifecycle extends WorkerLifecyclePort {
+class Lifecycle extends WorkerLifecycle {
   readonly close = vi.fn(async () => undefined);
 }
 

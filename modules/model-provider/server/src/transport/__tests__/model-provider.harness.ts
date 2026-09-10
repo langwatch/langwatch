@@ -18,8 +18,8 @@ import {
   CodexAccountService,
   type CodexDeviceCode,
   type CodexPollResult,
-} from "../../adapters/codex-oauth.model-provider-token-refresher.adapter.ts";
-import { ModelProviderCredentialProbePort } from "../../ports/model-provider.port.ts";
+} from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
+import { ModelProviderCredentialProbe } from "../../app/model-provider.infrastructure.ts";
 
 /** What a mount reads off the request: who is calling. */
 export type ModelProviderTrpcTestContext = { actor: { id: string } };
@@ -59,7 +59,7 @@ export function modelProviderTrpcTestPorts(
 }
 
 /** Every probe this test decided, and the verdict each one answers with. */
-export class RecordingCredentialProbe extends ModelProviderCredentialProbePort {
+export class RecordingCredentialProbe extends ModelProviderCredentialProbe {
   readonly probed: Array<{ provider: string; customKeys: Record<string, string> }> = [];
   readonly probedStored: Array<{ projectId: string; provider: string }> = [];
 

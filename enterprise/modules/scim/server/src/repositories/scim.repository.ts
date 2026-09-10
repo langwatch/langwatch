@@ -74,11 +74,11 @@ export interface ScimDirectoryIdentityRecord {
 }
 
 /** Semantic store used by the SCIM service; no transport or ORM vocabulary. */
-export abstract class ScimGrantRepositoryPort {
+export abstract class ScimGrantRepository {
   abstract listRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]>;
 }
 
-export abstract class ScimRepositoryPort extends ScimGrantRepositoryPort {
+export abstract class ScimRepository extends ScimGrantRepository {
   abstract findOrganizationBySsoDomain(input: {
     domain: string;
   }): Promise<{ id: string } | null>;

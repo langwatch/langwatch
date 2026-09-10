@@ -1,5 +1,5 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { AutomationClock } from "../app/automation.infrastructure.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 
 /** How long a project's active-automation list is reused before re-reading. */
@@ -32,14 +32,14 @@ export class ActiveTriggerCacheService {
 
   static create(input: {
     triggers: TriggerRepository;
-    clock: AutomationClockPort;
+    clock: AutomationClock;
   }): ActiveTriggerCacheService {
     return new ActiveTriggerCacheService(input.triggers, input.clock);
   }
 
   private constructor(
     private readonly triggers: TriggerRepository,
-    private readonly clock: AutomationClockPort,
+    private readonly clock: AutomationClock,
   ) {}
 
   /** Automations whose subject is a custom graph. Never a report. */

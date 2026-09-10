@@ -17,7 +17,7 @@ import { nanoid } from "nanoid";
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
-  NlpPayloadStagingPort,
+  NlpPayloadStaging,
   ModelProviderWorkflowStudioDslAdapter,
   WorkflowAgentMappingAdapter,
   StudioEventPreparerService,
@@ -25,18 +25,18 @@ import {
   WorkflowNlpExecutionService,
   WorkflowProjectEnvironmentService,
   WorkflowService as WorkflowGraphService,
-  WorkflowIdPort,
+  WorkflowId,
   workflowRepositories,
   UnconfiguredWorkflowNlpRuntimeAdapter,
-  WorkflowAiCallPort,
+  WorkflowAiCall,
   WorkflowApp,
-  WorkflowCommitMessageModelPort,
+  WorkflowCommitMessageModel,
   WorkflowCommitMessageService,
-  WorkflowLlmParametersPort,
+  WorkflowLlmParameters,
   type WorkflowEnvironmentDecryptor,
   type WorkflowAiCallFeature,
   type WorkflowLlmParameterResolution,
-  type WorkflowNlpRuntimePort,
+  type WorkflowNlpRuntime,
   type WorkflowService,
   type WorkflowRepositories,
   type WorkflowStudioDispatchService,
@@ -100,15 +100,15 @@ export type ApiWorkflowRuntime = Readonly<{
   /** The ONE workflow service on this process. */
   workflows: WorkflowService;
   /** Where a studio graph and a code evaluator both execute. */
-  nlpRuntime: WorkflowNlpRuntimePort;
+  nlpRuntime: WorkflowNlpRuntime;
   /** The rows this process chose at boot, for every surface that writes one. */
   repositories: WorkflowRepositories;
 }>;
 
 /** Workflow and version ids, minted the way the platform app minted them. */
-class ApiWorkflowIdPort extends WorkflowIdPort {
-  static create(): ApiWorkflowIdPort {
-    return new ApiWorkflowIdPort();
+class ApiWorkflowId implements WorkflowId {
+  static create(): ApiWorkflowId {
+    return new ApiWorkflowId();
   }
 
   next(): string {
@@ -134,9 +134,9 @@ export function composeWorkflowRuntime(options: {
    * body cap is 6 MB, so a deployment with no object storage must refuse by
    * name rather than post over it.
    */
-  payloadStaging: NlpPayloadStagingPort;
+  payloadStaging: NlpPayloadStaging;
 }): ApiWorkflowRuntime {
-  const nlpRuntime: WorkflowNlpRuntimePort = options.nlpServiceUrl
+  const nlpRuntime: WorkflowNlpRuntime = options.nlpServiceUrl
     ? HttpWorkflowNlpRuntimeAdapter.create({
         serviceUrl: options.nlpServiceUrl,
         staging: options.payloadStaging,
@@ -147,7 +147,7 @@ export function composeWorkflowRuntime(options: {
     backend: "postgres",
     infrastructure: { prisma: options.infrastructure.prisma },
   });
-  const ids = ApiWorkflowIdPort.create();
+  const ids = ApiWorkflowId.create();
   const studioEvents = StudioEventPreparerService.create({
     datasets: options.peers.datasets,
     projectEnvironment: WorkflowProjectEnvironmentService.create({
@@ -205,12 +205,12 @@ export function composeWorkflowCommitMessages(options: {
   const failures = AiCallFailureService.create();
 
   return WorkflowCommitMessageService.create({
-    models: new (class extends WorkflowCommitMessageModelPort {
+    models: new (class implements WorkflowCommitMessageModel {
       resolve(input: { projectId: string; featureKey: string }) {
         return resolveModel(input);
       }
     })(),
-    aiCalls: new (class extends WorkflowAiCallPort {
+    aiCalls: new (class implements WorkflowAiCall {
       run<T>(feature: WorkflowAiCallFeature, call: () => Promise<T>): Promise<T> {
         return failures.wrapAiCall(feature, call);
       }
@@ -396,14 +396,12 @@ const actorId = (ctx: unknown): string => (ctx as ApiTrpcPortsContext).actor().i
 /**
  * The LiteLLM parameters one Studio run executes each of its models with.
  */
-class ApiWorkflowLlmParametersAdapter extends WorkflowLlmParametersPort {
+class ApiWorkflowLlmParametersAdapter implements WorkflowLlmParameters {
   static create(input: { modelProviders: ModelProviderApi }): ApiWorkflowLlmParametersAdapter {
     return new ApiWorkflowLlmParametersAdapter(input.modelProviders);
   }
 
-  private constructor(private readonly modelProviders: ModelProviderApi) {
-    super();
-  }
+  private constructor(private readonly modelProviders: ModelProviderApi) {}
 
   async resolve(input: {
     projectId: string;

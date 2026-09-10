@@ -38,7 +38,7 @@ import type {
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
-import type { TenantBroadcastPort } from "@langwatch/notification-server";
+import type { TenantBroadcast } from "@langwatch/notification-server";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   TraceDerivationSpanClickHouseRepository,
@@ -54,7 +54,7 @@ import type { ScenarioWorkerCapability } from "../features/scenario/scenario-wor
  * intent is the one place a queued run turns into a running one, and a process without an execution
  * pool refuses it into the outbox rather than dropping it.
  */
-export abstract class WorkerScenarioAbsenceReportPort {
+export abstract class WorkerScenarioAbsenceReport {
   abstract withoutExecutionPool(): void;
 }
 
@@ -71,7 +71,7 @@ export type WorkerScenarioCompositionInput = Readonly<{
   /** This process's own event store, for the finish command's ECST backfill. */
   eventStore: EventStore;
   /** The one tenant publisher this process holds; absent without Redis. */
-  broadcast?: TenantBroadcastPort;
+  broadcast?: TenantBroadcast;
   /** Suite's own two commands, as the installer publishes them before install. */
   suiteRuns: {
     recordSuiteRunItemStarted: CommandDispatcher<Record<string, unknown>>;
@@ -83,7 +83,7 @@ export type WorkerScenarioCompositionInput = Readonly<{
    * pod that holds a pool takes the run.
    */
   executionPool?: ScenarioExecutionPoolPort;
-  absence?: WorkerScenarioAbsenceReportPort;
+  absence?: WorkerScenarioAbsenceReport;
 }>;
 
 /**

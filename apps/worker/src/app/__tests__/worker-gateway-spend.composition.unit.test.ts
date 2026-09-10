@@ -6,7 +6,7 @@ import {
   createWorkerGatewaySpend,
   dispatchWebhookThrough,
   resolveWebhookPlan,
-  WorkerGatewaySpendAbsenceReportPort,
+  WorkerGatewaySpendAbsenceReport,
 } from "../worker-gateway-spend.composition.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
@@ -32,7 +32,7 @@ function reset(): void {
   RECORDED.absences.length = 0;
 }
 
-class RecordingAbsence extends WorkerGatewaySpendAbsenceReportPort {
+class RecordingAbsence extends WorkerGatewaySpendAbsenceReport {
   withoutSpendSettlement(): void {
     RECORDED.absences.push("spendSettlement");
   }

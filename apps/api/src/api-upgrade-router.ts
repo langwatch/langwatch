@@ -12,10 +12,10 @@
 
 import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
-import type { ConnectUpgradeRouterPort, UpgradeHandler } from "@langwatch/api";
-import { ApiUpgradeSurfacePort } from "./api-http.listener.ts";
+import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
+import { ApiUpgradeSurface } from "./api-http.listener.ts";
 
-export class ApiUpgradeRouter extends ApiUpgradeSurfacePort implements ConnectUpgradeRouterPort {
+export class ApiUpgradeRouter extends ApiUpgradeSurface implements ConnectUpgradeRouter {
   static create(): ApiUpgradeRouter {
     return new ApiUpgradeRouter();
   }

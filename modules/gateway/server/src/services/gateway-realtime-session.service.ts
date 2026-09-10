@@ -15,9 +15,9 @@ import type {
   ReserveResult,
 } from "../repositories/gateway-realtime-session.repository.ts";
 import { EMPTY_SPEND_USAGE, type SpendUsage } from "../processes/gateway-spend-commands.process.ts";
-import type { GatewaySpanIngestionPort } from "../ports/gateway-span-ingestion.port.ts";
-import type { GatewaySpendConfirmationPort } from "../ports/gateway-spend-confirmation.port.ts";
-import type { GatewaySpendRatingPort } from "../ports/gateway-spend-rating.port.ts";
+import type { GatewaySpanIngestion } from "../app/gateway.infrastructure.ts";
+import type { GatewaySpendConfirmation } from "../app/gateway.infrastructure.ts";
+import type { GatewaySpendRating } from "../app/gateway.infrastructure.ts";
 import { createHash } from "crypto";
 import { ATTR_KEYS as ATTR, DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -42,14 +42,14 @@ const EXPIRY_CLOSE_REASON = "no vendor report arrived within the longest possibl
 export type GatewayRealtimeSessionCollaborators = {
   sessions: GatewayRealtimeSessionRepository;
   /** Prices the vendor's quantities. The one rating seam for the vertical. */
-  spendRating: GatewaySpendRatingPort;
+  spendRating: GatewaySpendRating;
   /** Sends the confirmation into the gateway spend pipeline. */
-  spendConfirmation: GatewaySpendConfirmationPort;
+  spendConfirmation: GatewaySpendConfirmation;
   /**
    * Writes the settlement span. Absent where the deployment composes no trace
    * storage: the money still lands, the trace just carries no cost line.
    */
-  spanIngestion?: GatewaySpanIngestionPort | undefined;
+  spanIngestion?: GatewaySpanIngestion | undefined;
 };
 
 export interface ReserveInput {
@@ -390,7 +390,7 @@ async function recordRealtimeSessionSpan(params: {
    * span is then not written, which is the honest answer: there is no trace
    * to write it into. The spend record is unaffected either way.
    */
-  spanIngestion?: GatewaySpanIngestionPort | undefined;
+  spanIngestion?: GatewaySpanIngestion | undefined;
 }): Promise<void> {
   const { session } = params;
   // No trace means the mint predates the trace id being carried, or the

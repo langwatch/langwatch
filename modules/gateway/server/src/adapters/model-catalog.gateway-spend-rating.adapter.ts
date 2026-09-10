@@ -7,7 +7,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { GatewaySpendRatingPort } from "../ports/gateway-spend-rating.port.ts";
+import { GatewaySpendRating } from "../app/gateway.infrastructure.ts";
 import type { SpendUsage } from "../processes/gateway-spend-commands.process.ts";
 
 /**
@@ -92,9 +92,9 @@ function warnUnpriced({
 }
 
 /**
- * The vertical's ONE rating seam over the static catalog: a class satisfying {@link GatewaySpendRatingPort}, not a bare function, since voice settlement and the data plane's drainer both take the same port — two implementations would price one call twice. Arithmetic is {@link rateSpendNanoUsd}, unchanged, so a replay re-rates identically unless the catalog moved.
+ * The vertical's ONE rating seam over the static catalog: a class satisfying {@link GatewaySpendRating}, not a bare function, since voice settlement and the data plane's drainer both take the same port — two implementations would price one call twice. Arithmetic is {@link rateSpendNanoUsd}, unchanged, so a replay re-rates identically unless the catalog moved.
  */
-export class ModelCatalogGatewaySpendRatingAdapter extends GatewaySpendRatingPort {
+export class ModelCatalogGatewaySpendRatingAdapter implements GatewaySpendRating {
   static create(): ModelCatalogGatewaySpendRatingAdapter {
     return new ModelCatalogGatewaySpendRatingAdapter();
   }

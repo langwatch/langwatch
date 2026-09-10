@@ -16,7 +16,7 @@ import {
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { AuthzGrantsCommandDispatcherPort } from "@langwatch/authz-server";
+import type { AuthzGrantsCommandDispatcher } from "@langwatch/authz-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -57,7 +57,7 @@ export async function createWorkerFoundationApps(options: {
   plans: PlanProvider;
   featureFlags: FeatureFlagApi;
   resources: ResourceScope;
-  authzDispatcher: AuthzGrantsCommandDispatcherPort;
+  authzDispatcher: AuthzGrantsCommandDispatcher;
   topicClustering: ProjectInfrastructure["topicClustering"];
 }): Promise<WorkerFoundationApps> {
   const storedObjects = createWorkerStoredObjects({

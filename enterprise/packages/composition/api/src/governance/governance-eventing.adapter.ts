@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GovernanceEventingPort,
-  GovernanceDiagnosticsPort,
+  GovernanceEventing,
+  GovernanceDiagnostics,
   IngestionPullEventingAdapter,
-  IngestionPullLifecycleCommandPort,
+  IngestionPullLifecycleCommand,
   IngestionPullLifecycleService,
-  IngestionPullMetricsPort,
-  IngestionPullOutcomePort,
+  IngestionPullMetrics,
+  IngestionPullOutcome,
   IngestionPullProcess,
   IngestionPullRunPort,
-  IngestionPullSchedulePort,
+  IngestionPullSchedule,
   IngestionPullService,
-  IngestionPullTenantPort,
+  IngestionPullTenant,
   PrismaIngestionPullLifecycleRepository,
   PrismaIngestionPullRunProjectionRepository,
   PulledUsageDispatcherPort,
   PulledUsageEventingAdapter,
-  PulledUsageLedgerPort,
+  PulledUsageLedger,
   PulledUsageLedgerProcess,
   type IngestionPullLifecycleDatabase,
   type IngestionPullRunProjectionDatabase,
@@ -36,7 +36,7 @@ import type { EventSourcing } from "@langwatch/eventing";
 import { mapCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
+import type { GovernanceInternalProject } from "@langwatch/project-server";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:enterprise:governance-eventing");
@@ -83,16 +83,16 @@ type PulledUsageRecordCommand = PulledUsageObservedEventData & {
   occurredAt: number;
 };
 
-export type GovernancePulledUsageLedgerPort = {
+export type GovernancePulledUsageLedger = {
   insertPulledUsageRows(rows: PulledUsageLedgerRow[]): Promise<void>;
 };
 
-export type GovernanceIngestionPullMetricsPort = {
+export type GovernanceIngestionPullMetrics = {
   count(outcome: "completed" | "failed_retryable" | "failed_final"): void;
   observeDuration(durationMs: number): void;
 };
 
-export type GovernanceIngestionPullSchedulePort = {
+export type GovernanceIngestionPullSchedule = {
   nextRunAt(input: { cron: string; after: number }): number;
 };
 
@@ -181,14 +181,14 @@ export class AppPulledUsagePipeline {
 export class AppIngestionPullExecutionRuntime {
   private constructor(
     readonly worker: IngestionPullWorkerService,
-    readonly ledger: GovernancePulledUsageLedgerPort | undefined,
-    readonly metrics: GovernanceIngestionPullMetricsPort,
+    readonly ledger: GovernancePulledUsageLedger | undefined,
+    readonly metrics: GovernanceIngestionPullMetrics,
   ) {}
 
   static create(
     worker: IngestionPullWorkerService,
-    ledger: GovernancePulledUsageLedgerPort | undefined,
-    metrics: GovernanceIngestionPullMetricsPort,
+    ledger: GovernancePulledUsageLedger | undefined,
+    metrics: GovernanceIngestionPullMetrics,
   ): AppIngestionPullExecutionRuntime {
     return new AppIngestionPullExecutionRuntime(worker, ledger, metrics);
   }
@@ -198,15 +198,15 @@ export class AppIngestionPullExecutionRuntime {
 export class AppIngestionPullLifecycleRuntime {
   private constructor(
     readonly database: IngestionPullLifecycleDatabase & IngestionPullRunProjectionDatabase,
-    readonly projects: GovernanceInternalProjectPort,
-    readonly schedule: GovernanceIngestionPullSchedulePort,
+    readonly projects: GovernanceInternalProject,
+    readonly schedule: GovernanceIngestionPullSchedule,
     readonly runsWorkers: boolean,
   ) {}
 
   static create(
     database: IngestionPullLifecycleDatabase & IngestionPullRunProjectionDatabase,
-    projects: GovernanceInternalProjectPort,
-    schedule: GovernanceIngestionPullSchedulePort,
+    projects: GovernanceInternalProject,
+    schedule: GovernanceIngestionPullSchedule,
     runsWorkers: boolean,
   ): AppIngestionPullLifecycleRuntime {
     return new AppIngestionPullLifecycleRuntime(database, projects, schedule, runsWorkers);
@@ -228,13 +228,13 @@ export class AppGovernanceEventingRuntime {
   }
 }
 
-class AppPulledUsageLedgerPort extends PulledUsageLedgerPort {
-  private constructor(private readonly repository: GovernancePulledUsageLedgerPort) {
+class AppPulledUsageLedger extends PulledUsageLedger {
+  private constructor(private readonly repository: GovernancePulledUsageLedger) {
     super();
   }
 
-  static create(repository: GovernancePulledUsageLedgerPort): AppPulledUsageLedgerPort {
-    return new AppPulledUsageLedgerPort(repository);
+  static create(repository: GovernancePulledUsageLedger): AppPulledUsageLedger {
+    return new AppPulledUsageLedger(repository);
   }
 
   insert(rows: PulledUsageLedgerRow[]): Promise<void> {
@@ -257,7 +257,7 @@ export class AppPulledUsageEventDispatcher extends PulledUsageDispatcherPort {
   }
 }
 
-class AppIngestionPullRunPort extends IngestionPullRunPort {
+class AppIngestionPullRun extends IngestionPullRunPort {
   private constructor(
     private readonly worker: IngestionPullWorkerService,
     private readonly pulledUsage: PulledUsageDispatcherPort,
@@ -268,8 +268,8 @@ class AppIngestionPullRunPort extends IngestionPullRunPort {
   static create(options: {
     worker: IngestionPullWorkerService;
     pulledUsage: PulledUsageDispatcherPort;
-  }): AppIngestionPullRunPort {
-    return new AppIngestionPullRunPort(options.worker, options.pulledUsage);
+  }): AppIngestionPullRun {
+    return new AppIngestionPullRun(options.worker, options.pulledUsage);
   }
 
   run(input: { sourceId: string; cursor: string | null }) {
@@ -277,13 +277,13 @@ class AppIngestionPullRunPort extends IngestionPullRunPort {
   }
 }
 
-class AppIngestionPullOutcomePort extends IngestionPullOutcomePort {
+class AppIngestionPullOutcome extends IngestionPullOutcome {
   private constructor(private readonly pipeline: AppIngestionPullPipeline) {
     super();
   }
 
-  static create(pipeline: AppIngestionPullPipeline): AppIngestionPullOutcomePort {
-    return new AppIngestionPullOutcomePort(pipeline);
+  static create(pipeline: AppIngestionPullPipeline): AppIngestionPullOutcome {
+    return new AppIngestionPullOutcome(pipeline);
   }
 
   async completed(input: IngestionPullCompletedCommand): Promise<void> {
@@ -295,13 +295,13 @@ class AppIngestionPullOutcomePort extends IngestionPullOutcomePort {
   }
 }
 
-class AppIngestionPullMetricsPort extends IngestionPullMetricsPort {
-  private constructor(private readonly metrics: GovernanceIngestionPullMetricsPort) {
+class AppIngestionPullMetrics extends IngestionPullMetrics {
+  private constructor(private readonly metrics: GovernanceIngestionPullMetrics) {
     super();
   }
 
-  static create(metrics: GovernanceIngestionPullMetricsPort): AppIngestionPullMetricsPort {
-    return new AppIngestionPullMetricsPort(metrics);
+  static create(metrics: GovernanceIngestionPullMetrics): AppIngestionPullMetrics {
+    return new AppIngestionPullMetrics(metrics);
   }
 
   count(outcome: "completed" | "failed_retryable" | "failed_final"): void {
@@ -313,13 +313,13 @@ class AppIngestionPullMetricsPort extends IngestionPullMetricsPort {
   }
 }
 
-class UtcIngestionPullSchedulePort extends IngestionPullSchedulePort {
-  private constructor(private readonly schedule: GovernanceIngestionPullSchedulePort) {
+class UtcIngestionPullSchedule extends IngestionPullSchedule {
+  private constructor(private readonly schedule: GovernanceIngestionPullSchedule) {
     super();
   }
 
-  static create(schedule: GovernanceIngestionPullSchedulePort): UtcIngestionPullSchedulePort {
-    return new UtcIngestionPullSchedulePort(schedule);
+  static create(schedule: GovernanceIngestionPullSchedule): UtcIngestionPullSchedule {
+    return new UtcIngestionPullSchedule(schedule);
   }
 
   nextRunAt(input: { cron: string; after: number }): number {
@@ -327,13 +327,13 @@ class UtcIngestionPullSchedulePort extends IngestionPullSchedulePort {
   }
 }
 
-class AppIngestionPullTenantPort extends IngestionPullTenantPort {
-  private constructor(private readonly projects: GovernanceInternalProjectPort) {
+class AppIngestionPullTenant extends IngestionPullTenant {
+  private constructor(private readonly projects: GovernanceInternalProject) {
     super();
   }
 
-  static create(projects: GovernanceInternalProjectPort): AppIngestionPullTenantPort {
-    return new AppIngestionPullTenantPort(projects);
+  static create(projects: GovernanceInternalProject): AppIngestionPullTenant {
+    return new AppIngestionPullTenant(projects);
   }
 
   async resolveTenantId(organizationId: string): Promise<string> {
@@ -346,13 +346,13 @@ class AppIngestionPullTenantPort extends IngestionPullTenantPort {
   }
 }
 
-class AppIngestionPullLifecycleCommandPort extends IngestionPullLifecycleCommandPort {
+class AppIngestionPullLifecycleCommand extends IngestionPullLifecycleCommand {
   private constructor(private readonly pipeline: AppIngestionPullPipeline) {
     super();
   }
 
-  static create(pipeline: AppIngestionPullPipeline): AppIngestionPullLifecycleCommandPort {
-    return new AppIngestionPullLifecycleCommandPort(pipeline);
+  static create(pipeline: AppIngestionPullPipeline): AppIngestionPullLifecycleCommand {
+    return new AppIngestionPullLifecycleCommand(pipeline);
   }
 
   async configure(input: IngestionPullConfigureCommand): Promise<void> {
@@ -364,13 +364,13 @@ class AppIngestionPullLifecycleCommandPort extends IngestionPullLifecycleCommand
   }
 }
 
-class AppIngestionPullDiagnosticsPort extends GovernanceDiagnosticsPort {
+class AppIngestionPullDiagnostics extends GovernanceDiagnostics {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }
 }
 
-class AppPipelineGovernanceEventingPort extends GovernanceEventingPort {
+class AppPipelineGovernanceEventing extends GovernanceEventing {
   private constructor(
     private readonly ingestionPull: AppIngestionPullPipeline,
     private readonly pulledUsage: AppPulledUsagePipeline,
@@ -381,8 +381,8 @@ class AppPipelineGovernanceEventingPort extends GovernanceEventingPort {
   static create(
     ingestionPull: AppIngestionPullPipeline,
     pulledUsage: AppPulledUsagePipeline,
-  ): AppPipelineGovernanceEventingPort {
-    return new AppPipelineGovernanceEventingPort(ingestionPull, pulledUsage);
+  ): AppPipelineGovernanceEventing {
+    return new AppPipelineGovernanceEventing(ingestionPull, pulledUsage);
   }
 
   async configureIngestion(input: ConfigureIngestionPullCommand): Promise<void> {
@@ -465,8 +465,8 @@ export class AppGovernanceEventingAdapter {
     return AppPulledUsagePipeline.create(async () => undefined);
   }
 
-  static noopGovernancePort(): GovernanceEventingPort {
-    return AppPipelineGovernanceEventingPort.create(
+  static noopGovernancePort(): GovernanceEventing {
+    return AppPipelineGovernanceEventing.create(
       this.noopIngestionPullPipeline(),
       this.noopPulledUsagePipeline(),
     );
@@ -475,8 +475,8 @@ export class AppGovernanceEventingAdapter {
   static governancePort(
     ingestionPull: AppIngestionPullPipeline,
     pulledUsage: AppPulledUsagePipeline,
-  ): GovernanceEventingPort {
-    return AppPipelineGovernanceEventingPort.create(ingestionPull, pulledUsage);
+  ): GovernanceEventing {
+    return AppPipelineGovernanceEventing.create(ingestionPull, pulledUsage);
   }
 
   register(): AppGovernanceEventingInstallation {
@@ -484,7 +484,7 @@ export class AppGovernanceEventingAdapter {
       PulledUsageEventingAdapter.create({
         ledger: this.runtime.execution.ledger
           ? PulledUsageLedgerProcess.create(
-              AppPulledUsageLedgerPort.create(this.runtime.execution.ledger),
+              AppPulledUsageLedger.create(this.runtime.execution.ledger),
             )
           : undefined,
       }).build(),
@@ -493,12 +493,12 @@ export class AppGovernanceEventingAdapter {
     const pulledUsage = AppPulledUsagePipeline.create(pulledUsageCommands.recordPulledUsage);
     const ingestionPull = AppIngestionPullPipeline.deferred();
     const execution = IngestionPullService.create(
-      AppIngestionPullRunPort.create({
+      AppIngestionPullRun.create({
         worker: this.runtime.execution.worker,
         pulledUsage: AppPulledUsageEventDispatcher.create(pulledUsage),
       }),
-      AppIngestionPullOutcomePort.create(ingestionPull),
-      AppIngestionPullMetricsPort.create(this.runtime.execution.metrics),
+      AppIngestionPullOutcome.create(ingestionPull),
+      AppIngestionPullMetrics.create(this.runtime.execution.metrics),
     );
     const ingestionPullPipeline = this.eventSourcing.register(
       IngestionPullEventingAdapter.create({
@@ -506,7 +506,7 @@ export class AppGovernanceEventingAdapter {
           this.runtime.lifecycle.database,
         ),
         process: IngestionPullProcess.create({
-          schedule: UtcIngestionPullSchedulePort.create(this.runtime.lifecycle.schedule),
+          schedule: UtcIngestionPullSchedule.create(this.runtime.lifecycle.schedule),
           execution,
         }),
       }).build(),
@@ -526,9 +526,9 @@ export class AppGovernanceEventingAdapter {
   private lifecycle(pipeline: AppIngestionPullPipeline): IngestionPullLifecycleService {
     return IngestionPullLifecycleService.create({
       repository: PrismaIngestionPullLifecycleRepository.create(this.runtime.lifecycle.database),
-      tenant: AppIngestionPullTenantPort.create(this.runtime.lifecycle.projects),
-      commands: AppIngestionPullLifecycleCommandPort.create(pipeline),
-      diagnostics: new AppIngestionPullDiagnosticsPort(),
+      tenant: AppIngestionPullTenant.create(this.runtime.lifecycle.projects),
+      commands: AppIngestionPullLifecycleCommand.create(pipeline),
+      diagnostics: new AppIngestionPullDiagnostics(),
     });
   }
 

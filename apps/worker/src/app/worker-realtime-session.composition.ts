@@ -7,7 +7,7 @@ import { createSsrfUrlValidator, fetchValidatedDestination } from "@langwatch/eg
 import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
 import {
   GatewayElevenLabsCredentialService,
-  GatewayModelProviderCredentialsPort,
+  GatewayModelProviderCredentials,
   GatewayRealtimeSessionReconciliationService,
   GatewayRealtimeSessionService,
   ModelCatalogGatewaySpendRatingAdapter,
@@ -17,7 +17,7 @@ import {
   type ElevenLabsConversationReport,
   type ElevenLabsCredentialReader,
   type GatewayRealtimeSessionCollaborators,
-  type GatewaySpendConfirmationPort,
+  type GatewaySpendConfirmation,
 } from "@langwatch/gateway-server";
 import { PrismaGatewayElevenLabsCredentialRepository } from "@langwatch/gateway-server/composition/gateway-elevenlabs-credentials";
 import { EncryptedModelProviderCredentialAdapter } from "@langwatch/model-provider-server";
@@ -33,7 +33,7 @@ const realtimeSessions = GatewayRealtimeSessionService.create();
  * expensive: brokered voice spend then settles only when a customer's post-call webhook arrives,
  * and a workspace that never configured one bills nothing at all.
  */
-export abstract class WorkerRealtimeSessionAbsenceReportPort {
+export abstract class WorkerRealtimeSessionAbsenceReport {
   abstract withoutPoller(reason: "no-typed-prisma-connection" | "no-encryption-key"): void;
 }
 
@@ -46,8 +46,8 @@ export type WorkerRealtimeSessionCompositionInput = Readonly<{
    * session confirms into the SAME pipeline the data plane's own drainer sends to: two paths
    * writing one spend record is how they come to disagree about what a call cost.
    */
-  spendConfirmation: GatewaySpendConfirmationPort;
-  absence?: WorkerRealtimeSessionAbsenceReportPort;
+  spendConfirmation: GatewaySpendConfirmation;
+  absence?: WorkerRealtimeSessionAbsenceReport;
 }>;
 
 export function tryCreateWorkerRealtimeSessionPoller(
@@ -185,7 +185,7 @@ class WorkerElevenLabsCredentials implements ElevenLabsCredentialReader {
  * value written under a rotated key all read as "no custom keys" rather than throwing: one
  * unreadable credential must not stop the sweep that settles every other session.
  */
-class WorkerGatewayModelProviderCredentials extends GatewayModelProviderCredentialsPort {
+class WorkerGatewayModelProviderCredentials extends GatewayModelProviderCredentials {
   static create(encryption: AesGcmSecretEncryptionAdapter): WorkerGatewayModelProviderCredentials {
     return new WorkerGatewayModelProviderCredentials(encryption);
   }
@@ -246,7 +246,7 @@ function elevenLabsReport(body: unknown): ElevenLabsConversationReport | undefin
 }
 
 /** Names the poller's absence in this process's own log. */
-export class LoggedWorkerRealtimeSessionAbsence extends WorkerRealtimeSessionAbsenceReportPort {
+export class LoggedWorkerRealtimeSessionAbsence extends WorkerRealtimeSessionAbsenceReport {
   static create(logger: Logger): LoggedWorkerRealtimeSessionAbsence {
     return new LoggedWorkerRealtimeSessionAbsence(logger);
   }

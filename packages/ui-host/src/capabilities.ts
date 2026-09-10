@@ -4,9 +4,9 @@
  * screen asks ports instead. Missing ports refuse loudly, never silently.
  */
 
-import type { UiScopeHostPort } from "./use-organization-team-project.ts";
+import type { UiScopeHost } from "./use-organization-team-project.ts";
 import type { UiSessionSnapshot } from "./session.ts";
-import type { UiSlotsPort } from "./slots.tsx";
+import type { UiSlots } from "./slots.tsx";
 import { createContext, useContext } from "react";
 
 /** The composition never filled this port, and something asked it to work. */
@@ -21,7 +21,7 @@ export class UiCapabilityUnavailableError extends Error {
 }
 
 /** Sets the browser tab's title, and hands back the way to put it back. */
-export abstract class UiDocumentTitlePort {
+export abstract class UiDocumentTitle {
   abstract set(title: string): () => void;
 }
 
@@ -73,13 +73,13 @@ export type UiFailureNotice = {
 };
 
 /** Tells the user how something they did turned out. */
-export abstract class UiFeedbackPort {
+export abstract class UiFeedback {
   abstract succeeded(notice: UiSuccessNotice): void;
   abstract failed(failure: UiFailureNotice): void;
 }
 
 /** Moves the address bar. */
-export abstract class UiNavigationPort {
+export abstract class UiNavigation {
   abstract navigate(to: string): void;
   abstract replace(to: string): void;
   abstract back(): void;
@@ -104,7 +104,7 @@ export type UiRouteReadingValues = {
  * the router, sealed off by ADR-004. `setQuery` takes the WHOLE next
  * query, not a patch, so a screen can remove a key as well as set one.
  */
-export abstract class UiRoutePort {
+export abstract class UiRoute {
   abstract reading(): UiRouteReadingValues;
   abstract setQuery(
     next: Readonly<Record<string, string | undefined>>,
@@ -131,7 +131,7 @@ export type UiActiveScope = {
  * and `isFeatureEnabled` answer synchronously and fail closed, so a
  * loading screen renders the same as a "no" screen.
  */
-export abstract class UiSessionPort {
+export abstract class UiSession {
   abstract currentUser(): UiActor | null;
   abstract activeScope(): UiActiveScope;
   abstract hasPermission(permission: string): boolean;
@@ -162,7 +162,7 @@ export abstract class UiSessionPort {
    * Absent is a reading, never a throw, keeping a cross-feature component
    * alive on a route its own host never mounted.
    */
-  scopeHost(): UiScopeHostPort | undefined {
+  scopeHost(): UiScopeHost | undefined {
     return void 0;
   }
 
@@ -172,7 +172,7 @@ export abstract class UiSessionPort {
   }
 }
 
-class UnavailableUiFeedback extends UiFeedbackPort {
+class UnavailableUiFeedback extends UiFeedback {
   succeeded(): never {
     throw new UiCapabilityUnavailableError("feedback");
   }
@@ -182,7 +182,7 @@ class UnavailableUiFeedback extends UiFeedbackPort {
   }
 }
 
-class UnavailableUiSession extends UiSessionPort {
+class UnavailableUiSession extends UiSession {
   currentUser(): never {
     throw new UiCapabilityUnavailableError("session");
   }
@@ -209,11 +209,11 @@ class UnavailableUiSession extends UiSessionPort {
 }
 
 /** The default for a port with no implementation this package can write. */
-export const UNAVAILABLE_UI_FEEDBACK: UiFeedbackPort = new UnavailableUiFeedback();
-export const UNAVAILABLE_UI_SESSION: UiSessionPort = new UnavailableUiSession();
+export const UNAVAILABLE_UI_FEEDBACK: UiFeedback = new UnavailableUiFeedback();
+export const UNAVAILABLE_UI_SESSION: UiSession = new UnavailableUiSession();
 
 /** The title of the document this application is rendered into. */
-export class BrowserUiDocumentTitle extends UiDocumentTitlePort {
+export class BrowserUiDocumentTitle extends UiDocumentTitle {
   static create(target: Pick<Document, "title"> = document): BrowserUiDocumentTitle {
     return new BrowserUiDocumentTitle(target);
   }
@@ -250,17 +250,17 @@ export type UiCapabilities = {
    * {@link resolveUiCapabilities} always fills it, production when absent.
    */
   deployment?: UiDeployment;
-  documentTitle: UiDocumentTitlePort;
-  feedback: UiFeedbackPort;
-  navigation: UiNavigationPort;
-  route: UiRoutePort;
-  session: UiSessionPort;
+  documentTitle: UiDocumentTitle;
+  feedback: UiFeedback;
+  navigation: UiNavigation;
+  route: UiRoute;
+  session: UiSession;
   /**
    * The blocks a core screen leaves for the composition to fill. Optional
    * because absent and "filled nothing" are the same reading — `useUiSlots`
    * degrades to the core defaults either way.
    */
-  slots?: UiSlotsPort;
+  slots?: UiSlots;
 };
 
 /** What the composing application chose to answer itself. */
@@ -269,15 +269,15 @@ export type UiCapabilityInstall = Partial<UiCapabilities>;
 export type UiCapabilityResolution = {
   install: UiCapabilityInstall;
   /** The default only the browser can build. */
-  documentTitle: UiDocumentTitlePort;
+  documentTitle: UiDocumentTitle;
   /** The defaults only router context can build. */
-  navigation: UiNavigationPort;
-  route: UiRoutePort;
+  navigation: UiNavigation;
+  route: UiRoute;
   /**
    * The default only a live host can build — absent for a composition
    * that declared no session source, when the refusal below is the honest answer.
    */
-  session?: UiSessionPort;
+  session?: UiSession;
 };
 
 /**

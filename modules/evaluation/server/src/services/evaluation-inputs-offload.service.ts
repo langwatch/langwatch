@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { EvaluationInputStoragePort } from "../ports/evaluation.port.ts";
+import type { EvaluationInputStorage } from "../app/evaluation.infrastructure.ts";
 
 export const STORED_OBJECT_MARKER_KEY = "__lw_stored_object" as const;
 
@@ -40,7 +40,7 @@ export const EVALUATION_INPUTS_STORED_OBJECT_MARKER_KEY = STORED_OBJECT_MARKER_K
 
 export class EvaluationInputsOffloadService {
   static create(input: {
-    storage: EvaluationInputStoragePort;
+    storage: EvaluationInputStorage;
     config: EvaluationInputOffloadConfig;
   }): EvaluationInputsOffloadService {
     return new EvaluationInputsOffloadService(input.storage, input.config);
@@ -52,7 +52,7 @@ export class EvaluationInputsOffloadService {
   }
 
   private constructor(
-    private readonly storage: EvaluationInputStoragePort,
+    private readonly storage: EvaluationInputStorage,
     private readonly config: EvaluationInputOffloadConfig,
   ) {}
 

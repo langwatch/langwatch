@@ -41,7 +41,7 @@ export interface SpendSummaryRow {
   costUsd: string;
 }
 
-export abstract class GatewaySpendEventsPort {
+export abstract class GatewaySpendEvents {
   abstract upsertFromFold(
     entries: Array<{
       tenantId: string;

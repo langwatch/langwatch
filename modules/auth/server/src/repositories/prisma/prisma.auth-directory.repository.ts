@@ -1,9 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { AuthDirectoryPort, type AuthDirectoryProject } from "../../transport/auth-directory.ts";
+import { AuthDirectory, type AuthDirectoryProject } from "../../transport/auth-directory.ts";
 
 type Database = Pick<PrismaClient, "user" | "organization" | "organizationUser" | "project">;
 
-export class PrismaAuthDirectoryRepository extends AuthDirectoryPort {
+export class PrismaAuthDirectoryRepository extends AuthDirectory {
   private constructor(private readonly database: Database) {
     super();
   }

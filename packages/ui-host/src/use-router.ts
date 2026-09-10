@@ -115,7 +115,7 @@ function asAddress(to: UiRouterTarget, currentPathname: string): string {
 /**
  * The address this screen is rendering, and the two ways off it. A push whose address is only a
  * query string never leaves the page: it is a whole-query write, which is what
- * `UiRoutePort.setQuery` takes. An address with a path is a navigation.
+ * `UiRoute.setQuery` takes. An address with a path is a navigation.
  */
 export function useRouter(): UiRouter {
   const capabilities = useOptionalUiCapabilities();

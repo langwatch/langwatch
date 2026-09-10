@@ -1,7 +1,7 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
-import type { EvaluationClickHouseResolver } from "../../ports/evaluation.port.ts";
+import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 import {
   MonitorPerformanceRepository,
   type MonitorPerformanceBucket,

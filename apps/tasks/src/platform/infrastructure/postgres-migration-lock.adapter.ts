@@ -1,5 +1,5 @@
 import { type PrismaDriverAdapter, PrismaDriverAdapterService } from "@langwatch/prisma-client";
-import { MigrationLockPort } from "../migration-lock.port.ts";
+import { MigrationLock } from "../migration-lock.port.ts";
 
 /** The one string the lock key is derived from. Changing it splits the mutex. */
 export const MIGRATION_LOCK_NAME = "langwatch:migrations";
@@ -22,7 +22,7 @@ type PoolClient = Awaited<ReturnType<typeof borrowClient>>;
  * application's pool would be handed back to somebody else mid-migration, and
  * the lock would travel with it.
  */
-export class PostgresMigrationLockAdapter extends MigrationLockPort {
+export class PostgresMigrationLockAdapter extends MigrationLock {
   private connection: { adapter: PrismaDriverAdapter; client: PoolClient } | undefined;
   private held = false;
 

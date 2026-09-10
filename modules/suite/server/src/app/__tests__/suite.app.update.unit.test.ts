@@ -9,7 +9,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi, ScenarioTestSuite } from "@langwatch/scenario-contract";
 import { SuiteScopeNotAllowedError } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { SuiteExecutionPort } from "../../ports/suite-execution.port.ts";
+import type { SuiteExecution } from "../suite.app.ts";
 import { SuiteApp } from "../suite.app.ts";
 import { createSuiteTestRepositories } from "./suite.fixture.ts";
 
@@ -139,8 +139,8 @@ function buildApp(overrides: { scenarios?: Partial<ScenarioApi> } = {}) {
     ...overrides.scenarios,
   });
 
-  const execution = new (class extends SuiteExecutionPort {
-    execute = vi.fn<SuiteExecutionPort["execute"]>();
+  const execution = new (class implements SuiteExecution {
+    execute = vi.fn<SuiteExecution["execute"]>();
   })();
 
   const app = SuiteApp.create({

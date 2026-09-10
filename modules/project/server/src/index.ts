@@ -16,10 +16,10 @@ export { ProjectApp, type ProjectInfrastructure } from "./app/project.app.ts";
 export { ProjectOperationsService } from "./services/project-operations.service.ts";
 export { projectServer } from "./project.server.ts";
 export {
-  ProjectCredentialsPort,
-  ProjectDiagnosticsPort,
-  ProjectKeyMapPort,
-  ProjectStoredObjectsPort,
+  ProjectCredentials,
+  ProjectDiagnostics,
+  ProjectKeyMap,
+  ProjectStoredObjects,
 } from "./ports/project.port.ts";
 export {
   ProjectManagementApi,
@@ -39,8 +39,8 @@ export {
   integrationsChecksTrpcTransport,
 } from "./transport/integrations-checks.trpc.ts";
 export {
-  GovernanceInternalProjectPort,
+  GovernanceInternalProject,
   GovernanceInternalProjectService,
-  ProjectOldestTeamPort,
+  ProjectOldestTeam,
 } from "./services/governance-internal-project.service.ts";
 export { PrismaGovernanceInternalProjectRepository } from "./repositories/prisma/prisma.governance-internal-project.repository.ts";

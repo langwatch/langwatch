@@ -3,12 +3,12 @@ import {
   isGovernanceOriginTrace,
 } from "@langwatch/enterprise-governance-contract";
 import {
-  GovernanceOcsfEventPort,
-  GovernanceSubscriberDiagnosticsPort,
+  GovernanceOcsfEventWriter,
+  GovernanceSubscriberDiagnosticsSink,
   type GovernanceOcsfEvent,
   type GovernanceTraceContext,
   type GovernanceTraceEvent,
-} from "../ports/governance-subscriber.port.ts";
+} from "../app/governance.infrastructure.ts";
 import { Temporal } from "@langwatch/time";
 
 export const GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS = 30_000;
@@ -18,13 +18,13 @@ export const GOVERNANCE_OCSF_MEDIUM_SEVERITY_ID = 4;
 
 export class GovernanceOcsfSubscriber {
   private constructor(
-    private readonly events: GovernanceOcsfEventPort,
-    private readonly diagnostics: GovernanceSubscriberDiagnosticsPort,
+    private readonly events: GovernanceOcsfEventWriter,
+    private readonly diagnostics: GovernanceSubscriberDiagnosticsSink,
   ) {}
 
   static create(options: {
-    events: GovernanceOcsfEventPort;
-    diagnostics: GovernanceSubscriberDiagnosticsPort;
+    events: GovernanceOcsfEventWriter;
+    diagnostics: GovernanceSubscriberDiagnosticsSink;
   }): GovernanceOcsfSubscriber {
     return new GovernanceOcsfSubscriber(options.events, options.diagnostics);
   }

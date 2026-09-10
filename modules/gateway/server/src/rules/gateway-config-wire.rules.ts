@@ -21,8 +21,8 @@ import {
 } from "@langwatch/gateway-contract";
 import type { LangyMirrorTier } from "@langwatch/langy-contract";
 import { modelProviders } from "@langwatch/model-provider-contract";
-import type { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port.ts";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
+import type { GatewayConfigAssembly } from "../app/gateway.infrastructure.ts";
+import type { GatewayModelProviderCredentials } from "../app/gateway.infrastructure.ts";
 
 export type GuardrailWire = {
   id: string;
@@ -281,7 +281,7 @@ export function normalisePolicyRules(raw: unknown): BundlePolicyRules {
 export function resolvePolicySideOfBundle(
   vk: VirtualKeyWithScopes,
   _config: ReturnType<typeof parseVirtualKeyConfig>,
-  assembly: GatewayConfigAssemblyPort,
+  assembly: GatewayConfigAssembly,
 ): {
   modelAliases: Record<string, string>;
   policyRules: BundlePolicyRules;
@@ -313,8 +313,8 @@ export function resolvePolicySideOfBundle(
 export function buildProviderSlot(
   mp: ModelProvider,
   index: number,
-  credentialReader: GatewayModelProviderCredentialsPort,
-  assembly: GatewayConfigAssemblyPort,
+  credentialReader: GatewayModelProviderCredentials,
+  assembly: GatewayConfigAssembly,
 ): ProviderSlot {
   const credentials = assembly.buildCredentials(mp, credentialReader);
   const customKeys = credentialReader.readCustomKeys(mp.customKeys);
@@ -361,7 +361,7 @@ export function routingWire({
   assembly,
 }: {
   mp: ModelProvider;
-  assembly: GatewayConfigAssemblyPort;
+  assembly: GatewayConfigAssembly;
 }): Pick<ProviderSlot, "handle" | "models"> {
   const models = assembly.tryDeclaredModelsForProvider(mp);
 

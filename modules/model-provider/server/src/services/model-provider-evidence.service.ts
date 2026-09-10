@@ -1,7 +1,7 @@
 import { modelProviderListProjectInputSchema } from "@langwatch/model-provider-contract";
 import type {
-  ModelCostProjectScopePort
-} from "../ports/model-provider.port.ts";
+  ModelCostProjectScope
+} from "../app/model-provider.infrastructure.ts";
 import type {
   ModelProviderEvidenceRepository
 } from "../repositories/model-provider-evidence.repository.ts";
@@ -31,12 +31,12 @@ import type {
 export class ModelProviderEvidenceService {
   private constructor(
     private readonly providers: ModelProviderEvidenceRepository,
-    private readonly scopes: ModelCostProjectScopePort,
+    private readonly scopes: ModelCostProjectScope,
   ) {}
 
   static create(options: {
     providers: ModelProviderEvidenceRepository;
-    scopes: ModelCostProjectScopePort;
+    scopes: ModelCostProjectScope;
   }): ModelProviderEvidenceService {
     return new ModelProviderEvidenceService(options.providers, options.scopes);
   }

@@ -3,7 +3,7 @@ import sgMail from "@sendgrid/mail";
 import { sanitizeHeaders } from "./mime.ts";
 import {
   type EmailContent,
-  type EmailProviderPort,
+  type EmailProvider,
   type MailerConfiguration,
   toArray,
 } from "./types.ts";
@@ -11,7 +11,7 @@ import {
 const logger = createLogger("langwatch:mailer:sendgrid");
 
 /** SendGrid's module client has no transport lifecycle, only one process configuration. */
-export class SendgridEmailProvider implements EmailProviderPort {
+export class SendgridEmailProvider implements EmailProvider {
   readonly name = "sendgrid" as const;
 
   static create(configuration: MailerConfiguration["sendgrid"]): SendgridEmailProvider {

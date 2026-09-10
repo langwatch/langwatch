@@ -6,10 +6,10 @@ import type {
   IncrementalClusteringParams,
   TopicClusteringProviderConfig,
 } from "@langwatch/topic-contract";
-import { TopicClusteringModelsPort } from "@langwatch/topic-contract";
+import { TopicClusteringModels } from "@langwatch/topic-contract";
 import {
   OtelTopicClusteringMetricsAdapter,
-  TopicClusteringLangevalsPort,
+  TopicClusteringLangevals,
   type TopicClusteringClickHouseResolver,
   type TopicClusteringExecutionDependencies,
   type TopicClusteringLangevalsKind,
@@ -26,7 +26,7 @@ export const TOPIC_CLUSTERING_PAYLOAD_SIZE_METRIC_NAME = "payload_size_bytes";
  * pipeline mounts either way, so all nine of its routing keys stay claimed, the schedule advances,
  * and every command and projection is real. What is absent is the page RUN.
  */
-export abstract class WorkerTopicAbsenceReportPort {
+export abstract class WorkerTopicAbsenceReport {
   abstract withoutClusteringModels(): void;
 }
 
@@ -40,7 +40,7 @@ export type WorkerTopicClusteringOptions = Readonly<{
    * provider.composition.ts`.
    */
   modelProviders?: ModelProviderApi;
-  absence?: WorkerTopicAbsenceReportPort;
+  absence?: WorkerTopicAbsenceReport;
   /** Injected by the mount test; the process's own `fetch` otherwise. */
   fetch?: typeof globalThis.fetch;
 }>;
@@ -96,7 +96,7 @@ export function createWorkerTopicRuntime(
 /**
  * Topic's langevals exchange, posted directly.
  */
-export class WorkerTopicClusteringLangevalsAdapter extends TopicClusteringLangevalsPort {
+export class WorkerTopicClusteringLangevalsAdapter extends TopicClusteringLangevals {
   static create(fetchImpl: typeof globalThis.fetch): WorkerTopicClusteringLangevalsAdapter {
     return new WorkerTopicClusteringLangevalsAdapter(fetchImpl);
   }
@@ -126,7 +126,7 @@ export class WorkerTopicClusteringLangevalsAdapter extends TopicClusteringLangev
  * customer's own model-provider configuration — which provider is enabled for the clustering
  * feature, which embeddings model it names, and the decrypted credentials LiteLLM is handed.
  */
-class AbsentTopicClusteringModels extends TopicClusteringModelsPort {
+class AbsentTopicClusteringModels extends TopicClusteringModels {
   resolveClusteringModel(projectId: string): Promise<never> {
     return Promise.reject(new TopicClusteringModelsUnavailableError(projectId));
   }

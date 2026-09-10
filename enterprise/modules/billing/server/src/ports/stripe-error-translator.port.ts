@@ -1,3 +1,3 @@
-export abstract class StripeErrorTranslatorPort {
+export abstract class StripeErrorTranslator {
   abstract translate(error: unknown): unknown;
 }

@@ -1,35 +1,35 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { EventSourcing } from "@langwatch/eventing";
 import type { StateProjectionStore } from "@langwatch/eventing";
-import type { TopicApi, TopicClusteringModelsPort } from "@langwatch/topic-contract";
-import { type AssignTopicCommandData, TraceTopicAssignmentPort } from "@langwatch/trace-contract";
+import type { TopicApi, TopicClusteringModels } from "@langwatch/topic-contract";
+import { type AssignTopicCommandData, TraceTopicAssignment } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
 import {
   EventingTopicClusteringCommandsAdapter,
   EventingTopicClusteringOutcomeCommandsAdapter,
-} from "../../adapters/eventing.topic-clustering-commands.adapter.ts";
-import { EventingTopicClusteringScheduleAdapter } from "../../adapters/eventing.topic-clustering-schedule.adapter.ts";
+} from "../../services/topic-clustering-commands.service.ts";
+import { EventingTopicClusteringScheduleAdapter } from "../../services/topic-clustering-schedule.service.ts";
 import {
   createTopicClusteringProcessingPipeline,
   type TopicClusteringProcessingPipelineDeps,
-} from "../../adapters/eventing.topic-clustering.adapter.ts";
+} from "../../services/topic-clustering-eventing.service.ts";
 import { RedisTopicClusteringBootstrapRepository } from "../redis/redis.topic-clustering-bootstrap.repository.ts";
 import {
   classifyClusteringError,
-  type TopicClusteringMetricsPort,
-  type TopicClusteringRunPort,
+  type TopicClusteringMetrics,
+  type TopicClusteringRun,
 } from "../../intents/topic-clustering.intent.ts";
 import {
   TopicClusteringRunner,
   type TopicClusteringRunnerDeps,
 } from "../../intents/topic-clustering-runner.intent.ts";
 import { LegacyImportTopicClusteringMigration } from "../../migrations/legacy-import.topic-clustering.migration.ts";
-import type { TopicClusteringClickHouseResolver } from "../../ports/topic-clustering-clickhouse.port.ts";
+import type { TopicClusteringClickHouseResolver } from "../../app/topic.infrastructure.ts";
 import type {
   TopicClusteringLangevalsKind,
-  TopicClusteringLangevalsPort,
-} from "../../ports/topic-clustering-langevals.port.ts";
-import type { TopicClusteringCommandsPort } from "../../ports/topic-clustering-commands.port.ts";
+  TopicClusteringLangevals,
+} from "../../app/topic.infrastructure.ts";
+import type { TopicClusteringCommands } from "../../app/topic.infrastructure.ts";
 import type { TopicClusteringDatabase } from "./prisma.topic-clustering.repository.ts";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./prisma.topic-clustering-run-history-projection.repository.ts";
 import { PrismaTopicClusteringRunProjectionRepository } from "./prisma.topic-clustering-run-projection.repository.ts";
@@ -54,8 +54,8 @@ export interface TopicClusteringPersistence {
 /** Technical dependencies supplied by API/worker composition for Topic execution. */
 export interface TopicClusteringExecutionDependencies {
   resolveClickHouseClient: TopicClusteringClickHouseResolver;
-  models: TopicClusteringModelsPort;
-  langevals: TopicClusteringLangevalsPort;
+  models: TopicClusteringModels;
+  langevals: TopicClusteringLangevals;
   langevalsEndpoint: string | null;
   observePayloadSize(kind: TopicClusteringLangevalsKind, sizeBytes: number): void;
 }
@@ -65,7 +65,7 @@ export interface TopicServerInstallerDependencies {
   processStore: ProcessStore;
   redis: Redis | Cluster | null;
   execution: TopicClusteringExecutionDependencies;
-  metrics: TopicClusteringMetricsPort;
+  metrics: TopicClusteringMetrics;
 }
 
 /** Builds Topic's read service, pipeline, runner, and boot seeds as one graph. */
@@ -76,11 +76,11 @@ export class PrismaTopicServerInstallerRepository {
 
   readonly service: TopicApi;
   readonly persistence: TopicClusteringPersistence;
-  readonly runPort: TopicClusteringRunPort;
+  readonly runPort: TopicClusteringRun;
 
   private readonly commands = new EventingTopicClusteringCommandsAdapter();
   private readonly outcomes = new EventingTopicClusteringOutcomeCommandsAdapter();
-  private readonly traceAssignments = new UnconnectedTraceTopicAssignmentPort();
+  private readonly traceAssignments = new UnconnectedTraceTopicAssignment();
   private readonly migration: LegacyImportTopicClusteringMigration;
   private installed = false;
 
@@ -116,7 +116,7 @@ export class PrismaTopicServerInstallerRepository {
     this.runPort = TopicClusteringRunner.create(runnerDependencies);
   }
 
-  install(options: { eventSourcing: EventSourcing; traceAssignments: TraceTopicAssignmentPort }) {
+  install(options: { eventSourcing: EventSourcing; traceAssignments: TraceTopicAssignment }) {
     if (this.installed) throw new Error("Topic clustering pipeline is already installed");
     this.installed = true;
 
@@ -156,7 +156,7 @@ export class PrismaTopicServerInstallerRepository {
     this.migration.startBootSeeds();
   }
 
-  get commandDispatch(): TopicClusteringCommandsPort {
+  get commandDispatch(): TopicClusteringCommands {
     return this.commands;
   }
 
@@ -175,10 +175,10 @@ export class PrismaTopicServerInstallerRepository {
   }
 }
 
-class UnconnectedTraceTopicAssignmentPort extends TraceTopicAssignmentPort {
-  private delegate: TraceTopicAssignmentPort | null = null;
+class UnconnectedTraceTopicAssignment extends TraceTopicAssignment {
+  private delegate: TraceTopicAssignment | null = null;
 
-  connect(delegate: TraceTopicAssignmentPort): void {
+  connect(delegate: TraceTopicAssignment): void {
     this.delegate = delegate;
   }
 

@@ -4,8 +4,8 @@ import { Prisma } from "@langwatch/prisma-client/generated";
 
 import {
   GatewayUsageService,
-  type GatewayUsageProjectsPort,
-  type GatewayUsageVirtualKeysPort,
+  type GatewayUsageProjects,
+  type GatewayUsageVirtualKeys,
 } from "../services/gateway-usage.service.ts";
 import type {
   GatewayTraceRow,
@@ -19,7 +19,7 @@ type TraceStub = Pick<GatewayTraceRow, "virtualKeyId" | "costUsd" | "occurredAt"
 };
 
 /** The org's projects: the tenant set gateway traces can land in. */
-function mockProjects(): GatewayUsageProjectsPort {
+function mockProjects(): GatewayUsageProjects {
   return { listIdsByOrganization: async () => ["proj_01"] };
 }
 
@@ -31,7 +31,7 @@ function mockProjects(): GatewayUsageProjectsPort {
 function mockVirtualKeys(
   virtualKeys: Array<{ id: string; name: string; displayPrefix: string; organizationId?: string }>,
   belongingTo = "org_01",
-): GatewayUsageVirtualKeysPort {
+): GatewayUsageVirtualKeys {
   return {
     findMetaByIds: async ({ organizationId, ids }) =>
       virtualKeys.filter(

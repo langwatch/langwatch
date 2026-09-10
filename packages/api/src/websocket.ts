@@ -1,6 +1,6 @@
 import { WebSocket, WebSocketServer } from "ws";
 import type { z } from "zod";
-import type { ConnectUpgradeRouterPort } from "./ports.ts";
+import type { ConnectUpgradeRouter } from "./ports.ts";
 
 export interface ProtocolConnection {
   readonly open: boolean;
@@ -111,7 +111,7 @@ export class WebSocketProtocol<App, Facts extends z.ZodObject> {
     this.#options = options;
   }
 
-  mount(router: ConnectUpgradeRouterPort, app: App): void {
+  mount(router: ConnectUpgradeRouter, app: App): void {
     if (this.#server) throw new Error("The WebSocket protocol is already mounted.");
 
     const server = new WebSocketServer({

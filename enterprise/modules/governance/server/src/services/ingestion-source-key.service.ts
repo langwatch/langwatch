@@ -12,9 +12,9 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type {
-  IngestionKeyIssuerPort,
+  IngestionKeyIssuer,
   IngestionKeyRepository,
-} from "../ports/ingestion-source-key.port.ts";
+} from "../app/governance.infrastructure.ts";
 import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:ingestion-key");
@@ -24,13 +24,13 @@ const EPOCH = Temporal.Instant.fromEpochMilliseconds(0);
 export class IngestionKeyService {
   private constructor(
     private readonly repository: IngestionKeyRepository,
-    private readonly issuer: IngestionKeyIssuerPort,
+    private readonly issuer: IngestionKeyIssuer,
     private readonly organizations: OrganizationService,
   ) {}
 
   static create(options: {
     repository: IngestionKeyRepository;
-    issuer: IngestionKeyIssuerPort;
+    issuer: IngestionKeyIssuer;
     organizations: OrganizationService;
   }): IngestionKeyService {
     return new IngestionKeyService(options.repository, options.issuer, options.organizations);

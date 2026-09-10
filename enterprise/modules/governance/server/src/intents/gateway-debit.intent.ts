@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  GatewayDebitPort,
+  GatewayBudgetLedger,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,
@@ -62,9 +62,9 @@ const EMPTY_USAGE: GatewaySpendUsage = {
 };
 
 export class GatewayDebitIntent {
-  private constructor(private readonly port: GatewayDebitPort) {}
+  private constructor(private readonly port: GatewayBudgetLedger) {}
 
-  static create(port: GatewayDebitPort): GatewayDebitIntent {
+  static create(port: GatewayBudgetLedger): GatewayDebitIntent {
     return new GatewayDebitIntent(port);
   }
 

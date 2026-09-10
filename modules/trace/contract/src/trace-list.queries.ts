@@ -177,7 +177,7 @@ export interface BatchedFacetResult {
   ranges: Record<string, { min: number; max: number }>;
 }
 
-export interface TraceListReadPort {
+export interface TraceListRead {
   findAll(query: TraceListQuery): Promise<TraceListRepositoryPage>;
 
   findFacetCounts(params: {
@@ -304,4 +304,4 @@ export interface TraceListReadPort {
 }
 
 /** Compatibility name for composition adapters; callers depend on the port. */
-export type TraceListRepository = TraceListReadPort;
+export type TraceListRepository = TraceListRead;

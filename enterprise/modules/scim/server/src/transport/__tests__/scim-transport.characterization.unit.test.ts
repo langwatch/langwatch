@@ -43,7 +43,7 @@ describe("SCIM transport characterization", () => {
 
   it("keeps the management family behind an organization credential and organization:manage", () => {
     expect(tokens.namespace).toBe("scim-tokens");
-    expect(tokens.credential).toBe("organizationKey");
+    expect(tokens.credential).toBe("organization");
     expect(tokens.routes.map((route) => `${route.method} ${route.path}`)).toEqual([
       "get /",
       "post /",

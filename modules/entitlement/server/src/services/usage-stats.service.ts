@@ -10,7 +10,7 @@ import type {
   PlanProviderUser,
   UsageStats,
 } from "@langwatch/entitlement-contract";
-import { USAGE_UNKNOWN, UsageCounterPort } from "../ports/usage-counter.port.ts";
+import { USAGE_UNKNOWN, UsageCounter } from "../app/entitlement.infrastructure.ts";
 import type { UsageMembershipRepository } from "../repositories/usage-membership.repository.ts";
 
 /**
@@ -56,7 +56,7 @@ export type UsageStatsCaller = PlanProviderUser;
 export class UsageStatsService {
   static create(options: {
     membership: UsageMembershipRepository;
-    counter: UsageCounterPort;
+    counter: UsageCounter;
     plans: PlanProvider;
   }): UsageStatsService {
     return new UsageStatsService(options.membership, options.counter, options.plans);
@@ -64,7 +64,7 @@ export class UsageStatsService {
 
   private constructor(
     private readonly membership: UsageMembershipRepository,
-    private readonly counter: UsageCounterPort,
+    private readonly counter: UsageCounter,
     private readonly planProvider: PlanProvider,
   ) {}
 

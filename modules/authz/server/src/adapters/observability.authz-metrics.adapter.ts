@@ -1,5 +1,5 @@
 import { Counter, type Registry } from "prom-client";
-import { type AuthzCounter, AuthzMetricsPort } from "../ports/authz-metrics.port.ts";
+import { type AuthzCounter, AuthzMetrics } from "../ports/authz-metrics.port.ts";
 import type { AuthzRevocationReason } from "../ports/authz-revocation-telemetry.port.ts";
 
 /**
@@ -35,10 +35,10 @@ const ENGINE_GATE_READ_FAILURES = {
  * of sharing the series it already has.
  *
  * This is the ONE module in the feature that names `prom-client`, and
- * {@link AuthzMetricsPort} is what keeps it that way: a process composes AuthZ
+ * {@link AuthzMetrics} is what keeps it that way: a process composes AuthZ
  * with this adapter or without one, and only the former imports a registry.
  */
-export class ObservabilityAuthzMetricsAdapter extends AuthzMetricsPort {
+export class ObservabilityAuthzMetricsAdapter extends AuthzMetrics {
   static create(options: { registry: Registry }): ObservabilityAuthzMetricsAdapter {
     return new ObservabilityAuthzMetricsAdapter(options.registry);
   }

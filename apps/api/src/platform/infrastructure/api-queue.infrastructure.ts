@@ -2,7 +2,7 @@ import {
   GroupQueueDependenciesAdapter,
   type GroupQueueDependencies,
   type GroupQueuePolicy,
-  type GroupQueueStoragePort,
+  type GroupQueueStorage,
 } from "@langwatch/group-queue";
 import {
   RedisConnectionService,
@@ -13,7 +13,7 @@ import {
   type RedisLogger,
 } from "@langwatch/redis-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { ApiReadinessPort } from "../../api-process.lifecycle.ts";
+import { ApiReadiness } from "../../api-process.lifecycle.ts";
 import { ApiGroupQueueContextAdapter } from "./api-group-queue-context.adapter.ts";
 
 export type ApiQueueInfrastructureOptions = {
@@ -21,11 +21,11 @@ export type ApiQueueInfrastructureOptions = {
   redis: RedisConfigResolution;
   redisLogger?: RedisLogger;
   queuePolicy?: GroupQueuePolicy;
-  storage?: GroupQueueStoragePort;
+  storage?: GroupQueueStorage;
 };
 
 /** Reports the composition decision an unconfigured Redis silently used to hide. */
-export abstract class ApiQueueAbsenceReportPort {
+export abstract class ApiQueueAbsenceReport {
   abstract absent(reason: "disabled" | "unconfigured"): void;
 }
 
@@ -44,7 +44,7 @@ export class ApiQueueInfrastructure {
    * degrading that quietly would move the failure to the first request.
    */
   static tryCreate(
-    options: ApiQueueInfrastructureOptions & { report?: ApiQueueAbsenceReportPort },
+    options: ApiQueueInfrastructureOptions & { report?: ApiQueueAbsenceReport },
   ): ApiQueueInfrastructure | undefined {
     if (!options.redis.configured) {
       options.report?.absent(options.redis.reason);
@@ -91,7 +91,7 @@ export class ApiQueueInfrastructure {
   private constructor(
     readonly redis: NonNullable<ReturnType<RedisConnectionService["connectResolved"]>>,
     readonly dependencies: GroupQueueDependencies<Record<string, unknown>>,
-    readonly readiness: ApiReadinessPort,
+    readonly readiness: ApiReadiness,
   ) {}
 
   close(): Promise<void> {
@@ -100,7 +100,7 @@ export class ApiQueueInfrastructure {
   }
 }
 
-class ApiRedisReadinessAdapter extends ApiReadinessPort {
+class ApiRedisReadinessAdapter extends ApiReadiness {
   static create(options: {
     connection: RedisConnection;
     resolution: RedisConfigResolution;

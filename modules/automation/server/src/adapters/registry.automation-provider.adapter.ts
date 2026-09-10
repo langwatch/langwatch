@@ -34,7 +34,7 @@ import {
 } from "#adapters/slack-provider.adapter";
 import { WebhookProviderAdapter } from "#adapters/webhook-provider.adapter";
 import type {
-  AutomationWebhookProviderPort,
+  AutomationWebhookProvider,
   AutomationWebhookStoredParams,
 } from "#ports/automation-provider.port";
 
@@ -77,7 +77,7 @@ export class AutomationProviderRegistryAdapter {
   }
 
   /** The webhook channel's secret capability, exposed for the two read paths. */
-  readonly webhooks: AutomationWebhookProviderPort;
+  readonly webhooks: AutomationWebhookProvider;
 
   private readonly slack: SlackProviderAdapter;
   private readonly providers: Record<TriggerAction, ServerEntry>;

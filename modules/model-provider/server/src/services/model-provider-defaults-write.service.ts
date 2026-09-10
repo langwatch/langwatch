@@ -12,7 +12,7 @@ import {
 import type {
   ModelProviderCatalog,
   ModelProviderIdService
-} from "../ports/model-provider.port.ts";
+} from "../app/model-provider.infrastructure.ts";
 import type {
   ModelDefaultRepository
 } from "../repositories/model-default.repository.ts";

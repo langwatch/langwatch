@@ -124,7 +124,7 @@ export interface AuthorizePort {
  * The two refusals whose concrete error class is the process's to choose: both
  * carry product copy and codes a client renders.
  */
-export interface AccessDenialPort {
+export interface AccessDenial {
   /** The membership exists but an admin disabled it, so it grants nothing. */
   membershipDisabled(): Error;
   /** The organization role does not reach this feature at all. */
@@ -252,7 +252,7 @@ export function assertRouteScopePermission({
   permission: AuthzGetDecisionInput["permission"];
   target: DeclaredScopeId;
   decision: PermissionDecision;
-  denials?: AccessDenialPort;
+  denials?: AccessDenial;
 }): void {
   if (decision.permitted) return;
 
@@ -302,7 +302,7 @@ export async function decide({
   caller: Caller;
   input: unknown;
   authorize?: AuthorizePort;
-  denials?: AccessDenialPort;
+  denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const credentialScope = caller.scope ?? null;
   assertInputScope({ input, scope: credentialScope });
@@ -366,7 +366,7 @@ async function decidePermission({
   caller: Caller;
   input: unknown;
   authorize?: AuthorizePort;
-  denials?: AccessDenialPort;
+  denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const { actor } = requireCaller(caller);
   const decisions = requireAuthorize({ authorize, kind: declaration.kind });
@@ -401,7 +401,7 @@ async function decidePermissionAny({
   caller: Caller;
   input: unknown;
   authorize?: AuthorizePort;
-  denials?: AccessDenialPort;
+  denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const { actor } = requireCaller(caller);
   const decisions = requireAuthorize({ authorize, kind: declaration.kind });
@@ -444,7 +444,7 @@ async function decidePermissionAll({
   caller: Caller;
   input: unknown;
   authorize?: AuthorizePort;
-  denials?: AccessDenialPort;
+  denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const { actor } = requireCaller(caller);
   const decisions = requireAuthorize({ authorize, kind: declaration.kind });
@@ -473,7 +473,7 @@ async function decidePermissionAll({
 export type ApiEntitlement = "enterprise";
 
 /** Whether one tenant holds one entitlement, as the process reads its plans. */
-export interface EntitlementsPort {
+export interface Entitlements {
   holds(input: { entitlement: ApiEntitlement; scope: AuthzDeclaredScopeId }): Promise<boolean>;
 }
 
@@ -492,7 +492,7 @@ export async function decideEntitlement({
 }: {
   entitlement: ApiEntitlement;
   scope: AuthzDeclaredScopeId | null;
-  entitlements: EntitlementsPort;
+  entitlements: Entitlements;
   address: string;
 }): Promise<void> {
   if (!scope) {
@@ -650,7 +650,7 @@ function denied({
   permission: AuthzGetDecisionInput["permission"];
   scope: DeclaredScopeId;
   decision: PermissionDecision;
-  denials?: AccessDenialPort;
+  denials?: AccessDenial;
 }): Error {
   // Checked before the role, because a disabled member HAS a role and every
   // role-shaped answer would be wrong for them.

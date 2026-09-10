@@ -68,7 +68,7 @@ export type JoinRequestLifecycleIntents = {
  * decides WHEN; the guard behind `expireRequest` still decides whether — it
  * re-reads the folded deadline, so a wake that fires early expires nothing.
  */
-export interface JoinRequestLifecyclePort {
+export interface JoinRequestLifecycle {
   remindAdmins(args: { joinRequestId: string; organizationId: string }): Promise<void>;
   expireRequest(args: {
     joinRequestId: string;

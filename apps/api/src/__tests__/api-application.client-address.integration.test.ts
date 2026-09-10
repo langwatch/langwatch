@@ -9,14 +9,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ApiApplication,
-  ApiTrpcFeaturesPort,
+  ApiTrpcFeatures,
   type ApiTrpcFeatureMount,
   NoApiTrpcFeatures,
 } from "../api.application.ts";
 import { ApiHttpListener } from "../api-http.listener.ts";
 
 /** One public procedure that answers with the key the limits would use. */
-class AddressProbeFeatures extends ApiTrpcFeaturesPort<TRPCCreateRouterOptions> {
+class AddressProbeFeatures extends ApiTrpcFeatures<TRPCCreateRouterOptions> {
   private readonly none = new NoApiTrpcFeatures();
 
   readonly authorization = this.none.authorization;

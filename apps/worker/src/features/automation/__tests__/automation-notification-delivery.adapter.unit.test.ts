@@ -1,6 +1,6 @@
 import type { WebhookDeliveryTransport } from "@langwatch/automation-server";
 import { DispatchError } from "@langwatch/eventing";
-import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
+import { EmailDelivery, type EmailContent } from "@langwatch/notification-server";
 import { describe, expect, it } from "vitest";
 import { createWorkerWebhookTransport } from "../../../app/worker-webhook-egress.composition.ts";
 import { resolveWorkerConfig } from "../../../platform/config/worker.config.ts";
@@ -31,7 +31,7 @@ const APPLICATION_HTML = `<html><body><p>hi</p>
       <a href="${BASE_HOST}/unsubscribe?token=${APPLICATION_PROJECT_TOKEN}" style="color:#8B96A5;text-decoration:underline;">Stop all notifications from this project</a>
     </div></body></html>`;
 
-class RecordingMailer extends EmailDeliveryPort {
+class RecordingMailer extends EmailDelivery {
   readonly sent: EmailContent[] = [];
 
   defaultFrom(): string {

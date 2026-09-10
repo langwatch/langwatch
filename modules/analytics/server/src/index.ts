@@ -62,7 +62,7 @@ export {
 } from "./services/langwatch-ql-executor.service.ts";
 export {
   type LangWatchQLConnection,
-  LangWatchQLExecutorPort,
+  LangWatchQLExecutor,
   type LangWatchQLResultLimits,
 } from "./repositories/langwatch-ql-executor.repository.ts";
 export { ClickHouseLangWatchQLExecutorAdapter } from "./repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
@@ -73,7 +73,7 @@ export { ClickHouseLangWatchQLExecutorAdapter } from "./repositories/clickhouse/
  */
 export { FilterOptionsAdapter } from "./services/filter-options-composition.service.ts";
 export { FilterService, type GetFilterOptionsInput } from "./services/filter.service.ts";
-export { FilterOptionsPort, type FindFilterOptionsInput } from "./repositories/filter-options.repository.ts";
+export { FilterOptions, type FindFilterOptionsInput } from "./repositories/filter-options.repository.ts";
 export type { FilterOption } from "./repositories/filter-options.repository.ts";
 export {
   filterFieldRequiresKey,
@@ -105,7 +105,7 @@ export { generateClickHouseFilterConditions } from "./rules/analytics-filter-con
 // The LangWatchQL key map: the row a project's access is granted by, written at
 // project creation and repaired by the deploy backfill.
 export {
-  LwqlKeyMapErrorSinkPort,
+  LwqlKeyMapErrorSink,
   LwqlKeyMapService,
 } from "./services/langwatch-ql-key-map.service.ts";
 export { LwqlKeyMapClickHouseRepository } from "./repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";

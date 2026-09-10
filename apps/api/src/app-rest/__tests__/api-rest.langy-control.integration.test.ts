@@ -13,7 +13,7 @@
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import {
-  LangyLocalControlRuntimeAdapter,
+  RedisLangyLocalControlRuntimeRepository,
   LocalControlLongPoll,
   LocalControlSessionCoreService,
   type LocalControlRuntime,
@@ -36,7 +36,7 @@ let api: ReturnType<typeof mount>;
 
 beforeEach(() => {
   actingUserId = OWNER;
-  runtime = LangyLocalControlRuntimeAdapter.create({
+  runtime = RedisLangyLocalControlRuntimeRepository.create({
     store: SessionStateStoreFactory.memory(),
     projects: { tryReadOrganizationId: async () => "organization-1" },
     mintSessionKey: async () => ({
@@ -44,7 +44,7 @@ beforeEach(() => {
       apiKeyId: `key_${nanoid(10)}`,
     }),
     events: { startUserWait: async () => undefined, endUserWait: async () => undefined },
-    buffer: LangyLocalControlRuntimeAdapter.nullBuffer(),
+    buffer: RedisLangyLocalControlRuntimeRepository.nullBuffer(),
   });
   api = mount();
 });

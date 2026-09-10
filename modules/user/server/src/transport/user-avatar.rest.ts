@@ -47,7 +47,7 @@ export const userAvatarRest = defineRestRouter(UserApi)
   .withNamespace("user-avatar")
   .withVersion(MANAGEMENT_API_VERSION)
   // The browser's own door: a project API key opens the same one.
-  .withCredential("session")
+  .withCredential("browser")
   .withAddressing("literal", { v1Twin: false })
 
   .get("/api/user-avatar/:projectId/:id", "readUserAvatarBytes")

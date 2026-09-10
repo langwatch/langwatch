@@ -1,6 +1,6 @@
 import type { Logger } from "@langwatch/observability";
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import type { TraceProductAnalyticsPort } from "@langwatch/trace-server";
+import type { TraceProductAnalytics } from "@langwatch/trace-server";
 import { WorkerPostHogProductAnalyticsAdapter } from "../platform/infrastructure/worker-product-analytics.adapter.ts";
 import type { WorkerProductAnalyticsConfig } from "../platform/config/worker.config.ts";
 
@@ -14,7 +14,7 @@ import type { WorkerProductAnalyticsConfig } from "../platform/config/worker.con
  * before `projectMetadata` is mounted here, which is what the ledger recorded
  * as a named absence blocking the conversion.
  *
- *     TraceProductAnalyticsPort                    (trace-server declares it)
+ *     TraceProductAnalytics                    (trace-server declares it)
  *       └─ WorkerPostHogProductAnalyticsAdapter    posthog-node, lazily built
  *            └─ config.productAnalytics            POSTHOG_KEY / POSTHOG_HOST
  *
@@ -34,7 +34,7 @@ export function createWorkerTraceProductAnalytics(options: {
   config: WorkerProductAnalyticsConfig;
   resources?: ResourceScope;
   logger?: Logger;
-}): TraceProductAnalyticsPort {
+}): TraceProductAnalytics {
   const analytics = WorkerPostHogProductAnalyticsAdapter.create({
     config: options.config,
     logger: options.logger,

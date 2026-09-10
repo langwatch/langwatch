@@ -16,8 +16,8 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  */
 import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http-poller.service.ts";
-import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
-import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port.ts";
+import type { GovernanceHttpClient } from "../app/governance.infrastructure.ts";
+import type { IngestionPullDiagnosticsSink } from "../app/governance.infrastructure.ts";
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
 /**
@@ -75,15 +75,15 @@ export class CopilotStudioReferencePullerAdapter extends HttpPollingPullerAdapte
   override readonly id: string = "copilot_studio";
 
   private constructor(options: {
-    http: GovernanceHttpPort;
-    diagnostics?: IngestionPullDiagnosticsPort;
+    http: GovernanceHttpClient;
+    diagnostics?: IngestionPullDiagnosticsSink;
   }) {
     super(options.http, options.diagnostics);
   }
 
   static override create(options: {
-    http: GovernanceHttpPort;
-    diagnostics?: IngestionPullDiagnosticsPort;
+    http: GovernanceHttpClient;
+    diagnostics?: IngestionPullDiagnosticsSink;
   }): CopilotStudioReferencePullerAdapter {
     return new CopilotStudioReferencePullerAdapter(options);
   }

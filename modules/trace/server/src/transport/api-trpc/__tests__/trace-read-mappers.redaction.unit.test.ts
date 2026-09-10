@@ -8,7 +8,7 @@ import {
   gateTraceLogVisibility as gateTraceLogVisibilityWithService,
   redactTraceLogContent as redactTraceLogContentWithService,
   redactV2Content as redactV2ContentWithPorts,
-  type TraceContentPrivacyPort,
+  type TraceContentPrivacy,
   type V2Protections,
 } from "../trace-read-mappers.api.ts";
 
@@ -24,7 +24,7 @@ import { TestCodingAgentService } from "../../../services/ingestion/__tests__/su
 /**
  * The data-privacy vocabulary the mappers take as a port, wired to the REAL catalog and chat-turn stripper so these assertions still cover the keys ingestion actually classifies. Only the resolved-policy read is absent — nothing here derives the trace-level DROP banner.
  */
-const contentPrivacy: TraceContentPrivacyPort = {
+const contentPrivacy: TraceContentPrivacy = {
   contentKeyCatalog: CONTENT_KEY_CATALOG,
   droppedMarkerAttribute: PRIVACY_DROPPED_MARKER_ATTR,
   piiIncompleteMarkerAttribute: PRIVACY_PII_INCOMPLETE_MARKER_ATTR,

@@ -6,7 +6,7 @@ import { StoredObjectStoragePortAdapter } from "../stored-object-storage.service
 import type { StoredObjectStorageAddress } from "../../app/stored-object.infrastructure.ts";
 import {
   StoredObjectStorageRuntimeAdapter,
-  StoredObjectProjectDestinationResolverPort,
+  StoredObjectProjectDestinationResolver,
 } from "../stored-object-storage-runtime.service.ts";
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 
@@ -16,7 +16,7 @@ class NoProxy {
   }
 }
 
-class Destination extends StoredObjectProjectDestinationResolverPort {
+class Destination extends StoredObjectProjectDestinationResolver {
   async resolve() {
     return { kind: "s3" as const, bucket: "bucket" };
   }

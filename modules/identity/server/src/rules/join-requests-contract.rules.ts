@@ -60,7 +60,7 @@ export interface JoinRequestNotifier {
 }
 
 /** How a membership actually lands: the same ledger an invitation uses. */
-export interface JoinMembershipPort {
+export interface JoinMembership {
   attachDefaultMembership(args: {
     userId: string;
     organizationId: string;
@@ -71,7 +71,7 @@ export interface JoinMembershipPort {
 }
 
 /** Whether this organization may change its joining setting, and to what. */
-export interface JoinSettingPort {
+export interface JoinSetting {
   read(args: {
     organizationId: string;
   }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
@@ -86,9 +86,9 @@ export interface JoinRequestsServiceDeps {
   requests: JoinRequestService;
   reads: JoinRequestListReadRepository;
   candidates: JoinCandidateRepository;
-  membership: JoinMembershipPort;
+  membership: JoinMembership;
   notifier: JoinRequestNotifier;
-  settings: JoinSettingPort;
+  settings: JoinSetting;
   /** The licence gate. Holds `auto`, lets `request` through. */
   autoJoinLicensed: () => Promise<boolean>;
   /** Whether any of this exists at all. Flag off, nothing here runs. */

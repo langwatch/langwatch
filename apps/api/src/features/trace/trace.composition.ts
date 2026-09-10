@@ -1,4 +1,4 @@
-import type { TraceSpanIngestPort } from "@langwatch/trace-server";
+import type { TraceSpanIngest } from "@langwatch/trace-server";
 import type { Protections } from "@langwatch/trace-contract";
 /**
  * A project's captured traffic, composed as its own feature.
@@ -9,7 +9,7 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { type Logger } from "@langwatch/observability";
-import type { PresenceEmitterPort } from "@langwatch/presence-server";
+import type { PresenceEmitter } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
@@ -19,7 +19,7 @@ import type { SharedTraceTrpcPorts } from "@langwatch/trace-server/api-trpc/shar
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import type { TrpcRequestLike } from "@langwatch/api/trpc";
 import { trpcClientAddress } from "../../app/api-client-address.ts";
-import { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
+import { ApiTraceReadStack } from "./trace-read-stack.port.ts";
 import type { ApiTraceProducerCommands } from "./trace-producer.composition.ts";
 import type { ApiTracePorts } from "./trace.composition.types.ts";
 
@@ -49,7 +49,7 @@ export type TraceFeatureOptions = Readonly<{
    * tenant emitter it hands out, which is why they keep working on a process
    * that composed no trace read stack.
    */
-  broadcast: PresenceEmitterPort;
+  broadcast: PresenceEmitter;
   /** The application's own ClickHouse, or `null` where the process composed none. */
   resolveClickHouseClient: ((tenantId: string) => Promise<ClickHouseClient>) | null;
   /**
@@ -62,7 +62,7 @@ export type TraceFeatureOptions = Readonly<{
   processName: string;
   /** The process's once-registered trace pipeline senders for annotation markers. */
   traceCommands?: ApiTraceProducerCommands;
-  spanIngest?: TraceSpanIngestPort;
+  spanIngest?: TraceSpanIngest;
   /** The other features' services the trace application is built over. */
   peers: Readonly<{
     /** The one ledger an anonymous read redeems its token against. */
@@ -72,11 +72,11 @@ export type TraceFeatureOptions = Readonly<{
   }>;
 
   /** The ClickHouse trace read stack; absent refuses every trace read. */
-  traceReads?: ApiTraceReadStackPort;
+  traceReads?: ApiTraceReadStack;
   /**
    * Builds the read stack over the two collaborators THIS composition owns.
    */
-  traceReadsFrom?: () => ApiTraceReadStackPort;
+  traceReadsFrom?: () => ApiTraceReadStack;
   /** Which plan an organization is on; absent refuses the plan read. */
   plans?: PlanProvider;
   /** Where each absence is written down. */
@@ -141,9 +141,9 @@ export function composeTraceFeature(options: TraceFeatureOptions): ComposedTrace
   const ports: ApiTracePorts = {
     tracesV2: {
       ...(traceReads?.readPorts() ??
-        refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(refuse, "the trace read passes")),
+        refuseAll<ReturnType<ApiTraceReadStack["readPorts"]>>(refuse, "the trace read passes")),
       ...(traceReads?.explorerPorts() ??
-        refuseAll<ReturnType<ApiTraceReadStackPort["explorerPorts"]>>(
+        refuseAll<ReturnType<ApiTraceReadStack["explorerPorts"]>>(
           refuse,
           "the trace explorer",
         )),
@@ -152,7 +152,7 @@ export function composeTraceFeature(options: TraceFeatureOptions): ComposedTrace
     sharedTrace: {
       mappers: (
         traceReads?.readPorts() ??
-        refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(refuse, "the trace read passes")
+        refuseAll<ReturnType<ApiTraceReadStack["readPorts"]>>(refuse, "the trace read passes")
       ).mappers,
       tryGetShareViewerProtections: (input) =>
         traceReads

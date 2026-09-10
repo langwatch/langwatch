@@ -5,8 +5,8 @@
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 import type {
   CodingAgentClickHouseClient,
-  CodingAgentClickHousePort,
-} from "../../ports/coding-agent-clickhouse.port.ts";
+  CodingAgentClickHouse,
+} from "../../app/coding-agent.infrastructure.ts";
 
 /** A moment as a ClickHouse INSERT carries it. The client serialises this into
  *  `DateTime64(3)`; an instant serialises to `{}`, so the conversion is here. */
@@ -31,7 +31,7 @@ export const parseClickHouseDateTimeMs = (value: string): number => {
 
 export async function groupTenantsByClient(input: {
   tenantIds: string[];
-  clickHouse: CodingAgentClickHousePort;
+  clickHouse: CodingAgentClickHouse;
 }): Promise<Array<{ client: CodingAgentClickHouseClient; tenantIds: string[] }>> {
   const groups = new Map<
     CodingAgentClickHouseClient,

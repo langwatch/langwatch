@@ -2,10 +2,10 @@ import type { LanguageModel } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  WorkflowAiCallPort,
-  WorkflowCommitMessageModelPort,
+  WorkflowAiCall,
+  WorkflowCommitMessageModel,
   type WorkflowAiCallFeature,
-} from "../../ports/workflow-commit-message.port.ts";
+} from "../../app/workflow.app.ts";
 import { WorkflowCommitMessageService } from "../workflow-commit-message.service.ts";
 
 // Regression: commit-message autogen sent function tools + reasoning_effort
@@ -16,7 +16,7 @@ import { WorkflowCommitMessageService } from "../workflow-commit-message.service
 const generateText = vi.hoisted(() => vi.fn());
 vi.mock("ai", () => ({ generateText }));
 
-class StubModels extends WorkflowCommitMessageModelPort {
+class StubModels implements WorkflowCommitMessageModel {
   readonly asked: { projectId: string; featureKey: string }[] = [];
 
   resolve(input: { projectId: string; featureKey: string }): Promise<LanguageModel> {
@@ -25,7 +25,7 @@ class StubModels extends WorkflowCommitMessageModelPort {
   }
 }
 
-class PassThroughAiCalls extends WorkflowAiCallPort {
+class PassThroughAiCalls implements WorkflowAiCall {
   readonly features: WorkflowAiCallFeature[] = [];
 
   run<T>(feature: WorkflowAiCallFeature, call: () => Promise<T>): Promise<T> {
@@ -109,7 +109,7 @@ describe("WorkflowCommitMessageService", () => {
       generateText.mockReset();
       generateText.mockRejectedValue(new Error("provider 500"));
       const models = new StubModels();
-      const aiCalls = new (class extends WorkflowAiCallPort {
+      const aiCalls = new (class implements WorkflowAiCall {
         async run<T>(_feature: WorkflowAiCallFeature, call: () => Promise<T>): Promise<T> {
           try {
             return await call();

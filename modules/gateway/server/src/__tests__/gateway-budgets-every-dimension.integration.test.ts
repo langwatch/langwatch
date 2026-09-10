@@ -44,7 +44,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 
 import { budgetAppliesToProvider } from "@langwatch/gateway-contract";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
+import type { GatewayModelProviderCredentials } from "../app/gateway.infrastructure.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
@@ -115,7 +115,7 @@ class SuiteProjectService extends TestProjectApi {
 }
 
 /** Stored provider keys arrive already decrypted in these fixtures. */
-const credentials: GatewayModelProviderCredentialsPort = {
+const credentials: GatewayModelProviderCredentials = {
   readCustomKeys: (stored: unknown) => stored as Record<string, unknown>,
 };
 

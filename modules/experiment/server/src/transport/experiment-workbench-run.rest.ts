@@ -79,7 +79,7 @@ async function permittedPerson({
 export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
   .withNamespace("experiments")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("session")
+  .withCredential("browser")
 
   // ── POST /execute ──────────────────────────────────────────────────────
   // Kept out of the published document: no API client can present the browser

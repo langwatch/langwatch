@@ -8,11 +8,11 @@ import {
   LangyModelNotConfiguredError,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  LangySessionKeyScopeError,
-  type LangyWorkerProbeInput,
-  type LangyWorkerWarmInput,
-} from "../../ports/langy-turn-runtime.port.ts";
+import type {
+  LangyWorkerProbeInput,
+  LangyWorkerWarmInput,
+} from "../../app/langy.infrastructure.ts";
+import { LangySessionKeyScopeError } from "../langy-session-key-scope.error.ts";
 import type {
   LangyTurnServiceDependencies,
   LangyTurnServiceDeps,

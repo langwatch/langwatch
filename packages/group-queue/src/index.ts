@@ -1,9 +1,9 @@
 export { GroupQueueConsumer, GroupQueueProducer, RunningGroupQueueConsumer } from "./capabilities.ts";
 export type {
   DeduplicationConfig,
-  GroupQueueActivityPort,
+  GroupQueueActivity,
   GroupQueueContextMetadata,
-  GroupQueueContextPort,
+  GroupQueueContext,
   GroupQueueDefinition,
   GroupQueueDependencies,
   GroupQueueFailureClassifier,
@@ -19,7 +19,7 @@ export {
   GroupQueueDependenciesAdapter,
   type GroupQueueDependenciesAdapterOptions,
   type GroupQueueRedis,
-  type GroupQueueStoragePort,
+  type GroupQueueStorage,
 } from "./dependencies-adapter.ts";
 export {
   GroupQueueConfigurationError,

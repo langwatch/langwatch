@@ -10,6 +10,6 @@
  * organization, or the deployment composes no minting. Both already read that
  * way to the caller, which simply omits the credential.
  */
-export abstract class ExperimentSandboxCredentialPort {
+export abstract class ExperimentSandboxCredential {
   abstract findRunKey(input: { projectId: string }): Promise<string | undefined>;
 }

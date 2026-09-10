@@ -1,7 +1,7 @@
 import {
   RedisTenantBroadcastAdapter,
-  TenantBroadcastPublisherPort,
-  type TenantBroadcastPort,
+  TenantBroadcastPublisher,
+  type TenantBroadcast,
 } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -14,7 +14,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 export function tryCreateWorkerTenantBroadcast(options: {
   redis?: RedisConnection | null;
   logger?: Logger;
-}): TenantBroadcastPort | undefined {
+}): TenantBroadcast | undefined {
   if (!options.redis) return undefined;
 
   return RedisTenantBroadcastAdapter.create({
@@ -24,7 +24,7 @@ export function tryCreateWorkerTenantBroadcast(options: {
 }
 
 /** The one Redis operation a broadcast performs. */
-class WorkerTenantBroadcastPublisher extends TenantBroadcastPublisherPort {
+class WorkerTenantBroadcastPublisher extends TenantBroadcastPublisher {
   constructor(private readonly connection: RedisConnection) {
     super();
   }

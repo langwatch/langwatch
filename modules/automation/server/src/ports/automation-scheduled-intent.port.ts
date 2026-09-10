@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
 
-export abstract class AutomationScheduledIntentPort {
+export abstract class AutomationScheduledIntent {
   abstract decideGraphTriggerHeartbeat(input: {
     now: Instant;
   }): Promise<GraphTriggerSweepCandidate[]>;

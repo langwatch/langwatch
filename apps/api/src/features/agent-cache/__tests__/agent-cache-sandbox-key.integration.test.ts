@@ -9,7 +9,7 @@ import {
   RedisAgentSandboxKeyShareRepository,
 } from "@langwatch/api-key-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -27,7 +27,7 @@ const PROJECT = {
   ownerUserId: null,
 };
 const SHARE_SECRET = "a".repeat(64);
-const encryption: SecretEncryptionPort = {
+const encryption: SecretEncryption = {
   encrypt: (value: string) => `sealed:${value}`,
   decrypt: (value: string) => value.slice("sealed:".length),
 };

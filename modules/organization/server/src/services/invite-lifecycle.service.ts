@@ -11,7 +11,7 @@ import {
 } from "@langwatch/organization-contract";
 import { nanoid } from "nanoid";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
-import type { OrganizationInviteMailPort } from "../app/organization.infrastructure.ts";
+import type { OrganizationInviteMail } from "../app/organization.infrastructure.ts";
 import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules.ts";
 import {
   INVITE_EXPIRATION_MS,
@@ -38,7 +38,7 @@ export class InviteLifecycleService {
     return this.deps.invites;
   }
 
-  private get mailer(): OrganizationInviteMailPort | undefined {
+  private get mailer(): OrganizationInviteMail | undefined {
     return this.deps.mail;
   }
 

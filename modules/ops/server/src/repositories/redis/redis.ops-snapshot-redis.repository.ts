@@ -1,8 +1,8 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
-import { OpsSnapshotRedisPort } from "../../app/ops.app.ts";
+import { OpsSnapshotRedis } from "../../app/ops.app.ts";
 
 /** The snapshot store's four commands over a live connection. */
-export class RedisOpsSnapshotRedisRepository implements OpsSnapshotRedisPort {
+export class RedisOpsSnapshotRedisRepository implements OpsSnapshotRedis {
   static create(redis: IORedis | Cluster): RedisOpsSnapshotRedisRepository {
     return new RedisOpsSnapshotRedisRepository(redis);
   }

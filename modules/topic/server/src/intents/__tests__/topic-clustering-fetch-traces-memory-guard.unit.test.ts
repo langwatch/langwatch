@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import { fetchTracesFromClickHouse } from "../topic-clustering-runner.intent.ts";
-import type { TopicClusteringClickHousePort } from "../../ports/topic-clustering-clickhouse.port.ts";
+import type { TopicClusteringClickHouse } from "../../app/topic.infrastructure.ts";
 
 describe("topicClustering page fetch memory guard", () => {
   describe("when the page of traces is fetched", () => {
@@ -21,7 +21,7 @@ describe("topicClustering page fetch memory guard", () => {
         query: string;
         clickhouse_settings?: Record<string, unknown>;
       }> = [];
-      const clickhouse: TopicClusteringClickHousePort = {
+      const clickhouse: TopicClusteringClickHouse = {
         query: async (params) => {
           captured.push(params);
           return { json: async () => [] };

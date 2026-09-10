@@ -1,5 +1,5 @@
 import {
-  LangyAnalyticsEventSinkPort,
+  LangyAnalyticsEventSink,
   type LangyAnalyticsEventRecord,
 } from "../langy-analytics-event.repository.ts";
 import type { LangyMemoryStore } from "./langy-memory.store.ts";
@@ -8,7 +8,7 @@ import type { LangyMemoryStore } from "./langy-memory.store.ts";
  * The analytics rows a process without ClickHouse keeps. They are held rather
  * than dropped so a test can read back what the fold wrote.
  */
-export class LangyAnalyticsEventMemoryRepository extends LangyAnalyticsEventSinkPort {
+export class LangyAnalyticsEventMemoryRepository extends LangyAnalyticsEventSink {
   private constructor(private readonly store: LangyMemoryStore) {
     super();
   }

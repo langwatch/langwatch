@@ -5,7 +5,7 @@ import type {
   RawEventRow,
 } from "../../repositories/observe/event-explorer.repository.ts";
 import {
-  OpsEventingIntrospectionPort,
+  OpsEventingIntrospection,
   type OpsDejaViewProjection,
   type OpsProjectionMetadata,
 } from "../../app/ops.app.ts";
@@ -21,7 +21,7 @@ const DEFAULT_DEJA_VIEW: OpsDejaViewProjection[] = [
   },
 ];
 
-class FakeIntrospection implements OpsEventingIntrospectionPort {
+class FakeIntrospection implements OpsEventingIntrospection {
   dejaView: OpsDejaViewProjection[] = DEFAULT_DEJA_VIEW;
 
   killSwitches(): never[] {

@@ -8,7 +8,7 @@ import {
   type EvaluationAnalyticsRow,
   EvaluationAnalyticsRowProjection,
 } from "../../projections/evaluation-analytics-row.projection.ts";
-import type { EvaluationAnalyticsAttributePolicy } from "../../ports/evaluation.port.ts";
+import type { EvaluationAnalyticsAttributePolicy } from "../../app/evaluation.infrastructure.ts";
 
 /**
  * `FoldProjectionStore` adapter for the slim `evaluation_analytics` fold

@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createLogger } from "@langwatch/observability";
-import { TraceTokenCounterPort } from "@langwatch/trace-server";
+import { TraceTokenCounter } from "@langwatch/trace-server";
 import type { WorkerTraceTokenizerConfig } from "../config/worker.config.ts";
 
 const logger = createLogger("langwatch:tiktoken");
@@ -24,7 +24,7 @@ type Tiktoken = { encode: (text: string) => Uint32Array; free: () => void };
  * the `with` attribute because production runs an esbuild bundle where tiktoken
  * stays external and Node resolves them through the ESM loader.
  */
-export class WorkerTiktokenCounterAdapter extends TraceTokenCounterPort {
+export class WorkerTiktokenCounterAdapter extends TraceTokenCounter {
   static create(config: WorkerTraceTokenizerConfig): WorkerTiktokenCounterAdapter {
     return new WorkerTiktokenCounterAdapter(config);
   }

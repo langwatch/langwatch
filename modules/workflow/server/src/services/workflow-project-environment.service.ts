@@ -7,7 +7,7 @@
  * that composes its own cipher hands it in here instead, and neither can
  * silently become the other.
  */
-import { WorkflowProjectEnvironmentPort } from "../ports/workflow.port.ts";
+import { WorkflowProjectEnvironment } from "../app/workflow.app.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../repositories/workflow-project-environment.repository.ts";
 
 /** The stored-secret cipher, as this service asks it. */
@@ -15,7 +15,7 @@ export type WorkflowEnvironmentDecryptor = {
   decrypt(value: string): string;
 };
 
-export class WorkflowProjectEnvironmentService extends WorkflowProjectEnvironmentPort {
+export class WorkflowProjectEnvironmentService implements WorkflowProjectEnvironment {
   static create(options: {
     repository: WorkflowProjectEnvironmentRepository;
     encryption: WorkflowEnvironmentDecryptor;
@@ -28,9 +28,7 @@ export class WorkflowProjectEnvironmentService extends WorkflowProjectEnvironmen
       repository: WorkflowProjectEnvironmentRepository;
       encryption: WorkflowEnvironmentDecryptor;
     },
-  ) {
-    super();
-  }
+  ) {}
 
   async get(input: {
     projectId: string;

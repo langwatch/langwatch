@@ -12,7 +12,7 @@ import {
   type PollWaitResponse,
 } from "@langwatch/langy-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 
 /** What the platform keeps about one card while it is on screen. */
 export const storedUserWaitSchema = z.object({
@@ -72,7 +72,7 @@ export interface UserWaitEvents {
 
 /** The live half: the entries the panel wakes up on, and the turn's liveness. */
 export type UserWaitBuffer = Pick<
-  LangyTokenBufferPort,
+  LangyTokenBuffer,
   "appendLocalPermission" | "appendQuestion" | "appendStatus" | "heartbeat"
 >;
 

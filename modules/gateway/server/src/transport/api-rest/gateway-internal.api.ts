@@ -29,10 +29,10 @@ import {
   VirtualKeyCryptoError,
 } from "../../adapters/virtual-key-crypto.adapter.ts";
 import type { GatewayJwtAdapter } from "../../adapters/jwt.gateway-token.adapter.ts";
-import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port.ts";
-import type { GatewayChangeEventsPort } from "../../ports/gateway-change-events.port.ts";
-import type { GatewayInternalStorePort } from "../../ports/gateway-internal-store.port.ts";
-import type { GatewaySpendRatingPort } from "../../ports/gateway-spend-rating.port.ts";
+import type { GatewayBudgetSpend } from "../../app/gateway.infrastructure.ts";
+import type { GatewayChangeEvents } from "../../app/gateway.infrastructure.ts";
+import type { GatewayInternalStore } from "../../ports/gateway-internal-store.port.ts";
+import type { GatewaySpendRating } from "../../app/gateway.infrastructure.ts";
 import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
@@ -72,13 +72,13 @@ export type GatewayInternalRestPorts = Readonly<{
   /** Mints the short-lived credential the data plane presents onward. */
   jwt: () => GatewayJwtAdapter;
   /** The row reads no service on this package owns. */
-  store: () => GatewayInternalStorePort;
+  store: () => GatewayInternalStore;
   /** The durable revision feed the configuration long-poll walks. */
-  changes: () => GatewayChangeEventsPort;
+  changes: () => GatewayChangeEvents;
   /** Builds one key's warm-cache configuration bundle. */
   config: () => GatewayConfigMaterialiserService;
   /** Absent with no ClickHouse; the bucket read then reports zero spend, not an invented figure. */
-  budgetSpend: () => GatewayBudgetSpendPort | undefined;
+  budgetSpend: () => GatewayBudgetSpend | undefined;
   /** Absent with no model-provider service composed; a 401 recovery then refuses by name. */
   refreshCodex?:
     | ((input: {
@@ -96,7 +96,7 @@ export type GatewayInternalRestPorts = Readonly<{
     | (() =>
         | {
             commands: Record<string, GatewaySpendCommandSender | undefined>;
-            rating: GatewaySpendRatingPort;
+            rating: GatewaySpendRating;
           }
         | undefined)
     | undefined;
@@ -390,8 +390,8 @@ function virtualKeyStatusRejection({
  * the gateway resolves and caches the request's own bucket here, not the whole template.
  */
 async function bucketSpentMicroUsd(params: {
-  store: GatewayInternalStorePort;
-  budgetRepository: GatewayBudgetSpendPort;
+  store: GatewayInternalStore;
+  budgetRepository: GatewayBudgetSpend;
   budget: GatewayBudget;
   bucketScopeId: string;
   periodFloorMs: number | undefined;
@@ -450,7 +450,7 @@ interface SpendCommandReject {
  */
 function pricedOutcomeData(
   data: Record<string, unknown>,
-  rating: GatewaySpendRatingPort,
+  rating: GatewaySpendRating,
 ): Record<string, unknown> {
   const outcome = data as unknown as {
     model: string;
@@ -475,7 +475,7 @@ function pricedOutcomeData(
  *  priced on the way through. */
 function toSpendCommandData(
   record: SpendCommandRecord,
-  rating: GatewaySpendRatingPort,
+  rating: GatewaySpendRating,
 ): { ok: true; data: Record<string, unknown> } | { ok: false; reject: SpendCommandReject } {
   const wire = record.payload;
   const projectId = wire.project_id;
@@ -535,7 +535,7 @@ function rejectedRecordIdentity(record: SpendCommandRecord): Record<string, stri
  *  200 from the emitter's side and loses billing records. */
 function groupSpendCommands(
   records: SpendCommandRecord[],
-  rating: GatewaySpendRatingPort,
+  rating: GatewaySpendRating,
 ): {
   perCommand: Record<SpendCommandName, Array<Record<string, unknown>>>;
   rejected: Array<{ index: number; code: string }>;
@@ -602,7 +602,7 @@ function attributedIdentity(command: Record<string, unknown>): {
 
 /** Best effort: oversight, not enforcement, so a failure must not retry already-billed records. */
 async function touchAdmittedVirtualKeys(
-  store: GatewayInternalStorePort,
+  store: GatewayInternalStore,
   virtualKeys: AttributionVirtualKey[],
   now: Instant,
 ): Promise<void> {
@@ -659,7 +659,7 @@ async function enrichAttributedCommands({
   admits,
   outcomes,
 }: {
-  store: GatewayInternalStorePort;
+  store: GatewayInternalStore;
   admits: Array<Record<string, unknown>>;
   outcomes: Array<Record<string, unknown>>;
 }): Promise<void> {

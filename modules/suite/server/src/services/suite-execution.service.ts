@@ -13,10 +13,10 @@ import {
   withResolvedModels,
 } from "@langwatch/scenario-contract";
 import {
-  SuiteExecutionPort,
-  SuiteRunCommandsPort,
-  SuiteRunIdPort,
-} from "../ports/suite-execution.port.ts";
+  SuiteExecution,
+  SuiteRunCommands,
+  SuiteRunId,
+} from "../app/suite.app.ts";
 import type { SuiteRunModelsResolver } from "./suite-run-models.service.ts";
 
 const logger = createLogger("langwatch:suite-run:service");
@@ -55,10 +55,10 @@ type SuiteExecutionItem = {
   scenarioRunId: string;
 };
 
-export class SuiteExecutionService extends SuiteExecutionPort {
+export class SuiteExecutionService implements SuiteExecution {
   static create(input: {
-    commands: SuiteRunCommandsPort;
-    ids: SuiteRunIdPort;
+    commands: SuiteRunCommands;
+    ids: SuiteRunId;
     scenarios: ScenarioApi;
     /**
      * Reads, once per batch, the models each queued run really runs on. Absent in a context
@@ -76,12 +76,11 @@ export class SuiteExecutionService extends SuiteExecutionPort {
   }
 
   private constructor(
-    private readonly commands: SuiteRunCommandsPort,
-    private readonly ids: SuiteRunIdPort,
+    private readonly commands: SuiteRunCommands,
+    private readonly ids: SuiteRunId,
     private readonly scenarios: ScenarioApi,
     private readonly resolveRunModels?: SuiteRunModelsResolver,
   ) {
-    super();
   }
 
   async execute(input: SuiteExecutionRequest): Promise<SuiteRunResult> {

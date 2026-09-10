@@ -3,13 +3,13 @@
  * what it decided, and the connection ledger — or the refusal that stands in
  * for one, on a deployment that composed no identity pipeline to command.
  */
-import { SsoConnectionLedgerPort, SsoGateLoggerPort } from "@langwatch/enterprise-api";
+import { SsoConnectionLedgerPort, SsoGateLogger } from "@langwatch/enterprise-api";
 import type { Logger } from "@langwatch/observability";
 
 import { ApiEnterpriseUnavailableError } from "../enterprise/enterprise.composition.ts";
 
 /** Where the gate says what it decided, on this process's own logger. */
-export class ApiSsoGateLogger extends SsoGateLoggerPort {
+export class ApiSsoGateLogger extends SsoGateLogger {
   static create(logger: Pick<Logger, "info" | "warn">): ApiSsoGateLogger {
     return new ApiSsoGateLogger(logger);
   }

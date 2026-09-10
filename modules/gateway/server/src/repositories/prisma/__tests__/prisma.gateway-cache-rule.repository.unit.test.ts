@@ -11,8 +11,8 @@
  * the gateway to drop its cached bundle.
  */
 import { describe, expect, it } from "vitest";
-import type { GatewayAuditPort } from "../../../ports/gateway-audit.port.ts";
-import type { GatewayChangeEventsPort } from "../../../ports/gateway-change-events.port.ts";
+import type { GatewayAudit } from "../../../app/gateway.infrastructure.ts";
+import type { GatewayChangeEvents } from "../../../app/gateway.infrastructure.ts";
 import {
   PrismaGatewayCacheRuleRepository,
   type GatewayCacheRuleDatabase,
@@ -85,13 +85,13 @@ function recordingPorts() {
         changes.push({ kind: input.kind, inTransaction: transaction !== undefined });
         return Promise.resolve({ revision: 1n });
       },
-    } as unknown as GatewayChangeEventsPort,
+    } as unknown as GatewayChangeEvents,
     auditPort: {
       append: (input: { action: string }, transaction?: unknown) => {
         audits.push({ action: input.action, inTransaction: transaction !== undefined });
         return Promise.resolve();
       },
-    } as unknown as GatewayAuditPort,
+    } as unknown as GatewayAudit,
   };
 }
 

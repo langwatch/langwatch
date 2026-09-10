@@ -19,7 +19,7 @@ import {
   EventStoreProducerOnly,
 } from "@langwatch/eventing";
 import {
-  IdentityEventingPort,
+  IdentityEventing,
   JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
 } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -115,7 +115,7 @@ function testGrants() {
 }
 
 /** No event stack: the identity ledger stages nothing, which nothing here needs. */
-class SilentEventing extends IdentityEventingPort {
+class SilentEventing extends IdentityEventing {
   async tryPipelineCommand() {
     return null;
   }
@@ -144,7 +144,7 @@ const rateLimit = async () => ({ allowed: true, resetAt: Date.now() + 60_000 });
 async function composePersonFeatures(
   prisma: PrismaClient,
   grants: AuthzGrantsService,
-  eventing: IdentityEventingPort = new SilentEventing(),
+  eventing: IdentityEventing = new SilentEventing(),
   plans: ApiTrpcInfrastructure["plans"] = roomyPlan(),
 ) {
   const user = await installApiUser({
@@ -206,7 +206,7 @@ class RecordingAudit extends ApiAuditPort {
 }
 
 async function composeApplication(
-  overrides: { prismaClient?: PrismaClient; eventing?: IdentityEventingPort } = {},
+  overrides: { prismaClient?: PrismaClient; eventing?: IdentityEventing } = {},
 ) {
   const prisma = testPrisma();
   const { grants, attachBindings } = testGrants();

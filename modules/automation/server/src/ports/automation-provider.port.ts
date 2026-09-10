@@ -12,11 +12,11 @@ export type AutomationWebhookStoredParams = {
   previousSigningSecretExpiresAt?: number;
 };
 
-export abstract class AutomationSlackProviderPort {
+export abstract class AutomationSlackProvider {
   abstract tryDecrypt(params: { slackBotToken?: string }): string | null;
 }
 
-export abstract class AutomationWebhookProviderPort {
+export abstract class AutomationWebhookProvider {
   abstract parseStored(value: unknown): AutomationWebhookStoredParams;
 
   abstract decryptHeaders(params: {

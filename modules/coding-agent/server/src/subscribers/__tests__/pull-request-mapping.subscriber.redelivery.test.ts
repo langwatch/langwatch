@@ -11,7 +11,7 @@ import {
   createPullRequestMappingSubscriber,
   shouldMapPullRequests,
 } from "../pull-request-mapping.subscriber.ts";
-import { buildTestCodingAgentProcessingPipeline } from "../../adapters/__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { buildTestCodingAgentProcessingPipeline } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 import { TestGithubService } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
 function foldState(over: Partial<CodingAgentSessionState> = {}): CodingAgentSessionState {

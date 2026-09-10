@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { Instance, Ksuid } from "@langwatch/ksuid";
 import {
   type DeriveIdentifierIdInput,
-  IdentifierIdentityPort,
+  IdentifierIdentity,
 } from "../app/identity.infrastructure.ts";
 
 /**
@@ -14,7 +14,7 @@ const IDENTIFIER_ID_ENVIRONMENT = "prod";
 /**
  * Deterministic identifier identity (ADR-101 S3): a real KSUID -
  */
-export class CryptoIdentifierIdentityAdapter implements IdentifierIdentityPort {
+export class CryptoIdentifierIdentityAdapter implements IdentifierIdentity {
   static create(): CryptoIdentifierIdentityAdapter {
     return new CryptoIdentifierIdentityAdapter();
   }

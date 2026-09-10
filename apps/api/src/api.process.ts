@@ -10,13 +10,13 @@ import {
   NoApiTrpcFeatures,
   type ApiHttpOptions,
   type ApiSubscriptionMount,
-  type ApiTrpcFeaturesPort,
+  type ApiTrpcFeatures,
 } from "./api.application.ts";
 import { ApiHttpListener, type ApiHttpListenerOptions } from "./api-http.listener.ts";
 import {
-  ApiMetricsPort,
+  ApiMetrics,
   ApiProcessLifecycleRoutes,
-  ApiReadinessPort,
+  ApiReadiness,
   ObservabilityApiRequestFailureCaptureAdapter,
 } from "./api-process.lifecycle.ts";
 import { ApiRequestPolicy } from "./api-request.policy.ts";
@@ -25,7 +25,7 @@ import type { Hono } from "hono";
 import { trace } from "@opentelemetry/api";
 
 /** Resources backing the composed service graph, closed after telemetry flushes. */
-export abstract class ApiProcessGraphPort {
+export abstract class ApiProcessGraph {
   /**
    * Stops feature-owned intake and drains work that still needs infrastructure.
    * Implementations without feature work intentionally inherit the no-op.
@@ -53,14 +53,14 @@ export class ApiProcess {
     subscriptions?: ApiSubscriptionMount;
     observability: ProcessObservabilityOptions;
     listener?: Omit<ApiHttpListenerOptions, "application" | "logger">;
-    graph?: ApiProcessGraphPort;
-    featureDrain?: ApiFeatureDrainPort;
-    readiness?: ApiReadinessPort;
-    metrics?: ApiMetricsPort;
+    graph?: ApiProcessGraph;
+    featureDrain?: ApiFeatureDrain;
+    readiness?: ApiReadiness;
+    metrics?: ApiMetrics;
     /**
      * The packaged tRPC namespaces, when this process composed them.
      */
-    features?: ApiTrpcFeaturesPort<TRPCCreateRouterOptions>;
+    features?: ApiTrpcFeatures<TRPCCreateRouterOptions>;
     /**
      * Whether every mounted tRPC procedure's answer is checked against the
      * output schema it declares. Resolved once from configuration by the
@@ -123,9 +123,9 @@ export class ApiProcess {
     readonly application: ApiApplication<TRPCCreateRouterOptions>,
     private readonly observability: ProcessObservability,
     private readonly listener: ApiHttpListener | undefined,
-    private readonly graph: ApiProcessGraphPort | undefined,
-    private readonly featureDrain: ApiFeatureDrainPort | undefined,
-    private readonly readiness: ApiReadinessPort | undefined,
+    private readonly graph: ApiProcessGraph | undefined,
+    private readonly featureDrain: ApiFeatureDrain | undefined,
+    private readonly readiness: ApiReadiness | undefined,
   ) {}
 
   async start(): Promise<{ host: string; port: number } | undefined> {
@@ -156,8 +156,8 @@ export class ApiProcess {
  */
 export async function closeApiProcessResources(options: {
   listener?: (Pick<ApiHttpListener, "close"> & { closePhaseTimeoutMs?: number }) | undefined;
-  featureDrain?: ApiFeatureDrainPort | undefined;
-  graph?: ApiProcessGraphPort | undefined;
+  featureDrain?: ApiFeatureDrain | undefined;
+  graph?: ApiProcessGraph | undefined;
   observability: Pick<ProcessObservability, "shutdown">;
   logger?: ShutdownLogger;
 }): Promise<void> {
@@ -215,7 +215,7 @@ const SILENT_SHUTDOWN_LOGGER: ShutdownLogger = {
 };
 
 /** Feature-owned shutdown work that must finish before telemetry and infrastructure close. */
-export abstract class ApiFeatureDrainPort {
+export abstract class ApiFeatureDrain {
   abstract drain(): Promise<void>;
 }
 

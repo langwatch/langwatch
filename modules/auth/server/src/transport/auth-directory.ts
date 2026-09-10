@@ -3,7 +3,7 @@
  * email domain claims, the person and organization a device grant names, and
  * whether a membership is still active.
  */
-export abstract class AuthDirectoryPort {
+export abstract class AuthDirectory {
   abstract tryFindOrganizationIdBySsoDomain(domain: string): Promise<string | null>;
 
   abstract tryFindPerson(

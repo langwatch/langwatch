@@ -1,4 +1,4 @@
-import type { DatasetRow } from "../../ports/dataset.port.ts";
+import type { DatasetRow } from "../dataset.repository.ts";
 import { type Instant, toDate } from "@langwatch/time";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";

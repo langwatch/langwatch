@@ -5,7 +5,7 @@
  */
 import { isDispatchableProvider } from "@langwatch/model-provider-contract";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port.ts";
+import type { GatewayPersistenceTransaction } from "../app/gateway.infrastructure.ts";
 
 import type {
   EligibleModelProvider,

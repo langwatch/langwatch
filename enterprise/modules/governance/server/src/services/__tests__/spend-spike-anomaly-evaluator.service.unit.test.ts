@@ -4,11 +4,11 @@ import type {
   SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AnomalyAlertHttpPort } from "../../app/governance.infrastructure.ts";
+import { AnomalyAlertHttpClient } from "../../app/governance.infrastructure.ts";
 import {
-  AnomalySpendReaderPort,
+  AnomalySpendReader,
   type AnomalySpendSourceFilter,
-} from "../../ports/spend-spike-anomaly.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { SpendSpikeAnomalyRepository } from "../../repositories/policy/spend-spike-anomaly.repository.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "../spend-spike-anomaly-evaluator.service.ts";
@@ -78,7 +78,7 @@ class MemoryAnomalyRepository extends SpendSpikeAnomalyRepository {
   }
 }
 
-class FixedSpendReader extends AnomalySpendReaderPort {
+class FixedSpendReader implements AnomalySpendReader {
   readonly findSpendTotals = vi.fn(
     async (_input: {
       tenantId: string;
@@ -90,7 +90,7 @@ class FixedSpendReader extends AnomalySpendReaderPort {
   );
 }
 
-class SuccessfulHttpPort implements AnomalyAlertHttpPort {
+class SuccessfulHttp implements AnomalyAlertHttpClient {
   async post() {
     return { status: 200, ok: true, statusText: "OK" };
   }
@@ -105,7 +105,7 @@ function createService(
       repository,
       spend,
       dispatcher: AnomalyAlertDispatcherService.create({
-        http: new SuccessfulHttpPort(),
+        http: new SuccessfulHttp(),
         retryBackoffMs: 0,
       }),
     }),

@@ -11,7 +11,7 @@ import {
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 
-import { SubsystemProbeAdapter } from "../adapters/subsystem-probe.adapter.ts";
+import { SubsystemProbeAdapter } from "../services/subsystem-probe-run.service.ts";
 import { PlatformHealthKeyService } from "../services/platform-health-key.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
 import { SubsystemProbeService } from "../services/subsystem-probe.service.ts";

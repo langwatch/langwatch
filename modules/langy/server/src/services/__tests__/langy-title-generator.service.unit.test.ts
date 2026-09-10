@@ -15,7 +15,7 @@ vi.mock("ai", () => ({ generateText: vi.fn() }));
 
 import { generateText } from "ai";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import { LangyTitleModelPort } from "../../ports/langy-title-model.port.ts";
+import { LangyTitleModel } from "../../app/langy.infrastructure.ts";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
 import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service.ts";
 
@@ -25,11 +25,10 @@ const PROJECT_ID = "project-1";
 const CONVERSATION_ID = "conversation-1";
 
 /** The resolver, recording what the service asked it for. */
-class RecordingTitleModel extends LangyTitleModelPort {
+class RecordingTitleModel implements LangyTitleModel {
   readonly asked: Array<{ projectId: string; featureKey: string; fallbackModel: string }> = [];
 
   constructor(private readonly answer: unknown = { modelId: "openai/gpt-5-mini" }) {
-    super();
   }
 
   resolveTitleModel(input: {
@@ -43,14 +42,14 @@ class RecordingTitleModel extends LangyTitleModelPort {
 }
 
 /** A resolver that cannot answer, for the failure contract. */
-class RefusingTitleModel extends LangyTitleModelPort {
+class RefusingTitleModel implements LangyTitleModel {
   resolveTitleModel(): Promise<never> {
     return Promise.reject(new Error("no model gateway on this deployment"));
   }
 }
 
 /** A project with no cheap model configured: nothing to retry. */
-class UnconfiguredTitleModel extends LangyTitleModelPort {
+class UnconfiguredTitleModel implements LangyTitleModel {
   resolveTitleModel(): Promise<never> {
     return Promise.reject(new ModelNotConfiguredError("langy_title", "FAST", "Langy titles", PROJECT_ID));
   }
@@ -69,7 +68,7 @@ function messagesOf(records: Array<{ role: string; content: string }>): LangyTru
 
 function generatorOver(input: {
   records: Array<{ role: string; content: string }>;
-  models?: LangyTitleModelPort;
+  models?: LangyTitleModel;
 }) {
   const models = input.models ?? new RecordingTitleModel();
   return {

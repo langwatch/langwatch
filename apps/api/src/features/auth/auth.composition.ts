@@ -28,7 +28,7 @@ import { resolveInviteDisplayStatus } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
+import type { ApiPersonMail } from "../../app/api-person-mail.port.ts";
 
 import { createFrontDoorTrpcRouter } from "./auth-trpc.mount.ts";
 import type { ComposedAuthFeature } from "./auth.composition.types.ts";
@@ -90,7 +90,7 @@ export function apiAuthInfrastructure(options: {
   /** The deployment's own answers; see {@link ApiPersonDeploymentFacts}. */
   deployment: ApiPersonDeploymentFacts;
   /** The confirmation link this feature sends, where the deployment composed a gateway. */
-  mail?: Pick<ApiPersonMailPort, "sendSignUpVerificationLink"> | undefined;
+  mail?: Pick<ApiPersonMail, "sendSignUpVerificationLink"> | undefined;
   /** Names this process in every refusal below. */
   processName: string;
 }): AuthInfrastructure {
@@ -117,7 +117,7 @@ export function apiAuthInfrastructure(options: {
 function signUpCollaborators(options: {
   prisma: PrismaClient;
   deployment: ApiPersonDeploymentFacts;
-  mail?: Pick<ApiPersonMailPort, "sendSignUpVerificationLink"> | undefined;
+  mail?: Pick<ApiPersonMail, "sendSignUpVerificationLink"> | undefined;
 }): AuthSignUpCollaborators | null {
   const { mail, deployment } = options;
   if (!mail || !deployment.baseUrl) return null;

@@ -11,9 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
 import {
-  StoredObjectAzureDestinationPort,
+  StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
-  StoredObjectProjectS3ConfigPort,
+  StoredObjectProjectS3Config,
 } from "#services/stored-object-destination-policy.service";
 import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 import { StoredObjectsService } from "#services/stored-objects.service";
@@ -86,13 +86,13 @@ function azureOnlyRegistry(): StoredObjectStorageRegistryAdapter {
   });
 }
 
-class NoPrivateBucket extends StoredObjectProjectS3ConfigPort {
+class NoPrivateBucket extends StoredObjectProjectS3Config {
   async tryGet(): Promise<null> {
     return null;
   }
 }
 
-class ConfiguredAzure extends StoredObjectAzureDestinationPort {
+class ConfiguredAzure extends StoredObjectAzureDestination {
   resolve() {
     return { accountName: ACCOUNT, container: CONTAINER };
   }

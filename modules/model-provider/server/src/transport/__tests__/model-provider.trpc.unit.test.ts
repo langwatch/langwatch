@@ -10,7 +10,7 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { modelProviderTrpcTransport } from "../model-provider.trpc.ts";
-import type { CodexAccountService } from "../../adapters/codex-oauth.model-provider-token-refresher.adapter.ts";
+import type { CodexAccountService } from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
 import {
   mountableModelProviderApp,
   modelProviderTrpcTestPorts,

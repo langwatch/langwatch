@@ -9,7 +9,7 @@
 // modules/model-provider/specs/model-provider.feature.
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
-import { ModelProviderCredentialCodec } from "../../../ports/model-provider.port.ts";
+import { ModelProviderCredentialCodec } from "../../../app/model-provider.infrastructure.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 
 const ORGANIZATION_ID = "organization-1";

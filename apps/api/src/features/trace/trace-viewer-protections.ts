@@ -3,7 +3,7 @@ import type { Protections } from "@langwatch/trace-contract";
 /**
  * The caller's read-time redactions for one project.
  */
-export abstract class ApiViewerProtectionsPort {
+export abstract class ApiViewerProtections {
   /**
    * The same redactions for a viewer the caller has ALREADY resolved. A
    * surface that holds a user id rather than a request context reads through
@@ -41,7 +41,7 @@ export abstract class ApiViewerProtectionsPort {
  * answer instead of refusing. A second resolver would let one screen show a field another
  * hides.
  */
-export class ApiTraceReadViewerProtections extends ApiViewerProtectionsPort {
+export class ApiTraceReadViewerProtections extends ApiViewerProtections {
   static create(reads: ApiTraceViewerProtectionsSource): ApiTraceReadViewerProtections {
     return new ApiTraceReadViewerProtections(reads);
   }

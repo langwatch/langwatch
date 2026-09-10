@@ -15,14 +15,14 @@ export type WorkerMainOptions = WorkerBootOptions & {
 };
 
 /** The executable needs only the worker's lifecycle and structured logger. */
-export type WorkerMainProcessPort = {
+export type WorkerMainProcess = {
   readonly logger: Pick<Logger, "error" | "info">;
   start(): Promise<void>;
   close(options?: { terminating?: boolean }): Promise<void>;
 };
 
 type WorkerMainCreateOptions = {
-  worker: WorkerMainProcessPort;
+  worker: WorkerMainProcess;
   signals?: WorkerMainSignals;
 };
 
@@ -62,7 +62,7 @@ export class WorkerMain {
   private closing: Promise<void> | undefined;
   private signals: WorkerSignalHandlers | undefined;
 
-  private constructor(readonly worker: WorkerMainProcessPort) {}
+  private constructor(readonly worker: WorkerMainProcess) {}
 
   start(): Promise<void> {
     return this.worker.start();

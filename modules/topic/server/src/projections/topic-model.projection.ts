@@ -6,8 +6,8 @@ import {
   TOPIC_MODEL_RECORD_SOURCE,
   type TopicModelEntry,
 } from "@langwatch/topic-contract";
-import type { TopicClusteringTopicsRecordedEvent } from "../adapters/eventing.topic-events.adapter.ts";
-import { TopicClusteringTopicsRecordedEventSchema } from "../adapters/eventing.topic-events.adapter.ts";
+import type { TopicClusteringTopicsRecordedEvent } from "../services/topic-events.service.ts";
+import { TopicClusteringTopicsRecordedEventSchema } from "../services/topic-events.service.ts";
 
 /** A projected topic with its firstRecordedAt resolved (never optional). */
 export type ProjectedTopic = Omit<TopicModelEntry, "firstRecordedAt"> & {

@@ -29,7 +29,7 @@ export interface BillableEventRecord {
  * organization (private-instance customers get their own), and the caller has
  * already resolved the organization for the tenant before this is reached.
  */
-export abstract class BillableEventsMeterPort {
+export abstract class BillableEventsMeter {
   /** Inserts one deduplicated billable-event row. */
   abstract insert(input: { record: BillableEventRecord; organizationId: string }): Promise<void>;
 }

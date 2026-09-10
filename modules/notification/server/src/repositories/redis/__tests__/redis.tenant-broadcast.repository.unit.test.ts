@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   TENANT_BROADCAST_EVENT_TYPES,
-  TenantBroadcastPublisherPort,
+  TenantBroadcastPublisher,
 } from "../../tenant-broadcast.repository.ts";
 import { RedisTenantBroadcastRepository } from "../redis.tenant-broadcast.repository.ts";
 
@@ -14,7 +14,7 @@ import { RedisTenantBroadcastRepository } from "../redis.tenant-broadcast.reposi
  * (`platform/app/src/server/app-layer/broadcast/broadcast.service.ts`), which
  * matches the channel by exact string and destructures `{ tenantId, event }`.
  */
-class RecordingPublisher extends TenantBroadcastPublisherPort {
+class RecordingPublisher extends TenantBroadcastPublisher {
   readonly published: Array<{ channel: string; message: string }> = [];
 
   async publish(channel: string, message: string): Promise<number> {
@@ -23,7 +23,7 @@ class RecordingPublisher extends TenantBroadcastPublisherPort {
   }
 }
 
-class RefusingPublisher extends TenantBroadcastPublisherPort {
+class RefusingPublisher extends TenantBroadcastPublisher {
   async publish(): Promise<number> {
     throw new Error("READONLY You can't write against a read only replica.");
   }
@@ -31,7 +31,7 @@ class RefusingPublisher extends TenantBroadcastPublisherPort {
 
 const FROZEN_NOW = 1_756_000_000_000;
 
-function adapterOver(publisher: TenantBroadcastPublisherPort, logger?: unknown) {
+function adapterOver(publisher: TenantBroadcastPublisher, logger?: unknown) {
   return RedisTenantBroadcastRepository.createWithClock({
     publisher,
     now: () => FROZEN_NOW,

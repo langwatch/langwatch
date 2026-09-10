@@ -7,7 +7,7 @@ import {
   type PresenceEvent,
 } from "@langwatch/presence-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PresenceEmitterPort } from "../ports/presence.port.ts";
+import type { PresenceEmitter } from "../ports/presence.port.ts";
 import type { PresenceService } from "./presence.service.ts";
 
 const logger = createLogger("langwatch:api:presence");
@@ -22,12 +22,12 @@ type BroadcastFrame = { event: string; timestamp: number };
 export class PresenceStreamService {
   private constructor(
     private readonly presence: PresenceService,
-    private readonly emitters: PresenceEmitterPort,
+    private readonly emitters: PresenceEmitter,
   ) {}
 
   static create(options: {
     presence: PresenceService;
-    emitters: PresenceEmitterPort;
+    emitters: PresenceEmitter;
   }): PresenceStreamService {
     return new PresenceStreamService(options.presence, options.emitters);
   }

@@ -1,6 +1,6 @@
 import {
-  EvaluationModelEnvPort,
-  type EvaluationAzureSafetyCredentialsPort,
+  EvaluationModelEnv,
+  type EvaluationAzureSafetyCredentials,
 } from "@langwatch/evaluation-server";
 import { isAzureEvaluatorType, EvaluatorConfigError } from "@langwatch/evaluation-contract";
 import type { AVAILABLE_EVALUATORS, EvaluatorTypes } from "@langwatch/evaluator-contract";
@@ -21,7 +21,7 @@ import type { WorkerModelProviders } from "./worker-model-provider.composition.t
  */
 export function createWorkerEvaluationModelEnv(input: {
   models: WorkerModelProviders;
-  azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
+  azureSafetyCredentials: EvaluationAzureSafetyCredentials;
   /** The process environment an evaluator's own `envVars` are read from. */
   environment: Readonly<Record<string, string | undefined>>;
 }): WorkerEvaluationModelEnv {
@@ -38,11 +38,11 @@ export function createWorkerEvaluationModelEnv(input: {
  * model providers. Composed HERE since it bridges two features' server
  * packages. The Azure Content Safety branch never reads `process.env`.
  */
-export class WorkerEvaluationModelEnv extends EvaluationModelEnvPort {
+export class WorkerEvaluationModelEnv extends EvaluationModelEnv {
   static create(input: {
     modelProviders: ModelProviderApi;
     managedProviders: ManagedProviderApi;
-    azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
+    azureSafetyCredentials: EvaluationAzureSafetyCredentials;
     /** The process environment an evaluator's own `envVars` are read from. */
     environment: Readonly<Record<string, string | undefined>>;
   }): WorkerEvaluationModelEnv {
@@ -53,7 +53,7 @@ export class WorkerEvaluationModelEnv extends EvaluationModelEnvPort {
     private readonly deps: {
       modelProviders: ModelProviderApi;
       managedProviders: ManagedProviderApi;
-      azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
+      azureSafetyCredentials: EvaluationAzureSafetyCredentials;
       environment: Readonly<Record<string, string | undefined>>;
     },
   ) {

@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import {
-  NlpLambdaInvokePort,
-  NlpPayloadStagingPort,
+  NlpLambdaInvoke,
+  NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type StagedNlpPayload,
-} from "../ports/workflow-nlp-lambda.port.ts";
+} from "../app/workflow.app.ts";
 
 const logger = createLogger("langwatch:workflow:nlp-lambda");
 
@@ -67,8 +67,8 @@ export class NlpInvokeTransportAdapter {
     /** A plain base URL, or a Lambda function ARN. */
     target: string;
     config: NlpInvokeStagingConfig;
-    lambda?: NlpLambdaInvokePort | undefined;
-    staging: NlpPayloadStagingPort;
+    lambda?: NlpLambdaInvoke | undefined;
+    staging: NlpPayloadStaging;
     /** Injected so a test drives the wire without a listener. */
     fetch?: typeof fetch;
   }): NlpInvokeTransportAdapter {
@@ -79,8 +79,8 @@ export class NlpInvokeTransportAdapter {
     private readonly options: {
       target: string;
       config: NlpInvokeStagingConfig;
-      lambda?: NlpLambdaInvokePort | undefined;
-      staging: NlpPayloadStagingPort;
+      lambda?: NlpLambdaInvoke | undefined;
+      staging: NlpPayloadStaging;
       fetch?: typeof fetch;
     },
   ) {}

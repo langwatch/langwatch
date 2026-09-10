@@ -3,7 +3,7 @@
 /**
  * The tenant-to-organization lookup the billable-events meter runs on.
  *
- * Separate from `BillingOrganizationPort`, which reads an organization the
+ * Separate from `BillingOrganization`, which reads an organization the
  * caller has already named. This one answers the question that comes first:
  * an event carries a tenant (a project), and billing is counted per
  * organization, so every billable event has to be attributed before it can be
@@ -11,7 +11,7 @@
  * is an orphan rather than an error — it is skipped, never billed to a
  * neighbour.
  */
-export abstract class BillingTenantOrganizationPort {
+export abstract class BillingTenantOrganization {
   /** Null means the tenant has no organization; never a fallback to another. */
   abstract tryFindOrganizationForTenant(tenantId: string): Promise<string | null>;
 }

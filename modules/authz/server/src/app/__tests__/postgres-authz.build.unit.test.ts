@@ -4,16 +4,16 @@ import {
 } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
-  AuthzGrantsCommandDispatcherPort,
+  AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
 } from "../../ports/authz-grants-command-dispatcher.port.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../adapters/eventing.authz.adapter.ts";
 import { PostgresAuthzAdapter } from "../postgres-authz.build.ts";
-import { type AuthzCounter, AuthzMetricsPort } from "../../ports/authz-metrics.port.ts";
-import type { PostgresAuthzDatabasePort } from "../../ports/postgres-authz-database.port.ts";
+import { type AuthzCounter, AuthzMetrics } from "../../ports/authz-metrics.port.ts";
+import type { PostgresAuthzDatabase } from "../../ports/postgres-authz-database.port.ts";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
 
-class RecordingDispatcher extends AuthzGrantsCommandDispatcherPort {
+class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
   calls = 0;
 
   private readonly send = vi.fn(async () => undefined);
@@ -36,13 +36,13 @@ class RecordingDispatcher extends AuthzGrantsCommandDispatcherPort {
 function buildDatabase() {
   const auditLog = { createMany: vi.fn(async () => ({ count: 1 })) };
   return {
-    database: { auditLog } as unknown as PostgresAuthzDatabasePort,
+    database: { auditLog } as unknown as PostgresAuthzDatabase,
     auditLog,
   };
 }
 
 /** Answers the two counters and remembers which were asked for. */
-class RecordingMetrics extends AuthzMetricsPort {
+class RecordingMetrics extends AuthzMetrics {
   readonly asked: string[] = [];
 
   revocationCounter(reason: string): AuthzCounter {

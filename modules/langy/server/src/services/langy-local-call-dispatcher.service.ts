@@ -9,7 +9,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
 import { callActivityLine } from "../rules/langy-local-call-activity.rules.ts";
-import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import {
   CALL_ENVELOPE_SLACK_MS,
@@ -28,7 +28,7 @@ import {
   pendingCallsKey,
   workspaceChannel,
 } from "../rules/langy-local-control-keys.rules.ts";
-import type { LangyLocalPresencePort } from "../repositories/langy-local-presence.repository.ts";
+import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
 import { type CallEnvelope, type LocalToolCall, type ResultFrame } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -43,7 +43,7 @@ import {
 const logger = createLogger("langwatch:langy:local-control:dispatcher");
 export class LocalCallDispatcherService {
   private readonly store: SessionStateStore;
-  private readonly presence: LangyLocalPresencePort;
+  private readonly presence: LangyLocalPresence;
   private readonly buffer: LocalCallBuffer | null;
   private readonly offlineWaitMs: number;
   private readonly pollIntervalMs: number;

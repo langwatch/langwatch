@@ -1,6 +1,6 @@
 /**
- * `LANGY_UI_ACTIONS_FLAG` moved to `ports/langy-turn-runtime.port.ts`, beside
- * `LangyUiActionSurfacePort` — its adapter may not import this transport file.
+ * `LANGY_UI_ACTIONS_FLAG` lives in `app/langy.infrastructure.ts`, beside
+ * `LangyUiActionSurface` — its adapter may not import this transport file.
  */
 
 /** `/api/langy/conversations` — the project-API-key turn surface. */

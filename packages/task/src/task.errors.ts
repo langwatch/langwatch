@@ -20,7 +20,7 @@ export class TaskNotFoundError extends HandledError {
 }
 
 /**
- * Raised by a {@link TaskHostPort} `require*` helper when the infrastructure
+ * Raised by a {@link TaskHost} `require*` helper when the infrastructure
  * handle a task needs was never composed for this process — an environment
  * with no ClickHouse configured running `clickhouse-migrate`, for example.
  * `fault: "platform"` because the caller (deploy config, an operator running

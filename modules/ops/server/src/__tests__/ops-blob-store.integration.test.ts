@@ -12,7 +12,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   NoopSchedulerWakeService,
   OpsOperations,
-  QueuePayloadDecoderPort,
+  QueuePayloadDecoder,
   type SchedulerOpsRepository,
 } from "@langwatch/ops-server";
 import type { OpsService } from "../services/ops.service.ts";
@@ -40,7 +40,7 @@ const schedulerRepository: SchedulerOpsRepository = {
 const projects: ProjectApi = Object.create(ProjectApi.prototype);
 projects.listNamesByIds = async () => [];
 
-class NoopQueuePayloadDecoder implements QueuePayloadDecoderPort {
+class NoopQueuePayloadDecoder implements QueuePayloadDecoder {
   async tryDecode(): Promise<Record<string, unknown> | null> {
     return null;
   }

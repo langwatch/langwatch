@@ -1,5 +1,5 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
-import { AutomationSettlementObservabilityPort } from "../ports/automation-settlement.port.ts";
+import { AutomationSettlementObservability } from "../ports/automation-settlement.port.ts";
 
 export const AUTOMATION_OVERFLOW_FLUSH_METRIC_NAME = "automation_overflow_flush_total";
 
@@ -13,7 +13,7 @@ export const AUTOMATION_OVERFLOW_FLUSH_METRIC_NAME = "automation_overflow_flush_
  * (`LoggedSettlementObservability`), and that composition can adopt this
  * adapter by passing its existing capture through.
  */
-export class OtelAutomationSettlementObservabilityAdapter extends AutomationSettlementObservabilityPort {
+export class OtelAutomationSettlementObservabilityAdapter extends AutomationSettlementObservability {
   static create(options: {
     capture: (error: Error, extra: Record<string, unknown>) => void;
   }): OtelAutomationSettlementObservabilityAdapter {

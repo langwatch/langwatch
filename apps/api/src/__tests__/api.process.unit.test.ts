@@ -31,8 +31,8 @@ vi.mock("../api-http.listener.ts", () => ({
 }));
 
 import { ApiProcess } from "../api.process.ts";
-import { ApiFeatureDrainPort, ApiProcessGraphPort } from "../api.process.ts";
-import { ApiReadinessPort } from "../api-process.lifecycle.ts";
+import { ApiFeatureDrain, ApiProcessGraph } from "../api.process.ts";
+import { ApiReadiness } from "../api-process.lifecycle.ts";
 
 describe("ApiProcess", () => {
   beforeEach(() => {
@@ -138,11 +138,11 @@ describe("ApiProcess", () => {
   });
 });
 
-class TestReadiness extends ApiReadinessPort {
+class TestReadiness extends ApiReadiness {
   readonly assertReady = vi.fn(async () => undefined);
 }
 
-class TestGraph extends ApiProcessGraphPort {
+class TestGraph extends ApiProcessGraph {
   private readonly closeImpl: () => Promise<void>;
 
   constructor(closeImpl: () => Promise<void>) {
@@ -155,7 +155,7 @@ class TestGraph extends ApiProcessGraphPort {
   readonly drain = vi.fn(async () => undefined);
 }
 
-class TestFeatureDrain extends ApiFeatureDrainPort {
+class TestFeatureDrain extends ApiFeatureDrain {
   private readonly drainImpl: () => Promise<void>;
 
   constructor(drainImpl: () => Promise<void>) {
@@ -167,9 +167,9 @@ class TestFeatureDrain extends ApiFeatureDrainPort {
 }
 
 function createProcess(
-  graph?: ApiProcessGraphPort,
-  readiness?: ApiReadinessPort,
-  featureDrain?: ApiFeatureDrainPort,
+  graph?: ApiProcessGraph,
+  readiness?: ApiReadiness,
+  featureDrain?: ApiFeatureDrain,
 ): ApiProcess {
   return ApiProcess.create({
     agents: createApiFixture<AgentApi>(),

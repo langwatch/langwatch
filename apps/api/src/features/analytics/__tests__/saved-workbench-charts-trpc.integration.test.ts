@@ -30,7 +30,7 @@ import {
   DashboardApp,
   PostgresDashboardAdapter,
   SavedWorkbenchChartErrorsAdapter,
-  WorkbenchAccessPort,
+  type WorkbenchAccess,
   WorkbenchAwareGraphVisibilityAdapter,
   type DashboardGraphAlertLookup,
 } from "@langwatch/dashboard-server";
@@ -111,7 +111,7 @@ const NO_GRAPH_ALERTS: DashboardGraphAlertLookup = {
 /** Whether the workbench switch is on. Flipped by the switched-off case. */
 let workbenchEnabled = true;
 
-class TestWorkbenchAccess extends WorkbenchAccessPort {
+class TestWorkbenchAccess implements WorkbenchAccess {
   async isWorkbenchEnabled(): Promise<boolean> {
     return workbenchEnabled;
   }

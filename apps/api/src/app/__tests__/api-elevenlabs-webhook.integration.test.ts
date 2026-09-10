@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ELEVENLABS_WEBHOOK_SECRET_KEY,
-  GatewaySpendConfirmationPort,
+  GatewaySpendConfirmation,
   type ConfirmSpendCommandData,
 } from "@langwatch/gateway-server";
 import { ApiRestObservabilityComposition } from "../api-rest-observability.composition.ts";
@@ -85,7 +85,7 @@ async function webhookHarness(options: HarnessOptions = {}) {
     },
   } as PrismaClient;
 
-  class RecordingSpendConfirmation extends GatewaySpendConfirmationPort {
+  class RecordingSpendConfirmation extends GatewaySpendConfirmation {
     async confirmSpend(data: ConfirmSpendCommandData): Promise<void> {
       confirmations.push(data);
     }

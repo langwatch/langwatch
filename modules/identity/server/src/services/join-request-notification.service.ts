@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { JoinRequestAudiencePort } from "../repositories/join-request-audience.repository.ts";
-import type { JoinRequestMailPort } from "../app/identity.infrastructure.ts";
+import type { JoinRequestAudience } from "../repositories/join-request-audience.repository.ts";
+import type { JoinRequestMail } from "../app/identity.infrastructure.ts";
 
 const logger = createLogger("langwatch:identity:join-request-notification");
 
@@ -26,15 +26,15 @@ const UNNAMED_REQUESTER = "A colleague";
  */
 export class JoinRequestNotificationService {
   static create(options: {
-    audience: JoinRequestAudiencePort;
-    mail: JoinRequestMailPort;
+    audience: JoinRequestAudience;
+    mail: JoinRequestMail;
   }): JoinRequestNotificationService {
     return new JoinRequestNotificationService(options.audience, options.mail);
   }
 
   private constructor(
-    private readonly audience: JoinRequestAudiencePort,
-    private readonly mail: JoinRequestMailPort,
+    private readonly audience: JoinRequestAudience,
+    private readonly mail: JoinRequestMail,
   ) {}
 
   /**

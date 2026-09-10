@@ -25,7 +25,7 @@ import {
   expireRequestIntentSchema,
   JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,
   JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
-  type JoinRequestLifecyclePort,
+  type JoinRequestLifecycle,
   type JoinRequestLifecycleState,
   joinRequestLifecycleWake,
   onJoinRequested,
@@ -62,7 +62,7 @@ export interface JoinRequestPipelineDeps {
    *  shape the calling path uses. */
   joinRequestGuards: JoinRequestGuardsService;
   /** How the reminder and expiry wakes reach the world. */
-  lifecycle: JoinRequestLifecyclePort;
+  lifecycle: JoinRequestLifecycle;
 }
 
 export type JoinRequestPipeline = ReturnType<typeof JoinRequestPipelineDefinitionAdapter.create>;
@@ -114,7 +114,7 @@ export class JoinRequestPipelineDefinitionAdapter {
  */
 function mountRequestLifecycle(
   pm: ProcessManagerInitialStage<JoinRequestEvent>,
-  lifecycle: JoinRequestLifecyclePort,
+  lifecycle: JoinRequestLifecycle,
 ) {
   return pm
     .state<JoinRequestLifecycleState>(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE)

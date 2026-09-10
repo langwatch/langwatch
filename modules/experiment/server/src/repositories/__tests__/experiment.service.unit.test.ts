@@ -14,7 +14,7 @@ import type { ExperimentRepository, ExperimentRowState } from "../experiment.rep
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { ExperimentService } from "../../services/experiment.service.ts";
-import { ExperimentExecutionPort } from "../../ports/experiment-execution.port.ts";
+import { ExperimentExecution } from "../../ports/experiment-execution.port.ts";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -294,7 +294,7 @@ class MemoryExperimentRunRepository extends ExperimentRunRepository {
   }
 }
 
-class MemoryExperimentExecutionPort extends ExperimentExecutionPort {
+class MemoryExperimentExecution extends ExperimentExecution {
   startExperimentRun = vi.fn(async () => {});
   recordTargetResult = vi.fn(async () => {});
   recordEvaluatorResult = vi.fn(async () => {});
@@ -358,7 +358,7 @@ class MemoryExperimentDspyRepository extends ExperimentDspyRepository {
 
 const build = (
   repository = new MemoryExperimentRepository(),
-  execution = new MemoryExperimentExecutionPort(),
+  execution = new MemoryExperimentExecution(),
 ) => {
   const runRepository = new MemoryExperimentRunRepository();
   const dspyRepository = new MemoryExperimentDspyRepository();

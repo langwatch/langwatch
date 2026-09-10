@@ -16,7 +16,7 @@ export type { SsoConnectionEvent } from "./projections/sso-connection-state.proj
 export { CryptoIdentifierIdentityAdapter } from "./services/crypto-identifier-identity.service.ts";
 export {
   type DeriveIdentifierIdInput,
-  type IdentifierIdentityPort,
+  type IdentifierIdentity,
 } from "./app/identity.infrastructure.ts";
 export { computeIdentifierHash, deriveNewbornUserId } from "./rules/identifier-hash.rules.ts";
 export { s256Challenge } from "./rules/pkce.rules.ts";
@@ -125,7 +125,7 @@ export type { MfaEnrollmentRepository } from "./repositories/mfa-enrollment.repo
 export { MfaGuardsService } from "./services/mfa-guards.service.ts";
 export {
   type SignInBreakGlassLimiter,
-  type SignInDomainRoutingPort,
+  type SignInDomainRouting,
   type SignInMethodPolicyPort,
   type SignInRouteRequest,
   SignInRouterService,
@@ -146,7 +146,7 @@ export {
   type CallbackLinkOutcome,
   type CallbackUserMatch,
   type SignInCallbackAudit,
-  type SignInCallbackDirectoryPort,
+  type SignInCallbackDirectory,
   SignInCallbackLinkingService,
   type SignInCallbackLinkingDeps,
 } from "./services/signin-callback-linking.service.ts";
@@ -159,8 +159,8 @@ export {
   JoinRequestGuardsService,
   type JoinRequestGuardsDeps,
 } from "./services/join-request-guards.service.ts";
-export { type JoinRequestAudiencePort } from "./repositories/join-request-audience.repository.ts";
-export { type JoinRequestMailPort } from "./app/identity.infrastructure.ts";
+export { type JoinRequestAudience } from "./repositories/join-request-audience.repository.ts";
+export { type JoinRequestMail } from "./app/identity.infrastructure.ts";
 export { JoinRequestNotificationService } from "./services/join-request-notification.service.ts";
 export {
   approveJoinCommandId,
@@ -221,8 +221,8 @@ export {
 // layer/identity/`: the Postgres repositories the guards and the fold read and write through, the
 // two ledger writers, the join-request orchestration around the event-sourced lifecycle, and the
 // instance's sign-in method policy.
-export { type IdentityEventingPort } from "./app/identity.infrastructure.ts";
-export { type PlatformOperatorPort } from "./app/identity.infrastructure.ts";
+export { type IdentityEventing } from "./app/identity.infrastructure.ts";
+export { type PlatformOperator } from "./app/identity.infrastructure.ts";
 export {
   IDENTITY_CONVERGENCE_POLL_MS,
   IDENTITY_CONVERGENCE_TIMEOUT_MS,
@@ -239,7 +239,7 @@ export {
 } from "./services/join-request-ledger.service.ts";
 export { EmailJoinRequestNotifierAdapter } from "./services/join-request-notifier.service.ts";
 export { JoinRequestLifecycleDispatcherAdapter } from "./services/join-request-lifecycle-dispatcher.service.ts";
-export { type JoinRequestNotificationMailPort } from "./app/identity.infrastructure.ts";
+export { type JoinRequestNotificationMail } from "./app/identity.infrastructure.ts";
 export { InProcessBreakGlassLimiterAdapter } from "./services/in-process-break-glass-limiter.service.ts";
 export { LocalDoorBreakGlassBindingAdapter } from "./services/local-door-break-glass-binding.service.ts";
 export { PrismaIdentityVerificationRepository } from "./repositories/prisma/prisma.identity-verification.repository.ts";
@@ -262,10 +262,10 @@ export { SsoConnectionDomainRoutingRepository } from "./repositories/prisma/pris
 export { JoinRequestsService } from "./services/join-requests.service.ts";
 export {
   JOIN_REJECTION_COOLDOWN_MS,
-  type JoinMembershipPort,
+  type JoinMembership,
   type JoinRequestNotifier,
   type JoinRequestsServiceDeps,
-  type JoinSettingPort,
+  type JoinSetting,
 } from "./rules/join-requests-contract.rules.ts";
 export {
   LOCAL_METHOD_SET,
@@ -298,7 +298,7 @@ export {
   IDENTITY_WRITE_GATE_TTL_MS,
   IdentityWriteGateService,
 } from "./services/identity-write-gate.service.ts";
-export { type IdentityWriteGateStatePort } from "./app/identity.infrastructure.ts";
+export { type IdentityWriteGateState } from "./app/identity.infrastructure.ts";
 
 // better-auth's `database:` entry and its two account ceremonies (ADR-116 §1,
 // §5). Exported because the process that mounts better-auth composes them; a

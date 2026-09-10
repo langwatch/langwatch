@@ -18,17 +18,17 @@ import type {
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import {
-  ApiAuthAbsenceReportPort,
+  ApiAuthAbsenceReport,
   ApiAuthComposition,
-  ApiAuthSessionCompositionPort,
-  ApiBrowserSessionTransportPort,
+  ApiAuthSessionComposition,
+  ApiBrowserSessionTransport,
   AuthSessionApiAuthenticationAdapter,
   BetterAuthBrowserSessionTransportAdapter,
   type ApiAuthSessionDependencies,
   type BetterAuthSessionLookup,
 } from "../api-auth.composition.ts";
 import { ApiUserAvatarStorageAdapter } from "../../features/user/user-avatar-storage.adapter.ts";
-import { ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy.ts";
+import { ApiAuthorization, ApiRequestPolicy } from "../../api-request.policy.ts";
 
 const verified: VerifiedBrowserSession = {
   session: { id: "session-1", expiresAt: new Date("2026-08-28T12:00:00.000Z") },
@@ -68,7 +68,7 @@ class TestAuthService implements BrowserSessionApi {
   );
 }
 
-class TestAuthorization extends ApiAuthorizationPort {
+class TestAuthorization extends ApiAuthorization {
   async can(_input: {
     userId: string;
     permission: AuthzPermission;
@@ -103,7 +103,7 @@ function testUserApi(): UserApi {
   });
 }
 
-class TestAuthComposition extends ApiAuthSessionCompositionPort {
+class TestAuthComposition extends ApiAuthSessionComposition {
   readonly compose = vi.fn(() => this.dependencies);
 
   constructor(private readonly dependencies: ApiAuthSessionDependencies) {
@@ -339,7 +339,7 @@ function stubConnection(options: { finalized: boolean }): PrismaConnection {
   return PrismaConnection.create({ client: guarded as never, pool: guarded as never });
 }
 
-class RecordingAuthAbsence extends ApiAuthAbsenceReportPort {
+class RecordingAuthAbsence extends ApiAuthAbsenceReport {
   readonly reasons: string[] = [];
 
   absent(reason: "no-database" | "no-tenancy" | "no-browser-session-transport"): void {
@@ -364,7 +364,7 @@ function composeAuth(options: { finalized: boolean }) {
   return { composition, sessions, auth };
 }
 
-class TestSessionTransport extends ApiBrowserSessionTransportPort {
+class TestSessionTransport extends ApiBrowserSessionTransport {
   async tryResolveVerifiedSession(): Promise<VerifiedBrowserSession | null> {
     return verified;
   }

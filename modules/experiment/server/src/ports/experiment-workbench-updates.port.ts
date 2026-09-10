@@ -1,6 +1,6 @@
 import type { WorkbenchActorLabel } from "@langwatch/experiment-contract";
 
-export abstract class ExperimentWorkbenchUpdatesPort {
+export abstract class ExperimentWorkbenchUpdates {
   abstract publish(input: {
     projectId: string;
     experimentId: string;

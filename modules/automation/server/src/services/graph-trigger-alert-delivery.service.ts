@@ -6,7 +6,7 @@ import {
 } from "@langwatch/automation-contract";
 import { createHash } from "node:crypto";
 import { isNoDataPredicate } from "@langwatch/automation-contract";
-import type { GraphAlertDispatchResult } from "../ports/automation-graph.port.ts";
+import type { GraphAlertDispatchResult } from "../app/automation.infrastructure.ts";
 import { TriggerEvaluatorService } from "./trigger-evaluator.service.ts";
 import type { GraphEvaluationPlan, GraphSeriesEvaluation } from "./trigger-evaluator.service.ts";
 import { toDate } from "@langwatch/time";

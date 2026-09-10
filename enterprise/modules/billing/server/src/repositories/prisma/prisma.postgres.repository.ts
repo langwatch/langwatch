@@ -14,15 +14,15 @@ import {
   PrismaBillingCheckpointRepository,
   type BillingCheckpointDatabase,
 } from "./prisma.billing-checkpoint.repository.ts";
-import type { OrganizationPricingPort } from "../../ports/organization-pricing.port.ts";
+import type { OrganizationPricing } from "../../ports/organization-pricing.port.ts";
 import type { SubscriptionRepository } from "../subscription.repository.ts";
-import type { BillingOrganizationPort } from "../../ports/organization.port.ts";
+import type { BillingOrganization } from "../../ports/organization.port.ts";
 import type { BillingCheckpointPort } from "../../ports/billing-checkpoint.port.ts";
 
 export type PostgresBillingPersistence = {
-  organizationPricing: OrganizationPricingPort;
+  organizationPricing: OrganizationPricing;
   subscriptions: SubscriptionRepository;
-  organization: BillingOrganizationPort;
+  organization: BillingOrganization;
   /** The two-phase meter checkpoint the monthly roll-up reports against. */
   checkpoints: BillingCheckpointPort;
 };

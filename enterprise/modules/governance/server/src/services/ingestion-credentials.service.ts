@@ -1,13 +1,13 @@
-import type { GovernanceEncryptionPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceEncryptor } from "../app/governance.infrastructure.ts";
 
 const ENCRYPTED_PREFIX = "enc:v1:";
 
 export class IngestionCredentialsService {
-  static create(encryption: GovernanceEncryptionPort): IngestionCredentialsService {
+  static create(encryption: GovernanceEncryptor): IngestionCredentialsService {
     return new IngestionCredentialsService(encryption);
   }
 
-  private constructor(private readonly encryption: GovernanceEncryptionPort) {}
+  private constructor(private readonly encryption: GovernanceEncryptor) {}
 
   isEncrypted(value: unknown): value is string {
     return typeof value === "string" && value.startsWith(ENCRYPTED_PREFIX);

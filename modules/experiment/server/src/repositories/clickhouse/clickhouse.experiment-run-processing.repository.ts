@@ -24,7 +24,7 @@ import {
   traceMetricsComputedEventDataSchema,
 } from "../../processes/experiment-run-events.process.ts";
 import { makeExperimentRunKey } from "../../processes/experiment-run-key.process.ts";
-import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port.ts";
+import type { ExperimentClickHouse } from "../../ports/experiment-clickhouse.port.ts";
 import {
   ClickhouseExperimentClickHouseRepository,
   type ExperimentEventingClickHouseResolver,
@@ -163,7 +163,7 @@ export interface ClickhouseExperimentRunProcessingRepository {
  * pipeline reads and writes through, and the pipeline definition itself.
  */
 export class ExperimentEventingAdapter {
-  private constructor(private readonly clickhouse: ExperimentClickHousePort | null) {}
+  private constructor(private readonly clickhouse: ExperimentClickHouse | null) {}
 
   static create(input: {
     resolveClient: ExperimentEventingClickHouseResolver;

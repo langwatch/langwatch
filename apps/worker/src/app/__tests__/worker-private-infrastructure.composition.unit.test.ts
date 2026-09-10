@@ -1,19 +1,19 @@
-import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import { describe, expect, it } from "vitest";
 import { createWorkerPrivateInfrastructureComposition } from "../worker-private-infrastructure.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
-  WorkerAzureStorageFactoryPort,
-  WorkerProjectS3SourcePort,
+  WorkerAzureStorageFactory,
+  WorkerProjectS3Source,
 } from "../../platform/infrastructure/worker-stored-object-storage.adapter.ts";
 
-class Projects extends WorkerProjectS3SourcePort {
+class Projects extends WorkerProjectS3Source {
   async tryGet(projectId: string) {
     return projectId === "byoc-project" ? { bucket: "byoc-bucket" } : null;
   }
 }
 
-class Azure extends WorkerAzureStorageFactoryPort {
+class Azure extends WorkerAzureStorageFactory {
   createDriver() {
     return undefined;
   }
@@ -23,7 +23,7 @@ class Azure extends WorkerAzureStorageFactoryPort {
   }
 }
 
-class NoProxy extends OutboundProxyResolverPort {
+class NoProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {
     return undefined;
   }

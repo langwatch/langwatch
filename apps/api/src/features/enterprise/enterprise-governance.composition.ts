@@ -6,7 +6,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
-import type { ApiEnterpriseApplicationPort } from "./enterprise.composition.ts";
+import type { ApiEnterpriseApplication } from "./enterprise.composition.ts";
 
 /** A capability this deployment did not compose, refused by name. */
 class ApiCapabilityUnavailableError extends HandledError {
@@ -30,7 +30,7 @@ const logger: Pick<Logger, "info"> = createLogger("langwatch:api:enterprise-gove
 
 /** The four slices, MEMBER BY MEMBER, each one either composed or refusing under its own name. */
 export function composeEnterpriseGovernanceApplication(
-  enterprise: ApiEnterpriseApplicationPort | undefined,
+  enterprise: ApiEnterpriseApplication | undefined,
 ): EnterpriseGovernanceApplication {
   const composed = {
     governance: enterprise?.governance,

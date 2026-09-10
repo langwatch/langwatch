@@ -30,7 +30,7 @@ import {
 import {
   CONNECTION_TEARDOWN_INITIAL_STATE,
   CONNECTION_TEARDOWN_PROCESS_NAME,
-  type ConnectionTeardownPort,
+  type ConnectionTeardown,
   type ConnectionTeardownState,
   completeTeardownIntentSchema,
   connectionTeardownWake,
@@ -76,7 +76,7 @@ export interface SsoConnectionPipelineDeps {
    *  shape the calling path uses. */
   connectionGuards: SsoConnectionGuardsService;
   /** How the teardown wake dispatches its completion command. */
-  teardown: ConnectionTeardownPort;
+  teardown: ConnectionTeardown;
 }
 
 /**
@@ -126,7 +126,7 @@ export class SsoConnectionPipelineDefinitionAdapter {
  */
 function mountTeardownGrace(
   pm: ProcessManagerInitialStage<SsoConnectionEvent>,
-  teardown: ConnectionTeardownPort,
+  teardown: ConnectionTeardown,
 ) {
   return pm
     .state<ConnectionTeardownState>(CONNECTION_TEARDOWN_INITIAL_STATE)

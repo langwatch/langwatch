@@ -1,5 +1,5 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
@@ -40,7 +40,7 @@ export interface GovernanceEventsWorkerCapability {
  * leaves its debits with nowhere to land. Keeping them a pair is what
  * preserves that.
  */
-export class GovernanceEventsWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class GovernanceEventsWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: GovernanceEventsWorkerCapability;
     eventing: WorkerEventingRuntime;

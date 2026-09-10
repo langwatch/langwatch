@@ -8,7 +8,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
-  OpsEventingIntrospectionPort,
+  OpsEventingIntrospection,
   type OpsKillSwitchDescriptor,
 } from "../ops.app.ts";
 import type { OpsApp, OpsCapability } from "../ops.app.ts";
@@ -22,7 +22,7 @@ const liveSwitch: OpsKillSwitchDescriptor = {
   pipelineName: "trace-processing",
 };
 
-class OneSwitchIntrospection implements OpsEventingIntrospectionPort {
+class OneSwitchIntrospection implements OpsEventingIntrospection {
   projections() {
     return [];
   }

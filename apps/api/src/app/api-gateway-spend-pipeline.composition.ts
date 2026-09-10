@@ -4,7 +4,7 @@
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import {
-  GatewaySpendConfirmationPort,
+  GatewaySpendConfirmation,
   GatewaySpendProducerAdapter,
   type ConfirmSpendCommandData,
 } from "@langwatch/gateway-server";
@@ -36,7 +36,7 @@ export type ApiGatewaySpendPipeline = Readonly<{
    */
   commands: Record<string, GatewaySpendCommandSender | undefined>;
   /** The voice settlement's one write, as the realtime session service holds it. */
-  confirmation: GatewaySpendConfirmationPort;
+  confirmation: GatewaySpendConfirmation;
 }>;
 
 /**
@@ -90,7 +90,7 @@ function requireSender(input: {
 }
 
 /** The voice settlement's confirmation, on this process's own registration. */
-class EventingApiGatewaySpendConfirmation extends GatewaySpendConfirmationPort {
+class EventingApiGatewaySpendConfirmation extends GatewaySpendConfirmation {
   static create(sender: GatewaySpendCommandSender): EventingApiGatewaySpendConfirmation {
     return new EventingApiGatewaySpendConfirmation(sender);
   }

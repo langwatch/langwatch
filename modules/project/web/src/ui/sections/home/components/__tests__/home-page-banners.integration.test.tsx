@@ -29,7 +29,7 @@ vi.mock("@langwatch/langy-web/surfaces/asaplangy", () => ({
 import { HomePageBanners } from "../home-page-banners.tsx";
 import {
   ProjectHomeHostProvider,
-  ProjectHomeHostPort,
+  ProjectHomeHost,
   type ProjectHomeDeployment,
   type ProjectHomeFlagReading,
   type ProjectHomeLangyVisibility,
@@ -50,7 +50,7 @@ const hostState: {
   reducedMotion: false,
 };
 
-class StubProjectHomeHost extends ProjectHomeHostPort {
+class StubProjectHomeHost extends ProjectHomeHost {
   project(): ProjectHomeProject | undefined {
     return hostState.project;
   }

@@ -15,10 +15,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AutomationEvaluationSubscriberService,
   AutomationEvaluationTriggerFilterService,
-  AutomationTriggerMatchRecorderPort,
+  AutomationTriggerMatchRecorder,
 } from "../../index.ts";
-import type { AutomationGraphActivityPort } from "../../ports/automation-graph-activity.port.ts";
-import type { AutomationTraceTriggerCataloguePort } from "../../ports/automation-trace-trigger-catalogue.port.ts";
+import type { AutomationGraphActivity } from "../../app/automation.infrastructure.ts";
+import type { AutomationTraceTriggerCatalogue } from "../../ports/automation-trace-trigger-catalogue.port.ts";
 
 function trigger(): TriggerSummary {
   return {
@@ -163,7 +163,7 @@ class TestTraceService extends TraceService {
  * same two narrow ports production composes over.
  */
 class TestAutomationService
-  implements AutomationTraceTriggerCataloguePort, AutomationGraphActivityPort
+  implements AutomationTraceTriggerCatalogue, AutomationGraphActivity
 {
   private readonly unavailable = (): never => {
     throw new Error("not used by this subscriber");
@@ -184,7 +184,7 @@ class TestAutomationService
   }
 }
 
-class TestTriggerMatchRecorderPort extends AutomationTriggerMatchRecorderPort {
+class TestTriggerMatchRecorder implements AutomationTriggerMatchRecorder {
   readonly sent: Array<Record<string, unknown>> = [];
   readonly committed = new Set<string>();
 
@@ -206,7 +206,7 @@ describe("evaluation alert trigger-match subscriber redelivery", () => {
     vi.useFakeTimers();
     const occurredAt = 1_750_000_000_000;
     vi.setSystemTime(occurredAt);
-    const recordTriggerMatch = new TestTriggerMatchRecorderPort();
+    const recordTriggerMatch = new TestTriggerMatchRecorder();
     const service = AutomationEvaluationSubscriberService.create({
       triggers: new TestAutomationService(),
       graphActivity: new TestAutomationService(),

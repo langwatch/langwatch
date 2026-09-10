@@ -6,7 +6,7 @@
 import { type Instant, nowInstant } from "@langwatch/time";
 import type { GatewayBudget } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
-import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
 import type { VirtualKeyDirectBudgetRepository } from "../repositories/gateway-virtual-key-direct-budget.repository.ts";
 import { GatewayWindow } from "@langwatch/gateway-contract";
 
@@ -80,7 +80,7 @@ async function loadPeriodSpend(args: {
   repository: VirtualKeyDirectBudgetRepository;
   organizationId: string;
   budgets: GatewayBudget[];
-  chRepo: GatewayBudgetSpendPort | undefined;
+  chRepo: GatewayBudgetSpend | undefined;
   now: Instant;
 }): Promise<Map<string, string> | null> {
   const { repository, organizationId, budgets, chRepo, now } = args;
@@ -92,7 +92,7 @@ async function loadPeriodSpend(args: {
   try {
     const spends = await chRepo.getSpendForTargetsAcrossTenants(
       projectIds,
-      GatewayBudgetSpendPort.targetsForBudgets({ budgets, now }),
+      GatewayBudgetSpend.targetsForBudgets({ budgets, now }),
       now,
     );
 
@@ -131,7 +131,7 @@ export class VirtualKeyDirectBudgetService {
   async loadDirectBudgetsForKeys(args: {
     organizationId: string;
     virtualKeyIds: string[];
-    chRepo: GatewayBudgetSpendPort | undefined;
+    chRepo: GatewayBudgetSpend | undefined;
     /**
      * The instant the periods are computed from. Injectable so a test that
      * wrote a debit at a known time reads the same period back instead of

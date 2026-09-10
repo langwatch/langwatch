@@ -11,10 +11,10 @@
  * URL is a supported shape rather than a degraded one — it is what every
  * self-hosted install and every local stack already runs.
  */
-import { WorkflowStudioStreamPort, type WorkflowStudioStreamInput } from "../ports/workflow.port.ts";
+import { WorkflowStudioStream, type WorkflowStudioStreamInput } from "../app/workflow.app.ts";
 
 /** The engine's streaming studio route at a single configured address. */
-export class HttpWorkflowStudioStreamAdapter extends WorkflowStudioStreamPort {
+export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {
   static create(options: {
     /** Where the engine answers, for example `http://127.0.0.1:5561`. */
     serviceUrl: string;
@@ -24,9 +24,7 @@ export class HttpWorkflowStudioStreamAdapter extends WorkflowStudioStreamPort {
     return new HttpWorkflowStudioStreamAdapter(options);
   }
 
-  private constructor(private readonly options: { serviceUrl: string; fetch?: typeof fetch }) {
-    super();
-  }
+  private constructor(private readonly options: { serviceUrl: string; fetch?: typeof fetch }) {}
 
   async open(input: WorkflowStudioStreamInput): Promise<ReadableStreamDefaultReader<Uint8Array>> {
     const call = this.options.fetch ?? fetch;
@@ -55,14 +53,12 @@ export class HttpWorkflowStudioStreamAdapter extends WorkflowStudioStreamPort {
  * `fetch` at `undefined/go/...` reports a URL parse failure instead of the
  * configuration gap that caused it.
  */
-export class UnconfiguredWorkflowStudioStreamAdapter extends WorkflowStudioStreamPort {
+export class UnconfiguredWorkflowStudioStreamAdapter implements WorkflowStudioStream {
   static create(): UnconfiguredWorkflowStudioStreamAdapter {
     return new UnconfiguredWorkflowStudioStreamAdapter();
   }
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   open(): Promise<ReadableStreamDefaultReader<Uint8Array>> {
     return Promise.reject(

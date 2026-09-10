@@ -1,4 +1,4 @@
-import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import { S3Client } from "@aws-sdk/client-s3";
@@ -6,7 +6,7 @@ import {
   AbsentPayloadStagingAdapter,
   AzureBlobStoredObjectDriverAdapter,
   AzureBlobCredentialsAdapter,
-  PayloadStagingPort,
+  PayloadStaging,
   PayloadStagingS3TargetPort,
   S3PayloadStagingAdapter,
   type PayloadStagingS3Target,
@@ -16,8 +16,8 @@ import type {
   StoredObjectStorageRuntimeAdapter,
 } from "@langwatch/stored-object-server";
 import {
-  WorkerAzureStorageFactoryPort,
-  WorkerProjectS3SourcePort,
+  WorkerAzureStorageFactory,
+  WorkerProjectS3Source,
   WorkerStoredObjectStorageRuntimeFactory,
   type WorkerProjectS3Target,
 } from "../platform/infrastructure/worker-stored-object-storage.adapter.ts";
@@ -38,7 +38,7 @@ export type WorkerObjectStorage = {
    * not only its bucket: the destination policy answers where an object belongs, and an S3 client
    * still has to be built to reach it.
    */
-  projects: WorkerProjectS3SourcePort;
+  projects: WorkerProjectS3Source;
   /** The shared bucket, for a project with no route of its own. */
   globalS3?: WorkerProjectS3Target;
   /**
@@ -53,7 +53,7 @@ export type WorkerObjectStorage = {
    * deployment's S3 routing; the features that stage take it as a required
    * collaborator and refuse by name when it is the absent one.
    */
-  payloadStaging: PayloadStagingPort;
+  payloadStaging: PayloadStaging;
 };
 
 /**
@@ -79,7 +79,7 @@ export function createWorkerAzureBlobDriver(
  * matching the registry's own Azure policy (`createDriver` is a factory the
  * general path invokes only when an `azure-blob://` URI is actually touched).
  */
-class WorkerAzureStorageAdapter extends WorkerAzureStorageFactoryPort {
+class WorkerAzureStorageAdapter extends WorkerAzureStorageFactory {
   static create(azure: WorkerStorageConfig["azure"]): WorkerAzureStorageAdapter {
     return new WorkerAzureStorageAdapter(azure);
   }
@@ -160,7 +160,7 @@ export function createWorkerObjectStorage(options: {
  */
 class WorkerPayloadStagingS3Targets extends PayloadStagingS3TargetPort {
   static create(options: {
-    projects: WorkerProjectS3SourcePort;
+    projects: WorkerProjectS3Source;
     global: WorkerProjectS3Target;
     aws: AwsClientProcessRuntime;
   }): WorkerPayloadStagingS3Targets {
@@ -168,7 +168,7 @@ class WorkerPayloadStagingS3Targets extends PayloadStagingS3TargetPort {
   }
 
   private constructor(
-    private readonly projects: WorkerProjectS3SourcePort,
+    private readonly projects: WorkerProjectS3Source,
     private readonly global: WorkerProjectS3Target,
     private readonly aws: AwsClientProcessRuntime,
   ) {
@@ -196,7 +196,7 @@ class WorkerPayloadStagingS3Targets extends PayloadStagingS3TargetPort {
  * Which S3 account a project's objects belong in. THE PROJECT'S ORGANIZATION IS RE-READ ON EVERY
  * RESOLUTION, deliberately.
  */
-class WorkerProjectS3SourceAdapter extends WorkerProjectS3SourcePort {
+class WorkerProjectS3SourceAdapter extends WorkerProjectS3Source {
   static create(options: {
     database: WorkerProjectStorageDatabase;
     routes: ReadonlyMap<
@@ -240,7 +240,7 @@ class WorkerProjectS3SourceAdapter extends WorkerProjectS3SourcePort {
   }
 }
 
-class WorkerObjectStorageProxyResolver extends OutboundProxyResolverPort {
+class WorkerObjectStorageProxyResolver extends OutboundProxyResolver {
   static create(config: WorkerOutboundProxyConfig): WorkerObjectStorageProxyResolver {
     return new WorkerObjectStorageProxyResolver(config);
   }

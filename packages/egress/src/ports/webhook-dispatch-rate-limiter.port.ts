@@ -18,7 +18,7 @@ export interface WebhookDispatchRateLimitResult {
   resetAt: number;
 }
 
-export abstract class WebhookDispatchRateLimiterPort {
+export abstract class WebhookDispatchRateLimiter {
   /** Counts one attempt against `key` and says whether it is inside `max` for the window. */
   abstract limit(input: {
     key: string;

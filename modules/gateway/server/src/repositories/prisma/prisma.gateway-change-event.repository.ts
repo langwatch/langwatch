@@ -4,22 +4,21 @@
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 import {
-  GatewayChangeEventsPort,
+  GatewayChangeEvents,
   type AppendGatewayChangeEventInput,
   type GatewayChangeEventKind,
   type GatewayPersistenceTransaction,
-} from "../../ports/gateway-change-events.port.ts";
+} from "../../app/gateway.infrastructure.ts";
 
 /** The client slice the revision feed needs. */
 export type GatewayChangeEventDatabase = Pick<PrismaClient, "gatewayChangeEvent">;
 
-export class PrismaGatewayChangeEventsRepository extends GatewayChangeEventsPort {
+export class PrismaGatewayChangeEventsRepository implements GatewayChangeEvents {
   static create(database: GatewayChangeEventDatabase): PrismaGatewayChangeEventsRepository {
     return new PrismaGatewayChangeEventsRepository(database);
   }
 
   constructor(private readonly prisma: GatewayChangeEventDatabase) {
-    super();
   }
 
   async append(

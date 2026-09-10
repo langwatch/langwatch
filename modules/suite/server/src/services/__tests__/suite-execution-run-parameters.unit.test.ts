@@ -5,7 +5,7 @@
 import { resolveRunParameters, type ScenarioApi } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import type { QueueSimulationRunCommandData } from "../../ports/suite-execution.port.ts";
+import type { QueueSimulationRunCommandData } from "../../app/suite.app.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";
 
 const scenarioId = "scenario_refund";

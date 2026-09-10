@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { vi } from "vitest";
-import type { ScimRepositoryPort } from "../../repositories/scim.repository.ts";
+import type { ScimRepository } from "../../repositories/scim.repository.ts";
 
 /**
- * A complete `ScimRepositoryPort`, answering nothing.
+ * A complete `ScimRepository`, answering nothing.
  *
  * `ScimService` reaches nineteen of the port's members across tokens,
  * memberships, groups and directory identities, so a test that builds one is
@@ -17,8 +17,8 @@ import type { ScimRepositoryPort } from "../../repositories/scim.repository.ts";
  * instead of reaching for this.
  */
 export function scimRepositoryFixture(
-  overrides: Partial<ScimRepositoryPort> = {},
-): ScimRepositoryPort {
+  overrides: Partial<ScimRepository> = {},
+): ScimRepository {
   return {
     findOrganizationBySsoDomain: vi.fn(async () => null),
     createToken: vi.fn(async () => ({ id: "token-1" })),

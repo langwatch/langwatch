@@ -104,9 +104,9 @@ vi.mock("../src/features/installed-ui-features", () => ({
 import {
   resolveUiCapabilities,
   UiCapabilityContextProvider,
-  UiDocumentTitlePort,
-  UiFeedbackPort,
-  UiSessionPort,
+  UiDocumentTitle,
+  UiFeedback,
+  UiSession,
   type UiActiveScope,
   type UiActor,
 } from "@langwatch/ui-host/capabilities";
@@ -114,19 +114,19 @@ import { useRouterUiNavigation, useRouterUiRoute } from "../src/behavior/ui-rout
 import { createUiRouteObjects } from "../src/ui/sections/ui-route-objects";
 import { useDrawerStore } from "@langwatch/trace-web/drawer.store";
 
-class SilentTitle extends UiDocumentTitlePort {
+class SilentTitle extends UiDocumentTitle {
   set(): () => void {
     return () => {};
   }
 }
 
-class SilentFeedback extends UiFeedbackPort {
+class SilentFeedback extends UiFeedback {
   succeeded(): void {}
   failed(): void {}
 }
 
 /** A signed-in reader on one project, which is all the trace host reads. */
-class ProjectSession extends UiSessionPort {
+class ProjectSession extends UiSession {
   currentUser(): UiActor {
     return { id: "user-1", name: "Ada", email: "ada@example.com", image: null };
   }

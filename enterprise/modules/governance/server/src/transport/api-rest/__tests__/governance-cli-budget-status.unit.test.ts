@@ -11,7 +11,7 @@ import { createAppRestSecurity } from "@langwatch/api/rest";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createGovernanceCliRestApp, type GovernanceCliRestPorts } from "../governance-cli.api.ts";
+import { createGovernanceCliRestApp, type GovernanceCliRestDependencies } from "../governance-cli.api.ts";
 
 describe("GET /api/auth/cli/budget/status", () => {
   describe("when the Bearer token is unknown to the access-token store", () => {
@@ -28,8 +28,8 @@ describe("GET /api/auth/cli/budget/status", () => {
   });
 });
 
-function mountCli(accessTokens: { resolve: GovernanceCliRestPorts["accessTokens"]["resolve"] }) {
-  const ports: GovernanceCliRestPorts = {
+function mountCli(accessTokens: { resolve: GovernanceCliRestDependencies["accessTokens"]["resolve"] }) {
+  const ports: GovernanceCliRestDependencies = {
     accessTokens: {
       resolve: accessTokens.resolve,
       revoke: vi.fn().mockResolvedValue(undefined),
@@ -41,7 +41,7 @@ function mountCli(accessTokens: { resolve: GovernanceCliRestPorts["accessTokens"
     plans: () => ({}) as never,
     permittedOnOrganization: vi.fn().mockResolvedValue(true),
     permittedOnProject: vi.fn().mockResolvedValue(true),
-  } as unknown as GovernanceCliRestPorts;
+  } as unknown as GovernanceCliRestDependencies;
 
   const app = createGovernanceCliRestApp({
     security: passThroughSecurity(),

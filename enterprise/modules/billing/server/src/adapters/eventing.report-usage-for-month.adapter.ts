@@ -6,7 +6,7 @@ import {
   reportUsageForMonthCommandDataSchema,
   type ReportUsageForMonthCommandData,
 } from "@langwatch/enterprise-billing-contract";
-import type { BillingErrorReporterPort } from "../ports/error-reporter.port.ts";
+import type { BillingErrorReporter } from "../ports/error-reporter.port.ts";
 import type {
   BillingReportOrganizationLookup,
   BillingReportOrganizationPort,
@@ -75,7 +75,7 @@ export interface ReportUsageForMonthCommandDeps {
   /** Shared organization-read cache; see BILLING_ORG_CACHE_PREFIX. */
   organizationCache: BillingOrganizationCache;
   /** Where an unexpected failure in this handler is reported. */
-  errorReporter: BillingErrorReporterPort;
+  errorReporter: BillingErrorReporter;
 }
 
 const SCHEMA = defineCommandSchema(

@@ -24,7 +24,7 @@ import {
   userErasureFacts,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
-import type { IdentifierIdentityPort } from "../app/identity.infrastructure.ts";
+import type { IdentifierIdentity } from "../app/identity.infrastructure.ts";
 import { computeIdentifierHash } from "../rules/identifier-hash.rules.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
@@ -39,7 +39,7 @@ export class IdentityGuardsService {
     heads: IdentityHeadsRepository,
     users: IdentityUsersRepository,
     reservations: IdentityReservationRepository,
-    identifiers: IdentifierIdentityPort,
+    identifiers: IdentifierIdentity,
   ): IdentityGuardsService {
     return new IdentityGuardsService(heads, users, reservations, identifiers);
   }
@@ -48,7 +48,7 @@ export class IdentityGuardsService {
     private readonly heads: IdentityHeadsRepository,
     private readonly users: IdentityUsersRepository,
     private readonly reservations: IdentityReservationRepository,
-    private readonly identifiers: IdentifierIdentityPort,
+    private readonly identifiers: IdentifierIdentity,
   ) {}
 
   /**

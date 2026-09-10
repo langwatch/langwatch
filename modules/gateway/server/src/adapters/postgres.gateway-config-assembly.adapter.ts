@@ -5,10 +5,10 @@ import { createHash } from "node:crypto";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ModelProvider } from "@langwatch/gateway-contract";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
+import type { GatewayModelProviderCredentials } from "../app/gateway.infrastructure.ts";
 import { llmModels, toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port.ts";
+import { GatewayConfigAssembly } from "../app/gateway.infrastructure.ts";
 
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
@@ -41,9 +41,8 @@ function buildHostedCatalog(): Record<string, string[]> {
   return out;
 }
 
-export class GatewayConfigAssemblyAdapter extends GatewayConfigAssemblyPort {
+export class GatewayConfigAssemblyAdapter implements GatewayConfigAssembly {
   private constructor(private readonly prisma: PrismaClient) {
-    super();
   }
 
   static create(input: { prisma: PrismaClient }): GatewayConfigAssemblyAdapter {
@@ -117,7 +116,7 @@ export class GatewayConfigAssemblyAdapter extends GatewayConfigAssemblyPort {
 
   buildCredentials(
     mp: ModelProvider,
-    credentials: GatewayModelProviderCredentialsPort,
+    credentials: GatewayModelProviderCredentials,
   ): Record<string, unknown> {
     const provider = mp.provider;
     const customKeys = credentials.readCustomKeys(mp.customKeys);

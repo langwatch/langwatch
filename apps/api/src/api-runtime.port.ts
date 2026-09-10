@@ -16,6 +16,6 @@ export abstract class ApiApplicationPort<Application> {
 }
 
 /** The explicit API composition phase, kept separate from product application types. */
-export abstract class ApiLifecyclePort<Services> {
+export abstract class ApiLifecycle<Services> {
   abstract compose(resources: ResourceScope): Promise<Services>;
 }

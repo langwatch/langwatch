@@ -9,10 +9,10 @@ import type { IncomingMessage } from "node:http";
 import { Redis } from "ioredis";
 import {
   createMcpHandler,
-  McpApiKeyCipherPort,
-  McpClientAddressPort,
-  McpProjectLookupPort,
-  McpSessionGrantPort,
+  McpApiKeyCipher,
+  McpClientAddress,
+  McpProjectLookup,
+  McpSessionGrant,
   type HostedMcpRedis,
   type McpHandler,
 } from "../../../index.ts";
@@ -68,7 +68,7 @@ export function connectTestRedis(): HostedMcpRedis {
 }
 
 /** The project every key in `apiKeys` belongs to, keyed by the key itself. */
-class HarnessProjectLookup extends McpProjectLookupPort {
+class HarnessProjectLookup extends McpProjectLookup {
   constructor(private readonly apiKeys: readonly string[]) {
     super();
   }
@@ -84,14 +84,14 @@ class HarnessProjectLookup extends McpProjectLookupPort {
 }
 
 /** Every grant holds: these suites are about transport, not about revocation. */
-class HarnessSessionGrant extends McpSessionGrantPort {
+class HarnessSessionGrant extends McpSessionGrant {
   stillGranted(): Promise<boolean> {
     return Promise.resolve(true);
   }
 }
 
 /** Identity "encryption", so a suite can read the value it expected to be stored. */
-class HarnessCipher extends McpApiKeyCipherPort {
+class HarnessCipher extends McpApiKeyCipher {
   encrypt(text: string): string {
     return `encrypted:${text}`;
   }
@@ -101,7 +101,7 @@ class HarnessCipher extends McpApiKeyCipherPort {
 }
 
 /** Every replica answers on loopback, so every caller is the same address. */
-class HarnessClientAddress extends McpClientAddressPort {
+class HarnessClientAddress extends McpClientAddress {
   clientIp(request: IncomingMessage): string {
     return request.socket.remoteAddress ?? "127.0.0.1";
   }

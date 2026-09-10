@@ -10,13 +10,13 @@ import type {
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
 import type { LangyAnalyticsEventProjectionRecord } from "../../projections/langy-analytics-event.projection.ts";
-import type { LangyTitleGenerator } from "../../ports/langy-effect.port.ts";
+import type { LangyTitleGenerator } from "../../app/langy.infrastructure.ts";
 import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
 import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
 import type { LangyBroadcastPort } from "../../subscribers/langy-conversation.subscriber.ts";
-import { NullLangyWorkerMetricsAdapter } from "../../adapters/null-langy-worker-metrics.adapter.ts";
-import { UnavailableLangyWorkerAdapter } from "../../adapters/unavailable-langy-worker.adapter.ts";
+import { NullLangyWorkerMetricsAdapter } from "../../services/langy-worker-metrics-null.service.ts";
+import { UnavailableLangyWorkerAdapter } from "../../services/langy-worker-unavailable.service.ts";
 import { EventingLangyConversationAdapter } from "./redis.langy-conversation-runtime.repository.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */

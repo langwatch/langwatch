@@ -6,7 +6,7 @@
  * time — but two runners rebuilding the same schema at once is not. The
  * second one waits here, and then finds nothing pending.
  */
-export abstract class MigrationLockPort {
+export abstract class MigrationLock {
   /** Takes the lock if it is free right now; never blocks. */
   abstract tryAcquire(): Promise<boolean>;
   /** Blocks until the lock is held. */
@@ -16,7 +16,7 @@ export abstract class MigrationLockPort {
 }
 
 /** The runner that has nothing to contend for: no database, nothing to lock. */
-export class UnlockedMigrationLock extends MigrationLockPort {
+export class UnlockedMigrationLock extends MigrationLock {
   tryAcquire(): Promise<boolean> {
     return Promise.resolve(true);
   }

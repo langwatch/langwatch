@@ -110,7 +110,7 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
 
   const hono = runtime.mount(createDatasetRest(platformUrl).router(), {
     app: () => stub,
-    credential: "projectKey",
+    credential: "project",
     onError: createDatasetErrorHandler({ boundaryErrorHandler }),
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({

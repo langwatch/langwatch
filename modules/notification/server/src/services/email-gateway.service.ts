@@ -81,7 +81,7 @@ export type EmailOutboundProxyConfig = Readonly<{
  * mapping the shared surface (bcc, reply-to, custom headers, attachments) onto
  * whatever their transport expects.
  */
-export abstract class EmailGatewayPort {
+export abstract class EmailGateway {
   /** One address or many, as every transport below wants to see them. */
   static recipients(value: string | string[] | undefined): string[] {
     if (value == null) {
@@ -99,7 +99,7 @@ export abstract class EmailGatewayPort {
 }
 
 /** A composed mail delivery capability, injected into application adapters. */
-export abstract class EmailDeliveryPort {
+export abstract class EmailDelivery {
   abstract defaultFrom(): string;
 
   abstract send(content: EmailContent): Promise<unknown>;

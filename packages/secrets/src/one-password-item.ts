@@ -1,4 +1,4 @@
-import type { ProcessRunnerPort } from "./process-runner.port.ts";
+import type { ProcessRunner } from "./process-runner.port.ts";
 
 /** The 1Password item one profile's secrets live in. */
 export type VaultItem = Readonly<{ vault: string; item: string }>;
@@ -46,7 +46,7 @@ export async function writeFields({
 }: {
   fields: ReadonlyMap<string, string>;
   item: VaultItem;
-  runner: ProcessRunnerPort;
+  runner: ProcessRunner;
 }): Promise<void> {
   if (fields.size === 0) return;
 

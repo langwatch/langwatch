@@ -18,7 +18,7 @@
 
 export { codingAgentApi, type CodingAgentApiMap } from "./coding-agent-api.ts";
 export {
-  CodingAgentActivityHostPort,
+  CodingAgentActivityHost,
   CodingAgentActivityHostProvider,
   useCodingAgentActivityHost,
   type CodingAgentFailure,

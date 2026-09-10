@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
-import type { DatasetStorageResolverPort } from "../../ports/dataset-storage.port.ts";
+import type { DatasetStorageResolver } from "../../app/dataset.app.ts";
 import { StreamingChunkWriterService } from "../../services/dataset-chunk-writer.service.ts";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
@@ -38,7 +38,7 @@ export type DatasetMigrationRunResult =
 export class PrismaDatasetMigrationRepository {
   static create(options: {
     database: PrismaClient;
-    storage: DatasetStorageResolverPort;
+    storage: DatasetStorageResolver;
   }): PrismaDatasetMigrationRepository {
     return new PrismaDatasetMigrationRepository(options);
   }
@@ -46,7 +46,7 @@ export class PrismaDatasetMigrationRepository {
   private constructor(
     private readonly options: {
       database: PrismaClient;
-      storage: DatasetStorageResolverPort;
+      storage: DatasetStorageResolver;
     },
   ) {}
 

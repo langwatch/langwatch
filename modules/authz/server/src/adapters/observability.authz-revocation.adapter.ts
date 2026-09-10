@@ -1,5 +1,5 @@
 import {
-  AuthzRevocationTelemetryPort,
+  AuthzRevocationTelemetry,
   type AuthzRevocationReason,
 } from "../ports/authz-revocation-telemetry.port.ts";
 
@@ -27,7 +27,7 @@ export type ObservabilityAuthzRevocationAdapterOptions = {
  * adapter stays the one description of WHEN to increment. Two processes writing
  * the same series described two ways is how the series stops meaning one thing.
  */
-export class ObservabilityAuthzRevocationAdapter extends AuthzRevocationTelemetryPort {
+export class ObservabilityAuthzRevocationAdapter extends AuthzRevocationTelemetry {
   static create(
     options: ObservabilityAuthzRevocationAdapterOptions,
   ): ObservabilityAuthzRevocationAdapter {

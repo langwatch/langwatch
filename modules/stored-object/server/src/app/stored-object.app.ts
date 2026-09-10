@@ -26,8 +26,8 @@ import type {
   StoredObjectsGetOutput,
 } from "@langwatch/stored-object-contract";
 import type {
-  StoredObjectDeliveryPort,
-  StoredObjectStoragePort,
+  StoredObjectDelivery,
+  StoredObjectStorage,
   StoredObjectUploadTokenPort,
 } from "./stored-object.infrastructure.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
@@ -55,8 +55,8 @@ export interface StoredObjectFileReadPort {
 }
 
 export type StoredObjectInfrastructure = Readonly<{
-  storage: StoredObjectStoragePort;
-  delivery: StoredObjectDeliveryPort;
+  storage: StoredObjectStorage;
+  delivery: StoredObjectDelivery;
   uploadTokens: StoredObjectUploadTokenPort;
   idDeriver: StoredObjectIdDeriver;
   maximumUploadBytes: number;

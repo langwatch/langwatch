@@ -1,5 +1,5 @@
 import { LANGY_PROMPT_HANDLES } from "@langwatch/langy-contract";
-import { LangyPromptRegistryService, type LangyPromptPort } from "./langy-prompt-registry.service.ts";
+import { LangyPromptRegistryService, type LangyPrompt } from "./langy-prompt-registry.service.ts";
 import { LANGY_OVERRIDE } from "./langy-turn-shared.service.ts";
 
 export type LangyTurnOverride = {
@@ -12,12 +12,12 @@ export class LangyTurnOverrideService {
   private static lastRegistryOverrideText: string | null = null;
 
   private constructor(
-    private readonly prompts: LangyPromptPort | undefined,
+    private readonly prompts: LangyPrompt | undefined,
     private readonly projectId: string | undefined,
   ) {}
 
   static create(input: {
-    prompts: LangyPromptPort | undefined;
+    prompts: LangyPrompt | undefined;
     projectId: string | undefined;
   }): LangyTurnOverrideService {
     return new LangyTurnOverrideService(input.prompts, input.projectId);

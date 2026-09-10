@@ -16,6 +16,7 @@ import {
   type CopyWorkflowCommand,
   type CreateWorkflowCommand,
   type ExecuteWorkflowComponentInput,
+  type LLMConfig,
   type PublishWorkflowCommand,
   type RunWorkflowCommand,
   type StudioClientEvent,
@@ -27,6 +28,7 @@ import {
   type WorkflowCascadeArchive,
   type WorkflowCopiesRow,
   type WorkflowCopyWithPath,
+  type WorkflowDsl,
   type WorkflowEvaluationRequest,
   type WorkflowEvaluationStarted,
   type WorkflowLineageRow,
@@ -35,6 +37,7 @@ import {
   type WorkflowReference,
   type WorkflowRelatedEntities,
   type WorkflowRunAnswer,
+  type WorkflowRunOrigin,
   type WorkflowSourceRow,
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
@@ -45,10 +48,6 @@ import type { WorkflowService } from "../services/workflow.service.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 import { nanoid } from "nanoid";
-import type {
-  WorkflowAgentMappingPort,
-  WorkflowStudioDslPort,
-} from "../ports/workflow.port.ts";
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 import type { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
@@ -226,11 +225,25 @@ export interface WorkflowInfrastructure {
   /** The dataset copies a Studio graph carries with it into another project. */
   datasets: DatasetApi;
   /** How a Studio graph is prepared before any version of it is written. */
-  studioDsl: WorkflowStudioDslPort;
+  studioDsl: WorkflowStudioDsl;
   /** The agent mappings a saved Studio graph refreshes, best effort. */
-  agentMappings: WorkflowAgentMappingPort;
+  agentMappings: WorkflowAgentMapping;
   /** The bare row a Studio copy lands in, before its first version exists. */
   workflowRows: WorkflowRowRepository;
+  /** Executes a workflow run; absent means nothing executes. */
+  execution: WorkflowExecution;
+  /** Where a studio graph and a code evaluator both execute. */
+  nlpRuntime: WorkflowNlpRuntime;
+  /** The engine's streaming studio route, as bytes. */
+  studioStream: WorkflowStudioStream;
+  /** Mints workflow and version ids. */
+  ids: WorkflowId;
+  /** Upgrades a persisted graph before it becomes the workflow's current version. */
+  dslMigration: WorkflowDslMigration;
+  /** Project credentials and decrypted secrets. */
+  projectEnvironment: WorkflowProjectEnvironment;
+  /** Resolves process-specific LiteLLM credentials without exposing provider rows. */
+  llmParameters: WorkflowLlmParameters;
   permissions: WorkflowPermissionProbe;
   lineage: WorkflowLineageReads;
   publications: WorkflowPublicationReads;
@@ -239,6 +252,13 @@ export interface WorkflowInfrastructure {
   codeCompletions: WorkflowCodeCompletions;
   studioRuns: WorkflowStudioRuns;
   signals: WorkflowSignals;
+  nlpLambdaArnResolver: NlpLambdaArnResolver;
+  nlpLambdaFunction: NlpLambdaFunctionPort;
+  nlpLambdaInvoke: NlpLambdaInvoke;
+  nlpLambdaStreamInvoke: NlpLambdaStreamInvoke;
+  nlpPayloadStaging: NlpPayloadStaging;
+  workflowAiCall: WorkflowAiCall;
+  workflowCommitMessageModel: WorkflowCommitMessageModel;
 }
 
 type WorkflowSetup = FeatureSetup<
@@ -749,4 +769,219 @@ export class WorkflowApp implements WorkflowApi {
         this.#infrastructure.signals.failed(error, { projectId: input.projectId });
       });
   }
+}
+
+/** One project's resolved function, as the shared cache holds it. */
+export type NlpLambdaArnEntry = Readonly<{
+  arn: string;
+  /** The deployment image it was resolved under; a change invalidates it. */
+  imageUri: string;
+}>;
+
+/** The AWS flow that finds, creates or updates the project's function. */
+export interface NlpLambdaArnResolver {
+  resolve(input: { projectId: string; imageUri: string }): Promise<string>;
+}
+
+/**
+ * Which function one project's engine answers on, as the caller needs it. The
+ * resolution behind it is cached and single-flighted; a caller only asks.
+ */
+export interface NlpLambdaFunctionPort {
+  arnFor(input: { projectId: string }): Promise<string>;
+}
+
+/** One frame off a streaming invoke. */
+export type NlpLambdaStreamChunk =
+  | Readonly<{ kind: "payload"; bytes: Uint8Array<ArrayBufferLike> }>
+  /** AWS reports a handler failure as a terminal frame, not a rejection. */
+  | Readonly<{ kind: "failed"; errorCode: string; details?: string | undefined }>;
+
+
+export interface NlpLambdaStreamInvoke {
+  /**
+   * Opens the invocation. The signal aborts the call itself, so a viewer who
+   * walks away stops the run rather than leaving it billing until it ends.
+   */
+  invokeStream(input: {
+    functionArn: string;
+    payload: string;
+    signal?: AbortSignal | undefined;
+  }): Promise<AsyncIterable<NlpLambdaStreamChunk>>;
+}
+
+/** Resolves one feature key's model for one project. */
+export interface WorkflowCommitMessageModel {
+  resolve(input: { projectId: string; featureKey: string }): Promise<LanguageModel>;
+}
+
+/** The registered feature a call runs under, as the failure policy reads it. */
+export type WorkflowAiCallFeature = Readonly<{
+  key: string;
+  role: ModelRole;
+  displayName: string;
+}>;
+
+/**
+ * Runs one model call for a named feature, turning any provider or SDK failure
+ * into the application's typed `ai_call_failed` cause.
+ */
+export interface WorkflowAiCall {
+  run<T>(feature: WorkflowAiCallFeature, call: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * The header the receiver reads the presigned URL from. Its readers are
+ * langevals (`langevals/staged_payload.py`), the Go engine
+ * (`services/nlpgo/adapters/httpapi/staged_payload.go`) and this module.
+ */
+export const STAGED_PAYLOAD_HEADER = "X-Payload-S3-URL";
+
+export type NlpLambdaInvokeResult = Readonly<{
+  statusCode: number;
+  /** AWS reports a handler failure here rather than as a non-2xx status. */
+  functionError?: string | undefined;
+  payload: string;
+}>;
+
+export interface NlpLambdaInvoke {
+  invoke(input: { functionArn: string; payload: string }): Promise<NlpLambdaInvokeResult>;
+}
+
+/** One parked payload, as the caller needs it back to reference and discard. */
+export interface StagedNlpPayload {
+  /** The presigned GET URL the receiver fetches the body from. */
+  readonly url: string;
+  /**
+   * Removes the parked object. Best-effort by contract: a bucket lifecycle
+   * rule on the staging prefix is the fallback for the crash paths where the
+   * ask never happens.
+   */
+  discard(): Promise<void>;
+}
+
+
+export interface NlpPayloadStaging {
+  stage(input: {
+    projectId: string;
+    /** The path segment the parked object is filed under. */
+    keyPrefix: string;
+    serialized: Buffer;
+    ttlSeconds: number;
+  }): Promise<StagedNlpPayload>;
+}
+
+export type WorkflowExecutionInput = {
+  projectId: string;
+  workflowId: string;
+  version: WorkflowVersion;
+  inputs: Record<string, unknown>;
+  doNotTrace?: boolean;
+  runEvaluations?: boolean;
+  origin?: WorkflowRunOrigin;
+  causalityDepth?: number;
+  parentTrace?: { traceId: string; parentSpanId: string };
+};
+
+/** Execution is infrastructure: the feature supplies a dispatch port. */
+export interface WorkflowExecution {
+  execute(input: WorkflowExecutionInput): Promise<WorkflowRunAnswer>;
+}
+
+export type WorkflowNlpDispatchInput = {
+  projectId: string;
+  body: StudioClientEvent;
+  origin: WorkflowRunOrigin;
+  causalityDepth?: number;
+  parentTrace?: { traceId: string; parentSpanId: string };
+};
+
+export type WorkflowNlpDispatchResponse = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  json(): Promise<unknown>;
+};
+
+export interface WorkflowNlpRuntime {
+  dispatch(input: WorkflowNlpDispatchInput): Promise<WorkflowNlpDispatchResponse>;
+}
+
+/** One STREAMING studio run, opened against the engine. */
+export type WorkflowStudioStreamInput = {
+  projectId: string;
+  body: StudioClientEvent;
+  origin: WorkflowRunOrigin;
+};
+
+/**
+ * The engine's streaming studio route, as bytes.
+ *
+ * Separate from {@link WorkflowNlpRuntime} because it is a different
+ * conversation rather than a different address: `execute_sync` answers once
+ * with a result, and `execute` answers continuously until it says `done`. A
+ * process that can do the first cannot necessarily do the second — the
+ * platform app reached the streaming route through per-project Lambda
+ * routing — so a deployment declares them apart.
+ *
+ * The port hands back the raw reader rather than decoded events: the SSE
+ * framing and the abort protocol are the same on any address, and stating them
+ * once in a service is what keeps a second adapter from re-deriving them.
+ */
+export interface WorkflowStudioStream {
+  open(input: WorkflowStudioStreamInput): Promise<ReadableStreamDefaultReader<Uint8Array>>;
+}
+
+export interface WorkflowId {
+  next(): string;
+}
+
+/** Upgrades a persisted graph before it becomes the workflow's current version. */
+export interface WorkflowDslMigration {
+  migrate(dsl: WorkflowDsl): WorkflowDsl;
+}
+
+/** Project credentials and decrypted secrets are application infrastructure. */
+export interface WorkflowProjectEnvironment {
+  get(input: { projectId: string }): Promise<{ apiKey: string; secrets: Record<string, string> }>;
+}
+
+export type WorkflowLlmParameterResolution = {
+  model: string;
+  provider: string;
+  configured: boolean;
+  enabled: boolean;
+  litellmParams?: Record<string, string>;
+};
+
+/** Resolves process-specific LiteLLM credentials without exposing provider rows. */
+export interface WorkflowLlmParameters {
+  resolve(input: {
+    projectId: string;
+    models: readonly LLMConfig["model"][];
+  }): Promise<readonly WorkflowLlmParameterResolution[]>;
+}
+
+/**
+ * Application-owned preparation of a Studio graph before it is persisted.
+ *
+ * Two steps the host owns rather than the feature: editor-only local node
+ * configuration is folded into the execution DSL, and every LLM node without a
+ * model is filled in from the project's providers. The second reaches the
+ * host's model cascade and its registry flagship, so the whole preparation is
+ * one port rather than a rule split across the boundary.
+ */
+export interface WorkflowStudioDsl {
+  prepare(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow>;
+}
+
+/**
+ * The agent-mapping recompute a saved Studio graph triggers.
+ *
+ * Best effort and outside the save: the agents whose scenario mappings this
+ * refreshes are the host's rows, and a failure to refresh them must never fail
+ * the version that was already written.
+ */
+export interface WorkflowAgentMapping {
+  recompute(input: { projectId: string; workflowId: string; dsl: StudioWorkflow }): Promise<void>;
 }

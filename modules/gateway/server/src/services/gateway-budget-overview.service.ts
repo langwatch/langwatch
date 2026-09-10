@@ -13,7 +13,7 @@ import {
   type ApplicableBudget,
   GatewayApplicableBudgetsService,
 } from "./gateway-applicable-budgets.service.ts";
-import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
 import { scopeTargetKey, GatewayWindow } from "@langwatch/gateway-contract";
 import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
@@ -120,7 +120,7 @@ export class BudgetOverviewService {
     private readonly personalUsage: PersonalUsageReader | undefined,
     private readonly budgetDecisions: GatewayService,
     private readonly providerLabels: GatewayProviderLabelRepository,
-    private readonly chRepo?: GatewayBudgetSpendPort,
+    private readonly chRepo?: GatewayBudgetSpend,
   ) {}
 
   private get applicableBudgets(): GatewayApplicableBudgetsService {
@@ -138,7 +138,7 @@ export class BudgetOverviewService {
     budgetDecisions: GatewayService;
     providerLabels: GatewayProviderLabelRepository;
     personalUsage?: PersonalUsageReader;
-    budgetRepository?: GatewayBudgetSpendPort;
+    budgetRepository?: GatewayBudgetSpend;
   }): BudgetOverviewService {
     return new BudgetOverviewService(
       options.repository,
@@ -305,7 +305,7 @@ export class BudgetOverviewService {
     try {
       const spends = await this.chRepo.getSpendForTargetsAcrossTenants(
         tenantIds,
-        GatewayBudgetSpendPort.targetsForBudgets({ budgets: [budget], now }),
+        GatewayBudgetSpend.targetsForBudgets({ budgets: [budget], now }),
         now,
       );
 

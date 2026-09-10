@@ -13,9 +13,9 @@ import {
 import { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import { getStoredObjectStorageScheme } from "@langwatch/stored-object-contract";
 import {
-  StoredObjectAzureDestinationPort,
+  StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
-  StoredObjectProjectS3ConfigPort,
+  StoredObjectProjectS3Config,
   StoredObjectStorageRuntimeAdapter,
   type StoredObjectStorageDriver,
   type StoredObjectStorageSelection,
@@ -35,12 +35,12 @@ export type WorkerProjectS3Target = Readonly<{
 }>;
 
 /** The physical Worker resolves the current project target for every operation. */
-export abstract class WorkerProjectS3SourcePort extends StoredObjectProjectS3ConfigPort {
+export abstract class WorkerProjectS3Source extends StoredObjectProjectS3Config {
   abstract override tryGet(projectId: string): Promise<WorkerProjectS3Target | null>;
 }
 
 /** Azure stays lazy so an inactive or BYOC-first deployment never constructs it. */
-export abstract class WorkerAzureStorageFactoryPort extends StoredObjectAzureDestinationPort {
+export abstract class WorkerAzureStorageFactory extends StoredObjectAzureDestination {
   abstract createDriver(): StoredObjectStorageDriver | undefined;
 }
 
@@ -48,7 +48,7 @@ export type WorkerStoredObjectStorageConfig = Readonly<{
   backend: "azure" | "s3" | "file";
   localFilesystemRoot: string;
   globalS3?: WorkerProjectS3Target;
-  azure?: WorkerAzureStorageFactoryPort;
+  azure?: WorkerAzureStorageFactory;
 }>;
 
 /**
@@ -61,7 +61,7 @@ export type WorkerStoredObjectStorageConfig = Readonly<{
 export class WorkerStoredObjectStorageRuntimeFactory {
   static create(options: {
     config: WorkerStoredObjectStorageConfig;
-    projects: WorkerProjectS3SourcePort;
+    projects: WorkerProjectS3Source;
   }): WorkerStoredObjectStorageRuntimeFactory {
     if (options.config.backend === "azure" && !options.config.azure) {
       throw new Error("Worker Azure storage requires a configured Azure driver factory");
@@ -71,7 +71,7 @@ export class WorkerStoredObjectStorageRuntimeFactory {
 
   private constructor(
     private readonly config: WorkerStoredObjectStorageConfig,
-    private readonly projects: WorkerProjectS3SourcePort,
+    private readonly projects: WorkerProjectS3Source,
   ) {}
 
   createRuntime(): StoredObjectStorageRuntimeAdapter {
@@ -104,7 +104,7 @@ class WorkerS3StorageDriver implements StoredObjectStorageDriver {
   static create(options: {
     projectId: string;
     aws: AwsClientProcessRuntime;
-    projects: WorkerProjectS3SourcePort;
+    projects: WorkerProjectS3Source;
     global: WorkerProjectS3Target | undefined;
   }): WorkerS3StorageDriver {
     return new WorkerS3StorageDriver(
@@ -118,7 +118,7 @@ class WorkerS3StorageDriver implements StoredObjectStorageDriver {
   private constructor(
     private readonly projectId: string,
     private readonly aws: AwsClientProcessRuntime,
-    private readonly projects: WorkerProjectS3SourcePort,
+    private readonly projects: WorkerProjectS3Source,
     private readonly global: WorkerProjectS3Target | undefined,
   ) {}
 

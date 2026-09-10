@@ -73,7 +73,7 @@ export function mountAutomationRest(app: Partial<AutomationApi>) {
   return requests(
     runtime().mount(createAutomationRest(platformUrl).router(), {
       app: () => app as AutomationApi,
-      credential: "projectKey",
+      credential: "project",
       onError: renderHandled,
       facts: projectFacts(),
     }),
@@ -85,7 +85,7 @@ export function mountSlackAutomationRest(app: Partial<AutomationApi>) {
   return requests(
     runtime().mount(slackAutomationRest.router(), {
       app: () => app as AutomationApi,
-      credential: "projectKey",
+      credential: "project",
       onError: slackAutomationRestErrors,
     }),
   );

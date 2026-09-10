@@ -10,7 +10,7 @@ import { adminActor, adminAuthSession, adminRest, type AdminRestPorts } from "@l
 import type { OpsApp } from "@langwatch/ops-server";
 
 import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
-import type { ApiBrowserSessionTransportPort } from "../../app/api-auth.composition.ts";
+import type { ApiBrowserSessionTransport } from "../../app/api-auth.composition.ts";
 
 export type ApiAdminRestOptions = Readonly<{
   /** The operator application, where this process composed one. */
@@ -20,7 +20,7 @@ export type ApiAdminRestOptions = Readonly<{
    * where it composed one. The SAME pair every other session door reads, so
    * two doors cannot decide differently about who somebody is.
    */
-  session: Readonly<{ auth: BrowserSessionApi; sessions: ApiBrowserSessionTransportPort }> | undefined;
+  session: Readonly<{ auth: BrowserSessionApi; sessions: ApiBrowserSessionTransport }> | undefined;
 }>;
 
 /** The back office's ports, or none where either half is missing. */

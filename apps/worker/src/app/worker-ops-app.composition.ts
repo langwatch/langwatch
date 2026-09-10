@@ -34,7 +34,7 @@ import {
   OpsOperations,
   PrismaProcessAuditRepository,
   ProcessOpsPrismaRepository,
-  QueuePayloadDecoderPort,
+  QueuePayloadDecoder,
   DefaultOpsSnapshotService,
   RedisOpsSnapshotRepository,
   RedisSchedulerWakeAdapter,
@@ -254,7 +254,7 @@ function parseJson(input: string): unknown {
 }
 
 /** Ops inspection decodes ordinary JSON jobs while preserving opaque envelopes as unreadable. */
-class WorkerOpsQueuePayloadDecoder extends QueuePayloadDecoderPort {
+class WorkerOpsQueuePayloadDecoder extends QueuePayloadDecoder {
   static create(): WorkerOpsQueuePayloadDecoder {
     return new WorkerOpsQueuePayloadDecoder();
   }

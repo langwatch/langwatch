@@ -6,7 +6,7 @@ import {
   signWebhookPayload,
   WEBHOOK_DELIVERY_ID_HEADER,
   WEBHOOK_SIGNATURE_HEADER,
-  type WebhookDispatchRateLimiterPort,
+  type WebhookDispatchRateLimiter,
 } from "@langwatch/egress";
 
 import {
@@ -417,7 +417,7 @@ export interface SqsWebhookDestinationAdapterOptions extends SqsDestinationConfi
    * cap is a limit, not a gate: a process without a shared counter delivers
    * uncapped rather than refusing every queue endpoint it holds.
    */
-  rateLimiter?: WebhookDispatchRateLimiterPort | undefined;
+  rateLimiter?: WebhookDispatchRateLimiter | undefined;
 }
 
 export class SqsWebhookDestinationAdapter implements WebhookDestination {

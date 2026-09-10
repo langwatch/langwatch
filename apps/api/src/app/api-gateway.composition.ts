@@ -9,7 +9,7 @@ import {
   GatewayApp,
   GatewayApplicableBudgetsService,
   GatewayBudgetLedgerAdapter,
-  GatewayScopePermissionsPort,
+  GatewayScopePermissions,
   GatewaySpendEventsClickHouseAdapter,
   GatewaySpendEventsService,
   GatewayUsageService,
@@ -20,10 +20,10 @@ import {
   VirtualKeyCryptoAdapter,
   VirtualKeyDirectBudgetService,
   VirtualKeyService,
-  type GatewayBudgetSpendPort,
+  type GatewayBudgetSpend,
   type GatewayClickHouseClient,
   type GatewayClickHouseResolver,
-  type GatewayGovernanceSignalsPort,
+  type GatewayGovernanceSignals,
   type GatewayPermissionScope,
   type GatewayService,
   type GatewayVirtualKeySpendPort,
@@ -70,7 +70,7 @@ class ApiCapabilityUnavailableError extends HandledError {
  * dependency because the ledger — the `IdempotencyReceipt` claim, its heartbeat and its
  * takeover window — needs a database AND a cipher, and a deployment can hold neither.
  */
-export abstract class ApiGatewayIdempotencyPort {
+export abstract class ApiGatewayIdempotency {
   abstract readonly run: IdempotentRunner;
 }
 
@@ -79,7 +79,7 @@ export abstract class ApiGatewayIdempotencyPort {
  * the process opened none. The gateway's spend is a projection in that instance, so a
  * deployment holding no trace storage holds no spend to price a budget against.
  */
-export type ApiGatewayClickHousePort = Readonly<{
+export type ApiGatewayClickHouse = Readonly<{
   resolve(tenantId: string): Promise<GatewayClickHouseClient>;
 }>;
 
@@ -87,7 +87,7 @@ export type ApiGatewayClickHousePort = Readonly<{
  * The two questions a virtual-key write is authorized by, answered from this process's
  * own AuthZ service.
  */
-class ApiGatewayScopePermissions extends GatewayScopePermissionsPort {
+class ApiGatewayScopePermissions extends GatewayScopePermissions {
   static create(authz: AuthzService): ApiGatewayScopePermissions {
     return new ApiGatewayScopePermissions(authz);
   }
@@ -149,18 +149,18 @@ export type ApiGatewayCompositionOptions = Readonly<{
    * where the deployment opened none, which turns the spend source off by name
    * rather than by a zero.
    */
-  clickhouse: ApiGatewayClickHousePort | null;
+  clickhouse: ApiGatewayClickHouse | null;
   /** The HMAC key a virtual key's stored secret is hashed under. */
   virtualKeyPepper: string | undefined;
   /** The receipt ledger the keyed REST creates run through, where one exists. */
-  idempotency?: ApiGatewayIdempotencyPort | undefined;
+  idempotency?: ApiGatewayIdempotency | undefined;
   agentCache?: GatewayAppDependencies["agentCache"];
   elevenLabsWebhook?: GatewayAppDependencies["elevenLabsWebhook"];
   /**
    * Where a virtual key's lifecycle is announced, where the deployment composed a ledger
    * for it.
    */
-  governanceSignals?: GatewayGovernanceSignalsPort | undefined;
+  governanceSignals?: GatewayGovernanceSignals | undefined;
 }>;
 
 /** What this composition opened, for the doors that need more than the application. */
@@ -170,7 +170,7 @@ export type ApiGatewayComposition = Readonly<{
   /** The virtual-key operations service, as the governance console mints through it. */
   virtualKeys: VirtualKeyService;
   /** The ClickHouse budget ledger, or `undefined` on a process with no ClickHouse. */
-  budgetSpend: GatewayBudgetSpendPort | undefined;
+  budgetSpend: GatewayBudgetSpend | undefined;
   /** The per-key spend rollup, or `undefined` for the same reason. */
   virtualKeySpend: GatewayVirtualKeySpendPort | undefined;
   /** The spend-event feed the REST spend family reads, on the same terms. */

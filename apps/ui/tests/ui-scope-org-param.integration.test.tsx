@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { UiRpcContextProvider, UiRpcPort, type UiRpcSubscription } from "../src/behavior/ui-rpc";
+import { UiRpcContextProvider, UiRpc, type UiRpcSubscription } from "../src/behavior/ui-rpc";
 import { useUiOrgQueryParamSelection } from "../src/behavior/ui-scope-org-param";
 import {
   UI_SELECTED_ORGANIZATION_ID_KEY,
@@ -26,7 +26,7 @@ const ROUTE_PATHS = ["/me", "/settings", "/gateway/virtual-keys"];
 const query = vi.fn((_path: string) => Promise.resolve(ORGANIZATIONS as unknown));
 
 /** Answers `organization.getAll` and refuses everything a page has no business asking here. */
-class RecordedUiRpc extends UiRpcPort {
+class RecordedUiRpc extends UiRpc {
   query(path: string): Promise<unknown> {
     return query(path);
   }

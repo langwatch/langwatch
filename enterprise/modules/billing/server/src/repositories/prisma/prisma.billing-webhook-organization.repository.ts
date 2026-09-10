@@ -3,15 +3,15 @@
  *
  * The organization aggregate belongs to a core feature, so billing reaches four
  * named columns of it rather than that feature's repository — the same narrow
- * shape {@link BillingWebhookOrganizationPort} declares.
+ * shape {@link BillingWebhookOrganization} declares.
  */
 import type { Currency, PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { BillingWebhookOrganizationPort } from "../billing-webhook-organization.repository.ts";
+import { BillingWebhookOrganization } from "../billing-webhook-organization.repository.ts";
 
 export type BillingWebhookOrganizationDatabase = Pick<PrismaClient, "organization">;
 
-export class PrismaBillingWebhookOrganizationRepository extends BillingWebhookOrganizationPort {
+export class PrismaBillingWebhookOrganizationRepository extends BillingWebhookOrganization {
   private constructor(private readonly database: BillingWebhookOrganizationDatabase) {
     super();
   }

@@ -1,7 +1,7 @@
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
-import { TraceSpoolStoragePort, type TraceSpoolObjectStore } from "@langwatch/trace-server";
+import { TraceSpoolStorage, type TraceSpoolObjectStore } from "@langwatch/trace-server";
 
 export type ApiTraceSpoolStorageOptions = {
   runtime: StoredObjectStorageRuntimeAdapter;
@@ -15,7 +15,7 @@ export type ApiTraceSpoolStorageOptions = {
  * project so a BYOC tenant writes into its own bucket. The worker's twin.
  */
 // NO v1 TRANSPORT: this process is the WRITE side, and only ever mints v2.
-export class ApiTraceSpoolStorageAdapter extends TraceSpoolStoragePort {
+export class ApiTraceSpoolStorageAdapter extends TraceSpoolStorage {
   static create(options: ApiTraceSpoolStorageOptions): ApiTraceSpoolStorageAdapter {
     return new ApiTraceSpoolStorageAdapter(options);
   }

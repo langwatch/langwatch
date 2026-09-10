@@ -2,7 +2,7 @@
  * Virtual-key crypto: mint/hash/verify vk-lw-<ULID>. hashedSecret is HMAC-SHA256(pepper, secret) for deterministic lookup-by-hash in one indexed query; HMAC over argon2id since the secret already carries 128+ bits of entropy (no offline brute-force to mitigate) and must stay fast on the hot resolve path — same choice Stripe/GitHub API keys make. The pepper (LW_VIRTUAL_KEY_PEPPER) keeps a DB leak alone from recovering plaintext.
  */
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
-import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port.ts";
+import { GatewayVirtualKeyCrypto } from "../app/gateway.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 
 const VK_PREFIX = "vk-lw-";
@@ -29,7 +29,7 @@ export type VirtualKeyCryptoConfig = {
   pepper?: string;
 };
 
-export class VirtualKeyCryptoAdapter extends GatewayVirtualKeyCryptoPort {
+export class VirtualKeyCryptoAdapter implements GatewayVirtualKeyCrypto {
   static readonly displayPrefixLength = 13;
 
   static create(config: VirtualKeyCryptoConfig): VirtualKeyCryptoAdapter {
@@ -37,7 +37,6 @@ export class VirtualKeyCryptoAdapter extends GatewayVirtualKeyCryptoPort {
   }
 
   private constructor(private readonly pepper: string | undefined) {
-    super();
   }
 
   /** The minting and parsing halves of the port, over this module's format. */

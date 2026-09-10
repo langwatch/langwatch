@@ -3,7 +3,7 @@
 import {
   type CancelledSubscription,
   type SubscriptionWithOrg,
-  BillingWebhookSubscriptionPort,
+  BillingWebhookSubscription,
 } from "../billing-webhook-subscription.repository.ts";
 import type {
   SubscriptionRepository,
@@ -15,7 +15,7 @@ import type { MemoryBillingStore } from "./memory-billing.store.ts";
  * The webhook's nullable view of the subscription aggregate. Null means only
  * one thing here, as it does in the Prisma twin: the row Stripe named is gone.
  */
-export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSubscriptionPort {
+export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSubscription {
   private constructor(
     private readonly subscriptions: SubscriptionRepository,
     private readonly store: MemoryBillingStore,

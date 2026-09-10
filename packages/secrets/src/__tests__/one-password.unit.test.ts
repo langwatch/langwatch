@@ -3,9 +3,9 @@ import {
   OnePasswordSecretSource,
   OnePasswordUnavailableError,
 } from "../one-password.secret-source.ts";
-import { ProcessRunnerPort, type ProcessResult } from "../process-runner.port.ts";
+import { ProcessRunner, type ProcessResult } from "../process-runner.port.ts";
 
-class FakeRunner extends ProcessRunnerPort {
+class FakeRunner extends ProcessRunner {
   readonly calls: { command: string; args: readonly string[]; input?: string }[] = [];
 
   constructor(private readonly answer: (input: string) => ProcessResult) {

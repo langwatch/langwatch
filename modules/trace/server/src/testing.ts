@@ -21,7 +21,7 @@ export class MissingTraceRecordRepository extends TraceRecordRepository {
   }
 }
 
-export class EmptyTraceEventDerivationPort implements TraceEventDerivation {
+export class EmptyTraceEventDerivation implements TraceEventDerivation {
   async derive(_input: TraceDerivedEventsInput): Promise<[]> {
     return [];
   }
@@ -33,7 +33,7 @@ export class EmptyTraceSummaryReaderRepository extends TraceSummaryReaderReposit
   }
 }
 
-export class EmptyTraceQueryClassificationPort implements TraceQueryClassifier {
+export class EmptyTraceQueryClassification implements TraceQueryClassifier {
   classify() {
     return { evaluations: false, events: false, spans: false };
   }

@@ -32,7 +32,7 @@ export interface PersistCapDependencies {
 }
 
 /** Redis commands used by the cap, independent of a concrete client. */
-export interface AutomationPersistCapRedisPort {
+export interface AutomationPersistCapRedis {
   eval(script: string, keyCount: number, ...keysAndArguments: string[]): Promise<unknown>;
   get(key: string): Promise<string | null>;
 }
@@ -63,22 +63,22 @@ export type PersistCapClaimKeyInput = Pick<
 >;
 
 export type ConsumePersistCapSlotOptions = ConsumePersistCapSlotInput & {
-  redis?: AutomationPersistCapRedisPort | null;
+  redis?: AutomationPersistCapRedis | null;
 };
 
 export type ReadPersistCapCountsOptions = ReadPersistCapCountsInput & {
-  redis?: AutomationPersistCapRedisPort | null;
+  redis?: AutomationPersistCapRedis | null;
 };
 
 /** One process-owned service for plan resolution and idempotent cap claims. */
 export class AutomationPersistCapService {
   private constructor(
     private readonly dependencies: PersistCapDependencies,
-    private readonly redis: AutomationPersistCapRedisPort | null,
+    private readonly redis: AutomationPersistCapRedis | null,
   ) {}
 
   static create(
-    input: PersistCapDependencies & { redis?: AutomationPersistCapRedisPort | null },
+    input: PersistCapDependencies & { redis?: AutomationPersistCapRedis | null },
   ): AutomationPersistCapService {
     return new AutomationPersistCapService(input, input.redis ?? null);
   }
@@ -142,7 +142,7 @@ export class AutomationPersistCapService {
      */
     dedupKey: string;
     /** Omit for the App's connection; pass `null` to force the in-memory path. */
-    redis?: AutomationPersistCapRedisPort | null;
+    redis?: AutomationPersistCapRedis | null;
   }): Promise<PersistCapDecision> {
     const key = AutomationPersistCapService.persistCapKey({ projectId, triggerId, now });
     const claimKey = AutomationPersistCapService.persistCapClaimKey({
@@ -356,7 +356,7 @@ export class AutomationPersistCapService {
   }: {
     key: string;
     claimKey: string;
-    connection: AutomationPersistCapRedisPort | null;
+    connection: AutomationPersistCapRedis | null;
   }): Promise<number | null> {
     if (!connection) {
       return null;

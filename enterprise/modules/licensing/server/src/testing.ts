@@ -7,7 +7,7 @@ import type { LicenseData } from "@langwatch/enterprise-licensing-contract";
 import { planQuantities } from "@langwatch/plans";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { LicensingApp, type LicensingInfrastructure } from "./app/licensing.app.ts";
-import { LicenseStoragePort, type StoredLicense } from "./ports/license-storage.port.ts";
+import { LicenseStorage, type StoredLicense } from "./app/licensing.infrastructure.ts";
 import { TEST_PUBLIC_KEY } from "./fixtures/license-keys.fixture.ts";
 
 /**
@@ -122,7 +122,7 @@ export const MALFORMED_BASE64 = "not-valid-base64!!!";
 export const INVALID_JSON_BASE64 = Buffer.from("not json").toString("base64");
 export const GARBAGE_DATA = "garbage-data";
 
-class TestLicenseStorage extends LicenseStoragePort {
+class TestLicenseStorage implements LicenseStorage {
   private license: string | null = null;
 
   async tryReadLicense(): Promise<string | null> {

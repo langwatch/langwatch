@@ -1,14 +1,14 @@
-import { Task, TaskHostPort } from "@langwatch/task";
+import { Task, TaskHost } from "@langwatch/task";
 
 /**
  * What a saas (or other private) plugin module exports: exactly one of a
- * ready-made array, or a factory over this process's own `TaskHostPort` —
+ * ready-made array, or a factory over this process's own `TaskHost` —
  * the same host the built-in catalogue's tasks get. Contract:
  * `dev/docs/adr/102-runtime-composition-roots.md`, amendment 2026-09-06.
  */
 export type TaskModuleExports = {
   tasks?: readonly Task[];
-  createTasks?: (host: TaskHostPort) => readonly Task[];
+  createTasks?: (host: TaskHost) => readonly Task[];
 };
 
 /**
@@ -23,7 +23,7 @@ export async function loadTaskModules({
   host,
 }: {
   specifiers: readonly string[];
-  host: TaskHostPort;
+  host: TaskHost;
 }): Promise<Task[]> {
   const tasks: Task[] = [];
   for (const specifier of specifiers) {
@@ -45,7 +45,7 @@ async function loadOneTaskModule({
   host,
 }: {
   specifier: string;
-  host: TaskHostPort;
+  host: TaskHost;
 }): Promise<readonly Task[]> {
   let moduleExports: TaskModuleExports;
   try {

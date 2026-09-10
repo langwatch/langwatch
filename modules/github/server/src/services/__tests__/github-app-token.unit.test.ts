@@ -20,7 +20,7 @@ import {
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
 } from "../../app/github.app.ts";
-import type { GithubRedisPort } from "../../repositories/redis/github-redis.connection.ts";
+import type { GithubRedis } from "../../repositories/redis/github-redis.connection.ts";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -28,7 +28,7 @@ const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   publicKeyEncoding: { type: "spki", format: "pem" },
 });
 
-function fakeRedis(): GithubRedisPort & { store: Map<string, string> } {
+function fakeRedis(): GithubRedis & { store: Map<string, string> } {
   const store = new Map<string, string>();
   return {
     store,
@@ -45,7 +45,7 @@ function fakeRedis(): GithubRedisPort & { store: Map<string, string> } {
       return store.delete(k) ? 1 : 0;
     },
     // Implements the compare-and-delete release script: eval(script, 1, key, token).
-    // Takes the trailing arguments as the rest parameter GithubRedisPort declares,
+    // Takes the trailing arguments as the rest parameter GithubRedis declares,
     // rather than naming them, so the fake keeps the real client's shape.
     async tryEval(_script, _numKeys, ...args) {
       const [key, token] = args;

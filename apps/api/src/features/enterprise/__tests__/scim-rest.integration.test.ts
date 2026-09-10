@@ -13,7 +13,7 @@ import {
   type EventSourcedQueueProcessor,
   EventStoreProducerOnly,
 } from "@langwatch/eventing";
-import type { IdentityEventingPort } from "@langwatch/identity-server";
+import type { IdentityEventing } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
@@ -527,7 +527,7 @@ async function scimWorld(
      * process that registered no pipeline at all, which is what every scenario
      * above is about — none of them states a directory-sync fact.
      */
-    eventing?: IdentityEventingPort;
+    eventing?: IdentityEventing;
   } = {},
 ) {
   const users = {

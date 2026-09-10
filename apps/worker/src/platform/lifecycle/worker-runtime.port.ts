@@ -1,11 +1,11 @@
-export abstract class WorkerHandlePort {
+export abstract class WorkerHandle {
   abstract shutdown(): Promise<void>;
 }
 
-export abstract class WorkerLifecyclePort {
+export abstract class WorkerLifecycle {
   abstract close(): Promise<void>;
 }
 
-export abstract class WorkerTransportPort {
-  abstract start(): Promise<WorkerHandlePort>;
+export abstract class WorkerTransport {
+  abstract start(): Promise<WorkerHandle>;
 }

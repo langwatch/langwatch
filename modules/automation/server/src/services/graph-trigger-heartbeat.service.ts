@@ -31,8 +31,8 @@ import type {
 } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type {
-  AutomationHeartbeatPort,
-  AutomationLoggerPort,
+  AutomationHeartbeat,
+  AutomationLogger,
 } from "../ports/automation-graph.port.ts";
 import type { Instant } from "@langwatch/time";
 import { fromDate } from "@langwatch/time";
@@ -77,8 +77,8 @@ interface CandidateTrigger {
 export interface GraphTriggerHeartbeatDeps {
   triggers: TriggerRepository;
   triggerSent: GraphTriggerSentRepository;
-  heartbeat: AutomationHeartbeatPort;
-  logger: AutomationLoggerPort;
+  heartbeat: AutomationHeartbeat;
+  logger: AutomationLogger;
 }
 
 /**

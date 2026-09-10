@@ -7,9 +7,9 @@ import {
   type ExperimentAppDependencies,
   ExperimentFindOrCreateService,
   type ExecutionDataServices,
-  type ExperimentRunAbortPort,
+  type ExperimentRunAbort,
   type ExperimentRunPorts,
-  type ExperimentRunProgressPort,
+  type ExperimentRunProgress,
   type ExperimentService,
 } from "@langwatch/experiment-server";
 import { HandledError } from "@langwatch/handled-error";
@@ -136,13 +136,13 @@ export function experimentRun(
   } = {},
 ): ApiExperimentRun {
   const available = options.available ?? true;
-  const abort = createApiFixture<ExperimentRunAbortPort>({
+  const abort = createApiFixture<ExperimentRunAbort>({
     findRunningProjectId: options.findRunningProjectId ?? (async () => null),
     requestAbort: options.requestAbort ?? (async () => {}),
   });
   const ports = available ? createApiFixture<ExperimentRunPorts>({ abort }) : null;
   const progress = available
-    ? createApiFixture<ExperimentRunProgressPort>({ findRunState: async () => null })
+    ? createApiFixture<ExperimentRunProgress>({ findRunState: async () => null })
     : null;
 
   return createApiFixture<ApiExperimentRun>({

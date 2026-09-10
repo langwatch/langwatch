@@ -18,8 +18,8 @@ import {
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
-import type { GatewayAuditPort } from "../../ports/gateway-audit.port.ts";
-import type { GatewayChangeEventsPort } from "../../ports/gateway-change-events.port.ts";
+import type { GatewayAudit } from "../../app/gateway.infrastructure.ts";
+import type { GatewayChangeEvents } from "../../app/gateway.infrastructure.ts";
 import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository.ts";
 
 const wirePages = GatewayWirePaginationAdapter.create();
@@ -34,16 +34,16 @@ export type GatewayCacheRuleDatabase = Pick<PrismaClient, "gatewayCacheRule" | "
 export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository {
   static create(input: {
     database: GatewayCacheRuleDatabase;
-    changes: GatewayChangeEventsPort;
-    audit: GatewayAuditPort;
+    changes: GatewayChangeEvents;
+    audit: GatewayAudit;
   }): PrismaGatewayCacheRuleRepository {
     return new PrismaGatewayCacheRuleRepository(input.database, input.changes, input.audit);
   }
 
   private constructor(
     private readonly database: GatewayCacheRuleDatabase,
-    private readonly changes: GatewayChangeEventsPort,
-    private readonly audit: GatewayAuditPort,
+    private readonly changes: GatewayChangeEvents,
+    private readonly audit: GatewayAudit,
   ) {
     super();
   }

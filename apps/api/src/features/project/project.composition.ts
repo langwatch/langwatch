@@ -8,7 +8,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { projectServer } from "@langwatch/project-server";
 import { createApp } from "@langwatch/runtime-composition";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretEncryption } from "@langwatch/secret-server";
 import { ShareApi, type ShareApi as ShareApiContract } from "@langwatch/share-contract";
 import { TopicApi, type TopicApi as TopicApiContract } from "@langwatch/topic-contract";
 import {
@@ -19,7 +19,7 @@ import {
 import type { ApiAuditPort } from "../../api-request.policy.ts";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
-import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections.ts";
+import type { ApiViewerProtections } from "../trace/trace-viewer-protections.ts";
 import { createProjectTrpcRouter, type ProjectBrowserPorts } from "./project-trpc.mount.ts";
 
 /** The other services one project's own surfaces reach. */
@@ -33,9 +33,9 @@ export type ProjectPeers = Readonly<{
   /** The topic tree the trace group composed. */
   topics: TopicApiContract;
   /** The deployment's cipher, for a project's object-storage credentials. */
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
   /** The protections resolver, where the deployment composed one. */
-  viewerProtections?: ApiViewerProtectionsPort | undefined;
+  viewerProtections?: ApiViewerProtections | undefined;
 }>;
 
 import type { ComposedProjectFeature } from "./project.composition.types.ts";

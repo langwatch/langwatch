@@ -3,7 +3,7 @@ import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
 import { describe, expect, it } from "vitest";
 import {
   createWorkerScenarioProcessing,
-  WorkerScenarioAbsenceReportPort,
+  WorkerScenarioAbsenceReport,
 } from "../worker-scenario-processing.composition.ts";
 import type { ExecuteRunIntent } from "@langwatch/scenario-server";
 import { resolveWorkerScenarioExecutionPrerequisites } from "../worker-scenario-execution.composition.ts";
@@ -27,7 +27,7 @@ function reset(): void {
   RECORDED.commands.length = 0;
 }
 
-class RecordingAbsence extends WorkerScenarioAbsenceReportPort {
+class RecordingAbsence extends WorkerScenarioAbsenceReport {
   withoutExecutionPool(): void {
     RECORDED.absences.push("executionPool");
   }

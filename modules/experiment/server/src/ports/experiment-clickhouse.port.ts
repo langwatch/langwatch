@@ -35,6 +35,6 @@ export type ExperimentEventingClickHouseClient = {
  * resolves its client through this port, so no persistence module reaches for a
  * connection of its own.
  */
-export abstract class ExperimentClickHousePort {
+export abstract class ExperimentClickHouse {
   abstract resolveClient(tenantId: string): Promise<ExperimentEventingClickHouseClient>;
 }

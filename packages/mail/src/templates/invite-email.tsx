@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDeliveryPort } from "../providers/types.ts";
+import type { EmailDelivery } from "../providers/types.ts";
 import { EmailLayout, Muted, Paragraph, PrimaryButton } from "./email-layout.tsx";
 import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
@@ -109,7 +109,7 @@ export const inviteEmailTemplate = defineTemplate({
 export const sendInviteEmail = async ({
   mailer,
   ...props
-}: InviteEmailProps & { mailer: EmailDeliveryPort }) => {
+}: InviteEmailProps & { mailer: EmailDelivery }) => {
   const { subject, html } = await renderMailTemplate(inviteEmailTemplate, props);
   await sendEmail({ mailer, content: { to: props.email, subject, html } });
 };

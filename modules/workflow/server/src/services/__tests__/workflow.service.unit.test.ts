@@ -6,11 +6,11 @@ import {
   type RunWorkflowCommand,
 } from "@langwatch/workflow-contract";
 import {
-  WorkflowDslMigrationPort,
-  WorkflowExecutionPort,
-  WorkflowIdPort,
+  WorkflowDslMigration,
+  WorkflowExecution,
+  WorkflowId,
   type WorkflowExecutionInput,
-} from "../../ports/workflow.port.ts";
+} from "../../app/workflow.app.ts";
 import type {
   StudioEventPreparer,
   StudioEventPreparationInput,
@@ -202,7 +202,7 @@ class FakeWorkflowRepository extends WorkflowRepository {
   }
 }
 
-class FakeWorkflowExecutionPort extends WorkflowExecutionPort {
+class FakeWorkflowExecution implements WorkflowExecution {
   readonly calls: WorkflowExecutionInput[] = [];
 
   async execute(input: WorkflowExecutionInput): Promise<unknown> {
@@ -211,13 +211,13 @@ class FakeWorkflowExecutionPort extends WorkflowExecutionPort {
   }
 }
 
-class FakeWorkflowDslMigrationPort extends WorkflowDslMigrationPort {
+class FakeWorkflowDslMigration implements WorkflowDslMigration {
   migrate(dsl: WorkflowVersion["dsl"]): WorkflowVersion["dsl"] {
     return { ...dsl, name: `${dsl.name} migrated` };
   }
 }
 
-class FakeWorkflowIdPort extends WorkflowIdPort {
+class FakeWorkflowId implements WorkflowId {
   constructor(private readonly value = "id") {
     super();
   }
@@ -245,7 +245,7 @@ class FakeStudioEventPreparer implements StudioEventPreparer {
 const service = (
   repository = new FakeWorkflowRepository(),
   options: {
-    execution?: WorkflowExecutionPort;
+    execution?: WorkflowExecution;
     studioEvents?: StudioEventPreparer;
   } = {},
 ) =>
@@ -253,9 +253,9 @@ const service = (
     repository,
     datasets: new TestDatasetService().api,
     studioEvents: options.studioEvents ?? new FakeStudioEventPreparer(),
-    dslMigration: new FakeWorkflowDslMigrationPort(),
-    execution: options.execution ?? new FakeWorkflowExecutionPort(),
-    ids: new FakeWorkflowIdPort(),
+    dslMigration: new FakeWorkflowDslMigration(),
+    execution: options.execution ?? new FakeWorkflowExecution(),
+    ids: new FakeWorkflowId(),
     ...options,
   });
 
@@ -278,9 +278,9 @@ describe("WorkflowService", () => {
       repository: new FakeWorkflowRepository(),
       datasets: new TestDatasetService().api,
       studioEvents: new FakeStudioEventPreparer(),
-      dslMigration: new FakeWorkflowDslMigrationPort(),
-      execution: new FakeWorkflowExecutionPort(),
-      ids: new FakeWorkflowIdPort(),
+      dslMigration: new FakeWorkflowDslMigration(),
+      execution: new FakeWorkflowExecution(),
+      ids: new FakeWorkflowId(),
     });
     const result = await workflowService.create({
       projectId: "project_1",
@@ -464,7 +464,7 @@ describe("WorkflowService", () => {
   /** @scenario "Published version selection is tenant scoped" */
   it("validates and dispatches a resolved published version through the execution port", async () => {
     const repository = new FakeWorkflowRepository();
-    const execution = new FakeWorkflowExecutionPort();
+    const execution = new FakeWorkflowExecution();
     const workflowService = service(repository, { execution });
     const version = await repository.createVersion({
       id: "version_1",

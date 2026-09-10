@@ -11,7 +11,7 @@ import { OutputPathInput } from "../elements/http-output-path-input.tsx";
 import { SessionPathInput } from "../elements/http-session-path-input.tsx";
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { ReactNode } from "react";
-import type { HttpTestErrorExplanationPort } from "../../model/http-test.types.ts";
+import type { HttpTestErrorExplanation } from "../../model/http-test.types.ts";
 import type { HttpTestResult } from "../../model/http-test.types.ts";
 
 export interface RenderScenarioMappingsInput {
@@ -57,7 +57,7 @@ export type AgentHttpEditorTabsProps = {
   onTest: (variables: Record<string, unknown>) => Promise<HttpTestResult>;
   renderScenarioMappings(input: RenderScenarioMappingsInput): ReactNode;
   renderVariables(input: RenderAgentVariablesInput): ReactNode;
-  explainTestError: HttpTestErrorExplanationPort;
+  explainTestError: HttpTestErrorExplanation;
 };
 
 export function AgentHttpEditorTabs({

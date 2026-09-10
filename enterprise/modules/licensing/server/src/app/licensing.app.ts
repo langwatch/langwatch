@@ -24,7 +24,7 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { LicenseCryptography } from "./licensing.infrastructure.ts";
 import type { LicenseLogger } from "./licensing.infrastructure.ts";
 import type { LicenseRetention } from "./licensing.infrastructure.ts";
-import type { LicenseStoragePort } from "../ports/license-storage.port.ts";
+import type { LicenseStorage } from "./licensing.infrastructure.ts";
 import type { LicenseUsage } from "./licensing.infrastructure.ts";
 import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
@@ -32,7 +32,7 @@ import { fromDate, nowInstant, Temporal } from "@langwatch/time";
 
 /** What the process composes this feature's application from. */
 export type LicensingInfrastructure = Readonly<{
-  repository: LicenseStoragePort;
+  repository: LicenseStorage;
   usage?: LicenseUsage;
   retention?: LicenseRetention;
   logger?: LicenseLogger;

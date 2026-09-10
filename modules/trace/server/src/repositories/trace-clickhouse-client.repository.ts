@@ -28,6 +28,6 @@ export type TraceClickHouseWriteResolver = (
   tenantId: string,
 ) => Promise<TraceClickHouseWriteClient>;
 
-export abstract class TraceClickHousePort {
+export abstract class TraceClickHouse {
   abstract resolve(tenantId: string): Promise<TraceClickHouseClient>;
 }

@@ -11,7 +11,7 @@ import {
   type LangyConversationCommands,
   type LangyTurnTechnicalPorts,
 } from "@langwatch/langy-server";
-import type { PresenceEmitterPort } from "@langwatch/presence-server";
+import type { PresenceEmitter } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
@@ -104,7 +104,7 @@ function composedTurns(redis: RedisConnection | null): LangyTurnTechnicalPorts {
     commands: {} as unknown as LangyConversationCommands,
     redis,
     publicBaseUrl: undefined,
-    broadcast: {} as unknown as PresenceEmitterPort,
+    broadcast: {} as unknown as PresenceEmitter,
     demoProjectId: undefined,
     rateLimit: async () => ({ allowed: true, resetAt: 0 }),
     processName: "langwatch-api-test",

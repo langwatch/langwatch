@@ -13,7 +13,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { describe, expect, it } from "vitest";
-import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
+import { GatewayAudit } from "../app/gateway.infrastructure.ts";
 
 class FakeBudgetRepository extends GatewayBudgetRepository {
   input: GatewayBudgetCheckReadInput | null = null;
@@ -142,7 +142,7 @@ function unusedMonitors(): MonitorApi {
   return new Proxy({}, { get: () => refuse, has: () => true }) as MonitorApi;
 }
 
-class NullGatewayAuditPort extends GatewayAuditPort {
+class NullGatewayAudit implements GatewayAudit {
   append(): Promise<void> {
     return Promise.resolve();
   }
@@ -164,7 +164,7 @@ function serviceFor(result: GatewayBudgetCheckResult): {
         evaluators: createApiFixture<EvaluatorApi>(),
         monitors: unusedMonitors(),
         projects,
-        audit: new NullGatewayAuditPort(),
+        audit: new NullGatewayAudit(),
       }),
     }),
     repository,
@@ -200,7 +200,7 @@ function serviceOverCatalogues({
       evaluators: createApiFixture<EvaluatorApi>(),
       monitors: unusedMonitors(),
       projects,
-      audit: new NullGatewayAuditPort(),
+      audit: new NullGatewayAudit(),
     }),
   });
 }

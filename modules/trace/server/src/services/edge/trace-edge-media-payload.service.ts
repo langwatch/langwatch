@@ -5,7 +5,7 @@ import {
   type EdgeMediaExtractionDeps,
   type EdgeMediaExtractionLogger,
 } from "./trace-edge-media-extraction.service.ts";
-import { TraceIngressPayloadPort } from "../ingestion/trace-ingestion.service.ts";
+import { TraceIngressPayload } from "../ingestion/trace-ingestion.service.ts";
 
 // Extraction runs FIRST, which is why `next` is a member here rather than an
 // ordering a composition root remembers: externalizing the heavy part usually
@@ -17,12 +17,12 @@ import { TraceIngressPayloadPort } from "../ingestion/trace-ingestion.service.ts
  * both halves: extraction returns the span unchanged on any failure, and
  * whatever follows sees exactly what it would have seen.
  */
-export class TraceEdgeMediaPayloadService extends TraceIngressPayloadPort {
+export class TraceEdgeMediaPayloadService extends TraceIngressPayload {
   static create(options: {
     deps: EdgeMediaExtractionDeps;
     logger: EdgeMediaExtractionLogger;
     /** The preparation this one runs before, when the process composed one. */
-    next?: TraceIngressPayloadPort;
+    next?: TraceIngressPayload;
   }): TraceEdgeMediaPayloadService {
     return new TraceEdgeMediaPayloadService(options);
   }
@@ -31,7 +31,7 @@ export class TraceEdgeMediaPayloadService extends TraceIngressPayloadPort {
     private readonly options: {
       deps: EdgeMediaExtractionDeps;
       logger: EdgeMediaExtractionLogger;
-      next?: TraceIngressPayloadPort;
+      next?: TraceIngressPayload;
     },
   ) {
     super();

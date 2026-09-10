@@ -25,15 +25,18 @@ import {
   prismaModelNames,
 } from "./persistence/prisma-table-ownership.ts";
 import { lintClickhouseTableOwnership } from "./persistence/clickhouse-table-ownership.ts";
+import { lintMemoryTwinDrift } from "./persistence/memory-twin-drift.ts";
 import { lintPrismaMigrationAccess } from "./persistence/prisma-migration-access.ts";
 import { lintCommentBlockRoots } from "./quality/comment-blocks.ts";
 import { lintComposedExports } from "./quality/composed-exports.ts";
 import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.ts";
 import { lintDeclarationProjectReferences } from "./quality/declaration-project-references.ts";
 import { lintDeclarations } from "./quality/declarations.ts";
+import { lintInfrastructureMembers } from "./quality/infrastructure-member-unused.ts";
 import { lintOxlintBaseline } from "./quality/oxlint-baseline-check.ts";
 import { lintServiceCeilings } from "./quality/service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./quality/service-projection-boundaries.ts";
+import { lintUnusedModuleExports } from "./quality/unused-module-export.ts";
 import {
   lintCompositionRootMayOnlyShrink,
   lintMountFileIsOneCall,
@@ -67,6 +70,7 @@ export function definePolicy(policy: PolicyDefinition): PolicyDefinition {
 const FEATURE_PACKAGE_BOUNDARIES = "specs/feature-package-boundaries.feature";
 const STRICT_FEATURE_LAYOUT = "specs/strict-feature-layout.feature";
 const LINT_BASELINES = "specs/lint-baselines.feature";
+const DEAD_CODE_GUARDS = "specs/dead-code-guards.feature";
 
 /** Prisma migration access needs the same schema read as table ownership; share it rather than re-parse. */
 function lintPrismaMigrationAccessPolicy(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
@@ -107,6 +111,24 @@ export const POLICIES: readonly PolicyDefinition[] = [
     spec: STRICT_FEATURE_LAYOUT,
     baseline: "feature-shape-baseline.json",
     run: lintFeatureShape,
+  }),
+  definePolicy({
+    id: "unused-module-export",
+    spec: DEAD_CODE_GUARDS,
+    baseline: "unused-module-export-baseline.json",
+    run: lintUnusedModuleExports,
+  }),
+  definePolicy({
+    id: "infrastructure-member-unused",
+    spec: DEAD_CODE_GUARDS,
+    baseline: "infrastructure-member-unused-baseline.json",
+    run: lintInfrastructureMembers,
+  }),
+  definePolicy({
+    id: "memory-twin-drift",
+    spec: DEAD_CODE_GUARDS,
+    baseline: "memory-twin-drift-baseline.json",
+    run: lintMemoryTwinDrift,
   }),
   definePolicy({
     id: "source-folder-shape",

@@ -9,7 +9,7 @@ export interface ConnectionDirectoryRevocation {
     connectionId: string;
   }): Promise<{ revoked: number }>;
 }
-import type { ConnectionTeardownPort } from "../processes/connection-teardown.process.ts";
+import type { ConnectionTeardown } from "../processes/connection-teardown.process.ts";
 import { newSsoConnectionCommandId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 import { createLogger } from "@langwatch/observability";
@@ -21,7 +21,7 @@ const logger = createLogger("langwatch:identity:sso-connection-teardown");
  * projection write, and that is the point — the process manager decides WHEN,
  * `completeTeardown` command (ADR-117 §5).
  */
-export class SsoConnectionTeardownDispatcherAdapter implements ConnectionTeardownPort {
+export class SsoConnectionTeardownDispatcherAdapter implements ConnectionTeardown {
   static create({
     connections,
     scim,

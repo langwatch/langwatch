@@ -30,7 +30,7 @@ import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { ApiClickHouseConfigResolution } from "../config/api.config.ts";
 
 /** Reports the composition decision an unconfigured ClickHouse would otherwise hide. */
-export abstract class ApiClickHouseAbsenceReportPort {
+export abstract class ApiClickHouseAbsenceReport {
   abstract absent(): void;
 }
 
@@ -156,7 +156,7 @@ export class ApiClickHouseInfrastructure {
    * Composes the connection only when this process was given an endpoint.
    */
   static tryCreate(
-    options: ApiClickHouseInfrastructureOptions & { report?: ApiClickHouseAbsenceReportPort },
+    options: ApiClickHouseInfrastructureOptions & { report?: ApiClickHouseAbsenceReport },
   ): ApiClickHouseInfrastructure | undefined {
     const configured =
       Boolean(options.clickhouse.url?.trim()) || options.clickhouse.privateRoutes.length > 0;

@@ -6,7 +6,7 @@ import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { MemoryProcessOpsRepository } from "../../repositories/memory/memory.process-ops.repository.ts";
 import type { ProcessNameCounts } from "../../repositories/process/process-ops.repository.ts";
 import {
-  OpsEventingIntrospectionPort,
+  OpsEventingIntrospection,
   type OpsProcessManagerMetadata,
 } from "../../app/ops.app.ts";
 
@@ -51,7 +51,7 @@ function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = 
     hasWake: true,
   }));
 
-  class FakeIntrospection implements OpsEventingIntrospectionPort {
+  class FakeIntrospection implements OpsEventingIntrospection {
     killSwitches(): never[] {
       return [];
     }

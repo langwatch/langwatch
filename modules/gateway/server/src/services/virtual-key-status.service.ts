@@ -6,11 +6,11 @@
 
 import { TRPCError } from "@trpc/server";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
-import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
-import type { GatewayTransactionPort } from "../ports/gateway-transaction.port.ts";
-import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port.ts";
-import type { GatewayVirtualKeysPort } from "../ports/gateway-virtual-key.port.ts";
+import { GatewayAudit } from "../app/gateway.infrastructure.ts";
+import { GatewayChangeEvents } from "../app/gateway.infrastructure.ts";
+import type { GatewayTransaction } from "../app/gateway.infrastructure.ts";
+import type { GatewayGovernanceSignals } from "../app/gateway.infrastructure.ts";
+import type { GatewayVirtualKeys } from "../ports/gateway-virtual-key.port.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import {
   VirtualKeyValidationService,
@@ -19,23 +19,23 @@ import {
 
 export class VirtualKeyStatusService {
   private constructor(
-    private readonly transactions: GatewayTransactionPort,
-    private readonly repository: GatewayVirtualKeysPort,
-    private readonly changeEvents: GatewayChangeEventsPort,
-    private readonly auditLog: GatewayAuditPort,
+    private readonly transactions: GatewayTransaction,
+    private readonly repository: GatewayVirtualKeys,
+    private readonly changeEvents: GatewayChangeEvents,
+    private readonly auditLog: GatewayAudit,
     private readonly validation: VirtualKeyValidationService,
     private readonly budgets: VirtualKeyBudgetService,
-    private readonly governanceSignals?: GatewayGovernanceSignalsPort,
+    private readonly governanceSignals?: GatewayGovernanceSignals,
   ) {}
 
   static create(input: {
-    transactions: GatewayTransactionPort;
-    repository: GatewayVirtualKeysPort;
-    changeEvents: GatewayChangeEventsPort;
-    auditLog: GatewayAuditPort;
+    transactions: GatewayTransaction;
+    repository: GatewayVirtualKeys;
+    changeEvents: GatewayChangeEvents;
+    auditLog: GatewayAudit;
     validation: VirtualKeyValidationService;
     budgets: VirtualKeyBudgetService;
-    governanceSignals?: GatewayGovernanceSignalsPort;
+    governanceSignals?: GatewayGovernanceSignals;
   }): VirtualKeyStatusService {
     return new VirtualKeyStatusService(
       input.transactions,

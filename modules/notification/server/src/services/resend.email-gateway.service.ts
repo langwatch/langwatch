@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 import {
   type EmailContent,
-  EmailGatewayPort,
+  EmailGateway,
   type EmailOutboundProxyConfig,
   EmailProviderConfigurationError,
   type MailerConfiguration,
@@ -67,13 +67,13 @@ const encodeAttachments = (attachments: EmailContent["attachments"]) => {
  * the rendered headers, matching the other gateways.
  */
 const buildPayload = (content: EmailContent, defaultFrom: string, mime: EmailMimeService) => {
-  const bccAddresses = EmailGatewayPort.recipients(content.bcc);
+  const bccAddresses = EmailGateway.recipients(content.bcc);
   const headers = mime.trySanitizeHeaders(content.headers);
   const attachments = encodeAttachments(content.attachments);
 
   return {
     from: content.from ?? defaultFrom,
-    to: EmailGatewayPort.recipients(content.to),
+    to: EmailGateway.recipients(content.to),
     subject: content.subject,
     html: content.html,
     ...(bccAddresses.length > 0 && { bcc: bccAddresses }),
@@ -83,7 +83,7 @@ const buildPayload = (content: EmailContent, defaultFrom: string, mime: EmailMim
   };
 };
 
-export class ResendEmailGatewayAdapter extends EmailGatewayPort {
+export class ResendEmailGatewayAdapter extends EmailGateway {
   static create(input: {
     configuration: MailerConfiguration["resend"];
     outboundProxy: EmailOutboundProxyConfig;
@@ -116,7 +116,7 @@ export class ResendEmailGatewayAdapter extends EmailGatewayPort {
     }
 
     logger.info("Sending email using Resend");
-    const bccAddresses = EmailGatewayPort.recipients(content.bcc);
+    const bccAddresses = EmailGateway.recipients(content.bcc);
     const payload = buildPayload(content, defaultFrom, this.mime);
     this.dispatcher ??= proxyDispatcher(this.outboundProxy);
     const dispatcher = this.dispatcher;
@@ -150,7 +150,7 @@ export class ResendEmailGatewayAdapter extends EmailGatewayPort {
       logger.info(
         {
           messageId: data.id,
-          recipientCount: EmailGatewayPort.recipients(content.to).length + bccAddresses.length,
+          recipientCount: EmailGateway.recipients(content.to).length + bccAddresses.length,
         },
         "Email sent successfully",
       );

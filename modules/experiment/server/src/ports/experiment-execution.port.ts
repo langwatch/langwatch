@@ -10,7 +10,7 @@ import type {
  * Eventing pipeline. The feature owns validation; this port only dispatches
  * already-valid commands with their original IDs and timestamps unchanged.
  */
-export abstract class ExperimentExecutionPort {
+export abstract class ExperimentExecution {
   abstract startExperimentRun(input: StartExperimentRunInput): Promise<void>;
   abstract recordTargetResult(input: RecordTargetResultInput): Promise<void>;
   abstract recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void>;

@@ -37,7 +37,7 @@ export {
   refusingTraceFeature,
   type TraceFeatureOptions,
 } from "./features/trace/trace.composition.ts";
-export { ApiTraceReadStackPort } from "./features/trace/trace-read-stack.port.ts";
+export { ApiTraceReadStack } from "./features/trace/trace-read-stack.port.ts";
 export type {
   ApiTracePorts,
   ComposedTraceFeature,
@@ -80,27 +80,27 @@ export {
 } from "./features/gateway/gateway.composition.ts";
 export type { ComposedGatewayFeature } from "./features/gateway/gateway.composition.types.ts";
 export {
-  ApiGatewayIdempotencyPort,
+  ApiGatewayIdempotency,
   composeApiGateway,
-  type ApiGatewayClickHousePort,
+  type ApiGatewayClickHouse,
   type ApiGatewayComposition,
   type ApiGatewayCompositionOptions,
 } from "./app/api-gateway.composition.ts";
 export { installApiAgent, type ApiAgentComposition } from "./app/api-agents.composition.ts";
 export {
-  ApiAuthzAbsenceReportPort,
+  ApiAuthzAbsenceReport,
   ApiAuthzComposition,
   type ApiAuthzCompositionOptions,
   type ApiAuthzEpochRedis,
 } from "./app/api-authz.composition.ts";
 export {
-  ApiTenancyAbsenceReportPort,
+  ApiTenancyAbsenceReport,
   ApiTenancyComposition,
   type ApiTenancyCompositionOptions,
 } from "./app/api-tenancy.composition.ts";
 export { ApiOrganizationSettingsSecretAdapter } from "./app/api-organization-settings-secret.adapter.ts";
 export {
-  ApiEventingAbsenceReportPort,
+  ApiEventingAbsenceReport,
   ApiEventingInfrastructure,
   type ApiEventingInfrastructureOptions,
   type ApiEventingQueue,
@@ -115,10 +115,10 @@ export {
   type ApiStandaloneExecutableOptions,
 } from "./app/api-standalone.executable.ts";
 export {
-  ApiAuthAbsenceReportPort,
+  ApiAuthAbsenceReport,
   ApiAuthComposition,
-  ApiAuthSessionCompositionPort,
-  ApiBrowserSessionTransportPort,
+  ApiAuthSessionComposition,
+  ApiBrowserSessionTransport,
   AuthSessionApiAuthenticationAdapter,
   BetterAuthBrowserSessionTransportAdapter,
   type ApiAuthCompositionOptions,
@@ -131,28 +131,28 @@ export {
   type ApiListenerAddress,
 } from "./api-http.listener.ts";
 export {
-  ApiFeatureDrainPort,
+  ApiFeatureDrain,
   ApiProcess,
-  ApiProcessGraphPort,
+  ApiProcessGraph,
   closeApiProcessResources,
 } from "./api.process.ts";
 export {
-  ApiMetricsPort,
+  ApiMetrics,
   ApiProcessLifecycleRoutes,
-  ApiReadinessPort,
-  ApiRequestFailureCapturePort,
+  ApiReadiness,
+  ApiRequestFailureCapture,
   ObservabilityApiRequestFailureCaptureAdapter,
   type ApiRequestFailure,
 } from "./api-process.lifecycle.ts";
 export {
   ApiRuntimeBootstrap,
-  ApiRuntimeCompositionPort,
-  ApiRuntimeProcessPort,
+  ApiRuntimeComposition,
+  ApiRuntimeProcess,
   type ApiRuntimeCompositionOptions,
   type ApiRuntimeBootstrapOptions,
 } from "./api.main.ts";
 export {
-  ApiBootFailurePort,
+  ApiBootFailure,
   startApiExecutable,
   type ApiExecutableOptions,
 } from "./api.executable.ts";
@@ -162,9 +162,9 @@ export {
   type ApiShutdownSignal,
 } from "./api.signal-handlers.ts";
 export {
-  ApiAuthenticationPort,
+  ApiAuthentication,
   ApiAuditPort,
-  ApiAuthorizationPort,
+  ApiAuthorization,
   ApiRequestPolicy,
   AuthzApiAuthorizationAdapter,
 } from "./api-request.policy.ts";
@@ -220,7 +220,7 @@ export { createGovernanceRestApp } from "@langwatch/enterprise-api";
 export { type CodingAgentCallerScope } from "@langwatch/coding-agent-server";
 export { type TrackedEventPorts } from "@langwatch/trace-server";
 export {
-  type TraceExportPort,
+  type TraceExport,
   type TraceExportRequestFields,
   type TraceExportRestPorts,
 } from "@langwatch/trace-server";
@@ -230,7 +230,7 @@ export {
   createOrganizationsRestApp,
   ORGANIZATIONS_SPEC_OPTIONS,
   type OrganizationsProvisioningRestApi,
-  type OrganizationProvisioningPort,
+  type OrganizationProvisioning,
   type OrganizationProvisioningSummary,
 } from "@langwatch/organization-server";
 export { createTeamsRestApp } from "@langwatch/organization-server";
@@ -254,18 +254,18 @@ export {
   type ApiShutdownConfig,
 } from "./platform/config/api.config.ts";
 export {
-  ApiDatabaseAbsenceReportPort,
+  ApiDatabaseAbsenceReport,
   ApiDatabaseInfrastructure,
   type ApiDatabaseInfrastructureOptions,
 } from "./platform/infrastructure/api-database.infrastructure.ts";
 export { ApiGroupQueueContextAdapter } from "./platform/infrastructure/api-group-queue-context.adapter.ts";
 export {
-  ApiQueueAbsenceReportPort,
+  ApiQueueAbsenceReport,
   ApiQueueInfrastructure,
   type ApiQueueInfrastructureOptions,
 } from "./platform/infrastructure/api-queue.infrastructure.ts";
 export {
-  ApiMetricsAbsenceReportPort,
+  ApiMetricsAbsenceReport,
   ApiMetricsInfrastructure,
   type ApiMetricsInfrastructureOptions,
 } from "./platform/infrastructure/api-metrics.infrastructure.ts";
@@ -275,19 +275,19 @@ export {
   type ApiMetricsRegistry,
 } from "./platform/infrastructure/prometheus.api-metrics.adapter.ts";
 export {
-  ApiSecretEncryptionAbsenceReportPort,
+  ApiSecretEncryptionAbsenceReport,
   ApiSecretEncryptionInfrastructure,
   type ApiSecretEncryptionInfrastructureOptions,
 } from "./platform/infrastructure/api-secret-encryption.infrastructure.ts";
 export {
   ApiRateLimitInfrastructure,
-  type ApiRateLimitConnectionPort,
+  type ApiRateLimitConnection,
   type ApiRateLimitRequest,
   type ApiRateLimitResult,
 } from "./platform/infrastructure/api-rate-limit.infrastructure.ts";
 export {
   ApiApplicationPort,
-  ApiLifecyclePort,
+  ApiLifecycle,
   ApiRuntime,
   type ApiRuntimeOptions,
   type ApiShutdownOptions,

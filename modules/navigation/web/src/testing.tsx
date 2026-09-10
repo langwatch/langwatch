@@ -14,7 +14,7 @@
 
 import type { ReactNode } from "react";
 import {
-  NavigationHostPort,
+  NavigationHost,
   NavigationHostProvider,
   type NavigationAccountMenu,
   type NavigationCommandBar,
@@ -87,7 +87,7 @@ const FREE_PLAN: NavigationPlanReading = {
 
 const NO_OPS_ACCESS: NavigationOpsAccess = { hasAccess: false, isAdmin: false };
 
-export class StubNavigationHost extends NavigationHostPort {
+export class StubNavigationHost extends NavigationHost {
   static create(
     readings: StubNavigationReadings = {},
     actions: StubNavigationActions = {},

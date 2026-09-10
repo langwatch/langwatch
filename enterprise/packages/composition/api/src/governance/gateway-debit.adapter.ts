@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GatewayDebitPort,
+  GatewayDebit,
   GatewayDebitProcess,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
@@ -11,7 +11,7 @@ import {
 import {
   type BudgetSpendTarget,
   type GatewayBudgetResolutionApi,
-  type GatewayChangeEventsPort,
+  type GatewayChangeEvents,
 } from "@langwatch/gateway-server";
 import {
   budgetAppliesToProvider,
@@ -22,14 +22,14 @@ import { createLogger } from "@langwatch/observability";
 import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   AppGovernanceSignalsService,
-  GovernanceSignalDeliveryPort,
-  GovernanceSignalStoragePort,
+  GovernanceSignalDelivery,
+  GovernanceSignalStorage,
 } from "./governance-signals.adapter.ts";
 import { type Instant, fromDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:gateway-debits");
 
-class DisabledGovernanceSignalDeliveryPort extends GovernanceSignalDeliveryPort {
+class DisabledGovernanceSignalDelivery extends GovernanceSignalDelivery {
   available(): boolean {
     return false;
   }
@@ -52,7 +52,7 @@ export type GovernanceBudgetResolutionInput = {
 };
 
 /** Complete API-process bridge to the Gateway runtime. */
-export abstract class GatewayGovernancePort extends GovernanceSignalStoragePort {
+export abstract class GatewayGovernance extends GovernanceSignalStorage {
   abstract resolveBudgetDebits(
     input: GovernanceBudgetResolutionInput,
   ): Promise<GatewayResolvedBudget[]>;
@@ -82,12 +82,12 @@ export abstract class GatewayBudgetChangeEventDedupe {
 }
 
 /** Bridges the core Gateway stores to Enterprise Governance at process composition. */
-export class AppGatewayGovernancePort extends GatewayGovernancePort {
+export class AppGatewayGovernance extends GatewayGovernance {
   private constructor(
     private readonly database: PrismaClient,
     private readonly budgets: GatewayGovernanceBudgetStore,
     private readonly budgetDecisions: GatewayBudgetResolutionApi,
-    private readonly gatewayChanges: GatewayChangeEventsPort,
+    private readonly gatewayChanges: GatewayChangeEvents,
     private readonly changeEvents: GatewayBudgetChangeEventDedupe | undefined,
   ) {
     super();
@@ -97,10 +97,10 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
     database: PrismaClient,
     budgets: GatewayGovernanceBudgetStore,
     budgetDecisions: GatewayBudgetResolutionApi,
-    gatewayChanges: GatewayChangeEventsPort,
+    gatewayChanges: GatewayChangeEvents,
     changeEvents?: GatewayBudgetChangeEventDedupe,
-  ): AppGatewayGovernancePort {
-    return new AppGatewayGovernancePort(
+  ): AppGatewayGovernance {
+    return new AppGatewayGovernance(
       database,
       budgets,
       budgetDecisions,
@@ -286,20 +286,20 @@ function toBudgetSpendTarget(
   };
 }
 
-class AppGatewayDebitPort extends GatewayDebitPort {
+class AppGatewayDebit extends GatewayDebit {
   private constructor(
-    private readonly gateway: GatewayGovernancePort,
+    private readonly gateway: GatewayGovernance,
     private readonly signals: AppGovernanceSignalsService,
   ) {
     super();
   }
 
   static create(
-    gateway: GatewayGovernancePort,
-    delivery: GovernanceSignalDeliveryPort = new DisabledGovernanceSignalDeliveryPort(),
-  ): AppGatewayDebitPort {
+    gateway: GatewayGovernance,
+    delivery: GovernanceSignalDelivery = new DisabledGovernanceSignalDelivery(),
+  ): AppGatewayDebit {
     const signals = AppGovernanceSignalsService.create(gateway, delivery);
-    return new AppGatewayDebitPort(gateway, signals);
+    return new AppGatewayDebit(gateway, signals);
   }
 
   async resolve(input: GovernanceBudgetResolutionInput) {
@@ -355,18 +355,18 @@ class AppGatewayDebitPort extends GatewayDebitPort {
 
 export class AppGatewayDebitAdapter {
   private constructor(
-    private readonly gateway: GatewayGovernancePort,
-    private readonly delivery: GovernanceSignalDeliveryPort,
+    private readonly gateway: GatewayGovernance,
+    private readonly delivery: GovernanceSignalDelivery,
   ) {}
 
   static create(
-    gateway: GatewayGovernancePort,
-    delivery: GovernanceSignalDeliveryPort,
+    gateway: GatewayGovernance,
+    delivery: GovernanceSignalDelivery,
   ): AppGatewayDebitAdapter {
     return new AppGatewayDebitAdapter(gateway, delivery);
   }
 
   build(): GatewayDebitProcess {
-    return GatewayDebitProcess.create(AppGatewayDebitPort.create(this.gateway, this.delivery));
+    return GatewayDebitProcess.create(AppGatewayDebit.create(this.gateway, this.delivery));
   }
 }

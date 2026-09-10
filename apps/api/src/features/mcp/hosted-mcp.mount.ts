@@ -3,9 +3,9 @@ import {
   createMcpHandler,
   HeaderMcpClientAddressAdapter,
   MCP_AUTHORIZE_PERMISSION,
-  McpProjectLookupPort,
-  McpSessionGrantPort,
-  McpSessionToolRegistrarPort,
+  McpProjectLookup,
+  McpSessionGrant,
+  McpSessionToolRegistrar,
   type HostedMcpDependencies,
   type HostedMcpRedis,
   type McpHandler,
@@ -13,13 +13,13 @@ import {
 } from "@langwatch/hosted-mcp-server";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import { ApiRawRequestSurfacePort } from "../../api-http.listener.ts";
+import type { SecretEncryption } from "@langwatch/secret-server";
+import { ApiRawRequestSurface } from "../../api-http.listener.ts";
 
 /**
  * The hosted Model Context Protocol endpoint, composed for this process.
  */
-export class HostedMcpSurface extends ApiRawRequestSurfacePort {
+export class HostedMcpSurface extends ApiRawRequestSurface {
   private constructor(private readonly handler: McpHandler) {
     super();
   }
@@ -46,7 +46,7 @@ export class HostedMcpSurface extends ApiRawRequestSurfacePort {
  * The project an MCP bearer token belongs to, read through the process's own guarded
  * client.
  */
-export class PrismaMcpProjectLookupAdapter extends McpProjectLookupPort {
+export class PrismaMcpProjectLookupAdapter extends McpProjectLookup {
   private constructor(private readonly prisma: PrismaClient) {
     super();
   }
@@ -71,7 +71,7 @@ export class PrismaMcpProjectLookupAdapter extends McpProjectLookupPort {
  * Whether the person an MCP bearer was minted for still holds the grant the approval step
  * demanded.
  */
-export class AuthzMcpSessionGrantAdapter extends McpSessionGrantPort {
+export class AuthzMcpSessionGrantAdapter extends McpSessionGrant {
   private constructor(private readonly authz: AuthzService) {
     super();
   }
@@ -98,7 +98,7 @@ export class AuthzMcpSessionGrantAdapter extends McpSessionGrantPort {
 /**
  * Installs the tools an Enterprise deployment adds to each MCP session.
  */
-export class DelegatingMcpSessionToolRegistrar extends McpSessionToolRegistrarPort {
+export class DelegatingMcpSessionToolRegistrar extends McpSessionToolRegistrar {
   private constructor(
     private readonly install: (input: {
       server: McpToolServer;
@@ -134,11 +134,11 @@ export class DelegatingMcpSessionToolRegistrar extends McpSessionToolRegistrarPo
  */
 export function tryCreateHostedMcpSurface(options: {
   prisma: PrismaClient | undefined;
-  encryption: SecretEncryptionPort | undefined;
+  encryption: SecretEncryption | undefined;
   authz: AuthzService | undefined;
   redis: HostedMcpRedis | null;
   baseHost: string;
-  sessionTools?: McpSessionToolRegistrarPort | undefined;
+  sessionTools?: McpSessionToolRegistrar | undefined;
 }): HostedMcpSurface | undefined {
   const { prisma, encryption, authz } = options;
   if (!prisma || !encryption || !authz) return undefined;

@@ -12,7 +12,7 @@ import { testProject } from "../../app/__tests__/support/project-fixtures.ts";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiTracesRestOptions } from "../../features/trace/traces-rest.mount.ts";
-import type { ApiTraceReadStackPort } from "../../features/trace/trace-read-stack.port.ts";
+import type { ApiTraceReadStack } from "../../features/trace/trace-read-stack.port.ts";
 import {
   REST_AUTH_ORGANIZATION,
   REST_AUTH_PROJECT,
@@ -155,7 +155,7 @@ function mountTraces(options: {
       }) as TraceApp,
     reads: {
       getApiKeyProtections: async () => ({ canSeeCapturedInput: true, canSeeCapturedOutput: true }),
-    } as unknown as ApiTraceReadStackPort,
+    } as unknown as ApiTraceReadStack,
     platformUrl: () => "https://app.langwatch.test/acme/traces",
   };
 

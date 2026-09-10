@@ -50,7 +50,7 @@ import type {
   PullResult,
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceHttpClient } from "../app/governance.infrastructure.ts";
 import { AdminUsageReportAdapter } from "./admin-usage-report.service.ts";
 import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 
@@ -210,9 +210,9 @@ const pageSchema = z.object({
 export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullConfig> {
   readonly id: string = OPENAI_ADMIN_ADAPTER_ID;
 
-  private constructor(private readonly http: GovernanceHttpPort) {}
+  private constructor(private readonly http: GovernanceHttpClient) {}
 
-  static create(http: GovernanceHttpPort): OpenAiAdminPullerAdapter {
+  static create(http: GovernanceHttpClient): OpenAiAdminPullerAdapter {
     return new OpenAiAdminPullerAdapter(http);
   }
 

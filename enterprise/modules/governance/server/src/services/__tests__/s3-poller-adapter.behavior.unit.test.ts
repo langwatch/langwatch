@@ -6,7 +6,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { S3PollingPullerAdapter } from "../s3-puller.service.ts";
-import { TestObjectStoragePort } from "../../__tests__/support/puller-test-ports.ts";
+import { TestObjectStorage } from "../../__tests__/support/puller-test-ports.ts";
 
 const VALID_CONFIG = {
   adapter: "s3_polling" as const,
@@ -27,14 +27,14 @@ const VALID_CONFIG = {
   },
 };
 
-let storage: TestObjectStoragePort;
+let storage: TestObjectStorage;
 
 function makeAdapter(): S3PollingPullerAdapter {
   return S3PollingPullerAdapter.create({ objects: storage });
 }
 
 beforeEach(() => {
-  storage = new TestObjectStoragePort();
+  storage = new TestObjectStorage();
 });
 
 describe("S3PollingPullerAdapter", () => {

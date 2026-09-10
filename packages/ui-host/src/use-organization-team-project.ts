@@ -16,7 +16,7 @@ export type UiHostTeam = { id: string; name?: string };
  * The one thing a scope reading is asked of. Grants answer SYNCHRONOUSLY AND FAIL CLOSED: a
  * permission that flickers open while the answer is in flight is a permission that leaked.
  */
-export abstract class UiScopeHostPort {
+export abstract class UiScopeHost {
   abstract project(): UiHostProject | undefined;
 
   abstract organization(): UiHostOrganization | undefined;
@@ -53,7 +53,7 @@ export type UiScopeHostReadings = {
   isLoading?: () => boolean;
 };
 
-class DerivedUiScopeHost extends UiScopeHostPort {
+class DerivedUiScopeHost extends UiScopeHost {
   constructor(private readonly readings: UiScopeHostReadings) {
     super();
   }
@@ -74,16 +74,16 @@ class DerivedUiScopeHost extends UiScopeHostPort {
  * resolved the scope for its own port answers this from the same readings rather than from a
  * second source of truth.
  */
-export function createUiScopeHost(readings: UiScopeHostReadings): UiScopeHostPort {
+export function createUiScopeHost(readings: UiScopeHostReadings): UiScopeHost {
   return new DerivedUiScopeHost(readings);
 }
 
-const UiScopeHostContext = createContext<UiScopeHostPort | undefined>(void 0);
+const UiScopeHostContext = createContext<UiScopeHost | undefined>(void 0);
 
 export const UiScopeHostProvider = UiScopeHostContext.Provider;
 
 /** The scope host above this screen, or undefined where none is mounted. */
-export function useOptionalUiScopeHost(): UiScopeHostPort | undefined {
+export function useOptionalUiScopeHost(): UiScopeHost | undefined {
   return useContext(UiScopeHostContext);
 }
 

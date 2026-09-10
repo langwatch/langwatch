@@ -25,24 +25,24 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
 import {
   WorkerInfrastructureAdapter,
-  WorkerStorageFactoryPort,
+  WorkerStorageFactory,
 } from "../worker-foundation.adapter.ts";
-import { OutboundProxyResolverPort } from "@langwatch/aws-client";
-import type { GroupQueueStoragePort } from "@langwatch/group-queue";
+import { OutboundProxyResolver } from "@langwatch/aws-client";
+import type { GroupQueueStorage } from "@langwatch/group-queue";
 import type { RedisConfigResolution } from "@langwatch/redis-client";
 import {
   StoredObjectDestinationPolicyAdapter,
-  StoredObjectProjectS3ConfigPort,
+  StoredObjectProjectS3Config,
   StoredObjectStorageRuntimeAdapter,
 } from "@langwatch/stored-object-server";
 
-class NoProxy extends OutboundProxyResolverPort {
+class NoProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {
     return undefined;
   }
 }
 
-class StorageFactory extends WorkerStorageFactoryPort {
+class StorageFactory extends WorkerStorageFactory {
   readonly create = vi.fn(() => ({
     storage: {
       objectStoreFor: () => ({
@@ -53,7 +53,7 @@ class StorageFactory extends WorkerStorageFactoryPort {
         delete: async () => undefined,
       }),
       resolveDestination: async () => ({ kind: "file", root: "/tmp/langwatch" }),
-    } satisfies GroupQueueStoragePort,
+    } satisfies GroupQueueStorage,
     close: async () => undefined,
   }));
 }
@@ -69,7 +69,7 @@ class FailingStorageFactory extends StorageFactory {
         delete: async () => undefined,
       }),
       resolveDestination: async () => ({ kind: "file", root: "/tmp/langwatch" }),
-    } satisfies GroupQueueStoragePort,
+    } satisfies GroupQueueStorage,
     close: async () => {
       throw new Error("storage close failed");
     },
@@ -85,7 +85,7 @@ const redisConfig: RedisConfigResolution = {
   warnings: [],
 };
 
-class NoPrivateS3Config extends StoredObjectProjectS3ConfigPort {
+class NoPrivateS3Config extends StoredObjectProjectS3Config {
   async tryGet(): Promise<Readonly<{ bucket: string }> | null> {
     return null;
   }

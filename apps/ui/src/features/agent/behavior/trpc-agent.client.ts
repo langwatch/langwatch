@@ -20,14 +20,14 @@ import {
   type AgentPushToCopiesInput,
   type AgentSyncFromSourceInput,
 } from "@langwatch/agent-web/agent-client";
-import type { UiRpcPort } from "../../../behavior/ui-rpc";
+import type { UiRpc } from "../../../behavior/ui-rpc";
 
 export class TrpcAgentClient implements AgentClient {
-  static create(rpc: UiRpcPort): TrpcAgentClient {
+  static create(rpc: UiRpc): TrpcAgentClient {
     return new TrpcAgentClient(rpc);
   }
 
-  private constructor(private readonly rpc: UiRpcPort) {}
+  private constructor(private readonly rpc: UiRpc) {}
 
   async getById(input: AgentApiAgentInput) {
     const output = await this.rpc.query("agents.getById", input);

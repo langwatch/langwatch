@@ -58,14 +58,14 @@ export type MailerConfiguration = Readonly<{
  * mapping the shared surface (bcc, reply-to, custom headers, attachments) onto
  * whatever their transport expects.
  */
-export interface EmailProviderPort {
+export interface EmailProvider {
   name: EmailProviderName;
   send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }): Promise<unknown>;
   close?(): Promise<void>;
 }
 
 /** A composed mail delivery capability, injected into application adapters. */
-export abstract class EmailDeliveryPort {
+export abstract class EmailDelivery {
   abstract defaultFrom(): string;
 
   abstract send(content: EmailContent): Promise<unknown>;

@@ -8,13 +8,13 @@ export type GovernanceEncryption = {
   decrypt(value: string): string;
 };
 
-export class AppGovernanceEncryptionPort extends GovernanceEncryptionPort {
+export class AppGovernanceEncryption extends GovernanceEncryptionPort {
   private constructor(private readonly encryption: GovernanceEncryption) {
     super();
   }
 
-  static create(encryption: GovernanceEncryption): AppGovernanceEncryptionPort {
-    return new AppGovernanceEncryptionPort(encryption);
+  static create(encryption: GovernanceEncryption): AppGovernanceEncryption {
+    return new AppGovernanceEncryption(encryption);
   }
 
   encrypt(value: string): string {

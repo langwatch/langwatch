@@ -39,18 +39,18 @@
  */
 import {
   AutomationApp,
-  AutomationClockPort,
-  AutomationGraphNotifierPort,
-  AutomationDispatchErrorPort,
-  AutomationHeartbeatPort,
-  AutomationLoggerPort,
+  AutomationClock,
+  AutomationGraphNotifier,
+  AutomationDispatchError,
+  AutomationHeartbeat,
+  AutomationLogger,
   AutomationProviderRegistryAdapter,
-  AutomationRunawayPort,
-  AutomationSlackBotTokenDecryptorPort,
-  AutomationTestFirePort,
+  AutomationRunaway,
+  AutomationSlackBotTokenDecryptor,
+  AutomationTestFire,
   HmacUnsubscribeTokenAdapter,
   PostgresAutomationRepositories,
-  SchedulerWakePort,
+  SchedulerWake,
   type ClaimLease,
 } from "@langwatch/automation-server";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
@@ -161,7 +161,7 @@ function unevaluatedGraphAnalytics(): AnalyticsService {
 }
 
 /** The process's own wall clock, as the feature reads time. */
-class ApiAutomationClock extends AutomationClockPort {
+class ApiAutomationClock extends AutomationClock {
   now() {
     return nowInstant();
   }
@@ -175,7 +175,7 @@ class ApiAutomationClock extends AutomationClockPort {
  * the row is already written by the time this runs, so a dropped publish or an
  * absent Redis costs the time to the worker's next sweep, never a fire.
  */
-class ApiSchedulerWake extends SchedulerWakePort {
+class ApiSchedulerWake extends SchedulerWake {
   constructor(
     private readonly redis: RedisConnection | null,
     private readonly logger: Pick<Logger, "debug">,
@@ -197,14 +197,14 @@ class ApiSchedulerWake extends SchedulerWakePort {
 }
 
 /** Graph alerts are dispatched by the worker, so this one refuses by name. */
-class UndeliveredApiGraphAlerts extends AutomationGraphNotifierPort {
+class UndeliveredApiGraphAlerts extends AutomationGraphNotifier {
   dispatch(): never {
     throw new ApiAutomationUnavailableError("deliver graph alerts");
   }
 }
 
 /** The feature's log lines, on this process's own logger. */
-class ApiAutomationLogger extends AutomationLoggerPort {
+class ApiAutomationLogger extends AutomationLogger {
   constructor(private readonly logger: Logger) {
     super();
   }
@@ -231,7 +231,7 @@ class ApiAutomationLogger extends AutomationLoggerPort {
  * redacts with — one cipher, so a token stored by one door is readable by the
  * other.
  */
-class ApiAutomationSlackTokens extends AutomationSlackBotTokenDecryptorPort {
+class ApiAutomationSlackTokens extends AutomationSlackBotTokenDecryptor {
   constructor(private readonly providers: AutomationProviderRegistryAdapter) {
     super();
   }
@@ -248,7 +248,7 @@ class ApiAutomationSlackTokens extends AutomationSlackBotTokenDecryptorPort {
  * process has no queue to retry on, so a failure it called retryable would
  * simply be lost.
  */
-class ApiAutomationDispatchErrors extends AutomationDispatchErrorPort {
+class ApiAutomationDispatchErrors extends AutomationDispatchError {
   isTerminal(): boolean {
     return true;
   }
@@ -259,7 +259,7 @@ class ApiAutomationDispatchErrors extends AutomationDispatchErrorPort {
 }
 
 /** The heartbeat's recency query has no endpoint here. */
-class UnmeasuredApiAutomationHeartbeat extends AutomationHeartbeatPort {
+class UnmeasuredApiAutomationHeartbeat extends AutomationHeartbeat {
   tryResolveClickHouseClient(): Promise<null> {
     return Promise.resolve(null);
   }
@@ -272,7 +272,7 @@ class UnmeasuredApiAutomationHeartbeat extends AutomationHeartbeatPort {
  * taken where a fire happens, and a ceiling this process claimed to enforce
  * would be a ceiling nobody actually counts against.
  */
-class UncontainedApiAutomationRunaway extends AutomationRunawayPort {
+class UncontainedApiAutomationRunaway extends AutomationRunaway {
   constructor(private readonly logger: Logger) {
     super();
   }
@@ -331,7 +331,7 @@ class UncontainedApiAutomationRunaway extends AutomationRunawayPort {
 }
 
 /** A test fire goes out over the worker's transports, never this process's. */
-class UndeliverableApiTestFire extends AutomationTestFirePort {
+class UndeliverableApiTestFire extends AutomationTestFire {
   sendEmail(): Promise<void> {
     return Promise.reject(new ApiAutomationUnavailableError("send a test email"));
   }

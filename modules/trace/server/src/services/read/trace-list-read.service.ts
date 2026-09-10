@@ -21,7 +21,7 @@ import type {
   TraceListFacetCounts,
   TraceListItem,
   TraceListPage,
-  TraceListReadPort,
+  TraceListRead,
 } from "@langwatch/trace-contract";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 import { PageTooDeepError } from "@langwatch/trace-contract";
@@ -83,7 +83,7 @@ export class TraceListService {
     evaluations,
     topicService,
   }: {
-    repository: TraceListReadPort;
+    repository: TraceListRead;
     evaluations: EvaluationApi;
     topicService: TopicApi;
   }): TraceListService {
@@ -98,7 +98,7 @@ export class TraceListService {
   }
 
   private constructor(
-    private readonly repository: TraceListReadPort,
+    private readonly repository: TraceListRead,
     private readonly evaluations: EvaluationApi,
     private readonly discover: TraceDiscoverService,
     private readonly facetValues: TraceFacetValuesService,

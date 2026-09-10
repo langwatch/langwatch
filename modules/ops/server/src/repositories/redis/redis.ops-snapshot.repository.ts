@@ -6,7 +6,7 @@ import {
   tryParseDetailSnapshot,
   tryParseLiveSnapshot,
 } from "@langwatch/ops-contract";
-import { OpsSnapshotRedisPort } from "../../app/ops.app.ts";
+import { OpsSnapshotRedis } from "../../app/ops.app.ts";
 import { OpsSnapshotRepository } from "../observe/ops-snapshot.repository.ts";
 
 /**
@@ -97,11 +97,11 @@ export class RedisOpsSnapshotRepository extends OpsSnapshotRepository {
   /** The value this instance last wrote into the lease key, or null. */
   private currentToken: string | null = null;
 
-  static create(redis: OpsSnapshotRedisPort): RedisOpsSnapshotRepository {
+  static create(redis: OpsSnapshotRedis): RedisOpsSnapshotRepository {
     return new RedisOpsSnapshotRepository(redis);
   }
 
-  private constructor(private readonly redis: OpsSnapshotRedisPort) {
+  private constructor(private readonly redis: OpsSnapshotRedis) {
     super();
   }
 

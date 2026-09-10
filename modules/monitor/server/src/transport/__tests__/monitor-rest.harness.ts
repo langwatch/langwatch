@@ -71,7 +71,7 @@ export function mountMonitorRest(
 
   const hono = runtime.mount(createMonitorsRest(platformUrl).router(), {
     app: () => app,
-    credential: "projectKey",
+    credential: "project",
     onError: renderHandled,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({

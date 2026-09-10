@@ -14,7 +14,7 @@ describe("the projects REST declaration", () => {
   describe("given the declaration a process mounts", () => {
     it("keeps the family's namespace, door, dated version and addressing", () => {
       expect(projectRest.namespace).toBe("projects");
-      expect(declaration.credential).toBe("organizationKey");
+      expect(declaration.credential).toBe("organization");
       expect(declaration.version).toBe("2026-08-07");
       expect(declaration.addressing).toBe("dated");
       // `/api/v1/projects` belongs to the LangWatch-QL family.

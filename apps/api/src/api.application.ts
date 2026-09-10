@@ -17,16 +17,16 @@ import {
   type AppTrpcPolicyMiddlewares,
   type TrpcRuntime,
   type TrpcAuthorizationDecisions,
-  type TrpcAuthorizationDenialPort,
-  type TrpcCauseTranslationPort,
-  type TrpcErrorReportingPort,
+  type TrpcAuthorizationDenial,
+  type TrpcCauseTranslation,
+  type TrpcErrorReporting,
   type TrpcRequestLike,
 } from "@langwatch/api/trpc";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono, type Context } from "hono";
 import type { AppTrpcFeatureRecord } from "./app-trpc/app-trpc.features.ts";
 import type { TopicApiFeature } from "./features/topic/topic-api.feature.ts";
-import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle.ts";
+import type { ApiRequestFailureCapture } from "./api-process.lifecycle.ts";
 import type { SseSubscriptionPorts } from "./app-trpc/app-trpc.sse.ts";
 import { apiClientAddress, apiSocketAddress } from "./app/api-client-address.ts";
 import { appTrpcErrorFormatter } from "./app-trpc/app-trpc.error-formatter.ts";
@@ -91,7 +91,7 @@ export type ApiHttpOptions = Readonly<{
   audit?(event: ApiAuditEvent): Promise<void>;
   endpoint?: string;
   logger?: Pick<Logger, "error" | "info">;
-  errorCapture?: ApiRequestFailureCapturePort;
+  errorCapture?: ApiRequestFailureCapture;
   errorFormatter?: ApiErrorFormatter;
   /**
    * Absent for a process that serves no subscriptions. Present, it is mounted
@@ -170,17 +170,17 @@ export type ApiTrpcFeatureMount = Readonly<{
  * The packaged tRPC surfaces this process serves beyond its own two, and everything their
  * policy chain needs.
  */
-export abstract class ApiTrpcFeaturesPort<
+export abstract class ApiTrpcFeatures<
   TRecord extends TRPCCreateRouterOptions = AppTrpcFeatureRecord,
 > {
   /** The AuthZ decisions every declared check and the lineage guard run on. */
   abstract readonly authorization: TrpcAuthorizationDecisions;
   /** The two refusals whose concrete error class is this process's to choose. */
-  abstract readonly denials: TrpcAuthorizationDenialPort;
+  abstract readonly denials: TrpcAuthorizationDenial;
   /** Application error classes the chain answers with a code of its own. */
-  abstract readonly causes: TrpcCauseTranslationPort;
+  abstract readonly causes: TrpcCauseTranslation;
   /** Where an unhandled server fault is reported. */
-  abstract readonly errorReporting: TrpcErrorReportingPort;
+  abstract readonly errorReporting: TrpcErrorReporting;
   /** The application slices the mounted surfaces read off `ctx.app`. */
   abstract readonly application: ApiTrpcFeatureApplication;
   /** Builds the namespace record on this process's mount. */
@@ -207,7 +207,7 @@ const unavailableFeatureApplication = new Proxy({} as ApiTrpcFeatureApplication,
 /**
  * What a process that composed no packaged surfaces mounts instead.
  */
-export class NoApiTrpcFeatures extends ApiTrpcFeaturesPort<Record<string, never>> {
+export class NoApiTrpcFeatures extends ApiTrpcFeatures<Record<string, never>> {
   private unavailable(): never {
     throw new Error(
       "No packaged tRPC surfaces were composed for this API application, so its policy chain has nothing to decide.",
@@ -220,14 +220,14 @@ export class NoApiTrpcFeatures extends ApiTrpcFeaturesPort<Record<string, never>
     checkScopeLineage: () => this.unavailable(),
   };
 
-  readonly denials: TrpcAuthorizationDenialPort = {
+  readonly denials: TrpcAuthorizationDenial = {
     membershipDisabled: () => this.unavailable(),
     liteMemberRestricted: () => this.unavailable(),
   };
 
-  readonly causes: TrpcCauseTranslationPort = { translate: () => undefined };
+  readonly causes: TrpcCauseTranslation = { translate: () => undefined };
 
-  readonly errorReporting: TrpcErrorReportingPort = {
+  readonly errorReporting: TrpcErrorReporting = {
     capture: () => this.unavailable(),
     asError: () => this.unavailable(),
   };
@@ -264,7 +264,7 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
      * {@link NoApiTrpcFeatures}, whose record is empty, so the root is exactly
      * what it was: two routers and nothing else.
      */
-    features: ApiTrpcFeaturesPort<TRecord>;
+    features: ApiTrpcFeatures<TRecord>;
     /** @see ApiTrpcFeatureMount's field of the same name. Off unless asked. */
     validateOutput?: boolean;
   }): ApiApplication<TRecord> {
@@ -289,7 +289,7 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
     private readonly http: ApiHttpOptions | undefined,
     rest: Hono | undefined,
     readonly topic: TopicApiFeature | undefined,
-    private readonly features: ApiTrpcFeaturesPort<TRecord>,
+    private readonly features: ApiTrpcFeatures<TRecord>,
     private readonly validateOutput = false,
   ) {
     this.root = createTrpcRoot(http?.errorFormatter ?? defaultErrorFormatter);

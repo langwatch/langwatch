@@ -1,5 +1,5 @@
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
-import type { BillingSubscriptionPort } from "@langwatch/enterprise-billing-server";
+import type { BillingSubscription } from "@langwatch/enterprise-billing-server";
 import { OrganizationLicense } from "@langwatch/enterprise-licensing-server";
 import {
   ENTERPRISE_LICENSE_KEY,
@@ -8,7 +8,7 @@ import {
 import { describe, expect, it } from "vitest";
 import {
   createWorkerPlanProvider,
-  WorkerEntitlementAbsenceReportPort,
+  WorkerEntitlementAbsenceReport,
 } from "../worker-plan-provider.composition.ts";
 import { Temporal } from "@langwatch/time";
 
@@ -35,7 +35,7 @@ import { Temporal } from "@langwatch/time";
  * disagreeing with the table it stands for.
  */
 type SubscriptionRecord = NonNullable<
-  Awaited<ReturnType<BillingSubscriptionPort["tryFindActive"]>>
+  Awaited<ReturnType<BillingSubscription["tryFindActive"]>>
 >;
 
 const subscription = (overrides: Partial<SubscriptionRecord> = {}): SubscriptionRecord => ({
@@ -55,10 +55,10 @@ const subscription = (overrides: Partial<SubscriptionRecord> = {}): Subscription
 });
 
 /** The one read the subscription source makes; nothing else is exercised. */
-function subscriptions(active: SubscriptionRecord | null): BillingSubscriptionPort {
+function subscriptions(active: SubscriptionRecord | null): BillingSubscription {
   return {
     tryFindActive: async () => active,
-  } as unknown as BillingSubscriptionPort;
+  } as unknown as BillingSubscription;
 }
 
 /**
@@ -73,7 +73,7 @@ function licenses(licenseKey: string | null): OrganizationLicense {
 }
 
 /** Records which plan sources the composition said it did not hold. */
-class RecordingEntitlementAbsence extends WorkerEntitlementAbsenceReportPort {
+class RecordingEntitlementAbsence extends WorkerEntitlementAbsenceReport {
   readonly sources: string[] = [];
 
   absent(source: "licence" | "subscription"): void {

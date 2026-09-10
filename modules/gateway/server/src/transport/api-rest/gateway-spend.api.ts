@@ -24,8 +24,8 @@ import {
   SPEND_GROUP_BY_KEYS,
   type SpendGroupByKey,
 } from "../../ports/gateway-spend-events.port.ts";
-import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port.ts";
-import type { GatewaySettlementPolicyPort } from "../../ports/gateway-settlement-policy.port.ts";
+import type { GatewayBudgetSpend } from "../../app/gateway.infrastructure.ts";
+import type { GatewaySettlementPolicy } from "../../app/gateway.infrastructure.ts";
 import type { GatewaySpendEventsService } from "../../services/gateway-spend-events.service.ts";
 import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-contract";
 import { requires } from "@langwatch/api";
@@ -125,7 +125,7 @@ export type GatewaySpendRestPorts = Readonly<{
    */
   spendEvents: GatewaySpendEventsService | undefined;
   /** The budget ledger the per-end-user caps are read against. */
-  budgetSpend: GatewayBudgetSpendPort | undefined;
+  budgetSpend: GatewayBudgetSpend | undefined;
 
   /** The endpoint registry a replay names its destination in. */
   webhookEndpoints: GatewaySpendWebhookEndpoints;
@@ -148,7 +148,7 @@ export type GatewaySpendRestPorts = Readonly<{
    * How long after a request an outcome may still arrive, which is what makes
    * a recent grouping unstable under a page walk.
    */
-  settlementPolicy: GatewaySettlementPolicyPort;
+  settlementPolicy: GatewaySettlementPolicy;
 
   /** Resolves Postgres filters to CH ids. A no-match resolves to EMPTY, never "unfiltered". */
   resolveSpendScope(input: {
@@ -164,7 +164,7 @@ export type GatewaySpendRestPorts = Readonly<{
     endUserId: string;
     tenantIds: string[];
     virtualKeyId?: string;
-    budgetRepository: GatewayBudgetSpendPort;
+    budgetRepository: GatewayBudgetSpend;
   }): Promise<Array<Record<string, unknown>>>;
 
   /**

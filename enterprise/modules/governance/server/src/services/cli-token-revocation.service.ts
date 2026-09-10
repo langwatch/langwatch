@@ -4,18 +4,18 @@ import {
   cliUserTokensIndexKey,
 } from "@langwatch/auth-contract";
 import { type CliUserInput, cliUserInputSchema } from "@langwatch/enterprise-governance-contract";
-import type { CliTokenStorePort } from "../app/governance.infrastructure.ts";
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
+import type { CliTokenStore } from "../app/governance.infrastructure.ts";
+import type { GovernanceDiagnosticsSink } from "../app/governance.infrastructure.ts";
 
 export class DefaultGovernanceCliTokenRevocationService {
   private constructor(
-    private readonly store: CliTokenStorePort | undefined,
-    private readonly diagnostics: GovernanceDiagnosticsPort | undefined,
+    private readonly store: CliTokenStore | undefined,
+    private readonly diagnostics: GovernanceDiagnosticsSink | undefined,
   ) {}
 
   static create(options: {
-    store?: CliTokenStorePort;
-    diagnostics?: GovernanceDiagnosticsPort;
+    store?: CliTokenStore;
+    diagnostics?: GovernanceDiagnosticsSink;
   }): DefaultGovernanceCliTokenRevocationService {
     return new DefaultGovernanceCliTokenRevocationService(options.store, options.diagnostics);
   }

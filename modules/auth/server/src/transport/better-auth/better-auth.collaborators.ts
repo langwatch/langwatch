@@ -29,7 +29,7 @@ import type { SignInMethodPolicy } from "@langwatch/identity-contract";
  * without this package knowing that routing exists, and lets a deployment that
  * does not route hand over the stock Prisma adapter.
  */
-export abstract class BetterAuthStoragePort {
+export abstract class BetterAuthStorage {
   /** The value handed to `betterAuth({ database })`. */
   abstract adapter(): unknown;
 }
@@ -42,7 +42,7 @@ export abstract class BetterAuthStoragePort {
  * deployment must not wait on a licensing store to be told it has nothing to
  * wait for; the other two may read.
  */
-export abstract class BetterAuthFederationPort {
+export abstract class BetterAuthFederation {
   /**
    * Whether this deployment registers any federated method at all.
    *
@@ -72,7 +72,7 @@ export abstract class BetterAuthFederationPort {
  * branch, so a hook that stated it unconditionally would append the event
  * twice whenever the first fold had not landed.
  */
-export abstract class BetterAuthIdentityCeremoniesPort {
+export abstract class BetterAuthIdentityCeremonies {
   abstract beforeUserDelete(user: { id: string }): Promise<void>;
 
   /**
@@ -114,7 +114,7 @@ export type PendingOrganizationInvite = Readonly<{
  * the person in the organization as a plain member while the invite kept
  * looking unused.
  */
-export abstract class BetterAuthPendingInvitePort {
+export abstract class BetterAuthPendingInvite {
   abstract tryFindPendingByOrganizationAndEmail(input: {
     organizationId: string;
     email: string;
@@ -131,7 +131,7 @@ export abstract class BetterAuthPendingInvitePort {
  * fire-and-forget from the caller's point of view, and an implementation that
  * throws would turn a successful sign-in into a failed one.
  */
-export abstract class BetterAuthAnnouncementsPort {
+export abstract class BetterAuthAnnouncements {
   /** The product-analytics trail. */
   abstract trackServerEvent(input: {
     userId: string;

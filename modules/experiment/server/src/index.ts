@@ -5,9 +5,9 @@
  * evaluation reporting) import the type from here now.
  */
 export { ExperimentService, type ExperimentServiceOptions } from "./services/experiment.service.ts";
-export { ExperimentDspyRetentionPort } from "./ports/experiment-dspy-retention.port.ts";
-export { ExperimentWorkbenchUpdatesPort } from "./ports/experiment-workbench-updates.port.ts";
-export { ExperimentExecutionPort } from "./ports/experiment-execution.port.ts";
+export { ExperimentDspyRetention } from "./ports/experiment-dspy-retention.port.ts";
+export { ExperimentWorkbenchUpdates } from "./ports/experiment-workbench-updates.port.ts";
+export { ExperimentExecution } from "./ports/experiment-execution.port.ts";
 export {
   PrismaExperimentRepository,
   type ExperimentDatabase,
@@ -87,27 +87,27 @@ export {
   shouldStripScore,
 } from "./processes/experiment-evaluator-score-filter.process.ts";
 export { getRunUrl } from "./rules/experiment-run-url.rules.ts";
-export { ExperimentRunAbortRepository as ExperimentRunAbortPort } from "./repositories/experiment-run-abort.repository.ts";
-export { ExperimentConnectedDispatchPort } from "./ports/experiment-connected-dispatch.port.ts";
+export { ExperimentRunAbortRepository as ExperimentRunAbort } from "./repositories/experiment-run-abort.repository.ts";
+export { ExperimentConnectedDispatch } from "./ports/experiment-connected-dispatch.port.ts";
 export {
-  ExperimentConnectedAgentOwnershipPort,
+  ExperimentConnectedAgentOwnership,
   type ExperimentConnectedAgentSubject,
 } from "./ports/experiment-connected-agent-ownership.port.ts";
 export { RedisExperimentRunAbortRepository as RedisExperimentRunAbortAdapter } from "./repositories/redis/redis.experiment-run-abort.repository.ts";
 
-export { ExperimentEvaluationReportingPort } from "./ports/experiment-evaluation-reporting.port.ts";
-export { ExperimentModelCostPort } from "./ports/experiment-model-cost.port.ts";
+export { ExperimentEvaluationReporting } from "./ports/experiment-evaluation-reporting.port.ts";
+export { ExperimentModelCost } from "./ports/experiment-model-cost.port.ts";
 export {
-  ExperimentRunProgressRepository as ExperimentRunProgressPort,
+  ExperimentRunProgressRepository as ExperimentRunProgress,
   type ExperimentRunProgressFailure,
   type ExperimentRunProgressState,
   type ExperimentRunProgressSummary,
 } from "./repositories/experiment-run-progress.repository.ts";
-export { ExperimentRunErrorReportingPort } from "./ports/experiment-run-error-reporting.port.ts";
-export { ExperimentSandboxCredentialPort } from "./ports/experiment-sandbox-credential.port.ts";
-export { ExperimentStudioDispatchPort } from "./ports/experiment-studio-dispatch.port.ts";
-export { ExperimentTargetEntityNamesPort } from "./ports/experiment-target-entity-names.port.ts";
-export { ExperimentWorkflowDslPort } from "./ports/experiment-workflow-dsl.port.ts";
+export { ExperimentRunErrorReporting } from "./ports/experiment-run-error-reporting.port.ts";
+export { ExperimentSandboxCredential } from "./ports/experiment-sandbox-credential.port.ts";
+export { ExperimentStudioDispatch } from "./ports/experiment-studio-dispatch.port.ts";
+export { ExperimentTargetEntityNames } from "./ports/experiment-target-entity-names.port.ts";
+export { ExperimentWorkflowDsl } from "./ports/experiment-workflow-dsl.port.ts";
 export { RedisExperimentRunProgressRepository as RedisExperimentRunProgressAdapter } from "./repositories/redis/redis.experiment-run-progress.repository.ts";
 
 export { ExperimentRunOrchestratorService } from "./services/experiment-run-orchestrator.service.ts";

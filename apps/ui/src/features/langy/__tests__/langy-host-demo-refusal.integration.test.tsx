@@ -52,11 +52,11 @@ vi.mock("../../../behavior/public-config", async () => {
 import { type LangyHostPort, useLangyHost } from "@langwatch/langy-web/langy";
 import {
   UiCapabilityContextProvider,
-  UiDocumentTitlePort,
-  UiFeedbackPort,
-  UiNavigationPort,
-  UiRoutePort,
-  UiSessionPort,
+  UiDocumentTitle,
+  UiFeedback,
+  UiNavigation,
+  UiRoute,
+  UiSession,
   type UiActiveScope,
   type UiActor,
   type UiCapabilities,
@@ -64,32 +64,32 @@ import {
 import { withHost } from "../../../ui/sections/ui-page";
 import { LangyHost } from "../ui/sections/host";
 
-class SilentNavigation extends UiNavigationPort {
+class SilentNavigation extends UiNavigation {
   navigate(): void {}
   replace(): void {}
   back(): void {}
 }
 
-class SilentRoute extends UiRoutePort {
+class SilentRoute extends UiRoute {
   reading() {
     return { params: {}, query: {} };
   }
   setQuery(): void {}
 }
 
-class SilentFeedback extends UiFeedbackPort {
+class SilentFeedback extends UiFeedback {
   succeeded(): void {}
   failed(): void {}
 }
 
-class SilentTitle extends UiDocumentTitlePort {
+class SilentTitle extends UiDocumentTitle {
   set(): () => void {
     return () => {};
   }
 }
 
 /** Permission and rollout are wide open, so only the demo check can refuse. */
-class OpenSession extends UiSessionPort {
+class OpenSession extends UiSession {
   constructor(private readonly projectId: string) {
     super();
   }

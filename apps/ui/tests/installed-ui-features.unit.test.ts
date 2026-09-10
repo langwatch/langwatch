@@ -1,7 +1,7 @@
 /** What this package installs for itself, and how a host's install merges over it. */
 
 import { describe, expect, it } from "vitest";
-import { UiFeedbackPort } from "@langwatch/ui-host/capabilities";
+import { UiFeedback } from "@langwatch/ui-host/capabilities";
 import { installedUiFeatures } from "../src/features/installed-ui-features";
 
 const AGENT_PAGE_KEYS = [
@@ -456,7 +456,7 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("answers the feedback capability rather than leaving the refusing default", () => {
-      expect(installedUiFeatures.capabilities?.feedback).toBeInstanceOf(UiFeedbackPort);
+      expect(installedUiFeatures.capabilities?.feedback).toBeInstanceOf(UiFeedback);
     });
 
     /** @scenario "The browser application installs one session for every feature" */

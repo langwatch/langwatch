@@ -12,7 +12,7 @@ import type {
   DynamicKeysFacetDescriptor,
   FacetDescriptor,
   RangeFacetDescriptor,
-  TraceListReadPort,
+  TraceListRead,
 } from "@langwatch/trace-contract";
 import type {
   ExpressionCategoricalDef,
@@ -28,7 +28,7 @@ import type { TraceTopicNamingService } from "../support/trace-topic-naming.serv
 
 export class TraceFacetDescriptorService {
   private constructor(
-    private readonly repository: TraceListReadPort,
+    private readonly repository: TraceListRead,
     private readonly topicNaming: TraceTopicNamingService,
   ) {}
 
@@ -36,7 +36,7 @@ export class TraceFacetDescriptorService {
     repository,
     topicNaming,
   }: {
-    repository: TraceListReadPort;
+    repository: TraceListRead;
     topicNaming: TraceTopicNamingService;
   }): TraceFacetDescriptorService {
     return new TraceFacetDescriptorService(repository, topicNaming);

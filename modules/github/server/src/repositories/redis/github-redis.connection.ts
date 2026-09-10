@@ -23,7 +23,7 @@ function isRedisConnection(value: object): value is GithubRedisConnection {
  * the process client behind it. It lives here rather than beside the App
  * token minter because it is the store, not a provider.
  */
-export abstract class GithubRedisPort {
+export abstract class GithubRedis {
   abstract tryGet(key: string): Promise<string | null>;
   abstract trySet(key: string, value: string, ...args: (string | number)[]): Promise<string | null>;
   abstract delete(key: string): Promise<number>;
@@ -36,7 +36,7 @@ export abstract class GithubRedisPort {
 }
 
 /** Keeps the process Redis client behind the GitHub feature's private port. */
-export class RedisGithubAdapter extends GithubRedisPort {
+export class RedisGithubAdapter extends GithubRedis {
   static create(connection: GithubRedisConnection): RedisGithubAdapter {
     if (!isRedisConnection(connection)) {
       throw new TypeError("GitHub requires a Redis-compatible connection");

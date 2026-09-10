@@ -6,8 +6,8 @@ import {
 } from "@langwatch/stored-object-contract";
 import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
 import {
-  TraceSpoolLegacyObjectPort,
-  TraceSpoolStoragePort,
+  TraceSpoolLegacyObject,
+  TraceSpoolStorage,
   type TraceSpoolObjectStore,
 } from "@langwatch/trace-server";
 
@@ -29,7 +29,7 @@ export type WorkerTraceSpoolStorageOptions = {
  * byte-writing surface here uses, resolved per project so a BYOC tenant writes
  * into its own bucket.
  */
-export class WorkerTraceSpoolStorageAdapter extends TraceSpoolStoragePort {
+export class WorkerTraceSpoolStorageAdapter extends TraceSpoolStorage {
   static create(options: WorkerTraceSpoolStorageOptions): WorkerTraceSpoolStorageAdapter {
     return new WorkerTraceSpoolStorageAdapter(options);
   }
@@ -70,7 +70,7 @@ export class WorkerTraceSpoolStorageAdapter extends TraceSpoolStoragePort {
  * v1 key can only ever name an S3 object. Minting one against an Azure or file
  * destination would fabricate a location nothing ever wrote to.
  */
-export class WorkerTraceSpoolLegacyObjectAdapter extends TraceSpoolLegacyObjectPort {
+export class WorkerTraceSpoolLegacyObjectAdapter extends TraceSpoolLegacyObject {
   static create(options: {
     runtime: StoredObjectStorageRuntimeAdapter;
     aws: AwsClientProcessRuntime;

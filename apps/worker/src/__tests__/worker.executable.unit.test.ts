@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkerExecutableHost, WorkerExecutableOptions } from "../worker.executable.ts";
-import { WorkerExecutable, WorkerExecutableCompositionPort } from "../worker.executable.ts";
+import { WorkerExecutable, WorkerExecutableComposition } from "../worker.executable.ts";
 import type { WorkerProcessComposition, WorkerProcessFactoryContext } from "../worker.process.ts";
 
 const mocks = vi.hoisted(() => ({
@@ -95,7 +95,7 @@ class Host implements WorkerExecutableHost {
   }
 }
 
-class Composition extends WorkerExecutableCompositionPort {
+class Composition extends WorkerExecutableComposition {
   readonly compose = vi.fn(async (_context: WorkerProcessFactoryContext) => this.process);
 
   constructor(readonly process: WorkerProcessComposition) {

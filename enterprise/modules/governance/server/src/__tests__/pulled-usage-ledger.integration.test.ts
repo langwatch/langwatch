@@ -10,7 +10,7 @@ import {
   GatewayBudgetLedgerAdapter,
   PrismaGatewayAdapter,
   TestProjectApi,
-  type GatewayBudgetSpendPort,
+  type GatewayBudgetSpend,
   type GatewayService,
 } from "@langwatch/gateway-server/testing";
 import {
@@ -31,9 +31,9 @@ import {
   type WritePulledUsagePayload,
 } from "../intents/pulled-usage-ledger.intent.ts";
 import {
-  PulledUsageLedgerPort,
+  PulledUsageLedgerRepository,
   type PulledUsageLedgerRow,
-} from "../ports/pulled-usage-ledger.port.ts";
+} from "../app/governance.infrastructure.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -68,15 +68,15 @@ const WINDOW_FROM = new Date("2026-08-01T00:00:00.000Z");
 const WINDOW_TO = new Date("2026-09-01T00:00:00.000Z");
 const BUCKET_AT = new Date("2026-08-03T00:00:00.000Z");
 
-let budgets: GatewayBudgetSpendPort;
+let budgets: GatewayBudgetSpend;
 let gateway: GatewayService;
 let writePulledUsage: (payload: WritePulledUsagePayload) => Promise<void>;
 let clickhouse: ClickHouseClient;
 
 /** The ledger as the composition wires it: the intent's port over the
  *  gateway's ClickHouse repository. */
-class LedgerOverGatewayBudgets extends PulledUsageLedgerPort {
-  constructor(private readonly repository: GatewayBudgetSpendPort) {
+class LedgerOverGatewayBudgets implements PulledUsageLedgerRepository {
+  constructor(private readonly repository: GatewayBudgetSpend) {
     super();
   }
 

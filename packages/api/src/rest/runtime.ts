@@ -31,10 +31,10 @@ import {
   decide,
   decideEntitlement,
   routeScopeOf,
-  type AccessDenialPort,
+  type AccessDenial,
   type AuthorizePort,
   type Credential,
-  type EntitlementsPort,
+  type Entitlements,
 } from "../access/access.ts";
 import { RateLimitedError } from "../errors.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
@@ -118,7 +118,7 @@ export type RestCaller = Readonly<{
  * one with nothing asked of it, and answer a permission at a scope a route's
  * own path named.
  */
-export type RestIdentityPort = Readonly<{
+export type RestIdentity = Readonly<{
   authenticate(input: {
     request: Request;
     permission: AuthzPermission;
@@ -170,12 +170,12 @@ export type RestAuditRow = Readonly<{
 /** Everything the process supplies for the path to run. */
 export type RestRuntimePorts = Readonly<{
   /** The family's own door: the one every route falls back to. */
-  identity: RestIdentityPort;
+  identity: RestIdentity;
   /**
    * One door per credential kind a ROUTE may raise for itself. A route naming a
    * kind this table does not open is refused at mount, by kind.
    */
-  doors?: Partial<Readonly<Record<RestDoorCredential, RestIdentityPort>>>;
+  doors?: Partial<Readonly<Record<RestDoorCredential, RestIdentity>>>;
   /** Where every route that declared an action leaves its row. */
   audit?: RestAuditSink;
   /** Only a family whose routes carry a check of their own supplies these. */
@@ -184,13 +184,13 @@ export type RestRuntimePorts = Readonly<{
   rateLimiter?: RateLimiter;
   /** The store behind every route that declared how long its answer stands. */
   cache?: ResponseCache;
-  denials?: AccessDenialPort;
+  denials?: AccessDenial;
   /** What the process reads a tenant's entitlements from, for a route that asks. */
-  entitlements?: EntitlementsPort;
+  entitlements?: Entitlements;
   /** The receipt ledger behind every create declared replayable. */
   idempotency?: IdempotentRunner;
   /** Where the first call of each deprecated route is recorded. */
-  deprecationLog?: RestDeprecationLogPort;
+  deprecationLog?: RestDeprecationLog;
 }>;
 
 /**
@@ -198,7 +198,7 @@ export type RestRuntimePorts = Readonly<{
  * operator learns a superseded endpoint is still in use without a line per
  * request. Defaults to doing nothing.
  */
-export type RestDeprecationLogPort = Readonly<{
+export type RestDeprecationLog = Readonly<{
   deprecatedRouteCalled(input: {
     family: string;
     operation: string;
@@ -1227,7 +1227,7 @@ async function checkRouteScope({
 }: {
   route: RestTransportRoute<unknown>;
   caller: RestCaller;
-  door: RestIdentityPort;
+  door: RestIdentity;
   ports: RestRuntimePorts;
   input: unknown;
 }): Promise<AuthzDeclaredScopeId | null> {
@@ -1259,7 +1259,7 @@ async function callerOf({
   request,
 }: {
   route: RestTransportRoute<unknown>;
-  door: RestIdentityPort;
+  door: RestIdentity;
   request: Request;
 }): Promise<RestCaller | null> {
   const kind = route.access?.kind;
@@ -1281,7 +1281,7 @@ function doorOf({
 }: {
   credential: RestDoorCredential;
   ports: RestRuntimePorts;
-}): RestIdentityPort {
+}): RestIdentity {
   return ports.doors?.[credential] ?? ports.identity;
 }
 
@@ -1305,8 +1305,8 @@ function handlerScopeOf({
 
 /** @see assertPortsBound, which refuses these before a request arrives. */
 function requireIdentifyOptional(
-  door: RestIdentityPort,
-): NonNullable<RestIdentityPort["identifyOptional"]> {
+  door: RestIdentity,
+): NonNullable<RestIdentity["identifyOptional"]> {
   const identifyOptional = door.identifyOptional;
 
   if (!identifyOptional) throw new Error("REST runtime supplied no identity.identifyOptional");
@@ -1315,7 +1315,7 @@ function requireIdentifyOptional(
 }
 
 /** @see assertPortsBound, which refuses these before a request arrives. */
-function requireIdentify(door: RestIdentityPort): NonNullable<RestIdentityPort["identify"]> {
+function requireIdentify(door: RestIdentity): NonNullable<RestIdentity["identify"]> {
   const identify = door.identify;
 
   if (!identify) throw new Error("REST runtime supplied no identity.identify");
@@ -1324,7 +1324,7 @@ function requireIdentify(door: RestIdentityPort): NonNullable<RestIdentityPort["
 }
 
 /** @see assertPortsBound, which refuses these before a request arrives. */
-function requireAuthorize(door: RestIdentityPort): NonNullable<RestIdentityPort["authorize"]> {
+function requireAuthorize(door: RestIdentity): NonNullable<RestIdentity["authorize"]> {
   const authorize = door.authorize;
 
   if (!authorize) throw new Error("REST runtime supplied no identity.authorize");

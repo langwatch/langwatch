@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { JoinRequestAudiencePort } from "../join-request-audience.repository.ts";
+import { JoinRequestAudience } from "../join-request-audience.repository.ts";
 
 /** Every model a join-request notification reads, and no other. */
 export type PrismaJoinRequestAudienceDatabase = Pick<
@@ -20,7 +20,7 @@ export type PrismaJoinRequestAudienceDatabase = Pick<
  * carries a `projectId` — a join request is not scoped to a project, and none
  * of these models has the column.
  */
-export class PrismaJoinRequestAudienceRepository extends JoinRequestAudiencePort {
+export class PrismaJoinRequestAudienceRepository extends JoinRequestAudience {
   static create(database: PrismaJoinRequestAudienceDatabase): PrismaJoinRequestAudienceRepository {
     return new PrismaJoinRequestAudienceRepository(database);
   }

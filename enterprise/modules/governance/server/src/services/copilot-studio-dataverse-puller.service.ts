@@ -27,7 +27,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceHttpClient } from "../app/governance.infrastructure.ts";
 import { COPILOT_CONVERSATION_ACTION } from "./copilot-studio-trace-mapper.service.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
 import {
@@ -226,9 +226,9 @@ interface TranscriptWalk {
 export class CopilotStudioDataversePullerAdapter implements PullerAdapter<CopilotStudioDataverseConfig> {
   readonly id: string = COPILOT_STUDIO_DATAVERSE_ADAPTER_ID;
 
-  private constructor(private readonly http: GovernanceHttpPort) {}
+  private constructor(private readonly http: GovernanceHttpClient) {}
 
-  static create(http: GovernanceHttpPort): CopilotStudioDataversePullerAdapter {
+  static create(http: GovernanceHttpClient): CopilotStudioDataversePullerAdapter {
     return new CopilotStudioDataversePullerAdapter(http);
   }
 
@@ -471,7 +471,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
     credentials: Record<string, string> | undefined;
     environmentUrl: string;
     signal?: AbortSignal;
-    http: GovernanceHttpPort;
+    http: GovernanceHttpClient;
   }): Promise<string> {
     const { credentials, environmentUrl, signal, http } = params;
     const tenantId = credentials?.tenantId;

@@ -1,15 +1,15 @@
 import { ResourceScope } from "@langwatch/runtime-composition";
 import type {
-  WorkerHandlePort,
-  WorkerLifecyclePort,
-  WorkerTransportPort,
+  WorkerHandle,
+  WorkerLifecycle,
+  WorkerTransport,
 } from "./worker-runtime.port.ts";
 
-export { WorkerHandlePort, WorkerLifecyclePort, WorkerTransportPort } from "./worker-runtime.port.ts";
+export { WorkerHandle, WorkerLifecycle, WorkerTransport } from "./worker-runtime.port.ts";
 
 export type WorkerRuntimeOptions = {
-  lifecycle: WorkerLifecyclePort;
-  transport: WorkerTransportPort;
+  lifecycle: WorkerLifecycle;
+  transport: WorkerTransport;
   resources?: ResourceScope;
 };
 
@@ -24,7 +24,7 @@ export class WorkerRuntime {
     );
   }
 
-  private handle: WorkerHandlePort | undefined;
+  private handle: WorkerHandle | undefined;
   private starting: Promise<void> | undefined;
   private draining: Promise<void> | undefined;
   private resourcesClosing: Promise<void> | undefined;
@@ -32,8 +32,8 @@ export class WorkerRuntime {
   private closed = false;
 
   private constructor(
-    private readonly lifecycle: WorkerLifecyclePort,
-    private readonly transport: WorkerTransportPort,
+    private readonly lifecycle: WorkerLifecycle,
+    private readonly transport: WorkerTransport,
     private readonly resources: ResourceScope,
     private readonly ownsResources: boolean,
   ) {}

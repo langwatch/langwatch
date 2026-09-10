@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
 import { CliDeviceSessionService } from "../../services/cli-device-session.service.ts";
-import type { AuthDirectoryPort } from "../auth-directory.ts";
+import type { AuthDirectory } from "../auth-directory.ts";
 import {
   authCliDeviceFlowRest,
   type AuthCliDeviceFlowApi,
@@ -364,7 +364,7 @@ function deviceFlowWorld(
     revokedForLogout: [] as Array<{ apiKeyId: string; userId: string }>,
   };
 
-  const directory: AuthDirectoryPort = {
+  const directory: AuthDirectory = {
     tryFindOrganizationIdBySsoDomain: () => Promise.resolve(null),
     tryFindPerson: () => Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" }),
     tryFindOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),

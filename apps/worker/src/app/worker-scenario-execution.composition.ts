@@ -44,20 +44,20 @@ import {
   type ScenarioEgressPolicy,
 } from "@langwatch/scenario-server";
 import { AesGcmSecretEncryptionAdapter, secretServer } from "@langwatch/secret-server";
-import { suiteServer, SuiteExecutionPort } from "@langwatch/suite-server";
+import { suiteServer, SuiteExecution } from "@langwatch/suite-server";
 import type { TraceApi } from "@langwatch/trace-contract";
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
-  NlpPayloadStagingPort,
+  NlpPayloadStaging,
   StudioEventPreparerService,
-  WorkflowIdPort,
-  WorkflowLlmParametersPort,
+  WorkflowId,
+  WorkflowLlmParameters,
   WorkflowNlpExecutionService,
   WorkflowProjectEnvironmentService,
   WorkflowService,
   workflowRepositories,
-  type WorkflowNlpRuntimePort,
+  type WorkflowNlpRuntime,
   type WorkflowLlmParameterResolution,} from "@langwatch/workflow-server";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
@@ -70,7 +70,7 @@ import { nowInstant, toDate } from "@langwatch/time";
  * no executor is not broken — the `execute` intent refuses into the outbox and another pod takes
  * the run.
  */
-export abstract class WorkerScenarioExecutionAbsenceReportPort {
+export abstract class WorkerScenarioExecutionAbsenceReport {
   abstract withoutExecutor(
     reason:
       | "no-typed-prisma-connection"
@@ -96,8 +96,8 @@ export type WorkerScenarioExecutionCompositionInput = Readonly<{
   resolveClickHouseClient: EventingClickHouseClientResolver | undefined;
   defaultRetentionDays: number;
   /** Where an oversized NLP invoke body is parked; the absent one refuses by name. */
-  payloadStaging: NlpPayloadStagingPort;
-  absence?: WorkerScenarioExecutionAbsenceReportPort;
+  payloadStaging: NlpPayloadStaging;
+  absence?: WorkerScenarioExecutionAbsenceReport;
 }>;
 
 /** Everything an executor needs, once every optional above has answered. */
@@ -112,7 +112,7 @@ export type WorkerScenarioExecutionPrerequisites = Readonly<{
   langwatchEndpoint: string;
   nlpServiceUrl: string;
   encryptionKey: string;
-  payloadStaging: NlpPayloadStagingPort;
+  payloadStaging: NlpPayloadStaging;
 }>;
 
 /**
@@ -152,7 +152,7 @@ export function resolveWorkerScenarioExecutionPrerequisites(
 
 function refuse(
   options: WorkerScenarioExecutionCompositionInput,
-  reason: Parameters<WorkerScenarioExecutionAbsenceReportPort["withoutExecutor"]>[0],
+  reason: Parameters<WorkerScenarioExecutionAbsenceReport["withoutExecutor"]>[0],
 ): undefined {
   options.absence?.withoutExecutor(reason);
   return undefined;
@@ -222,7 +222,7 @@ export interface WorkerScenarioGraph {
   suites: SuiteApi;
   workflows: WorkflowService;
   datasets: DatasetService;
-  nlpRuntime: WorkflowNlpRuntimePort;
+  nlpRuntime: WorkflowNlpRuntime;
   secrets: SecretApi;
   prefetcher: ScenarioExecutionPrefetcherService;
 }
@@ -303,7 +303,7 @@ export async function createWorkerScenarioExecutionGraph(input: {
     projectEnvironment: workflowProjectEnvironment,
     llmParameters: workflowLlmParameters,
   });
-  const workflowIds = WorkerNanoidWorkflowIdPort.create();
+  const workflowIds = WorkerNanoidWorkflowId.create();
   const workflows = WorkflowService.create({
     repository: workflowRepos.workflows,
     datasets,
@@ -405,9 +405,9 @@ class NanoidScenarioTestSuiteId extends ScenarioTestSuiteIdPort {
 }
 
 /** The worker's own workflow-id generator, over the same nanoid the module used. */
-class WorkerNanoidWorkflowIdPort extends WorkflowIdPort {
-  static create(): WorkerNanoidWorkflowIdPort {
-    return new WorkerNanoidWorkflowIdPort();
+class WorkerNanoidWorkflowId implements WorkflowId {
+  static create(): WorkerNanoidWorkflowId {
+    return new WorkerNanoidWorkflowId();
   }
 
   next(): string {
@@ -445,10 +445,8 @@ class WorkerScenarioSecretCipher extends ScenarioSecretCipherPort {
  * start is a browser write dispatched on the API's own producer, and this process reads a suite
  * only to resolve the plan overrides a simulation already in flight was configured with.
  */
-class WorkerSuiteStartRefusal extends SuiteExecutionPort {
-  constructor(private readonly processName: string) {
-    super();
-  }
+class WorkerSuiteStartRefusal implements SuiteExecution {
+  constructor(private readonly processName: string) {}
 
   execute(input: { suiteId: string }): Promise<never> {
     return Promise.reject(
@@ -464,14 +462,12 @@ class WorkerSuiteStartRefusal extends SuiteExecutionPort {
  * than two, exactly as the API tier resolves them: a provider the project never configured, one
  * configured and switched off, and one that is on and hands back prepared credentials.
  */
-class WorkerWorkflowLlmParameters extends WorkflowLlmParametersPort {
+class WorkerWorkflowLlmParameters implements WorkflowLlmParameters {
   static create(input: { modelProviders: ModelProviderApi }): WorkerWorkflowLlmParameters {
     return new WorkerWorkflowLlmParameters(input.modelProviders);
   }
 
-  private constructor(private readonly modelProviders: ModelProviderApi) {
-    super();
-  }
+  private constructor(private readonly modelProviders: ModelProviderApi) {}
 
   async resolve(input: {
     projectId: string;
@@ -505,7 +501,7 @@ class WorkerWorkflowLlmParameters extends WorkflowLlmParametersPort {
 }
 
 /** Names the executor's absence in this process's own log. */
-export class LoggedWorkerScenarioExecutionAbsence extends WorkerScenarioExecutionAbsenceReportPort {
+export class LoggedWorkerScenarioExecutionAbsence extends WorkerScenarioExecutionAbsenceReport {
   static create(serviceName: string): LoggedWorkerScenarioExecutionAbsence {
     return new LoggedWorkerScenarioExecutionAbsence(createLogger(serviceName));
   }
@@ -515,7 +511,7 @@ export class LoggedWorkerScenarioExecutionAbsence extends WorkerScenarioExecutio
   }
 
   withoutExecutor(
-    reason: Parameters<WorkerScenarioExecutionAbsenceReportPort["withoutExecutor"]>[0],
+    reason: Parameters<WorkerScenarioExecutionAbsenceReport["withoutExecutor"]>[0],
   ): void {
     this.logger.warn(
       { reason },

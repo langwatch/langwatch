@@ -16,7 +16,7 @@ describe("the coding-agent REST families", () => {
       expect(codingAgentRest.namespace).toBe("coding-agent");
       expect(sessions.addressing).toBe("dated");
       expect(sessions.v1Twin).toBe(true);
-      expect(sessions.credential).toBe("projectKey");
+      expect(sessions.credential).toBe("project");
     });
 
     it("keeps the one path, its operation id and the permission it asks", () => {
@@ -42,7 +42,7 @@ describe("the coding-agent REST families", () => {
       expect(codingAgentRollupRest.namespace).toBe("coding-agent-rollup");
       expect(rollup.addressing).toBe("literal");
       expect(rollup.v1Twin).toBe(false);
-      expect(rollup.credential).toBe("projectKey");
+      expect(rollup.credential).toBe("project");
     });
 
     it("keeps the address, the operation id and the permission it asks", () => {

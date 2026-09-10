@@ -19,7 +19,7 @@ import { TaskInfrastructureUnavailableError } from "./task.errors.ts";
  * without the generated Prisma client. See
  * `dev/docs/adr/102-runtime-composition-roots.md`, amendment 2026-09-06, for the rest.
  */
-export abstract class TaskHostPort<
+export abstract class TaskHost<
   Config = unknown,
   Prisma = unknown,
   ClickHouse = unknown,

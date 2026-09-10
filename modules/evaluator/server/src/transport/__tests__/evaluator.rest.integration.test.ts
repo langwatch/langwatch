@@ -84,7 +84,7 @@ function buildApi(overrides: Record<string, unknown> = {}) {
   });
   const hono = runtime.mount(createEvaluatorRest(platformUrl).router(), {
     app: () => stub,
-    credential: "projectKey",
+    credential: "project",
     onError: renderHandled,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({

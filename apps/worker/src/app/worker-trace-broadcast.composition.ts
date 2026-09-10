@@ -1,7 +1,7 @@
-import type { TenantBroadcastPort } from "@langwatch/notification-server";
+import type { TenantBroadcast } from "@langwatch/notification-server";
 import type { Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { TraceTenantBroadcastPort } from "@langwatch/trace-server";
+import { TraceTenantBroadcast } from "@langwatch/trace-server";
 import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition.ts";
 
 /**
@@ -13,7 +13,7 @@ import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.compos
  * broadcast port from the shared publisher that ships in
  * `@langwatch/notification-server`.
  *
- *     TraceTenantBroadcastPort              (trace-server declares it)
+ *     TraceTenantBroadcast              (trace-server declares it)
  *       └─ WorkerTraceTenantBroadcastAdapter        a rename, nothing else
  *            └─ RedisTenantBroadcastAdapter         channel + body, pinned
  *                 └─ this process's Redis           one PUBLISH
@@ -32,9 +32,9 @@ import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.compos
  */
 export function tryCreateWorkerTraceBroadcast(options: {
   redis?: RedisConnection | null;
-  broadcast?: TenantBroadcastPort;
+  broadcast?: TenantBroadcast;
   logger?: Logger;
-}): TraceTenantBroadcastPort | undefined {
+}): TraceTenantBroadcast | undefined {
   const broadcast =
     options.broadcast ??
     tryCreateWorkerTenantBroadcast({ redis: options.redis, logger: options.logger });
@@ -53,8 +53,8 @@ export function tryCreateWorkerTraceBroadcast(options: {
  * subscriber that started publishing something other than `trace_updated` would
  * have to say so at its own call site rather than having it silently corrected.
  */
-class WorkerTraceTenantBroadcastAdapter extends TraceTenantBroadcastPort {
-  constructor(private readonly broadcast: TenantBroadcastPort) {
+class WorkerTraceTenantBroadcastAdapter extends TraceTenantBroadcast {
+  constructor(private readonly broadcast: TenantBroadcast) {
     super();
   }
 

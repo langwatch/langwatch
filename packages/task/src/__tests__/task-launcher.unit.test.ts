@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { runTask } from "../task-launcher.ts";
 import { Task } from "../task.ts";
 import { TaskCatalogue } from "../task-catalogue.ts";
-import { TaskHostPort } from "../task-host.port.ts";
+import { TaskHost } from "../task-host.port.ts";
 import { TaskInfrastructureUnavailableError } from "../task.errors.ts";
 
 /** A minimal fake — the launcher only ever calls `.info` and `.error`. */
@@ -116,7 +116,7 @@ describe("runTask", () => {
   });
 });
 
-class NoClickhouseHost extends TaskHostPort<{ name: string }> {
+class NoClickhouseHost extends TaskHost<{ name: string }> {
   readonly prisma = undefined;
   readonly clickhouse = undefined;
   readonly redis = undefined;
@@ -124,8 +124,8 @@ class NoClickhouseHost extends TaskHostPort<{ name: string }> {
   readonly config = { name: "test" };
 }
 
-describe("TaskHostPort", () => {
-  describe("given a TaskHostPort composed without a ClickHouse handle", () => {
+describe("TaskHost", () => {
+  describe("given a TaskHost composed without a ClickHouse handle", () => {
     /** @scenario "A task whose infrastructure handle is absent refuses by name" */
     it("refuses requireClickhouse with a named, non-stack-trace HandledError", () => {
       const host = new NoClickhouseHost();

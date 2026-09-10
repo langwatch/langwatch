@@ -63,7 +63,7 @@ export type TenantBroadcastMessage = {
  * satisfy it, and so does a fake, which is what lets the twin test read the
  * exact bytes that would have gone on the wire.
  */
-export abstract class TenantBroadcastPublisherPort {
+export abstract class TenantBroadcastPublisher {
   abstract publish(channel: string, message: string): Promise<number>;
 }
 
@@ -75,7 +75,7 @@ export abstract class TenantBroadcastPublisherPort {
  * server package may only be consumed by an application root. That is the cost
  * of sharing one publisher, and it is the same cost the mail capability pays.
  */
-export abstract class TenantBroadcastPort {
+export abstract class TenantBroadcast {
   /** The channel a given event type is published on: `broadcast:<eventType>`. */
   static channelFor(eventType: TenantBroadcastEventType): string {
     return `broadcast:${eventType}`;

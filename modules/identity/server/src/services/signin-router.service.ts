@@ -14,7 +14,7 @@ const logger = createLogger("langwatch:identity:signin-router");
  */
 
 /** Org-level routing data. Never per-user: see the engine's docblock. */
-export interface SignInDomainRoutingPort {
+export interface SignInDomainRouting {
   /** The connection owning an email domain, or null when none does — the
    *  same null a domain nobody ever configured produces. */
   tryFindConnectionForDomain(input: { domain: string }): Promise<RoutableConnection | null>;
@@ -65,7 +65,7 @@ const defaultRecorder: SignInRoutingRecorder = {
 };
 
 export interface SignInRouterDeps {
-  domains: SignInDomainRoutingPort;
+  domains: SignInDomainRouting;
   policy: SignInMethodPolicyPort;
   breakGlass: SignInBreakGlassLimiter;
   recorder?: SignInRoutingRecorder;
@@ -84,7 +84,7 @@ export class SignInRouterService {
     return new SignInRouterService(deps);
   }
 
-  private readonly domains: SignInDomainRoutingPort;
+  private readonly domains: SignInDomainRouting;
   private readonly policy: SignInMethodPolicyPort;
   private readonly breakGlass: SignInBreakGlassLimiter;
   private readonly recorder: SignInRoutingRecorder;

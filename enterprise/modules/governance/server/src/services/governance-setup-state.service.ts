@@ -1,5 +1,5 @@
 import { type GovernanceSetupState } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceSetupActivityPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceSetupActivityReader } from "../app/governance.infrastructure.ts";
 import type { GovernanceSetupStateRepository } from "../repositories/audit/governance-setup-state.repository.ts";
 
 const RECENT_ACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
@@ -7,13 +7,13 @@ const RECENT_ACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 export class DefaultGovernanceSetupStateService {
   private constructor(
     private readonly repository: GovernanceSetupStateRepository,
-    private readonly activity: GovernanceSetupActivityPort | undefined,
+    private readonly activity: GovernanceSetupActivityReader | undefined,
     private readonly now: () => number,
   ) {}
 
   static create(options: {
     repository: GovernanceSetupStateRepository;
-    activity?: GovernanceSetupActivityPort;
+    activity?: GovernanceSetupActivityReader;
     now?: () => number;
   }): DefaultGovernanceSetupStateService {
     return new DefaultGovernanceSetupStateService(

@@ -14,9 +14,9 @@ import {
   sendSignUpVerificationEmail,
 } from "@langwatch/mail";
 import type { ApiMailComposition } from "./api-mail.composition.ts";
-import { ApiPersonMailPort } from "./api-person-mail.port.ts";
+import { ApiPersonMail } from "./api-person-mail.port.ts";
 
-export class ApiComposedPersonMail extends ApiPersonMailPort {
+export class ApiComposedPersonMail extends ApiPersonMail {
   static create(mail: ApiMailComposition): ApiComposedPersonMail {
     return new ApiComposedPersonMail(mail);
   }

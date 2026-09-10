@@ -1,15 +1,16 @@
 import { createLogger } from "@langwatch/observability";
 import type { PlanInfo, UsageUnit } from "@langwatch/entitlement-contract";
-import { USAGE_UNKNOWN, type UsageCount } from "../ports/usage-counter.port.ts";
-import { NoUsageCache, type UsageCachePort } from "../ports/usage-cache.port.ts";
+import { USAGE_UNKNOWN, type UsageCount } from "../app/entitlement.infrastructure.ts";
+import type { UsageCache } from "../app/entitlement.infrastructure.ts";
+import { NoUsageCache } from "./usage-cache.service.ts";
 import {
   type UsageMeterReading,
-  type UsageOrganizationPort,
-} from "../ports/usage-organization.port.ts";
+  type UsageOrganization,
+} from "../app/entitlement.infrastructure.ts";
 import {
   type ProjectUsageCounts,
-  type UsageVolumeCounterPort,
-} from "../ports/usage-volume-counter.port.ts";
+  type UsageVolumeCounter,
+} from "../app/entitlement.infrastructure.ts";
 import { UsageMeterPolicyService } from "./usage-meter-policy.service.ts";
 import { UsageLimitMessageService, type UsageDeployment } from "./usage-limit-message.service.ts";
 
@@ -50,14 +51,14 @@ export type UsageLimitResult =
 
 /** What enforcement is composed from: the counters, the plan, and the install. */
 export interface UsageServiceDependencies {
-  organizations: UsageOrganizationPort;
-  traceCounter: UsageVolumeCounterPort;
-  eventCounter: UsageVolumeCounterPort;
+  organizations: UsageOrganization;
+  traceCounter: UsageVolumeCounter;
+  eventCounter: UsageVolumeCounter;
   planResolver: PlanResolver;
   deployment: UsageDeployment;
   /** Both caches are 30-second windows in production; absent means uncached. */
-  countCache?: UsageCachePort;
-  decisionCache?: UsageCachePort;
+  countCache?: UsageCache;
+  decisionCache?: UsageCache;
 }
 
 /**
@@ -66,13 +67,13 @@ export interface UsageServiceDependencies {
  * TraceUsageService or EventUsageService depending on the resolved meter.
  */
 export class UsageService {
-  private readonly organizations: UsageOrganizationPort;
-  private readonly traceUsageService: UsageVolumeCounterPort;
-  private readonly eventUsageService: UsageVolumeCounterPort;
+  private readonly organizations: UsageOrganization;
+  private readonly traceUsageService: UsageVolumeCounter;
+  private readonly eventUsageService: UsageVolumeCounter;
   private readonly planResolver: PlanResolver;
   private readonly deployment: UsageDeployment;
-  private readonly countCache: UsageCachePort;
-  private readonly decisionCache: UsageCachePort;
+  private readonly countCache: UsageCache;
+  private readonly decisionCache: UsageCache;
 
   static create(deps: UsageServiceDependencies): UsageService {
     return new UsageService(deps);

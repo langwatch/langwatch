@@ -1,7 +1,7 @@
 import { EventingAuthzCommandDispatcherAdapter, type AuthzPipeline } from "@langwatch/authz-server";
 import type {
   WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
+  WorkerFeatureInstaller,
 } from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
@@ -13,7 +13,7 @@ export interface AuthzWorkerCapability {
 }
 
 /** Registers the ledger before connecting the worker's grant commands. */
-export class AuthzWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
+export class AuthzWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
     installer: AuthzWorkerCapability;
     eventing: WorkerEventingRuntime;

@@ -15,7 +15,7 @@ import { tryCreateWorkerTraceBroadcast } from "../worker-trace-broadcast.composi
  * has not converted — the application still registers both of these subscribers
  * — so nothing in this process publishes yet. What has to be true today is that
  * the real subscriber bodies, handed nothing but Trace's own
- * `TraceTenantBroadcastPort`, put the application's exact bytes on the wire.
+ * `TraceTenantBroadcast`, put the application's exact bytes on the wire.
  *
  * Channel and body are pinned by LITERAL. The subscriber on the far side is in
  * the application and compiles against none of this: it matches

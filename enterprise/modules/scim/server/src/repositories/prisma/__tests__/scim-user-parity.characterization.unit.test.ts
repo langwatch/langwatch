@@ -5,7 +5,7 @@ import {
   SCIM_ENTERPRISE_USER_SCHEMA,
   type ScimCreateUserRequest,
 } from "@langwatch/enterprise-scim-contract";
-import type { ScimRepositoryPort } from "../../scim.repository.ts";
+import type { ScimRepository } from "../../scim.repository.ts";
 import { scimRepositoryFixture as repository } from "../../../__tests__/support/scim-repository-fixture.ts";
 import { ScimService } from "../../../services/scim.service.ts";
 import type { UpdateUserProfileInput, UserProfile } from "@langwatch/user-contract";
@@ -50,7 +50,7 @@ class EnterpriseEntitlements implements Pick<EntitlementApi, "getActivePlan"> {
 
 function harness(
   options: {
-    repository?: ScimRepositoryPort;
+    repository?: ScimRepository;
     existingUser?: UserProfile | null;
     membership?: unknown;
     currentUser?: UserProfile | null;

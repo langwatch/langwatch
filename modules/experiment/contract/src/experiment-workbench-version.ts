@@ -23,7 +23,7 @@ export type WorkbenchActorLabel = z.infer<typeof workbenchActorLabelSchema>;
  * Signal-then-refetch: it names WHAT changed and at which version, never the
  * state itself. The client compares versions and refetches through the normal
  * read path when it is behind. The publisher is
- * `ExperimentWorkbenchUpdatesPort.publish`; this is the same shape with the
+ * `ExperimentWorkbenchUpdates.publish`; this is the same shape with the
  * event name on it, and it lives here because the two ends of that wire belong
  * to one contract.
  */

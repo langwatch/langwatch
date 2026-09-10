@@ -23,7 +23,7 @@ import {
   type Graph,
   type GraphLayout,
 } from "@langwatch/dashboard-contract";
-import type { WorkbenchAccessPort } from "../ports/workbench-access.port.ts";
+import type { WorkbenchAccess } from "../app/dashboard.infrastructure.ts";
 import type {
   DashboardGraphKind,
   DashboardRepository,
@@ -39,16 +39,16 @@ const defaultLayout: GraphLayout = {
 /** The project's dashboards and the chart-builder graphs placed on them. */
 export class DashboardService {
   #repository: DashboardRepository;
-  #workbenchAccess: WorkbenchAccessPort;
+  #workbenchAccess: WorkbenchAccess;
 
-  private constructor(repository: DashboardRepository, workbenchAccess: WorkbenchAccessPort) {
+  private constructor(repository: DashboardRepository, workbenchAccess: WorkbenchAccess) {
     this.#repository = repository;
     this.#workbenchAccess = workbenchAccess;
   }
 
   static create(options: {
     repository: DashboardRepository;
-    workbenchAccess: WorkbenchAccessPort;
+    workbenchAccess: WorkbenchAccess;
   }): DashboardService {
     return new DashboardService(options.repository, options.workbenchAccess);
   }

@@ -2,7 +2,7 @@ import { type IdentifierFact, isLiveIdentifierState } from "@langwatch/identity-
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
-  IdentityAccountsPort,
+  IdentityAccounts,
   IdentityResolution,
   IdentityResolutionPort,
 } from "../../rules/identity-storage-ports.rules.ts";
@@ -37,7 +37,7 @@ const EMPTY_SECRETS = {
  * `Account` rows are the memory adapter's own, which is what makes the
  * bridge mirror observable.
  */
-export class InMemoryIdentityStorage implements IdentityAccountsPort, IdentityResolutionPort {
+export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolutionPort {
   readonly credentials = new Map<string, StoredCredential>();
 
   constructor(
@@ -257,7 +257,7 @@ export const inertIdentityPorts = {
     deleteCredentials: refuses("deleteCredentials"),
     deleteBridgeAccounts: refuses("deleteBridgeAccounts"),
     mirrorSecretsOntoAccounts: refuses("mirrorSecretsOntoAccounts"),
-  } satisfies IdentityAccountsPort,
+  } satisfies IdentityAccounts,
   resolution: {
     async tryResolveByIdentifierValue() {
       return null;

@@ -13,11 +13,11 @@ import {
 } from "../../api-rest.doors.ts";
 import {
   createApiRestRuntime,
-  type ApiOrganizationCredentialPort,
-  type ApiOrganizationIdentityPort,
-  type ApiRestRouteAuthorizationPort,
+  type ApiOrganizationCredential,
+  type ApiOrganizationIdentity,
+  type ApiRestRouteAuthorization,
   type ApiRestRuntime,
-  type ApiScimDirectoryCredentialPort,
+  type ApiScimDirectoryCredential,
 } from "../../api-rest.runtime.ts";
 import type { ApiPackagedRestCollaborators } from "../../api-rest.packaged-services.ts";
 import type { ApiRestPorts, ApiRestServices } from "../../api-rest.services.ts";
@@ -55,13 +55,13 @@ export function openTestRestDoors(options: {
   packaged?: ApiPackagedRestCollaborators | undefined;
   absence?: ApiRestAbsenceReport | undefined;
   /** The organization door, for a suite driving a family that answers behind one. */
-  organizationCredential?: ApiOrganizationCredentialPort | undefined;
+  organizationCredential?: ApiOrganizationCredential | undefined;
   /** The same door with no permission asked, for a family that answers any caller. */
-  organizationIdentity?: ApiOrganizationIdentityPort | undefined;
+  organizationIdentity?: ApiOrganizationIdentity | undefined;
   /** The permission a route asks at the project its own path names. */
-  routeAuthorization?: ApiRestRouteAuthorizationPort | undefined;
+  routeAuthorization?: ApiRestRouteAuthorization | undefined;
   /** The directory bearer, for a suite driving the SCIM 2.0 protocol family. */
-  directoryCredential?: ApiScimDirectoryCredentialPort | undefined;
+  directoryCredential?: ApiScimDirectoryCredential | undefined;
 }): MountableRestApp[] {
   const errors = ApiRestObservabilityComposition.create().legacyErrorHandler;
   const dualCredential = options.packaged?.ports.dualAuth;

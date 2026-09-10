@@ -1,4 +1,4 @@
-import type { WebhookDispatchRateLimiterPort, WebhookEgressService } from "@langwatch/egress";
+import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatch/egress";
 
 import type { WebhookDestination } from "../app/webhook.app.ts";
 import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
@@ -20,7 +20,7 @@ export type WebhookDestinationDeps = Readonly<{
    * service; a queue send never passes through that sender, so it has to be handed the same
    * counter directly or a queue endpoint would be the one uncapped destination.
    */
-  rateLimiter?: WebhookDispatchRateLimiterPort | undefined;
+  rateLimiter?: WebhookDispatchRateLimiter | undefined;
 }>;
 
 /** Picks the transport one endpoint's configuration names. */

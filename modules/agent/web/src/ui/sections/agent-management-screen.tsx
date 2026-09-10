@@ -14,9 +14,9 @@ import { AgentReplicateDialog } from "../blocks/agent-replicate-dialog.tsx";
 import { ConnectedAgentsSection } from "../blocks/connected-agents-section.tsx";
 import { AgentCard } from "../blocks/agent-card.tsx";
 import {
-  type AgentManagementCardPort,
+  type AgentManagementCard,
   AgentManagementPage,
-  type AgentPageCompositionPort,
+  type AgentPageComposition,
   type AgentArchiveDialogInput,
   type AgentCardRenderInput,
   type AgentCopyDialogInput,
@@ -35,7 +35,7 @@ export const AGENT_NEW_QUERY_KEY = "new";
 
 export const AGENT_NEW_QUERY_VALUE = "agent";
 
-class ScreenComposition implements AgentPageCompositionPort {
+class ScreenComposition implements AgentPageComposition {
   constructor(private readonly host: AgentManagementHost) {}
 
   renderHeader({ onCreate }: { onCreate: () => void }): ReactNode {
@@ -122,7 +122,7 @@ class ScreenComposition implements AgentPageCompositionPort {
   }
 }
 
-class ScreenCard implements AgentManagementCardPort {
+class ScreenCard implements AgentManagementCard {
   render({ agent, ...callbacks }: AgentCardRenderInput): ReactNode {
     return (
       <AgentCard

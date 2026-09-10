@@ -6,10 +6,10 @@
 import type { ModelProvider } from "@langwatch/gateway-contract";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 
-import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port.ts";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
+import { GatewayConfigAssembly } from "../app/gateway.infrastructure.ts";
+import type { GatewayModelProviderCredentials } from "../app/gateway.infrastructure.ts";
 import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
-import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   budgetPeriodFloorMs,
@@ -39,7 +39,7 @@ export class GatewayConfigMaterialiserService {
     /** Which providers a key reaches, and in which dispatch order. */
     private readonly scopeResolution: GatewayScopeResolutionService,
     private readonly projects: ProjectApi,
-    private readonly chRepo: GatewayBudgetSpendPort | null,
+    private readonly chRepo: GatewayBudgetSpend | null,
     /**
      * The process's own gateway service. Required rather than defaulted: building one here meant
      * composing a second service per request over the same tables, and the default could not be
@@ -51,13 +51,13 @@ export class GatewayConfigMaterialiserService {
      * the Model Provider feature and a gateway package may not depend on
      * another feature's server package.
      */
-    private readonly credentials: GatewayModelProviderCredentialsPort,
+    private readonly credentials: GatewayModelProviderCredentials,
     /**
      * The version token, the reserved tier vocabulary and the shipped model
      * catalog: the three reads the bundle needs that are not this service's
      * own logic.
      */
-    private readonly assembly: GatewayConfigAssemblyPort,
+    private readonly assembly: GatewayConfigAssembly,
     /**
      * The mirror project this deployment names, if any. Stated by the
      * composition root rather than read here: a package receives its
@@ -69,10 +69,10 @@ export class GatewayConfigMaterialiserService {
   static create(input: {
     scopeResolution: GatewayScopeResolutionService;
     projects: ProjectApi;
-    chRepo: GatewayBudgetSpendPort | null;
+    chRepo: GatewayBudgetSpend | null;
     budgetDecisions: GatewayService;
-    credentials: GatewayModelProviderCredentialsPort;
-    assembly: GatewayConfigAssemblyPort;
+    credentials: GatewayModelProviderCredentials;
+    assembly: GatewayConfigAssembly;
     /** `LANGY_MIRROR_PROJECT_ID`; absent means nothing is mirrored. */
     langyMirrorProjectId?: string | undefined;
   }): GatewayConfigMaterialiserService {

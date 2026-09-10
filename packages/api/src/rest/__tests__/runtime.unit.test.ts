@@ -9,7 +9,7 @@ import { Hono, type Hono as HonoApp } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { anyAuthenticated, publicRoute, type EntitlementsPort } from "../../access/access.ts";
+import { anyAuthenticated, publicRoute, type Entitlements } from "../../access/access.ts";
 import {
   ApiVersionConflictError,
   createErrorHandler,
@@ -695,7 +695,7 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
       .router();
   }
 
-  function mounted({ holds, handle }: { holds: EntitlementsPort["holds"]; handle: () => void }) {
+  function mounted({ holds, handle }: { holds: Entitlements["holds"]; handle: () => void }) {
     const runtime = createRestRuntime({
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),

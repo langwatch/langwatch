@@ -65,10 +65,10 @@ import {
   TraceIOExtractionService,
   TraceListService,
   TraceLegacyReadService,
-  TraceFullIoPort,
+  TraceFullIo,
   TracePayloadReaderRepository,
   TraceQueryClassificationAdapter,
-  TraceSpanIngestPort,
+  TraceSpanIngest,
   TraceSummaryService,
   traceMetadataUpdateSchema,
   VisibilityWindowService,
@@ -86,7 +86,7 @@ import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/tr
 
 import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
-import { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port.ts";
+import { ApiTraceReadStack } from "../features/trace/trace-read-stack.port.ts";
 
 /** Everything the read stack is composed from. */
 export type ApiTraceReadStackOptions = Readonly<{
@@ -119,7 +119,7 @@ export type ApiTraceReadStackOptions = Readonly<{
   /** The coding-agent sessions the Sessions lens joins, if composed. */
   codingAgents?: CodingAgentApi | undefined;
   /** Where a reserved-metadata amendment is recorded, if a queue was composed. */
-  ingest?: TraceSpanIngestPort | undefined;
+  ingest?: TraceSpanIngest | undefined;
   /** Analytics's filter translator; absent, a FILTERED list refuses. */
   filterConditions?: TraceLegacyFilterConditions | undefined;
   /** Names a refusal, so a stand-in says which process reached it. */
@@ -260,11 +260,11 @@ function preconditionTraceData(
 
 /** The project's resolved data-privacy policy, as this stack reads it. */
 /** Composes the trace read stack over this process's own connection. */
-export function composeApiTraceReadStack(options: ApiTraceReadStackOptions): ApiTraceReadStackPort {
+export function composeApiTraceReadStack(options: ApiTraceReadStackOptions): ApiTraceReadStack {
   return ApiComposedTraceReadStack.create(options);
 }
 
-class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
+class ApiComposedTraceReadStack extends ApiTraceReadStack {
   static create(options: ApiTraceReadStackOptions): ApiComposedTraceReadStack {
     return new ApiComposedTraceReadStack(options);
   }
@@ -662,7 +662,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     });
   }
 
-  private requireIngest(): TraceSpanIngestPort {
+  private requireIngest(): TraceSpanIngest {
     const ingest = this.options.ingest;
     if (!ingest) {
       throw this.refuse("the reserved-metadata write");
@@ -766,7 +766,7 @@ class UnresolvedTracePayloadReader extends TracePayloadReaderRepository {
 }
 
 /** Full-IO recomputation, on a process that folds no trace projections. */
-class UnrecomputedTraceFullIo extends TraceFullIoPort {
+class UnrecomputedTraceFullIo extends TraceFullIo {
   static create(): UnrecomputedTraceFullIo {
     return new UnrecomputedTraceFullIo();
   }

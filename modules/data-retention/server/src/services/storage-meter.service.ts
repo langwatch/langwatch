@@ -8,7 +8,7 @@ import {
   RETENTION_TABLE_CATEGORY_MAP,
   PRODUCTION_STORAGE_METER_TABLES,
 } from "@langwatch/data-retention-contract/retention-tables";
-import type { StorageMeterClickHouseResolver } from "../ports/storage-meter-clickhouse.port.ts";
+import type { StorageMeterClickHouseResolver } from "../app/data-retention.infrastructure.ts";
 import {
   RedisStorageMeterCacheStore,
   type StorageMeterRedis,

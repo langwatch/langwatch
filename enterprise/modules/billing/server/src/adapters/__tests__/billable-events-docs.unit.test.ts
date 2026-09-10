@@ -19,7 +19,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import type { BillableEventsMeterPort } from "../../ports/billable-events-meter.port.ts";
+import type { BillableEventsMeter } from "../../ports/billable-events-meter.port.ts";
 import type { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 import { EventingBillableEventsMeterAdapter } from "../eventing.billable-events-meter.adapter.ts";
 
@@ -93,7 +93,7 @@ function pricingFaqAnswer(): string {
 }
 
 const meteredEventTypes = EventingBillableEventsMeterAdapter.create({
-  meter: {} as unknown as BillableEventsMeterPort,
+  meter: {} as unknown as BillableEventsMeter,
   organizations: {} as unknown as BillingTenantOrganizationService,
 }).build().eventTypes;
 

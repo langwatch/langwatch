@@ -1,12 +1,12 @@
 import {
-  AutomationDispatchErrorPort,
+  AutomationDispatchError,
   AutomationEmailCapService,
-  AutomationGraphNotifierPort,
-  AutomationLoggerPort,
-  AutomationHeartbeatPort,
-  AutomationRunawayPort,
-  AutomationSlackBotTokenDecryptorPort,
-  AutomationTestFirePort,
+  AutomationGraphNotifier,
+  AutomationLogger,
+  AutomationHeartbeat,
+  AutomationRunaway,
+  AutomationSlackBotTokenDecryptor,
+  AutomationTestFire,
   AutomationPersistCapService,
 } from "./index.ts";
 
@@ -30,7 +30,7 @@ export {
   TestDispatchErrors,
 } from "./fixtures/graph-activity.fixture.ts";
 
-class TestNotifier extends AutomationGraphNotifierPort {
+class TestNotifier implements AutomationGraphNotifier {
   async dispatch() {
     return {
       channel: "none" as const,
@@ -40,23 +40,23 @@ class TestNotifier extends AutomationGraphNotifierPort {
     };
   }
 }
-class TestLogger extends AutomationLoggerPort {
+class TestLogger extends AutomationLogger {
   error(): void {}
   debug(): void {}
   info(): void {}
   warn(): void {}
 }
-class TestHeartbeat extends AutomationHeartbeatPort {
+class TestHeartbeat extends AutomationHeartbeat {
   async tryResolveClickHouseClient() {
     return null;
   }
 }
-class TestSlackTokens extends AutomationSlackBotTokenDecryptorPort {
+class TestSlackTokens extends AutomationSlackBotTokenDecryptor {
   tryDecrypt() {
     return null;
   }
 }
-class TestDispatchErrors extends AutomationDispatchErrorPort {
+class TestDispatchErrors extends AutomationDispatchError {
   isTerminal() {
     return false;
   }
@@ -64,7 +64,7 @@ class TestDispatchErrors extends AutomationDispatchErrorPort {
     return new Error(message);
   }
 }
-class TestRunaway extends AutomationRunawayPort {
+class TestRunaway extends AutomationRunaway {
   async countProjectTraces24h() {
     return 0;
   }
@@ -92,7 +92,7 @@ class TestRunaway extends AutomationRunawayPort {
   info() {}
 }
 
-class TestFireDelivery extends AutomationTestFirePort {
+class TestFireDelivery extends AutomationTestFire {
   async sendEmail(): Promise<void> {}
   async sendSlack(): Promise<void> {}
   async sendSlackBot(): Promise<void> {}
@@ -101,7 +101,7 @@ class TestFireDelivery extends AutomationTestFirePort {
   }
 }
 
-export function createAutomationTestFirePort(): AutomationTestFirePort {
+export function createAutomationTestFirePort(): AutomationTestFire {
   return new TestFireDelivery();
 }
 

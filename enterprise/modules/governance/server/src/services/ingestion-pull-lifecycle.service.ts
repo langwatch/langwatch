@@ -1,28 +1,28 @@
-import {
-  GovernanceDiagnosticsPort,
-  NullGovernanceDiagnosticsAdapter,
-} from "../ports/governance-diagnostics.port.ts";
 import type {
-  IngestionPullLifecycleCommandPort,
+  GovernanceDiagnosticsSink,
+  IngestionPullLifecycleChannel,
+  IngestionPullTenantResolver,
+} from "../app/governance.infrastructure.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
+import type {
   IngestionPullLifecycleRepository,
   IngestionPullLifecycleSource,
-  IngestionPullTenantPort,
-} from "../ports/ingestion-pull-lifecycle.port.ts";
+} from "../repositories/ingestion-pull-lifecycle.repository.ts";
 
 export class IngestionPullLifecycleService {
   private constructor(
     private readonly repository: IngestionPullLifecycleRepository,
-    private readonly tenant: IngestionPullTenantPort,
-    private readonly commands: IngestionPullLifecycleCommandPort,
-    private readonly diagnostics: GovernanceDiagnosticsPort,
+    private readonly tenant: IngestionPullTenantResolver,
+    private readonly commands: IngestionPullLifecycleChannel,
+    private readonly diagnostics: GovernanceDiagnosticsSink,
     private readonly now: () => number,
   ) {}
 
   static create(options: {
     repository: IngestionPullLifecycleRepository;
-    tenant: IngestionPullTenantPort;
-    commands: IngestionPullLifecycleCommandPort;
-    diagnostics?: GovernanceDiagnosticsPort;
+    tenant: IngestionPullTenantResolver;
+    commands: IngestionPullLifecycleChannel;
+    diagnostics?: GovernanceDiagnosticsSink;
     now?: () => number;
   }): IngestionPullLifecycleService {
     return new IngestionPullLifecycleService(

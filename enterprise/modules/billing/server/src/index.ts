@@ -27,7 +27,7 @@ export {
   PrismaPostgresRepository as PostgresBillingAdapter,
   type PostgresBillingPersistence,
 } from "./repositories/prisma/prisma.postgres.repository.ts";
-export { StripeErrorTranslatorPort } from "./ports/stripe-error-translator.port.ts";
+export { StripeErrorTranslator } from "./ports/stripe-error-translator.port.ts";
 export { BillingCheckpointPort, type BillingCheckpoint } from "./ports/billing-checkpoint.port.ts";
 export {
   BILLING_ORG_CACHE_PREFIX,
@@ -52,15 +52,15 @@ export {
 } from "./adapters/stripe.usage-reporting.adapter.ts";
 export { ObservabilityBillingErrorAdapter } from "./adapters/observability.billing-error.adapter.ts";
 export { EventingBillingReportingAdapter } from "./adapters/eventing.billing-reporting.adapter.ts";
-export { BillingErrorReporterPort, NullBillingErrorReporter } from "./ports/error-reporter.port.ts";
-export { BillingOrganizationPort } from "./ports/organization.port.ts";
+export { BillingErrorReporter, NullBillingErrorReporter } from "./ports/error-reporter.port.ts";
+export { BillingOrganization } from "./ports/organization.port.ts";
 export { NullBillingOrganizationAdapter } from "./adapters/null-organization.adapter.ts";
-export { BillingSubscriptionNotifierPort } from "./ports/subscription-notifier.port.ts";
+export { BillingSubscriptionNotifier } from "./ports/subscription-notifier.port.ts";
 export { NullBillingSubscriptionNotifierAdapter } from "./adapters/null-subscription-notifier.adapter.ts";
 export { NullUsageLimitEmailAdapter, UsageLimitEmailPort } from "./ports/usage-limit-email.port.ts";
-export { BillableEventsRepository as BillableEventsPort, type BillableEventsWindow } from "./repositories/billable-events.repository.ts";
+export { BillableEventsRepository as BillableEvents, type BillableEventsWindow } from "./repositories/billable-events.repository.ts";
 export {
-  BillableEventsMeterPort,
+  BillableEventsMeter,
   type BillableEventRecord,
 } from "./ports/billable-events-meter.port.ts";
 export {
@@ -77,7 +77,7 @@ export {
   BILLING_METER_DISPATCH_SUPPRESS_MS,
   EventingBillingMeterDispatchAdapter,
 } from "./adapters/eventing.billing-meter-dispatch.adapter.ts";
-export { BillingTenantOrganizationPort } from "./ports/tenant-organization.port.ts";
+export { BillingTenantOrganization } from "./ports/tenant-organization.port.ts";
 export {
   BillingTenantOrganizationService,
   type BillingTenantOrganizationCache,
@@ -90,8 +90,8 @@ export {
 } from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
 export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
 export { PlanLimitsPlanCatalogueAdapter } from "./adapters/plan-limits.plan-catalogue.adapter.ts";
-export { OrganizationPricingPort } from "./ports/organization-pricing.port.ts";
-export { SubscriptionRepository as BillingSubscriptionPort } from "./repositories/subscription.repository.ts";
+export { OrganizationPricing } from "./ports/organization-pricing.port.ts";
+export { SubscriptionRepository as BillingSubscription } from "./repositories/subscription.repository.ts";
 export {
   ANNUAL_EVENTS_BILLING_THRESHOLD,
   AnnualEventsBillingThresholdService,
@@ -174,15 +174,15 @@ export {
   createBillingStripeClient,
   STRIPE_API_VERSION,
 } from "./adapters/stripe.stripe-client.adapter.ts";
-export { BillingWebhookOrganizationPort } from "./repositories/billing-webhook-organization.repository.ts";
+export { BillingWebhookOrganization } from "./repositories/billing-webhook-organization.repository.ts";
 export type { BillingWebhookOrganizationDatabase } from "./repositories/prisma/prisma.billing-webhook-organization.repository.ts";
 export type { BillingWebhookTrialLicenseDatabase } from "./repositories/prisma/prisma.billing-webhook-subscription.repository.ts";
 export {
-  BillingWebhookHostPort,
+  BillingWebhookHost,
   SilentBillingWebhookHost,
 } from "./ports/billing-webhook-host.port.ts";
 export {
-  BillingWebhookSubscriptionPort,
+  BillingWebhookSubscription,
   NullBillingWebhookSubscriptionAdapter,
   type CancelledSubscription,
   type SubscriptionWithOrg,

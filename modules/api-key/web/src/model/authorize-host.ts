@@ -77,7 +77,7 @@ export type AuthorizeFailureNotice = {
   /**
    * The failure itself, which the composition's presentation registry turns
    * into the sentence a customer reads. Required rather than optional, and the
-   * shape `UiFeedbackPort` takes: a notice with no error degrades to the generic
+   * shape `UiFeedback` takes: a notice with no error degrades to the generic
    * line for a failure we could have named.
    */
   readonly error: unknown;

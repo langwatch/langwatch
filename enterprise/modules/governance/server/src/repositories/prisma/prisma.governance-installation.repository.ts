@@ -33,31 +33,31 @@ import { DefaultGovernancePersonalVirtualKeyService } from "../../services/gover
 import { PrismaPersonalVirtualKeyRepository } from "./prisma.governance-personal-key.repository.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../../services/governance-routing.service.ts";
 import { PrismaRoutingPolicyRepository } from "./prisma.governance-routing.repository.ts";
-import type { AdminWorkspaceViewOcsfPort } from "../../app/governance.infrastructure.ts";
-import type { AiToolProviderCatalogPort, AiToolSlugPort } from "../ai-tool-catalog.repository.ts";
-import type { CliAdminContactPort } from "../../app/governance.infrastructure.ts";
-import type { CliTokenStorePort } from "../../app/governance.infrastructure.ts";
-import { GovernanceBudgetOverviewPort } from "../../ports/governance-budget-overview.port.ts";
-import type { GovernanceDiagnosticsPort } from "../../ports/governance-diagnostics.port.ts";
-import type { GovernanceEncryptionPort } from "../../app/governance.infrastructure.ts";
-import type { GovernanceEventingPort } from "../../app/governance.infrastructure.ts";
-import type { GovernanceOcsfEventsReaderPort } from "../../app/governance.infrastructure.ts";
-import type { GovernanceSetupActivityPort } from "../../app/governance.infrastructure.ts";
-import type { GovernanceClickHouseResolverPort } from "../../ports/ingestion-source-activity.port.ts";
+import type { AdminWorkspaceViewOcsfChannel } from "../../app/governance.infrastructure.ts";
+import type { AiToolProviderCatalog, AiToolSlug } from "../ai-tool-catalog.repository.ts";
+import type { CliAdminContactReader } from "../../app/governance.infrastructure.ts";
+import type { CliTokenStore } from "../../app/governance.infrastructure.ts";
+import type { CliBudgetOverviewReader } from "../../app/governance.infrastructure.ts";
+import type { GovernanceDiagnosticsSink } from "../../app/governance.infrastructure.ts";
+import type { GovernanceEncryptor } from "../../app/governance.infrastructure.ts";
+import type { GovernanceEventingChannel } from "../../app/governance.infrastructure.ts";
+import type { GovernanceOcsfEventsReader } from "../../app/governance.infrastructure.ts";
+import type { GovernanceSetupActivityReader } from "../../app/governance.infrastructure.ts";
+import type { GovernanceClickHouseResolver } from "../../app/governance.infrastructure.ts";
 import type {
-  IngestionSourceEntitlementsPort,
-  IngestionSourceLifecyclePort,
-} from "../../ports/ingestion-source.port.ts";
+  IngestionSourceEntitlements,
+  IngestionSourceLifecycleChannel,
+} from "../../app/governance.infrastructure.ts";
 import type {
-  IngestionKeyIssuerPort,
+  IngestionKeyIssuer,
   IngestionKeyRepository,
-} from "../../ports/ingestion-source-key.port.ts";
-import type { PersonalUsageReaderPort } from "../../ports/personal-usage.port.ts";
-import type { PersonalVirtualKeyIssuerPort } from "../../ports/personal-usage.port.ts";
+} from "../../app/governance.infrastructure.ts";
+import type { PersonalUsageReader } from "../../app/governance.infrastructure.ts";
+import type { PersonalVirtualKeyIssuer } from "../../app/governance.infrastructure.ts";
 import type {
-  QuarantineTenantPort,
-  QuarantineTraceActivityPort,
-} from "../../ports/quarantine-fill.port.ts";
+  QuarantineTenantResolver,
+  QuarantineTraceActivityReader,
+} from "../../app/governance.infrastructure.ts";
 import { QuarantineFillEvaluatorService } from "../../services/quarantine-fill.service.ts";
 
 /**
@@ -70,30 +70,30 @@ export type GovernanceInstallationOptions = {
   organizations: OrganizationService;
   projects: ProjectApi;
   gatewayBaseUrl: string;
-  eventing: GovernanceEventingPort;
-  activityClickhouse: GovernanceClickHouseResolverPort;
-  ingestionSourceEntitlements: IngestionSourceEntitlementsPort;
-  ingestionSourceLifecycle: IngestionSourceLifecyclePort;
-  ingestionEncryption: GovernanceEncryptionPort;
+  eventing: GovernanceEventingChannel;
+  activityClickhouse: GovernanceClickHouseResolver;
+  ingestionSourceEntitlements: IngestionSourceEntitlements;
+  ingestionSourceLifecycle: IngestionSourceLifecycleChannel;
+  ingestionEncryption: GovernanceEncryptor;
   ingestionSecretPepper: string;
-  ingestionDiagnostics: GovernanceDiagnosticsPort;
-  personalUsageReader?: PersonalUsageReaderPort;
-  personalVirtualKeyIssuer: PersonalVirtualKeyIssuerPort;
-  budgetOverview: GovernanceBudgetOverviewPort;
-  aiToolSlugs: AiToolSlugPort;
-  aiToolProviders: AiToolProviderCatalogPort;
-  cliContacts: CliAdminContactPort;
-  cliTokenStore?: CliTokenStorePort;
-  diagnostics?: GovernanceDiagnosticsPort;
-  adminWorkspaceOcsf?: AdminWorkspaceViewOcsfPort;
-  adminWorkspaceDiagnostics?: GovernanceDiagnosticsPort;
-  quarantineTenant: QuarantineTenantPort;
-  quarantineTraceActivity?: QuarantineTraceActivityPort;
-  quarantineDiagnostics?: GovernanceDiagnosticsPort;
-  setupActivity?: GovernanceSetupActivityPort;
-  ocsfEvents?: GovernanceOcsfEventsReaderPort;
+  ingestionDiagnostics: GovernanceDiagnosticsSink;
+  personalUsageReader?: PersonalUsageReader;
+  personalVirtualKeyIssuer: PersonalVirtualKeyIssuer;
+  budgetOverview: CliBudgetOverviewReader;
+  aiToolSlugs: AiToolSlug;
+  aiToolProviders: AiToolProviderCatalog;
+  cliContacts: CliAdminContactReader;
+  cliTokenStore?: CliTokenStore;
+  diagnostics?: GovernanceDiagnosticsSink;
+  adminWorkspaceOcsf?: AdminWorkspaceViewOcsfChannel;
+  adminWorkspaceDiagnostics?: GovernanceDiagnosticsSink;
+  quarantineTenant: QuarantineTenantResolver;
+  quarantineTraceActivity?: QuarantineTraceActivityReader;
+  quarantineDiagnostics?: GovernanceDiagnosticsSink;
+  setupActivity?: GovernanceSetupActivityReader;
+  ocsfEvents?: GovernanceOcsfEventsReader;
   ingestionKeyRepository: IngestionKeyRepository;
-  ingestionKeyIssuer: IngestionKeyIssuerPort;
+  ingestionKeyIssuer: IngestionKeyIssuer;
   ottl: GovernanceOttlGateway;
 };
 

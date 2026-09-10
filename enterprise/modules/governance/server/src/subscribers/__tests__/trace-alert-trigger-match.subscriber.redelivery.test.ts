@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
-  TraceAlertMetricsPort,
-  TraceAlertOriginGuardPort,
-  TraceAlertTriggerMatchPort,
-  TraceAlertTriggerPort,
+  TraceAlertMetricsSink,
+  TraceAlertOriginGuard,
+  TraceAlertTriggerMatchChannel,
+  TraceAlertTriggerReader,
   type TraceAlertTrigger,
-} from "../../ports/governance-subscriber.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
 import {
   governanceTraceContext,
   governanceTraceEvent,
-} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures.ts";
+} from "./governance-subscriber.fixtures.ts";
 
-class FixedTriggers extends TraceAlertTriggerPort {
+class FixedTriggers implements TraceAlertTriggerReader {
   activeForProject(): Promise<TraceAlertTrigger[]> {
     return Promise.resolve([
       {
@@ -27,23 +27,23 @@ class FixedTriggers extends TraceAlertTriggerPort {
   }
 }
 
-class DeduplicatingMatchCommands extends TraceAlertTriggerMatchPort {
-  readonly commands = new Map<string, Parameters<TraceAlertTriggerMatchPort["send"]>[0]>();
+class DeduplicatingMatchCommands implements TraceAlertTriggerMatchChannel {
+  readonly commands = new Map<string, Parameters<TraceAlertTriggerMatchChannel["send"]>[0]>();
 
-  send(input: Parameters<TraceAlertTriggerMatchPort["send"]>[0]): Promise<void> {
+  send(input: Parameters<TraceAlertTriggerMatchChannel["send"]>[0]): Promise<void> {
     const key = `${input.triggerId}:${input.traceId}:${input.occurredAt}`;
     this.commands.set(key, input);
     return Promise.resolve();
   }
 }
 
-class PassingOrigin extends TraceAlertOriginGuardPort {
+class PassingOrigin implements TraceAlertOriginGuard {
   passes(): boolean {
     return true;
   }
 }
 
-class NullMetrics extends TraceAlertMetricsPort {
+class NullMetrics implements TraceAlertMetricsSink {
   countRecorded(): void {}
 }
 

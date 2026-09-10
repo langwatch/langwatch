@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiBootFailurePort, startApiExecutable } from "../api.executable.ts";
+import { ApiBootFailure, startApiExecutable } from "../api.executable.ts";
 import {
-  ApiRuntimeCompositionPort,
-  ApiRuntimeProcessPort,
+  ApiRuntimeComposition,
+  ApiRuntimeProcess,
   type ApiRuntimeCompositionOptions,
 } from "../api.main.ts";
 
-class TestProcess extends ApiRuntimeProcessPort {
+class TestProcess extends ApiRuntimeProcess {
   readonly start = vi.fn(async () => undefined);
   readonly close = vi.fn(async () => undefined);
 }
 
-class TestComposition extends ApiRuntimeCompositionPort {
+class TestComposition extends ApiRuntimeComposition {
   readonly compose = vi.fn(async (_options: ApiRuntimeCompositionOptions) => this.process);
 
   constructor(readonly process: TestProcess) {
@@ -19,7 +19,7 @@ class TestComposition extends ApiRuntimeCompositionPort {
   }
 }
 
-class TestFailures extends ApiBootFailurePort {
+class TestFailures extends ApiBootFailure {
   readonly report = vi.fn();
 }
 

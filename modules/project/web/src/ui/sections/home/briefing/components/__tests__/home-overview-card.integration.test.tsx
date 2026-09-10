@@ -6,13 +6,13 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
   ProjectHomeHostProvider,
-  ProjectHomeHostPort,
+  ProjectHomeHost,
   type ProjectHomeProject,
 } from "../../../../../../model/project-home-host.ts";
 import type { StatusCell } from "../../types.ts";
 import { HomeOverviewCard } from "../home-overview-card.tsx";
 
-class StubProjectHomeHost extends ProjectHomeHostPort {
+class StubProjectHomeHost extends ProjectHomeHost {
   project(): ProjectHomeProject | undefined {
     return { id: "project-1", name: "My Project", slug: "acme" };
   }

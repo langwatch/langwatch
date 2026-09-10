@@ -22,7 +22,7 @@ import {
   readOffsets,
   toChunkLines,
 } from "../rules/dataset-chunk-lines.rules.ts";
-import { type DatasetStorage } from "../ports/dataset-storage.port.ts";
+import { type DatasetStorage } from "../app/dataset.app.ts";
 import { type DatasetColumns } from "@langwatch/dataset-contract";
 import { DatasetChunkDeleteService } from "./dataset-chunk-delete.service.ts";
 import { DatasetChunkMaintenanceService } from "./dataset-chunk-maintenance.service.ts";

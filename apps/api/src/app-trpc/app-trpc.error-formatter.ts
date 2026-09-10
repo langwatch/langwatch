@@ -1,7 +1,7 @@
 import {
   createTrpcErrorFormatter,
   trpcFailureTraceIds,
-  type TrpcErrorCausePayloadPort,
+  type TrpcErrorCausePayload,
 } from "@langwatch/api/trpc";
 import {
   ModelNotConfiguredError,
@@ -19,7 +19,7 @@ import { AiCallFailedError } from "@langwatch/model-provider-server";
  * plan-limit shape is last because it is the shapeless one, recognised by a
  * field rather than by a class.
  */
-const causePayload: TrpcErrorCausePayloadPort = {
+const causePayload: TrpcErrorCausePayload = {
   payloadFor(cause) {
     if (cause instanceof ModelNotConfiguredError) {
       return {

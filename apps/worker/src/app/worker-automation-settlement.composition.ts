@@ -9,24 +9,24 @@ import {
 } from "@langwatch/analytics-server";
 import { TRACE_EXPANSIONS, type DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
-  AutomationClockPort,
-  AutomationDatasetMapperPort,
+  AutomationClock,
+  AutomationDatasetMapper,
   AutomationPersistActionService,
   AutomationPersistCapService,
-  AutomationPersistActionWriterPort,
-  AutomationScheduledIntentPort,
-  AutomationSettlementBreachPort,
+  AutomationPersistActionWriter,
+  AutomationScheduledIntent,
+  AutomationSettlementBreach,
   AutomationSettlementDispatchService,
-  AutomationSettlementEvaluationReaderPort,
-  AutomationSettlementFilterEvaluatorPort,
+  AutomationSettlementEvaluationReader,
+  AutomationSettlementFilterEvaluator,
   AutomationSettlementMatchConfirmationService,
-  AutomationSettlementObservabilityPort,
+  AutomationSettlementObservability,
   OtelAutomationSettlementObservabilityAdapter,
-  AutomationSettlementTraceReaderPort,
+  AutomationSettlementTraceReader,
   AutomationEmailCapService,
-  AutomationHeartbeatPort,
-  AutomationLoggerPort,
-  AutomationNotificationDeliveryPort,
+  AutomationHeartbeat,
+  AutomationLogger,
+  AutomationNotificationDelivery,
   createAutomationsPipeline,
   GraphTriggerHeartbeatService,
   OtelAutomationRunawayMetricsAdapter,
@@ -38,8 +38,8 @@ import {
   SlackProviderAdapter,
   WebhookProviderAdapter,
   type AutomationEvent,
-  type AutomationGraphActivityPort,
-  type AutomationIntentRetentionPort,
+  type AutomationGraphActivity,
+  type AutomationIntentRetention,
   type AutomationProjectIdentityPort,
   type AutomationSettlementLedgerDatabase,
   type AutomationSecretCrypto,
@@ -49,7 +49,7 @@ import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { EmailDeliveryPort } from "@langwatch/notification-server";
+import type { EmailDelivery } from "@langwatch/notification-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
   traceSchema,
@@ -58,7 +58,7 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { mapTraceToDatasetEntry } from "@langwatch/dataset-contract";
-import { TraceQueryEvaluationAdapter } from "@langwatch/trace-server";
+import { ClickhouseTraceQueryEvaluationRepository } from "@langwatch/trace-server";
 import {
   WorkerAutomationRunawayAdapter,
   type WorkerAutomationNextStepResolver,
@@ -72,19 +72,19 @@ import type { Instant } from "@langwatch/time";
 export type WorkerAutomationSettlementCompositionOptions = Readonly<{
   config: WorkerConfig;
   prisma: AutomationSettlementLedgerDatabase;
-  clock: AutomationClockPort;
+  clock: AutomationClock;
   /**
    * The transports a settled digest leaves through, and the origin its links
    * point at. Absent exactly when this deployment named no `BASE_HOST`.
    */
   notifications?: AutomationSettlementNotifications | undefined;
   projects: AutomationProjectIdentityPort;
-  traces: AutomationSettlementTraceReaderPort;
-  evaluations: AutomationSettlementEvaluationReaderPort;
+  traces: AutomationSettlementTraceReader;
+  evaluations: AutomationSettlementEvaluationReader;
   /** The graph half, when this process composed one. */
-  graphActivity?: AutomationGraphActivityPort | undefined;
+  graphActivity?: AutomationGraphActivity | undefined;
   /** Reads the recency the heartbeat sweep decides absence from. */
-  heartbeat: AutomationHeartbeatPort;
+  heartbeat: AutomationHeartbeat;
   /**
    * Where an `ADD_TO_DATASET` automation appends its mapped rows. The dataset feature's own
    * service, narrowed to the one call this path makes. Absent exactly when this graph composed no
@@ -106,7 +106,7 @@ export type WorkerAutomationSettlementCompositionOptions = Readonly<{
    */
   containment?: WorkerAutomationContainment | undefined;
   redis?: RedisConnection | null;
-  absence?: WorkerAutomationSettlementAbsenceReportPort;
+  absence?: WorkerAutomationSettlementAbsenceReport;
   logger?: Logger;
 }>;
 
@@ -114,7 +114,7 @@ export type WorkerAutomationSettlementCompositionOptions = Readonly<{
  * The delivery collaborators settlement SHARES with the graph vertical. Shared deliberately.
  */
 export type AutomationSettlementDeliveryComposition = Readonly<{
-  delivery: AutomationNotificationDeliveryPort;
+  delivery: AutomationNotificationDelivery;
   emailCaps: AutomationEmailCapService;
   crypto: AutomationSecretCrypto;
 }>;
@@ -142,7 +142,7 @@ export type WorkerAutomationPlanSource = Readonly<{
  * The three substrates runaway containment adds on top of settlement's own.
  */
 export type WorkerAutomationContainment = Readonly<{
-  mailer: EmailDeliveryPort;
+  mailer: EmailDelivery;
   directories: WorkerAutomationRunawayDirectories;
   resolveClickHouseClient: WorkerRunawayClickHouseResolver;
   /**
@@ -162,7 +162,7 @@ export interface WorkerAutomationAnnotationWriter {
 /**
  * What this process CANNOT do about a settled match, said once at composition.
  */
-export abstract class WorkerAutomationSettlementAbsenceReportPort {
+export abstract class WorkerAutomationSettlementAbsenceReport {
   /**
    * The full trace record, spans and all. Two paths want it: the digest's fallback when the summary
    * fold has not landed, and `ADD_TO_DATASET`'s row mapping.
@@ -306,7 +306,7 @@ export function createWorkerAutomationSettlement(
   });
 
   return {
-    buildPipeline: ({ retention }: { retention: AutomationIntentRetentionPort }) =>
+    buildPipeline: ({ retention }: { retention: AutomationIntentRetention }) =>
       createAutomationsPipeline({ scheduledIntents, settlement, retention }),
   };
 }
@@ -329,7 +329,7 @@ function unavailableNotifications(): AutomationSettlementNotifications {
   };
 }
 
-class UnavailableNotificationDelivery extends AutomationNotificationDeliveryPort {
+class UnavailableNotificationDelivery extends AutomationNotificationDelivery {
   constructor(private readonly message: string) {
     super();
   }
@@ -363,7 +363,7 @@ class UnavailableNotificationDelivery extends AutomationNotificationDeliveryPort
  * in. Both halves are the packaged decision, so an automation confirms here the way it confirmed in
  * the application.
  */
-class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluatorPort {
+class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluator {
   private readonly legacy = LegacyFilterMatchingService.create();
   private readonly traceData = PreconditionTraceDataService.create();
 
@@ -373,7 +373,7 @@ class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluato
     evaluations: EvaluationRunData[] | null;
     events: DerivedTraceEvent[] | null;
   }): boolean {
-    return TraceQueryEvaluationAdapter.matches(input.query, {
+    return ClickhouseTraceQueryEvaluationRepository.mat(input.query, {
       summary: input.foldState,
       evaluations: input.evaluations,
       events: input.events,
@@ -409,7 +409,7 @@ class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluato
 /**
  * `ADD_TO_DATASET`'s row mapping, over the rules the customer previewed with.
  */
-class WorkerAutomationDatasetMapper extends AutomationDatasetMapperPort {
+class WorkerAutomationDatasetMapper extends AutomationDatasetMapper {
   map(input: {
     trace: TraceRecord;
     mapping: DatasetActionParams["datasetMapping"]["mapping"];
@@ -429,7 +429,7 @@ class WorkerAutomationDatasetMapper extends AutomationDatasetMapperPort {
 /**
  * The two persist writes, both of them the feature's own packaged call.
  */
-class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriterPort {
+class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriter {
   constructor(
     private readonly datasets: WorkerAutomationDatasetWriter | undefined,
     private readonly annotations: WorkerAutomationAnnotationWriter | undefined,
@@ -495,13 +495,13 @@ class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriterP
 /**
  * The two schedules, and the graph evaluation one of them drives.
  */
-class WorkerAutomationScheduledIntents extends AutomationScheduledIntentPort {
+class WorkerAutomationScheduledIntents extends AutomationScheduledIntent {
   static create(input: {
     prisma: AutomationSettlementLedgerDatabase;
-    clock: AutomationClockPort;
-    heartbeat: AutomationHeartbeatPort;
+    clock: AutomationClock;
+    heartbeat: AutomationHeartbeat;
     logger: Logger;
-    graphActivity?: AutomationGraphActivityPort;
+    graphActivity?: AutomationGraphActivity;
   }): WorkerAutomationScheduledIntents {
     return new WorkerAutomationScheduledIntents(
       GraphTriggerHeartbeatService.create({
@@ -518,7 +518,7 @@ class WorkerAutomationScheduledIntents extends AutomationScheduledIntentPort {
   private constructor(
     private readonly heartbeat: GraphTriggerHeartbeatService,
     private readonly deliveries: { pruneExpired(now?: Instant): Promise<number> },
-    private readonly graphActivity: AutomationGraphActivityPort | undefined,
+    private readonly graphActivity: AutomationGraphActivity | undefined,
   ) {
     super();
   }
@@ -530,7 +530,7 @@ class WorkerAutomationScheduledIntents extends AutomationScheduledIntentPort {
   evaluateGraphTrigger(input: {
     triggerId: string;
     projectId: string;
-    reason: Parameters<AutomationGraphActivityPort["evaluateGraphTrigger"]>[0]["reason"];
+    reason: Parameters<AutomationGraphActivity["evaluateGraphTrigger"]>[0]["reason"];
   }) {
     if (!this.graphActivity) {
       return Promise.reject(
@@ -551,7 +551,7 @@ class WorkerAutomationScheduledIntents extends AutomationScheduledIntentPort {
 }
 
 /** Automation's logger port, over this process's own logger. */
-class WorkerSettlementLogger extends AutomationLoggerPort {
+class WorkerSettlementLogger extends AutomationLogger {
   constructor(private readonly logger: Logger) {
     super();
   }
@@ -575,7 +575,7 @@ class WorkerSettlementLogger extends AutomationLoggerPort {
  * process's log, because the counter answers how often the fleet flushes early and the log line is
  * what names the settlement that did.
  */
-class WorkerSettlementObservability extends AutomationSettlementObservabilityPort {
+class WorkerSettlementObservability extends AutomationSettlementObservability {
   static create(logger: Logger): WorkerSettlementObservability {
     return new WorkerSettlementObservability(
       logger,
@@ -588,7 +588,7 @@ class WorkerSettlementObservability extends AutomationSettlementObservabilityPor
 
   private constructor(
     private readonly logger: Logger,
-    private readonly metrics: AutomationSettlementObservabilityPort,
+    private readonly metrics: AutomationSettlementObservability,
   ) {
     super();
   }
@@ -608,7 +608,7 @@ class WorkerSettlementObservability extends AutomationSettlementObservabilityPor
  * containment service reads the suppression rows off the ledger this port is handed to — so the
  * thunk is the knot, not an optional dependency nobody supplies.
  */
-class WorkerSettlementBreach extends AutomationSettlementBreachPort {
+class WorkerSettlementBreach extends AutomationSettlementBreach {
   constructor(
     private readonly logger: Logger,
     private readonly resolve: () => RunawayContainmentService | undefined,

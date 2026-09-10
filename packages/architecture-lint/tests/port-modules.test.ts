@@ -66,7 +66,7 @@ describe("strict feature ports", () => {
   it("rejects a callback type bag even beside a valid abstract port class", () => {
     root = mkdtempSync(join(tmpdir(), "strict-port-module-"));
     writePort(
-      "export abstract class ExamplePort { abstract load(): Promise<void>; } export type LegacyExamplePort = { load(): Promise<void>; };",
+      "export abstract class ExamplePort { abstract load(): Promise<void>; } export type LegacyExample = { load(): Promise<void>; };",
     );
 
     expect(lint()).toMatchObject([{ policy: "strict-port-module" }]);
