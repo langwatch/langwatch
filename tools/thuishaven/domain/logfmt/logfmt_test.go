@@ -109,6 +109,36 @@ func TestRender(t *testing.T) {
 			opts: base,
 			want: "11:10:48.250  api        info   x",
 		},
+		{
+			name: "a record with an empty message, no fields and no stack is not worth a line",
+			line: `{"time":"2026-09-07T11:10:46.108Z","level":"info","msg":""}`,
+			opts: base,
+			want: "",
+		},
+		{
+			name: "an empty message still prints when the record carries a field",
+			line: `{"time":"2026-09-07T11:10:46.108Z","level":"info","msg":"","keep":"yes"}`,
+			opts: base,
+			want: "11:10:46.108  api        info     keep=yes",
+		},
+		{
+			name: "a passthrough line that is only whitespace is dropped",
+			line: "   ",
+			opts: base,
+			want: "",
+		},
+		{
+			name: "a passthrough line that is only color escapes is dropped",
+			line: "\x1b[2m\x1b[22m",
+			opts: base,
+			want: "",
+		},
+		{
+			name: "a passthrough line that is only box-drawing decoration is dropped",
+			line: "────────────────",
+			opts: base,
+			want: "",
+		},
 	}
 
 	for _, tc := range cases {
@@ -118,6 +148,58 @@ func TestRender(t *testing.T) {
 			}
 		})
 	}
+}
+
+// @scenario "A tool banner renders as one line or not at all"
+func TestRenderViteBanner(t *testing.T) {
+	time.Local = time.UTC
+	opts := Options{Lane: "ui", Time: time.Date(2026, 9, 7, 4, 39, 39, 0, time.UTC)}
+
+	t.Run("the ready line and everything around it collapse to one record", func(t *testing.T) {
+		// The exact defect from a real haven log: Vite's own logger bakes its
+		// multi-line startup banner - the ready line, the blank spacing, the
+		// routed addresses and the shortcut hint - into one record's message
+		// as embedded newlines.
+		line := `{"time":"2026-09-07T04:39:39.099Z","level":"info","msg":"\n  VITE v8.1.2  ready in 1814 ms\n\n  ➜  Local:   https://app.langwatch.localhost/\n  ➜  Network: use --host to expose\n  ➜  press h + enter to show help\n"}`
+		want := "04:39:39.099  ui         info   vite 8.1.2 ready in 1814 ms"
+		if got := Render(line, opts); got != want {
+			t.Errorf("Render() =\n%q\nwant\n%q", got, want)
+		}
+	})
+
+	t.Run("a banner with nothing but the addresses and the help hint drops entirely", func(t *testing.T) {
+		line := `{"time":"2026-09-07T04:39:39.099Z","level":"info","msg":"\n  ➜  Local:   https://app.langwatch.localhost/\n  ➜  Network: use --host to expose\n  ➜  press h + enter to show help\n"}`
+		if got := Render(line, opts); got != "" {
+			t.Errorf("Render() = %q, want empty", got)
+		}
+	})
+
+	t.Run("an already-clean single-line ready message is left exactly as written", func(t *testing.T) {
+		line := `{"time":"2026-09-07T04:39:39.099Z","level":"info","msg":"VITE v8.1.2  ready in 1814 ms"}`
+		want := "04:39:39.099  ui         info   VITE v8.1.2  ready in 1814 ms"
+		if got := Render(line, opts); got != want {
+			t.Errorf("Render() =\n%q\nwant\n%q", got, want)
+		}
+	})
+
+	t.Run("the raw ready line, not wrapped in JSON, still collapses", func(t *testing.T) {
+		want := "04:39:39.000  ui         info   vite 8.1.2 ready in 1814 ms"
+		if got := Render("VITE v8.1.2  ready in 1814 ms", opts); got != want {
+			t.Errorf("Render() =\n%q\nwant\n%q", got, want)
+		}
+	})
+
+	t.Run("a raw address or help line, not wrapped in JSON, drops", func(t *testing.T) {
+		for _, line := range []string{
+			"➜  Local:   https://app.langwatch.localhost/",
+			"➜  Network: use --host to expose",
+			"➜  press h + enter to show help",
+		} {
+			if got := Render(line, opts); got != "" {
+				t.Errorf("Render(%q) = %q, want empty", line, got)
+			}
+		}
+	})
 }
 
 func TestRenderColor(t *testing.T) {

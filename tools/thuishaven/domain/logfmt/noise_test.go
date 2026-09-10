@@ -49,3 +49,66 @@ func TestMuted_LeavesServiceLanesAlone(t *testing.T) {
 		}
 	}
 }
+
+// TestIsPassthroughNoise_DropsDecorationAndWhitespace pins the lines that
+// carry nothing once a tool's own framing is stripped away, for every lane -
+// unlike Muted, which only applies to the one-shot ones.
+func TestIsPassthroughNoise_DropsDecorationAndWhitespace(t *testing.T) {
+	for _, line := range []string{
+		"",
+		"   ",
+		"\x1b[2m\x1b[22m",
+		"────────────────",
+		"═══ ═══",
+		"  •  ",
+	} {
+		if !isPassthroughNoise(line) {
+			t.Errorf("isPassthroughNoise(%q) = false, want true", line)
+		}
+	}
+}
+
+// TestIsPassthroughNoise_KeepsWordsUnderTheirOwnDecoration pins that a line
+// carrying real words is never dropped just because it is also dimmed or
+// bordered.
+func TestIsPassthroughNoise_KeepsWordsUnderTheirOwnDecoration(t *testing.T) {
+	for _, line := range []string{
+		"exited — restarting in 1s",
+		"── build ──",
+		"\x1b[2mLoaded Prisma config from prisma.config.ts.\x1b[22m",
+	} {
+		if isPassthroughNoise(line) {
+			t.Errorf("isPassthroughNoise(%q) = true, want false", line)
+		}
+	}
+}
+
+// TestViteReadyMessage_CollapsesTheStartupLine pins the transform: Vite's own
+// spelling and spacing becomes the shared format's, in lowercase.
+func TestViteReadyMessage_CollapsesTheStartupLine(t *testing.T) {
+	got, ok := viteReadyMessage("VITE v8.1.2  ready in 1814 ms")
+	if !ok {
+		t.Fatal("viteReadyMessage() ok = false, want true")
+	}
+	if want := "vite 8.1.2 ready in 1814 ms"; got != want {
+		t.Errorf("viteReadyMessage() = %q, want %q", got, want)
+	}
+}
+
+// TestIsViteBannerNoise_MatchesTheLinesAfterReady pins the banner lines that
+// follow Vite's ready line, which haven covers another way and so drops.
+func TestIsViteBannerNoise_MatchesTheLinesAfterReady(t *testing.T) {
+	for _, line := range []string{
+		"➜  Local:   https://app.langwatch.localhost/",
+		"➜  Network: use --host to expose",
+		"➜  press h + enter to show help",
+		"press h + enter to show help",
+	} {
+		if !isViteBannerNoise(line) {
+			t.Errorf("isViteBannerNoise(%q) = false, want true", line)
+		}
+	}
+	if isViteBannerNoise("VITE v8.1.2  ready in 1814 ms") {
+		t.Error("isViteBannerNoise(ready line) = true, want false")
+	}
+}

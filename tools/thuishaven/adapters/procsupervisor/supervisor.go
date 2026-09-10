@@ -512,6 +512,9 @@ func (c proc) logln(line string) {
 		Time:      time.Now(),
 		Color:     !c.isPlain,
 	})
+	if rendered == "" {
+		return
+	}
 	if c.preview != nil {
 		c.preview.Lock()
 		c.preview.lines = append(c.preview.lines, rendered)

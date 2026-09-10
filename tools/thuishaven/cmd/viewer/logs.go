@@ -94,12 +94,16 @@ func (t *LogsTab) ingest(line sources.LogLine) {
 	if t.src.Render != nil {
 		rendered = t.src.Render(line)
 	}
-	// A record's message can carry newlines of its own - the Vite banner is
-	// three lines in one msg - and so can a stack trace. One ring entry holding
-	// several physical lines counts as one row to the layout and paints as
-	// three on the terminal, which is a frame taller than the terminal thinks
-	// it is and a banner scrolled off the top. Each physical line is its own
-	// row; only the first carries the record, since only it has the fields.
+	if rendered == "" {
+		// Nothing worth a row: a record with nothing to say, or a tool banner
+		// line already covered another way (domain/logfmt.Render).
+		return
+	}
+	// A record's message can carry newlines of its own, and so can a stack
+	// trace. One ring entry holding several physical lines counts as one row
+	// to the layout and paints as several on the terminal - a frame taller
+	// than the terminal thinks it is. Each physical line is its own row;
+	// only the first carries the record, since only it has the fields.
 	for i, physical := range strings.Split(rendered, "\n") {
 		row := Row{ID: t.pages.nextRowID(), Text: physical}
 		if i == 0 {

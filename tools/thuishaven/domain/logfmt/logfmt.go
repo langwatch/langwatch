@@ -280,13 +280,64 @@ func renderValue(value json.RawMessage) string {
 	return compact
 }
 
-// Render turns one captured line into what a person reads. The result may span
-// several lines when the record carries a stack trace.
+// Render turns one captured line into what a person reads, spanning several
+// lines when the record carries a stack trace. It returns "" for a line
+// worth dropping instead of printing: nothing to say, pure decoration, or a
+// tool banner line covered another way. Every caller must skip an empty
+// result rather than print a bare time and level.
 func Render(line string, opts Options) string {
 	rec, ok := Parse(line)
 	if !ok {
+		if isPassthroughNoise(line) {
+			return ""
+		}
+		if msg, ready := viteReadyMessage(line); ready {
+			return renderRecord(Record{Level: LevelInfo, Message: msg}, opts)
+		}
+		if isViteBannerNoise(line) {
+			return ""
+		}
 		return renderPassthrough(line, opts)
 	}
+	rec = collapseViteMessage(rec)
+	if rec.Message == "" && len(rec.Fields) == 0 && rec.Stack == "" {
+		return ""
+	}
+	return renderRecord(rec, opts)
+}
+
+// collapseViteMessage rewrites a record whose message is Vite's own
+// multi-line banner - baked into one field with embedded newlines - into
+// the single line worth reading, dropping a message that turns out to be
+// only the banner's other lines. A message with no embedded newline is
+// touched only when it is, by itself, one of those other lines.
+func collapseViteMessage(rec Record) Record {
+	if !strings.Contains(rec.Message, "\n") {
+		if isViteBannerNoise(rec.Message) {
+			rec.Message = ""
+		}
+		return rec
+	}
+	var kept []string
+	for _, part := range strings.Split(rec.Message, "\n") {
+		clean := strings.TrimSpace(stripSGR(part))
+		if clean == "" || isViteBannerNoise(clean) {
+			continue
+		}
+		if msg, ready := viteReadyMessage(clean); ready {
+			clean = msg
+		}
+		kept = append(kept, clean)
+	}
+	rec.Message = strings.Join(kept, "\n")
+	return rec
+}
+
+// renderRecord composes the fixed-column line (and any stack continuation)
+// for a parsed record. Render is the only caller for a captured line; the
+// synthesized Vite "ready" record goes through it too, so it gets the same
+// time, lane and level columns as everything else.
+func renderRecord(rec Record, opts Options) string {
 	at := opts.Time
 	if rec.HasTime {
 		at = rec.Time

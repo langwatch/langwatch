@@ -339,7 +339,14 @@ func filterLogLines(lines []logLine, since time.Time, level string) []logLine {
 	return out
 }
 
-func printLogLine(l logLine, mode renderMode, plain bool) { fmt.Println(formatLogLine(l, mode, plain)) }
+// printLogLine prints one captured line, unless the renderer found nothing in
+// it worth a row: a record with nothing to say, or a tool banner line haven
+// already covers another way.
+func printLogLine(l logLine, mode renderMode, plain bool) {
+	if rendered := formatLogLine(l, mode, plain); rendered != "" {
+		fmt.Println(rendered)
+	}
+}
 
 // renderMode is what `haven logs` does with a captured payload.
 type renderMode int
