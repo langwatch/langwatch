@@ -10,8 +10,8 @@ import type {
   RawGroupRow,
   RawRunTargetRow,
   RawTrendRow,
-  ResultAtomsReadPort,
-} from "../../ports/result-atoms-read.port.ts";
+  ResultAtomsRepository,
+} from "../../repositories/clickhouse/clickhouse.result-atoms.repository.ts";
 import type {
   ScenarioPlanRecord,
   ScenarioRepository,
@@ -56,7 +56,7 @@ function makeRepo(data: FakeData) {
     findRunOrdinals: vi.fn().mockResolvedValue([]),
     findCodeScenarios: vi.fn().mockResolvedValue([]),
     findRunTargets: vi.fn().mockResolvedValue(data.runTargets ?? []),
-  } as unknown as ResultAtomsReadPort;
+  } as unknown as ResultAtomsRepository;
 }
 
 function makeScenarios({

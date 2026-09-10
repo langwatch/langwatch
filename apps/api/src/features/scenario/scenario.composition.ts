@@ -7,7 +7,6 @@ import { MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { SimulationService } from "@langwatch/scenario-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -18,10 +17,17 @@ import { createApp, LocalFeatureApis, type ResourceScope } from "@langwatch/runt
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import {
   AgentTestService,
+  MemoryResultAtomsRepository,
+  MemoryRunConfigurationsRepository,
+  NullSimulationRepository,
   PostgresScenarioRepositories,
-  ResultAtomsClickHouseAdapter,
-  RunConfigurationsClickHouseAdapter,
+  ResultAtomsClickHouseRepository,
+  ResultAtomsService,
+  RunConfigurationsClickHouseRepository,
+  RunConfigurationsService,
   scenarioServer,
+  SimulationClickHouseRepository,
+  SimulationService,
   type ScenarioAppInfrastructure,
   ScenarioClockPort,
   ScenarioExecutionPrefetcherService,
@@ -34,14 +40,11 @@ import {
   ScenarioTabStorePort,
   NlpFetchAdapter,
   SerializedAgentRegistryAdapter,
-  SimulationClickHouseAdapter,
-  SimulationWindowedReadPort,
+  SimulationWindowedRepository,
   RedisCancellationPublisherAdapter,
   RedisScenarioTabStoreAdapter,
   UnavailableCancellationPublisherAdapter,
   UnavailableScenarioExecutionPoolService,
-  type ResultAtomsService,
-  type RunConfigurationsService,
   type ScenarioExecutionPrefetchConfig,
   type SimulationReadClient,
   type SimulationWindowedReadInput,
@@ -311,42 +314,46 @@ export async function installApiScenario(
 function composeSimulations(options: ScenarioFeatureCollaborators, pipelines: ApiAgentPipelines) {
   const execution = pipelines.simulations;
   if (!options.resolveClickHouseClient) {
-    return SimulationClickHouseAdapter.createNull({ execution });
+    return SimulationService.create(new NullSimulationRepository(), execution);
   }
-  return SimulationClickHouseAdapter.create({
-    resolveClient: options.resolveClickHouseClient,
-    windowedRead: new UnwindowedApiSimulationRead(),
+  return SimulationService.create(
+    SimulationClickHouseRepository.create(
+      options.resolveClickHouseClient,
+      new UnwindowedApiSimulationRead(),
+    ),
     execution,
-  });
+  );
 }
 
 /**
  * The Results tab reads, and the run dialog's configuration history.
  */
 function composeResultAtoms(options: ScenarioFeatureCollaborators): ResultAtomsService {
+  const scenarios = PostgresScenarioRepositories.create({ prisma: options.prisma }).scenarios;
   if (!options.resolveClickHouseClient) {
-    return ResultAtomsClickHouseAdapter.createUnavailable({ prisma: options.prisma });
+    return ResultAtomsService.create(new MemoryResultAtomsRepository(), scenarios);
   }
-  return ResultAtomsClickHouseAdapter.create({
-    resolveClient: options.resolveClickHouseClient,
-    prisma: options.prisma,
-  });
+  return ResultAtomsService.create(
+    ResultAtomsClickHouseRepository.create(options.resolveClickHouseClient),
+    scenarios,
+  );
 }
 
 function composeRunConfigurations(options: ScenarioFeatureCollaborators): RunConfigurationsService {
+  const scenarios = PostgresScenarioRepositories.create({ prisma: options.prisma }).scenarios;
   if (!options.resolveClickHouseClient) {
-    return RunConfigurationsClickHouseAdapter.createUnavailable({ prisma: options.prisma });
+    return RunConfigurationsService.create(new MemoryRunConfigurationsRepository(), scenarios);
   }
-  return RunConfigurationsClickHouseAdapter.create({
-    resolveClient: options.resolveClickHouseClient,
-    prisma: options.prisma,
-  });
+  return RunConfigurationsService.create(
+    RunConfigurationsClickHouseRepository.create(options.resolveClickHouseClient),
+    scenarios,
+  );
 }
 
 /**
  * The partition-window policy, unapplied.
  */
-class UnwindowedApiSimulationRead extends SimulationWindowedReadPort {
+class UnwindowedApiSimulationRead extends SimulationWindowedRepository {
   query<Result>(input: SimulationWindowedReadInput<Result>): Promise<Result> {
     return input.run(null);
   }

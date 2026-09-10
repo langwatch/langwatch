@@ -13,7 +13,7 @@ import {
   type SuiteTarget,
 } from "@langwatch/suite-contract";
 import type { ScenarioPlanRecord } from "../../repositories/scenario.repository.ts";
-import type { RawRunConfigurationRow } from "../../ports/run-configurations-read.port.ts";
+import type { RawRunConfigurationRow } from "../../repositories/clickhouse/clickhouse.run-configurations.repository.ts";
 import { __testing } from "../run-configurations.service.ts";
 
 const { toEntry, toTarget, collapse } = __testing;

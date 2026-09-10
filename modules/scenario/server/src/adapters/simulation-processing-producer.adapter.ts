@@ -9,7 +9,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { SimulationExecutionPort } from "../ports/simulation-execution.port.ts";
+import { SimulationExecutionRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
 import type { SimulationRunMetricsProjectionRecord } from "../projections/simulation-run-metrics.projection.ts";
 import type { SimulationRunStateData } from "../projections/simulation-run-state.projection.ts";
 import {
@@ -18,7 +18,8 @@ import {
 } from "../processes/simulation-run-execution.process.ts";
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.adapter.ts";
 import { FinishRunCommand } from "./finish-run.adapter.ts";
-import { SimulationClickHouseAdapter } from "./simulation.clickhouse.adapter.ts";
+import { NullSimulationRepository } from "../repositories/simulation.repository.ts";
+import { SimulationService as SimulationServiceClass } from "../services/simulation.service.ts";
 import { SimulationProcessingPipelineAdapter } from "./simulation-processing-pipeline.adapter.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
@@ -95,7 +96,7 @@ class ProducerOnlyScenarioExecution extends ScenarioExecutionService {
  * The eight writes, as the process manager's `finish` intent would reach them. This is the seat a
  * REAL dispatcher takes in a producer — the commands the registration itself hands back.
  */
-class ProducerOnlySimulationExecution extends SimulationExecutionPort {
+class ProducerOnlySimulationExecution extends SimulationExecutionRepository {
   constructor(private readonly processName: string) {
     super();
   }
@@ -141,7 +142,10 @@ class ProducerOnlySimulationExecution extends SimulationExecutionPort {
 function buildSimulationProcessingProducerPipeline(input: { processName: string }) {
   const { processName } = input;
   const execution = new ProducerOnlySimulationExecution(processName);
-  const simulations: SimulationService = SimulationClickHouseAdapter.createNull({ execution });
+  const simulations: SimulationService = SimulationServiceClass.create(
+    new NullSimulationRepository(),
+    execution,
+  );
 
   return SimulationProcessingPipelineAdapter.create({
     simulationRunStore: new ProducerOnlyFoldStore<SimulationRunStateData>(

@@ -25,16 +25,16 @@
       "default": "./src/services/scenario-failure-handler.service.ts"
     },
     "./composition/simulation-clickhouse": {
-      "types": "./dist/adapters/simulation.clickhouse.adapter.d.ts",
-      "default": "./src/adapters/simulation.clickhouse.adapter.ts"
+      "types": "./dist/repositories/clickhouse/simulation-clickhouse.repository.d.ts",
+      "default": "./src/repositories/clickhouse/simulation-clickhouse.repository.ts"
     },
     "./composition/simulation-eventing": {
       "types": "./dist/adapters/simulation-eventing.adapter.d.ts",
       "default": "./src/adapters/simulation-eventing.adapter.ts"
     },
     "./composition/simulation-execution-port": {
-      "types": "./dist/ports/simulation-execution.port.d.ts",
-      "default": "./src/ports/simulation-execution.port.ts"
+      "types": "./dist/repositories/clickhouse/simulation-clickhouse.repository.d.ts",
+      "default": "./src/repositories/clickhouse/simulation-clickhouse.repository.ts"
     },
     "./composition/simulation-processing-producer": {
       "types": "./dist/adapters/simulation-processing-producer.adapter.d.ts",

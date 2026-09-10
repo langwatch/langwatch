@@ -6,7 +6,11 @@
 
 import Parse from "papaparse";
 import type { SimulationExportRun, SimulationService } from "@langwatch/scenario-contract";
-import { SimulationClickHouseAdapter, SimulationExecutionPort } from "../../index.ts";
+import {
+  SimulationExecutionRepository as SimulationExecutionPort,
+  NullSimulationRepository,
+} from "../../index.ts";
+import { SimulationService as SimulationServiceClass } from "../simulation.service.ts";
 import { describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { ScenarioRunExportService } from "../scenario-run-export.service.ts";
@@ -56,9 +60,10 @@ class NoopSimulationExecutionPort extends SimulationExecutionPort {
 }
 
 function createSimulationService(): SimulationService {
-  return SimulationClickHouseAdapter.createNull({
-    execution: new NoopSimulationExecutionPort(),
-  });
+  return SimulationServiceClass.create(
+    new NullSimulationRepository(),
+    new NoopSimulationExecutionPort(),
+  );
 }
 
 /**

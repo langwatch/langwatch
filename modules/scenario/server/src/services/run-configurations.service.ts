@@ -18,8 +18,8 @@ import {
 } from "@langwatch/suite-contract";
 import {
   type RawRunConfigurationRow,
-  type RunConfigurationsReadPort,
-} from "../ports/run-configurations-read.port.ts";
+  type RunConfigurationsRepository,
+} from "../repositories/clickhouse/clickhouse.run-configurations.repository.ts";
 import type { ScenarioPlanRecord, ScenarioRepository } from "../repositories/scenario.repository.ts";
 
 /** How far back a configuration is still offered, in days. */
@@ -82,14 +82,14 @@ export interface RunConfigurationEntry {
  */
 export class RunConfigurationsService {
   static create(
-    repository: RunConfigurationsReadPort,
+    repository: RunConfigurationsRepository,
     scenarios: ScenarioRepository,
   ): RunConfigurationsService {
     return new RunConfigurationsService(repository, scenarios);
   }
 
   private constructor(
-    private readonly repository: RunConfigurationsReadPort,
+    private readonly repository: RunConfigurationsRepository,
     private readonly scenarios: ScenarioRepository,
   ) {}
 

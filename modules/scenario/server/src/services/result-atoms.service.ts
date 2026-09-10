@@ -10,8 +10,8 @@ import { getSuiteSetId, tryExtractSuiteId } from "@langwatch/suite-contract";
 import {
   MAX_TREND_POINTS,
   type RawGroupRow,
-  type ResultAtomsReadPort,
-} from "../ports/result-atoms-read.port.ts";
+  type ResultAtomsRepository,
+} from "../repositories/clickhouse/clickhouse.result-atoms.repository.ts";
 import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
 import {
   fillSeries,
@@ -39,14 +39,14 @@ const DAY_SECONDS = 24 * HOUR_SECONDS;
  */
 export class ResultAtomsService {
   static create(
-    repository: ResultAtomsReadPort,
+    repository: ResultAtomsRepository,
     scenarios: ScenarioRepository,
   ): ResultAtomsService {
     return new ResultAtomsService(repository, scenarios);
   }
 
   private constructor(
-    private readonly repository: ResultAtomsReadPort,
+    private readonly repository: ResultAtomsRepository,
     private readonly scenarios: ScenarioRepository,
   ) {}
 

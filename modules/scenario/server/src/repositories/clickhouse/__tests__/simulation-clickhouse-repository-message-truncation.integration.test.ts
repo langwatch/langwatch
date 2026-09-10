@@ -8,7 +8,7 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-import { SimulationWindowedReadPort } from "../../../ports/simulation-windowed-read.port.ts";
+import { SimulationWindowedRepository } from "../simulation-clickhouse.repository.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -67,7 +67,7 @@ function makeInsertRow(overrides: Record<string, unknown> = {}) {
 }
 
 /** Same window strategy as `SimulationWindowedReadPort`'s production adapter, minus caching. */
-class HintWindowedRead extends SimulationWindowedReadPort {
+class HintWindowedRead extends SimulationWindowedRepository {
   async query<Result>(input: {
     hintMs: number | null;
     windowMs?: number;

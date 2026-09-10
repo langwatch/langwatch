@@ -10,9 +10,12 @@ import {
 import { ScenarioApi, type SimulationService } from "@langwatch/scenario-contract";
 import {
   AgentTestService,
+  PostgresScenarioRepositories,
   RedisScenarioTabStoreAdapter,
-  ResultAtomsClickHouseAdapter,
-  RunConfigurationsClickHouseAdapter,
+  ResultAtomsClickHouseRepository,
+  ResultAtomsService,
+  RunConfigurationsClickHouseRepository,
+  RunConfigurationsService,
   scenarioServer,
   ScenarioTabRegistryService,
   SerializedAgentRegistryAdapter,
@@ -105,14 +108,14 @@ export async function createWorkerAgentApps(options: {
           clock: { now: () => toDate(nowInstant()) },
         }),
         broadcast,
-        resultAtoms: ResultAtomsClickHouseAdapter.create({
-          prisma: database,
-          resolveClient: options.resolveClickHouseClient,
-        }),
-        runConfigurations: RunConfigurationsClickHouseAdapter.create({
-          prisma: database,
-          resolveClient: options.resolveClickHouseClient,
-        }),
+        resultAtoms: ResultAtomsService.create(
+          ResultAtomsClickHouseRepository.create(options.resolveClickHouseClient),
+          PostgresScenarioRepositories.create({ prisma: database }).scenarios,
+        ),
+        runConfigurations: RunConfigurationsService.create(
+          RunConfigurationsClickHouseRepository.create(options.resolveClickHouseClient),
+          PostgresScenarioRepositories.create({ prisma: database }).scenarios,
+        ),
       },
     })
     .boot({ role: "worker" });

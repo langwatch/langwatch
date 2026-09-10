@@ -6,10 +6,6 @@ import { MAX_RUN_CONFIGURATIONS } from "@langwatch/scenario-contract";
  */
 import type { ResultsFilter } from "@langwatch/scenario-contract";
 import {
-  RunConfigurationsReadPort,
-  type RawRunConfigurationRow,
-} from "../../ports/run-configurations-read.port.ts";
-import {
   ATOM_SORT_KEY,
   LANGWATCH_METADATA,
   TARGET_KEY_EXPR,
@@ -60,11 +56,51 @@ export const HAS_TARGET_CLAUSE = `AND JSONExtractString(${LANGWATCH_METADATA}, '
 export const HAS_NOTE_EXPR = `JSONExtractString(ifNull(Metadata, '{}'), 'note') != ''`;
 
 /**
+ * One configuration as the store folds it, before the plan row is joined. Every value is a string
+ * because ClickHouse serialises UInt64 that way, and because the parameters are handed over as the
+ * raw JSON they were stored as.
+ */
+export interface RawRunConfigurationRow {
+  SetId: string;
+  /** `<type>:<targetKey>` per target, sorted by the database. */
+  TargetPairs: string[];
+  /**
+   * The raw overrides of each target, '' for a target with none, in the same
+   * order as `TargetPairs`.
+   */
+  TargetParameters: string[];
+  RepeatCount: string;
+  SimulatorModel: string;
+  JudgeModel: string;
+  /**
+   * The raw merged parameters of the first scenario run against a target with no overrides, or of
+   * the first scenario run at all when every target carries some; '' when the run resolved none.
+   */
+  Parameters: string;
+  /** The raw overrides of the target `Parameters` was read from, or ''. */
+  FirstTargetParameters: string;
+  /** "1" when any run of this configuration carried a note, never the note. */
+  UsesNote: string;
+  LastRunAtMs: string;
+}
+
+/**
  * Reads the configurations a project's plans already ran with. A sibling of the atom repository
  * rather than a method on it: the atom reads answer "what happened", this one answers "what was it
  * asked to do".
  */
-export class RunConfigurationsClickHouseRepository extends RunConfigurationsReadPort {
+export abstract class RunConfigurationsRepository {
+  /** One row per distinct configuration, newest first. */
+  abstract findConfigurations(input: {
+    filter: ResultsFilter;
+    limit?: number;
+  }): Promise<RawRunConfigurationRow[]>;
+}
+
+/**
+ * Reads the configurations a project's plans already ran with, over ClickHouse.
+ */
+export class RunConfigurationsClickHouseRepository extends RunConfigurationsRepository {
   static create(
     resolveClient: ResultAtomsClickHouseClientResolver,
   ): RunConfigurationsClickHouseRepository {

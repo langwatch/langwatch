@@ -11,18 +11,19 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import {
   ComputeRunMetricsCommand,
   FinishRunCommand,
+  NullSimulationRepository,
   RedisCancellationPublisherAdapter,
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
-  SimulationClickHouseAdapter,
   SimulationProcessingPipelineAdapter,
   SimulationRunMetricsStoreAdapter,
-  SimulationExecutionPort,
+  SimulationExecutionRepository,
   SimulationRunStateStoreAdapter,
+  SimulationService,
   simulationRunExecutionPM,
   UnavailableCancellationPublisherAdapter,
   type ScenarioExecutionPoolPort,
 } from "@langwatch/scenario-server";
-import { ScenarioExecutionService, type SimulationService } from "@langwatch/scenario-contract";
+import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type {
   ComputeRunMetricsCommandData,
   ScenarioExecutionJob,
@@ -116,7 +117,7 @@ export function createWorkerScenarioProcessing(
   });
 
   if (!options.executionPool) options.absence?.withoutExecutionPool();
-  const simulations = SimulationClickHouseAdapter.createNull({ execution });
+  const simulations = SimulationService.create(new NullSimulationRepository(), execution);
 
   const definition = () =>
     SimulationProcessingPipelineAdapter.create({
@@ -246,7 +247,7 @@ class WorkerScenarioExecutionAdapter extends ScenarioExecutionService {
 /**
  * The simulation write surface, as this pipeline's own commands.
  */
-class WorkerSimulationExecutionAdapter extends SimulationExecutionPort {
+class WorkerSimulationExecutionAdapter extends SimulationExecutionRepository {
   private commands: Record<string, CommandDispatcher<unknown>> | undefined;
 
   connect(commands: Record<string, CommandDispatcher<unknown>>): void {

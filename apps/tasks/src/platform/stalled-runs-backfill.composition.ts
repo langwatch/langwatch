@@ -1,6 +1,6 @@
-import { SimulationClickHouseAdapter } from "@langwatch/scenario-server/composition/simulation-clickhouse";
+import { NullSimulationRepository, SimulationService } from "@langwatch/scenario-server";
 import { SimulationStalledRunAdapter } from "@langwatch/scenario-server/composition/simulation-eventing";
-import { SimulationExecutionPort } from "@langwatch/scenario-server/composition/simulation-execution-port";
+import { SimulationExecutionRepository } from "@langwatch/scenario-server/composition/simulation-execution-port";
 import { SimulationProcessingProducerAdapter } from "@langwatch/scenario-server/composition/simulation-processing-producer";
 import { StalledRunsBackfillTask } from "@langwatch/scenario-server/composition/stalled-runs-backfill";
 import { nowInstant } from "@langwatch/time";
@@ -8,7 +8,6 @@ import {
   ScenarioExecutionService,
   ScenarioRunStatus,
   buildFailureResults,
-  type SimulationService,
   type ScenarioExecutionJob,
   type ScenarioExecutionPrefetchInput,
   type ScenarioExecutionPrefetchResult,
@@ -35,7 +34,7 @@ import type { TasksHost } from "./tasks-host.composition.ts";
  * Only `finishRun` is ever called by stalled-runs-backfill; the rest refuse by name — this task
  * submits and cancels nothing, and streams no messages.
  */
-class TasksSimulationExecution extends SimulationExecutionPort {
+class TasksSimulationExecution extends SimulationExecutionRepository {
   constructor(
     private readonly finishRunCommand: { send(input: SimulationFinishRun): Promise<void> },
   ) {
@@ -153,9 +152,10 @@ export function buildStalledRunsBackfillTask({
       const registered = eventing.eventSourcing.register(
         SimulationProcessingProducerAdapter.create({ processName: TASKS_PROCESS_NAME }).build(),
       );
-      const simulations = SimulationClickHouseAdapter.createNull({
-        execution: new TasksSimulationExecution(registered.commands.finishRun),
-      });
+      const simulations = SimulationService.create(
+        new NullSimulationRepository(),
+        new TasksSimulationExecution(registered.commands.finishRun),
+      );
       return new TasksScenarioExecution(simulations);
     },
   });

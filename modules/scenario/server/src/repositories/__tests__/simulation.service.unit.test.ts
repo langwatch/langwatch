@@ -9,11 +9,11 @@ import type {
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
-import { SimulationExecutionPort } from "../../ports/simulation-execution.port.ts";
+import { SimulationExecutionRepository } from "../clickhouse/simulation-clickhouse.repository.ts";
 import { NullSimulationRepository } from "../simulation.repository.ts";
 import { SimulationService } from "../../services/simulation.service.ts";
 
-class RecordingExecutionPort extends SimulationExecutionPort {
+class RecordingExecutionPort extends SimulationExecutionRepository {
   queue: SimulationQueueRun | undefined;
   async queueRun(input: SimulationQueueRun): Promise<void> {
     this.queue = input;

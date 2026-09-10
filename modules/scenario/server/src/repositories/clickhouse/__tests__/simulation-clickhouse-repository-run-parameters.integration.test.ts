@@ -16,11 +16,11 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { SimulationWindowedReadPort } from "../../../ports/simulation-windowed-read.port.ts";
+import { SimulationWindowedRepository } from "../simulation-clickhouse.repository.ts";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 
 /** The repository's own hint window, derived the way production derives it. */
-class HintWindowedRead extends SimulationWindowedReadPort {
+class HintWindowedRead extends SimulationWindowedRepository {
   async query<Result>(input: {
     hintMs: number | null;
     windowMs?: number;

@@ -53,21 +53,21 @@ import type {
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
-import type { SimulationExecutionPort } from "../ports/simulation-execution.port.ts";
+import type { SimulationExecutionRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
 import type { SimulationRepository } from "../repositories/simulation.repository.ts";
 
 /** Canonical read capability; its only persistence dependency is Simulation's repository. */
 export class SimulationService extends SimulationServiceContract {
   static create(
     repository: SimulationRepository,
-    execution: SimulationExecutionPort,
+    execution: SimulationExecutionRepository,
   ): SimulationService {
     return new SimulationService(repository, execution);
   }
 
   private constructor(
     private readonly repository: SimulationRepository,
-    private readonly execution: SimulationExecutionPort,
+    private readonly execution: SimulationExecutionRepository,
   ) {
     super();
   }

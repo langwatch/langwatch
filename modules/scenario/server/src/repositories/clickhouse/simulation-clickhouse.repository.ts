@@ -18,15 +18,64 @@ import {
   mapClickHouseRowToScenarioRunData,
   mapStatus,
 } from "./simulation-run.mapper.ts";
-import {
-  type SimulationWindowFragment,
-  SimulationWindowedReadPort,
-} from "../../ports/simulation-windowed-read.port.ts";
-import type { SimulationExportRun } from "@langwatch/scenario-contract";
+import type {
+  SimulationExportRun,
+  SimulationCancelRun,
+  SimulationDeleteRun,
+  SimulationFinishRun,
+  SimulationMessageSnapshot,
+  SimulationQueueRun,
+  SimulationRecordAgentInstance,
+  SimulationStartRun,
+  SimulationTextMessageEnd,
+  SimulationTextMessageStart,
+} from "@langwatch/scenario-contract";
 import { SimulationRepository } from "../simulation.repository.ts";
 
 const DEFAULT_SET_ID = "default";
 const INTERNAL_SET_PREFIX = "__internal__";
+
+/**
+ * Simulation's boundary to the shared partition-window read policy.
+ *
+ * The feature chooses when it can use a partition hint. Application
+ * composition supplies the shared policy and its telemetry implementation.
+ */
+export type SimulationWindowFragment = {
+  fromMs: number;
+  toMs: number;
+  params: { fromMs: number; toMs: number };
+  sqlFor(column: string): string;
+};
+
+export type SimulationWindowFallback = "unbounded" | "none" | { lookbackMs: number };
+
+export type SimulationWindowedReadInput<Result> = {
+  table: string;
+  hintMs: number | null;
+  windowMs?: number;
+  fallback: SimulationWindowFallback;
+  isEmpty(result: Result): boolean;
+  run(window: SimulationWindowFragment | null): Promise<Result>;
+};
+
+/** Application adapter for the shared query-window and telemetry policy. */
+export abstract class SimulationWindowedRepository {
+  abstract query<Result>(input: SimulationWindowedReadInput<Result>): Promise<Result>;
+}
+
+/** Eventing is application composition; Simulation dispatches through this repository. */
+export abstract class SimulationExecutionRepository {
+  abstract queueRun(input: SimulationQueueRun): Promise<void>;
+  abstract startRun(input: SimulationStartRun): Promise<void>;
+  abstract messageSnapshot(input: SimulationMessageSnapshot): Promise<void>;
+  abstract textMessageStart(input: SimulationTextMessageStart): Promise<void>;
+  abstract textMessageEnd(input: SimulationTextMessageEnd): Promise<void>;
+  abstract finishRun(input: SimulationFinishRun): Promise<void>;
+  abstract cancelRun(input: SimulationCancelRun): Promise<void>;
+  abstract deleteRun(input: SimulationDeleteRun): Promise<void>;
+  abstract recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void>;
+}
 
 export const TABLE_NAME = "simulation_runs" as const;
 
@@ -216,7 +265,7 @@ interface PreviewItemRow {
   MessagePreviewContents: string[];
 }
 
-type SimulationClickHouseClient = {
+export type SimulationClickHouseClient = {
   query(input: {
     query: string;
     query_params: Record<string, string | string[]>;
@@ -229,7 +278,7 @@ type SimulationClickHouseClientResolver = (tenantId: string) => Promise<Simulati
 export class SimulationClickHouseRepository extends SimulationRepository {
   static create(
     resolveClient: SimulationClickHouseClientResolver,
-    windowedRead: SimulationWindowedReadPort,
+    windowedRead: SimulationWindowedRepository,
   ): SimulationClickHouseRepository {
     return new SimulationClickHouseRepository(resolveClient, windowedRead);
   }
@@ -309,7 +358,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
   private constructor(
     private readonly resolveClient: SimulationClickHouseClientResolver,
-    private readonly windowedRead: SimulationWindowedReadPort,
+    private readonly windowedRead: SimulationWindowedRepository,
   ) {
     super();
   }
