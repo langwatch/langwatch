@@ -8,7 +8,6 @@ import type {
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
-import { PostgresAnomalyRuleAdapter } from "./postgres.anomaly-rule.adapter.ts";
 import { PostgresDepartmentAdapter } from "./postgres.department.adapter.ts";
 import { DefaultGovernanceCliBootstrapService } from "../services/governance-cli-tool-bootstrap.service.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
@@ -26,14 +25,8 @@ import {
   IngestionSecretService,
 } from "../services/ingestion-source-secret.service.ts";
 import { PullDestinationService } from "../services/pull-destination.service.ts";
-import { PostgresAdminWorkspaceViewAuditAdapter } from "./postgres.admin-workspace-view-audit.adapter.ts";
-import { PostgresAiToolCatalogAdapter } from "./postgres.ai-tool-catalog.adapter.ts";
 import { PostgresGovernanceAdapter } from "./postgres.governance.adapter.ts";
-import { PostgresGovernanceOcsfExportAdapter } from "./postgres.ocsf-export.adapter.ts";
-import { PostgresGovernanceSetupStateAdapter } from "./postgres.governance-setup-state.adapter.ts";
-import { PostgresIngestionTemplateAdapter } from "./postgres.ingestion-template.adapter.ts";
 import { PostgresIngestionSourceActivityAdapter } from "./postgres.ingestion-source-activity.adapter.ts";
-import { PostgresIngestionSourceAdapter } from "./postgres.ingestion-source.adapter.ts";
 import { PostgresPersonalVirtualKeyAdapter } from "./postgres.governance-personal-key.adapter.ts";
 import { PostgresRoutingPolicyAdapter } from "./postgres.governance-routing.adapter.ts";
 import type { AdminWorkspaceViewOcsfPort } from "../ports/admin-workspace-view-audit.port.ts";
@@ -100,6 +93,21 @@ export type GovernanceInstallationOptions = {
   ottl: GovernanceOttlGateway;
 };
 
+import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
+import { PrismaAiToolCatalogRepository } from "../repositories/prisma/prisma.ai-tool-catalog.repository.ts";
+import { PrismaAnomalyRuleRepository } from "../repositories/prisma/prisma.anomaly-rule.repository.ts";
+import { PrismaGovernanceOcsfExportRepository } from "../repositories/prisma/prisma.ocsf-export.repository.ts";
+import { PrismaGovernanceSetupStateRepository } from "../repositories/prisma/prisma.governance-setup-state.repository.ts";
+import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
+import { PrismaIngestionTemplateRepository } from "../repositories/prisma/prisma.ingestion-template.repository.ts";
+import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
+import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
+import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
+import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.service.ts";
+import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
+import { IngestionSourceService } from "../services/ingestion-source.service.ts";
+import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
+
 /** Builds the one process-owned GovernanceApi from injected infrastructure. */
 export class PostgresGovernanceInstallationAdapter {
   private constructor(private readonly options: GovernanceInstallationOptions) {}
@@ -109,9 +117,9 @@ export class PostgresGovernanceInstallationAdapter {
   }
 
   build(): GovernanceApi {
-    const anomalyRules = PostgresAnomalyRuleAdapter.create({
-      database: this.options.database,
-    }).build();
+    const anomalyRules = AnomalyRuleService.create({
+      repository: PrismaAnomalyRuleRepository.create(this.options.database),
+    });
     const departments = PostgresDepartmentAdapter.create({
       database: this.options.database,
     }).build();
@@ -128,17 +136,17 @@ export class PostgresGovernanceInstallationAdapter {
       policies: routingPolicies,
       gatewayBaseUrl: this.options.gatewayBaseUrl,
     }).build();
-    const aiTools = PostgresAiToolCatalogAdapter.create({
-      database: this.options.database,
+    const aiTools = DefaultGovernanceAiToolCatalogService.create({
+      repository: PrismaAiToolCatalogRepository.create(this.options.database),
       slugs: this.options.aiToolSlugs,
       providers: this.options.aiToolProviders,
-    }).build();
+    });
     const activity = PostgresIngestionSourceActivityAdapter.create({
       database: this.options.database,
       clickhouse: this.options.activityClickhouse,
     }).build();
-    const ingestionSources = PostgresIngestionSourceAdapter.create({
-      database: this.options.database,
+    const ingestionSources = IngestionSourceService.create({
+      repository: PrismaIngestionSourceRepository.create(this.options.database),
       projects: this.options.projects,
       entitlements: this.options.ingestionSourceEntitlements,
       lifecycle: this.options.ingestionSourceLifecycle,
@@ -150,7 +158,7 @@ export class PostgresGovernanceInstallationAdapter {
       ),
       destinations: PullDestinationService.create(),
       diagnostics: this.options.ingestionDiagnostics,
-    }).build();
+    });
 
     const canonicalCost = CanonicalCostExtractorService.create();
     const policy = PostgresGovernanceAdapter.create({
@@ -161,13 +169,13 @@ export class PostgresGovernanceInstallationAdapter {
       issuer: this.options.ingestionKeyIssuer,
       organizations: this.options.organizations,
     });
-    const templates = PostgresIngestionTemplateAdapter.create({
-      database: this.options.database,
-    }).build();
-    const ocsf = PostgresGovernanceOcsfExportAdapter.create({
-      database: this.options.database,
+    const templates = IngestionTemplateService.create({
+      repository: PrismaIngestionTemplateRepository.create(this.options.database),
+    });
+    const ocsf = DefaultGovernanceOcsfExportService.create({
+      repository: PrismaGovernanceOcsfExportRepository.create(this.options.database),
       events: this.options.ocsfEvents,
-    }).build();
+    });
     const cliBootstrap = DefaultGovernanceCliBootstrapService.create({
       catalog: aiTools,
       budgets: this.options.budgetOverview,
@@ -182,21 +190,21 @@ export class PostgresGovernanceInstallationAdapter {
       store: this.options.cliTokenStore,
       diagnostics: this.options.diagnostics,
     });
-    const adminWorkspaceViewAudit = PostgresAdminWorkspaceViewAuditAdapter.create({
-      database: this.options.database,
+    const adminWorkspaceViewAudit = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      repository: PrismaAdminWorkspaceViewAuditRepository.create(this.options.database),
       projects: this.options.projects,
       ocsf: this.options.adminWorkspaceOcsf,
       diagnostics: this.options.adminWorkspaceDiagnostics,
-    }).build();
+    });
     const quarantineFill = QuarantineFillEvaluatorService.create({
       tenant: this.options.quarantineTenant,
       traceActivity: this.options.quarantineTraceActivity,
       diagnostics: this.options.quarantineDiagnostics,
     });
-    const setupState = PostgresGovernanceSetupStateAdapter.create({
-      database: this.options.database,
+    const setupState = DefaultGovernanceSetupStateService.create({
+      repository: PrismaGovernanceSetupStateRepository.create(this.options.database),
       activity: this.options.setupActivity,
-    }).build();
+    });
 
     const rules = GovernanceRulesOperationsService.create(
       anomalyRules,

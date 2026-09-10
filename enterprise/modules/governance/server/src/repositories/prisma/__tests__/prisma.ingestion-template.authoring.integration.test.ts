@@ -18,7 +18,8 @@
  */
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
-import { PostgresIngestionTemplateAdapter } from "../postgres.ingestion-template.adapter.ts";
+import { PrismaIngestionTemplateRepository } from "../prisma.ingestion-template.repository.ts";
+import { IngestionTemplateService } from "../../../services/ingestion-template.service.ts";
 import {
   PlatformTemplateImmutableError,
   TemplateNotFoundError,
@@ -59,9 +60,9 @@ const ADMIN_ID = `usr-admin-${suffix}`;
 const PLATFORM_TEMPLATE_ID = `tmpl-platform-${suffix}`;
 
 describe.skipIf(!databaseUrl)("IngestionTemplateService admin authoring", () => {
-  const service = PostgresIngestionTemplateAdapter.create({
-    database: prisma,
-  }).build();
+  const service = IngestionTemplateService.create({
+    repository: PrismaIngestionTemplateRepository.create(prisma),
+  });
 
   beforeAll(async () => {
     await prisma.organization.createMany({

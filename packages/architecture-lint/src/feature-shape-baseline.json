@@ -159,15 +159,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "governance|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "governance|testing-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "governance|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {
