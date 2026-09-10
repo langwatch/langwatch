@@ -499,7 +499,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|modules/prompt/web/src/screens/prompt-studio",
+      "key": "crowded-folder|modules/prompt/web/src/ui/sections/prompt-studio",
       "measured": "2026-09-08"
     },
     {
@@ -1059,23 +1059,23 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/prompt/web/src/screens/prompt-studio/browser/window/demonstrations-tab-content.tsx",
+      "key": "fragment-file|modules/prompt/web/src/ui/sections/prompt-studio/browser/window/demonstrations-tab-content.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/prompt/web/src/screens/prompt-studio/fields/messages/remove-message-button.tsx",
+      "key": "fragment-file|modules/prompt/web/src/ui/sections/prompt-studio/fields/messages/remove-message-button.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/prompt/web/src/screens/prompt-studio/prompt-studio-sidebar-empty-state.tsx",
+      "key": "fragment-file|modules/prompt/web/src/ui/sections/prompt-studio/prompt-studio-sidebar-empty-state.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/prompt/web/src/surfaces/prompt-reference/organization-badge.tsx",
+      "key": "fragment-file|modules/prompt/web/src/organization-badge.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/prompt/web/src/surfaces/prompt-reference/prompt-handle.ts",
+      "key": "fragment-file|modules/prompt/web/src/prompt-handle.ts",
       "measured": "2026-09-08"
     },
     {
