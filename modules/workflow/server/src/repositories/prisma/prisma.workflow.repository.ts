@@ -115,15 +115,15 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     });
   }
 
-  static create(database: WorkflowDatabase): PrismaWorkflowRepository {
-    return new PrismaWorkflowRepository(database);
+  static create(options: { database: WorkflowDatabase }): PrismaWorkflowRepository {
+    return new PrismaWorkflowRepository(options.database);
   }
 
   private constructor(private readonly database: WorkflowDatabase) {
     super();
   }
 
-  async tryFindById(input: {
+  async findById(input: {
     id: string;
     projectId: string;
     includeVersion?: boolean;
@@ -206,7 +206,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     });
   }
 
-  async tryFindVersionById(input: {
+  async findVersionById(input: {
     id: string;
     projectId: string;
   }): Promise<WorkflowVersion | null> {
@@ -216,7 +216,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     return row ? mapVersion(row) : null;
   }
 
-  async tryFindVersion(input: {
+  async findVersion(input: {
     id: string;
     workflowId: string;
     projectId: string;
@@ -227,7 +227,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     return row ? mapVersion(row) : null;
   }
 
-  async tryFindPublishedVersion(input: {
+  async findPublishedVersion(input: {
     workflowId: string;
     projectId: string;
     versionId?: string;
@@ -238,7 +238,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     })) as { publishedId?: string | null } | null;
     const id = input.versionId ?? workflow?.publishedId;
     if (!id) return null;
-    return this.tryFindVersion({
+    return this.findVersion({
       id,
       workflowId: input.workflowId,
       projectId: input.projectId,

@@ -21,7 +21,7 @@ function fixture() {
   return {
     workflow,
     workflowVersion,
-    repository: PrismaWorkflowRepository.create({ workflow, workflowVersion }),
+    repository: PrismaWorkflowRepository.create({ database: { workflow, workflowVersion } }),
   };
 }
 

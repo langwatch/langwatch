@@ -55,7 +55,7 @@ export abstract class WorkflowRepository {
   }): Promise<{ id: string; name: string }[]>;
   abstract archiveLinked(input: WorkflowReference): Promise<{ id: string }>;
   abstract deleteUncommitted(input: WorkflowReference): Promise<void>;
-  abstract tryFindById(input: {
+  abstract findById(input: {
     id: string;
     projectId: string;
     includeVersion?: boolean;
@@ -72,16 +72,16 @@ export abstract class WorkflowRepository {
     projectId: string;
     includeDsl: boolean;
   }): Promise<WorkflowVersionHistoryRecord[]>;
-  abstract tryFindVersionById(input: {
+  abstract findVersionById(input: {
     id: string;
     projectId: string;
   }): Promise<WorkflowVersion | null>;
-  abstract tryFindVersion(input: {
+  abstract findVersion(input: {
     id: string;
     workflowId: string;
     projectId: string;
   }): Promise<WorkflowVersion | null>;
-  abstract tryFindPublishedVersion(input: {
+  abstract findPublishedVersion(input: {
     workflowId: string;
     projectId: string;
     versionId?: string;

@@ -22,10 +22,12 @@ import type {
 } from "../workflow.app.ts";
 import {
   WorkflowAgentMappingPort,
-  WorkflowRowPort,
   WorkflowStudioDslPort,
-  type WorkflowRowDraft,
 } from "../../ports/workflow.port.ts";
+import {
+  WorkflowRowRepository,
+  type WorkflowRowDraft,
+} from "../../repositories/workflow-row.repository.ts";
 
 /** A Studio graph prepared by doing nothing to it. */
 class UnchangedStudioDsl extends WorkflowStudioDslPort {
@@ -42,7 +44,7 @@ class UnrecordedAgentMappings extends WorkflowAgentMappingPort {
 }
 
 /** The bare rows a copy lands in, kept in memory. */
-class RecordingWorkflowRows extends WorkflowRowPort {
+class RecordingWorkflowRows extends WorkflowRowRepository {
   readonly created: WorkflowRowDraft[] = [];
 
   create(input: WorkflowRowDraft): Promise<void> {

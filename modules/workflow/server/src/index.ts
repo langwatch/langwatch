@@ -2,17 +2,42 @@ export {
   PostgresWorkflowAdapter,
   type PostgresWorkflowAdapterOptions,
 } from "./adapters/postgres.workflow.adapter.ts";
-export { WorkflowAgentMappingAdapter } from "./adapters/workflow-agent-mapping.adapter.ts";
+export { PrismaWorkflowRowAdapter } from "./adapters/prisma.workflow-row.adapter.ts";
+export { PrismaWorkflowProjectEnvironmentAdapter } from "./adapters/prisma.workflow-project-environment.adapter.ts";
 export {
-  PrismaWorkflowProjectEnvironmentAdapter,
+  workflowRepositories,
+  type WorkflowRepositories,
+} from "./repositories/workflow-repositories.registry.ts";
+export {
+  WorkflowRepository,
+  type PersistWorkflowInput,
+  type PersistWorkflowVersionInput,
+  type WorkflowVersionHistoryRecord,
+} from "./repositories/workflow.repository.ts";
+export {
+  WorkflowRowRepository,
+  type WorkflowRowDraft,
+} from "./repositories/workflow-row.repository.ts";
+export type { WorkflowRowDatabase } from "./repositories/prisma/prisma.workflow-row.repository.ts";
+export type { WorkflowProjectEnvironmentDatabase } from "./repositories/prisma/prisma.workflow-project-environment.repository.ts";
+export {
+  WorkflowProjectEnvironmentRepository,
+  type StoredProjectEnvironment,
+  type StoredProjectSecret,
+} from "./repositories/workflow-project-environment.repository.ts";
+export {
+  MemoryWorkflowRepositories,
+} from "./repositories/memory/memory.workflow.repositories.ts";
+export {
+  PostgresWorkflowRepositories,
+  type WorkflowPrismaDatabase,
+} from "./repositories/prisma/prisma.workflow.repositories.ts";
+export {
+  WorkflowProjectEnvironmentService,
   UnavailableWorkflowEnvironmentDecryptor,
   type WorkflowEnvironmentDecryptor,
-  type WorkflowProjectEnvironmentDatabase,
-} from "./adapters/prisma.workflow-project-environment.adapter.ts";
-export {
-  PrismaWorkflowRowAdapter,
-  type WorkflowRowDatabase,
-} from "./adapters/prisma.workflow-row.adapter.ts";
+} from "./services/workflow-project-environment.service.ts";
+export { WorkflowAgentMappingAdapter } from "./adapters/workflow-agent-mapping.adapter.ts";
 export { ContractWorkflowDslMigrationAdapter } from "./adapters/workflow-dsl-migration.adapter.ts";
 export {
   HttpWorkflowNlpRuntimeAdapter,
@@ -94,13 +119,11 @@ export {
   WorkflowIdPort,
   WorkflowNlpRuntimePort,
   WorkflowStudioStreamPort,
-  WorkflowRowPort,
   WorkflowStudioDslPort,
   type WorkflowExecutionInput,
   type WorkflowLlmParameterResolution,
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
-  type WorkflowRowDraft,
 } from "./ports/workflow.port.ts";
 export {
   WorkflowAiCallPort,
@@ -110,6 +133,12 @@ export {
 export { WorkflowCommitMessageService } from "./services/workflow-commit-message.service.ts";
 export { WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY } from "./rules/workflow-commit-message.rules.ts";
 export { WorkflowService, type WorkflowServiceOptions } from "./services/workflow.service.ts";
+export {
+  StudioEventPreparerService,
+  type StudioEventPreparer,
+  type StudioEventPreparationInput,
+} from "./services/studio-event-preparer.service.ts";
+export { WorkflowNlpExecutionService } from "./services/workflow-nlp-execution.service.ts";
 export {
   WorkflowStudioCopyService,
   type WorkflowStudioCopyServiceOptions,

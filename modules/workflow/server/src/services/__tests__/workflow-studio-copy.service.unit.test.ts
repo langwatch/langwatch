@@ -4,11 +4,14 @@ import {
   type WorkflowStudioCopySource,
 } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
-import { WorkflowRowPort, type WorkflowRowDraft } from "../../ports/workflow.port.ts";
+import {
+  WorkflowRowRepository,
+  type WorkflowRowDraft,
+} from "../../repositories/workflow-row.repository.ts";
 import { WorkflowStudioCopyService } from "../workflow-studio-copy.service.ts";
 import { TestDatasetService } from "./dataset.service.fake.ts";
 
-class RecordingRowPort extends WorkflowRowPort {
+class RecordingRowRepository extends WorkflowRowRepository {
   readonly created: WorkflowRowDraft[] = [];
 
   create(input: WorkflowRowDraft): Promise<void> {
@@ -76,7 +79,7 @@ const source = (dsl: unknown): WorkflowStudioCopySource => ({
 
 function build() {
   const datasets = new TestDatasetService(undefined, copiedDataset);
-  const rows = new RecordingRowPort();
+  const rows = new RecordingRowRepository();
   return { datasets, rows, service: WorkflowStudioCopyService.create({ datasets: datasets.api, rows }) };
 }
 

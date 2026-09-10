@@ -1,3 +1,11 @@
+/**
+ * The workflow graph service over Postgres, under the name the worker
+ * compositions still construct it by.
+ *
+ * A delegating factory only: the rows moved to `repositories/prisma`, and the
+ * three services it binds are the module's own. This name goes once every
+ * process reads its rows from the repository registry instead.
+ */
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { nanoid } from "nanoid";
@@ -41,7 +49,6 @@ class NanoidWorkflowIdPort extends WorkflowIdPort {
   }
 }
 
-/** Binds the private Workflow repositories to one process-owned service. */
 export class PostgresWorkflowAdapter {
   static create(options: PostgresWorkflowAdapterOptions): WorkflowService {
     const ids = NanoidWorkflowIdPort.create();
@@ -50,17 +57,16 @@ export class PostgresWorkflowAdapter {
       projectEnvironment: options.projectEnvironment,
       llmParameters: options.llmParameters,
     });
-    const execution = WorkflowNlpExecutionService.create({
-      ids,
-      modelProviders: options.modelProviders,
-      nlpRuntime: options.nlpRuntime,
-      studioEvents,
-    });
 
     return WorkflowService.create({
-      repository: PrismaWorkflowRepository.create(options.database),
+      repository: PrismaWorkflowRepository.create({ database: options.database }),
       datasets: options.datasets,
-      execution,
+      execution: WorkflowNlpExecutionService.create({
+        ids,
+        modelProviders: options.modelProviders,
+        nlpRuntime: options.nlpRuntime,
+        studioEvents,
+      }),
       studioEvents,
       dslMigration: options.dslMigration,
       ids,

@@ -35,7 +35,7 @@ function database() {
 }
 
 function repository() {
-  return PrismaWorkflowRepository.create(database());
+  return PrismaWorkflowRepository.create({ database: database() });
 }
 
 async function commitVersion(workflowId: string, results: { identifier: string; type: string }[]) {

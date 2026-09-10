@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PrismaWorkflowProjectEnvironmentAdapter } from "../prisma.workflow-project-environment.adapter.ts";
+import { WorkflowProjectEnvironmentPrismaRepository } from "../../repositories/prisma/prisma.workflow-project-environment.repository.ts";
+import { WorkflowProjectEnvironmentService } from "../workflow-project-environment.service.ts";
 
 type ProjectQuery = {
   where: { id: string };
@@ -11,7 +12,7 @@ type ProjectSecretQuery = {
   select: { name: true; encryptedValue: true };
 };
 
-function projectEnvironmentAdapter(input: {
+function projectEnvironment(input: {
   apiKey: string;
   projectSecrets: Array<{ name: string; encryptedValue: string }>;
 }) {
@@ -19,21 +20,23 @@ function projectEnvironmentAdapter(input: {
   const projectSecretQueries: ProjectSecretQuery[] = [];
   const decryptedValues: string[] = [];
 
-  const port = PrismaWorkflowProjectEnvironmentAdapter.create({
-    database: {
-      project: {
-        async findUniqueOrThrow(query: ProjectQuery) {
-          projectQueries.push(query);
-          return { apiKey: input.apiKey };
+  const port = WorkflowProjectEnvironmentService.create({
+    repository: WorkflowProjectEnvironmentPrismaRepository.create({
+      database: {
+        project: {
+          async findUniqueOrThrow(query: ProjectQuery) {
+            projectQueries.push(query);
+            return { apiKey: input.apiKey };
+          },
+        },
+        projectSecret: {
+          async findMany(query: ProjectSecretQuery) {
+            projectSecretQueries.push(query);
+            return input.projectSecrets;
+          },
         },
       },
-      projectSecret: {
-        async findMany(query: ProjectSecretQuery) {
-          projectSecretQueries.push(query);
-          return input.projectSecrets;
-        },
-      },
-    },
+    }),
     encryption: {
       decrypt(value) {
         decryptedValues.push(value);
@@ -45,9 +48,9 @@ function projectEnvironmentAdapter(input: {
   return { port, projectQueries, projectSecretQueries, decryptedValues };
 }
 
-describe("PrismaWorkflowProjectEnvironmentAdapter", () => {
+describe("WorkflowProjectEnvironmentService over the Prisma repository", () => {
   it("selects a project's API key and decrypts each project-scoped secret", async () => {
-    const adapter = projectEnvironmentAdapter({
+    const environmentSeam = projectEnvironment({
       apiKey: "project-api-key",
       projectSecrets: [
         { name: "OPENAI_API_KEY", encryptedValue: "encrypted-openai" },
@@ -55,18 +58,18 @@ describe("PrismaWorkflowProjectEnvironmentAdapter", () => {
       ],
     });
 
-    const environment = await adapter.port.get({ projectId: "project-1" });
+    const environment = await environmentSeam.port.get({ projectId: "project-1" });
 
-    expect(adapter.projectQueries).toEqual([
+    expect(environmentSeam.projectQueries).toEqual([
       { where: { id: "project-1" }, select: { apiKey: true } },
     ]);
-    expect(adapter.projectSecretQueries).toEqual([
+    expect(environmentSeam.projectSecretQueries).toEqual([
       {
         where: { projectId: "project-1" },
         select: { name: true, encryptedValue: true },
       },
     ]);
-    expect(adapter.decryptedValues).toEqual(["encrypted-openai", "encrypted-anthropic"]);
+    expect(environmentSeam.decryptedValues).toEqual(["encrypted-openai", "encrypted-anthropic"]);
     expect(environment).toEqual({
       apiKey: "project-api-key",
       secrets: {
@@ -77,15 +80,15 @@ describe("PrismaWorkflowProjectEnvironmentAdapter", () => {
   });
 
   it("returns an empty secret map without decrypting values", async () => {
-    const adapter = projectEnvironmentAdapter({
+    const environmentSeam = projectEnvironment({
       apiKey: "project-api-key",
       projectSecrets: [],
     });
 
-    await expect(adapter.port.get({ projectId: "project-1" })).resolves.toEqual({
+    await expect(environmentSeam.port.get({ projectId: "project-1" })).resolves.toEqual({
       apiKey: "project-api-key",
       secrets: {},
     });
-    expect(adapter.decryptedValues).toEqual([]);
+    expect(environmentSeam.decryptedValues).toEqual([]);
   });
 });

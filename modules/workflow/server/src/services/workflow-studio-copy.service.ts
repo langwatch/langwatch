@@ -11,11 +11,11 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
-import type { WorkflowRowPort } from "../ports/workflow.port.ts";
+import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 
 export type WorkflowStudioCopyServiceOptions = {
   datasets: DatasetApi;
-  rows: WorkflowRowPort;
+  rows: WorkflowRowRepository;
 };
 
 /** A dataset reference as a Studio node or parameter carries one. */

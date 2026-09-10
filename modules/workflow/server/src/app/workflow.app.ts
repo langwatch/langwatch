@@ -46,9 +46,9 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nanoid } from "nanoid";
 import type {
   WorkflowAgentMappingPort,
-  WorkflowRowPort,
   WorkflowStudioDslPort,
 } from "../ports/workflow.port.ts";
+import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 import type { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
 import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
@@ -193,7 +193,7 @@ export interface WorkflowInfrastructure {
   /** The agent mappings a saved Studio graph refreshes, best effort. */
   agentMappings: WorkflowAgentMappingPort;
   /** The bare row a Studio copy lands in, before its first version exists. */
-  workflowRows: WorkflowRowPort;
+  workflowRows: WorkflowRowRepository;
   permissions: WorkflowPermissionProbe;
   lineage: WorkflowLineageReads;
   publications: WorkflowPublicationReads;

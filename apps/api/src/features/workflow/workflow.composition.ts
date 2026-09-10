@@ -6,23 +6,27 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { ResourceScope } from "@langwatch/runtime-composition";
+import { instantiateRepositories, type ResourceScope } from "@langwatch/runtime-composition";
 import { pMapLimited } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { AiCallFailureService, getProjectModelProviders } from "@langwatch/model-provider-server";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
+import { nanoid } from "nanoid";
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
   NlpPayloadStagingPort,
   ModelProviderWorkflowStudioDslAdapter,
-  PostgresWorkflowAdapter,
   WorkflowAgentMappingAdapter,
-  PrismaWorkflowProjectEnvironmentAdapter,
-  PrismaWorkflowRowAdapter,
+  StudioEventPreparerService,
   UnavailableWorkflowEnvironmentDecryptor,
+  WorkflowNlpExecutionService,
+  WorkflowProjectEnvironmentService,
+  WorkflowService as WorkflowGraphService,
+  WorkflowIdPort,
+  workflowRepositories,
   UnconfiguredWorkflowNlpRuntimeAdapter,
   WorkflowAiCallPort,
   WorkflowApp,
@@ -34,6 +38,7 @@ import {
   type WorkflowLlmParameterResolution,
   type WorkflowNlpRuntimePort,
   type WorkflowService,
+  type WorkflowRepositories,
   type WorkflowStudioDispatchService,
   type WorkflowTrpcPorts,
 } from "@langwatch/workflow-server";
@@ -96,7 +101,20 @@ export type ApiWorkflowRuntime = Readonly<{
   workflows: WorkflowService;
   /** Where a studio graph and a code evaluator both execute. */
   nlpRuntime: WorkflowNlpRuntimePort;
+  /** The rows this process chose at boot, for every surface that writes one. */
+  repositories: WorkflowRepositories;
 }>;
+
+/** Workflow and version ids, minted the way the platform app minted them. */
+class ApiWorkflowIdPort extends WorkflowIdPort {
+  static create(): ApiWorkflowIdPort {
+    return new ApiWorkflowIdPort();
+  }
+
+  next(): string {
+    return nanoid();
+  }
+}
 
 /** Composes the workflow service and its engine address. */
 export function composeWorkflowRuntime(options: {
@@ -125,22 +143,36 @@ export function composeWorkflowRuntime(options: {
       })
     : UnconfiguredWorkflowNlpRuntimeAdapter.create();
 
-  const workflows: WorkflowService = PostgresWorkflowAdapter.create({
-    database: options.infrastructure.prisma,
+  const repositories = instantiateRepositories(workflowRepositories, {
+    backend: "postgres",
+    infrastructure: { prisma: options.infrastructure.prisma },
+  });
+  const ids = ApiWorkflowIdPort.create();
+  const studioEvents = StudioEventPreparerService.create({
     datasets: options.peers.datasets,
-    modelProviders: options.peers.modelProviders,
-    nlpRuntime,
-    projectEnvironment: PrismaWorkflowProjectEnvironmentAdapter.create({
-      database: options.infrastructure.prisma,
+    projectEnvironment: WorkflowProjectEnvironmentService.create({
+      repository: repositories.projectEnvironment,
       encryption: options.secretDecryptor ?? UnavailableWorkflowEnvironmentDecryptor.create(),
     }),
     llmParameters: ApiWorkflowLlmParametersAdapter.create({
       modelProviders: options.peers.modelProviders,
     }),
+  });
+  const workflows: WorkflowService = WorkflowGraphService.create({
+    repository: repositories.workflows,
+    datasets: options.peers.datasets,
+    execution: WorkflowNlpExecutionService.create({
+      ids,
+      modelProviders: options.peers.modelProviders,
+      nlpRuntime,
+      studioEvents,
+    }),
+    studioEvents,
     dslMigration: ContractWorkflowDslMigrationAdapter.create(),
+    ids,
   });
 
-  return { workflows, nlpRuntime };
+  return { workflows, nlpRuntime, repositories };
 }
 
 /** The other features' services the studio's own surfaces reach. */
@@ -305,7 +337,7 @@ export function composeWorkflowFeature(options: {
   captureException?: (error: unknown) => void;
 }): ComposedWorkflowFeature {
   const logger = createLogger("langwatch:api:workflow");
-  const { prisma, authz } = options.infrastructure;
+  const { authz } = options.infrastructure;
 
   const app = WorkflowApp.create({
     infrastructure: {
@@ -317,7 +349,7 @@ export function composeWorkflowFeature(options: {
         modelProviders: options.peers.modelProviders,
       }),
       agentMappings: WorkflowAgentMappingAdapter.create({ agents: options.peers.agents }),
-      workflowRows: PrismaWorkflowRowAdapter.create({ database: prisma }),
+      workflowRows: options.runtime.repositories.workflowRows,
     },
     dependencies: {},
     config: void 0,

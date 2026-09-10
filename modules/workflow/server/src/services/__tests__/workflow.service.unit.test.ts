@@ -10,19 +10,19 @@ import {
   WorkflowExecutionPort,
   WorkflowIdPort,
   type WorkflowExecutionInput,
-} from "../workflow.port.ts";
+} from "../../ports/workflow.port.ts";
 import type {
   StudioEventPreparer,
   StudioEventPreparationInput,
-} from "../../services/studio-event-preparer.service.ts";
-import { WorkflowService as ServerWorkflowService } from "../../services/workflow.service.ts";
+} from "../studio-event-preparer.service.ts";
+import { WorkflowService as ServerWorkflowService } from "../workflow.service.ts";
 import {
   WorkflowRepository,
   type PersistWorkflowInput,
   type PersistWorkflowVersionInput,
   type WorkflowVersionHistoryRecord,
 } from "../../repositories/workflow.repository.ts";
-import { TestDatasetService } from "../../services/__tests__/dataset.service.fake.ts";
+import { TestDatasetService } from "./dataset.service.fake.ts";
 
 const workflow = (id = "workflow_1", projectId = "project_1"): Workflow => ({
   id,
@@ -62,7 +62,7 @@ class FakeWorkflowRepository extends WorkflowRepository {
     super();
     this.workflows.set("workflow_1", workflow());
   }
-  async tryFindById(input: {
+  async findById(input: {
     id: string;
     projectId: string;
     includeVersion?: boolean;
@@ -113,14 +113,14 @@ class FakeWorkflowRepository extends WorkflowRepository {
       author: null,
     }));
   }
-  async tryFindVersionById(input: {
+  async findVersionById(input: {
     id: string;
     projectId: string;
   }): Promise<WorkflowVersion | null> {
     const item = this.versions.get(input.id);
     return item?.projectId === input.projectId ? item : null;
   }
-  async tryFindVersion(input: {
+  async findVersion(input: {
     id: string;
     workflowId: string;
     projectId: string;
@@ -130,7 +130,7 @@ class FakeWorkflowRepository extends WorkflowRepository {
       ? item
       : null;
   }
-  async tryFindPublishedVersion(input: {
+  async findPublishedVersion(input: {
     workflowId: string;
     projectId: string;
     versionId?: string;
@@ -454,7 +454,7 @@ describe("WorkflowService", () => {
       dsl: { name: "Old shape migrated" },
     });
     await expect(
-      repository.tryFindById({ id: "workflow_1", projectId: "project_1" }),
+      repository.findById({ id: "workflow_1", projectId: "project_1" }),
     ).resolves.toMatchObject({
       currentVersionId: version.id,
       name: "Old shape migrated",

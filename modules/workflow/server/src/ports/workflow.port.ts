@@ -128,27 +128,3 @@ export abstract class WorkflowAgentMappingPort {
     dsl: StudioWorkflow;
   }): Promise<void>;
 }
-
-/** The stored workflow a copy lands in, before its first version exists. */
-export type WorkflowRowDraft = {
-  id: string;
-  projectId: string;
-  name: string;
-  icon: string;
-  description: string;
-  isEvaluator: boolean;
-  isComponent: boolean;
-  copiedFromWorkflowId: string;
-};
-
-/**
- * Writes the bare workflow row a Studio copy lands in.
- *
- * A copy is two writes with the caller's own step between them: the row, then
- * a version the caller commits once it has finished rewriting the graph. The
- * lifecycle's own `copy` writes both at once, so this is the seam that keeps
- * the two-step available without duplicating the version rules.
- */
-export abstract class WorkflowRowPort {
-  abstract create(input: WorkflowRowDraft): Promise<void>;
-}

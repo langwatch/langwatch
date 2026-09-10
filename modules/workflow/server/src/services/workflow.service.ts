@@ -17,6 +17,7 @@ import {
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
   type WorkflowVersionHistoryMode,
+  type WorkflowRunAnswer,
   type WorkflowWithVersion,
   type StudioClientEvent,
   type WorkflowReference,
@@ -90,7 +91,7 @@ export class WorkflowService {
     projectId: string;
     includeVersion?: boolean;
   }): Promise<WorkflowWithVersion> {
-    const workflow = await this.options.repository.tryFindById(input);
+    const workflow = await this.options.repository.findById(input);
     if (!workflow) {
       throw new WorkflowNotFoundError(input.id, input.projectId);
     }
@@ -155,7 +156,7 @@ export class WorkflowService {
     const previousVersionId = current?.parent?.id;
     const previousVersion =
       input.mode === "previousDsl" && previousVersionId
-        ? await this.options.repository.tryFindVersionById({
+        ? await this.options.repository.findVersionById({
             id: previousVersionId,
             projectId: input.projectId,
           })
@@ -184,7 +185,7 @@ export class WorkflowService {
   }
 
   async restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
-    const version = await this.options.repository.tryFindVersionById({
+    const version = await this.options.repository.findVersionById({
       id: input.versionId,
       projectId: input.projectId,
     });
@@ -192,7 +193,7 @@ export class WorkflowService {
       throw new WorkflowVersionNotFoundError(input.versionId);
     }
 
-    const workflow = await this.options.repository.tryFindById({
+    const workflow = await this.options.repository.findById({
       id: version.workflowId,
       projectId: input.projectId,
       includeArchived: true,
@@ -226,7 +227,7 @@ export class WorkflowService {
       projectId: input.projectId,
       includeVersion: false,
     });
-    const version = await this.options.repository.tryFindPublishedVersion(input);
+    const version = await this.options.repository.findPublishedVersion(input);
     if (!version) {
       if (!workflow.publishedId && !input.versionId) {
         throw new WorkflowNotPublishedError(input.workflowId);
@@ -339,7 +340,7 @@ export class WorkflowService {
     input: import("@langwatch/workflow-contract").PublishWorkflowCommand,
   ): Promise<Workflow> {
     const command = this.parse(publishWorkflowCommandSchema, input);
-    const version = await this.options.repository.tryFindVersion({
+    const version = await this.options.repository.findVersion({
       id: command.versionId,
       workflowId: command.id,
       projectId: command.projectId,
