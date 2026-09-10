@@ -127,7 +127,7 @@ export class IngestionPullWorkerService {
     cursor: string | null;
     pulledUsage?: PulledUsageDispatcherPort;
   }): Promise<{ nextCursor: string | null; eventCount: number }> {
-    const source = await this.sources.tryFindById(input.sourceId);
+    const source = await this.sources.findById(input.sourceId);
     if (!source) {
       throw new Error(`IngestionSource ${input.sourceId} not found`);
     }
@@ -310,9 +310,9 @@ export class IngestionPullWorkerService {
         continue;
       }
 
-      let record: ReturnType<PulledUsageRecordService["tryBuild"]>;
+      let record: ReturnType<PulledUsageRecordService["findBuilt"]>;
       try {
-        record = this.usageRecords.tryBuild({
+        record = this.usageRecords.findBuilt({
           event,
           source: {
             ingestionSourceId: input.source.id,

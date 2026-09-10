@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { GovernanceOcsfExportRepository } from "../../ports/ocsf-export.port.ts";
+import { GovernanceOcsfExportRepository } from "../audit/governance-setup-state.repository.ts";
 
 const GOVERNANCE_PROJECT_KIND = "internal_governance";
 
@@ -18,7 +18,7 @@ export class PrismaGovernanceOcsfExportRepository extends GovernanceOcsfExportRe
     return new PrismaGovernanceOcsfExportRepository(database);
   }
 
-  async tryResolveGovernanceTenantId(organizationId: string): Promise<string | null> {
+  async findGovernanceTenantId(organizationId: string): Promise<string | null> {
     const project = await this.prisma.project.findFirst({
       where: {
         kind: GOVERNANCE_PROJECT_KIND,

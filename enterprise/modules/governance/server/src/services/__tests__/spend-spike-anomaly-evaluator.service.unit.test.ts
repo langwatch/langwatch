@@ -8,8 +8,8 @@ import { AnomalyAlertHttpPort } from "../../ports/anomaly-alert-http.port.ts";
 import {
   AnomalySpendReaderPort,
   type AnomalySpendSourceFilter,
-  SpendSpikeAnomalyRepository,
 } from "../../ports/spend-spike-anomaly.port.ts";
+import { SpendSpikeAnomalyRepository } from "../../repositories/policy/spend-spike-anomaly.repository.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "../spend-spike-anomaly-evaluator.service.ts";
 import { Temporal, type Instant } from "@langwatch/time";
@@ -69,7 +69,7 @@ class MemoryAnomalyRepository extends SpendSpikeAnomalyRepository {
     return this.rules;
   }
 
-  async tryResolveGovernanceTenantId(): Promise<string | null> {
+  async findGovernanceTenantId(): Promise<string | null> {
     return this.tenantId;
   }
 

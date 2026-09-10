@@ -15,7 +15,7 @@ export class PostgresIngestionPullSourceAdapter extends IngestionPullSourcePort 
     return new PostgresIngestionPullSourceAdapter(PrismaIngestionSourceRepository.create(database));
   }
 
-  tryFindById(id: string): Promise<GovernanceIngestionSource | null> {
-    return this.repository.tryFindById(id);
+  findById(id: string): Promise<GovernanceIngestionSource | null> {
+    return this.repository.findById(id);
   }
 }

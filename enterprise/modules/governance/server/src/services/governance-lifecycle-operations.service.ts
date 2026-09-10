@@ -49,7 +49,7 @@ export class GovernanceLifecycleOperationsService {
     this.routingPolicies.list(...args);
 
   readonly findRoutingPolicyById: GovernanceApi["findRoutingPolicyById"] = (...args) =>
-    this.routingPolicies.tryFindById(...args);
+    this.routingPolicies.findById(...args);
 
   readonly routingPolicyGetById: GovernanceApi["routingPolicyGetById"] = (...args) =>
     this.routingPolicies.getById(...args);
@@ -67,7 +67,7 @@ export class GovernanceLifecycleOperationsService {
     this.routingPolicies.delete(...args);
 
   readonly tryResolveDefaultRoutingPolicyForUser: GovernanceApi["tryResolveDefaultRoutingPolicyForUser"] =
-    (...args) => this.routingPolicies.tryResolveDefaultForUser(...args);
+    (...args) => this.routingPolicies.findDefaultForUser(...args);
 
   readonly personalVirtualKeyEnsureDefault: GovernanceApi["personalVirtualKeyEnsureDefault"] = (
     ...args

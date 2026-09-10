@@ -1,7 +1,4 @@
-import type {
-  AdminWorkspaceKind,
-  RecordWorkspaceViewInput,
-} from "@langwatch/enterprise-governance-contract";
+import type { AdminWorkspaceKind } from "@langwatch/enterprise-governance-contract";
 
 export type AdminWorkspaceTarget = {
   id: string;
@@ -18,7 +15,7 @@ export type AdminWorkspaceAuditRow = {
 };
 
 export abstract class AdminWorkspaceViewAuditRepository {
-  abstract tryFindTarget(input: {
+  abstract findTarget(input: {
     teamId: string;
     actorUserId: string;
   }): Promise<AdminWorkspaceTarget | null>;
@@ -37,14 +34,4 @@ export abstract class AdminWorkspaceViewAuditRepository {
     targetId: string;
     metadata: { kind: AdminWorkspaceKind; workspaceLabel: string };
   }): Promise<AdminWorkspaceAuditRow>;
-}
-
-export abstract class AdminWorkspaceViewOcsfPort {
-  abstract mirror(input: {
-    tenantId: string;
-    auditLogId: string;
-    createdAtMs: number;
-    view: RecordWorkspaceViewInput;
-    label: string;
-  }): Promise<void>;
 }

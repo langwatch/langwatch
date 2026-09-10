@@ -14,7 +14,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { AnomalyRulePort, type AnomalyRuleChanges } from "../../ports/anomaly-rule.port.ts";
+import { AnomalyRulePort, type AnomalyRuleChanges } from "../../repositories/policy/anomaly-rule.repository.ts";
 import { AnomalyRuleService } from "../anomaly-rule.service.ts";
 
 const STORED_SECRET = "TheRealSigningSecret";
@@ -50,7 +50,7 @@ class InMemoryAnomalyRules extends AnomalyRulePort {
     return [this.row];
   }
 
-  async tryFindById() {
+  async findById() {
     return this.row;
   }
 

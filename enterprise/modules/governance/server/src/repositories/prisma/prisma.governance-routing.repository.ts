@@ -14,7 +14,7 @@ import type {
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import { RoutingPolicyPort } from "../../ports/routing-policy.port.ts";
+import { RoutingPolicyPort } from "../policy/routing-policy.repository.ts";
 
 type PolicyRow = PrismaRoutingPolicy & { scopes: PrismaRoutingPolicyScope[] };
 
@@ -56,7 +56,7 @@ export class PrismaRoutingPolicyRepository extends RoutingPolicyPort {
     return rows.map(mapPolicy);
   }
 
-  async tryFindById(id: string): Promise<RoutingPolicy | null> {
+  async findById(id: string): Promise<RoutingPolicy | null> {
     const row = await this.database.routingPolicy.findUnique({
       where: { id },
       include: { scopes: true },
@@ -228,7 +228,7 @@ export class PrismaRoutingPolicyRepository extends RoutingPolicyPort {
     });
   }
 
-  async tryResolveDefaultForUser(
+  async findDefaultForUser(
     input: ResolveDefaultRoutingPolicyInput,
   ): Promise<RoutingPolicy | null> {
     if (input.personalTeamId) {

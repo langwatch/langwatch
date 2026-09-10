@@ -7,7 +7,7 @@ import {
   AnomalyRulePort,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
-} from "../anomaly-rule.port.ts";
+} from "../../repositories/policy/anomaly-rule.repository.ts";
 import { AnomalyRuleService } from "../../services/anomaly-rule.service.ts";
 import { Temporal, toDate } from "@langwatch/time";
 
@@ -52,7 +52,7 @@ class MemoryAnomalyRuleRepository extends AnomalyRulePort {
     );
   }
 
-  async tryFindById(id: string): Promise<AnomalyRule | null> {
+  async findById(id: string): Promise<AnomalyRule | null> {
     return this.rows.get(id) ?? null;
   }
 
@@ -122,7 +122,7 @@ describe("AnomalyRuleService", () => {
     });
 
     await expect(
-      service.tryFindById({ id: "rule-1", organizationId: "organization-2" }),
+      service.findById({ id: "rule-1", organizationId: "organization-2" }),
     ).resolves.toBeNull();
   });
 

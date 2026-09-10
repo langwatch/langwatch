@@ -29,7 +29,7 @@
 import { type ZodRawShape, z } from "zod";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port.ts";
+import type { GovernanceDirectoryPort } from "../../repositories/directory/governance-directory.repository.ts";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently
@@ -98,7 +98,7 @@ export function registerGovernanceMcpTools(server: McpServerLike, ctx: Governanc
   const resolve = async (): Promise<ResolvedContext> => {
     if (!resolvedPromise) {
       resolvedPromise = (async () => {
-        const organizationId = await ctx.directory.tryFindOrganizationIdByProjectApiKey(ctx.apiKey);
+        const organizationId = await ctx.directory.findOrganizationIdByProjectApiKey(ctx.apiKey);
         if (organizationId === null) {
           throw new Error(
             "MCP session apiKey did not resolve to a project — cannot derive organization context for governance tools.",

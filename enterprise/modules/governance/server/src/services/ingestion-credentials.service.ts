@@ -13,7 +13,7 @@ export class IngestionCredentialsService {
     return typeof value === "string" && value.startsWith(ENCRYPTED_PREFIX);
   }
 
-  tryEncryptParserConfig(
+  encryptParserConfig(
     parserConfig: Record<string, unknown> | null | undefined,
   ): Record<string, unknown> | null | undefined {
     if (!parserConfig || typeof parserConfig !== "object") {

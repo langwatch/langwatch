@@ -3,10 +3,8 @@ import {
   NoEligibleProvidersError,
   type PersonalVirtualKey,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  PersonalVirtualKeyIssuerPort,
-  PersonalVirtualKeyRepository,
-} from "../personal-virtual-key.port.ts";
+import { PersonalVirtualKeyIssuerPort } from "../personal-usage.port.ts";
+import { PersonalVirtualKeyRepository } from "../../repositories/directory/personal-virtual-key.repository.ts";
 import { DefaultGovernancePersonalVirtualKeyService } from "../../services/governance-personal-key.service.ts";
 import { TestOrganizationService } from "./support/test-organization-service.ts";
 
@@ -27,9 +25,9 @@ const key: PersonalVirtualKey = {
 
 class MemoryKeys extends PersonalVirtualKeyRepository {
   eligible = 1;
-  tryFindDefault = vi.fn(async () => null);
+  findDefault = vi.fn(async () => null);
   list = vi.fn(async () => [key]);
-  tryFindOwned = vi.fn(async () => key);
+  findOwned = vi.fn(async () => key);
   listActiveForUser = vi.fn(async () => [key]);
   countEligibleProviders = vi.fn(async () => this.eligible);
 }
@@ -56,12 +54,12 @@ class MemoryOrganizations extends TestOrganizationService {
 
 class MemoryPolicies {
   list = vi.fn(async () => []);
-  tryFindById = vi.fn(async () => null);
+  findById = vi.fn(async () => null);
   create = vi.fn();
   update = vi.fn();
   setDefault = vi.fn();
   delete = vi.fn();
-  tryResolveDefaultForUser = vi.fn(async () => null);
+  findDefaultForUser = vi.fn(async () => null);
 }
 
 function setup() {

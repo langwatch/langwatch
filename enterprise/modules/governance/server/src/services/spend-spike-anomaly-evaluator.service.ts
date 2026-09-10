@@ -11,8 +11,8 @@ import {
 import type {
   AnomalySpendReaderPort,
   AnomalySpendSourceFilter,
-  SpendSpikeAnomalyRepository,
 } from "../ports/spend-spike-anomaly.port.ts";
+import { SpendSpikeAnomalyRepository } from "../repositories/policy/spend-spike-anomaly.repository.ts";
 import type { AnomalyAlertDispatcherService } from "./anomaly-alert-dispatcher.service.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
@@ -97,7 +97,7 @@ export class SpendSpikeAnomalyEvaluatorService {
     const windowEnd = now;
     const windowStart = now.subtract({ milliseconds: windowMs });
     const baselineStart = windowStart.subtract({ milliseconds: BASELINE_WINDOWS * windowMs });
-    const tenantId = await this.repository.tryResolveGovernanceTenantId(rule.organizationId);
+    const tenantId = await this.repository.findGovernanceTenantId(rule.organizationId);
     if (!tenantId) {
       return SpendSpikeAnomalyEvaluatorService.noDataResult(
         rule,

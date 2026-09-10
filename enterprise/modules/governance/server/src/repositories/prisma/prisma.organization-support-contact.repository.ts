@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { OrganizationSupportContactRepository } from "../organization-support-contact.repository.ts";
+import { OrganizationSupportContactRepository } from "../directory/organization-support-contact.repository.ts";
 
 /** The client slice the support-contact reads bind to. */
 export type OrganizationSupportContactDatabase = Pick<
@@ -46,7 +46,7 @@ export class PrismaOrganizationSupportContactRepository extends OrganizationSupp
     return new Map(users.map((user) => [user.id, user.email]));
   }
 
-  async tryFindConfiguredSupportContact({
+  async findConfiguredSupportContact({
     organizationId,
   }: {
     organizationId: string;

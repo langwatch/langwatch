@@ -67,7 +67,7 @@ function buildApp(options: {
       hasActivePersonalKeyLabelled:
         unreachable<GovernancePersonalVirtualKeyPorts["hasActivePersonalKeyLabelled"]>(),
     },
-    actors: { tryFindUser },
+    actors: { findUser: tryFindUser },
   });
 
   return { app, tryFindUser, isOrganizationMember, tryFindPersonalWorkspace };
@@ -83,7 +83,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
       });
 
       await expect(
-        app.tryResolveActorWorkspace({
+        app.findActorWorkspace({
           organizationId: ORGANIZATION_ID,
           actor: "ariana@acme.com",
         }),
@@ -104,7 +104,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
         workspace,
       });
       await expect(
-        app.tryResolveActorWorkspace({ organizationId: ORGANIZATION_ID, actor: "user-1" }),
+        app.findActorWorkspace({ organizationId: ORGANIZATION_ID, actor: "user-1" }),
       ).resolves.toMatchObject({ displayName: "ariana@acme.com" });
 
       const nameless = buildApp({
@@ -113,7 +113,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
         workspace,
       });
       await expect(
-        nameless.app.tryResolveActorWorkspace({
+        nameless.app.findActorWorkspace({
           organizationId: ORGANIZATION_ID,
           actor: "user-1",
         }),
@@ -128,7 +128,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
       });
 
       await expect(
-        app.tryResolveActorWorkspace({
+        app.findActorWorkspace({
           organizationId: ORGANIZATION_ID,
           actor: "stranger@example.com",
         }),
@@ -147,7 +147,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
       });
 
       await expect(
-        app.tryResolveActorWorkspace({
+        app.findActorWorkspace({
           organizationId: ORGANIZATION_ID,
           actor: "ben@other.com",
         }),
@@ -165,7 +165,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
       });
 
       await expect(
-        app.tryResolveActorWorkspace({
+        app.findActorWorkspace({
           organizationId: ORGANIZATION_ID,
           actor: "cara@acme.com",
         }),

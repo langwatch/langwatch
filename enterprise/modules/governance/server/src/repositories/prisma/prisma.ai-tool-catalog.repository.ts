@@ -106,7 +106,7 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
     return rows.map(mapEntry);
   }
 
-  async tryFindById(id: string): Promise<AiToolEntry | null> {
+  async findById(id: string): Promise<AiToolEntry | null> {
     const row = await this.database.aiToolEntry.findUnique({
       where: { id },
       include: { departments: { select: { departmentId: true } } },

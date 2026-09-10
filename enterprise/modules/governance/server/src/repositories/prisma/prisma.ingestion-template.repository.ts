@@ -56,7 +56,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplatePort {
     return rows.map(toIngestionTemplate);
   }
 
-  async tryFindVisible(input: {
+  async findVisible(input: {
     id: string;
     organizationId: string;
   }): Promise<IngestionTemplate | null> {
@@ -70,7 +70,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplatePort {
     return row ? toIngestionTemplate(row) : null;
   }
 
-  async tryFindPlatform(id: string): Promise<IngestionTemplate | null> {
+  async findPlatform(id: string): Promise<IngestionTemplate | null> {
     const row = await this.prisma.ingestionTemplate.findFirst({
       where: { id, organizationId: null, archivedAt: null },
     });

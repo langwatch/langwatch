@@ -1,5 +1,5 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { PersonalVirtualKeyIssuerPort } from "../ports/personal-virtual-key.port.ts";
+import type { PersonalVirtualKeyIssuerPort } from "../ports/personal-usage.port.ts";
 import {
   PrismaPersonalVirtualKeyRepository,
   type PersonalVirtualKeyDatabase,
@@ -7,13 +7,13 @@ import {
 import { DefaultGovernancePersonalVirtualKeyService } from "../services/governance-personal-key.service.ts";
 
 type RoutingPolicyReader = {
-  tryFindById(input: { id: string; organizationId: string }): Promise<{
+  findById(input: { id: string; organizationId: string }): Promise<{
     id: string;
     name: string;
     organizationId: string;
     modelProviderIds: string[];
   } | null>;
-  tryResolveDefaultForUser(input: { organizationId: string; personalTeamId: string }): Promise<{
+  findDefaultForUser(input: { organizationId: string; personalTeamId: string }): Promise<{
     id: string;
     name: string;
     organizationId: string;

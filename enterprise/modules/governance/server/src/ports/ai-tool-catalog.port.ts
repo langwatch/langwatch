@@ -16,7 +16,7 @@ export abstract class AiToolCatalogRepository {
     type?: AiToolType;
   }): Promise<AiToolEntry[]>;
   abstract listAdmin(organizationId: string): Promise<AiToolEntry[]>;
-  abstract tryFindById(id: string): Promise<AiToolEntry | null>;
+  abstract findById(id: string): Promise<AiToolEntry | null>;
   abstract departmentsBelongToOrganization(input: {
     organizationId: string;
     departmentIds: string[];

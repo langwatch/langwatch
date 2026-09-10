@@ -84,7 +84,7 @@ class FakeSources extends IngestionPullSourcePort {
     super();
   }
 
-  async tryFindById(): Promise<GovernanceIngestionSource | null> {
+  async findById(): Promise<GovernanceIngestionSource | null> {
     return this.source;
   }
 }

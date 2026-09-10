@@ -1,10 +1,10 @@
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
+import { AdminWorkspaceViewOcsfPort } from "../governance-audit-signal.port.ts";
 import {
   AdminWorkspaceViewAuditRepository,
-  AdminWorkspaceViewOcsfPort,
   type AdminWorkspaceTarget,
-} from "../admin-workspace-view-audit.port.ts";
+} from "../../repositories/audit/admin-workspace-view-audit.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../../services/admin-workspace-view-audit.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
@@ -18,7 +18,7 @@ class MemoryAuditRepository extends AdminWorkspaceViewAuditRepository {
     actorIsMember: false,
   };
   recent = false;
-  tryFindTarget = vi.fn(async () => this.target);
+  findTarget = vi.fn(async () => this.target);
   findRecent = vi.fn(async () => this.recent);
   create = vi.fn(async () => ({ id: "audit", createdAtMs: 1_700_000_000_000 }));
 }

@@ -3,10 +3,8 @@ import {
   type GovernanceOcsfExportInput,
   type GovernanceOcsfExportPage,
 } from "@langwatch/enterprise-governance-contract";
-import type {
-  GovernanceOcsfEventsReaderPort,
-  GovernanceOcsfExportRepository,
-} from "../ports/ocsf-export.port.ts";
+import type { GovernanceOcsfEventsReaderPort } from "../ports/governance-audit-signal.port.ts";
+import type { GovernanceOcsfExportRepository } from "../repositories/audit/governance-setup-state.repository.ts";
 
 export class DefaultGovernanceOcsfExportService {
   private constructor(
@@ -23,7 +21,7 @@ export class DefaultGovernanceOcsfExportService {
 
   async list(input: GovernanceOcsfExportInput): Promise<GovernanceOcsfExportPage> {
     const parsed = governanceOcsfExportInputSchema.parse(input);
-    const tenantId = await this.repository.tryResolveGovernanceTenantId(parsed.organizationId);
+    const tenantId = await this.repository.findGovernanceTenantId(parsed.organizationId);
     if (!tenantId) {
       return { events: [], nextCursor: null, nextCursorCompound: null };
     }

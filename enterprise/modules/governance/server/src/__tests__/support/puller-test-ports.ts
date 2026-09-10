@@ -110,7 +110,7 @@ class TestSourcePort extends IngestionPullSourcePort {
     super();
   }
 
-  tryFindById(): Promise<GovernanceIngestionSource | null> {
+  findById(): Promise<GovernanceIngestionSource | null> {
     return this.find();
   }
 }

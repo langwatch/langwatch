@@ -4,7 +4,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { buildIngestKeyReceiverPolicies } from "../rules/ingest-key-provenance.rules.ts";
 import type { TraceDepartmentInput } from "@langwatch/enterprise-governance-contract";
-import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
+import type { CostAttributionPolicyRepository } from "../repositories/policy/cost-attribution-policy.repository.ts";
 import {
   NullGovernanceDiagnosticsAdapter,
   type GovernanceDiagnosticsPort,

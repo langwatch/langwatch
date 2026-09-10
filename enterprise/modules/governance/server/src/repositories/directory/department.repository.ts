@@ -2,7 +2,7 @@ import type { Department, DepartmentAssignments } from "@langwatch/enterprise-go
 
 export abstract class DepartmentPort {
   abstract getAll(organizationId: string): Promise<Department[]>;
-  abstract tryGetById(input: { id: string; organizationId: string }): Promise<Department | null>;
+  abstract findById(input: { id: string; organizationId: string }): Promise<Department | null>;
   abstract getAssignments(organizationId: string): Promise<DepartmentAssignments>;
   abstract create(input: { organizationId: string; name: string }): Promise<Department>;
   abstract resolveByNameOrCreate(input: {

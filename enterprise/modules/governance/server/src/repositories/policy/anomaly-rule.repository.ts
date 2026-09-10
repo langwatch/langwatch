@@ -26,7 +26,7 @@ export type AnomalyRuleChanges = Partial<
 
 export abstract class AnomalyRulePort {
   abstract list(organizationId: string): Promise<AnomalyRule[]>;
-  abstract tryFindById(id: string): Promise<AnomalyRule | null>;
+  abstract findById(id: string): Promise<AnomalyRule | null>;
   abstract create(input: NewAnomalyRule): Promise<AnomalyRule>;
   abstract update(id: string, changes: AnomalyRuleChanges): Promise<AnomalyRule>;
 }

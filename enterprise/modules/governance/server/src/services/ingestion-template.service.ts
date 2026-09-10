@@ -51,15 +51,15 @@ export class IngestionTemplateService {
     return this.repository.listAdminVisible(input.organizationId);
   }
 
-  tryFindByIdForOrg(input: {
+  findByIdForOrg(input: {
     id: string;
     organizationId: string;
   }): Promise<IngestionTemplate | null> {
-    return this.repository.tryFindVisible(input);
+    return this.repository.findVisible(input);
   }
 
   async getByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate> {
-    const template = await this.repository.tryFindVisible(input);
+    const template = await this.repository.findVisible(input);
     if (!template) {
       throw new TemplateNotFoundError(input.id);
     }
@@ -124,7 +124,7 @@ export class IngestionTemplateService {
 
   async cloneFromPlatform(input: CloneIngestionTemplateInput): Promise<IngestionTemplate> {
     const parsed = cloneIngestionTemplateInputSchema.parse(input);
-    const source = await this.repository.tryFindPlatform(parsed.sourceTemplateId);
+    const source = await this.repository.findPlatform(parsed.sourceTemplateId);
     if (!source) {
       throw new TemplateNotFoundError(parsed.sourceTemplateId);
     }

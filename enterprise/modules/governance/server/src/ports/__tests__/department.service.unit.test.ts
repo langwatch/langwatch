@@ -5,7 +5,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import { DepartmentPort } from "../department.port.ts";
+import { DepartmentPort } from "../../repositories/directory/department.repository.ts";
 import { DepartmentService } from "../../services/department.service.ts";
 
 function department(overrides: Partial<Department> = {}): Department {
@@ -34,7 +34,7 @@ class MemoryDepartmentRepository extends DepartmentPort {
     return this.row ? [this.row] : [];
   }
 
-  async tryGetById(input: { id: string; organizationId: string }): Promise<Department | null> {
+  async findById(input: { id: string; organizationId: string }): Promise<Department | null> {
     return this.row?.id === input.id && this.row.organizationId === input.organizationId
       ? this.row
       : null;

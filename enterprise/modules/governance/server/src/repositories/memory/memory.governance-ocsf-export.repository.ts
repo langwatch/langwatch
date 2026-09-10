@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { GovernanceOcsfExportRepository } from "../../ports/ocsf-export.port.ts";
+import { GovernanceOcsfExportRepository } from "../audit/governance-setup-state.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
 /**
@@ -16,7 +16,7 @@ export class MemoryGovernanceOcsfExportRepository extends GovernanceOcsfExportRe
     return new MemoryGovernanceOcsfExportRepository(store);
   }
 
-  async tryResolveGovernanceTenantId(organizationId: string): Promise<string | null> {
+  async findGovernanceTenantId(organizationId: string): Promise<string | null> {
     return this.store.governanceTenantIds.get(organizationId) ?? null;
   }
 }

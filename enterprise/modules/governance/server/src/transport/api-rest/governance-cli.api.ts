@@ -66,7 +66,7 @@ import {
   type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
-import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port.ts";
+import type { GovernanceDirectoryPort } from "../../repositories/directory/governance-directory.repository.ts";
 import { randomBytes } from "node:crypto";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -487,7 +487,7 @@ export function createGovernanceCliRestApp(options: {
       const blocker = decision.blockedBy[0]!;
       const adminEmail = await ports
         .supportContacts()
-        .tryResolveSupportContact({ organizationId: caller.organization_id });
+        .findSupportContact({ organizationId: caller.organization_id });
       const params = new URLSearchParams({
         scope: blocker.scope.toLowerCase(),
         scope_id: blocker.scopeId,
@@ -572,7 +572,7 @@ export function createGovernanceCliRestApp(options: {
       const denied = await refuseInactiveMember(c, caller);
       if (denied) return denied;
 
-      const user = await ports.directory().tryFindPersonProfile(caller.user_id);
+      const user = await ports.directory().findPersonProfile(caller.user_id);
       try {
         const workspace = await ports.ensurePersonalWorkspace({
           organizationId: caller.organization_id,
@@ -633,7 +633,7 @@ export function createGovernanceCliRestApp(options: {
         );
       }
 
-      const user = await ports.directory().tryFindPersonProfile(caller.user_id);
+      const user = await ports.directory().findPersonProfile(caller.user_id);
 
       try {
         const issued = await issuePersonalVirtualKey({
@@ -717,7 +717,7 @@ export function createGovernanceCliRestApp(options: {
       if (!parsed.success) {
         return c.json({ error: "invalid_request", error_description: "slug is required" }, 400);
       }
-      const project = await ports.directory().tryFindLiveProjectBySlug({
+      const project = await ports.directory().findLiveProjectBySlug({
         slug: parsed.data.slug,
         organizationId: caller.organization_id,
       });
@@ -1020,7 +1020,7 @@ export function createGovernanceCliRestApp(options: {
       deviceLabel: string | null;
     },
   ): Promise<Response> {
-    const project = await ports.directory().tryFindLiveProjectByRef({
+    const project = await ports.directory().findLiveProjectByRef({
       projectRef: input.projectRef,
       organizationId: input.caller.organization_id,
     });

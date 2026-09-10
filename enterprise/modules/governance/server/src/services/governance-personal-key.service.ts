@@ -19,19 +19,19 @@ import {
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type {
   PersonalVirtualKeyIssuerPort,
-  PersonalVirtualKeyRepository,
-} from "../ports/personal-virtual-key.port.ts";
+} from "../ports/personal-usage.port.ts";
+import { PersonalVirtualKeyRepository } from "../repositories/directory/personal-virtual-key.repository.ts";
 
 const DEFAULT_PERSONAL_KEY_LABEL = "default";
 
 type RoutingPolicyReader = {
-  tryFindById(input: { id: string; organizationId: string }): Promise<{
+  findById(input: { id: string; organizationId: string }): Promise<{
     id: string;
     name: string;
     organizationId: string;
     modelProviderIds: string[];
   } | null>;
-  tryResolveDefaultForUser(input: { organizationId: string; personalTeamId: string }): Promise<{
+  findDefaultForUser(input: { organizationId: string; personalTeamId: string }): Promise<{
     id: string;
     name: string;
     organizationId: string;
@@ -69,7 +69,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
   ): Promise<IssuedPersonalVirtualKey> {
     const parsed = ensureDefaultPersonalVirtualKeyInputSchema.parse(input);
     const workspace = await this.organizations.ensurePersonalWorkspace(parsed);
-    const existing = await this.repository.tryFindDefault({
+    const existing = await this.repository.findDefault({
       userId: parsed.userId,
       organizationId: parsed.organizationId,
       personalProjectId: workspace.project.id,
@@ -91,12 +91,12 @@ export class DefaultGovernancePersonalVirtualKeyService {
     const parsed = issuePersonalVirtualKeyInputSchema.parse(input);
     let policy = null;
     if (parsed.routingPolicyId) {
-      policy = await this.policies.tryFindById({
+      policy = await this.policies.findById({
         id: parsed.routingPolicyId,
         organizationId: parsed.organizationId,
       });
     } else if (parsed.routingPolicyId === undefined && parsed.personalTeamId) {
-      policy = await this.policies.tryResolveDefaultForUser({
+      policy = await this.policies.findDefaultForUser({
         organizationId: parsed.organizationId,
         personalTeamId: parsed.personalTeamId,
       });
@@ -148,7 +148,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
 
   async revoke(input: RevokePersonalVirtualKeyInput): Promise<PersonalVirtualKey> {
     const parsed = revokePersonalVirtualKeyInputSchema.parse(input);
-    const key = await this.repository.tryFindOwned({
+    const key = await this.repository.findOwned({
       id: parsed.virtualKeyId,
       organizationId: parsed.organizationId,
       userId: parsed.userId,

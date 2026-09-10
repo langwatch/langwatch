@@ -5,7 +5,7 @@ import {
   type VirtualKeyScope,
 } from "@langwatch/prisma-client/generated";
 import type { PersonalVirtualKey } from "@langwatch/enterprise-governance-contract";
-import { PersonalVirtualKeyRepository } from "../../ports/personal-virtual-key.port.ts";
+import { PersonalVirtualKeyRepository } from "../directory/personal-virtual-key.repository.ts";
 
 type KeyRow = VirtualKey & { scopes: VirtualKeyScope[] };
 
@@ -26,7 +26,7 @@ export class PrismaPersonalVirtualKeyRepository extends PersonalVirtualKeyReposi
     return new PrismaPersonalVirtualKeyRepository(database);
   }
 
-  async tryFindDefault(input: {
+  async findDefault(input: {
     userId: string;
     organizationId: string;
     personalProjectId: string;
@@ -61,7 +61,7 @@ export class PrismaPersonalVirtualKeyRepository extends PersonalVirtualKeyReposi
     return rows.map(mapKey);
   }
 
-  async tryFindOwned(input: {
+  async findOwned(input: {
     id: string;
     organizationId: string;
     userId: string;

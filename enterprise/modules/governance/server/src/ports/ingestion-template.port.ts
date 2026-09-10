@@ -16,11 +16,11 @@ export type IngestionTemplateMutationResult =
 export abstract class IngestionTemplatePort {
   abstract listUserVisible(organizationId: string): Promise<IngestionTemplate[]>;
   abstract listAdminVisible(organizationId: string): Promise<IngestionTemplate[]>;
-  abstract tryFindVisible(input: {
+  abstract findVisible(input: {
     id: string;
     organizationId: string;
   }): Promise<IngestionTemplate | null>;
-  abstract tryFindPlatform(id: string): Promise<IngestionTemplate | null>;
+  abstract findPlatform(id: string): Promise<IngestionTemplate | null>;
   abstract createWithAudit(input: {
     template: NewIngestionTemplate;
     callerUserId: string;

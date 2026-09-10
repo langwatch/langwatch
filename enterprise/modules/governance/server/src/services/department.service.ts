@@ -4,7 +4,7 @@ import {
   type Department,
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
-import type { DepartmentPort } from "../ports/department.port.ts";
+import type { DepartmentPort } from "../repositories/directory/department.repository.ts";
 
 export class DepartmentService {
   private constructor(private readonly repository: DepartmentPort) {}
@@ -17,8 +17,8 @@ export class DepartmentService {
     return this.repository.getAll(input.organizationId);
   }
 
-  tryGetById(input: { id: string; organizationId: string }): Promise<Department | null> {
-    return this.repository.tryGetById(input);
+  findById(input: { id: string; organizationId: string }): Promise<Department | null> {
+    return this.repository.findById(input);
   }
 
   getAssignments(input: { organizationId: string }): Promise<DepartmentAssignments> {
@@ -95,7 +95,7 @@ export class DepartmentService {
   }
 
   private async getDepartment(input: { id: string; organizationId: string }): Promise<Department> {
-    const department = await this.repository.tryGetById(input);
+    const department = await this.repository.findById(input);
     if (!department) {
       throw new DepartmentNotFoundError();
     }

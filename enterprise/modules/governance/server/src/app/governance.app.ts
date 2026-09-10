@@ -200,7 +200,7 @@ export interface GovernancePersonalVirtualKeyPorts {
  * a single-row lookup the Governance service does not own.
  */
 export interface GovernanceActorDirectory {
-  tryFindUser(input: { token: string }): Promise<GovernanceActorUser | null>;
+  findUser(input: { token: string }): Promise<GovernanceActorUser | null>;
 }
 
 /** The identity columns an actor drill-in reads. */
@@ -554,11 +554,11 @@ export class GovernanceApp {
    * the governance surface still learns nothing about who else exists on the
    * instance from the shape of the answer.
    */
-  async tryResolveActorWorkspace(input: {
+  async findActorWorkspace(input: {
     organizationId: string;
     actor: string;
   }): Promise<GovernanceActorWorkspace | null> {
-    const user = await this.dependencies.actors.tryFindUser({ token: input.actor });
+    const user = await this.dependencies.actors.findUser({ token: input.actor });
     if (!user) return null;
 
     const member = await this.isOrganizationMember({

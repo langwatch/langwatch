@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { OrganizationSupportContactRepository } from "../organization-support-contact.repository.ts";
+import { OrganizationSupportContactRepository } from "../directory/organization-support-contact.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
 /**
@@ -32,7 +32,7 @@ export class MemoryOrganizationSupportContactRepository extends OrganizationSupp
     return emails;
   }
 
-  async tryFindConfiguredSupportContact({
+  async findConfiguredSupportContact({
     organizationId,
   }: {
     organizationId: string;

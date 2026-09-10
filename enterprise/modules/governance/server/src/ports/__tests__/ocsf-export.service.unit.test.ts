@@ -1,9 +1,7 @@
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  GovernanceOcsfEventsReaderPort,
-  GovernanceOcsfExportRepository,
-} from "../ocsf-export.port.ts";
+import { GovernanceOcsfEventsReaderPort } from "../governance-audit-signal.port.ts";
+import { GovernanceOcsfExportRepository } from "../../repositories/audit/governance-setup-state.repository.ts";
 import { DefaultGovernanceOcsfExportService } from "../../services/ocsf-export.service.ts";
 
 class FixedTenantRepository extends GovernanceOcsfExportRepository {
@@ -11,7 +9,7 @@ class FixedTenantRepository extends GovernanceOcsfExportRepository {
     super();
   }
 
-  async tryResolveGovernanceTenantId(): Promise<string | null> {
+  async findGovernanceTenantId(): Promise<string | null> {
     return this.tenantId;
   }
 }

@@ -84,14 +84,14 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     return rows.map(toIngestionSource);
   }
 
-  async tryFindById(id: string): Promise<GovernanceIngestionSource | null> {
+  async findById(id: string): Promise<GovernanceIngestionSource | null> {
     const row = await this.database.ingestionSource.findUnique({
       where: { id },
     });
     return row ? toIngestionSource(row) : null;
   }
 
-  async tryFindByCurrentSecretHash(hash: string): Promise<GovernanceIngestionSource | null> {
+  async findByCurrentSecretHash(hash: string): Promise<GovernanceIngestionSource | null> {
     const row = await this.database.ingestionSource.findFirst({
       where: { ingestSecretHash: hash, archivedAt: null },
     });
@@ -135,7 +135,7 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     return toIngestionSource(row);
   }
 
-  async tryUpdateIfCursorUnchanged(input: {
+  async updateIfCursorUnchanged(input: {
     id: string;
     cursor: unknown;
     update: UpdateIngestionSourceRecord;

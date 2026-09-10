@@ -8,7 +8,7 @@ import type {
 import { generate } from "@langwatch/ksuid";
 import type { Instant } from "@langwatch/time";
 import { toDate } from "@langwatch/time";
-import { SpendSpikeAnomalyRepository } from "../../ports/spend-spike-anomaly.port.ts";
+import { SpendSpikeAnomalyRepository } from "../policy/spend-spike-anomaly.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
 const ANOMALY_ALERT_KSUID_RESOURCE = "anomalert";
@@ -33,7 +33,7 @@ export class MemorySpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     );
   }
 
-  async tryResolveGovernanceTenantId(organizationId: string): Promise<string | null> {
+  async findGovernanceTenantId(organizationId: string): Promise<string | null> {
     return this.store.governanceTenantIds.get(organizationId) ?? null;
   }
 

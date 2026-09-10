@@ -80,9 +80,9 @@ describe("given the memory-backed governance repositories", () => {
       });
 
       await expect(
-        repositories.routingPolicies.tryResolveDefaultForUser({ organizationId: "org-1" }),
+        repositories.routingPolicies.findDefaultForUser({ organizationId: "org-1" }),
       ).resolves.toMatchObject({ id: second.id });
-      await expect(repositories.routingPolicies.tryFindById(first.id)).resolves.toMatchObject({
+      await expect(repositories.routingPolicies.findById(first.id)).resolves.toMatchObject({
         isDefault: false,
       });
     });

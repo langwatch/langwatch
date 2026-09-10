@@ -12,7 +12,7 @@
  * a budget refusal tells a person who to go to, and an organization that has
  * configured nobody gets no name rather than a guess.
  */
-import type { OrganizationSupportContactRepository } from "../repositories/organization-support-contact.repository.ts";
+import type { OrganizationSupportContactRepository } from "../repositories/directory/organization-support-contact.repository.ts";
 
 export class OrganizationSupportContactService {
   private constructor(private readonly repository: OrganizationSupportContactRepository) {}
@@ -40,7 +40,7 @@ export class OrganizationSupportContactService {
    * Nothing when the organization has no admin membership, or when every admin
    * membership is orphaned.
    */
-  async tryResolveOrgAdminEmail({
+  async findOrgAdminEmail({
     organizationId,
   }: {
     organizationId: string;
@@ -74,17 +74,17 @@ export class OrganizationSupportContactService {
    * no contact to surface, and inventing one would send a blocked person
    * nowhere.
    */
-  async tryResolveSupportContact({
+  async findSupportContact({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<string | null> {
-    const configured = await this.repository.tryFindConfiguredSupportContact({ organizationId });
+    const configured = await this.repository.findConfiguredSupportContact({ organizationId });
     const trimmed = configured?.trim();
     if (trimmed) {
       return trimmed;
     }
 
-    return this.tryResolveOrgAdminEmail({ organizationId });
+    return this.findOrgAdminEmail({ organizationId });
   }
 }

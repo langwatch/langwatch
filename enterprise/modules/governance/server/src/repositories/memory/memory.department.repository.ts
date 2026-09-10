@@ -5,7 +5,7 @@ import type {
   DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
-import { DepartmentPort } from "../../ports/department.port.ts";
+import { DepartmentPort } from "../directory/department.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
 const DEPARTMENT_KSUID_RESOURCE = "dept";
@@ -30,7 +30,7 @@ export class MemoryDepartmentRepository extends DepartmentPort {
     );
   }
 
-  async tryGetById(input: { id: string; organizationId: string }): Promise<Department | null> {
+  async findById(input: { id: string; organizationId: string }): Promise<Department | null> {
     return (
       this.store.departments.find(
         (department) =>
@@ -85,7 +85,7 @@ export class MemoryDepartmentRepository extends DepartmentPort {
   }
 
   async rename(input: { id: string; organizationId: string; name: string }): Promise<boolean> {
-    const department = await this.tryGetById(input);
+    const department = await this.findById(input);
     if (!department) return false;
     department.name = input.name;
     department.updatedAt = new Date();
@@ -132,7 +132,7 @@ export class MemoryDepartmentRepository extends DepartmentPort {
     input: { organizationId: string; departmentId: string | null },
   ): Promise<boolean> {
     if (input.departmentId !== null) {
-      const department = await this.tryGetById({
+      const department = await this.findById({
         id: input.departmentId,
         organizationId: input.organizationId,
       });

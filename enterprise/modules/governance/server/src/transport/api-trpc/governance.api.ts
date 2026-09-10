@@ -9,7 +9,7 @@
  *   - `quarantineFillStats` — rate the admin UI polls for the quarantine warning
  *
  * A fifth, `resolveActorPersonalProject`, answers the admin drill-in link. The
- * rule is {@link GovernanceApp.tryResolveActorWorkspace}; only the actor
+ * rule is {@link GovernanceApp.findActorWorkspace}; only the actor
  * token's lookup stays a port, because which columns carry an actor identity
  * is the process's fact rather than this feature's.
  *

@@ -29,7 +29,7 @@ import { PostgresGovernanceAdapter } from "./postgres.governance.adapter.ts";
 import { PostgresIngestionSourceActivityAdapter } from "./postgres.ingestion-source-activity.adapter.ts";
 import { PostgresPersonalVirtualKeyAdapter } from "./postgres.governance-personal-key.adapter.ts";
 import { PostgresRoutingPolicyAdapter } from "./postgres.governance-routing.adapter.ts";
-import type { AdminWorkspaceViewOcsfPort } from "../ports/admin-workspace-view-audit.port.ts";
+import type { AdminWorkspaceViewOcsfPort } from "../ports/governance-audit-signal.port.ts";
 import type { AiToolProviderCatalogPort, AiToolSlugPort } from "../ports/ai-tool-catalog.port.ts";
 import type { CliAdminContactPort } from "../ports/cli-bootstrap.port.ts";
 import type { CliTokenStorePort } from "../ports/cli-token-store.port.ts";
@@ -37,8 +37,8 @@ import { GovernanceBudgetOverviewPort } from "../ports/governance-budget-overvie
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 import type { GovernanceEncryptionPort } from "../ports/governance-encryption.port.ts";
 import type { GovernanceEventingPort } from "../ports/governance-eventing.port.ts";
-import type { GovernanceOcsfEventsReaderPort } from "../ports/ocsf-export.port.ts";
-import type { GovernanceSetupActivityPort } from "../ports/governance-setup-state.port.ts";
+import type { GovernanceOcsfEventsReaderPort } from "../ports/governance-audit-signal.port.ts";
+import type { GovernanceSetupActivityPort } from "../ports/governance-audit-signal.port.ts";
 import type { GovernanceClickHouseResolverPort } from "../ports/ingestion-source-activity.port.ts";
 import type {
   IngestionSourceEntitlementsPort,
@@ -49,7 +49,7 @@ import type {
   IngestionKeyRepository,
 } from "../ports/ingestion-source-key.port.ts";
 import type { PersonalUsageReaderPort } from "../ports/personal-usage.port.ts";
-import type { PersonalVirtualKeyIssuerPort } from "../ports/personal-virtual-key.port.ts";
+import type { PersonalVirtualKeyIssuerPort } from "../ports/personal-usage.port.ts";
 import type {
   QuarantineTenantPort,
   QuarantineTraceActivityPort,

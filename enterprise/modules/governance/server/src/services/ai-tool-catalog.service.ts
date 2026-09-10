@@ -74,9 +74,9 @@ export class DefaultGovernanceAiToolCatalogService {
     return this.repository.listAdmin(parsed.organizationId);
   }
 
-  async tryFindById(input: FindAiToolEntryInput): Promise<AiToolEntry | null> {
+  async findById(input: FindAiToolEntryInput): Promise<AiToolEntry | null> {
     const parsed = findAiToolEntryInputSchema.parse(input);
-    const entry = await this.repository.tryFindById(parsed.id);
+    const entry = await this.repository.findById(parsed.id);
 
     return entry?.organizationId === parsed.organizationId ? entry : null;
   }
@@ -294,7 +294,7 @@ export class DefaultGovernanceAiToolCatalogService {
   }
 
   private async getOwn(id: string, organizationId: string): Promise<AiToolEntry> {
-    const entry = await this.repository.tryFindById(id);
+    const entry = await this.repository.findById(id);
     if (!entry || entry.organizationId !== organizationId) {
       throw new AiToolEntryNotFoundError(id, organizationId);
     }

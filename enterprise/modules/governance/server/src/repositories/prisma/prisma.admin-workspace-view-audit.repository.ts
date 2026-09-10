@@ -4,7 +4,7 @@ import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceAuditRow,
   type AdminWorkspaceTarget,
-} from "../../ports/admin-workspace-view-audit.port.ts";
+} from "../audit/admin-workspace-view-audit.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -23,7 +23,7 @@ export class PrismaAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewA
     return new PrismaAdminWorkspaceViewAuditRepository(database);
   }
 
-  async tryFindTarget(input: {
+  async findTarget(input: {
     teamId: string;
     actorUserId: string;
   }): Promise<AdminWorkspaceTarget | null> {

@@ -7,7 +7,7 @@ import type {
   PersonalVirtualKey,
   RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceDirectoryProject } from "../../ports/governance-directory.port.ts";
+import type { GovernanceDirectoryProject } from "../directory/governance-directory.repository.ts";
 
 /** A seat in an organization, and whether it still answers as active. */
 export type MemoryGovernanceMember = {

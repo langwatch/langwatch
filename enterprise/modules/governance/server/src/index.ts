@@ -12,7 +12,7 @@ export {
   GovernanceDirectoryPort,
   type GovernanceDirectoryProject,
   type GovernanceMembershipStatus,
-} from "./ports/governance-directory.port.ts";
+} from "./repositories/directory/governance-directory.repository.ts";
 export type { PersonalUsageRollup } from "./services/personal-usage-dashboard.service.ts";
 /**
  * The landing decision, re-exported beside the service it gathers signals from.
@@ -55,35 +55,36 @@ export * from "./ports/gateway-debit.port.ts";
 export * from "./ports/governance-budget-overview.port.ts";
 export * from "./ports/governance-eventing.port.ts";
 export * from "./ports/ingestion-source-activity.port.ts";
-export * from "./ports/admin-workspace-view-audit.port.ts";
+export * from "./repositories/audit/admin-workspace-view-audit.repository.ts";
 export * from "./ports/ai-tool-catalog.port.ts";
 export * from "./ports/cli-bootstrap.port.ts";
 export * from "./ports/cli-token-store.port.ts";
-export * from "./ports/anomaly-rule.port.ts";
-export * from "./ports/department.port.ts";
+export * from "./repositories/policy/anomaly-rule.repository.ts";
+export * from "./repositories/directory/department.repository.ts";
 export * from "./ports/anomaly-alert-http.port.ts";
 export * from "./ports/governance-diagnostics.port.ts";
 export * from "./ports/governance-encryption.port.ts";
 export * from "./ports/governance-http.port.ts";
 export * from "./ports/governance-object-storage.port.ts";
 export * from "./ports/governance-signal.port.ts";
-export * from "./ports/governance-setup-state.port.ts";
+export * from "./repositories/audit/governance-setup-state.repository.ts";
 export * from "./ports/governance-webhook.port.ts";
 export * from "./ports/ingestion-pull.port.ts";
 export * from "./ports/ingestion-pull-lifecycle.port.ts";
 export * from "./ports/ingestion-pull-worker.port.ts";
 export * from "./ports/ingestion-source.port.ts";
 export * from "./ports/ingestion-template.port.ts";
-export * from "./ports/ocsf-export.port.ts";
+export * from "./ports/governance-audit-signal.port.ts";
 export * from "./ports/ingestion-source-key.port.ts";
 export * from "./ports/personal-usage.port.ts";
-export * from "./ports/personal-virtual-key.port.ts";
+export * from "./repositories/directory/personal-virtual-key.repository.ts";
 export * from "./ports/pulled-usage-ledger.port.ts";
 export * from "./ports/pulled-usage-rate.port.ts";
 export * from "./ports/quarantine-fill.port.ts";
-export * from "./ports/routing-policy.port.ts";
-export * from "./ports/session-policy.port.ts";
+export * from "./repositories/policy/routing-policy.repository.ts";
+export * from "./repositories/policy/session-policy.repository.ts";
 export * from "./ports/spend-spike-anomaly.port.ts";
+export * from "./repositories/policy/spend-spike-anomaly.repository.ts";
 export * from "./ports/governance-subscriber.port.ts";
 export {
   AUTOMATION_MATCH_RECORDS_METRIC_DESCRIPTION,

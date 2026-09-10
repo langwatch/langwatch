@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AnomalyRulePort } from "../ports/anomaly-rule.port.ts";
-import type { DepartmentPort } from "../ports/department.port.ts";
-import type { GovernanceDirectoryPort } from "../ports/governance-directory.port.ts";
-import type { GovernanceOcsfExportRepository } from "../ports/ocsf-export.port.ts";
-import type { GovernanceSetupStateRepository } from "../ports/governance-setup-state.port.ts";
-import type { OrganizationSessionPolicyPort } from "../ports/session-policy.port.ts";
-import type { PersonalVirtualKeyRepository } from "../ports/personal-virtual-key.port.ts";
-import type { RoutingPolicyPort } from "../ports/routing-policy.port.ts";
-import type { SpendSpikeAnomalyRepository } from "../ports/spend-spike-anomaly.port.ts";
-import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
+import type { AnomalyRulePort } from "./policy/anomaly-rule.repository.ts";
+import type { DepartmentPort } from "./directory/department.repository.ts";
+import type { GovernanceDirectoryPort } from "./directory/governance-directory.repository.ts";
+import type { GovernanceOcsfExportRepository } from "./audit/governance-setup-state.repository.ts";
+import type { GovernanceSetupStateRepository } from "./audit/governance-setup-state.repository.ts";
+import type { OrganizationSessionPolicyPort } from "./policy/session-policy.repository.ts";
+import type { PersonalVirtualKeyRepository } from "./directory/personal-virtual-key.repository.ts";
+import type { RoutingPolicyPort } from "./policy/routing-policy.repository.ts";
+import type { SpendSpikeAnomalyRepository } from "./policy/spend-spike-anomaly.repository.ts";
+import type { OrganizationSupportContactRepository } from "./directory/organization-support-contact.repository.ts";
 
 /**
  * The rows the governance module owns, chosen once at boot.

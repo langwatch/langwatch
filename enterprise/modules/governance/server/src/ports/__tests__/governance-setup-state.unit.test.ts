@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import { GovernanceSetupActivityPort } from "../governance-audit-signal.port.ts";
 import {
-  GovernanceSetupActivityPort,
   GovernanceSetupStateRepository,
   type GovernanceSetupCounts,
-} from "../governance-setup-state.port.ts";
+} from "../../repositories/audit/governance-setup-state.repository.ts";
 import { DefaultGovernanceSetupStateService } from "../../services/governance-setup-state.service.ts";
 
 const emptyCounts = (): GovernanceSetupCounts => ({

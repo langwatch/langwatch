@@ -22,7 +22,7 @@ const credentials = IngestionCredentialsService.create(new ReversibleEncryption(
 describe("ingestionCredentials", () => {
   describe("given a parserConfig with plaintext credentials", () => {
     it("encrypts the credentials subtree to a tagged string and leaves other keys", () => {
-      const out = credentials.tryEncryptParserConfig({
+      const out = credentials.encryptParserConfig({
         ottlStatements: ["keep me"],
         credentials: {
           aws_access_key_id: "AKIA",
@@ -36,15 +36,15 @@ describe("ingestionCredentials", () => {
 
     it("round-trips back to the original object", () => {
       const creds = { token: "bearer-xyz" };
-      const out = credentials.tryEncryptParserConfig({ credentials: creds })!;
+      const out = credentials.encryptParserConfig({ credentials: creds })!;
       expect(credentials.decrypt(out.credentials)).toEqual(creds);
     });
 
     it("is idempotent — an already-encrypted value is left untouched", () => {
-      const once = credentials.tryEncryptParserConfig({
+      const once = credentials.encryptParserConfig({
         credentials: { token: "t" },
       })!;
-      const twice = credentials.tryEncryptParserConfig(once)!;
+      const twice = credentials.encryptParserConfig(once)!;
       expect(twice.credentials).toBe(once.credentials);
     });
   });
@@ -52,12 +52,12 @@ describe("ingestionCredentials", () => {
   describe("given a parserConfig without credentials", () => {
     it("returns it unchanged", () => {
       const cfg = { ottlStatements: ["x"] };
-      expect(credentials.tryEncryptParserConfig(cfg)).toEqual(cfg);
+      expect(credentials.encryptParserConfig(cfg)).toEqual(cfg);
     });
 
     it("passes null/undefined through", () => {
-      expect(credentials.tryEncryptParserConfig(null)).toBeNull();
-      expect(credentials.tryEncryptParserConfig(undefined)).toBeUndefined();
+      expect(credentials.encryptParserConfig(null)).toBeNull();
+      expect(credentials.encryptParserConfig(undefined)).toBeUndefined();
     });
   });
 
@@ -77,7 +77,7 @@ describe("ingestionCredentials", () => {
     /** @scenario "The Admin API key is never stored in plain text" */
     it("stores the key encrypted, unreadable from the serialised config", () => {
       const token = "sk-admin-abcdef123456";
-      const out = credentials.tryEncryptParserConfig({
+      const out = credentials.encryptParserConfig({
         adapter: "openai_admin",
         report: "cost",
         credentials: { token },

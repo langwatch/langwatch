@@ -53,11 +53,11 @@ class MemoryIngestionTemplateRepository extends IngestionTemplatePort {
     return [template()];
   }
 
-  async tryFindVisible(): Promise<IngestionTemplate | null> {
+  async findVisible(): Promise<IngestionTemplate | null> {
     return template();
   }
 
-  async tryFindPlatform(): Promise<IngestionTemplate | null> {
+  async findPlatform(): Promise<IngestionTemplate | null> {
     return template({ organizationId: null, platformPublished: true });
   }
 

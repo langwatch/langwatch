@@ -75,21 +75,21 @@ export class IngestionSourceService {
     return this.repository.list(organizationId);
   }
 
-  async tryFindById({
+  async findById({
     id,
     organizationId,
   }: {
     id: string;
     organizationId: string;
   }): Promise<GovernanceIngestionSource | null> {
-    const row = await this.repository.tryFindById(id);
+    const row = await this.repository.findById(id);
 
     return row?.organizationId === organizationId ? row : null;
   }
 
-  async tryFindByIngestSecret(rawSecret: string): Promise<GovernanceIngestionSource | null> {
+  async findByIngestSecret(rawSecret: string): Promise<GovernanceIngestionSource | null> {
     const candidateHash = this.secrets.hash(rawSecret);
-    const direct = await this.repository.tryFindByCurrentSecretHash(candidateHash);
+    const direct = await this.repository.findByCurrentSecretHash(candidateHash);
     if (direct) {
       return direct;
     }
@@ -151,7 +151,7 @@ export class IngestionSourceService {
       organizationId: input.organizationId,
       traceProjectId: input.traceProjectId,
     });
-    const parserConfig = this.credentials.tryEncryptParserConfig(requestedParserConfig) ?? {};
+    const parserConfig = this.credentials.encryptParserConfig(requestedParserConfig) ?? {};
     const source = await this.repository.create({
       organizationId: input.organizationId,
       teamId: input.teamId ?? null,
@@ -192,11 +192,11 @@ export class IngestionSourceService {
       this.validation.assertAdapterUnchanged(existing.parserConfig, incoming);
       cursorMustNotMove = this.validation.assertReportUnchangedOncePulled(existing, incoming);
       this.destinations.assertAllowed(incoming);
-      update.parserConfig = this.credentials.tryEncryptParserConfig(incoming) ?? incoming;
+      update.parserConfig = this.credentials.encryptParserConfig(incoming) ?? incoming;
     }
 
     const source = cursorMustNotMove
-      ? await this.repository.tryUpdateIfCursorUnchanged({
+      ? await this.repository.updateIfCursorUnchanged({
           id: existing.id,
           cursor: existing.pollerCursor,
           update,
@@ -293,7 +293,7 @@ export class IngestionSourceService {
     }
 
     const ingestSecret = this.secrets.generate();
-    const parserConfig = this.credentials.tryEncryptParserConfig({
+    const parserConfig = this.credentials.encryptParserConfig({
       ...existing.parserConfig,
       _rotation: {
         priorHash: existing.ingestSecretHash,
@@ -341,7 +341,7 @@ export class IngestionSourceService {
     id: string;
     organizationId: string;
   }): Promise<GovernanceIngestionSource> {
-    const source = await this.tryFindById({ id, organizationId });
+    const source = await this.findById({ id, organizationId });
     if (!source) {
       throw new IngestionSourceNotFoundError(id);
     }

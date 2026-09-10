@@ -5,7 +5,7 @@ import {
   RoutingPolicyProviderScopeError,
   type RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
-import { RoutingPolicyPort } from "../routing-policy.port.ts";
+import { RoutingPolicyPort } from "../../repositories/policy/routing-policy.repository.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../../services/governance-routing.service.ts";
 
 const policy: RoutingPolicy = {
@@ -30,10 +30,10 @@ class MemoryRoutingPolicyRepository extends RoutingPolicyPort {
   create = vi.fn(async () => policy);
   update = vi.fn(async () => policy);
   list = vi.fn(async () => [policy]);
-  tryFindById = vi.fn(async () => policy);
+  findById = vi.fn(async () => policy);
   setDefault = vi.fn(async () => policy);
   delete = vi.fn(async () => undefined);
-  tryResolveDefaultForUser = vi.fn(async () => policy);
+  findDefaultForUser = vi.fn(async () => policy);
   countReachableModelProviders = vi.fn(async () => this.reachable);
 }
 

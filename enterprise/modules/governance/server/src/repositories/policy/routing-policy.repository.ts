@@ -10,7 +10,7 @@ import type {
 
 export abstract class RoutingPolicyPort {
   abstract list(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
-  abstract tryFindById(id: string): Promise<RoutingPolicy | null>;
+  abstract findById(id: string): Promise<RoutingPolicy | null>;
   abstract countReachableModelProviders(input: {
     organizationId: string;
     modelProviderIds: string[];
@@ -19,7 +19,7 @@ export abstract class RoutingPolicyPort {
   abstract update(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy>;
   abstract setDefault(input: SetDefaultRoutingPolicyInput): Promise<RoutingPolicy>;
   abstract delete(input: DeleteRoutingPolicyInput): Promise<void>;
-  abstract tryResolveDefaultForUser(
+  abstract findDefaultForUser(
     input: ResolveDefaultRoutingPolicyInput,
   ): Promise<RoutingPolicy | null>;
 }

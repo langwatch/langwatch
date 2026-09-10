@@ -5,7 +5,7 @@ import {
   GovernanceDirectoryPort,
   type GovernanceDirectoryProject,
   type GovernanceMembershipStatus,
-} from "../../ports/governance-directory.port.ts";
+} from "../directory/governance-directory.repository.ts";
 
 type Database = Pick<PrismaClient, "user" | "organizationUser" | "project">;
 
@@ -47,7 +47,7 @@ export class PrismaGovernanceDirectoryRepository extends GovernanceDirectoryPort
     return membership ? "active" : "not_org_member";
   }
 
-  async tryFindPersonProfile(
+  async findPersonProfile(
     userId: string,
   ): Promise<{ name: string | null; email: string | null } | null> {
     return await this.database.user.findUnique({
@@ -56,7 +56,7 @@ export class PrismaGovernanceDirectoryRepository extends GovernanceDirectoryPort
     });
   }
 
-  async tryFindOrganizationIdByProjectApiKey(apiKey: string): Promise<string | null> {
+  async findOrganizationIdByProjectApiKey(apiKey: string): Promise<string | null> {
     const project = await this.database.project.findUnique({
       where: { apiKey, archivedAt: null },
       select: { team: { select: { organizationId: true } } },
@@ -64,7 +64,7 @@ export class PrismaGovernanceDirectoryRepository extends GovernanceDirectoryPort
     return project?.team.organizationId ?? null;
   }
 
-  async tryFindMemberIdByEmail({
+  async findMemberIdByEmail({
     email,
     organizationId,
   }: {
@@ -78,7 +78,7 @@ export class PrismaGovernanceDirectoryRepository extends GovernanceDirectoryPort
     return user?.id ?? null;
   }
 
-  async tryFindLiveProjectBySlug({
+  async findLiveProjectBySlug({
     slug,
     organizationId,
   }: {
@@ -91,7 +91,7 @@ export class PrismaGovernanceDirectoryRepository extends GovernanceDirectoryPort
     });
   }
 
-  async tryFindLiveProjectByRef({
+  async findLiveProjectByRef({
     projectRef,
     organizationId,
   }: {

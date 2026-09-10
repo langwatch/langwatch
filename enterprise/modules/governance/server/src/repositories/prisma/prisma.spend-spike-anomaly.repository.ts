@@ -5,7 +5,7 @@ import {
   type SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { SpendSpikeAnomalyRepository } from "../../ports/spend-spike-anomaly.port.ts";
+import { SpendSpikeAnomalyRepository } from "../policy/spend-spike-anomaly.repository.ts";
 import { toDate, type Instant } from "@langwatch/time";
 
 const GOVERNANCE_PROJECT_KIND = "internal_governance";
@@ -39,7 +39,7 @@ export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     return rows.map((row) => anomalyRuleSchema.parse(row));
   }
 
-  async tryResolveGovernanceTenantId(organizationId: string): Promise<string | null> {
+  async findGovernanceTenantId(organizationId: string): Promise<string | null> {
     const project = await this.prisma.project.findFirst({
       where: {
         kind: GOVERNANCE_PROJECT_KIND,

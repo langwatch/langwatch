@@ -6,7 +6,7 @@ import {
   AnomalyRulePort,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
-} from "../../ports/anomaly-rule.port.ts";
+} from "../policy/anomaly-rule.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
 const ANOMALY_RULE_KSUID_RESOURCE = "anomrule";
@@ -27,7 +27,7 @@ export class MemoryAnomalyRuleRepository extends AnomalyRulePort {
     );
   }
 
-  async tryFindById(id: string): Promise<AnomalyRule | null> {
+  async findById(id: string): Promise<AnomalyRule | null> {
     return this.store.anomalyRules.find((rule) => rule.id === id) ?? null;
   }
 

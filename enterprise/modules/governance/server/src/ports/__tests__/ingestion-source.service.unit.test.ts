@@ -62,8 +62,8 @@ class FakeSourceRepository extends IngestionSourceRepository {
   createInput: CreateIngestionSourceRecord | null = null;
   updateInput: UpdateIngestionSourceRecord | null = null;
   list = vi.fn(async () => [this.row]);
-  tryFindById = vi.fn(async () => this.row);
-  tryFindByCurrentSecretHash = vi.fn(async () => null);
+  findById = vi.fn(async () => this.row);
+  findByCurrentSecretHash = vi.fn(async () => null);
   findByPriorSecretHash = vi.fn(async () => []);
   countLive = vi.fn(async () => 0);
   create = vi.fn(async (input: CreateIngestionSourceRecord) => {
@@ -76,7 +76,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
     this.row = source({ ...this.row, ...rowPatchOf(input) });
     return this.row;
   });
-  tryUpdateIfCursorUnchanged = vi.fn(
+  updateIfCursorUnchanged = vi.fn(
     async (input: {
       update: UpdateIngestionSourceRecord;
     }): Promise<GovernanceIngestionSource | null> => {
@@ -339,7 +339,7 @@ describe("IngestionSourceService", () => {
       parserConfig: { report: "cost" },
     });
 
-    expect(repository.tryUpdateIfCursorUnchanged).toHaveBeenCalledWith({
+    expect(repository.updateIfCursorUnchanged).toHaveBeenCalledWith({
       id: "source-1",
       cursor: null,
       update: expect.objectContaining({
@@ -355,7 +355,7 @@ describe("IngestionSourceService", () => {
       parserConfig: { adapter: "anthropic_admin", report: "usage" },
       pollerCursor: null,
     });
-    repository.tryUpdateIfCursorUnchanged.mockResolvedValueOnce(null);
+    repository.updateIfCursorUnchanged.mockResolvedValueOnce(null);
 
     await expect(
       service.updateSource({

@@ -10,7 +10,7 @@ import type {
   UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
-import { RoutingPolicyPort } from "../../ports/routing-policy.port.ts";
+import { RoutingPolicyPort } from "../policy/routing-policy.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
 const ROUTING_POLICY_KSUID_RESOURCE = "routepol";
@@ -41,7 +41,7 @@ export class MemoryRoutingPolicyRepository extends RoutingPolicyPort {
     });
   }
 
-  async tryFindById(id: string): Promise<RoutingPolicy | null> {
+  async findById(id: string): Promise<RoutingPolicy | null> {
     return this.store.routingPolicies.find((policy) => policy.id === id) ?? null;
   }
 
@@ -111,7 +111,7 @@ export class MemoryRoutingPolicyRepository extends RoutingPolicyPort {
     this.store.routingPolicies.splice(this.indexOfOwned(input), 1);
   }
 
-  async tryResolveDefaultForUser(
+  async findDefaultForUser(
     input: ResolveDefaultRoutingPolicyInput,
   ): Promise<RoutingPolicy | null> {
     return (

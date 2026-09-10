@@ -44,7 +44,7 @@ class TestRatePort {
 const pulledUsageRecords = PulledUsageRecordService.create(
   PulledUsagePricingService.create(new TestRatePort()),
 );
-const buildPulledUsageRecord = pulledUsageRecords.tryBuild.bind(pulledUsageRecords);
+const buildPulledUsageRecord = pulledUsageRecords.findBuilt.bind(pulledUsageRecords);
 
 function makePuller(): AnthropicAdminPullerAdapter {
   return AnthropicAdminPullerAdapter.create(new TestHttpPort());

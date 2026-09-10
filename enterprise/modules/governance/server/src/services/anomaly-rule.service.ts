@@ -12,7 +12,7 @@ import {
   validateDestinationConfig,
   validateThresholdConfig,
 } from "@langwatch/enterprise-governance-contract";
-import type { AnomalyRuleChanges, AnomalyRulePort } from "../ports/anomaly-rule.port.ts";
+import type { AnomalyRuleChanges, AnomalyRulePort } from "../repositories/policy/anomaly-rule.repository.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 export class AnomalyRuleService {
@@ -29,14 +29,14 @@ export class AnomalyRuleService {
     return this.repository.list(organizationId);
   }
 
-  async tryFindById({
+  async findById({
     id,
     organizationId,
   }: {
     id: string;
     organizationId: string;
   }): Promise<AnomalyRule | null> {
-    const row = await this.repository.tryFindById(id);
+    const row = await this.repository.findById(id);
     if (!row || row.organizationId !== organizationId) {
       return null;
     }
@@ -56,7 +56,7 @@ export class AnomalyRuleService {
     id: string;
     organizationId: string;
   }): Promise<AnomalyRule> {
-    const existing = await this.tryFindById({ id, organizationId });
+    const existing = await this.findById({ id, organizationId });
     if (!existing) {
       throw new AnomalyRuleNotFoundError(id);
     }

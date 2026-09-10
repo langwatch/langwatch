@@ -26,23 +26,23 @@ export abstract class GovernanceDirectoryPort {
     organizationId: string;
   }): Promise<GovernanceMembershipStatus>;
 
-  abstract tryFindPersonProfile(
+  abstract findPersonProfile(
     userId: string,
   ): Promise<{ name: string | null; email: string | null } | null>;
 
-  abstract tryFindOrganizationIdByProjectApiKey(apiKey: string): Promise<string | null>;
+  abstract findOrganizationIdByProjectApiKey(apiKey: string): Promise<string | null>;
 
-  abstract tryFindMemberIdByEmail(params: {
+  abstract findMemberIdByEmail(params: {
     email: string;
     organizationId: string;
   }): Promise<string | null>;
 
-  abstract tryFindLiveProjectBySlug(params: {
+  abstract findLiveProjectBySlug(params: {
     slug: string;
     organizationId: string;
   }): Promise<(GovernanceDirectoryProject & { apiKey: string }) | null>;
 
-  abstract tryFindLiveProjectByRef(params: {
+  abstract findLiveProjectByRef(params: {
     projectRef: string;
     organizationId: string;
   }): Promise<GovernanceDirectoryProject | null>;

@@ -35,7 +35,7 @@ export type GovernanceOcsfEventInput = {
 };
 
 export abstract class IngestionPullSourcePort {
-  abstract tryFindById(id: string): Promise<GovernanceIngestionSource | null>;
+  abstract findById(id: string): Promise<GovernanceIngestionSource | null>;
 }
 
 export abstract class GovernanceOcsfEventSinkPort {

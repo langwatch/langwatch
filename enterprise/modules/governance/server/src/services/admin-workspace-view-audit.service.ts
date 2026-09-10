@@ -7,10 +7,8 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
-import type {
-  AdminWorkspaceViewAuditRepository,
-  AdminWorkspaceViewOcsfPort,
-} from "../ports/admin-workspace-view-audit.port.ts";
+import type { AdminWorkspaceViewOcsfPort } from "../ports/governance-audit-signal.port.ts";
+import type { AdminWorkspaceViewAuditRepository } from "../repositories/audit/admin-workspace-view-audit.repository.ts";
 
 const skipped = (): RecordWorkspaceViewResult => ({
   recorded: false,
@@ -43,7 +41,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
 
   async recordView(input: RecordWorkspaceViewInput): Promise<RecordWorkspaceViewResult> {
     const parsed = recordWorkspaceViewInputSchema.parse(input);
-    const team = await this.repository.tryFindTarget({
+    const team = await this.repository.findTarget({
       teamId: parsed.targetTeamId,
       actorUserId: parsed.actorUserId,
     });

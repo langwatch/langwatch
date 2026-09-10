@@ -20,7 +20,7 @@ import {
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import type { RoutingPolicyPort } from "../ports/routing-policy.port.ts";
+import type { RoutingPolicyPort } from "../repositories/policy/routing-policy.repository.ts";
 
 const MOVING_MODEL_NAME = /^(openai|anthropic|gemini)\/(latest|latest-mini)$/;
 
@@ -35,16 +35,16 @@ export class DefaultGovernanceRoutingPolicyService {
     return this.repository.list(listRoutingPoliciesInputSchema.parse(input));
   }
 
-  async tryFindById(input: FindRoutingPolicyInput): Promise<RoutingPolicy | null> {
+  async findById(input: FindRoutingPolicyInput): Promise<RoutingPolicy | null> {
     const parsed = findRoutingPolicyInputSchema.parse(input);
-    const policy = await this.repository.tryFindById(parsed.id);
+    const policy = await this.repository.findById(parsed.id);
 
     return policy?.organizationId === parsed.organizationId ? policy : null;
   }
 
   async getById(input: FindRoutingPolicyInput): Promise<RoutingPolicy> {
     const parsed = findRoutingPolicyInputSchema.parse(input);
-    const policy = await this.tryFindById(parsed);
+    const policy = await this.findById(parsed);
     if (!policy) {
       throw new RoutingPolicyNotFoundError(parsed.id);
     }
@@ -97,8 +97,8 @@ export class DefaultGovernanceRoutingPolicyService {
     return this.repository.delete(parsed);
   }
 
-  tryResolveDefaultForUser(input: ResolveDefaultRoutingPolicyInput): Promise<RoutingPolicy | null> {
-    return this.repository.tryResolveDefaultForUser(
+  findDefaultForUser(input: ResolveDefaultRoutingPolicyInput): Promise<RoutingPolicy | null> {
+    return this.repository.findDefaultForUser(
       resolveDefaultRoutingPolicyInputSchema.parse(input),
     );
   }

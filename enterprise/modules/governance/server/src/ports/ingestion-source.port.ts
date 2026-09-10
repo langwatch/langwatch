@@ -33,8 +33,8 @@ export type UpdateIngestionSourceRecord = {
 
 export abstract class IngestionSourceRepository {
   abstract list(organizationId: string): Promise<GovernanceIngestionSource[]>;
-  abstract tryFindById(id: string): Promise<GovernanceIngestionSource | null>;
-  abstract tryFindByCurrentSecretHash(hash: string): Promise<GovernanceIngestionSource | null>;
+  abstract findById(id: string): Promise<GovernanceIngestionSource | null>;
+  abstract findByCurrentSecretHash(hash: string): Promise<GovernanceIngestionSource | null>;
   abstract findByPriorSecretHash(hash: string): Promise<GovernanceIngestionSource[]>;
   abstract countLive(organizationId: string): Promise<number>;
   abstract create(input: CreateIngestionSourceRecord): Promise<GovernanceIngestionSource>;
@@ -42,7 +42,7 @@ export abstract class IngestionSourceRepository {
     id: string,
     input: UpdateIngestionSourceRecord,
   ): Promise<GovernanceIngestionSource>;
-  abstract tryUpdateIfCursorUnchanged(input: {
+  abstract updateIfCursorUnchanged(input: {
     id: string;
     cursor: unknown;
     update: UpdateIngestionSourceRecord;

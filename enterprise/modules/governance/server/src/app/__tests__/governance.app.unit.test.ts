@@ -71,7 +71,7 @@ function buildApp(overrides: Partial<TestGovernanceService> = {}) {
       hasActivePersonalKeyLabelled:
         unreachable<GovernancePersonalVirtualKeyPorts["hasActivePersonalKeyLabelled"]>(),
     },
-    actors: { tryFindUser: unreachable<GovernanceActorDirectory["tryFindUser"]>() },
+    actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
   });
 
   return { app, getOrganizationId };

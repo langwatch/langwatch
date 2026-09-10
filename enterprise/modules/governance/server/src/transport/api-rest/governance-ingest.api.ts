@@ -56,7 +56,7 @@ import {
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { parseOtlpLogs, parseOtlpMetrics, parseOtlpTraces, readOtlpBody } from "@langwatch/otlp";
-import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port.ts";
+import type { GovernanceDirectoryPort } from "../../repositories/directory/governance-directory.repository.ts";
 import type { GovernanceProjectPort } from "../../ports/governance-project.port.ts";
 import type {
   IExportLogsServiceRequest,
@@ -954,7 +954,7 @@ async function priceCostEvents(input: {
       // still rolls up at organization, team and project scope.
       let principalUserId: string | null = null;
       if (event.userEmail) {
-        principalUserId = await directory.tryFindMemberIdByEmail({
+        principalUserId = await directory.findMemberIdByEmail({
           email: event.userEmail,
           organizationId: source.organizationId,
         });

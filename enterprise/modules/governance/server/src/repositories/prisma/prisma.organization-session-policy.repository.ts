@@ -2,7 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   OrganizationSessionPolicyPort,
   type OrganizationSessionPolicy,
-} from "../../ports/session-policy.port.ts";
+} from "../policy/session-policy.repository.ts";
 
 export class PrismaOrganizationSessionPolicyRepository extends OrganizationSessionPolicyPort {
   private constructor(private readonly prisma: PrismaClient) {

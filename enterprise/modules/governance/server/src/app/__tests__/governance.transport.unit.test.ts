@@ -156,7 +156,7 @@ function buildApi(
       hasActivePersonalKeyLabelled:
         unreachable<GovernancePersonalVirtualKeyPorts["hasActivePersonalKeyLabelled"]>(),
     },
-    actors: { tryFindUser: unreachable<GovernanceActorDirectory["tryFindUser"]>() },
+    actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
   });
 
   const built = spine(options.grants ?? ["aiTools:view", "aiTools:manage"]);

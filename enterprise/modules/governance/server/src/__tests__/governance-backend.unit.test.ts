@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PostgresGovernanceAdapter } from "../adapters/postgres.governance.adapter.ts";
 import { GovernanceEncryptionPort } from "../ports/governance-encryption.port.ts";
-import { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
+import { CostAttributionPolicyRepository } from "../repositories/policy/cost-attribution-policy.repository.ts";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
@@ -79,7 +79,7 @@ describe("governance backend services", () => {
 
   it("encrypts only the credential subtree and tolerates legacy plaintext", () => {
     const service = IngestionCredentialsService.create(new ReversibleEncryption());
-    const sealed = service.tryEncryptParserConfig({
+    const sealed = service.encryptParserConfig({
       adapter: "http_polling",
       credentials: { token: "secret" },
     });

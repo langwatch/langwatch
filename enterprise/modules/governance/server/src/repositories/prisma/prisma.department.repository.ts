@@ -4,7 +4,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { DepartmentPort } from "../../ports/department.port.ts";
+import { DepartmentPort } from "../directory/department.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -32,7 +32,7 @@ export class PrismaDepartmentRepository extends DepartmentPort {
     return rows.map((row) => departmentSchema.parse(row));
   }
 
-  async tryGetById(input: { id: string; organizationId: string }): Promise<Department | null> {
+  async findById(input: { id: string; organizationId: string }): Promise<Department | null> {
     const row = await this.prisma.department.findFirst({
       where: { ...input, archivedAt: null },
     });

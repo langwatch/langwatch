@@ -35,7 +35,7 @@ const tile: AiToolEntry = {
 class MemoryCatalog extends AiToolCatalogRepository {
   listVisible = vi.fn(async () => [tile]);
   listAdmin = vi.fn(async () => [tile]);
-  tryFindById = vi.fn(async () => tile);
+  findById = vi.fn(async () => tile);
   departmentsBelongToOrganization = vi.fn(async () => true);
   create = vi.fn(async () => tile);
   update = vi.fn(async () => tile);

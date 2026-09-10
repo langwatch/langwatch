@@ -61,7 +61,7 @@ function makePuller(): OpenAiAdminPullerAdapter {
 const usageRecords = PulledUsageRecordService.create(
   PulledUsagePricingService.create(new TestRatePort()),
 );
-const buildPulledUsageRecord = usageRecords.tryBuild.bind(usageRecords);
+const buildPulledUsageRecord = usageRecords.findBuilt.bind(usageRecords);
 
 const SOURCE = {
   ingestionSourceId: "src_1",

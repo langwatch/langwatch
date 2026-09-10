@@ -4,7 +4,7 @@ import {
   GovernanceDirectoryPort,
   type GovernanceDirectoryProject,
   type GovernanceMembershipStatus,
-} from "../../ports/governance-directory.port.ts";
+} from "../directory/governance-directory.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
 /** The directory twin: identity, membership and project rows from one store. */
@@ -32,18 +32,18 @@ export class MemoryGovernanceDirectoryRepository extends GovernanceDirectoryPort
     return seat.deactivated ? "user_deactivated" : "active";
   }
 
-  async tryFindPersonProfile(
+  async findPersonProfile(
     userId: string,
   ): Promise<{ name: string | null; email: string | null } | null> {
     const person = this.store.people.get(userId);
     return person ? { name: person.name, email: person.email } : null;
   }
 
-  async tryFindOrganizationIdByProjectApiKey(apiKey: string): Promise<string | null> {
+  async findOrganizationIdByProjectApiKey(apiKey: string): Promise<string | null> {
     return this.store.projects.find((project) => project.apiKey === apiKey)?.organizationId ?? null;
   }
 
-  async tryFindMemberIdByEmail(params: {
+  async findMemberIdByEmail(params: {
     email: string;
     organizationId: string;
   }): Promise<string | null> {
@@ -54,7 +54,7 @@ export class MemoryGovernanceDirectoryRepository extends GovernanceDirectoryPort
     return null;
   }
 
-  async tryFindLiveProjectBySlug(params: {
+  async findLiveProjectBySlug(params: {
     slug: string;
     organizationId: string;
   }): Promise<(GovernanceDirectoryProject & { apiKey: string }) | null> {
@@ -67,7 +67,7 @@ export class MemoryGovernanceDirectoryRepository extends GovernanceDirectoryPort
     return { ...this.view(project), apiKey: project.apiKey };
   }
 
-  async tryFindLiveProjectByRef(params: {
+  async findLiveProjectByRef(params: {
     projectRef: string;
     organizationId: string;
   }): Promise<GovernanceDirectoryProject | null> {
