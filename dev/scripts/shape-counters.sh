@@ -10,5 +10,5 @@ apiside=$(git ls-tree -r --name-only HEAD apps/api/src/features | grep -cE '\.(c
 portsfiles=$(git ls-tree -r --name-only HEAD modules packages/enterprise/features | grep -E "/(ports|adapters)/[^/]+\.ts$" | grep -v __tests__ | wc -l | tr -d " ")
 main=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo "?")
 boot=$(ls ${TMPDIR:-/tmp}/langwatch-boot-ok 2>/dev/null >/dev/null && cat ${TMPDIR:-/tmp}/langwatch-boot-ok || echo "unknown")
-dirty=$(git status --porcelain | grep -v "^\?\? \.rtk" | wc -l | tr -d " ")
+dirty=$(git status --porcelain --untracked-files=all | awk 'substr($0, 4) !~ /^\.rtk(\/|$)/ { count++ } END { print count+0 }')
 echo "dirty=$dirty legacy_files=$legacy modules_on_legacy=$mods feature_shape_rows=$rows families_absent=$absent api_side_files=$apiside ports_adapters_files=$portsfiles main_unfolded=$main api_boot=$boot head=$(git log --format=%h -1)"
