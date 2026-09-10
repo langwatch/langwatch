@@ -10,7 +10,7 @@ import {
   type CodingAgentScopeProject,
 } from "@langwatch/coding-agent-server";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
-import { PostgresGithubAdapter, type GithubDatabase } from "@langwatch/github-server";
+import { composeGithubApi, PostgresGithubRepositories } from "@langwatch/github-server";
 import { GithubApi, type GithubServerConfig } from "@langwatch/github-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
@@ -40,7 +40,7 @@ export type WorkerCodingAgent = Readonly<{
  * processing adapter over the same tenant-keyed ClickHouse storage.
  */
 export async function createWorkerCodingAgentApp(options: {
-  database: PrismaConnection["client"] & GithubDatabase;
+  database: PrismaConnection["client"];
   organizations: OrganizationApi;
   projects: ProjectApi;
   authorization: AuthzApi;
@@ -51,8 +51,8 @@ export async function createWorkerCodingAgentApp(options: {
   github: GithubServerConfig;
   signingKey: string;
 }): Promise<WorkerCodingAgent> {
-  const github = PostgresGithubAdapter.create({
-    database: options.database,
+  const github = composeGithubApi({
+    repositories: PostgresGithubRepositories.create({ prisma: options.database }),
     redis: options.redis,
     organization: options.organizations,
     project: options.projects,

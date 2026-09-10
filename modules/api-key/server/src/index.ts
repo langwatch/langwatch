@@ -1,8 +1,8 @@
 export { ApiKeyBindingIdAdapter } from "./adapters/api-key-binding-id.adapter.ts";
 export {
-  type AgentSandboxKeyReapDatabase,
-  PostgresAgentSandboxKeyReapAdapter,
-} from "./adapters/postgres.agent-sandbox-key-reap.adapter.ts";
+  PrismaApiKeyRepository,
+  type PrismaApiKeyDatabase,
+} from "./repositories/prisma/prisma.api-key.repository.ts";
 export { ApiKeyDiagnosticsAdapter } from "./adapters/api-key-diagnostics.adapter.ts";
 export {
   type AgentSandboxMaintenancePipelineDeps,

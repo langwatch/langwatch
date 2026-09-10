@@ -2,7 +2,7 @@
  * Whether a process that holds a database and one project seam can run the
  * demand half of pull-request linkage.
  *
- * Demand was reachable only through `PostgresGithubAdapter`, which takes an
+ * Demand was reachable only through `composeGithubApi`, which takes an
  * `OrganizationService` and a full `ProjectApi`. It genuinely needs two
  * project facts — the organization a tenant belongs to, and the activity stamp
  * a successful mapping writes — and nothing else in either service. What
@@ -16,7 +16,9 @@ import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GithubProjectActivityPort } from "../../ports/github-project-activity.port.ts";
-import { PostgresGithubBranchDemandAdapter } from "../postgres.github-branch-demand.adapter.ts";
+import { composeGithubBranchDemand } from "../../app/github.app.ts";
+import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
+import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
 import type { Instant } from "@langwatch/time";
 
 const { privateKey } = generateKeyPairSync("rsa", {
@@ -111,12 +113,15 @@ function githubApi() {
 }
 
 function demand(client: object, project: GithubProjectActivityPort) {
-  return PostgresGithubBranchDemandAdapter.create({
-    database: client as never,
+  return composeGithubBranchDemand({
+    repositories: {
+      installations: PrismaGithubInstallationsRepository.create(client as never),
+      pullRequests: PrismaGithubPullRequestsRepository.create(client as never),
+    },
     config: { appId: "1234", privateKey },
     redis: null,
     project,
-  }).build();
+  });
 }
 
 afterEach(() => {

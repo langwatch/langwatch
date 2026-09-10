@@ -10,7 +10,7 @@
  * so taking it whole is what kept those two unreachable outside the App.
  *
  * `GithubService` satisfies it, and so does the composition
- * `PostgresGithubBranchDemandAdapter` builds: both carry these two methods
+ * `composeGithubBranchDemand` builds: both carry these two methods
  * with these signatures.
  */
 export abstract class GithubBranchDemandPort {

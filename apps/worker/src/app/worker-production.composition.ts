@@ -23,18 +23,21 @@ import { createWorkerObservabilityApps } from "./worker-observability-apps.compo
 import { createWorkerGithubRedis } from "./worker-github-redis.composition.ts";
 import { WorkerEvaluationProcessingResult } from "./worker-evaluation-server.composition.ts";
 import {
-  type AgentSandboxKeyReapDatabase,
-  PostgresAgentSandboxKeyReapAdapter,
+  AgentSandboxKeyReapService,
+  type PrismaApiKeyDatabase,
+  PrismaApiKeyRepository,
 } from "@langwatch/api-key-server";
 import {
   type AuthzGrantPipelineDatabase,
   PostgresAuthzPipelineAdapter,
 } from "@langwatch/authz-server";
 import {
-  type GithubBranchDemandDatabase,
-  type GithubBranchMaintenanceDatabase,
-  PostgresGithubBranchDemandAdapter,
-  PostgresGithubBranchMaintenanceAdapter,
+  composeGithubBranchDemand,
+  composeGithubBranchMaintenance,
+  PrismaGithubInstallationsRepository,
+  type PrismaGithubInstallationsDatabase,
+  PrismaGithubPullRequestsRepository,
+  type PrismaGithubPullRequestsDatabase,
 } from "@langwatch/github-server";
 import {
   type IdentityPipelineDatabase,
@@ -305,7 +308,7 @@ export abstract class WorkerTraceAbsenceReportPort {
  * The one Prisma client this process opened. Optional only while the platform root still composes
  * this graph.
  */
-export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
+export type WorkerDatabaseCompositionOptions = PrismaApiKeyDatabase &
   IngestionPullLifecycleDatabase &
   SsoConnectionPipelineDatabase &
   TopicClusteringDatabase &
@@ -317,8 +320,8 @@ export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
   BillingTenantOrganizationDatabase &
   CodingAgentActivityDatabase &
   DatasetContentDatabase &
-  GithubBranchDemandDatabase &
-  GithubBranchMaintenanceDatabase &
+  PrismaGithubInstallationsDatabase &
+  PrismaGithubPullRequestsDatabase &
   IdentityPipelineDatabase &
   JoinRequestPipelineDatabase &
   LangySessionKeyReapDatabase &
@@ -512,9 +515,9 @@ export class WorkerProductionComposition {
     // there is no graph in which it is present but unbuildable.
     const apiKey = ApiKeyWorkerFeatureInstaller.create({
       eventing,
-      sandboxKeyReap: PostgresAgentSandboxKeyReapAdapter.create({
-        database: options.database,
-      }).build(),
+      sandboxKeyReap: AgentSandboxKeyReapService.create({
+        repository: PrismaApiKeyRepository.create({ prisma: options.database }),
+      }),
     });
     // Stateless derivation over one span or log record: it reads nothing and
     // holds nothing, so this graph builds its own rather than taking the App's.
@@ -533,15 +536,18 @@ export class WorkerProductionComposition {
     const githubRedis = createWorkerGithubRedis(processRedis);
     const github = GithubWorkerFeatureInstaller.create({
       eventing,
-      branchMaintenance: PostgresGithubBranchMaintenanceAdapter.create({
-        database: options.database,
+      branchMaintenance: composeGithubBranchMaintenance({
+        repositories: {
+          installations: PrismaGithubInstallationsRepository.create(options.database),
+          pullRequests: PrismaGithubPullRequestsRepository.create(options.database),
+        },
         config: {
           appId: githubConfig.appId ?? "",
           privateKey: githubConfig.privateKey ?? "",
         },
         redis: githubRedis,
         ...(githubConfig.host ? { hostConfig: { host: githubConfig.host } } : {}),
-      }).build(),
+      }),
     });
     // Unconditional, on the same footing as the sweeps above: every dependency is composed from a
     // feature package over substrates this process already holds — the tenant-keyed ClickHouse
@@ -559,8 +565,11 @@ export class WorkerProductionComposition {
         redis: eventingOptions.groupQueue.redis,
         traceCanonicalisation,
         projectActivity,
-        pullRequestMapping: PostgresGithubBranchDemandAdapter.create({
-          database: options.database,
+        pullRequestMapping: composeGithubBranchDemand({
+          repositories: {
+            installations: PrismaGithubInstallationsRepository.create(options.database),
+            pullRequests: PrismaGithubPullRequestsRepository.create(options.database),
+          },
           config: {
             appId: githubConfig.appId ?? "",
             privateKey: githubConfig.privateKey ?? "",
@@ -568,7 +577,7 @@ export class WorkerProductionComposition {
           redis: githubRedis,
           ...(githubConfig.host ? { hostConfig: { host: githubConfig.host } } : {}),
           project: projectActivity,
-        }).build(),
+        }),
         ...(options.config.eventing.foldCacheTtlSeconds === undefined
           ? {}
           : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),

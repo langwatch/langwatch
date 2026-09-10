@@ -1,18 +1,20 @@
+export { composeGithubApi } from "./app/github.app.ts";
+export { PostgresGithubRepositories } from "./repositories/prisma/prisma.github.repositories.ts";
+export type { GithubRepositories } from "./repositories/github.repositories.ts";
 export {
-  PostgresGithubAdapter,
-  PostgresGithubAdapter as GithubPrismaInstaller,
-  type GithubDatabase,
-} from "./adapters/postgres.github.adapter.ts";
+  PrismaGithubInstallationsRepository,
+  type PrismaGithubInstallationsDatabase,
+} from "./repositories/prisma/prisma.github-installations.repository.ts";
 export {
-  PostgresGithubBranchMaintenanceAdapter,
-  type GithubBranchMaintenanceDatabase,
-  type PostgresGithubBranchMaintenanceOptions,
-} from "./adapters/postgres.github-branch-maintenance.adapter.ts";
+  PrismaGithubPullRequestsRepository,
+  type PrismaGithubPullRequestsDatabase,
+} from "./repositories/prisma/prisma.github-pull-requests.repository.ts";
 export {
-  PostgresGithubBranchDemandAdapter,
-  type GithubBranchDemandDatabase,
-  type PostgresGithubBranchDemandOptions,
-} from "./adapters/postgres.github-branch-demand.adapter.ts";
+  composeGithubBranchMaintenance,
+  type GithubBranchMaintenanceComposition,
+  composeGithubBranchDemand,
+  type GithubBranchDemandComposition,
+} from "./app/github.app.ts";
 export { EventingGithubMaintenanceAdapter } from "./adapters/eventing.github-maintenance.adapter.ts";
 export { GithubBranchMaintenancePort } from "./ports/github-branch-maintenance.port.ts";
 export { GithubBranchDemandPort } from "./ports/github-branch-demand.port.ts";

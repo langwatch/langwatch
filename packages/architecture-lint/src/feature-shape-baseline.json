@@ -31,22 +31,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "api-key|persistence-adapter",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "api-key|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "api-key|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "api-key|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "authz|contract-service",
       "measured": "2026-09-08"
     },
@@ -160,10 +144,6 @@
     },
     {
       "key": "gateway|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "github|persistence-adapter",
       "measured": "2026-09-08"
     },
     {

@@ -1,7 +1,7 @@
 /**
  * Whether a process that holds nothing but a database can run the sweep.
  *
- * The sweep used to be reachable only through `PostgresGithubAdapter`, which
+ * The sweep used to be reachable only through `composeGithubApi`, which
  * takes an `OrganizationService` and a `ProjectApi` — so a worker could not
  * compose it without composing the application those two live in, even though
  * the sweep calls neither. The test that matters is therefore not "does it
@@ -13,7 +13,9 @@
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PostgresGithubBranchMaintenanceAdapter } from "../postgres.github-branch-maintenance.adapter.ts";
+import { composeGithubBranchMaintenance } from "../../app/github.app.ts";
+import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
+import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
 
 const { privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -106,11 +108,14 @@ function githubApi() {
 }
 
 function sweep(client: object) {
-  return PostgresGithubBranchMaintenanceAdapter.create({
-    database: client as never,
+  return composeGithubBranchMaintenance({
+    repositories: {
+      installations: PrismaGithubInstallationsRepository.create(client as never),
+      pullRequests: PrismaGithubPullRequestsRepository.create(client as never),
+    },
     config: { appId: "1234", privateKey },
     redis: null,
-  }).build();
+  });
 }
 
 afterEach(() => {
@@ -158,11 +163,14 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
     it("asks GitHub nothing and writes nothing, rather than failing", async () => {
       const { client, writes } = database();
       const paths = githubApi();
-      const uncredentialed = PostgresGithubBranchMaintenanceAdapter.create({
-        database: client as never,
+      const uncredentialed = composeGithubBranchMaintenance({
+        repositories: {
+          installations: PrismaGithubInstallationsRepository.create(client as never),
+          pullRequests: PrismaGithubPullRequestsRepository.create(client as never),
+        },
         config: { appId: "", privateKey: "" },
         redis: null,
-      }).build();
+      });
 
       await expect(uncredentialed.recheckDueBranches()).resolves.toBe(1);
 
@@ -173,11 +181,14 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
     /** @scenario "The retention prune runs without App credentials" */
     it("still prunes bookkeeping past the activity horizon", async () => {
       const { client } = database();
-      const uncredentialed = PostgresGithubBranchMaintenanceAdapter.create({
-        database: client as never,
+      const uncredentialed = composeGithubBranchMaintenance({
+        repositories: {
+          installations: PrismaGithubInstallationsRepository.create(client as never),
+          pullRequests: PrismaGithubPullRequestsRepository.create(client as never),
+        },
         config: { appId: "", privateKey: "" },
         redis: null,
-      }).build();
+      });
 
       await expect(uncredentialed.pruneStaleBranchLinkage()).resolves.toEqual({
         branchChecks: 1,

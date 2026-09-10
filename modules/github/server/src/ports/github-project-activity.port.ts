@@ -12,8 +12,8 @@
  * its own database without also composing the App.
  *
  * `ProjectApi` satisfies it: the published service carries both methods
- * with these signatures, which is what keeps `PostgresGithubAdapter` and the
- * App's own composition compiling.
+ * with these signatures, which is what keeps `composeGithubApi` and
+ * `composeGithubBranchDemand` compiling.
  */
 import type { Instant } from "@langwatch/time";
 
