@@ -63,7 +63,7 @@ func Classify(content string) Classification {
 		return Classification{Tier: TierRedis, Reason: "exported symbol is Redis-prefixed", Symbol: symbol}
 	}
 	if strings.HasPrefix(symbol, "ClickHouse") || strings.HasPrefix(symbol, "Clickhouse") {
-		return Classification{Tier: TierClickHouse, Reason: "exported symbol is ClickHouse-prefixed", Symbol: symbol}
+		return Classification{Tier: TierClickhouse, Reason: "exported symbol is ClickHouse-prefixed", Symbol: symbol}
 	}
 
 	if newMapRe.MatchString(content) && !hasDatastoreImport(imports) {
