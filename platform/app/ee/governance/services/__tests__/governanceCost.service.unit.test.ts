@@ -252,9 +252,24 @@ describe("GovernanceCostService.summary", () => {
       toDay: "2026-08-07",
     });
     expect(result.providers).toEqual([
-      { provider: "openai_admin", amountUsd: 3, cellsWithoutAmount: 0 },
-      { provider: "anthropic_admin", amountUsd: null, cellsWithoutAmount: 1 },
-      { provider: "copilot_studio", amountUsd: -2, cellsWithoutAmount: 0 },
+      {
+        provider: "openai_admin",
+        amountUsd: 3,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
+      {
+        provider: "anthropic_admin",
+        amountUsd: null,
+        cellsWithoutAmount: 1,
+        currenciesWithoutUsdAmount: ["EUR"],
+      },
+      {
+        provider: "copilot_studio",
+        amountUsd: -2,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
     ]);
   });
   describe("given a deployment with no cost store", () => {

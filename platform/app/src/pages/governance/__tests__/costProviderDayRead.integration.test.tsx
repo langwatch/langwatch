@@ -102,6 +102,7 @@ vi.mock("~/utils/api", () => ({
                 provider: "openai_admin",
                 amountUsd: 90,
                 cellsWithoutAmount: 0,
+                currenciesWithoutUsdAmount: [],
               },
             ],
             billed: { amountUsd: 90, cellsWithoutAmount: 0 },
@@ -140,12 +141,14 @@ const PROVIDER_DAY_ROWS = [
     provider: "openai_admin",
     amountUsd: 60,
     cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
   },
   {
     day: "2026-01-16",
     provider: "openai_admin",
     amountUsd: 30,
     cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
   },
 ];
 

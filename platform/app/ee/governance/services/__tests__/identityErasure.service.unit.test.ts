@@ -77,6 +77,8 @@ function buildService(
     pseudonym?: string;
     deletedActor?: string;
     deletedTenants?: string[];
+    renamedActor?: string;
+    renamedTo?: string;
     replayedSince?: string;
     replayedTenants?: string[];
     markedRebuildSince?: string | null;
@@ -179,6 +181,11 @@ function buildService(
           throw new Error("ClickHouse went away mid-mutation");
         }
       }),
+      renameActorInRestatementIndex: vi.fn(async (params) => {
+        calls.push("rollup.rename");
+        recorded.renamedActor = params.rawActorId;
+        recorded.renamedTo = params.pseudonymousActorId;
+      }),
     } as unknown as IdentityErasureDeps["rollupErasure"],
     replay: {
       replaySince: vi.fn(async (params) => {
@@ -219,6 +226,10 @@ describe("given a provider-named person an organization has asked us to erase", 
       expect(outcome.pseudonym).toBe(expected);
       expect(recorded.suppressionHashes).toContain(expected);
       expect(recorded.pseudonym).toBe(expected);
+      // The restatement index keys on the raw identifier too, so an erasure
+      // that left it alone would keep the name in a second table.
+      expect(recorded.renamedActor).toBe(EMAIL);
+      expect(recorded.renamedTo).toBe(expected);
       expect(outcome.identityMatchesBlanked).toBe(2);
       expect(deps.identityMatches.blankUserReferences).toHaveBeenCalledWith(
         expect.anything(),
