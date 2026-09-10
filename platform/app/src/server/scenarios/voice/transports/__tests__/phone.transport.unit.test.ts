@@ -297,6 +297,63 @@ describe("phoneTransport", () => {
         expect(resolvePublicBaseUrl({})).toBeUndefined();
       });
     });
+
+    describe("when the value is a valid https URL", () => {
+      it("passes through unchanged", () => {
+        expect(
+          resolvePublicBaseUrl({
+            VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
+          }),
+        ).toBe("https://voice.example.com");
+      });
+    });
+
+    describe("when the value is a valid http URL", () => {
+      it("passes through unchanged", () => {
+        expect(
+          resolvePublicBaseUrl({
+            VOICE_PUBLIC_BASE_URL: "http://voice.example.com",
+          }),
+        ).toBe("http://voice.example.com");
+      });
+    });
+
+    describe("when the value has a trailing slash", () => {
+      it("behaves as it does today: passes through with the trailing slash intact", () => {
+        expect(
+          resolvePublicBaseUrl({
+            VOICE_PUBLIC_BASE_URL: "https://voice.example.com/",
+          }),
+        ).toBe("https://voice.example.com/");
+      });
+    });
+
+    describe("when VOICE_PUBLIC_BASE_URL is a scheme-less value", () => {
+      it("throws naming VOICE_PUBLIC_BASE_URL and the offending value", () => {
+        expect(() =>
+          resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "localhost:3000" }),
+        ).toThrow(/VOICE_PUBLIC_BASE_URL/);
+        expect(() =>
+          resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "localhost:3000" }),
+        ).toThrow(/localhost:3000/);
+      });
+    });
+
+    describe("when VOICE_PUBLIC_BASE_URL is garbage", () => {
+      it("throws naming VOICE_PUBLIC_BASE_URL", () => {
+        expect(() =>
+          resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "not a url at all" }),
+        ).toThrow(/VOICE_PUBLIC_BASE_URL/);
+      });
+    });
+
+    describe("when BASE_HOST is malformed and VOICE_PUBLIC_BASE_URL is unset", () => {
+      it("throws naming BASE_HOST rather than VOICE_PUBLIC_BASE_URL", () => {
+        expect(() =>
+          resolvePublicBaseUrl({ BASE_HOST: "not-a-valid-url" }),
+        ).toThrow(/BASE_HOST/);
+      });
+    });
   });
 
   describe("given the http port is resolved", () => {

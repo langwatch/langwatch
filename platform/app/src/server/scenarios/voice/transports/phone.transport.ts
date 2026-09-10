@@ -20,6 +20,7 @@
  * does NOT go through them.
  */
 
+import { createLogger } from "@langwatch/observability";
 import { HandledError } from "@langwatch/handled-error";
 import type { AgentAdapter } from "@langwatch/scenario";
 import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
@@ -27,6 +28,8 @@ import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
 } from "../voice-transport.registry";
+
+const logger = createLogger("langwatch:scenarios:voice:phone");
 
 /**
  * Shown when a phone target's project has no Twilio credentials. Surfaced by
@@ -135,20 +138,90 @@ const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
 };
 
 /**
+ * The env var name a resolved public base URL came from, so a failure log can
+ * show at a glance whether the run used the voice worker's own hostname or
+ * fell back to the app's.
+ */
+export type PublicBaseUrlSource = "VOICE_PUBLIC_BASE_URL" | "BASE_HOST";
+
+/**
+ * Thrown when a present `VOICE_PUBLIC_BASE_URL` or `BASE_HOST` value does not
+ * parse as an absolute `http:`/`https:` URL. The vendored SDK builds Twilio's
+ * media-stream URL by a bare string replace
+ * (`publicBaseUrl.replace(/^https:/, "wss:")...`) with no validation of its
+ * own, so a malformed base URL is not rejected here — it is embedded as-is
+ * into the TwiML `<Stream url>` Twilio is told to open, and only surfaces
+ * later as Twilio error 11100 ("Invalid URL format") with a zero-duration
+ * call. Failing loudly at dial time, naming the offending env var and value,
+ * is far better than that 120-second silent timeout.
+ */
+export class VoicePublicBaseUrlInvalidError extends Error {
+  constructor(envVarName: PublicBaseUrlSource, value: string) {
+    super(
+      `${envVarName} is not a valid http(s) URL: "${value}". The Twilio ` +
+        "media-stream URL is built from this value by a bare string " +
+        "replace with no validation, so a malformed value reaches Twilio " +
+        "as an invalid stream URL and the call fails with error 11100.",
+    );
+    this.name = "VoicePublicBaseUrlInvalidError";
+  }
+}
+
+/** True when `value` parses as an absolute URL with an `http:`/`https:`
+ *  protocol — the shape the SDK's naive scheme-swap assumes without checking. */
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The app's public HTTPS base URL the SDK routes Twilio's media stream to.
  * `VOICE_PUBLIC_BASE_URL` when set (the voice worker's own hostname), otherwise
  * the app's own `BASE_HOST`. Read from `process.env` directly, the same way
  * `voice-limits` reads its knobs, so the pool child and the worker both reach
  * it without threading the config object.
+ *
+ * A present-but-malformed value throws {@link VoicePublicBaseUrlInvalidError}
+ * rather than being passed through: see that error's doc comment for why. Only
+ * a present value is validated — neither variable set still resolves to
+ * `undefined`, unchanged from before.
  */
 export function resolvePublicBaseUrl(
   processEnv: NodeJS.ProcessEnv = process.env,
 ): string | undefined {
-  return (
-    processEnv.VOICE_PUBLIC_BASE_URL?.trim() ||
-    processEnv.BASE_HOST?.trim() ||
-    undefined
-  );
+  const resolved = resolvePublicBaseUrlWithSource(processEnv);
+  return resolved?.value;
+}
+
+/** Same resolution as {@link resolvePublicBaseUrl}, but also reports which env
+ *  var the value came from, so a caller can log it alongside the value. */
+export function resolvePublicBaseUrlWithSource(
+  processEnv: NodeJS.ProcessEnv = process.env,
+): { value: string; source: PublicBaseUrlSource } | undefined {
+  const fromWorker = processEnv.VOICE_PUBLIC_BASE_URL?.trim();
+  if (fromWorker) {
+    if (!isValidHttpUrl(fromWorker)) {
+      throw new VoicePublicBaseUrlInvalidError(
+        "VOICE_PUBLIC_BASE_URL",
+        fromWorker,
+      );
+    }
+    return { value: fromWorker, source: "VOICE_PUBLIC_BASE_URL" };
+  }
+
+  const fromApp = processEnv.BASE_HOST?.trim();
+  if (fromApp) {
+    if (!isValidHttpUrl(fromApp)) {
+      throw new VoicePublicBaseUrlInvalidError("BASE_HOST", fromApp);
+    }
+    return { value: fromApp, source: "BASE_HOST" };
+  }
+
+  return undefined;
 }
 
 /**
@@ -277,11 +350,27 @@ export function createPhoneTransport(
         maxCallSeconds,
         TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
       );
+      const resolvedBaseUrl = resolvePublicBaseUrlWithSource(deps.processEnv);
+      // Log which base URL and env var this run's Twilio media stream is
+      // routed to. There is no span available at this point to stamp
+      // `voice.twilio.stream_base_url` on directly, so a failed call (error
+      // 11100, zero duration) can still be traced back to what URL Twilio
+      // actually received via this log line.
+      if (resolvedBaseUrl) {
+        logger.info(
+          {
+            agentId,
+            streamBaseUrl: resolvedBaseUrl.value,
+            streamBaseUrlSource: resolvedBaseUrl.source,
+          },
+          "resolved Twilio media-stream base URL for outbound call",
+        );
+      }
       const adapter = twilioAgentFactory({
         accountSid: twilio.accountSid,
         authToken: twilio.authToken,
         phoneNumber: twilio.fromNumber,
-        publicBaseUrl: resolvePublicBaseUrl(deps.processEnv),
+        publicBaseUrl: resolvedBaseUrl?.value,
         httpPort: resolveHttpPort(deps.processEnv),
         // Only the dialled target is allowlisted, so the SDK's deny-by-default
         // a-leg guard passes for exactly this number and nothing else. There is
