@@ -151,14 +151,15 @@ export {
 } from "./processes/experiment-cell-workflow.process.ts";
 export {
   ExperimentRunLoopUnavailableError,
-  createExperimentV3LegacyAliasRestApp,
-  createExperimentV3RestApp,
+  experimentV3Rest,
+  experimentV3AliasRest,
+  ExperimentV3RestApi,
+  ExperimentV3AliasApi,
   type ExperimentV3RestCredential,
-  type ExperimentV3RestPorts,
   type ExperimentV3RestSession,
   type ExperimentV3RunLoop,
   type ExperimentV3StartRunInput,
-} from "./transport/api-rest/experiment-v3.api.ts";
+} from "./transport/experiment-v3.rest.ts";
 export {
   ExperimentFindOrCreateService,
   type ExperimentFindOrCreateInput,
