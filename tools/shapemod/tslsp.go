@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"strconv"
 )
 
 // Runner shells out to tslsp-cli. A real Runner always runs from the
@@ -12,6 +13,11 @@ import (
 type Runner interface {
 	RenameFile(dir, oldPath, newPath string) (string, error)
 	Rename(dir, symbol, newName string) (string, error)
+	// RenameAtLine renames the symbol declared at path:line, the fallback
+	// when a plain --symbol rename comes back ambiguous. tslsp-cli's locator
+	// needs the symbol alongside file+line to disambiguate a line that
+	// itself carries more than one identifier.
+	RenameAtLine(dir, path string, line int, symbol, newName string) (string, error)
 	Diagnostics(dir, path string) (string, error)
 }
 
@@ -37,6 +43,10 @@ func (r TslspRunner) RenameFile(dir, oldPath, newPath string) (string, error) {
 
 func (r TslspRunner) Rename(dir, symbol, newName string) (string, error) {
 	return r.run(dir, "rename", "--symbol", symbol, "--new-name", newName)
+}
+
+func (r TslspRunner) RenameAtLine(dir, path string, line int, symbol, newName string) (string, error) {
+	return r.run(dir, "rename", "--file", path, "--line", strconv.Itoa(line), "--symbol", symbol, "--new-name", newName)
 }
 
 func (r TslspRunner) Diagnostics(dir, path string) (string, error) {

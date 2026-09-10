@@ -1,12 +1,12 @@
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
-import { NlpLambdaFleetPort, type NlpLambdaFunction } from "../../ports/nlp-lambda-fleet.port.ts";
+import { NlpLambdaFleetRepository, type NlpLambdaFunction } from "../../repositories/nlp-lambda-fleet.repository.ts";
 import { NlpLambdaCleanupService } from "../nlp-lambda-cleanup.service.ts";
 
 const NOW = Temporal.Instant.from("2026-09-05T00:00:00.000Z");
 const daysAgo = (days: number) => NOW.subtract({ milliseconds: days * 24 * 60 * 60 * 1000 });
 
-class FakeFleet extends NlpLambdaFleetPort {
+class FakeFleet extends NlpLambdaFleetRepository {
   readonly deletedFunctions: string[] = [];
   readonly deletedLogGroups: string[] = [];
 

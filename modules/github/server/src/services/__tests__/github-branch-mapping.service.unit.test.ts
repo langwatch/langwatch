@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { GithubBranchInstallationsPort } from "../../ports/github-branch-installations.port.ts";
+import { GithubBranchInstallationsRepository } from "../../repositories/github-branch-installations.repository.ts";
 import {
-  GithubAppTokenPort,
+  GithubAppTokenRepository,
   type GithubPullRequestSummary,
-} from "../../ports/github-app-token.port.ts";
+} from "../../repositories/github-app-token.repository.ts";
 import { GithubHostPort } from "../../ports/github-host.port.ts";
 import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository.ts";
 import type {
@@ -48,7 +48,7 @@ class FakeHost extends GithubHostPort {
   }
 }
 
-class FakeInstallations extends GithubBranchInstallationsPort {
+class FakeInstallations extends GithubBranchInstallationsRepository {
   installation: { organizationId: string } | null = null;
   findByInstallationId(): Promise<{ organizationId: string } | null> {
     return Promise.resolve(this.installation);
@@ -61,7 +61,7 @@ class FakeInstallations extends GithubBranchInstallationsPort {
   }
 }
 
-class FakeAppTokens extends GithubAppTokenPort {
+class FakeAppTokens extends GithubAppTokenRepository {
   pullRequests: GithubPullRequestSummary[] = [];
   listPullRequestsForHead(): Promise<GithubPullRequestSummary[]> {
     return Promise.resolve(this.pullRequests);

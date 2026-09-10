@@ -8,14 +8,14 @@ import {
   GithubPullRequestStatusService,
   MAX_STATUS_REFS,
 } from "../github-pull-request-status.service.ts";
-import { GithubRateLimitedError } from "../../adapters/github-app-token.adapter.ts";
+import { GithubRateLimitedError } from "../../repositories/redis/redis.github-app-token.repository.ts";
 import {
-  GithubAppTokenPort,
+  GithubAppTokenRepository,
   type GithubInstallationDetails,
   type GithubInstallationToken,
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
-} from "../../ports/github-app-token.port.ts";
+} from "../../repositories/github-app-token.repository.ts";
 import { GithubRedisPort } from "../../repositories/redis/github-redis.connection.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
@@ -113,7 +113,7 @@ class TestInstallationRepository extends NullGithubInstallationsRepository {
   }
 }
 
-class TestAppTokens extends GithubAppTokenPort {
+class TestAppTokens extends GithubAppTokenRepository {
   readonly configured = true;
 
   constructor(

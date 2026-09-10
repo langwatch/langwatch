@@ -15,10 +15,10 @@ export { topicServer } from "./topic.server.ts";
 export { topicRepositories } from "./repositories/topic-repositories.registry.ts";
 export type { TopicRepositories } from "./repositories/topic.repositories.ts";
 export {
-  TopicServerInstallerAdapter,
+  PrismaTopicServerInstallerRepository as TopicServerInstallerAdapter,
   type TopicClusteringExecutionDependencies,
   type TopicServerInstallerDependencies,
-} from "./adapters/topic-server-installer.adapter.ts";
+} from "./repositories/prisma/prisma.topic-server-installer.repository.ts";
 export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository.ts";
 export { EventingTopicClusteringScheduleAdapter } from "./adapters/eventing.topic-clustering-schedule.adapter.ts";
 export {
@@ -28,8 +28,8 @@ export {
 } from "./adapters/otel.topic-clustering-metrics.adapter.ts";
 export {
   BOOTSTRAP_CLAIM_TTL_SECONDS,
-  RedisTopicClusteringBootstrapAdapter,
-} from "./adapters/redis.topic-clustering-bootstrap.adapter.ts";
+  RedisTopicClusteringBootstrapRepository as RedisTopicClusteringBootstrapAdapter,
+} from "./repositories/redis/redis.topic-clustering-bootstrap.repository.ts";
 export {
   classifyClusteringError,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
@@ -93,7 +93,7 @@ export {
 } from "./ports/topic-clustering-langevals.port.ts";
 export { RequestTopicClusteringTask } from "./intents/run-topic-clustering.intent.ts";
 export { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task.ts";
-export { TopicClusteringSchedulePort } from "./ports/topic-clustering-schedule.port.ts";
+export { TopicClusteringScheduleRepository as TopicClusteringSchedulePort } from "./repositories/topic-clustering-schedule.repository.ts";
 export {
   TOPIC_CLUSTERING_PROCESS_NAME,
   TopicClusteringProcess,

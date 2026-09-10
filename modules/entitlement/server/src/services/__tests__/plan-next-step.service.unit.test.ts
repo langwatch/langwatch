@@ -1,6 +1,6 @@
 import type { Plan, PricingModel } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
-import { PlanCataloguePort, type CataloguePlan } from "../../ports/plan-catalogue.port.ts";
+import { PlanCatalogueRepository, type CataloguePlan } from "../../repositories/plan-catalogue.repository.ts";
 import { PlanNextStepService } from "../plan-next-step.service.ts";
 
 /**
@@ -70,7 +70,7 @@ const SEAT_EVENT_LADDER: readonly CataloguePlan[] = [
   },
 ];
 
-class FixedCatalogue extends PlanCataloguePort {
+class FixedCatalogue extends PlanCatalogueRepository {
   constructor(private readonly bySeatEvent: boolean) {
     super();
   }

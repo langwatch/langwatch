@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { point } from "../../app/__tests__/metric.fixture.ts";
-import { ClickHouseMetricProcessingAdapter } from "../clickhouse.metric-processing.adapter.ts";
+import { ClickhouseMetricProcessingRepository } from "../../repositories/clickhouse/clickhouse.metric-processing.repository.ts";
 import { ClickHouseMetricDataPointAppendRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import type { MetricClickHouseClient } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { MetricDataPointClickHouseRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point.repository.ts";
@@ -19,7 +19,7 @@ describe("ClickHouseMetricProcessingAdapter", () => {
     it("builds the metric-processing pipeline from that client alone", () => {
       const resolveClient = vi.fn(async () => client());
 
-      const pipeline = ClickHouseMetricProcessingAdapter.create({
+      const pipeline = ClickhouseMetricProcessingRepository.create({
         resolveClient,
         defaultRetentionDays: 49,
         metricCommandShardCount: 8,
@@ -36,7 +36,7 @@ describe("ClickHouseMetricProcessingAdapter", () => {
 
     /** @scenario "The processing pipeline composes from one tenant-keyed client" */
     it("mounts the dispatch subscribers it is handed under their own names", () => {
-      const pipeline = ClickHouseMetricProcessingAdapter.create({
+      const pipeline = ClickhouseMetricProcessingRepository.create({
         resolveClient: async () => client(),
         defaultRetentionDays: 49,
         metricCommandShardCount: 8,

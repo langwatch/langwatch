@@ -9,7 +9,7 @@ import type { Instant } from "@langwatch/time";
 /** One deployed function, reduced to what the policy actually reads. */
 export type NlpLambdaFunction = Readonly<{ name: string }>;
 
-export abstract class NlpLambdaFleetPort {
+export abstract class NlpLambdaFleetRepository {
   /** Every function whose name starts with the studio's engine prefix. */
   abstract listFunctions(input: { namePrefix: string }): Promise<readonly NlpLambdaFunction[]>;
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
-import { ClickHouseLogProcessingAdapter } from "../clickhouse.log-processing.adapter.ts";
+import { ClickhouseLogProcessingRepository } from "../../repositories/clickhouse/clickhouse.log-processing.repository.ts";
 import { ClickHouseCanonicalLogRecordAppendRepository } from "../../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
 import type { LogClickHouseClient } from "../../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
 import { ClickHouseCanonicalLogRecordRepository } from "../../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";
@@ -67,7 +67,7 @@ describe("ClickHouseLogProcessingAdapter", () => {
     /** @scenario "The processing pipeline composes from one tenant-keyed client" */
     /** @scenario "Valid OTLP logs become canonical durable events" */
     it("builds the log-processing pipeline from that client alone", () => {
-      const pipeline = ClickHouseLogProcessingAdapter.create({
+      const pipeline = ClickhouseLogProcessingRepository.create({
         resolveClient: async () => client(),
         defaultRetentionDays: 49,
         logCommandShardCount: 8,
@@ -80,7 +80,7 @@ describe("ClickHouseLogProcessingAdapter", () => {
 
     /** @scenario "The processing pipeline composes from one tenant-keyed client" */
     it("mounts the dispatch subscribers it is handed under their own names", () => {
-      const pipeline = ClickHouseLogProcessingAdapter.create({
+      const pipeline = ClickhouseLogProcessingRepository.create({
         resolveClient: async () => client(),
         defaultRetentionDays: 49,
         logCommandShardCount: 8,

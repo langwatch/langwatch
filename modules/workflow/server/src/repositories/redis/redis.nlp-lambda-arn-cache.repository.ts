@@ -6,7 +6,7 @@
  * exhausting it. A deployment with no Redis falls back to
  * `InMemoryNlpLambdaArnCacheAdapter`, which is slower rather than wrong.
  */
-import { NlpLambdaArnCachePort } from "../ports/nlp-lambda-arn.port.ts";
+import { NlpLambdaArnCachePort } from "../../ports/nlp-lambda-arn.port.ts";
 
 const CACHE_PREFIX = "nlp_lambda_arn:v1:";
 
@@ -17,9 +17,9 @@ export interface NlpLambdaArnRedisConnection {
   del(key: string): Promise<unknown>;
 }
 
-export class RedisNlpLambdaArnCacheAdapter extends NlpLambdaArnCachePort {
-  static create(redis: NlpLambdaArnRedisConnection): RedisNlpLambdaArnCacheAdapter {
-    return new RedisNlpLambdaArnCacheAdapter(redis);
+export class RedisNlpLambdaArnCacheRepository extends NlpLambdaArnCachePort {
+  static create(redis: NlpLambdaArnRedisConnection): RedisNlpLambdaArnCacheRepository {
+    return new RedisNlpLambdaArnCacheRepository(redis);
   }
 
   private constructor(private readonly redis: NlpLambdaArnRedisConnection) {

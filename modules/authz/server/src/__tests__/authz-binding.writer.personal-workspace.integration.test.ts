@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port.ts";
+import type { AuthzCompatibilityLedgerRepository } from "../repositories/authz-compatibility-ledger.repository.ts";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
@@ -26,7 +26,7 @@ const refusingLedger = new Proxy(
   {
     get: () => () => Promise.reject(new Error(LEDGER_REACHED)),
   },
-) as unknown as AuthzCompatibilityLedgerPort;
+) as unknown as AuthzCompatibilityLedgerRepository;
 
 describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => {
   const prisma = new PrismaClient({

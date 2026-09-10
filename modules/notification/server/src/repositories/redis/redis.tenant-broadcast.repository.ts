@@ -5,18 +5,18 @@ import {
   TenantBroadcastPublisherPort,
   type TenantBroadcastEventType,
   type TenantBroadcastMessage,
-} from "../ports/tenant-broadcast.port.ts";
+} from "../../ports/tenant-broadcast.port.ts";
 
 /**
  * One publish onto the tenant's channel, and nothing else. The application's `BroadcastAdapter`
  * does three things — publish, subscribe, and emit locally to the tabs this process is serving.
  */
-export class RedisTenantBroadcastAdapter extends TenantBroadcastPort {
+export class RedisTenantBroadcastRepository extends TenantBroadcastPort {
   static create(options: {
     publisher: TenantBroadcastPublisherPort;
     logger?: Logger;
-  }): RedisTenantBroadcastAdapter {
-    return new RedisTenantBroadcastAdapter(
+  }): RedisTenantBroadcastRepository {
+    return new RedisTenantBroadcastRepository(
       options.publisher,
       options.logger ?? createLogger("langwatch:tenant-broadcast"),
       () => nowInstant().epochMilliseconds,
@@ -28,8 +28,8 @@ export class RedisTenantBroadcastAdapter extends TenantBroadcastPort {
     publisher: TenantBroadcastPublisherPort;
     logger?: Logger;
     now: () => number;
-  }): RedisTenantBroadcastAdapter {
-    return new RedisTenantBroadcastAdapter(
+  }): RedisTenantBroadcastRepository {
+    return new RedisTenantBroadcastRepository(
       options.publisher,
       options.logger ?? createLogger("langwatch:tenant-broadcast"),
       options.now,

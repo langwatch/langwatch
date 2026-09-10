@@ -6,9 +6,9 @@ import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { GithubInstallationsService } from "./github-installations.service.ts";
 import type {
-  GithubAppTokenPort,
+  GithubAppTokenRepository,
   GithubPullRequestSummary,
-} from "../ports/github-app-token.port.ts";
+} from "../repositories/github-app-token.repository.ts";
 import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,
@@ -41,7 +41,7 @@ export interface GithubPullRequestLiveStatus extends GithubPullRequestRef {
 export interface GithubPullRequestStatusServiceDeps {
   repository: GithubPullRequestsRepository;
   installations: GithubInstallationsService;
-  appTokens: GithubAppTokenPort;
+  appTokens: GithubAppTokenRepository;
   cache: GithubPullRequestStatusCacheRepository;
 }
 

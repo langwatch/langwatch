@@ -5,7 +5,7 @@ import {
   type PricingModel,
 } from "@langwatch/entitlement-contract";
 import { planNextStepCeilingsOf } from "@langwatch/plans";
-import type { PlanCataloguePort } from "../ports/plan-catalogue.port.ts";
+import type { PlanCatalogueRepository } from "../repositories/plan-catalogue.repository.ts";
 
 /**
  * What an organization may truthfully be told about where it goes next.
@@ -22,11 +22,11 @@ import type { PlanCataloguePort } from "../ports/plan-catalogue.port.ts";
  * asks it rather than deciding for itself.
  */
 export class PlanNextStepService {
-  static create(options: { catalogue: PlanCataloguePort }): PlanNextStepService {
+  static create(options: { catalogue: PlanCatalogueRepository }): PlanNextStepService {
     return new PlanNextStepService(options.catalogue);
   }
 
-  private constructor(private readonly catalogue: PlanCataloguePort) {}
+  private constructor(private readonly catalogue: PlanCatalogueRepository) {}
 
   /**
    * The next step for this organization, in the currency it is quoted in.

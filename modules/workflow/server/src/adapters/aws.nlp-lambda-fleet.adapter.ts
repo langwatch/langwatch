@@ -17,11 +17,11 @@ import {
   ListFunctionsCommand,
 } from "@aws-sdk/client-lambda";
 import type { Logger } from "@langwatch/observability";
-import { NlpLambdaFleetPort, type NlpLambdaFunction } from "../ports/nlp-lambda-fleet.port.ts";
+import { NlpLambdaFleetRepository, type NlpLambdaFunction } from "../repositories/nlp-lambda-fleet.repository.ts";
 
 const LOG_GROUP_ROOT = "/aws/lambda/";
 
-export class AwsNlpLambdaFleetAdapter extends NlpLambdaFleetPort {
+export class AwsNlpLambdaFleetAdapter extends NlpLambdaFleetRepository {
   static create(options: {
     lambda: LambdaClient;
     logs: CloudWatchLogsClient;

@@ -107,6 +107,13 @@ func Classify(filename, content string) Classification {
 		return Classification{Tier: TierPrisma, Reason: "filename prefix names a Prisma adapter", Symbol: symbol}
 	}
 	if spec, ok := importContaining(imports, "prisma"); ok {
+		if importsSameSubjectPrismaRepository(spec, subject) {
+			return Classification{
+				Tier:   TierInfrastructure,
+				Reason: "wraps the existing Prisma" + subjectPascal + "Repository of the same subject (" + spec + "); wiring, not a repository implementation",
+				Symbol: symbol,
+			}
+		}
 		return Classification{Tier: TierPrisma, Reason: "imports a prisma module (" + spec + ")", Symbol: symbol}
 	}
 	if prismaCallRe.MatchString(content) {
@@ -187,6 +194,16 @@ func importContaining(specs []string, needle string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// importsSameSubjectPrismaRepository reports whether spec is an import of
+// this file's own subject's Prisma repository (e.g. a file classifying as
+// subject "thing" importing ".../prisma.thing.repository"), which marks the
+// file as a thin wrapper around a repository that already exists rather than
+// a repository implementation of its own.
+func importsSameSubjectPrismaRepository(spec, subject string) bool {
+	base := strings.TrimSuffix(filepath.Base(spec), filepath.Ext(spec))
+	return strings.EqualFold(base, "prisma."+subject+".repository")
 }
 
 // declarations returns every exported class/abstract-class/interface in
@@ -306,11 +323,30 @@ func subjectName(filename string) string {
 	return parts[len(parts)-1]
 }
 
+// properNouns is a small table of proper-noun words that keep their own
+// capitalisation instead of the default "uppercase the first letter" rule,
+// so a subject like "clickhouse-usage" becomes "ClickHouseUsage" and not
+// "ClickhouseUsage".
+var properNouns = map[string]string{
+	"clickhouse": "ClickHouse",
+	"openai":     "OpenAI",
+	"langwatch":  "LangWatch",
+	"sso":        "SSO",
+	"scim":       "SCIM",
+	"otlp":       "OTLP",
+	"http":       "HTTP",
+	"s3":         "S3",
+}
+
 func pascalCase(kebab string) string {
 	parts := strings.FieldsFunc(kebab, func(r rune) bool { return r == '-' || r == '_' })
 	var b strings.Builder
 	for _, p := range parts {
 		if p == "" {
+			continue
+		}
+		if proper, ok := properNouns[strings.ToLower(p)]; ok {
+			b.WriteString(proper)
 			continue
 		}
 		b.WriteString(strings.ToUpper(p[:1]))

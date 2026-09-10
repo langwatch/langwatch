@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import { redactStoredObjectStorageUri } from "@langwatch/stored-object-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { StoredObjectStoragePort } from "../ports/stored-object-storage.port.ts";
+import type { StoredObjectStorageRepository } from "../repositories/stored-object-storage.repository.ts";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import type { StoredObjectsTelemetryPort } from "../ports/stored-objects-telemetry.port.ts";
 import type { StoredObject } from "../rules/stored-object-row.rules.ts";
@@ -42,7 +42,7 @@ function deriveStoredObjectId({
  */
 export type MintStorageUri = (args: { projectId: string; sha256: string }) => Promise<string>;
 
-type RegistryResolver = StoredObjectStoragePort | ((projectId: string) => StoredObjectStoragePort);
+type RegistryResolver = StoredObjectStorageRepository | ((projectId: string) => StoredObjectStorageRepository);
 
 /** What the process composes this service from. */
 export type StoredObjectsServiceOptions = Readonly<{
@@ -85,7 +85,7 @@ export class StoredObjectsService {
     return this.options.mintStorageUri(input);
   }
 
-  private registryFor(projectId: string): StoredObjectStoragePort {
+  private registryFor(projectId: string): StoredObjectStorageRepository {
     const { registry } = this.options;
 
     return typeof registry === "function" ? registry(projectId) : registry;
@@ -198,7 +198,7 @@ export class StoredObjectsService {
     sha256,
     purpose,
   }: {
-    registry: StoredObjectStoragePort;
+    registry: StoredObjectStorageRepository;
     storageUri: string;
     bytes: Buffer;
     mediaType: string;
@@ -240,7 +240,7 @@ export class StoredObjectsService {
     purpose,
   }: {
     row: StoredObject;
-    registry: StoredObjectStoragePort;
+    registry: StoredObjectStorageRepository;
     storageUri: string;
     projectId: string;
     id: string;

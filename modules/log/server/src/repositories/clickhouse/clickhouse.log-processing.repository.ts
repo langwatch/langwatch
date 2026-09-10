@@ -3,8 +3,8 @@ import type { LogProcessingEvent } from "@langwatch/log-contract";
 import {
   ClickHouseCanonicalLogRecordAppendRepository,
   type LogClickHouseClientResolver,
-} from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
-import { LogProcessingAdapter, type LogProcessingPipeline } from "./log-processing.adapter.ts";
+} from "./clickhouse.canonical-log-record-append.repository.ts";
+import { LogProcessingAdapter, type LogProcessingPipeline } from "../../adapters/log-processing.adapter.ts";
 
 /**
  * Durable log processing, composed from nothing but a tenant-keyed ClickHouse
@@ -17,7 +17,7 @@ import { LogProcessingAdapter, type LogProcessingPipeline } from "./log-processi
  * unbuildable outside the App, so this adapter states the consumer's
  * dependencies instead of inheriting the producer's.
  */
-export class ClickHouseLogProcessingAdapter {
+export class ClickhouseLogProcessingRepository {
   private constructor(
     private readonly repository: ClickHouseCanonicalLogRecordAppendRepository,
     private readonly logCommandShardCount: number,
@@ -29,8 +29,8 @@ export class ClickHouseLogProcessingAdapter {
     /** The fallback for rows whose tenant declares no retention override. */
     defaultRetentionDays: number;
     logCommandShardCount: number;
-  }): ClickHouseLogProcessingAdapter {
-    return new ClickHouseLogProcessingAdapter(
+  }): ClickhouseLogProcessingRepository {
+    return new ClickhouseLogProcessingRepository(
       ClickHouseCanonicalLogRecordAppendRepository.create({
         resolveClient: options.resolveClient,
         defaultRetentionDays: options.defaultRetentionDays,

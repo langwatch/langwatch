@@ -4,7 +4,7 @@ import {
   redactStoredObjectStorageUri,
   type StoredObjectStorageScheme,
 } from "@langwatch/stored-object-contract";
-import { StoredObjectStoragePort } from "../ports/stored-object-storage.port.ts";
+import { StoredObjectStorageRepository } from "../repositories/stored-object-storage.repository.ts";
 import type {
   StoredObjectStorageDriver,
   StoredObjectStorageDriverFactory,
@@ -14,7 +14,7 @@ import type {
 /**
  * Provider-neutral scheme dispatch owned by Stored Objects.
  */
-export class StoredObjectStorageRegistryAdapter extends StoredObjectStoragePort {
+export class StoredObjectStorageRegistryAdapter extends StoredObjectStorageRepository {
   static create(input: {
     s3: StoredObjectStorageDriver;
     file: StoredObjectStorageDriver;

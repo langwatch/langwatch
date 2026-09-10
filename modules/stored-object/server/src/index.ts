@@ -26,7 +26,7 @@ export {
   type StoredObjectFileCaller,
   type StoredObjectFileViewPermission,
 } from "./transport/stored-object-file.rest.ts";
-export { StoredObjectOwnerLookupRuntimeAdapter } from "./adapters/stored-object-owner-lookup-runtime.adapter.ts";
+export { ClickhouseStoredObjectOwnerLookupRuntimeRepository as StoredObjectOwnerLookupRuntimeAdapter } from "./repositories/clickhouse/clickhouse.stored-object-owner-lookup-runtime.repository.ts";
 export {
   StoredObjectDestinationPolicyAdapter,
   StoredObjectAzureDestinationPort,
@@ -78,10 +78,10 @@ export {
   type StoredObjectUploadTokenClaims,
 } from "./ports/stored-object.port.ts";
 export {
-  StoredObjectOwnerInstanceDirectoryPort,
+  StoredObjectOwnerInstanceDirectoryRepository as StoredObjectOwnerInstanceDirectoryPort,
   type StoredObjectOwnerClickHouseClient,
   type StoredObjectOwnerClickHouseInstance,
-} from "./ports/stored-object-owner-instance-directory.port.ts";
+} from "./repositories/stored-object-owner-instance-directory.repository.ts";
 export {
   StoredObjectOwnerLookupTelemetryPort,
   type StoredObjectOwnerLookupSpan,

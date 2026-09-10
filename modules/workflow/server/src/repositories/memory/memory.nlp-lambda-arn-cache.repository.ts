@@ -6,13 +6,13 @@
  * the regional control-plane quota cares about. A deployment that composes a
  * shared store gets that back.
  */
-import { NlpLambdaArnCachePort } from "../ports/nlp-lambda-arn.port.ts";
+import { NlpLambdaArnCachePort } from "../../ports/nlp-lambda-arn.port.ts";
 
 type Entry = Readonly<{ value: string; expiresAt: number }>;
 
-export class InMemoryNlpLambdaArnCacheAdapter extends NlpLambdaArnCachePort {
-  static create(options: { now?: () => number } = {}): InMemoryNlpLambdaArnCacheAdapter {
-    return new InMemoryNlpLambdaArnCacheAdapter(options.now ?? Date.now);
+export class MemoryNlpLambdaArnCacheRepository extends NlpLambdaArnCachePort {
+  static create(options: { now?: () => number } = {}): MemoryNlpLambdaArnCacheRepository {
+    return new MemoryNlpLambdaArnCacheRepository(options.now ?? Date.now);
   }
 
   private readonly entries = new Map<string, Entry>();

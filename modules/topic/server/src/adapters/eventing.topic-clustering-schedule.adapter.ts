@@ -1,10 +1,10 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../processes/topic-clustering.process.ts";
 import { Temporal, type Instant } from "@langwatch/time";
-import { TopicClusteringSchedulePort } from "../ports/topic-clustering-schedule.port.ts";
+import { TopicClusteringScheduleRepository } from "../repositories/topic-clustering-schedule.repository.ts";
 
 /** Reads Topic's durable wake from the generic process-manager store. */
-export class EventingTopicClusteringScheduleAdapter extends TopicClusteringSchedulePort {
+export class EventingTopicClusteringScheduleAdapter extends TopicClusteringScheduleRepository {
   static create(options: { processStore: ProcessStore }): EventingTopicClusteringScheduleAdapter {
     return new EventingTopicClusteringScheduleAdapter(options.processStore);
   }

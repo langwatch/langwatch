@@ -9,7 +9,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
-import type { GithubAppTokenPort } from "../ports/github-app-token.port.ts";
+import type { GithubAppTokenRepository } from "../repositories/github-app-token.repository.ts";
 import type {
   GithubInstallationRow,
   GithubInstallationsRepository,
@@ -30,7 +30,7 @@ export type GithubWebhookAction =
 export class GithubInstallationsService {
   static create(
     repository: GithubInstallationsRepository,
-    appTokens: GithubAppTokenPort,
+    appTokens: GithubAppTokenRepository,
     organization: OrganizationApi,
     access: GithubInstallationAccessService,
   ): GithubInstallationsService {
@@ -39,7 +39,7 @@ export class GithubInstallationsService {
 
   private constructor(
     private readonly repository: GithubInstallationsRepository,
-    private readonly appTokens: GithubAppTokenPort,
+    private readonly appTokens: GithubAppTokenRepository,
     private readonly organization: OrganizationApi,
     private readonly access: GithubInstallationAccessService,
   ) {}

@@ -7,10 +7,10 @@ import {
 import { createLogger } from "@langwatch/observability";
 
 import {
-  type GithubAppTokenPort,
+  type GithubAppTokenRepository,
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
-} from "../ports/github-app-token.port.ts";
+} from "../repositories/github-app-token.repository.ts";
 import type {
   GithubInstallationRow,
   GithubInstallationsRepository,
@@ -31,14 +31,14 @@ type MintOutcome = {
 export class GithubInstallationAccessService {
   static create(
     repository: GithubInstallationsRepository,
-    appTokens: GithubAppTokenPort,
+    appTokens: GithubAppTokenRepository,
   ): GithubInstallationAccessService {
     return new GithubInstallationAccessService(repository, appTokens);
   }
 
   private constructor(
     private readonly repository: GithubInstallationsRepository,
-    private readonly appTokens: GithubAppTokenPort,
+    private readonly appTokens: GithubAppTokenRepository,
   ) {}
 
   // This read attributes a verified webhook and remains valid without

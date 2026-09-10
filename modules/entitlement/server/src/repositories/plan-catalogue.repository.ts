@@ -42,7 +42,7 @@ export interface CataloguePlan {
  * A port rather than a constant because the ladder is billing's, and the
  * organization's pricing model decides which rungs are on it.
  */
-export abstract class PlanCataloguePort {
+export abstract class PlanCatalogueRepository {
   abstract listSelfServePlans(input: {
     pricingModel: PricingModel | null;
   }): Promise<readonly CataloguePlan[]>;

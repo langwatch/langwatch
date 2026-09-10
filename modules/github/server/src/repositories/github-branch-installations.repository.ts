@@ -11,7 +11,7 @@
  * `GithubInstallationAccessService` satisfies it; so does anything else that
  * can answer both without a database.
  */
-export abstract class GithubBranchInstallationsPort {
+export abstract class GithubBranchInstallationsRepository {
   /**
    * The organization a webhook's installation belongs to.
    *

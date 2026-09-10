@@ -38,7 +38,7 @@ import {
   type GrantableAuthzScopeRef,
   scopeOrganizationId,
 } from "@langwatch/authz-contract";
-import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port.ts";
+import type { AuthzCompatibilityLedgerRepository } from "../repositories/authz-compatibility-ledger.repository.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
 import type {
@@ -58,7 +58,7 @@ import { AuthzOffboardingService } from "./authz-offboarding.service.ts";
 export type AuthzGrantsServiceOptions = {
   repository: AuthzGrantRepository;
   /** Private compatibility writer; its operations surface only through this service. */
-  ledger: AuthzCompatibilityLedgerPort;
+  ledger: AuthzCompatibilityLedgerRepository;
   epoch: AuthzEpochRepository;
   newBindingId: () => string;
   bindings: AuthzBindingRepository;

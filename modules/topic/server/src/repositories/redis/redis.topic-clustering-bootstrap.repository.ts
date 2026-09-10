@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
+import type { TopicClusteringCommandsPort } from "../../ports/topic-clustering-commands.port.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:topic-clustering:bootstrap-gate");
@@ -42,7 +42,7 @@ function buildKey(projectId: string): string {
  * Best-effort by design: a Redis failure proceeds WITHOUT the claim. Losing a
  * schedule is a silent product outage; an extra commit is not.
  */
-export class RedisTopicClusteringBootstrapAdapter {
+export class RedisTopicClusteringBootstrapRepository {
   private constructor(
     private readonly redis: Redis | Cluster,
     private readonly commands: TopicClusteringCommandsPort,
@@ -53,8 +53,8 @@ export class RedisTopicClusteringBootstrapAdapter {
     redis: Redis | Cluster;
     commands: TopicClusteringCommandsPort;
     ttlSeconds?: number;
-  }): RedisTopicClusteringBootstrapAdapter {
-    return new RedisTopicClusteringBootstrapAdapter(
+  }): RedisTopicClusteringBootstrapRepository {
+    return new RedisTopicClusteringBootstrapRepository(
       options.redis,
       options.commands,
       options.ttlSeconds ?? BOOTSTRAP_CLAIM_TTL_SECONDS,

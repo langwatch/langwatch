@@ -3,7 +3,7 @@ import {
   TENANT_BROADCAST_EVENT_TYPES,
   TenantBroadcastPublisherPort,
 } from "../../ports/tenant-broadcast.port.ts";
-import { RedisTenantBroadcastAdapter } from "../redis.tenant-broadcast.adapter.ts";
+import { RedisTenantBroadcastRepository } from "../../repositories/redis/redis.tenant-broadcast.repository.ts";
 
 /**
  * Spec: modules/notification/specs/tenant-broadcast-twin.feature
@@ -32,7 +32,7 @@ class RefusingPublisher extends TenantBroadcastPublisherPort {
 const FROZEN_NOW = 1_756_000_000_000;
 
 function adapterOver(publisher: TenantBroadcastPublisherPort, logger?: unknown) {
-  return RedisTenantBroadcastAdapter.createWithClock({
+  return RedisTenantBroadcastRepository.createWithClock({
     publisher,
     now: () => FROZEN_NOW,
     ...(logger ? { logger: logger as never } : {}),

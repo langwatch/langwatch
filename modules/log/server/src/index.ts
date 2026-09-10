@@ -2,9 +2,9 @@ export { LogApp } from "./app/log.app.ts";
 export type { LogInfrastructure } from "./app/log.app.ts";
 export { logServer } from "./log.server.ts";
 export { CanonicalLogAdapter } from "./adapters/canonical-log.adapter.ts";
-export { ClickHouseLogProcessingAdapter } from "./adapters/clickhouse.log-processing.adapter.ts";
+export { ClickhouseLogProcessingRepository as ClickHouseLogProcessingAdapter } from "./repositories/clickhouse/clickhouse.log-processing.repository.ts";
 export type { LogProcessingPipeline } from "./adapters/log-processing.adapter.ts";
-export { LogRuntimeAdapter } from "./adapters/runtime.log.adapter.ts";
+export { ClickhouseLogRepository as LogRuntimeAdapter } from "./repositories/clickhouse/clickhouse.log.repository.ts";
 
 /**
  * The OTLP LOG signal's collection: one export request in, canonical records

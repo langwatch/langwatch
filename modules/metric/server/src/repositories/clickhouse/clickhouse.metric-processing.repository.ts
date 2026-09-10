@@ -3,11 +3,11 @@ import type { MetricProcessingEvent } from "@langwatch/metric-contract";
 import {
   ClickHouseMetricDataPointAppendRepository,
   type MetricClickHouseClientResolver,
-} from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
+} from "./clickhouse.metric-data-point-append.repository.ts";
 import {
   MetricProcessingAdapter,
   type MetricProcessingPipeline,
-} from "./metric-processing.adapter.ts";
+} from "../../adapters/metric-processing.adapter.ts";
 
 /**
  * Durable metric processing, composed from nothing but a tenant-keyed
@@ -16,7 +16,7 @@ import {
  * this path, because demanding them is what kept the pipeline unbuildable
  * outside the App.
  */
-export class ClickHouseMetricProcessingAdapter {
+export class ClickhouseMetricProcessingRepository {
   private constructor(
     private readonly repository: ClickHouseMetricDataPointAppendRepository,
     private readonly metricCommandShardCount: number,
@@ -28,8 +28,8 @@ export class ClickHouseMetricProcessingAdapter {
     /** The fallback for rows whose tenant declares no retention override. */
     defaultRetentionDays: number;
     metricCommandShardCount: number;
-  }): ClickHouseMetricProcessingAdapter {
-    return new ClickHouseMetricProcessingAdapter(
+  }): ClickhouseMetricProcessingRepository {
+    return new ClickhouseMetricProcessingRepository(
       ClickHouseMetricDataPointAppendRepository.create({
         resolveClient: options.resolveClient,
         defaultRetentionDays: options.defaultRetentionDays,

@@ -1,12 +1,12 @@
 import { RedisCachedFoldStore, RepositoryFoldStore } from "@langwatch/eventing";
 import { SUITE_RUN_PROJECTION_VERSIONS, type SuiteRunStateData } from "@langwatch/suite-contract";
 import type { Cluster, Redis } from "ioredis";
-import { ClickHouseSuiteEventingAdapter } from "./clickhouse.suite-eventing.adapter.ts";
+import { ClickhouseSuiteEventingRepository } from "../clickhouse/clickhouse.suite-eventing.repository.ts";
 import {
   SuiteRunProcessingPipelineAdapter,
   type SuiteRunProcessingPipeline,
-} from "./suite-run-processing.adapter.ts";
-import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port.ts";
+} from "../../adapters/suite-run-processing.adapter.ts";
+import type { SuiteClickHouseClient } from "../../ports/suite-clickhouse.port.ts";
 
 /**
  * The Redis keyspace the suite-run fold's read-through cache occupies. A
@@ -33,11 +33,11 @@ export type ClickHouseSuiteRunProcessingAdapterOptions = {
  * Durable suite-run processing, composed from a tenant-keyed ClickHouse client and the
  * process's own Redis.
  */
-export class ClickHouseSuiteRunProcessingAdapter {
+export class RedisSuiteRunProcessingRepository {
   static create(
     options: ClickHouseSuiteRunProcessingAdapterOptions,
-  ): ClickHouseSuiteRunProcessingAdapter {
-    return new ClickHouseSuiteRunProcessingAdapter(options);
+  ): RedisSuiteRunProcessingRepository {
+    return new RedisSuiteRunProcessingRepository(options);
   }
 
   private constructor(private readonly options: ClickHouseSuiteRunProcessingAdapterOptions) {}
@@ -46,7 +46,7 @@ export class ClickHouseSuiteRunProcessingAdapter {
     return SuiteRunProcessingPipelineAdapter.create({
       suiteRunStateFoldStore: new RedisCachedFoldStore<SuiteRunStateData>(
         new RepositoryFoldStore<SuiteRunStateData>(
-          ClickHouseSuiteEventingAdapter.create({
+          ClickhouseSuiteEventingRepository.create({
             resolveClient: this.options.resolveClient,
             defaultRetentionDays: this.options.defaultRetentionDays,
           }).build().suiteRunState,

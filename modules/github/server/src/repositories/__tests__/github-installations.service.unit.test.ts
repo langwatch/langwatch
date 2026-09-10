@@ -9,13 +9,13 @@ import {
   type GithubRepository,
 } from "@langwatch/github-contract";
 import {
-  GithubAppTokenAdapter,
+  RedisGithubAppTokenRepository,
   type GithubInstallationDetails,
   GithubInstallationNotFoundError,
   type GithubInstallationToken,
   GithubRateLimitedError,
   type MintInstallationTokenInput,
-} from "../../adapters/github-app-token.adapter.ts";
+} from "../redis/redis.github-app-token.repository.ts";
 import type {
   GithubInstallationRow,
   GithubInstallationsRepository,
@@ -88,8 +88,8 @@ function makeAppTokens(
     mintInstallationToken: (input: MintInstallationTokenInput) => Promise<GithubInstallationToken>;
     listInstallationRepositories: (installationId: string) => Promise<GithubRepository[]>;
   }> = {},
-): GithubAppTokenAdapter {
-  const tokens = GithubAppTokenAdapter.create("app-1", "test-private-key", null);
+): RedisGithubAppTokenRepository {
+  const tokens = RedisGithubAppTokenRepository.create("app-1", "test-private-key", null);
 
   vi.spyOn(tokens, "configured", "get").mockReturnValue(over.configured ?? true);
   vi.spyOn(tokens, "getInstallation").mockImplementation(
@@ -116,7 +116,7 @@ function makeAppTokens(
 
 function service(
   repo: GithubInstallationsRepository,
-  appTokens: GithubAppTokenAdapter,
+  appTokens: RedisGithubAppTokenRepository,
 ): GithubInstallationsService {
   const access = GithubInstallationAccessService.create(repo, appTokens);
   return GithubInstallationsService.create(repo, appTokens, organizations, access);
@@ -515,7 +515,7 @@ describe("mintTurnToken", () => {
       const svc = service(repo, makeAppTokens({ mintInstallationToken: mint }));
       const result = await svc.tryMintTurnToken({ organizationId: "org-1" });
       expect(result?.token).toBe("ghs_all");
-      expect(result?.repoScopeKey).toBe(GithubAppTokenAdapter.computeRepoScopeKey({}));
+      expect(result?.repoScopeKey).toBe(RedisGithubAppTokenRepository.computeRepoScopeKey({}));
       // No repository_ids ⇒ full installation scope.
       expect(mint).toHaveBeenCalledWith({ installationId: "inst-1" });
       // The minted token is ephemeral: nothing about it reaches persistence.
@@ -542,7 +542,7 @@ describe("mintTurnToken", () => {
       });
       expect(result?.token).toBe("ghs_one");
       expect(result?.repoScopeKey).toBe(
-        GithubAppTokenAdapter.computeRepoScopeKey({ repositoryIds: ["77"] }),
+        RedisGithubAppTokenRepository.computeRepoScopeKey({ repositoryIds: ["77"] }),
       );
       expect(mint).toHaveBeenCalledWith({
         installationId: "inst-1",

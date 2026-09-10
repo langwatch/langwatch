@@ -7,39 +7,39 @@ import type { Cluster, Redis } from "ioredis";
 import {
   EventingTopicClusteringCommandsAdapter,
   EventingTopicClusteringOutcomeCommandsAdapter,
-} from "./eventing.topic-clustering-commands.adapter.ts";
-import { EventingTopicClusteringScheduleAdapter } from "./eventing.topic-clustering-schedule.adapter.ts";
+} from "../../adapters/eventing.topic-clustering-commands.adapter.ts";
+import { EventingTopicClusteringScheduleAdapter } from "../../adapters/eventing.topic-clustering-schedule.adapter.ts";
 import {
   createTopicClusteringProcessingPipeline,
   type TopicClusteringProcessingPipelineDeps,
-} from "./eventing.topic-clustering.adapter.ts";
-import { RedisTopicClusteringBootstrapAdapter } from "./redis.topic-clustering-bootstrap.adapter.ts";
+} from "../../adapters/eventing.topic-clustering.adapter.ts";
+import { RedisTopicClusteringBootstrapRepository } from "../redis/redis.topic-clustering-bootstrap.repository.ts";
 import {
   classifyClusteringError,
   type TopicClusteringMetricsPort,
   type TopicClusteringRunPort,
-} from "../intents/topic-clustering.intent.ts";
+} from "../../intents/topic-clustering.intent.ts";
 import {
   TopicClusteringRunner,
   type TopicClusteringRunnerDeps,
-} from "../intents/topic-clustering-runner.intent.ts";
-import { LegacyImportTopicClusteringMigration } from "../migrations/legacy-import.topic-clustering.migration.ts";
-import type { TopicClusteringClickHouseResolver } from "../ports/topic-clustering-clickhouse.port.ts";
+} from "../../intents/topic-clustering-runner.intent.ts";
+import { LegacyImportTopicClusteringMigration } from "../../migrations/legacy-import.topic-clustering.migration.ts";
+import type { TopicClusteringClickHouseResolver } from "../../ports/topic-clustering-clickhouse.port.ts";
 import type {
   TopicClusteringLangevalsKind,
   TopicClusteringLangevalsPort,
-} from "../ports/topic-clustering-langevals.port.ts";
-import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
-import type { TopicClusteringDatabase } from "../repositories/prisma/prisma.topic-clustering.repository.ts";
-import { PrismaTopicClusteringRunHistoryProjectionRepository } from "../repositories/prisma/prisma.topic-clustering-run-history-projection.repository.ts";
-import { PrismaTopicClusteringRunProjectionRepository } from "../repositories/prisma/prisma.topic-clustering-run-projection.repository.ts";
-import { PrismaTopicModelProjectionRepository } from "../repositories/prisma/prisma.topic-model-projection.repository.ts";
-import { PostgresTopicRepositories } from "../repositories/prisma/prisma.topic.repositories.ts";
-import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
-import type { TopicClusteringRunHistoryData } from "../projections/topic-clustering-run-history.projection.ts";
-import type { TopicClusteringRunStatusData } from "../projections/topic-clustering-run-status.projection.ts";
-import type { TopicModelData } from "../projections/topic-model.projection.ts";
-import { TopicService } from "../services/topic.service.ts";
+} from "../../ports/topic-clustering-langevals.port.ts";
+import type { TopicClusteringCommandsPort } from "../../ports/topic-clustering-commands.port.ts";
+import type { TopicClusteringDatabase } from "./prisma.topic-clustering.repository.ts";
+import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./prisma.topic-clustering-run-history-projection.repository.ts";
+import { PrismaTopicClusteringRunProjectionRepository } from "./prisma.topic-clustering-run-projection.repository.ts";
+import { PrismaTopicModelProjectionRepository } from "./prisma.topic-model-projection.repository.ts";
+import { PostgresTopicRepositories } from "./prisma.topic.repositories.ts";
+import type { TopicClusteringRepository } from "../topic-clustering.repository.ts";
+import type { TopicClusteringRunHistoryData } from "../../projections/topic-clustering-run-history.projection.ts";
+import type { TopicClusteringRunStatusData } from "../../projections/topic-clustering-run-status.projection.ts";
+import type { TopicModelData } from "../../projections/topic-model.projection.ts";
+import { TopicService } from "../../services/topic.service.ts";
 import { nowInstant } from "@langwatch/time";
 
 /** The clustering pipeline's Postgres persistence, keyed as the registry expects it. */
@@ -69,9 +69,9 @@ export interface TopicServerInstallerDependencies {
 }
 
 /** Builds Topic's read service, pipeline, runner, and boot seeds as one graph. */
-export class TopicServerInstallerAdapter {
-  static create(options: TopicServerInstallerDependencies): TopicServerInstallerAdapter {
-    return new TopicServerInstallerAdapter(options);
+export class PrismaTopicServerInstallerRepository {
+  static create(options: TopicServerInstallerDependencies): PrismaTopicServerInstallerRepository {
+    return new PrismaTopicServerInstallerRepository(options);
   }
 
   readonly service: TopicApi;
@@ -134,7 +134,7 @@ export class TopicServerInstallerAdapter {
       recordClusteringRunFailed: pipeline.commands.recordClusteringRunFailed,
     });
     const bootstrap = this.dependencies.redis
-      ? RedisTopicClusteringBootstrapAdapter.create({
+      ? RedisTopicClusteringBootstrapRepository.create({
           redis: this.dependencies.redis,
           commands: this.commands,
         })

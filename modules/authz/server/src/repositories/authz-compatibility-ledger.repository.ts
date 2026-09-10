@@ -17,7 +17,7 @@ import type {
  * cannot yet be expressed by the smaller high-level grant verbs. It remains
  * behind AuthzGrantsService and is never exported from the package root.
  */
-export abstract class AuthzCompatibilityLedgerPort {
+export abstract class AuthzCompatibilityLedgerRepository {
   abstract attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput>;
 
   abstract attachResourceGrant(args: AuthzAttachResourceGrantInput): Promise<void>;

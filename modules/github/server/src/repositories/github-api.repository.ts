@@ -5,9 +5,9 @@ import type {
   GithubInstallationToken,
   GithubPullRequestSummary,
   MintInstallationTokenInput,
-} from "./github-app-token.port.ts";
+} from "./github-app-token.repository.ts";
 
-export abstract class GithubApiPort {
+export abstract class GithubApiRepository {
   abstract readonly configured: boolean;
   abstract signAppJwt(nowSec?: number): string;
   abstract getInstallation(installationId: string): Promise<GithubInstallationDetails>;

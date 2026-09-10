@@ -181,6 +181,18 @@ export abstract class ProjectKeyMapPort {
 			want: TierSplit,
 		},
 		{
+			name: "a thin adapter wrapping the existing prisma repository of the same subject is wiring, not prisma",
+			file: "thing.adapter.ts",
+			content: `
+import { PrismaThingRepository } from "../repositories/prisma/prisma.thing.repository.ts";
+export class ThingAdapter {
+  constructor(private repo: PrismaThingRepository) {}
+  findById(id: string) { return this.repo.findById(id); }
+}
+`,
+			want: TierInfrastructure,
+		},
+		{
 			name: "a resolver port that does not contain the storage subject is not the symbol",
 			file: "dataset-storage.port.ts",
 			content: `
@@ -224,7 +236,20 @@ func TestSubjectName(t *testing.T) {
 }
 
 func TestPascalCase(t *testing.T) {
-	if got := pascalCase("agent-sandbox-key-share"); got != "AgentSandboxKeyShare" {
-		t.Errorf("pascalCase() = %q", got)
+	cases := map[string]string{
+		"agent-sandbox-key-share": "AgentSandboxKeyShare",
+		"clickhouse-usage":        "ClickHouseUsage",
+		"openai-connection":       "OpenAIConnection",
+		"langwatch-nexus":         "LangWatchNexus",
+		"sso-config":              "SSOConfig",
+		"scim-provisioning":       "SCIMProvisioning",
+		"otlp-export":             "OTLPExport",
+		"http-client":             "HTTPClient",
+		"s3-object":               "S3Object",
+	}
+	for kebab, want := range cases {
+		if got := pascalCase(kebab); got != want {
+			t.Errorf("pascalCase(%q) = %q, want %q", kebab, got, want)
+		}
 	}
 }

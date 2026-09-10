@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import { ClickHouseSuiteRunProcessingAdapter } from "../clickhouse.suite-run-processing.adapter.ts";
+import { RedisSuiteRunProcessingRepository } from "../../repositories/redis/redis.suite-run-processing.repository.ts";
 import type { SuiteRunProcessingPipeline } from "../suite-run-processing.adapter.ts";
 
 /**
@@ -52,7 +52,7 @@ function compose(
   const set = vi.fn(async (..._args: unknown[]) => "OK");
   const redis = { get: vi.fn(async () => null), set };
 
-  const pipeline: SuiteRunProcessingPipeline = ClickHouseSuiteRunProcessingAdapter.create({
+  const pipeline: SuiteRunProcessingPipeline = RedisSuiteRunProcessingRepository.create({
     resolveClient,
     defaultRetentionDays: 49,
     redis: redis as never,

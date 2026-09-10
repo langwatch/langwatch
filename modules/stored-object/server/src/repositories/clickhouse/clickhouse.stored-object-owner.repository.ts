@@ -1,4 +1,4 @@
-import { StoredObjectOwnerInstanceDirectoryPort } from "../../ports/stored-object-owner-instance-directory.port.ts";
+import { StoredObjectOwnerInstanceDirectoryRepository } from "../stored-object-owner-instance-directory.repository.ts";
 import {
   StoredObjectOwnerRepository,
   type StoredObjectOwnerHit,
@@ -12,12 +12,12 @@ type StoredObjectOwnerRow = Readonly<{
 /** Private ClickHouse adapter for the legacy id-only file delivery lookup. */
 export class ClickHouseStoredObjectOwnerRepository extends StoredObjectOwnerRepository {
   static create(
-    instanceDirectory: StoredObjectOwnerInstanceDirectoryPort,
+    instanceDirectory: StoredObjectOwnerInstanceDirectoryRepository,
   ): ClickHouseStoredObjectOwnerRepository {
     return new ClickHouseStoredObjectOwnerRepository(instanceDirectory);
   }
 
-  private constructor(private readonly instanceDirectory: StoredObjectOwnerInstanceDirectoryPort) {
+  private constructor(private readonly instanceDirectory: StoredObjectOwnerInstanceDirectoryRepository) {
     super();
   }
 

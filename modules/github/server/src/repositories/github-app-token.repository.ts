@@ -45,7 +45,7 @@ export type MintInstallationTokenInput = {
   permissions?: Record<string, string>;
 };
 
-export abstract class GithubAppTokenPort {
+export abstract class GithubAppTokenRepository {
   abstract readonly configured: boolean;
   abstract getInstallation(installationId: string): Promise<GithubInstallationDetails>;
   abstract mintInstallationToken(

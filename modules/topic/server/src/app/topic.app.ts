@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/topic-contract";
 import { TopicApi as TopicApiToken } from "@langwatch/topic-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { TopicClusteringSchedulePort } from "../ports/topic-clustering-schedule.port.ts";
+import type { TopicClusteringScheduleRepository } from "../repositories/topic-clustering-schedule.repository.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
 import { TopicService } from "../services/topic.service.ts";
 
@@ -18,7 +18,7 @@ import { TopicService } from "../services/topic.service.ts";
  * eventing owns the schedule, and a test owns time.
  */
 export type TopicInfrastructure = Readonly<{
-  schedule: TopicClusteringSchedulePort;
+  schedule: TopicClusteringScheduleRepository;
   now?: (() => number) | undefined;
 }>;
 

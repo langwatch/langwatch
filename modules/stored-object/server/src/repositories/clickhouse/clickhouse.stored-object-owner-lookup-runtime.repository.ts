@@ -1,0 +1,22 @@
+import { ClickHouseStoredObjectOwnerRepository } from "./clickhouse.stored-object-owner.repository.ts";
+import { StoredObjectOwnerLookupService } from "../../services/stored-object-owner-lookup.service.ts";
+import { StoredObjectOwnerLookupTelemetryPort } from "../../ports/stored-object-owner-lookup-telemetry.port.ts";
+import { StoredObjectOwnerInstanceDirectoryRepository } from "../stored-object-owner-instance-directory.repository.ts";
+import type { StoredObjectOwnerResolver } from "@langwatch/stored-object-contract";
+
+/** Process-composed compatibility graph for legacy id-only stored-object URLs. */
+export class ClickhouseStoredObjectOwnerLookupRuntimeRepository {
+  static create(input: {
+    instanceDirectory: StoredObjectOwnerInstanceDirectoryRepository;
+    telemetry: StoredObjectOwnerLookupTelemetryPort;
+  }): ClickhouseStoredObjectOwnerLookupRuntimeRepository {
+    const repository = ClickHouseStoredObjectOwnerRepository.create(input.instanceDirectory);
+    const resolver = StoredObjectOwnerLookupService.create({
+      repository,
+      telemetry: input.telemetry,
+    });
+    return new ClickhouseStoredObjectOwnerLookupRuntimeRepository(resolver);
+  }
+
+  private constructor(readonly resolver: StoredObjectOwnerResolver) {}
+}

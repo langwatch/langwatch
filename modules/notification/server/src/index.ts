@@ -20,7 +20,7 @@ export {
 } from "./ports/email-delivery.port.ts";
 export { EmailMimeService } from "./services/email-mime.service.ts";
 export { EmailProviderService } from "./services/email-provider.service.ts";
-export { RedisTenantBroadcastAdapter } from "./adapters/redis.tenant-broadcast.adapter.ts";
+export { RedisTenantBroadcastRepository as RedisTenantBroadcastAdapter } from "./repositories/redis/redis.tenant-broadcast.repository.ts";
 export {
   TENANT_BROADCAST_EVENT_TYPES,
   TenantBroadcastPort,

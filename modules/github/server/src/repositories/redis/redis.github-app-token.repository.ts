@@ -1,23 +1,23 @@
 import { createHash } from "node:crypto";
 import type { GithubRepository } from "@langwatch/github-contract";
 
-import type { GithubApiPort } from "../ports/github-api.port.ts";
+import type { GithubApiRepository } from "../github-api.repository.ts";
 import {
   GITHUB_READ_PULL_PERMISSIONS,
   GITHUB_WRITE_PERMISSIONS,
-  GithubAppTokenPort,
+  GithubAppTokenRepository,
   GithubInstallationNotFoundError,
   type GithubInstallationDetails,
   type GithubInstallationToken,
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
-} from "../ports/github-app-token.port.ts";
-import type { GithubRedisPort } from "../repositories/redis/github-redis.connection.ts";
-import type { GithubHostPort } from "../ports/github-host.port.ts";
-import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
-import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";
-import { GithubApiAdapter } from "./github-api.adapter.ts";
-import { GithubHostService } from "../services/github-host.service.ts";
+} from "../github-app-token.repository.ts";
+import type { GithubRedisPort } from "./github-redis.connection.ts";
+import type { GithubHostPort } from "../../ports/github-host.port.ts";
+import type { GithubTokenCacheRepository } from "../github-token-cache.repository.ts";
+import { GithubTokenCacheRedisRepository } from "./redis.github-token-cache.repository.ts";
+import { GithubApiAdapter } from "../../adapters/github-api.adapter.ts";
+import { GithubHostService } from "../../services/github-host.service.ts";
 
 export {
   GITHUB_READ_PULL_PERMISSIONS,
@@ -28,27 +28,27 @@ export {
   type GithubInstallationToken,
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
-} from "../ports/github-app-token.port.ts";
-export type { GithubRedisPort } from "../repositories/redis/github-redis.connection.ts";
+} from "../github-app-token.repository.ts";
+export type { GithubRedisPort } from "./github-redis.connection.ts";
 
 const INSTALLATION_TOKEN_CACHE_TTL_SEC = 50 * 60;
 const LIVENESS_RECHECK_TTL_SEC = 5 * 60;
 const LIVENESS_FAILURE_BACKOFF_SEC = 60;
 
-export class GithubAppTokenAdapter extends GithubAppTokenPort {
+export class RedisGithubAppTokenRepository extends GithubAppTokenRepository {
   static create(
     appId: string,
     privateKey: string,
     redis: GithubRedisPort | null,
     host: GithubHostPort = GithubHostService.create(),
-  ): GithubAppTokenAdapter {
+  ): RedisGithubAppTokenRepository {
     const api = GithubApiAdapter.create(appId, privateKey, host);
     const cache = GithubTokenCacheRedisRepository.create({ redis, host });
-    return new GithubAppTokenAdapter(api, cache);
+    return new RedisGithubAppTokenRepository(api, cache);
   }
 
   private constructor(
-    private readonly api: GithubApiPort,
+    private readonly api: GithubApiRepository,
     private readonly cache: GithubTokenCacheRepository,
   ) {
     super();
@@ -62,7 +62,7 @@ export class GithubAppTokenAdapter extends GithubAppTokenPort {
     repositoryIds?: string[];
     permissions?: Record<string, string>;
   }): string {
-    return GithubAppTokenAdapter.computeRepoScopeKey(input);
+    return RedisGithubAppTokenRepository.computeRepoScopeKey(input);
   }
 
   static computeRepoScopeKey(input: {

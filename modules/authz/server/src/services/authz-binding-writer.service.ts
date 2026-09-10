@@ -25,7 +25,7 @@ import {
 // One class, one status: an organization's membership is the organization
 // feature's fact, and every surface answers this refusal 422.
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
-import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port.ts";
+import type { AuthzCompatibilityLedgerRepository } from "../repositories/authz-compatibility-ledger.repository.ts";
 import type {
   AuthzBindingRepository,
   AuthzBindingScopeRow,
@@ -34,7 +34,7 @@ import type {
 export class AuthzBindingWriterService {
   static create(options: {
     bindings: AuthzBindingRepository;
-    ledger: AuthzCompatibilityLedgerPort;
+    ledger: AuthzCompatibilityLedgerRepository;
     newBindingId: () => string;
   }): AuthzBindingWriterService {
     return new AuthzBindingWriterService(options);
@@ -43,7 +43,7 @@ export class AuthzBindingWriterService {
   private constructor(
     private readonly options: {
       bindings: AuthzBindingRepository;
-      ledger: AuthzCompatibilityLedgerPort;
+      ledger: AuthzCompatibilityLedgerRepository;
       newBindingId: () => string;
     },
   ) {}

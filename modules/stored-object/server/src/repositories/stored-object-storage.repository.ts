@@ -3,7 +3,7 @@
  */
 import type { Readable } from "node:stream";
 
-export abstract class StoredObjectStoragePort {
+export abstract class StoredObjectStorageRepository {
   abstract get(uri: string): Promise<Readable>;
   abstract put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
   abstract delete(uri: string): Promise<void>;

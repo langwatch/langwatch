@@ -24,7 +24,7 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
 import type { GithubProjectActivityPort } from "../ports/github-project-activity.port.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
-import { GithubAppTokenAdapter } from "../adapters/github-app-token.adapter.ts";
+import { RedisGithubAppTokenRepository } from "../repositories/redis/redis.github-app-token.repository.ts";
 import { GithubHostService } from "../services/github-host.service.ts";
 import { GithubInstallResponseRules } from "../rules/github-install-response.rules.ts";
 import { GithubInstallStateService } from "../services/github-install-state.service.ts";
@@ -83,7 +83,7 @@ export type GithubComposition = Readonly<{
 export function composeGithubApi(parts: GithubComposition): GithubFeatureService {
   const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-  const appTokens = GithubAppTokenAdapter.create(
+  const appTokens = RedisGithubAppTokenRepository.create(
     parts.config.appId,
     parts.config.privateKey,
     redis,
@@ -166,7 +166,7 @@ export function composeGithubBranchMaintenance(
 ): GithubBranchMaintenancePort {
   const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-  const appTokens = GithubAppTokenAdapter.create(
+  const appTokens = RedisGithubAppTokenRepository.create(
     parts.config.appId,
     parts.config.privateKey,
     redis,
@@ -204,7 +204,7 @@ export function composeGithubBranchDemand(
 ): GithubBranchDemandPort {
   const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-  const appTokens = GithubAppTokenAdapter.create(
+  const appTokens = RedisGithubAppTokenRepository.create(
     parts.config.appId,
     parts.config.privateKey,
     redis,

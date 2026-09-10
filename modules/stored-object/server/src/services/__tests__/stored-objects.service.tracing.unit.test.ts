@@ -28,7 +28,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { StoredObjectStoragePort } from "../../ports/stored-object-storage.port.ts";
+import type { StoredObjectStorageRepository } from "../../repositories/stored-object-storage.repository.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
 import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port.ts";
@@ -64,7 +64,7 @@ function makeService(): StoredObjectsService {
       put: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
       exists: vi.fn(async () => true),
-    } as unknown as StoredObjectStoragePort,
+    } as unknown as StoredObjectStorageRepository,
     mintStorageUri: async ({ projectId, sha256 }) => `file:///tmp/${projectId}/${sha256}`,
     telemetry: {
       recordExtract: vi.fn(),

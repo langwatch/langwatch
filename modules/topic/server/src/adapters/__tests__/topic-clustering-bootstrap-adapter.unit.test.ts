@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   BOOTSTRAP_CLAIM_TTL_SECONDS,
-  RedisTopicClusteringBootstrapAdapter,
-} from "../redis.topic-clustering-bootstrap.adapter.ts";
+  RedisTopicClusteringBootstrapRepository,
+} from "../../repositories/redis/redis.topic-clustering-bootstrap.repository.ts";
 
 /** Minimal SET NX EX stand-in with real claim semantics. */
 function fakeRedis() {
@@ -28,7 +28,7 @@ describe("given a rate-limited topic clustering bootstrap", () => {
       const topicCommands = commands();
       const { redis } = fakeRedis();
 
-      await RedisTopicClusteringBootstrapAdapter.create({
+      await RedisTopicClusteringBootstrapRepository.create({
         redis,
         commands: topicCommands,
       }).claimAndBootstrap("project-1");
@@ -44,7 +44,7 @@ describe("given a rate-limited topic clustering bootstrap", () => {
       const topicCommands = commands();
       const { redis, set } = fakeRedis();
 
-      await RedisTopicClusteringBootstrapAdapter.create({
+      await RedisTopicClusteringBootstrapRepository.create({
         redis,
         commands: topicCommands,
       }).claimAndBootstrap("project-1");
@@ -64,7 +64,7 @@ describe("given a rate-limited topic clustering bootstrap", () => {
       // This is what makes calling it on every ingest affordable.
       const topicCommands = commands();
       const { redis } = fakeRedis();
-      const gate = RedisTopicClusteringBootstrapAdapter.create({ redis, commands: topicCommands });
+      const gate = RedisTopicClusteringBootstrapRepository.create({ redis, commands: topicCommands });
 
       await gate.claimAndBootstrap("project-1");
       await gate.claimAndBootstrap("project-1");
@@ -78,7 +78,7 @@ describe("given a rate-limited topic clustering bootstrap", () => {
     it("is claimed independently", async () => {
       const topicCommands = commands();
       const { redis } = fakeRedis();
-      const gate = RedisTopicClusteringBootstrapAdapter.create({ redis, commands: topicCommands });
+      const gate = RedisTopicClusteringBootstrapRepository.create({ redis, commands: topicCommands });
 
       await gate.claimAndBootstrap("project-1");
       await gate.claimAndBootstrap("project-2");
@@ -99,7 +99,7 @@ describe("given a rate-limited topic clustering bootstrap", () => {
         set: vi.fn().mockRejectedValue(new Error("connection refused")),
       } as never;
 
-      await RedisTopicClusteringBootstrapAdapter.create({
+      await RedisTopicClusteringBootstrapRepository.create({
         redis,
         commands: topicCommands,
       }).claimAndBootstrap("project-1");
@@ -119,7 +119,7 @@ describe("given a rate-limited topic clustering bootstrap", () => {
       const { redis } = fakeRedis();
 
       await expect(
-        RedisTopicClusteringBootstrapAdapter.create({
+        RedisTopicClusteringBootstrapRepository.create({
           redis,
           commands: topicCommands,
         }).claimAndBootstrap("project-1"),

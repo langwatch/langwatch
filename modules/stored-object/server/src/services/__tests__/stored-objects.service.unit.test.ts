@@ -43,7 +43,7 @@ vi.mock("@langwatch/observability", () => ({
 // ---------------------------------------------------------------------------
 
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import type { StoredObjectStoragePort } from "../../ports/stored-object-storage.port.ts";
+import type { StoredObjectStorageRepository } from "../../repositories/stored-object-storage.repository.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
 import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port.ts";
@@ -64,13 +64,13 @@ function makeRepository(): StoredObjectsRepository {
   } as unknown as StoredObjectsRepository;
 }
 
-function makeRegistry(): StoredObjectStoragePort {
+function makeRegistry(): StoredObjectStorageRepository {
   return {
     get: vi.fn().mockResolvedValue(Readable.from([])),
     put: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     exists: vi.fn().mockResolvedValue(true),
-  } as unknown as StoredObjectStoragePort;
+  } as unknown as StoredObjectStorageRepository;
 }
 
 function makeTelemetry(): StoredObjectsTelemetryPort {
@@ -117,7 +117,7 @@ function makeService({
   mintStorageUri,
 }: {
   repository: StoredObjectsRepository;
-  registry: StoredObjectStoragePort;
+  registry: StoredObjectStorageRepository;
   mintStorageUri?: MintStorageUri;
 }): StoredObjectsService {
   return StoredObjectsService.create({
@@ -135,7 +135,7 @@ function makeService({
 
 describe("storeFromBytes", () => {
   let repo: StoredObjectsRepository;
-  let registry: StoredObjectStoragePort;
+  let registry: StoredObjectStorageRepository;
   let service: StoredObjectsService;
   let mockMintStorageUri: ReturnType<typeof vi.fn> & MintStorageUri;
 
@@ -355,7 +355,7 @@ describe("storeFromBytes", () => {
 
 describe("tryGetById", () => {
   let repo: StoredObjectsRepository;
-  let registry: StoredObjectStoragePort;
+  let registry: StoredObjectStorageRepository;
   let service: StoredObjectsService;
 
   beforeEach(() => {
@@ -430,7 +430,7 @@ describe("tryGetById", () => {
 
 describe("deleteOwnedBy", () => {
   let repo: StoredObjectsRepository;
-  let registry: StoredObjectStoragePort;
+  let registry: StoredObjectStorageRepository;
   let service: StoredObjectsService;
 
   beforeEach(() => {
@@ -513,7 +513,7 @@ describe("deleteOwnedBy", () => {
 
 describe("headById", () => {
   let repo: StoredObjectsRepository;
-  let registry: StoredObjectStoragePort;
+  let registry: StoredObjectStorageRepository;
   let service: StoredObjectsService;
 
   beforeEach(() => {
@@ -570,7 +570,7 @@ describe("headById", () => {
 
 describe("the service surface a caller composes against", () => {
   let repo: StoredObjectsRepository;
-  let registry: StoredObjectStoragePort;
+  let registry: StoredObjectStorageRepository;
   let service: StoredObjectsService;
 
   beforeEach(() => {

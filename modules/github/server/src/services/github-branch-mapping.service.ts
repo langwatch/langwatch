@@ -4,11 +4,11 @@ import {
 } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
 import {
-  type GithubAppTokenPort,
+  type GithubAppTokenRepository,
   type GithubPullRequestSummary,
   GithubRateLimitedError,
-} from "../ports/github-app-token.port.ts";
-import type { GithubBranchInstallationsPort } from "../ports/github-branch-installations.port.ts";
+} from "../repositories/github-app-token.repository.ts";
+import type { GithubBranchInstallationsRepository } from "../repositories/github-branch-installations.repository.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
 import { Temporal, nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 import type {
@@ -47,8 +47,8 @@ type BranchScope = {
 };
 type BranchMappingDeps = {
   repository: GithubPullRequestsRepository;
-  installations: GithubBranchInstallationsPort;
-  appTokens: GithubAppTokenPort;
+  installations: GithubBranchInstallationsRepository;
+  appTokens: GithubAppTokenRepository;
   host: GithubHostPort;
   now?: () => number;
 };

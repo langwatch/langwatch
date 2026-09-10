@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
-import { GithubApiPort } from "../ports/github-api.port.ts";
+import { GithubApiRepository } from "../repositories/github-api.repository.ts";
 import {
   GithubInstallationNotFoundError,
   type GithubInstallationDetails,
@@ -12,7 +12,7 @@ import {
   GithubRateLimitedError,
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
-} from "../ports/github-app-token.port.ts";
+} from "../repositories/github-app-token.repository.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
 
@@ -96,7 +96,7 @@ function toPullRequestSummary(pull: z.infer<typeof pullRequestSchema>): GithubPu
   };
 }
 
-export class GithubApiAdapter extends GithubApiPort {
+export class GithubApiAdapter extends GithubApiRepository {
   static create(appId: string, privateKey: string, host: GithubHostPort): GithubApiAdapter {
     return new GithubApiAdapter(appId, privateKey, host);
   }
