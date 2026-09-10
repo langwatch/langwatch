@@ -157,15 +157,30 @@ describe.each(backends)("given the $name langy repositories", ({ create }) => {
   describe("when a status is put on the live edge", () => {
     it("replays it from the tail of the turn's stream", async () => {
       const repositories = create();
+      const buffer = repositories.tokenBuffer.open({ redis: undefined });
 
-      await repositories.tokenBuffer.appendStatus({ ...turn, status: "reading the trace" });
+      await buffer.appendStatus({ ...turn, status: "reading the trace" });
 
-      const tail = await repositories.tokenBuffer.readTail(turn);
+      const tail = await buffer.readTail(turn);
 
       expect(tail.reads.map((read) => read.entry)).toEqual([
         { type: "status", status: "reading the trace" },
       ]);
       expect(tail.lastId).not.toBe("0-0");
+    });
+  });
+
+  describe("when the token buffer is opened twice for the same store", () => {
+    it("both openings read back the same turn's entries", async () => {
+      const repositories = create();
+      const first = repositories.tokenBuffer.open({ redis: undefined });
+      const second = repositories.tokenBuffer.open({ redis: undefined });
+
+      await first.appendStatus({ ...turn, status: "reading the trace" });
+
+      expect((await second.readTail(turn)).reads.map((read) => read.entry)).toEqual([
+        { type: "status", status: "reading the trace" },
+      ]);
     });
   });
 

@@ -99,3 +99,6 @@ export abstract class LangyTokenBufferPort {
     now?: number;
   }): Promise<void>;
 }
+
+/** The connection a stream's blocking tail borrows, handed to `open()` below. */
+export type LangyTokenBufferConnection = { redis: unknown; blockingRedis?: unknown };

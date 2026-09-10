@@ -25,7 +25,7 @@ import {
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 
-import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
+import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
@@ -83,7 +83,7 @@ export interface LangyEgressState {
 
 /** One live turn's durable buffer, plus the connection it borrowed. */
 export interface LangyTurnStream {
-  buffer: LangyTokenBufferRedisRepository;
+  buffer: LangyTokenBufferPort;
   /** Releases the dedicated blocking connection. Always call it. */
   close(): void;
 }
@@ -135,6 +135,11 @@ export class LangyApp implements LangyApiContract {
   }
 
   private constructor(private readonly dependencies: LangyAppDependencies) {}
+
+  /** The rows this application persists outside its own event log. */
+  get repositories(): LangyRepositories {
+    return this.dependencies.repositories;
+  }
 
   /**
    * The service itself, for the paths that are not a Langy door. Everything below serves a
@@ -494,7 +499,10 @@ export class LangyApp implements LangyApiContract {
     if (!connection) return null;
     const blocking = connection.duplicate();
     return {
-      buffer: LangyTokenBufferRedisRepository.create({ redis: connection, blockingRedis: blocking }),
+      buffer: this.dependencies.repositories.tokenBuffer.open({
+        redis: connection,
+        blockingRedis: blocking,
+      }),
       close: () => blocking.disconnect(),
     };
   }

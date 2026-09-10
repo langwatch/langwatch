@@ -6,7 +6,10 @@ import type {
   LangyTurnHandoffPort,
 } from "./langy-live-turn.repository.ts";
 import type { LangyLocalPresencePort } from "./langy-local-presence.repository.ts";
-import type { LangyTokenBufferPort } from "./langy-token-buffer.repository.ts";
+import type {
+  LangyTokenBufferConnection,
+  LangyTokenBufferPort,
+} from "./langy-token-buffer.repository.ts";
 import { MemoryLangyRepositories } from "./memory/memory.langy.repositories.ts";
 import { PostgresLangyRepositories } from "./prisma/prisma.langy.repositories.ts";
 
@@ -23,7 +26,12 @@ export interface LangyRepositories {
   readonly frameDedup: LangyFrameDedupRepository;
   readonly resourceLinks: LangyResourceLinksRepository;
   readonly localPresence: LangyLocalPresencePort;
-  readonly tokenBuffer: LangyTokenBufferPort;
+  /**
+   * Opens the live edge over one turn's own borrowed connection (ADR-044 part
+   * 3): a blocking tail duplicates a connection per stream, so this row is a
+   * factory rather than one instance chosen at boot.
+   */
+  readonly tokenBuffer: { open(connection: LangyTokenBufferConnection): LangyTokenBufferPort };
 }
 
 export const langyRepositories = defineRepositories({

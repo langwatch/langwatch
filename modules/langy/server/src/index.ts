@@ -230,6 +230,7 @@ export { LangyTokenBufferRedisRepository } from "./repositories/redis/redis.lang
 export {
   type LangyStreamRead,
   type LangyStreamRedis,
+  type LangyTokenBufferConnection,
   LangyTokenBufferPort,
 } from "./repositories/langy-token-buffer.repository.ts";
 export { LANGY_EMPTY_TURN_FALLBACK } from "./rules/langy-empty-turn.rules.ts";

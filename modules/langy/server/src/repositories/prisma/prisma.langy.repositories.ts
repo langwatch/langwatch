@@ -28,7 +28,10 @@ export class PostgresLangyRepositories {
       localPresence: LangyLocalPresenceRedisRepository.create({
         store: SessionStateStoreFactory.redis(redis),
       }),
-      tokenBuffer: LangyTokenBufferRedisRepository.create({ redis }),
+      // A factory row, not a fixed instance: the blocking tail duplicates its
+      // own connection per stream, so every call builds a fresh repository
+      // over whatever connection the caller borrowed for that stream.
+      tokenBuffer: { open: (connection) => LangyTokenBufferRedisRepository.create(connection) },
     };
   }
 }
