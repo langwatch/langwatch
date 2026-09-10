@@ -34,7 +34,6 @@ import {
 import { api } from "~/utils/api";
 import { TalkToItPanel } from "./voice/TalkToItPanel";
 import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
-import { useVoicePhoneTargetsEnabled } from "./voice/useVoicePhoneTargetsEnabled";
 
 // ============================================================================
 // Constants
@@ -204,6 +203,27 @@ function hasElevenLabsKeyIn(
         Boolean(
           (row.customKeys as Record<string, unknown> | null | undefined)
             ?.ELEVENLABS_API_KEY,
+        )),
+  );
+}
+
+/**
+ * Whether the project has a Twilio provider that can dial a phone target.
+ * Mirrors {@link hasElevenLabsKeyIn}: the Phone number transport option is
+ * offered only when this is true, the same way the drawer derives ElevenLabs
+ * availability. A row with no auth token cannot dial, so it does not count.
+ */
+function hasTwilioKeyIn(
+  providers: readonly Record<string, unknown>[],
+): boolean {
+  return providers.some(
+    (row) =>
+      row.provider === "twilio" &&
+      row.enabled &&
+      (row.isSystem ||
+        Boolean(
+          (row.customKeys as Record<string, unknown> | null | undefined)
+            ?.TWILIO_AUTH_TOKEN,
         )),
   );
 }
@@ -418,10 +438,10 @@ function useVoiceAgentData({
       { projectId },
       { enabled: !!projectId && isOpen },
     );
-  const hasElevenLabsKey = hasElevenLabsKeyIn(
-    providersQuery.data?.providers ?? [],
-  );
-  return { agentQuery, hasElevenLabsKey };
+  const providers = providersQuery.data?.providers ?? [];
+  const hasElevenLabsKey = hasElevenLabsKeyIn(providers);
+  const hasTwilioKey = hasTwilioKeyIn(providers);
+  return { agentQuery, hasElevenLabsKey, hasTwilioKey };
 }
 
 /**
@@ -556,8 +576,7 @@ function useVoiceEditorState(props: AgentVoiceEditorDrawerProps) {
   // again once the editor has loaded (#23).
   const [isTalkOpen, setIsTalkOpen] = useState(drawerParams.talk === "1");
   const [createdAgentRowId, setCreatedAgentRowId] = useState<string>();
-  const phoneTargetsEnabled = useVoicePhoneTargetsEnabled();
-  const { agentQuery, hasElevenLabsKey } = useVoiceAgentData({
+  const { agentQuery, hasElevenLabsKey, hasTwilioKey } = useVoiceAgentData({
     agentId,
     projectId,
     isOpen,
@@ -585,7 +604,7 @@ function useVoiceEditorState(props: AgentVoiceEditorDrawerProps) {
     onClose,
     form,
     hasElevenLabsKey,
-    phoneTargetsEnabled,
+    hasTwilioKey,
     isTalkOpen,
     setIsTalkOpen,
     createdAgentRowId,
@@ -636,7 +655,7 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
     projectId,
     form,
     hasElevenLabsKey: state.hasElevenLabsKey,
-    phoneTargetsEnabled: state.phoneTargetsEnabled,
+    hasTwilioKey: state.hasTwilioKey,
     isSaving,
     isValid,
     hasAttemptedSubmit,
@@ -784,7 +803,7 @@ function VoiceAgentDrawerBody({
           setVoiceAgentId={form.setVoiceAgentId}
           phoneNumber={form.phoneNumber}
           setPhoneNumber={form.setPhoneNumber}
-          phoneTargetsEnabled={editor.phoneTargetsEnabled}
+          hasTwilioKey={editor.hasTwilioKey}
           hasElevenLabsKey={editor.hasElevenLabsKey}
           hasAttemptedSubmit={editor.hasAttemptedSubmit}
         />
@@ -882,19 +901,19 @@ function VoiceAgentTalkView({
 
 /**
  * The transports offered in the "Reached via" select. Phone stays hidden until
- * the `release_voice_phone_targets_enabled` flag is on, but an agent already
- * configured as phone still lists it so its own transport renders (the gate is
- * on the OPTION, not on an existing target).
+ * the project has a Twilio provider in Settings > Model Providers, but an agent
+ * already configured as phone still lists it so its own transport renders (the
+ * gate is on the OPTION, not on an existing target).
  */
 function visibleTransportsFor({
-  phoneTargetsEnabled,
+  hasTwilioKey,
   transport,
 }: {
-  phoneTargetsEnabled: boolean;
+  hasTwilioKey: boolean;
   transport: VoiceTransport;
 }): readonly VoiceTransport[] {
   return VOICE_TRANSPORTS.filter(
-    (t) => t !== "phone" || phoneTargetsEnabled || transport === "phone",
+    (t) => t !== "phone" || hasTwilioKey || transport === "phone",
   );
 }
 
@@ -907,7 +926,7 @@ function VoiceAgentForm({
   setVoiceAgentId,
   phoneNumber,
   setPhoneNumber,
-  phoneTargetsEnabled,
+  hasTwilioKey,
   hasElevenLabsKey,
   hasAttemptedSubmit,
 }: {
@@ -919,7 +938,7 @@ function VoiceAgentForm({
   setVoiceAgentId: (value: string) => void;
   phoneNumber: string;
   setPhoneNumber: (value: string) => void;
-  phoneTargetsEnabled: boolean;
+  hasTwilioKey: boolean;
   hasElevenLabsKey: boolean;
   hasAttemptedSubmit: boolean;
 }) {
@@ -930,7 +949,7 @@ function VoiceAgentForm({
     hasAttemptedSubmit && !E164_PHONE_PATTERN.test(phoneNumber.trim());
   const isPhone = transport === "phone";
   const visibleTransports = visibleTransportsFor({
-    phoneTargetsEnabled,
+    hasTwilioKey,
     transport,
   });
   const transportOptionsDisabled = visibleTransports.length <= 1;
@@ -970,6 +989,12 @@ function VoiceAgentForm({
           </NativeSelect.Field>
           <NativeSelect.Indicator />
         </NativeSelect.Root>
+        {!hasTwilioKey && !isPhone && (
+          <Field.HelperText data-testid="voice-agent-phone-hint">
+            To reach an agent by phone, add Twilio in Settings &gt; Model
+            Providers.
+          </Field.HelperText>
+        )}
       </Field.Root>
 
       {isPhone ? (

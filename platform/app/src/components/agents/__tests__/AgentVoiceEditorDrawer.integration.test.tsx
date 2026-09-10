@@ -19,6 +19,7 @@ vi.mock("../voice/TalkToItPanel", () => ({
   TalkToItPanel: (props: { onAgentCreated?: (agentRowId: string) => void }) =>
     props.onAgentCreated ? (
       <button
+        type="button"
         data-testid="mock-panel-created-row"
         onClick={() => props.onAgentCreated?.("agent_row_created")}
       >
@@ -59,13 +60,6 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 let mockVoiceAgentsEnabled = true;
 vi.mock("../voice/useVoiceAgentsEnabled", () => ({
   useVoiceAgentsEnabled: () => mockVoiceAgentsEnabled,
-}));
-
-/** Overridden per test; false by default so the phone option stays gated off
- * for the editor's own behavior tests. */
-let mockPhoneTargetsEnabled = false;
-vi.mock("../voice/useVoicePhoneTargetsEnabled", () => ({
-  useVoicePhoneTargetsEnabled: () => mockPhoneTargetsEnabled,
 }));
 
 /** What `agents.getById` answers with, so a test can open a saved agent. */
@@ -155,6 +149,12 @@ const ELEVENLABS_KEYED_PROVIDER = {
   customKeys: { ELEVENLABS_API_KEY: "***" },
 };
 
+const TWILIO_KEYED_PROVIDER = {
+  provider: "twilio",
+  enabled: true,
+  customKeys: { TWILIO_AUTH_TOKEN: "***" },
+};
+
 // -- Tests --
 
 describe("AgentVoiceEditorDrawer", () => {
@@ -163,7 +163,6 @@ describe("AgentVoiceEditorDrawer", () => {
     mockAgentById = null;
     mockProviders = [];
     mockVoiceAgentsEnabled = true;
-    mockPhoneTargetsEnabled = false;
     mockDrawerParams = {};
     try {
       sessionStorage.clear();
@@ -187,27 +186,31 @@ describe("AgentVoiceEditorDrawer", () => {
     });
   });
 
-  describe("given the phone targets flag gates the Phone number option", () => {
-    /** @scenario "The phone option is hidden until the phone targets flag is on" */
-    it("hides the Phone number option while off and offers it once on", async () => {
-      mockPhoneTargetsEnabled = false;
+  describe("given a Twilio provider gates the Phone number option", () => {
+    /** @scenario "The Phone number option appears only when a Twilio provider is configured" */
+    it("hides the option with a hint when no Twilio provider, and offers it once one exists", async () => {
+      mockProviders = [];
       const { unmount } = renderVoiceDrawer();
       await screen.findByTestId("voice-agent-transport-select");
       expect(
         screen.queryByRole("option", { name: "Phone number" }),
       ).not.toBeInTheDocument();
+      expect(screen.getByTestId("voice-agent-phone-hint")).toBeInTheDocument();
       unmount();
 
-      mockPhoneTargetsEnabled = true;
+      mockProviders = [TWILIO_KEYED_PROVIDER];
       renderVoiceDrawer();
       await screen.findByTestId("voice-agent-transport-select");
       expect(
         screen.getByRole("option", { name: "Phone number" }),
       ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("voice-agent-phone-hint"),
+      ).not.toBeInTheDocument();
     });
 
-    it("still renders an existing phone target's fields with the flag off", async () => {
-      mockPhoneTargetsEnabled = false;
+    it("still renders an existing phone target's fields when no Twilio provider", async () => {
+      mockProviders = [];
       mockAgentById = {
         id: "agent_phone",
         name: "Hotline",
@@ -224,7 +227,7 @@ describe("AgentVoiceEditorDrawer", () => {
     });
 
     it("never persists the typed phone number in the sessionStorage draft", async () => {
-      mockPhoneTargetsEnabled = true;
+      mockProviders = [TWILIO_KEYED_PROVIDER];
       const user = userEvent.setup();
       renderVoiceDrawer();
       await user.type(
