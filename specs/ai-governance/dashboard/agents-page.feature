@@ -222,6 +222,48 @@ Feature: The AI Governance Agents page
     And both carry the same request id, because they are one press
 
   @unit
+  Scenario: A source the scheduler will not pull is not asked, and is still on the screen
+    Given an organization with a source whose provider can list agents
+    And that source was never given a schedule to pull on
+    When a sync is requested
+    Then that source is not asked
+    And the result does not count it among the providers it names
+    But the screen still names it among the providers it speaks for
+    # The last line is the guard, and it is here rather than in a scenario of
+    # its own because alone it is a tautology — nothing filters that set
+    # today, so it would pass unchanged. It only says something next to the
+    # two above it: the obvious fix is to drop the source from the one set
+    # the button and the screen both read, and that breaks the sentence
+    # beside the button. An organization whose only listable source is
+    # unscheduled would be told it has no provider that can list agents at
+    # all, when it has one and has merely not scheduled it. Which sources
+    # exist and which are worth spending an ask on are two questions, and the
+    # schedule answers only the second.
+    #
+    # An ask lands on the source's own process, and a process that was never
+    # given a working schedule stands down without recording anything — not
+    # an answer, not a refusal, nothing the page can read afterwards. So the
+    # press claimed it had asked, the page went on saying nothing was known
+    # about that source, and no number of presses would ever change either.
+    # Skipped for the same reason a provider that cannot list agents at all
+    # is skipped: the outcome was knowable without spending a lease on it.
+
+  @unit
+  Scenario: A disabled source has no request sent for it either
+    Given an organization with a source whose provider can list agents
+    And that source has been disabled
+    When a sync is requested
+    Then no request is sent for that source
+    And the result does not count it among the providers it names
+    # Live or not is decided by the same rule the scheduler configures
+    # processes from, imported here rather than written out again — two
+    # copies is how the button and the scheduler come to disagree about which
+    # sources exist. A disabled source is already turned away further down, at
+    # its own process, which is why the claim is about the request and the
+    # count rather than about the provider being called: what is saved here
+    # is the lease and the number the press reports, not the call.
+
+  @unit
   Scenario: The sync control reports what it started, not what it found
     Given an organization with two providers that can list agents
     When a sync is requested

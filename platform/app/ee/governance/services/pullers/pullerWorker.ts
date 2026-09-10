@@ -433,6 +433,9 @@ export async function runIngestionPull(params: {
       source,
       pulledUsage: params.pulledUsage,
       identityMatch: params.identityMatch,
+      // Same default as the run report takes below: an adapter that says
+      // nothing is claiming it read to the end of its window.
+      completeness: result.completeness ?? "complete",
     });
     logger.info(
       {
@@ -547,11 +550,15 @@ async function writePulledEvents({
   source,
   pulledUsage,
   identityMatch,
+  completeness,
 }: {
   events: NormalizedPullEvent[];
   source: PullingSource;
   pulledUsage?: PulledUsageDispatcher;
   identityMatch?: DiscoveredPeopleMatcher;
+  /** Passed through untouched to `recordUnpricedUsageWindow`, which is the
+   * only decision here that turns on whether the run read to its end. */
+  completeness: "complete" | "truncated";
 }): Promise<void> {
   const govProject = await ensureHiddenGovernanceProject(
     prisma,
@@ -612,6 +619,7 @@ async function writePulledEvents({
     source,
     droppedPeriodsMs,
     recordedPeriodsMs,
+    completeness,
   });
   if (suppressedCount > 0) {
     // Worth a line: these are real provider rows this run deliberately did not
@@ -1084,21 +1092,46 @@ async function recordPulledUsageFor({
  * extend the window, never shrink it, so a short run in the middle of a gap
  * cannot make the gap look smaller than it is.
  *
- * Clearing is deliberately all-or-nothing. The cost adapters re-read a whole
- * trailing window from the source's start date rather than resuming from a
- * high-water mark, so a run that prices a period at or before the start of
- * the gap has necessarily re-read every later day in it too. A partial
- * re-read leaves the window alone: half a repair is not a repair, and
+ * Clearing is deliberately all-or-nothing. A run that prices a period at or
+ * before the start of the gap has re-read every later day in it too, so
+ * reaching back past the start is evidence the whole gap was re-priced. A
+ * partial re-read leaves the window alone: half a repair is not a repair, and
  * narrowing it would claim days that were never re-priced.
+ *
+ * AND ONLY IF THE RUN THAT REACHED BACK RAN TO ITS END. The evidence above
+ * assumes the read covered its whole window, and a truncated one did not.
+ * Adapters that own their cost read walk the bill oldest-first — anthropic and
+ * openai resume from a high-water mark and page forward, the polling adapters
+ * the same — so a run cut off by its page limit or by the clock emits exactly
+ * the earliest days, which are the ones that satisfy the test above, and never
+ * reaches the tail of the gap it would be credited with repairing. Clearing
+ * there forgets a loss that is still present, and nothing reopens it: the
+ * window is the source's only memory of those days, so once dropped they read
+ * as free from then on.
+ *
+ * An earlier version of this comment justified the clear by claiming the cost
+ * adapters re-read a whole trailing window from the source's start date. They
+ * do not: `anthropicAdmin` advances its cursor to the newest instant it
+ * emitted and the window start only ever moves forward. The lookbacks are
+ * three days, or seven — bounded, and unrelated to where the gap begins.
+ *
+ * ONE ADAPTER IS NOT COVERED. `copilotStudioDataverse` takes its completeness
+ * from the transcript walk while its cost half advances independently, so a
+ * truncated cost read there can still report a complete run. That is
+ * over-inclusive in the safe direction — the window is kept when it might have
+ * been cleared — and it is a separate defect from this one.
  */
 async function recordUnpricedUsageWindow({
   source,
   droppedPeriodsMs,
   recordedPeriodsMs,
+  completeness,
 }: {
   source: PullingSource;
   droppedPeriodsMs: number[];
   recordedPeriodsMs: number[];
+  /** Whether the run that produced these periods read to the end of its window. */
+  completeness: "complete" | "truncated";
 }): Promise<void> {
   if (droppedPeriodsMs.length > 0) {
     const since = new Date(Math.min(...droppedPeriodsMs));
@@ -1127,6 +1160,13 @@ async function recordUnpricedUsageWindow({
   const gapStart = source.unpricedUsageSince;
   if (!gapStart || recordedPeriodsMs.length === 0) return;
   if (Math.min(...recordedPeriodsMs) > gapStart.getTime()) return;
+  if (completeness === "truncated") {
+    logger.info(
+      { ingestionSourceId: source.id },
+      "a re-read reached back across the unpriced window but stopped short of its end; the window is kept",
+    );
+    return;
+  }
 
   logger.info(
     { ingestionSourceId: source.id },

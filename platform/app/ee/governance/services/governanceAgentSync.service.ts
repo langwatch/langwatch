@@ -25,7 +25,7 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { IngestionSource, PrismaClient } from "~/generated/prisma/client";
 
 import { IngestionSourceService } from "./activity-monitor/ingestionSource.service";
 import { AgentListingUnavailableError } from "./governanceAgentSync.errors";
@@ -35,6 +35,7 @@ import {
   agentListingRequests,
   listableAgentSources,
 } from "./logic/agentListingRequest";
+import { schedulerWillPull } from "./logic/schedulerWillPull";
 import {
   type AgentsListingOutcome,
   type AgentsListingSummary,
@@ -55,6 +56,13 @@ export interface AgentSyncSource {
   name: string;
   sourceType: string;
 }
+
+/** The row, narrowed to what the screen names a provider by. */
+const toSyncSource = (source: IngestionSource): AgentSyncSource => ({
+  id: source.id,
+  name: source.name,
+  sourceType: source.sourceType,
+});
 
 /**
  * A source the screen may name, plus how the last ask of it ended.
@@ -146,14 +154,33 @@ export class GovernanceAgentSyncService {
   }: {
     organizationId: string;
   }): Promise<AgentSyncSource[]> {
+    return (await this.listableSourceRows({ organizationId })).map(
+      toSyncSource,
+    );
+  }
+
+  /**
+   * The same sources, unprojected.
+   *
+   * {@link listableSources} narrows to the three columns the screen names a
+   * provider by, and that projection is the screen's contract — but the
+   * schedule state is not in it, and deciding whether a source is worth asking
+   * needs the schedule state. So the narrowing happens once, at the edge,
+   * rather than being undone by a second read.
+   *
+   * Private. Nothing outside this class should be choosing which projection of
+   * "the listable sources" it wants; there is one set, and the two shapes of it
+   * come from one query.
+   */
+  private async listableSourceRows({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<IngestionSource[]> {
     const sources = await IngestionSourceService.create(this.prisma).list(
       organizationId,
     );
-    return listableAgentSources(sources).map((source) => ({
-      id: source.id,
-      name: source.name,
-      sourceType: source.sourceType,
-    }));
+    return listableAgentSources(sources);
   }
 
   /**
@@ -227,7 +254,18 @@ export class GovernanceAgentSyncService {
     organizationId: string;
     now?: number;
   }): Promise<AgentListingRequestResult> {
-    const sources = await this.listableSources({ organizationId });
+    // Asked, not merely listable. A source the scheduler will not pull —
+    // no schedule set, or switched off — reaches a process that settles the
+    // request with no intent and no slot, so the ask spends a lease to record
+    // nothing while the press reports a number the reader waits on.
+    //
+    // Filtered HERE and not in `listableAgentSources`, because that set also
+    // answers "which providers does this screen speak for". An organization
+    // whose only Genie is unscheduled still has a Genie connected, and must
+    // not be told it has connected nothing that lists agents.
+    const sources = (await this.listableSourceRows({ organizationId }))
+      .filter(schedulerWillPull)
+      .map(toSyncSource);
     if (sources.length === 0) return { requested: 0, sources: [] };
 
     // The aggregate is tenanted to the hidden governance project, the same one

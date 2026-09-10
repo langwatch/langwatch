@@ -22,11 +22,27 @@ import { AgentListingUnavailableError } from "../governanceAgentSync.errors";
 import { GovernanceAgentSyncService } from "../governanceAgentSync.service";
 import type { AgentListingRequestCommand } from "../logic/agentListingRequest";
 
+/**
+ * `IngestionSourceService.list` runs no `select`, so every column of the row
+ * reaches this decision. These three are here because the schedule state is
+ * part of the decision and a fixture that cannot state it cannot test it —
+ * the same failure the header records above, one field over.
+ */
 interface FakeSource {
   id: string;
   name: string;
   sourceType: string;
+  status: string;
+  pullSchedule: string | null;
+  archivedAt: Date | null;
 }
+
+/** The schedule state of a source the scheduler would pull today. */
+const SCHEDULED = {
+  status: "active",
+  pullSchedule: "0 * * * *",
+  archivedAt: null,
+} as const;
 
 /** One run-status row, reduced to the columns the listing read selects. */
 interface FakeListingRow {
@@ -98,16 +114,39 @@ const GENIE: FakeSource = {
   id: "src-genie",
   name: "Prod Genie",
   sourceType: "databricks_genie",
+  ...SCHEDULED,
 };
 const COPILOT: FakeSource = {
   id: "src-copilot",
   name: "Copilot tenant",
   sourceType: "copilot_studio_dataverse",
+  ...SCHEDULED,
 };
 const OTEL: FakeSource = {
   id: "src-otel",
   name: "Traces",
   sourceType: "otel_generic",
+  ...SCHEDULED,
+};
+
+/** Listable, and the scheduler will never pull it: no schedule was set. */
+const UNSCHEDULED_GENIE: FakeSource = {
+  id: "src-genie-unscheduled",
+  name: "Staging Genie",
+  sourceType: "databricks_genie",
+  status: "active",
+  pullSchedule: null,
+  archivedAt: null,
+};
+
+/** Listable, scheduled, and turned off — not archived, which `list` filters. */
+const DISABLED_COPILOT: FakeSource = {
+  id: "src-copilot-disabled",
+  name: "Old Copilot tenant",
+  sourceType: "copilot_studio_dataverse",
+  status: "disabled",
+  pullSchedule: "0 * * * *",
+  archivedAt: null,
 };
 
 function serviceFor(client: PrismaClient) {
@@ -170,6 +209,69 @@ describe("requesting an agent listing", () => {
         "Copilot tenant",
       ]);
       expect(Object.keys(result).sort()).toEqual(["requested", "sources"]);
+    });
+  });
+
+  describe("given a listable source the scheduler will not pull", () => {
+    /**
+     * Three assertions, and the third is the point. The first two are the
+     * defect: an ask on a source with no schedule reaches a process that
+     * settles it with no intent and no slot, so the press spends a lease to
+     * record nothing and reports a number the reader will wait on.
+     *
+     * The third is the guard against the obvious fix. Dropping the source
+     * from `listableAgentSources` would satisfy the first two and break the
+     * sentence beside the button: that one set also answers "which providers
+     * does this screen speak for", and an organization whose only Genie is
+     * unscheduled would be told it has connected nothing that lists agents.
+     * Which sources exist and which are worth an ask are two questions.
+     */
+    /** @scenario "A source the scheduler will not pull is not asked, and is still on the screen" */
+    it("is left out of the ask and still named on the screen", async () => {
+      const client = fakeClient({ sources: [GENIE, UNSCHEDULED_GENIE] });
+      const { service, dispatched } = serviceFor(client);
+
+      const result = await service.requestListing({
+        organizationId: "org-1",
+        now: 1_700_000_000_000,
+      });
+
+      expect(dispatched.map((command) => command.sourceId)).toEqual([
+        "src-genie",
+      ]);
+      expect(result.sources.map((source) => source.id)).toEqual(["src-genie"]);
+      expect(result.requested).toBe(1);
+
+      const onScreen = await GovernanceAgentSyncService.forReads(
+        client,
+      ).listableSources({ organizationId: "org-1" });
+      expect(onScreen.map((source) => source.id)).toEqual([
+        "src-genie",
+        "src-genie-unscheduled",
+      ]);
+    });
+  });
+
+  describe("given a listable source that has been disabled", () => {
+    /**
+     * Disabled, not archived. Archived sources never reach here — `list`
+     * filters `archivedAt: null` in the query — so a scenario written about
+     * "stopped" sources would be true before any change and pin nothing.
+     */
+    /** @scenario "A disabled source has no request sent for it either" */
+    it("has no request sent for it and is not counted", async () => {
+      const { service, dispatched } = serviceFor(
+        fakeClient({ sources: [COPILOT, DISABLED_COPILOT] }),
+      );
+
+      const result = await service.requestListing({ organizationId: "org-1" });
+
+      expect(dispatched.map((command) => command.sourceId)).toEqual([
+        "src-copilot",
+      ]);
+      expect(result.sources.map((source) => source.id)).toEqual([
+        "src-copilot",
+      ]);
     });
   });
 

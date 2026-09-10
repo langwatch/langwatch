@@ -700,6 +700,34 @@ Feature: One cost screen, three honest lanes
     Then that lane holds no dollar total
     And the sum of only the parts stated in US dollars is not offered as the lane figure
 
+  # ── The same rule, one level down, where it currently stops ───────────────
+  # The lane above withholds because a cell holds no amount in any currency.
+  # A euro cell is not that: it holds an amount, in euros. So a provider
+  # billed in dollars and euros on one day has a dollar figure covering part
+  # of its bill, nothing marked missing beside it, and no way for a reader to
+  # tell the remainder from the whole. The lane headline already names the
+  # currencies it could not convert. The two panels a reader opens underneath
+  # it do not, and a marked total sitting directly above an unmarked
+  # breakdown of the same money is how a reader learns to distrust both.
+
+  @integration
+  Scenario: A provider billed in two currencies says which one its figure leaves out
+    Given a provider billed in both dollars and euros on the same day
+    And no dollar figure was published for the euro bill
+    When a permitted viewer reads the providers behind that day
+    Then that provider's figure is marked as leaving the euros out
+    # Marked, not withheld. Dropping the figure hands the reader a blank the
+    # chart beneath turns into a zero, on a panel carrying no note that the
+    # height is short — an honest dollar bill silently flattened. The figure
+    # stands and says what is not in it.
+
+  @integration
+  Scenario: The records behind a period are marked the same way
+    Given a period whose records were billed in both dollars and euros
+    And no dollar figure was published for the euro bill
+    When a permitted viewer opens the records behind that period
+    Then that record's figure is marked as leaving the euros out
+
   @integration
   Scenario: A lane with no total says why instead of showing a figure
     # The note is the whole reason withholding is acceptable rather than
@@ -810,6 +838,26 @@ Feature: One cost screen, three honest lanes
     # figure the same way, so a failed refresh lands as a blank beside
     # freshly filled neighbours and reads as no spend — the one confusion
     # the whole screen exists to prevent.
+
+  @integration
+  Scenario: A period that could not be read offers a way to try again
+    Given the records behind a provider's period are open for a permitted viewer
+    And that read failed
+    When they press the control the failure offers for trying again
+    Then the records behind that period are read again
+    # Pressed, not remounted. Closing the period and opening it afresh already
+    # re-runs the read, so a claim that it is merely "read again" is satisfied
+    # by accident. What is missing is something to press, in the place the
+    # reader is looking when they are told to try.
+    # The panel tells the reader to refresh and try again. The screen's
+    # refresh does not reach it, and that is held on purpose rather than
+    # forgotten: re-running a read nothing is showing is work for nobody, and
+    # the set of reads the control re-issues is pinned so that adding this one
+    # fails. So the sentence names the one control that cannot act on it.
+    #
+    # The retry belongs to the panel instead. It owns the read, it is the only
+    # thing that knows the period is open, and it is where the reader is
+    # already looking when they are told to try again.
 
   @integration
   Scenario: The screen does not quietly read the figures again on its own

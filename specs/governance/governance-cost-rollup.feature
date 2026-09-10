@@ -222,3 +222,4 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     # shown. Counting it as unpriced withholds the dollar total of every day
     # that touches a foreign bill, and tells the reader we hold no figure for
     # money we hold a perfectly good figure for.
+

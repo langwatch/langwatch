@@ -628,24 +628,28 @@ describe("the cost breakdown panels", () => {
             provider: "openai_admin",
             amountUsd: 60,
             cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
           },
           {
             day: "2026-01-15",
             provider: "anthropic_admin",
             amountUsd: 41,
             cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
           },
           {
             day: "2026-01-16",
             provider: "openai_admin",
             amountUsd: 30,
             cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
           },
           {
             day: "2026-01-16",
             provider: "anthropic_admin",
             amountUsd: 21,
             cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
           },
         ],
       };
@@ -691,12 +695,14 @@ describe("the cost breakdown panels", () => {
             provider: "anthropic_admin",
             amountUsd: 41,
             cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
           },
           {
             day: "2026-01-16",
             provider: "anthropic_admin",
             amountUsd: null,
             cellsWithoutAmount: 1,
+            currenciesWithoutUsdAmount: [],
           },
         ],
       };
@@ -720,6 +726,49 @@ describe("the cost breakdown panels", () => {
       // them and a bare caveat leaves a reader unable to tell which bar to
       // distrust.
       expect(region.getByText(/Anthropic/)).toBeInTheDocument();
+    });
+  });
+
+  describe("given one provider billed in two currencies on the same day", () => {
+    /**
+     * The day holds a dollar bill and a euro bill, and only the dollars were
+     * ever published in dollars. That is a different shape from the case above
+     * and the screen currently cannot tell them apart.
+     *
+     * The figure here is NOT null and the cell count is NOT one: the euro cell
+     * holds a real amount, in euros, so the rule that asks whether a cell holds
+     * money in any currency at all is satisfied and counts nothing. Every mark
+     * the panel has is keyed off those two values, so the day renders as a
+     * plain complete figure that silently omits the euros.
+     *
+     * The lane headline one level up already says which currency it left out.
+     * This is the same sentence, at the level where a reader actually compares
+     * one provider against another.
+     */
+    /** @scenario "A provider billed in two currencies says which one its figure leaves out" */
+    it("names the currency its figure leaves out", () => {
+      harness.providers = [
+        { provider: "anthropic_admin", amountUsd: 41, cellsWithoutAmount: 0 },
+      ];
+      harness.dailyByProvider = {
+        rows: [
+          {
+            day: "2026-01-15",
+            provider: "anthropic_admin",
+            amountUsd: 41,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: ["EUR"],
+          },
+        ],
+      };
+      renderScreen();
+
+      const region = within(
+        screen.getByLabelText("Cost over time · by provider"),
+      );
+      const note = region.getByLabelText(/cover only part of what was spent/i);
+      expect(note).toHaveTextContent(/Anthropic/);
+      expect(note).toHaveTextContent(/EUR/);
     });
   });
 });

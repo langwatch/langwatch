@@ -357,6 +357,13 @@ export interface GovernanceCostProviderDayRowDto {
   /** Withheld (null) unless every cell behind it holds an amount. */
   amountUsd: number | null;
   cellsWithoutAmount: number;
+  /**
+   * Currencies this figure leaves out: cells that hold an amount the provider
+   * billed, with no dollar conversion to add into the sum. A short figure with
+   * `cellsWithoutAmount: 0` is explained here and nowhere else. Empty when the
+   * figure is whole. At most a handful, sampled — see the read's limit.
+   */
+  currenciesWithoutUsdAmount: string[];
 }
 
 export interface GovernanceCostProviderDayBreakdownDto {
@@ -403,6 +410,8 @@ export interface GovernanceCostDayRecordDto {
   label: string;
   amountUsd: number | null;
   cellsWithoutAmount: number;
+  /** As on the figure above it — see {@link GovernanceCostProviderDayRowDto}. */
+  currenciesWithoutUsdAmount: string[];
 }
 
 export interface GovernanceCostDayRecordsDto {
@@ -1227,20 +1236,44 @@ function spenderKey(provider: string, rawActorId: string): string {
  * A spender row's figure, under the same withholding rule as every lane
  * total (`figureFor`): any unpriced cell withholds the whole figure, because
  * the priced part alone reads as the complete one.
+ *
+ * The currencies come out beside the figure and NOT folded into the count,
+ * because they are the other half of "why is this short" and the two halves
+ * are different failures. A cell with no amount in any currency is spend we
+ * could not price at all; a cell billed in euros with no conversion is spend
+ * we can see and cannot add. A figure can be short for either reason, and the
+ * reader can only act on the second one.
  */
 function spenderFigure(
-  rows: readonly Pick<SpenderGroup, "amountNanoUsd" | "cellsWithoutAmount">[],
+  rows: readonly (Pick<SpenderGroup, "amountNanoUsd" | "cellsWithoutAmount"> & {
+    /**
+     * Optional because `sumWindowBySpender` does not select it. Not because
+     * spender rows cannot be short for this reason — they can — but because
+     * the spender panel has nowhere to say so, and a column read to be
+     * discarded is a cost with no reader. Add it there when that panel grows
+     * a place to put it.
+     */
+    currenciesWithoutUsdAmount?: readonly string[];
+  })[],
 ): {
   amountUsd: number | null;
   cellsWithoutAmount: number;
+  currenciesWithoutUsdAmount: string[];
 } {
   const withoutAmount = rows.reduce(
     (count, row) => count + row.cellsWithoutAmount,
     0,
   );
+  const currencies = [
+    ...new Set(rows.flatMap((row) => row.currenciesWithoutUsdAmount ?? [])),
+  ].sort();
   const priced = rows.filter((row) => row.amountNanoUsd !== null);
   if (priced.length === 0) {
-    return { amountUsd: null, cellsWithoutAmount: withoutAmount };
+    return {
+      amountUsd: null,
+      cellsWithoutAmount: withoutAmount,
+      currenciesWithoutUsdAmount: currencies,
+    };
   }
   const totalNanoUsd = priced.reduce(
     (sum, row) => sum + BigInt(row.amountNanoUsd ?? 0),
@@ -1249,6 +1282,7 @@ function spenderFigure(
   return {
     amountUsd: usdFigure({ totalNanoUsd, cellsWithoutAmount: withoutAmount }),
     cellsWithoutAmount: withoutAmount,
+    currenciesWithoutUsdAmount: currencies,
   };
 }
 

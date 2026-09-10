@@ -1,4 +1,4 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { GovernanceCostProviderDayRowDto } from "@ee/governance/services/governanceCost.service";
 import { useMemo, useState } from "react";
 
@@ -66,11 +66,14 @@ export function CostProviderDayPanel({
   // hold a real number, so a reader who adds the bars up rebuilds exactly the
   // partial sum the total refused to show them. Saying so under the chart is
   // what stops the bars from BEING that sum.
-  const partialProviders = [
-    ...new Set(
-      rows.filter((row) => row.amountUsd === null).map((row) => row.provider),
-    ),
-  ].sort();
+  //
+  // TWO WAYS TO BE SHORT, one note. A bar is missing money either because a
+  // cell held no amount at all — `amountUsd === null` — or because a cell was
+  // billed in a currency we could not convert, which leaves the bar drawn at a
+  // real but incomplete number with nothing null about it. The second kind
+  // reads as complete unless it is said, and it is the one a reader can act
+  // on, so the currency is named rather than merely counted.
+  const partialProviders = partialProviderNotes(rows);
 
   const openedPeriod =
     opened === null
@@ -102,8 +105,7 @@ export function CostProviderDayPanel({
           color="fg.muted"
           aria-label="Some bars cover only part of what was spent"
         >
-          Part of {partialProviders.map(providerName).join(", ")} spend has no
-          dollar figure
+          Part of {partialProviders.join(", ")} spend has no dollar figure
         </Text>
       )}
       {openedPeriod && (
@@ -245,6 +247,40 @@ export function providerPeriods(
 }
 
 /**
+ * One phrase per provider whose bars are short, naming the currency when the
+ * shortfall has one.
+ *
+ * Exported for the same reason the bucket builders above are: it is the whole
+ * of a claim the screen makes in prose, and a claim about money is worth
+ * testing without a chart in the way.
+ *
+ * A provider short both ways — some cells with no amount at all, some billed
+ * in a currency we could not convert — is listed ONCE, with its currencies. Two
+ * entries for one provider would read as two providers, and the reader is being
+ * told which names to go and look at.
+ */
+export function partialProviderNotes(
+  rows: readonly GovernanceCostProviderDayRowDto[],
+): string[] {
+  const currenciesByProvider = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const short =
+      row.amountUsd === null || row.currenciesWithoutUsdAmount.length > 0;
+    if (!short) continue;
+    const held = currenciesByProvider.get(row.provider) ?? new Set<string>();
+    for (const currency of row.currenciesWithoutUsdAmount) held.add(currency);
+    currenciesByProvider.set(row.provider, held);
+  }
+  return [...currenciesByProvider.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([provider, currencies]) => {
+      const name = providerName(provider);
+      if (currencies.size === 0) return name;
+      return `${name} (${[...currencies].sort().join(", ")})`;
+    });
+}
+
+/**
  * What one period at one provider was made of: what each record was for, and
  * what it cost.
  *
@@ -295,9 +331,30 @@ function PeriodRecords({
         again. So the failure is asked about first.
       */}
       {records.isError ? (
-        <Text fontSize="sm" color="fg.muted">
-          This period could not be read. Refresh to try again.
-        </Text>
+        <HStack gap={2}>
+          <Text fontSize="sm" color="fg.muted">
+            This period could not be read.
+          </Text>
+          {/*
+            A CONTROL, not the word "refresh". The screen's own refresh
+            deliberately leaves this read out — the records behind a period are
+            absent until a reader opens one, and refetching a query nobody
+            opened is work with no reader — so the sentence that told them to
+            refresh was pointing at a button that would not have retried this.
+            The only way back was to close the period and open it again, which
+            works by accident and reads as giving up.
+
+            Local on purpose: the retry belongs where the failure is, and the
+            read it repeats is this component's own.
+          */}
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => void records.refetch()}
+          >
+            Try again
+          </Button>
+        </HStack>
       ) : rows === null ? (
         <Text fontSize="sm" color="fg.muted">
           Reading what this period was made of.
@@ -310,9 +367,22 @@ function PeriodRecords({
         rows.map((record) => (
           <HStack key={record.label} justify="space-between" gap={3}>
             <Text fontSize="sm">{record.label}</Text>
-            <Text fontSize="sm" fontVariantNumeric="tabular-nums">
-              {formatLaneUsd(record.amountUsd)}
-            </Text>
+            <HStack gap={2}>
+              {/*
+                The same mark the bar above this list carries, at the row it
+                belongs to rather than over the whole period. A reader opens a
+                period to find out WHICH charge made the figure short; a note
+                repeated at the top would send them back to guessing.
+              */}
+              {record.currenciesWithoutUsdAmount.length > 0 && (
+                <Text fontSize="xs" color="fg.muted">
+                  + {record.currenciesWithoutUsdAmount.join(", ")} not converted
+                </Text>
+              )}
+              <Text fontSize="sm" fontVariantNumeric="tabular-nums">
+                {formatLaneUsd(record.amountUsd)}
+              </Text>
+            </HStack>
           </HStack>
         ))
       )}

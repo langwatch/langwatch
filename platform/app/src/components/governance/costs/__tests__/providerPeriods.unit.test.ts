@@ -26,24 +26,28 @@ const ROWS = [
     provider: "openai_admin",
     amountUsd: 60,
     cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
   },
   {
     day: "2026-02-16",
     provider: "openai_admin",
     amountUsd: 30,
     cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
   },
   {
     day: "2026-01-15",
     provider: "anthropic_admin",
     amountUsd: 41,
     cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
   },
   {
     day: "2026-04-02",
     provider: "anthropic_admin",
     amountUsd: 9,
     cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
   },
 ];
 
@@ -166,12 +170,14 @@ describe("the provider breakdown fold", () => {
         provider: "anthropic_admin",
         amountUsd: 41,
         cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
       },
       {
         day: "2026-01-16",
         provider: "anthropic_admin",
         amountUsd: null,
         cellsWithoutAmount: 1,
+        currenciesWithoutUsdAmount: [],
       },
     ];
 

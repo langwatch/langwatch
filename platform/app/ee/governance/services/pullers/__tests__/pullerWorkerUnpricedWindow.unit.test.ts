@@ -306,5 +306,43 @@ describe("the window a pull read but was not allowed to price", () => {
 
       expect(update).not.toHaveBeenCalled();
     });
+
+    /**
+     * The same events as the clearing case above, and the opposite outcome,
+     * on one difference: the run says its read stopped short.
+     *
+     * Reaching back before the gap is only evidence of a repair if the read
+     * that reached back ran to its end. An adapter that walks its bill
+     * oldest-first and is cut off — by its page limit, or by the clock —
+     * emits exactly the early days that satisfy the clear, and never reaches
+     * the tail of the gap it is being credited with repairing. Clearing there
+     * forgets a loss that is still there, and nothing reopens it: the source
+     * has no second chance to notice, so the day reads as free from then on.
+     */
+    /** @scenario "A cost read that stopped before its end leaves the window alone" */
+    it("keeps the window when the read that reached back was cut short", async () => {
+      findUnique.mockResolvedValue(
+        sourceRow({
+          unpricedUsageSince: new Date(AUGUST_2),
+          unpricedUsageThrough: new Date(AUGUST_3),
+        }),
+      );
+      runOnce.mockResolvedValue({
+        events: [pricedDay(AUGUST_1), pricedDay(AUGUST_2), pricedDay(AUGUST_3)],
+        cursor: "next",
+        errorCount: 0,
+        completeness: "truncated",
+      });
+
+      await runIngestionPull({
+        sourceId: "src_1",
+        cursor: null,
+        pulledUsage: {
+          recordPulledUsage: vi.fn().mockResolvedValue(undefined),
+        },
+      });
+
+      expect(update).not.toHaveBeenCalled();
+    });
   });
 });

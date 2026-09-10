@@ -203,7 +203,7 @@ const UNPRICED_CURRENCY_SAMPLE_LIMIT = 8;
  *
  * Applied by every read whose row can SAY it is short a currency —
  * `sumDaysByLane`, `sumWindowByCurrency`, `sumDaysByProvider`,
- * `sumDayRecordsByProvider` and `sumWindowByProvider`, each of which carries
+ * `sumPeriodRecordsByProvider` and `sumWindowByProvider`, each of which carries
  * a per-currency line or a `CurrenciesWithoutUsdAmount` list beside the
  * dollar figure. `sumWindowBySpender` deliberately keeps the stricter
  * USD-only rule instead: its row has no currency channel at all, so narrowing
@@ -964,6 +964,7 @@ export class GovernanceCostRollupClickHouseRepository {
       provider: string;
       amountNanoUsd: number | null;
       cellsWithoutAmount: number;
+      currenciesWithoutUsdAmount: string[];
     }>
   > {
     const client = await this.resolveClient(input.tenantId);
@@ -974,7 +975,17 @@ export class GovernanceCostRollupClickHouseRepository {
           Provider                       AS Provider,
           sumOrNull(LatestAmountNanoUsd) AS AmountNanoUsd,
           countIf(${HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL}
-          ) AS CellsWithoutAmount
+          ) AS CellsWithoutAmount,
+          -- Which currency the figure beside it leaves out. A cell billed in
+          -- euros with no dollar conversion holds an amount, so it is NOT
+          -- counted above and never will be — the count answers "how much did
+          -- we fail to price at all", and this answers the other question a
+          -- short figure raises. Same expression as \`sumWindowByProvider\`: the
+          -- headline and the bars under it must name the same currencies.
+          arraySort(groupUniqArrayIf(${UNPRICED_CURRENCY_SAMPLE_LIMIT})(
+            CurrencyCode,
+            LatestAmountNanoUsd IS NULL AND CurrencyCode != {usd:String}
+          )) AS CurrenciesWithoutUsdAmount
         FROM (
           SELECT
             ${KEY_COLUMNS.join(",\n            ")},
@@ -1007,6 +1018,7 @@ export class GovernanceCostRollupClickHouseRepository {
       provider: str(row.Provider),
       amountNanoUsd: nullableInt(row.AmountNanoUsd),
       cellsWithoutAmount: int(row.CellsWithoutAmount),
+      currenciesWithoutUsdAmount: strArray(row.CurrenciesWithoutUsdAmount),
     }));
   }
 
@@ -1039,6 +1051,7 @@ export class GovernanceCostRollupClickHouseRepository {
       agentId: string;
       amountNanoUsd: number | null;
       cellsWithoutAmount: number;
+      currenciesWithoutUsdAmount: string[];
     }>
   > {
     const client = await this.resolveClient(input.tenantId);
@@ -1049,7 +1062,14 @@ export class GovernanceCostRollupClickHouseRepository {
           AgentId                        AS AgentId,
           sumOrNull(LatestAmountNanoUsd) AS AmountNanoUsd,
           countIf(${HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL}
-          ) AS CellsWithoutAmount
+          ) AS CellsWithoutAmount,
+          -- The same mark as the bar above this list carries. A reader who
+          -- opens a period to find out why its figure looked short must not
+          -- lose the answer by going one level deeper.
+          arraySort(groupUniqArrayIf(${UNPRICED_CURRENCY_SAMPLE_LIMIT})(
+            CurrencyCode,
+            LatestAmountNanoUsd IS NULL AND CurrencyCode != {usd:String}
+          )) AS CurrenciesWithoutUsdAmount
         FROM (
           SELECT
             ${KEY_COLUMNS.join(",\n            ")},
@@ -1084,6 +1104,7 @@ export class GovernanceCostRollupClickHouseRepository {
       agentId: str(row.AgentId),
       amountNanoUsd: nullableInt(row.AmountNanoUsd),
       cellsWithoutAmount: int(row.CellsWithoutAmount),
+      currenciesWithoutUsdAmount: strArray(row.CurrenciesWithoutUsdAmount),
     }));
   }
 

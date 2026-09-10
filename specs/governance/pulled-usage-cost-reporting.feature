@@ -213,6 +213,37 @@ Feature: Pulled provider usage becomes visible, attributed cost
     # Half a repair is not a repair, and narrowing the window would claim days
     # that were never re-priced.
 
+  @unit
+  Scenario: A cost read that stopped before its end leaves the window alone
+    Given a source that remembers an unpriced window
+    And an organization that is recording pulled cost again
+    When a run whose cost read stopped early prices a day at or before the start of that window
+    Then the source still remembers the whole window
+    # Clearing rests on one thing being true: a read that reached the earliest
+    # lost day reached every later one as well. That holds because a cost
+    # adapter re-reads a trailing window ending at today rather than resuming
+    # from where it stopped — and it stops holding the moment that read ends
+    # before its end. A read that hit its page limit or ran out of time
+    # reached the first lost day and an unknown number after it, and clearing
+    # on that evidence declares repaired a stretch of days nobody re-priced.
+    # The window is the only record that those days are missing, so clearing
+    # it wrongly is not recoverable by a later run.
+    #
+    # What is read here is the flag the run reports, and for every source that
+    # walks its own bill forward from the window start that flag is the cost
+    # read's own — set when the page limit or the clock cut the walk short
+    # with a page still in hand.
+    #
+    # One source is not covered and cannot be. It pulls conversations and
+    # money on separate cursors and reports the conversation walk, while its
+    # money half holds what it could not read inside a cursor the run never
+    # sees. There the flag errs safe — a cut-short conversation walk refuses
+    # to clear a window that was in fact repaired, which is the same "half a
+    # repair is not a repair" the rest of this file takes — and errs unsafe
+    # the other way, clearing on a whole conversation walk while money was
+    # held back. Closing that needs the money half to report, which it does
+    # not, so this scenario does not claim it.
+
   # --- A read that stopped halfway is honest about where it stopped ---
   # A read can end for three reasons that are not errors: it hit the number
   # of pages one run may take, it ran out of time, or it failed after some
