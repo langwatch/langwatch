@@ -1,22 +1,16 @@
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import {
-  studioWorkflowSchema,
-  type ExecuteWorkflowComponentInput,
-  type WorkflowApi,
-  type WorkflowService,
-} from "@langwatch/workflow-contract";
+import { studioWorkflowSchema, type ExecuteWorkflowComponentInput, type WorkflowApi } from "@langwatch/workflow-contract";
 import {
   HttpWorkflowStudioStreamAdapter,
   WorkflowApp,
   WorkflowStudioDispatchService,
   type WorkflowAgentMappingPort,
   type WorkflowRowPort,
-  type WorkflowStudioDslPort,
-} from "@langwatch/workflow-server";
+  type WorkflowStudioDslPort, type WorkflowService,} from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 
 const input: ExecuteWorkflowComponentInput = {
@@ -64,7 +58,7 @@ function dispatching(events: object[]) {
       serviceUrl: "http://127.0.0.1:5561",
       fetch: engine,
     }),
-    modelProviders: createApiFixture<ModelProviderService>({ getForProject: async () => ({}) }),
+    modelProviders: createApiFixture<ModelProviderApi>({ getForProject: async () => ({}) }),
   });
   return { app: workflowApp(dispatch), engine };
 }

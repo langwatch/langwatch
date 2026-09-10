@@ -28,6 +28,7 @@ import {
   projectRestFacts,
   UnprocessableEntityError,
   type RestErrorHandler,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
   AgentBusyError,
@@ -62,11 +63,19 @@ function response(agent: AgentOverview, app: AgentApi, projectSlug: string) {
   };
 }
 
-const relayMaxBytes = relayPayloadCaps().envelopeBytes;
+/**
+ * Builds the `/api/v1/agents` family. `relayMaxPayloadMb` is resolved by the
+ * caller at mount time (`LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`); it must never
+ * be read at module load, or every deployment gets the protocol default.
+ */
+export function createAgentRest(
+  relayMaxPayloadMb?: number,
+): Readonly<{ protocol: "rest"; namespace: string; router: () => RestTransportDeclaration<AgentApi> }> {
+  const relayMaxBytes = relayPayloadCaps(relayMaxPayloadMb).envelopeBytes;
 
-export const agentRest = defineRestRouter(AgentApi)
-  .withNamespace("agents")
-  .withVersion(MANAGEMENT_API_VERSION)
+  return defineRestRouter(AgentApi)
+    .withNamespace("agents")
+    .withVersion(MANAGEMENT_API_VERSION)
 
   .get("/", "listAgents")
   .withQuery(agentRestQuerySchema)
@@ -198,6 +207,7 @@ export const agentRest = defineRestRouter(AgentApi)
   )
 
   .build();
+}
 
 export const agentRestErrorHandler = (boundary: RestErrorHandler): RestErrorHandler =>
   createFamilyErrorHandler({

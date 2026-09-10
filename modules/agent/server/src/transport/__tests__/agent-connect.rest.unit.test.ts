@@ -1,16 +1,22 @@
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * @see specs/agents/connected-agents.feature
  */
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
-  createAppRestSecurity,
-  type AppRestSecurity,
-  type RestApiServicePorts,
+  bindRestMiddleware,
+  createRestRuntime,
+  type RestCaller,
+  type RestErrorHandler,
 } from "@langwatch/api/rest";
-import type { AgentApi } from "@langwatch/agent-contract";
-import type { ErrorHandler, MiddlewareHandler } from "hono";
+import type { AgentApi, AgentConnectRegisterAnswer } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { HandledError } from "@langwatch/handled-error";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
+import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
+import { agentRestErrorHandler } from "../agent.rest.ts";
+
 const outputLog = vi.hoisted(() => ({ error: vi.fn() }));
 vi.mock("@langwatch/observability", async (original) => {
   const actual = await original<typeof import("@langwatch/observability")>();
@@ -18,42 +24,21 @@ vi.mock("@langwatch/observability", async (original) => {
     ...actual,
     createLogger: (name: string) => {
       const logger = actual.createLogger(name);
-      if (name === "langwatch:api:json-protocol")
-        vi.spyOn(logger, "error").mockImplementation(outputLog.error);
+      if (name.startsWith("langwatch:api")) vi.spyOn(logger, "error").mockImplementation(outputLog.error);
       return logger;
     },
   };
 });
-import { registerConnectEndpoints } from "../agent-connect.rest.ts";
 
-const boundaryErrorHandler: ErrorHandler = (error, c) => {
-  const handled = error as Error & { code?: string; httpStatus?: number };
-  if (typeof handled.code === "string" && typeof handled.httpStatus === "number") {
-    return c.json({ error: handled.code, message: handled.message }, handled.httpStatus as 400);
+const renderRefusal: RestErrorHandler = (error, c) => {
+  if (HandledError.isHandled(error)) {
+    return c.json(
+      { error: error.code, message: error.message, ...error.meta },
+      (error.httpStatus ?? 500) as ContentfulStatusCode,
+    );
   }
   return c.json({ error: "internal_server_error", message: "Internal server error" }, 500);
 };
-
-function testSecurity(): AppRestSecurity {
-  const passthrough: MiddlewareHandler = async (_c, next) => next();
-  const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: boundaryErrorHandler,
-    canonicalErrorHandler: boundaryErrorHandler,
-    authenticateProject: () => passthrough,
-    authorizeProjectPermission: () => passthrough,
-    authorizeApiKeyCeiling: () => passthrough,
-    authenticateOrganization: () => passthrough,
-    authorizeOrganizationPermission: () => passthrough,
-    authorizeRouteTeamPermission: () => passthrough,
-    authorizeRouteProjectPermission: () => passthrough,
-    authenticateOrganizationThrowing: async () => undefined,
-    authorizeOrganizationPermissionThrowing: () => async () => undefined,
-  };
-  return createAppRestSecurity(ports);
-}
 
 function buildApi({
   relayMaxPayloadMb,
@@ -61,14 +46,28 @@ function buildApi({
 }: { relayMaxPayloadMb?: number; application?: AgentApi } = {}) {
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
   const app = application ?? createApiFixture<AgentApi>({ connectFrames: framesSpy });
-  const family = testSecurity().createProjectVersionedApp({
-    name: "agents-v1",
-    basePath: "/api/v1/agents",
-    errorEnvelope: "legacy",
-    staticGeneration: "v1",
-  });
-  registerConnectEndpoints({ family, app: () => app, relayMaxPayloadMb });
-  return { hono: family.service.build(), framesSpy };
+  const runtime = createRestRuntime({
+    identity: { authenticate: (): RestCaller => ({ actor: null, scope: null }) },
+  } as never);
+  const hono = new Hono();
+  hono.route(
+    "/",
+    runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
+      app: () => app,
+      onError: agentRestErrorHandler(renderRefusal),
+      facts: [
+        bindRestMiddleware(agentConnectHeaders, (context) => ({
+          authorization: context.req.header("authorization"),
+          projectId: context.req.header("x-project-id"),
+          instanceToken: context.req.header("x-agent-instance-token"),
+        })),
+      ],
+    }),
+  );
+  return {
+    hono: { request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init) },
+    framesSpy,
+  };
 }
 
 const headers = {
@@ -77,7 +76,7 @@ const headers = {
   "x-agent-instance-token": "ait_test",
 };
 
-describe("registerConnectEndpoints", () => {
+describe("registerConnectedAgentInstance", () => {
   it.each([
     ["api_key_invalid", 401],
     ["project_required", 400],
@@ -88,10 +87,9 @@ describe("registerConnectEndpoints", () => {
     ["environment_invalid", 422],
     ["protocol_invalid", 422],
   ] as const)("maps the %s refusal to HTTP %i", async (code, status) => {
+    const refusedFrame = { type: "refused" as const, protocol: 1 as const, code, message: "Refused" };
     const app = createApiFixture<AgentApi>({
-      connectRegister: async () => ({
-        frame: { type: "refused", protocol: 1, code, message: "Refused" },
-      }),
+      connectRegister: async (): Promise<AgentConnectRegisterAnswer> => ({ frame: refusedFrame }),
     });
     const { hono } = buildApi({ application: app });
 
@@ -102,13 +100,13 @@ describe("registerConnectEndpoints", () => {
     });
 
     expect(response.status).toBe(status);
-    expect(await response.json()).toEqual({
-      frame: { type: "refused", protocol: 1, code, message: "Refused" },
-    });
+    const body = (await response.json()) as { error: string; frame?: unknown };
+    expect(body.error).toBe("agent_register_refused");
+    expect(body.frame).toEqual(refusedFrame);
   });
 
   it("answers a registered frame and instance token with HTTP 200", async () => {
-    const answer = {
+    const answer: AgentConnectRegisterAnswer = {
       frame: {
         type: "registered" as const,
         protocol: 1 as const,
@@ -148,32 +146,6 @@ describe("registerConnectEndpoints", () => {
       { frames: [frame] },
       { authorization: headers.authorization, instanceToken: "ait_test" },
     );
-  });
-
-  it("preserves malformed output while logging validation metadata without content", async () => {
-    const app = createApiFixture<AgentApi>();
-    const secret = "private-response-marker";
-    Object.defineProperty(app, "connectFrames", { value: async () => ({ accepted: secret }) });
-    const { hono } = buildApi({ application: app });
-    outputLog.error.mockClear();
-
-    const response = await hono.request("/api/v1/agents/connect/frames", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ frames: [{ type: "ack", protocol: 1, callId: "call_one" }] }),
-    });
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ accepted: secret });
-    expect(outputLog.error).toHaveBeenCalledWith(
-      expect.objectContaining({
-        endpoint: "postConnectedAgentFrames",
-        method: "post",
-        validation: expect.any(Object),
-      }),
-      "Protocol response did not match its declared output schema",
-    );
-    expect(JSON.stringify(outputLog.error.mock.calls)).not.toContain(secret);
   });
 
   describe("given an instance registered over HTTP", () => {

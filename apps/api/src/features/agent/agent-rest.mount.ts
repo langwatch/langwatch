@@ -6,10 +6,10 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import {
   agentConnectHeaders,
-  agentConnectRest,
   agentLegacyRest,
-  agentRest,
   agentRestErrorHandler,
+  createAgentConnectRest,
+  createAgentRest,
 } from "@langwatch/agent-server";
 import { bindRestMiddleware, type MountableRestApp, type RestErrorHandler } from "@langwatch/api/rest";
 
@@ -20,10 +20,13 @@ export function mountAgentRest(
   options: Readonly<{ agents: () => AgentApi; errors: RestErrorHandler }>,
 ): readonly MountableRestApp[] {
   const onError = agentRestErrorHandler(options.errors);
+  // Resolved once, here at mount time, off the already-composed app - never
+  // at module load, where every deployment would read the protocol default.
+  const relayMaxPayloadMb = options.agents().relayMaxPayloadMb();
 
   return [
-    runtime.mount(agentRest.router(), options.agents, { onError }),
-    runtime.mount(agentConnectRest.router(), options.agents, {
+    runtime.mount(createAgentRest(relayMaxPayloadMb).router(), options.agents, { onError }),
+    runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), options.agents, {
       onError,
       facts: [
         bindRestMiddleware(agentConnectHeaders, (context) => ({

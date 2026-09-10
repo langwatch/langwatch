@@ -1,3 +1,4 @@
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AgentApi } from "@langwatch/agent-contract";
 /**
@@ -6,71 +7,52 @@ import type { AgentApi } from "@langwatch/agent-contract";
  * @see specs/agents/connected-agents.feature
  */
 import {
-  createAppRestSecurity,
-  type AppRestSecurity,
-  type RestApiServicePorts,
+  bindRestMiddleware,
+  createRestRuntime,
+  type RestCaller,
+  type RestErrorHandler,
 } from "@langwatch/api/rest";
-import type { ErrorHandler, MiddlewareHandler } from "hono";
+import { HandledError } from "@langwatch/handled-error";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { registerConnectEndpoints } from "../agent-connect.rest.ts";
+import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
+import { agentRestErrorHandler } from "../agent.rest.ts";
 
-const boundaryErrorHandler: ErrorHandler = (error, c) => {
-  const handled = error as Error & { code?: string; httpStatus?: number };
-  if (typeof handled.code === "string" && typeof handled.httpStatus === "number") {
-    return c.json({ error: handled.code, message: handled.message }, handled.httpStatus as 400);
+const renderRefusal: RestErrorHandler = (error, c) => {
+  if (HandledError.isHandled(error)) {
+    return c.json(
+      { error: error.code, message: error.message, ...error.meta },
+      (error.httpStatus ?? 500) as ContentfulStatusCode,
+    );
   }
   return c.json({ error: "internal_server_error", message: String(error) }, 500);
 };
 
-function testSecurity(): AppRestSecurity {
-  const pass: MiddlewareHandler = async (_c, next) => next();
-  const authenticateProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", {
-      id: "project_1",
-      name: "Project One",
-      slug: "project-one",
-      teamId: "team_1",
-      organizationId: "org_1",
-      isPersonal: false,
-      ownerUserId: null,
-    });
-    await next();
-  };
-  const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: boundaryErrorHandler,
-    canonicalErrorHandler: boundaryErrorHandler,
-    authenticateProject: () => authenticateProject,
-    authorizeProjectPermission: () => pass,
-    authorizeApiKeyCeiling: () => pass,
-    authenticateOrganization: () => pass,
-    authorizeOrganizationPermission: () => pass,
-    authorizeRouteTeamPermission: () => pass,
-    authorizeRouteProjectPermission: () => pass,
-    authenticateOrganizationThrowing: pass,
-    authorizeOrganizationPermissionThrowing: () => pass,
-  };
-  return createAppRestSecurity(ports);
-}
-
 function buildApi(relayMaxPayloadMb?: number) {
-  const security = testSecurity();
-  const family = security.createProjectVersionedApp({
-    name: "agents-v1",
-    basePath: "/api/v1/agents",
-    errorEnvelope: "legacy",
-    staticGeneration: "v1",
-  });
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
   const app = createApiFixture<AgentApi>({ connectFrames: framesSpy });
-  registerConnectEndpoints({
-    family,
-    app: () => app,
-    relayMaxPayloadMb,
-  });
-  return { hono: family.service.build(), framesSpy };
+  const runtime = createRestRuntime({
+    identity: { authenticate: (): RestCaller => ({ actor: null, scope: null }) },
+  } as never);
+  const hono = new Hono();
+  hono.route(
+    "/",
+    runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
+      app: () => app,
+      onError: agentRestErrorHandler(renderRefusal),
+      facts: [
+        bindRestMiddleware(agentConnectHeaders, (context) => ({
+          authorization: context.req.header("authorization"),
+          projectId: context.req.header("x-project-id"),
+          instanceToken: context.req.header("x-agent-instance-token"),
+        })),
+      ],
+    }),
+  );
+  return {
+    hono: { request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init) },
+    framesSpy,
+  };
 }
 
 const headers = { "content-type": "application/json", authorization: "Bearer sk-lw-anything" };
@@ -88,7 +70,7 @@ describe("POST /connect/frames", () => {
       });
 
       expect(response.status).toBe(422);
-      const body = (await response.json()) as { frame: { type: string; code: string } };
+      const body = (await response.json()) as { frame?: { type: string; code: string } };
       expect(body.frame).toMatchObject({ type: "refused", code: "protocol_invalid" });
       expect(framesSpy).not.toHaveBeenCalled();
     });

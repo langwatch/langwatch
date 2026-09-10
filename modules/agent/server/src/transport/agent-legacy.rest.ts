@@ -14,7 +14,12 @@ import {
   updateAgentRequestSchema,
   type Agent,
 } from "@langwatch/agent-contract";
-import { defineRestRouter, MANAGEMENT_API_VERSION, projectRestFacts } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  projectRestFacts,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import { z } from "zod";
 
 const legacyResponse = agentResponseSchema.pick({
@@ -45,7 +50,11 @@ function response(agent: Agent, app: AgentApi, projectSlug: string) {
 
 export const AGENTS_ALIAS_SUCCESSOR = "/api/v1/agents";
 
-export const agentLegacyRest = defineRestRouter(AgentApi)
+export const agentLegacyRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<AgentApi>;
+}> = defineRestRouter(AgentApi)
   .withNamespace("agents")
   .withVersion(MANAGEMENT_API_VERSION)
   .withDeprecated({ successor: AGENTS_ALIAS_SUCCESSOR, notice: `superseded by ${AGENTS_ALIAS_SUCCESSOR}` })

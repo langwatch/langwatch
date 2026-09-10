@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentNotFoundError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { createAgentAppFixture } from "../../testing.ts";
+import { createAgentAppFixture } from "./agent.fixture.ts";
 import { ConnectedAgentService } from "../../services/connected-agent.service.ts";
 
 const register = {

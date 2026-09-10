@@ -654,8 +654,15 @@ Feature: Connected agents
     Scenario: The HTTP transport refuses the same credentials as the socket
       Given a personal key that holds only "scenarios:view"
       When it posts a register frame to the register route
-      Then the answer is a refused frame with "permission_denied"
-      And an ingestion key is refused with "key_type_not_allowed"
+      Then the answer is a refused frame with "permission_denied" and status 403
+      And an ingestion key is refused with "key_type_not_allowed" and status 403
+
+    @integration
+    Scenario: A register refusal answers at the HTTP status of its reason
+      Given an SDK process whose network blocks WebSockets
+      When it registers with no bearer token
+      Then the answer is a refused frame with "api_key_invalid" and status 401
+      And a key that reaches several projects with none named is refused with "project_required" and status 400
 
     @integration
     Scenario: A poll delivers a parked call once
@@ -713,13 +720,13 @@ Feature: Connected agents
     Scenario: An HTTP register is refused without Redis on a deployment with several replicas
       Given no Redis and LANGWATCH_APP_REPLICAS set to 3
       When a process posts a register frame
-      Then the answer is a refused frame with "replica_count_unsupported"
+      Then the answer is a refused frame with "replica_count_unsupported" and status 503
 
     @integration
     Scenario: A frames body the endpoint does not take is refused as a protocol frame
       Given an instance registered over HTTP
       When it posts a body that carries no ack, result or deregister frame
-      Then the answer is a refused frame with "protocol_invalid"
+      Then the answer is a refused frame with "protocol_invalid" and status 422
 
     @integration
     Scenario: A frames body above the cap names the limit alone

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { agentFixture } from "../../testing.ts";
+import { agentFixture } from "../../app/__tests__/agent.fixture.ts";
 import { agentWithResolvedFields } from "../agent-view.rules.ts";
 
 describe("given a code agent whose config declares its own fields", () => {

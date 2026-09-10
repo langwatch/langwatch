@@ -3,7 +3,7 @@ import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { createAgentAppFixture } from "../../testing.ts";
+import { createAgentAppFixture } from "./agent.fixture.ts";
 
 const projectId = "project_1";
 const connected = {

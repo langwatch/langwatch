@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi, WorkflowMappingFields } from "@langwatch/workflow-contract";
-import { createAgentAppFixture } from "../../testing.ts";
+import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 
 async function setup() {
   const fields: Record<string, WorkflowMappingFields> = {

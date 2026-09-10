@@ -162,8 +162,12 @@ export class AgentSessionService {
       logger.error({ error }, "connect refused by an unexpected error");
     }
 
-    const { reason, ...meta } = refused.meta as {
+    // `frame` is the error's own precomputed refused frame (for the REST
+    // boundary's flat body); the socket gateway builds its own below, from
+    // the reason and whatever meta is left.
+    const { reason, frame: _frame, ...meta } = refused.meta as {
       reason: RefusedCode;
+      frame?: unknown;
     } & Record<string, unknown>;
 
     return {

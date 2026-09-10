@@ -4,7 +4,3 @@ import type { ComposedHttpProxyFeature } from "./http-proxy.composition.types.ts
 export function composeHttpProxyFeature(): ComposedHttpProxyFeature {
   return { router: (mount) => createHttpProxyTrpcRouter(mount.runtime) };
 }
-
-export function refusingHttpProxyFeature(): ComposedHttpProxyFeature {
-  return composeHttpProxyFeature();
-}

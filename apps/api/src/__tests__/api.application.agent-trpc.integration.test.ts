@@ -1,5 +1,5 @@
-import { type AgentWithFields } from "@langwatch/agent-contract";
-import { agentFixture, createAgentAppFixture } from "@langwatch/agent-server/testing";
+import { type AgentApi, type AgentWithFields } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication, NoApiTrpcFeatures } from "../api.application.ts";
 
@@ -26,6 +26,34 @@ const agent: AgentWithFields = {
   copyCount: 2,
 };
 
+/**
+ * This suite's own double: a signature agent composes no `connected`
+ * dependency, so `getAll` degrades to no owner, no parameters and offline
+ * presence with no instances - the fixed view these tests pin.
+ */
+function fixtureAgentApp(overrides: Partial<AgentApi> = {}): AgentApi {
+  return createApiFixture<AgentApi>({
+    getAll: async () => [
+      {
+        ...agent,
+        // The tRPC handler derives `_count.copiedAgents` from this field.
+        copyCount: 0,
+        environment: null,
+        ownerUserId: null,
+        hostLabel: null,
+        lastSeenAt: null,
+        parameters: [],
+        owner: null,
+        status: "offline",
+        instances: [],
+        selectable: true,
+        notSelectableReason: null,
+      },
+    ],
+    ...overrides,
+  });
+}
+
 class AllowingFeatures extends NoApiTrpcFeatures {
   readonly authorization = {
     getDecision: vi.fn(async () => ({ permitted: true, organizationRole: null })),
@@ -41,8 +69,7 @@ class AllowingFeatures extends NoApiTrpcFeatures {
 
 describe("ApiApplication Agent tRPC composition", () => {
   it("mounts every legacy agents.* procedure with its legacy presenter shape", async () => {
-    const { app: agents, repositories } = createAgentAppFixture();
-    await repositories.agents.create(agentFixture(agent));
+    const agents = fixtureAgentApp();
     const features = new AllowingFeatures();
     const application = ApiApplication.create({
       agents,
@@ -109,7 +136,7 @@ describe("ApiApplication Agent tRPC composition", () => {
   });
 
   it("refuses a copy command whose project inputs cross tenant boundaries", async () => {
-    const { app: agents } = createAgentAppFixture();
+    const agents = fixtureAgentApp();
     const features = new AllowingFeatures();
     features.authorization.checkScopeLineage.mockImplementation(async () => {
       throw new Error("scope lineage mismatch");

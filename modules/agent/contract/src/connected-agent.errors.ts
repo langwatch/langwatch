@@ -4,7 +4,24 @@
 
 import { HandledError, remediation } from "@langwatch/handled-error";
 
-import type { RefusedCode } from "./connected-agent.protocol.ts";
+import { PROTOCOL_VERSION, type RefusedCode, type RefusedFrame } from "./connected-agent.protocol.ts";
+
+/**
+ * The HTTP status of a register refusal, by its reason: the connect
+ * protocol's own status table, restored from origin/main. A credential
+ * refusal is 401, a key that cannot reach the target is 403, a body or
+ * deployment shape problem is 422 or 503.
+ */
+const REFUSAL_STATUSES = {
+  api_key_invalid: 401,
+  project_required: 400,
+  permission_denied: 403,
+  key_type_not_allowed: 403,
+  replica_count_unsupported: 503,
+  parameters_invalid: 422,
+  environment_invalid: 422,
+  protocol_invalid: 422,
+} as const satisfies Record<RefusedCode, number>;
 
 /** No live instance answered inside the first-turn grace. */
 export class AgentOfflineError extends HandledError {
@@ -224,10 +241,19 @@ export class AgentRegisterRefusedError extends HandledError {
     message: string;
     meta?: Record<string, unknown>;
   }) {
+    const frame: RefusedFrame = {
+      type: "refused",
+      protocol: PROTOCOL_VERSION,
+      code: reason,
+      message,
+      ...(meta && Object.keys(meta).length > 0 ? { meta } : {}),
+    };
     super("agent_register_refused", message, {
-      httpStatus: reason === "permission_denied" ? 403 : 422,
+      httpStatus: REFUSAL_STATUSES[reason],
       fault: "customer",
-      meta: { reason, ...meta },
+      // `frame` is the refused frame the connect protocol's clients read off
+      // the response body; the REST boundary spreads `meta` onto it.
+      meta: { reason, ...meta, frame },
       ...remediation("agent_register_refused"),
     });
     this.name = "AgentRegisterRefusedError";

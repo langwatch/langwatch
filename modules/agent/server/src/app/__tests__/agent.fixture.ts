@@ -14,9 +14,9 @@ import {
   workflowVersionSchema,
   type WorkflowApi,
 } from "@langwatch/workflow-contract";
-import { AgentApp, type AgentAppConfig, type AgentInfrastructure } from "./app/agent.app.ts";
-import { MemoryAgentRepositories } from "./repositories/memory/memory.agent.repositories.ts";
-import type { AgentRepositories } from "./repositories/agent.repositories.ts";
+import { AgentApp, type AgentAppConfig, type AgentInfrastructure } from "../agent.app.ts";
+import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
+import type { AgentRepositories } from "../../repositories/agent.repositories.ts";
 
 export function agentFixture(overrides: Partial<Agent> = {}): Agent {
   return agentSchema.parse({

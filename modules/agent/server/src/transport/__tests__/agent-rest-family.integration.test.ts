@@ -1,36 +1,23 @@
 /**
  * The `/api/v1/agents` REST family and its deprecated `/api/agents` alias, driven through
- * the real Hono apps `createAgentV1RestApp` and `createAgentLegacyRestApp` build — mounted
+ * the real Hono apps `createAgentRest` and `agentLegacyRest` build - mounted
  * @see specs/agents/agents-rest-api.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { agentSchema, type Agent } from "@langwatch/agent-contract";
 
 import { AGENTS_ALIAS_SUCCESSOR } from "../agent-legacy.rest.ts";
-import { createAgentV1RestApp } from "../agent.rest.ts";
-import { buildAgentApps, PROJECT_ID, testSecurity } from "./agent-rest.fixture.ts";
+import { createAgentRest } from "../agent.rest.ts";
+import { buildAgentApps, PROJECT_ID } from "./agent-rest.fixture.ts";
 
 it("declares every Agent REST protocol without resolving the app", () => {
-  const agents = vi.fn(() => {
-    throw new Error("OpenAPI must not resolve AgentApp");
-  });
-  const api = createAgentV1RestApp({
-    security: testSecurity(),
-    agents,
-    agentPlatformUrl: () => "https://app.test/agents",
-    connect: {},
-    call: {},
-  });
+  // `.build()` never calls the app factory: it is resolved per request, once
+  // the runtime mounts the declaration.
+  const declaration = createAgentRest().router();
 
-  expect(agents).not.toHaveBeenCalled();
-  expect(api.routes.map((route) => route.path)).toEqual(
-    expect.arrayContaining([
-      "/api/v1/agents/connect/register",
-      "/api/v1/agents/connect/poll",
-      "/api/v1/agents/connect/frames",
-      "/api/v1/agents/:id/call",
-    ]),
+  expect(declaration.routes.map((route) => route.path)).toEqual(
+    expect.arrayContaining(["/:id/call"]),
   );
 });
 

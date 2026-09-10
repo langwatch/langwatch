@@ -150,6 +150,8 @@ export interface AgentApi {
   }): Promise<AgentTestRunResult>;
   /** The platform's own deep link to this agent's editor drawer. */
   platformUrl(input: { projectSlug: string; agentId: string; agentType: string }): string;
+  /** `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`, resolved once at composition; the transports' own body caps read it at mount. */
+  relayMaxPayloadMb(): number | undefined;
 }
 
 export const AgentApi = moduleApi<AgentApi>("agent");

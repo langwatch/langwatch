@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAgentAppFixture } from "../../testing.ts";
+import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 
 describe("copying a connected agent", () => {
   it("refuses the copy and persists no row", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { agentWorkflowCopyFixture, createAgentAppFixture } from "../../testing.ts";
+import { agentWorkflowCopyFixture, createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 
 async function setup() {
   const listSummaries = vi.fn(async () => [{ id: "workflow_1", name: "Linked workflow" }]);

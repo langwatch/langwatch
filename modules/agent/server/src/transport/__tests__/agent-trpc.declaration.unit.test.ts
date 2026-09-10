@@ -1,6 +1,6 @@
 import { agentTrpc } from "@langwatch/agent-contract";
 import { expect, it } from "vitest";
-import { createAgentAppFixture } from "../../testing.ts";
+import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 import { agentTrpcTransport } from "../agent.trpc.ts";
 import { accessDeclaredBy, agentTrpcCaller } from "./agent-trpc.fixture.ts";
 

@@ -2,10 +2,14 @@
  * @vitest-environment node
  * @see specs/agents/connected-agents.feature
  */
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
-  createAppRestSecurity,
-  type AppRestSecurity,
-  type RestApiServicePorts,
+  bindRestMiddleware,
+  createRestRuntime,
+  defineRestMiddleware,
+  projectRestFacts,
+  type RestCaller,
+  type RestErrorHandler,
 } from "@langwatch/api/rest";
 import {
   AgentBusyError,
@@ -15,10 +19,14 @@ import {
 } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
-import type { ErrorHandler, MiddlewareHandler } from "hono";
+import { Hono } from "hono";
+import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
-import { registerCallEndpoint } from "../agent-call.rest.ts";
-import { agentRestErrorHandler } from "../agent.rest.ts";
+import { agentRestErrorHandler, createAgentRest } from "../agent.rest.ts";
+
+// Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
+// fact - a mount binds a declared fact by name, not by object identity.
+const traceparent = defineRestMiddleware("traceparent", z.string().nullable());
 
 class ForbiddenTestError extends HandledError {
   constructor() {
@@ -26,96 +34,17 @@ class ForbiddenTestError extends HandledError {
   }
 }
 
-const boundaryErrorHandler: ErrorHandler = (error, c) => {
-  const handled = error as Error & { code?: string; httpStatus?: number };
-  if (typeof handled.code === "string" && typeof handled.httpStatus === "number") {
-    return c.json({ error: handled.code, message: handled.message }, handled.httpStatus as 400);
+const renderRefusal: RestErrorHandler = (error, c) => {
+  if (HandledError.isHandled(error)) {
+    return c.json(
+      { error: error.code, message: error.message, ...error.meta },
+      (error.httpStatus ?? 500) as ContentfulStatusCode,
+    );
   }
   return c.json({ error: "internal_server_error", message: "Internal server error" }, 500);
 };
 
-function testSecurity({
-  projectId = "project-1",
-  apiKeyUserId,
-  authorizeRefuses = false,
-}: {
-  projectId?: string;
-  apiKeyUserId?: string | null;
-  authorizeRefuses?: boolean;
-} = {}): { security: AppRestSecurity; chain: string[] } {
-  const chain: string[] = [];
-  const record =
-    (label: string): MiddlewareHandler =>
-    async (_c, next) => {
-      chain.push(label);
-      await next();
-    };
-  const authenticateProject: MiddlewareHandler = async (c, next) => {
-    chain.push("authenticateProject");
-    c.set("project", {
-      id: projectId,
-      name: "Project One",
-      slug: "project-one",
-      teamId: "team-1",
-      organizationId: "organization-1",
-      isPersonal: false,
-      ownerUserId: null,
-    });
-    c.set("resolvedToken", {
-      type: "apiKey",
-      apiKeyId: "test-key",
-      userId: apiKeyUserId ?? null,
-      organizationId: "organization-1",
-      project: {
-        id: projectId,
-        name: "Project One",
-        slug: "project-one",
-        teamId: "team-1",
-        organizationId: "organization-1",
-        isPersonal: false,
-        ownerUserId: null,
-      },
-    });
-    if (apiKeyUserId !== undefined) c.set("apiKeyUserId", apiKeyUserId ?? undefined);
-    await next();
-  };
-  const authorizeProjectPermission: RestApiServicePorts["authorizeProjectPermission"] = ({
-    permission,
-  }) => {
-    if (authorizeRefuses) {
-      return async () => {
-        chain.push(`authorize:${permission}:refused`);
-        throw new ForbiddenTestError();
-      };
-    }
-    return record(`authorize:${permission}`);
-  };
-
-  const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: boundaryErrorHandler,
-    canonicalErrorHandler: boundaryErrorHandler,
-    authenticateProject: () => authenticateProject,
-    authorizeProjectPermission,
-    authorizeApiKeyCeiling: ({ permission }) => record(`ceiling:${permission}`),
-    authenticateOrganization: () => record("authenticateOrganization"),
-    authorizeOrganizationPermission: ({ permission }) => record(`authorizeOrg:${permission}`),
-    authorizeRouteTeamPermission: () => async (_c, next) => next(),
-    authorizeRouteProjectPermission: ({ permission }) =>
-      record(`authorizeRouteProject:${permission}`),
-    authenticateOrganizationThrowing: record("authenticateOrganizationThrowing"),
-    authorizeOrganizationPermissionThrowing: (permission) =>
-      record(`authorizeOrgThrowing:${permission}`),
-  };
-
-  return { security: createAppRestSecurity(ports), chain };
-}
-
-const outcome = { output: "hi", instance: { hostname: "laptop", label: null }, durationMs: 12 };
-const body = JSON.stringify({ messages: [{ role: "user", content: "hi" }] });
-const headers = { "content-type": "application/json" };
+const PROJECT_ID = "project-1";
 
 function buildApi(
   options: {
@@ -125,23 +54,46 @@ function buildApi(
     relayMaxPayloadMb?: number;
   } = {},
 ) {
-  const { security, chain } = testSecurity(options);
-  const family = security.createProjectVersionedApp({
-    name: "agents-v1",
-    basePath: "/api/v1/agents",
-    errorEnvelope: "legacy",
-    staticGeneration: "v1",
-    errorHandler: agentRestErrorHandler,
-  });
   const call = vi.fn(options.call ?? (async () => outcome));
   const app = createApiFixture<AgentApi>({ call });
-
-  registerCallEndpoint({
-    family,
-    deps: { agents: () => app, relayMaxPayloadMb: options.relayMaxPayloadMb },
-  });
-  return { hono: family.service.build(), chain, call };
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: ({ permission }): RestCaller => {
+        if (options.authorizeRefuses && permission === "scenarios:create") {
+          throw new ForbiddenTestError();
+        }
+        return {
+          actor: { type: "user", id: options.apiKeyUserId ?? "u_2" },
+          scope: { tier: "project", id: PROJECT_ID },
+        };
+      },
+    },
+  } as never);
+  const hono = new Hono();
+  hono.route(
+    "/",
+    runtime.mount(createAgentRest(options.relayMaxPayloadMb).router(), {
+      app: () => app,
+      onError: agentRestErrorHandler(renderRefusal),
+      facts: [
+        bindRestMiddleware(projectRestFacts, () => ({
+          projectSlug: "project-one",
+          viewerUserId: options.apiKeyUserId ?? null,
+          actorId: options.apiKeyUserId ?? "u_2",
+        })),
+        bindRestMiddleware(traceparent, (context) => context.req.header("traceparent") ?? null),
+      ],
+    }),
+  );
+  return {
+    hono: { request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init) },
+    call,
+  };
 }
+
+const outcome = { output: "hi", instance: { hostname: "laptop", label: null }, durationMs: 12 };
+const body = JSON.stringify({ messages: [{ role: "user", content: "hi" }] });
+const headers = { "content-type": "application/json" };
 
 describe("the connected-agent call boundary", () => {
   it("rejects oversized bodies before invoking the app", async () => {
@@ -172,6 +124,7 @@ describe("the connected-agent call boundary", () => {
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBe("2");
   });
+
   it("refuses a key without scenarios:create before invoking the app", async () => {
     const { hono, call } = buildApi({ authorizeRefuses: true });
     const response = await hono.request("/api/v1/agents/agent_1/call", {
@@ -199,7 +152,7 @@ describe("the connected-agent call boundary", () => {
     expect(response.status).toBe(404);
     expect(call.mock.calls[0]?.[0]).toEqual({
       id: "agent_elsewhere",
-      projectId: "project-1",
+      projectId: PROJECT_ID,
       messages: [{ role: "user", content: "hi" }],
     });
   });
