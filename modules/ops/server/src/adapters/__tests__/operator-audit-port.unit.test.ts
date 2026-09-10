@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/audit-log-contract";
 import { describe, expect, it } from "vitest";
 import { QueueAuditAdapter } from "../audit-log.queue-audit.adapter.ts";
-import { ProcessAuditRepository } from "../../repositories/prisma/prisma.process-audit.repository.ts";
+import { PrismaProcessAuditRepository } from "../../repositories/prisma/prisma.process-audit.repository.ts";
 import { PrismaSchedulerAuditRepository } from "../../repositories/prisma/prisma.scheduler-audit.repository.ts";
 
 class RecordingAuditLog implements AuditLogApi {
@@ -50,7 +50,7 @@ describe("given the operator surfaces record through the audit-log port", () => 
         queueName: "trace-ingest",
         metadata: { group: "project-1" },
       });
-      await ProcessAuditRepository.create({ prisma: refusingPrisma, auditLog }).append({
+      await PrismaProcessAuditRepository.create({ prisma: refusingPrisma, auditLog }).append({
         actorUserId: "user-1",
         action: "process_wake_now",
         processName: "gateway_debits",

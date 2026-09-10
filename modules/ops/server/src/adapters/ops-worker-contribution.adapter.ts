@@ -3,9 +3,9 @@ import type { OpsWorkerHandle, UsageStatsWorkerConfig } from "../ports/ops-worke
 import type {
   UsageStatsCollector,
   UsageStatsErrorReporterPort,
-  UsageStatsOrganizationRepositoryPort,
   UsageStatsTelemetryClientPort,
 } from "../ports/usage-stats-worker.port.ts";
+import type { UsageStatsOrganizationRepository } from "../repositories/observe/usage-stats.repository.ts";
 
 const anomalyLogger = createLogger("langwatch:observability:anomalyWorker");
 const usageStatsLogger = createLogger("langwatch:workers:usageStatsWorker");
@@ -82,7 +82,7 @@ export class AnomalyWorkerContributionAdapter {
 
 export interface UsageStatsWorkerContributionOptions {
   config: UsageStatsWorkerConfig;
-  organizations: UsageStatsOrganizationRepositoryPort;
+  organizations: UsageStatsOrganizationRepository;
   usageStats: UsageStatsCollector;
   telemetry: UsageStatsTelemetryClientPort;
   errors: UsageStatsErrorReporterPort;

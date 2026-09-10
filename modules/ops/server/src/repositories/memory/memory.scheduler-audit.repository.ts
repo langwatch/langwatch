@@ -1,13 +1,13 @@
 import { generate } from "@langwatch/ksuid";
 import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
-import { SchedulerAuditSink } from "../process/ops-audit.repository.ts";
+import { SchedulerAuditRepository } from "../process/ops-audit.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
 const SCHEDULER_AUDIT_KSUID_RESOURCE = "schedaudit";
 
 /** The scheduler-control trail in memory, newest act first on a read. */
-export class MemorySchedulerAuditRepository extends SchedulerAuditSink {
+export class MemorySchedulerAuditRepository extends SchedulerAuditRepository {
   static create({ store }: { store: MemoryOpsStore }): MemorySchedulerAuditRepository {
     return new MemorySchedulerAuditRepository(store);
   }

@@ -32,7 +32,7 @@ import {
   OpsReplayRuntimePort,
   type OpsAppDependencies,
   OpsOperations,
-  ProcessAuditRepository,
+  PrismaProcessAuditRepository,
   ProcessOpsPrismaRepository,
   QueuePayloadDecoderPort,
   RedisOpsSnapshotAdapter,
@@ -125,7 +125,7 @@ export function installWorkerOps<Infrastructure>(
           managerExplorer: ManagerExplorerService.create({
             store: options.processStore,
             fleet: ProcessOpsPrismaRepository.create({ prisma: database }),
-            audit: ProcessAuditRepository.create({
+            audit: PrismaProcessAuditRepository.create({
               prisma: database,
               auditLog: peers.auditLog,
             }),

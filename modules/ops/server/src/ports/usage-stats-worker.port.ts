@@ -83,27 +83,8 @@ export abstract class UsageStatsClickHouseClientResolverPort {
   abstract tryResolve(organizationId: string): Promise<UsageStatsClickHouseClientPort | null>;
 }
 
-/** Private Ops repository boundary for project-scoped relational usage. */
-export abstract class UsageStatsProjectRepositoryPort {
-  abstract collectProjectCounts(input: {
-    organizationId: string;
-    builderChartKind: string;
-  }): Promise<UsageStatsProjectCounts>;
-}
-
-/** Private Ops repository boundary for organization-wide ClickHouse usage. */
-export abstract class UsageStatsClickHouseRepositoryPort {
-  abstract findTraceCount(input: UsageStatsCountInput): Promise<number>;
-  abstract findScenarioRunCount(input: UsageStatsCountInput): Promise<number>;
-}
-
 export interface UsageStatsCollector {
   collect(input: { organizationId: string }): Promise<UsageStatsReport>;
-}
-
-/** Private Ops repository boundary for organizations that need reporting. */
-export abstract class UsageStatsOrganizationRepositoryPort {
-  abstract listForUsageStats(): Promise<UsageStatsOrganization[]>;
 }
 
 /** Infrastructure boundary for the self-hosted telemetry receiver. */

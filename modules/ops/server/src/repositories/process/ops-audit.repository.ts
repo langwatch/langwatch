@@ -19,7 +19,7 @@ export type ProcessControlAction =
   | "process_release_lapsed_lease";
 
 /** Durable audit trail for Ops process-manager controls. */
-export abstract class ProcessAuditSink {
+export abstract class ProcessAuditRepository {
   abstract append(entry: {
     actorUserId: string;
     action: ProcessControlAction;
@@ -36,7 +36,7 @@ export abstract class ProcessAuditSink {
 }
 
 /** Durable audit trail for Ops scheduler controls. */
-export abstract class SchedulerAuditSink {
+export abstract class SchedulerAuditRepository {
   abstract append(entry: {
     actorUserId: string;
     action: SchedulerControlAction;

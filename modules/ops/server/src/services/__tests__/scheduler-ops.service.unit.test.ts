@@ -4,7 +4,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 import {
   NoopSchedulerWakeService,
-  SchedulerAuditSink,
+  SchedulerAuditRepository,
   type ScheduledJobRecord,
 } from "../../index.ts";
 import type { SchedulerOpsRepository } from "../../index.ts";
@@ -61,7 +61,7 @@ class SchedulerRepositoryStub implements SchedulerOpsRepository {
     vi.fn<(params: { limit: number }) => Promise<{ rows: ScheduledJobRecord[]; total: number }>>();
 }
 
-class SchedulerAuditSinkStub extends SchedulerAuditSink {
+class SchedulerAuditRepositoryStub extends SchedulerAuditRepository {
   readonly append = vi.fn().mockResolvedValue(void 0);
   readonly listRecent = vi.fn().mockResolvedValue([]);
 }
@@ -74,7 +74,7 @@ const makeService = (row: ScheduledJobRecord | null) => {
   repo.requestImmediateRunForOps.mockResolvedValue(true);
   repo.listForOps.mockResolvedValue([]);
   repo.listPausedForOps.mockResolvedValue({ rows: [], total: 0 });
-  const audit = new SchedulerAuditSinkStub();
+  const audit = new SchedulerAuditRepositoryStub();
   const wake = NoopSchedulerWakeService.create();
   const wakeSpy = vi.spyOn(wake, "wake");
   const service = SchedulerOpsService.create({

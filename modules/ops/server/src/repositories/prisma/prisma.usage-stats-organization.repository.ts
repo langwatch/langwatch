@@ -1,10 +1,10 @@
-import {
-  UsageStatsOrganizationRepositoryPort,
-  type UsageStatsOrganization,
-  type UsageStatsOrganizationDatabase,
+import type {
+  UsageStatsOrganization,
+  UsageStatsOrganizationDatabase,
 } from "../../ports/usage-stats-worker.port.ts";
+import { UsageStatsOrganizationRepository } from "../observe/usage-stats.repository.ts";
 
-export class PrismaUsageStatsOrganizationRepository extends UsageStatsOrganizationRepositoryPort {
+export class PrismaUsageStatsOrganizationRepository extends UsageStatsOrganizationRepository {
   private constructor(private readonly database: UsageStatsOrganizationDatabase) {
     super();
   }

@@ -34,8 +34,8 @@ export {
 } from "./adapters/redis.scheduler-wake.adapter.ts";
 export { OpsSnapshotRedisPort } from "./ports/ops-snapshot-redis.port.ts";
 export {
-  ProcessAuditSink,
-  SchedulerAuditSink,
+  ProcessAuditRepository,
+  SchedulerAuditRepository,
   type ProcessControlAction,
 } from "./repositories/process/ops-audit.repository.ts";
 export { MemoryProcessAuditRepository } from "./repositories/memory/memory.process-audit.repository.ts";
@@ -121,7 +121,7 @@ export type {
 export { MemoryReplayRepository } from "./repositories/memory/memory.replay.repository.ts";
 export type { ReplayRepository } from "./repositories/process/replay.repository.ts";
 export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process-ops.repository.ts";
-export { ProcessAuditRepository } from "./repositories/prisma/prisma.process-audit.repository.ts";
+export { PrismaProcessAuditRepository } from "./repositories/prisma/prisma.process-audit.repository.ts";
 export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository.ts";
 export { OpsExplainClickHouseRepository } from "./repositories/clickhouse/clickhouse.ops-explain.repository.ts";
 export type {

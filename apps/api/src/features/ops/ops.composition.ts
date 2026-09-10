@@ -18,7 +18,7 @@ import {
   NoopSchedulerWakeService,
   OpsApp,
   OpsOperations,
-  ProcessAuditRepository,
+  PrismaProcessAuditRepository,
   OpsSnapshotRedisPort,
   ProcessOpsPrismaRepository,
   RedisOpsSnapshotAdapter,
@@ -315,7 +315,7 @@ function composeManagerExplorer(options: OpsFeatureCollaborators): OpsProcessExp
   return ManagerExplorerService.create({
     store: PrismaProcessStore.create({ database: options.prisma }),
     fleet: ProcessOpsPrismaRepository.create({ prisma: options.prisma }),
-    audit: ProcessAuditRepository.create({ prisma: options.prisma, auditLog: options.auditLog }),
+    audit: PrismaProcessAuditRepository.create({ prisma: options.prisma, auditLog: options.auditLog }),
     introspection: EventingOpsIntrospectionAdapter.create(
       () => options.eventing?.definitions ?? [],
     ),

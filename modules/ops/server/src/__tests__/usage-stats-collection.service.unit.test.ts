@@ -4,12 +4,11 @@ import {
   UsageStatsClickHouseClientResolverPort,
   type UsageStatsClickHouseQuery,
 } from "../index.ts";
+import type { UsageStatsProjectDatabase, UsageStatsProjectCounts } from "../ports/usage-stats-worker.port.ts";
 import {
-  UsageStatsClickHouseRepositoryPort,
-  UsageStatsProjectRepositoryPort,
-  type UsageStatsProjectDatabase,
-  type UsageStatsProjectCounts,
-} from "../ports/usage-stats-worker.port.ts";
+  UsageStatsClickHouseRepository,
+  UsageStatsProjectRepository,
+} from "../repositories/observe/usage-stats.repository.ts";
 import { ClickHouseUsageStatsRepository } from "../repositories/clickhouse/clickhouse.usage-stats.repository.ts";
 import { PrismaUsageStatsProjectRepository } from "../repositories/prisma/prisma.usage-stats-project.repository.ts";
 import { UsageStatsCollectionService } from "../services/usage-stats-collection.service.ts";
@@ -30,7 +29,7 @@ const projectCounts: UsageStatsProjectCounts = {
   workflows: 11,
 };
 
-class ProjectsFake extends UsageStatsProjectRepositoryPort {
+class ProjectsFake extends UsageStatsProjectRepository {
   readonly collectProjectCounts = vi.fn<
     (input: {
       organizationId: string;
@@ -39,7 +38,7 @@ class ProjectsFake extends UsageStatsProjectRepositoryPort {
   >(async () => projectCounts);
 }
 
-class CountsFake extends UsageStatsClickHouseRepositoryPort {
+class CountsFake extends UsageStatsClickHouseRepository {
   readonly findTraceCount = vi.fn(async () => 200);
   readonly findScenarioRunCount = vi.fn(async () => 75);
 }

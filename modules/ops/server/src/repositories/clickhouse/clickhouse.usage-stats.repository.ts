@@ -1,13 +1,13 @@
-import {
-  UsageStatsClickHouseRepositoryPort,
-  type UsageStatsClickHouseClientResolverPort,
-  type UsageStatsCountInput,
+import type {
+  UsageStatsClickHouseClientResolverPort,
+  UsageStatsCountInput,
 } from "../../ports/usage-stats-worker.port.ts";
+import { UsageStatsClickHouseRepository } from "../observe/usage-stats.repository.ts";
 import { z } from "zod";
 
 const usageStatsCountRowsSchema = z.array(z.object({ Total: z.string() }));
 
-export class ClickHouseUsageStatsRepository extends UsageStatsClickHouseRepositoryPort {
+export class ClickHouseUsageStatsRepository extends UsageStatsClickHouseRepository {
   private constructor(private readonly clients: UsageStatsClickHouseClientResolverPort) {
     super();
   }

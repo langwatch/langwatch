@@ -19,7 +19,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
-import { ProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
+import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
 import { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
 
@@ -89,7 +89,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
     service = ManagerExplorerService.create({
       store,
       fleet,
-      audit: ProcessAuditRepository.create({
+      audit: PrismaProcessAuditRepository.create({
         prisma,
         auditLog: PrismaAuditLogTestSink.create(prisma),
       }),

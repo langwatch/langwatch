@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UsageStatsErrorReporterPort, UsageStatsTelemetryClientPort } from "../../index.ts";
 import {
   type UsageStatsCollector,
-  UsageStatsOrganizationRepositoryPort,
   type UsageStatsOrganization,
   type UsageStatsReport,
 } from "../../ports/usage-stats-worker.port.ts";
+import { UsageStatsOrganizationRepository } from "../../repositories/observe/usage-stats.repository.ts";
 import {
   AnomalyWorkerContributionAdapter,
   UsageStatsWorkerContributionAdapter,
@@ -27,7 +27,7 @@ vi.mock("@langwatch/observability", () => ({
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-class OrganizationsStub extends UsageStatsOrganizationRepositoryPort {
+class OrganizationsStub extends UsageStatsOrganizationRepository {
   readonly listForUsageStats = vi.fn<() => Promise<UsageStatsOrganization[]>>(async () => []);
 }
 

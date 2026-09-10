@@ -1,13 +1,13 @@
+import type { UsageStatsReport } from "../ports/usage-stats-worker.port.ts";
 import type {
-  UsageStatsClickHouseRepositoryPort,
-  UsageStatsProjectRepositoryPort,
-  UsageStatsReport,
-} from "../ports/usage-stats-worker.port.ts";
+  UsageStatsClickHouseRepository,
+  UsageStatsProjectRepository,
+} from "../repositories/observe/usage-stats.repository.ts";
 import type { Instant } from "@langwatch/time";
 
 export interface UsageStatsCollectionServiceOptions {
-  projects: UsageStatsProjectRepositoryPort;
-  clickhouse: UsageStatsClickHouseRepositoryPort;
+  projects: UsageStatsProjectRepository;
+  clickhouse: UsageStatsClickHouseRepository;
   builderChartKind: string;
   now: () => Instant;
 }
