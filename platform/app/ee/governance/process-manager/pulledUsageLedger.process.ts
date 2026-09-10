@@ -330,6 +330,73 @@ function ledgerAmountNanoUsd(
 }
 
 /**
+ * Where the charge sits NOW, which is what the next version is compared
+ * against. Recording where it FIRST landed instead would name a cell the first
+ * correction already emptied, so every later pull would withdraw from nothing
+ * while the middle version stayed live.
+ */
+function filedCellFor(record: PulledUsageObservedEventData): FiledCell {
+  return {
+    model: record.model,
+    currencyCode: record.currencyCode,
+    agentId: record.agentId,
+    rawActorId: record.rawActorId,
+    occurredAtMs: record.occurredAtMs,
+  };
+}
+
+/**
+ * The withdrawal, addressed to the SUPERSEDED cell.
+ *
+ * Every address field comes from `filed` rather than from the observation that
+ * triggered it: the point is to empty where the charge used to sit, and the new
+ * observation names where it sits now. Only `observedAtMs` is the new pull's,
+ * because that is the ordering field.
+ */
+function retractionPayloadFor(
+  filed: FiledCell,
+  record: PulledUsageObservedEventData,
+  tenantId: string,
+): RetractPulledUsagePayload {
+  return {
+    restatement_key: record.restatementKey,
+    tenant_id: tenantId,
+    organization_id: record.organizationId,
+    source: record.source,
+    ingestion_source_id: record.ingestionSourceId,
+    model: filed.model,
+    currency_code: filed.currencyCode,
+    agent_id: filed.agentId,
+    raw_actor_id: filed.rawActorId,
+    occurred_at_ms: filed.occurredAtMs,
+    observed_at_ms: record.observedAtMs,
+  };
+}
+
+/** The ledger row for this observation, in nano-dollars. */
+function writePayloadFor(
+  record: PulledUsageObservedEventData,
+  costNanoUsd: number,
+  tenantId: string,
+): WritePulledUsagePayload {
+  return {
+    restatement_key: record.restatementKey,
+    tenant_id: tenantId,
+    scope_id: pulledUsageScopeId(record),
+    organization_id: record.organizationId,
+    team_id: record.teamId,
+    model: record.model,
+    cost_nano_usd: costNanoUsd,
+    tokens_input: record.tokensInput,
+    tokens_output: record.tokensOutput,
+    tokens_cache_read: record.tokensCacheRead,
+    tokens_cache_write: record.tokensCacheWrite,
+    occurred_at_ms: record.occurredAtMs,
+    observed_at_ms: record.observedAtMs,
+  };
+}
+
+/**
  * One instance per usage item. The event is already whole, so the handler
  * freezes exactly one deterministic write intent and keeps no state.
  *
@@ -366,34 +433,15 @@ export function pulledUsageLedgerPM(
         const reissued = filed !== null && isReissuedElsewhere(filed, record);
         const intents = reissued
           ? [
-              ctx.intents.retractPulledUsage(`retract:${record.observedAtMs}`, {
-                restatement_key: record.restatementKey,
-                tenant_id: ctx.projectId,
-                organization_id: record.organizationId,
-                source: record.source,
-                ingestion_source_id: record.ingestionSourceId,
-                model: filed.model,
-                currency_code: filed.currencyCode,
-                agent_id: filed.agentId,
-                raw_actor_id: filed.rawActorId,
-                occurred_at_ms: filed.occurredAtMs,
-                observed_at_ms: record.observedAtMs,
-              } satisfies RetractPulledUsagePayload),
+              ctx.intents.retractPulledUsage(
+                `retract:${record.observedAtMs}`,
+                retractionPayloadFor(filed, record, ctx.projectId),
+              ),
             ]
           : [];
 
-        // Where the charge sits NOW, which is what the next version is
-        // compared against. Recording where it FIRST landed instead would name
-        // a cell the first correction already emptied, so every later pull
-        // would withdraw from nothing while the middle version stayed live.
         const nextState: PulledUsageLedgerState = {
-          filedCell: {
-            model: record.model,
-            currencyCode: record.currencyCode,
-            agentId: record.agentId,
-            rawActorId: record.rawActorId,
-            occurredAtMs: record.occurredAtMs,
-          },
+          filedCell: filedCellFor(record),
         };
 
         const costNanoUsd = ledgerAmountNanoUsd(record);
@@ -418,21 +466,10 @@ export function pulledUsageLedgerPM(
           state: nextState,
           intents: [
             ...intents,
-            ctx.intents.writePulledUsage(`pulled:${record.observedAtMs}`, {
-              restatement_key: record.restatementKey,
-              tenant_id: ctx.projectId,
-              scope_id: pulledUsageScopeId(record),
-              organization_id: record.organizationId,
-              team_id: record.teamId,
-              model: record.model,
-              cost_nano_usd: costNanoUsd,
-              tokens_input: record.tokensInput,
-              tokens_output: record.tokensOutput,
-              tokens_cache_read: record.tokensCacheRead,
-              tokens_cache_write: record.tokensCacheWrite,
-              occurred_at_ms: record.occurredAtMs,
-              observed_at_ms: record.observedAtMs,
-            } satisfies WritePulledUsagePayload),
+            ctx.intents.writePulledUsage(
+              `pulled:${record.observedAtMs}`,
+              writePayloadFor(record, costNanoUsd, ctx.projectId),
+            ),
           ],
         };
       })

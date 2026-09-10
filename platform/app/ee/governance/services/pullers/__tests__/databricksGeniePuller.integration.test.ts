@@ -107,7 +107,19 @@ async function pullThroughTheRealPipeline(params: {
   try {
     const pipeline = eventSourcing.register(
       createPulledUsageProcessingPipeline({
-        ledger: { budgetCHRepository: chRepo },
+        // This file drives the WRITE half only: it asserts what the puller
+        // lands in the ledger. The withdrawal deps are stubbed, and the stub
+        // throws rather than no-ops so that a future change which does reach
+        // them fails here instead of silently swallowing a retraction.
+        ledger: {
+          budgetCHRepository: chRepo,
+          sendRetractPulledUsage: async () => {
+            throw new Error(
+              "unreachable: this suite drives the ledger writer only",
+            );
+          },
+          retractionEnabled: async () => false,
+        },
       }),
     );
     const commands = mapCommands(pipeline.commands);

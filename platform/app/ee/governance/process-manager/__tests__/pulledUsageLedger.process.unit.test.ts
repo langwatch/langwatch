@@ -29,6 +29,7 @@ import {
   ProcessManagerService,
 } from "~/server/event-sourcing/process-manager";
 import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager/outbox/outboxDispatcherService";
+import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
 import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager/processManager.types";
 import {
   buildIntentHandlers,
@@ -110,7 +111,7 @@ async function observe(data: PulledUsageObservedEventData): Promise<void> {
     tenantId: GOV_PROJECT,
     projectId: GOV_PROJECT,
     processKey: data.restatementKey,
-    payload: data as unknown as Record<string, unknown>,
+    payload: data as unknown as JsonValue,
   };
   await service.handleEvent({ envelope, now: clock });
 }
