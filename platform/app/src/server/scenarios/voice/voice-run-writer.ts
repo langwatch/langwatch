@@ -8,7 +8,7 @@
  * tagged `metadata.langwatch.callerKind = "human"`. Finishing it emits a
  * RunFinished that names the scenario, which is what the scenario-evaluations
  * subscriber keys on to grade the human transcript against the scenario's
- * attached evaluators — the same grading a simulated run gets. A drawer "Talk
+ * attached evaluators, the same grading a simulated run gets. A drawer "Talk
  * to it" call has no scenario, so it is never written as a run at all; it
  * leaves only its per-exchange traces (3a).
  *
@@ -151,7 +151,7 @@ export async function writeVoiceCallRun({
   // No results envelope: the verdict is not decided here. The run is finished
   // SUCCESS with the scenario id named on the event, so the scenario-evaluations
   // subscriber grades the transcript against the scenario's attached evaluators
-  // (AC23) — exactly the path a simulated run's finish takes.
+  // (AC23): exactly the path a simulated run's finish takes.
   await getApp().simulations.finishRun({
     tenantId: projectId,
     scenarioRunId,

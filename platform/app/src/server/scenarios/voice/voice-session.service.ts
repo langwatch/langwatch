@@ -635,7 +635,7 @@ async function ingestFinishedCall(
   // Record one trace per exchange before any run is written, so every message
   // links to its exchange's trace (3a). Best effort: recording failures are
   // swallowed inside the port, and the ids come back regardless (decision 7).
-  // Re-run on a re-drive — the ids are deterministic, so the fold dedupes.
+  // Re-run on a re-drive: the ids are deterministic, so the fold dedupes.
   const { turnTraceIds } = await ports.recordCallTraces({
     projectId: input.projectId,
     record,
@@ -652,7 +652,7 @@ async function ingestFinishedCall(
  * call is scored against no scenario, so it is NOT written as a run (#8020).
  * Writing it as a SUCCESS run with no verdict is exactly the forever-"the judge
  * is reading the conversation" state this issue removes. The agent row is still
- * created on first hang-up (unrelated to run-writing — decision 3), deduped by
+ * created on first hang-up (unrelated to run-writing, decision 3), deduped by
  * its identity key so a retried finish for a not-yet-saved agent reuses the
  * same row rather than creating a second one (decision 1).
  */

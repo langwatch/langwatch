@@ -309,7 +309,7 @@ describe("finishVoiceSession", () => {
         // find for a conversation id with no scenario (#8020).
         expect(writeCallRun).not.toHaveBeenCalled();
         expect(findExistingRun).not.toHaveBeenCalled();
-        // The traces are still recorded — that is where the transcript lives.
+        // The traces are still recorded; that is where the transcript lives.
         expect(recordCallTraces).toHaveBeenCalledTimes(1);
         // The finish carries no run id and no scenario set id.
         expect(result.runId).toBe("");

@@ -105,7 +105,7 @@ export function getDisplayRoleVisuals(
   }
   // The user side of a scenario run is normally an LLM user-simulator. On a
   // voice "Call it myself" run it is the person who spoke the call, so it reads
-  // as "You" — keeping the same side, but a human icon and no flask (#8020).
+  // as "You", keeping the same side, but a human icon and no flask (#8020).
   if (role === "user") {
     return isHumanCaller
       ? {

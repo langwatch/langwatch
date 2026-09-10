@@ -2,8 +2,8 @@
  * @vitest-environment node
  *
  * {@link AgentService.createVoiceAgent} folds a voice agent onto one row by its
- * identity key, so a first "Talk to it" hang-up before the agent is saved — or
- * two tabs racing the same not-yet-saved agent — cannot create a second row
+ * identity key, so a first "Talk to it" hang-up before the agent is saved (or
+ * two tabs racing the same not-yet-saved agent) cannot create a second row
  * (#8020, decision 1). This replaces the old run-based guard, which stopped
  * covering the drawer path once a drawer call no longer writes a run.
  *

@@ -228,7 +228,7 @@ export class AgentService {
   /**
    * Creates the voice agent row a "Talk to it" call is saved under on first
    * hang-up, deduped by its natural identity key so a retried finish for a
-   * not-yet-saved agent — or two browser tabs racing the same one — reuses the
+   * not-yet-saved agent (or two browser tabs racing the same one) reuses the
    * one row rather than creating a second (#8020, decision 1). This replaces the
    * old run-based guard, which stopped covering the drawer path once a drawer
    * call no longer writes a run.
