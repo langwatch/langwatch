@@ -299,24 +299,35 @@ describe("given a source whose runs keep stopping at the same point", () => {
  *
  * `status` is a free-form column, so the badge table gets indexed by a string
  * this build never chose. Every unknown word falls back correctly except the
- * handful naming an inherited member: those come back as a Function, and `??`
- * does not treat a Function as missing. The badge then carries no icon, and
- * rendering an undefined component throws — so the page dies rather than
- * degrading to "Awaiting first event".
+ * handful naming an inherited member: those resolve up the prototype chain to
+ * a real value, and `??` only treats null and undefined as missing. The badge
+ * then carries no icon, and rendering an undefined component throws, so the
+ * page dies rather than degrading to "Awaiting first event".
  *
- * The control case below is the point of the whole block. A test that reaches
- * for a plausible unknown word passes against the broken lookup, because
- * ordinary words are not inherited. Only naming the inherited ones finds it.
+ * `__proto__` is in the list because it is the one that does not fit the
+ * summary. The others resolve to a Function; `__proto__` resolves to
+ * Object.prototype, an object. Anything asserting "not a function" would wave
+ * it through, which is why the load-bearing assertion below is identity
+ * against the fallback and not a typeof check.
+ *
+ * The control case is the point of the whole block. A test that reaches for a
+ * plausible unknown word passes against the broken lookup, because ordinary
+ * words are not inherited. Only naming the inherited ones finds it.
  */
 describe("a status naming an inherited property", () => {
-  const INHERITED = ["toString", "constructor", "valueOf", "hasOwnProperty"];
+  const INHERITED = [
+    "toString",
+    "constructor",
+    "valueOf",
+    "hasOwnProperty",
+    "isPrototypeOf",
+    "__proto__",
+  ];
 
-  it.each(
-    INHERITED,
-  )("falls back to the awaiting badge for %s instead of yielding a function", (status) => {
+  it.each(INHERITED)("falls back to the awaiting badge for %s", (status) => {
     const badge = sourceBadge({ status, errorCount: 0 });
 
-    expect(typeof badge).toBe("object");
+    // Identity, not shape: `__proto__` would satisfy a shape check.
     expect(badge).toBe(SOURCE_STATUS_META.awaiting_first_event);
     expect(badge.icon).toBeDefined();
   });
