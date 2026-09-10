@@ -22,7 +22,7 @@ import {
   PostgresPersonalVirtualKeyAdapter,
   PostgresRoutingPolicyAdapter,
 } from "@langwatch/enterprise-governance-server/testing";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import {
   GroupIdentityAdapter,
@@ -134,7 +134,7 @@ function buildGovernanceApp(): GovernanceApp {
     prisma,
     authz: authz.authz,
     projects,
-    evaluators: {} as unknown as EvaluatorService,
+    evaluators: {} as unknown as EvaluatorApi,
     monitors: {} as unknown as MonitorService,
     clickhouse: null,
     virtualKeyPepper: "test-virtual-key-pepper",

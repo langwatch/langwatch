@@ -14,7 +14,6 @@ import {
   type EvaluatorHistoryEntry,
   type EvaluatorIdOrSlugInput,
   type EvaluatorResultAugmentationInput,
-  EvaluatorService as EvaluatorServiceContract,
   type EvaluatorUpdateInput,
   type EvaluatorWithFields,
   type ResolvedEvaluatorExecution,
@@ -46,7 +45,13 @@ export type EvaluatorServiceOptions = {
   generateId: () => string;
 };
 
-export class EvaluatorService extends EvaluatorServiceContract {
+/**
+ * The evaluator runtime this module composes over its own repository: every
+ * read, write, execution and copy-lineage rule an evaluator carries. Private
+ * to the module - `EvaluatorApp` is the only caller, and every operation here
+ * reaches a peer through `EvaluatorApi` instead.
+ */
+export class EvaluatorService {
   private readonly code: EvaluatorCodeService;
   private readonly native = EvaluatorNativeService.create();
   private readonly execution: EvaluatorExecutionService;
@@ -56,7 +61,6 @@ export class EvaluatorService extends EvaluatorServiceContract {
   }
 
   private constructor(private readonly options: EvaluatorServiceOptions) {
-    super();
     this.code = EvaluatorCodeService.create(options);
     this.execution = EvaluatorExecutionService.create(options);
   }

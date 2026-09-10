@@ -15,18 +15,18 @@ import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { ExperimentService } from "../../services/experiment.service.ts";
 import { ExperimentExecutionPort } from "../../ports/experiment-execution.port.ts";
 import type { AgentApi } from "@langwatch/agent-contract";
-import { DatasetService } from "@langwatch/dataset-contract";
-import { EvaluatorService } from "@langwatch/evaluator-contract";
-import { PromptService } from "@langwatch/prompt-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import { WorkflowService } from "@langwatch/workflow-contract";
 import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter.ts";
 import type { Instant } from "@langwatch/time";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-const prompts: PromptService = Object.create(PromptService.prototype);
+const prompts = {} as PromptApi;
 prompts.getAllPrompts = async () => [];
 const agents = createApiFixture<AgentApi>({ exists: async () => false });
-const evaluators: EvaluatorService = Object.create(EvaluatorService.prototype);
+const evaluators: EvaluatorApi = createApiFixture<EvaluatorApi>();
 evaluators.getById = async () => {
   throw new Error("missing");
 };
@@ -34,7 +34,7 @@ const workflows: WorkflowService = Object.create(WorkflowService.prototype);
 workflows.getById = async () => {
   throw new Error("missing");
 };
-const dataset: DatasetService = Object.create(DatasetService.prototype);
+const dataset = {} as DatasetApi;
 dataset.getByIds = async () => [];
 const references = { prompts, agents, evaluators, workflows, dataset };
 
@@ -71,13 +71,13 @@ class MemoryExperimentRepository implements ExperimentRepository {
     }
   >();
 
-  async tryFindById(input: { id: string; projectId: string }) {
+  async findById(input: { id: string; projectId: string }) {
     return (
       this.values.find((value) => value.id === input.id && value.projectId === input.projectId) ??
       null
     );
   }
-  async tryFindBySlug(input: { slug: string; projectId: string; type?: Experiment["type"] }) {
+  async findBySlug(input: { slug: string; projectId: string; type?: Experiment["type"] }) {
     return (
       this.values.find(
         (value) =>
@@ -96,18 +96,18 @@ class MemoryExperimentRepository implements ExperimentRepository {
   async count(input: { projectId: string }) {
     return (await this.findAll(input)).length;
   }
-  async tryFindLatest(input: { projectId: string }) {
+  async findLatest(input: { projectId: string }) {
     return (await this.findAll(input)).at(-1) ?? null;
   }
-  async tryFindForWorkflow(input: { projectId: string; workflowId: string }) {
+  async findForWorkflow(input: { projectId: string; workflowId: string }) {
     return (
       this.values.find(
         (value) => value.projectId === input.projectId && value.workflowId === input.workflowId,
       ) ?? null
     );
   }
-  async tryFindIdBySlug(input: { projectId: string; slug: string }) {
-    const value = await this.tryFindBySlug(input);
+  async findIdBySlug(input: { projectId: string; slug: string }) {
+    const value = await this.findBySlug(input);
     return value ? { id: value.id, slug: value.slug } : null;
   }
   getBySlugOrId(
@@ -115,7 +115,7 @@ class MemoryExperimentRepository implements ExperimentRepository {
   ): ReturnType<ExperimentRepository["getBySlugOrId"]> {
     throw new Error("Experiment lookup is not configured for this test repository");
   }
-  async tryGetRowState(input: { projectId: string; id: string }) {
+  async findRowState(input: { projectId: string; id: string }) {
     return this.states.get(`${input.projectId}:${input.id}`) ?? null;
   }
   async findSlugsByPrefix(input: { projectId: string; slugPrefix: string }) {
@@ -147,7 +147,7 @@ class MemoryExperimentRepository implements ExperimentRepository {
     id: string;
     workbenchState: SaveExperimentInput["workbenchState"];
   }) {
-    const value = await this.tryFindById(input);
+    const value = await this.findById(input);
     if (value) value.workbenchState = input.workbenchState;
   }
   async archiveActive(input: {
@@ -156,7 +156,7 @@ class MemoryExperimentRepository implements ExperimentRepository {
     archivedSlug: string;
     archivedAt: Instant;
   }) {
-    const state = await this.tryGetRowState(input);
+    const state = await this.findRowState(input);
     if (!state || state.archived) return false;
     this.states.set(`${input.projectId}:${input.id}`, {
       ...state,
@@ -659,7 +659,7 @@ describe("ExperimentService", () => {
           }),
         ).rejects.toBeInstanceOf(ExperimentNotFoundError);
         expect(
-          await repository.tryGetRowState({ projectId: "project_1", id: "experiment_1" }),
+          await repository.findRowState({ projectId: "project_1", id: "experiment_1" }),
         ).toMatchObject({ archived: true });
       });
     });
@@ -694,7 +694,7 @@ describe("ExperimentService", () => {
       success: true,
     });
     expect(
-      await repository.tryGetRowState({
+      await repository.findRowState({
         projectId: "project_1",
         id: "experiment_1",
       }),

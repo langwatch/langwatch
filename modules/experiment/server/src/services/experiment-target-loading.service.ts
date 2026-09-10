@@ -230,7 +230,7 @@ export class ExperimentTargetLoadingService {
 
     const loaded = new Map<string, Evaluator>();
     for (const evaluatorId of ids) {
-      const dbEvaluator = await services.evaluators?.tryGetById({ id: evaluatorId, projectId });
+      const dbEvaluator = await services.evaluators?.findById({ id: evaluatorId, projectId });
       // Same answer as a missing prompt, agent, or workflow: say what is gone
       // and stop, rather than silently running with fewer evaluators than
       // configured.

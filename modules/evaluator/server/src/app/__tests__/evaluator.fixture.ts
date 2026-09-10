@@ -2,26 +2,26 @@
  * The evaluator application over memory persistence and stub collaborators,
  * for cases about the application's own rules.
  *
- * The runtime service is built by the installer from the repositories, so a
- * case that watches it replaces the methods it watches on the ONE instance the
- * app holds. Everything the case does not name refuses by name rather than
- * answering undefined.
+ * The repository is real (in-memory): a case seeds the rows its precondition
+ * needs and spies on the repository's own methods to watch what the app
+ * wrote, rather than replacing methods on a runtime the app builds itself and
+ * keeps private. Everything the case does not name refuses by name rather
+ * than answering undefined.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type {
   ModelProviderResolution,
   ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import { vi } from "vitest";
 
 import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
 import type { EvaluatorNlpDispatcher } from "../../services/evaluator-code-execution.service.ts";
-import type { EvaluatorActorDirectory } from "../../services/evaluator-history.service.ts";
 import { EvaluatorApp, type EvaluatorGraph } from "../evaluator.app.ts";
 
 /** The workflow and monitor rows, as recording doubles. */
@@ -59,25 +59,23 @@ export function testEvaluatorPermissions(permits: (projectId: string) => boolean
   });
 }
 
-/** What a case may put in front of the runtime service the app built. */
-export type EvaluatorRuntimeStubs = Partial<EvaluatorService>;
-
 export function createEvaluatorTestApp(
   input: Readonly<{
-    evaluators?: EvaluatorRuntimeStubs;
+    repository?: MemoryEvaluatorRepository;
     modelProviders?: Partial<ModelProviderService>;
     permissions?: AuthzApi;
     graph?: EvaluatorGraph;
   }> = {},
 ): Readonly<{
   app: EvaluatorApp;
-  evaluators: EvaluatorService;
+  repository: MemoryEvaluatorRepository;
   modelProviders: ModelProviderService;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
 }> {
   const graph = input.graph ?? testEvaluatorGraph();
   const permissions = input.permissions ?? testEvaluatorPermissions(() => true);
+  const repository = input.repository ?? MemoryEvaluatorRepository.create();
   const modelProviders = createApiFixture<ModelProviderService>({
     resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) =>
       testModelResolution(
@@ -91,14 +89,14 @@ export function createEvaluatorTestApp(
   });
 
   const app = EvaluatorApp.create({
-    repositories: { evaluators: MemoryEvaluatorRepository.create() },
+    repositories: { evaluators: repository },
     dependencies: {
       permissions,
       auditLog: createApiFixture<AuditLogApi>({ listEntityHistory: async () => [] }),
+      users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
     },
     infrastructure: {
       workflows: createApiFixture<WorkflowService>({ assertInProject: async () => void 0 }),
-      actors: createApiFixture<EvaluatorActorDirectory>({ findByIds: async () => [] }),
       graph,
       nlp: createApiFixture<EvaluatorNlpDispatcher>(),
       modelProviders,
@@ -108,8 +106,5 @@ export function createEvaluatorTestApp(
     resources: new ResourceScope(),
   });
 
-  const evaluators = app.getRuntime();
-  Object.assign(evaluators, input.evaluators ?? {});
-
-  return { app, evaluators, modelProviders, permissions, graph };
+  return { app, repository, modelProviders, permissions, graph };
 }

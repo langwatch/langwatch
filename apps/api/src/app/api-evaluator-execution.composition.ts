@@ -22,7 +22,7 @@ import {
 import { WorkflowEvaluationAdapter } from "@langwatch/evaluation-server/workflow-evaluation";
 import type {
   AVAILABLE_EVALUATORS,
-  EvaluatorService,
+  EvaluatorApi,
   EvaluatorTypes,
   SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
@@ -84,7 +84,7 @@ export type ApiEvaluatorExecutionOptions = Readonly<{
    */
   traceReads: () => EvaluationTraceReadPort | undefined;
   /** The evaluator directory the studio publishes evaluators through. */
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   /** The studio a custom (workflow) evaluator runs on. */
   workflows: WorkflowService;
   /** The ONE model gateway on this process. */

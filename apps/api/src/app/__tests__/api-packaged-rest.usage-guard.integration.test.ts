@@ -21,7 +21,8 @@ import {
 } from "./api-trpc-record.test-doubles.ts";
 import { refusingOrganizationFeature } from "../../features/organization/organization.composition.ts";
 import { refusingAutomationFeature } from "../../features/automation/automation.composition.ts";
-import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition.ts";
+import { CodingAgentApp } from "@langwatch/coding-agent-server";
+import { createCodingAgentTrpcRouter } from "../../features/coding-agent/coding-agent-trpc.mount.ts";
 import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition.ts";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition.ts";
 
@@ -58,7 +59,10 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     presence: stubPresenceFeature(),
     organization: refusingOrganizationFeature(),
     automation: refusingAutomationFeature(),
-    codingAgent: refusingCodingAgentFeature(),
+    codingAgent: {
+      app: CodingAgentApp.refusing(),
+      router: (mount) => createCodingAgentTrpcRouter(mount.runtime),
+    },
     enterprise: refusingEnterpriseFeature(),
     dataset: refusingDatasetFeature(),
     evaluator: stubEvaluatorFeature(),

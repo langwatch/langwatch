@@ -3,13 +3,13 @@
  */
 
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   transposeColumnsFirstToRowsFirstWithId,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import type { PromptService, VersionedPrompt } from "@langwatch/prompt-contract";
+import type { PromptApi, VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port.ts";
 import { ExperimentTargetLoadingService } from "./experiment-target-loading.service.ts";
 
@@ -171,12 +171,12 @@ export type ExecutionDataInputs = {
  * Canonical feature services this load reads through.
  */
 export type ExecutionDataServices = {
-  datasets: DatasetService;
-  prompts: PromptService;
+  datasets: DatasetApi;
+  prompts: PromptApi;
   agents: AgentApi;
   /** The committed studio DSL a workflow target runs, once per dataset row. */
   workflows: ExperimentWorkflowDslPort;
-  evaluators?: EvaluatorService;
+  evaluators?: EvaluatorApi;
 };
 
 /**
@@ -196,7 +196,7 @@ export class ExperimentExecutionDataService {
   static async loadDataset(
     dataset: DatasetInput,
     projectId: string,
-    datasets: DatasetService,
+    datasets: DatasetApi,
   ): Promise<LoadedDataset | { error: string; status: number }> {
     let rows: Array<Record<string, unknown>>;
     let columns: Array<{ id: string; name: string; type: string }>;

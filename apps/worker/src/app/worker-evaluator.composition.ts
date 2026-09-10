@@ -10,14 +10,13 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   evaluatorServer,
-  type EvaluatorActor,
   type EvaluatorGraph,
   type EvaluatorNlpDispatcher,
 } from "@langwatch/evaluator-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
-import type { UserApi } from "@langwatch/user-contract";
+import { UserApi } from "@langwatch/user-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 
@@ -46,10 +45,10 @@ export async function installWorkerEvaluator(options: {
     .withInfrastructure({})
     .withProvided(AuthzApi, options.permissions)
     .withProvided(AuditLogApi, options.auditLog)
+    .withProvided(UserApi, options.users)
     .withModule(evaluatorServer, {
       infrastructure: {
         workflows: options.workflows,
-        actors: workerEvaluatorActors(options.users),
         graph: new UncomposedEvaluatorGraph(),
         nlp: options.nlpRuntime,
         modelProviders: options.modelProviders,
@@ -61,21 +60,6 @@ export async function installWorkerEvaluator(options: {
   options.resources.own(options.name, () => runtime.stop());
 
   return runtime.module(evaluatorServer).provided;
-}
-
-/** Who made each change, off the worker's own user directory. */
-function workerEvaluatorActors(users: UserApi) {
-  return {
-    findByIds: async (input: { userIds: string[] }): Promise<EvaluatorActor[]> => {
-      const profiles = await users.getProfiles({ userIds: input.userIds });
-
-      return profiles.map((profile) => ({
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-      }));
-    },
-  };
 }
 
 const uncomposedInWorker = (): Error =>

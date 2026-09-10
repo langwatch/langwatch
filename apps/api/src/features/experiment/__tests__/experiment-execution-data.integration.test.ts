@@ -17,9 +17,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AgentApi, AgentWithFields } from "@langwatch/agent-contract";
 import { AgentNotFoundError } from "@langwatch/agent-contract";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import { PostgresPromptAdapter } from "@langwatch/prompt-server";
 import {
   ExperimentExecutionDataService,
@@ -77,10 +77,10 @@ class FakeAgentApi implements Pick<AgentApi, "getById" | "create"> {
   }
 }
 
-/** `EvaluatorService` that never finds anything — this suite only exercises the miss path. */
-class FakeEvaluatorService implements Pick<EvaluatorService, "tryGetById"> {
-  async tryGetById(_input: { id: string; projectId: string }): Promise<Evaluator | null> {
-    return null;
+/** `EvaluatorApi` that never finds anything — this suite only exercises the miss path. */
+class FakeEvaluatorApi implements Pick<EvaluatorApi, "findById"> {
+  async findById(_input: { id: string; projectId: string }): Promise<Evaluator | undefined> {
+    return undefined;
   }
 }
 
@@ -168,15 +168,15 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
     await prisma.$disconnect();
   });
 
-  const createPromptService = (): PromptService =>
+  const createPromptService = (): PromptApi =>
     PostgresPromptAdapter.create({ database: prisma! }).build();
 
   const services = () => ({
-    datasets: {} as DatasetService,
+    datasets: {} as DatasetApi,
     prompts: createPromptService(),
     agents: new FakeAgentApi(),
     workflows: createWorkflowDslPort(prisma!),
-    evaluators: new FakeEvaluatorService() as unknown as EvaluatorService,
+    evaluators: new FakeEvaluatorApi() as unknown as EvaluatorApi,
   });
 
   const createPublishedWorkflow = async (name: string) => {

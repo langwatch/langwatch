@@ -6,10 +6,7 @@
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import { ApiOtlpCredentialPolicyAdapter } from "./api-otlp-credential-policy.adapter.ts";
 import { TraceProcessingProducerAdapter } from "@langwatch/trace-server";
-import {
-  CodingAgentService,
-  type CodingAgentSpanFilterInput,
-} from "@langwatch/coding-agent-contract";
+import { shouldFilterCodingAgentSpan } from "@langwatch/coding-agent-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -24,6 +21,7 @@ import {
   TraceSpanCollectionService,
   TraceSpanDedupPort,
   TrackedEventSpanService,
+  type CodingAgentIngestFilter,
   type EdgeMediaExtractionDeps,
   type SpanDedupRef,
   type TraceIngressPayloadPort,
@@ -170,7 +168,7 @@ export function composeApiTraceIngest(
   });
 
   const ingestion = TraceIngestionService.create({
-    codingAgents: new ApiSpanFilterOnlyCodingAgents(),
+    codingAgents: apiCodingAgentIngestFilter(),
     codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
     dedup,
     commands,
@@ -459,65 +457,12 @@ class ApiNullTraceSpanDedupAdapter extends TraceSpanDedupPort {
 
 /**
  * The coding-agent contract, holding only what the ingest path reads. `shouldFilterSpan`
- * is a concrete rule on the base class — it decides from the scope name, the span name
- * and the attribute keys, and reads no store — so it answers correctly here.
+ * is a pure rule — it decides from the scope name, the span name and the attribute keys,
+ * and reads no store — so this is the whole capability the ingest path needs, with no
+ * session store to compose and no "unavailable" twin for the rest of the surface.
  */
-class ApiSpanFilterOnlyCodingAgents extends CodingAgentService {
-  override shouldFilterSpan(input: CodingAgentSpanFilterInput): boolean {
-    return super.shouldFilterSpan(input);
-  }
-
-  private unavailable(): Promise<never> {
-    return Promise.reject(
-      new Error(
-        "The API process composes the coding-agent span filter for ingestion only; it holds no coding-agent session store to read.",
-      ),
-    );
-  }
-
-  getSessionEvents(): Promise<never> {
-    return this.unavailable();
-  }
-
-  tryGetBySessionId(): Promise<never> {
-    return this.unavailable();
-  }
-
-  tryGetSessionForTrace(): Promise<never> {
-    return this.unavailable();
-  }
-
-  listRecent(): Promise<never> {
-    return this.unavailable();
-  }
-
-  backfillPullRequestMappings(): Promise<never> {
-    return this.unavailable();
-  }
-
-  getUsageTotals(): Promise<never> {
-    return this.unavailable();
-  }
-
-  listForProject(): Promise<never> {
-    return this.unavailable();
-  }
-
-  linkTraceSessionsToPullRequests(): Promise<never> {
-    return this.unavailable();
-  }
-
-  getPullRequestUsage(): Promise<never> {
-    return this.unavailable();
-  }
-
-  getPullRequestDetail(): Promise<never> {
-    return this.unavailable();
-  }
-
-  getForPersonalProject(): Promise<never> {
-    return this.unavailable();
-  }
+function apiCodingAgentIngestFilter(): CodingAgentIngestFilter {
+  return { shouldFilterSpan: shouldFilterCodingAgentSpan };
 }
 
 // Media extraction goes in FRONT of the ADR-022 spool: externalizing the heavy

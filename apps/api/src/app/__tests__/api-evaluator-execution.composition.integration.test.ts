@@ -5,7 +5,7 @@
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentService } from "@langwatch/experiment-server";
 import {
   buildGatewayCanonicalString,
@@ -198,7 +198,7 @@ function evaluatorExecution(): ApiEvaluatorExecution {
 /**
  * The evaluator service, as the engine calls it on the built-in path.
  */
-function recordingEvaluators(): EvaluatorService {
+function recordingEvaluators(): EvaluatorApi {
   return {
     augmentResult: (input: { result: unknown }) => input.result,
     executeCode: () => {
@@ -207,7 +207,7 @@ function recordingEvaluators(): EvaluatorService {
     executeNative: () => {
       throw new Error("no native evaluator in this test");
     },
-  } as unknown as EvaluatorService;
+  } as unknown as EvaluatorApi;
 }
 
 /**
@@ -341,7 +341,7 @@ function mountProcessRest() {
         execution: evaluatorExecution(),
         evaluators: recordingEvaluators(),
         experiments: {
-          tryGetBySlug: async () => null,
+          findBySlug: async () => null,
         } as unknown as ExperimentService,
         modelProviders: unconfiguredModelProviders(),
         reportEvaluation: async () => undefined,

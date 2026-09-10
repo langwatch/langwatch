@@ -13,10 +13,6 @@ export {
   type EvaluatorGraph,
 } from "./app/evaluator.app.ts";
 export type { EvaluatorNlpDispatcher } from "./services/evaluator-code-execution.service.ts";
-export type {
-  EvaluatorActor,
-  EvaluatorActorDirectory,
-} from "./services/evaluator-history.service.ts";
 
 /** The replication both `evaluators.copy` and `monitors.copy` share. */
 export {

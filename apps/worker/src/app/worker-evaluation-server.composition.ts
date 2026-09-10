@@ -2,7 +2,7 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -38,7 +38,7 @@ export type WorkerEvaluationInfrastructure = Readonly<{
   /** The ONE workflow graph this process installed, and the engine behind it. */
   workflows: WorkerEvaluationWorkflows;
   /** The ONE evaluator runtime this process installed. */
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   /** The ONE dataset application this process installed. */
   datasets: DatasetApi;
   /** The ONE monitor application this process installed. */

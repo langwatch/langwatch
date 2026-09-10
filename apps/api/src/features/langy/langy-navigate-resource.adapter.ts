@@ -11,7 +11,7 @@
  */
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentService } from "@langwatch/experiment-server";
 import { type LangyNavigateResourceKind, LangyNavigateResourcePort } from "@langwatch/langy-server";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -30,7 +30,7 @@ export type ApiLangyNavigateResources = Readonly<{
   workflows?: WorkflowService | undefined;
   experiments?: ExperimentService | undefined;
   monitors?: MonitorApi | undefined;
-  evaluators?: EvaluatorService | undefined;
+  evaluators?: EvaluatorApi | undefined;
   agents?: AgentApi | undefined;
   simulations?: SimulationService | undefined;
 }>;
@@ -95,7 +95,7 @@ export class ApiLangyNavigateResourceAdapter extends LangyNavigateResourcePort {
           : null;
       }
       case "evaluator": {
-        const evaluator = await services.evaluators?.tryGetById({ id: resourceId, projectId });
+        const evaluator = await services.evaluators?.findById({ id: resourceId, projectId });
         return evaluator
           ? `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${encodeURIComponent(evaluator.id)}`
           : null;

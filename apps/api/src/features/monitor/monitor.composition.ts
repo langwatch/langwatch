@@ -9,7 +9,7 @@ import {
   MonitorPerformanceAdapter,
   type EvaluationClickHouseResolver,
 } from "@langwatch/evaluation-server";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EvaluatorReplicationService } from "@langwatch/evaluator-server";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -51,7 +51,7 @@ export type MonitorPeers = Readonly<{
   /** The caller's own grants, for the standing a declared check cannot cover. */
   permissions: AuthzApiContract;
   /** The evaluator a monitor runs, through the ONE evaluator service. */
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   /**
    * The evaluator replication the product-group half already built over this
    * process's workflow application. Taken rather than rebuilt, because a second
@@ -96,7 +96,7 @@ export async function installApiMonitor(options: {
 
 /** The one evaluator service on this process, as the monitor reads it. */
 class ProcessMonitorEvaluators extends MonitorEvaluatorPort {
-  constructor(private readonly evaluators: EvaluatorService) {
+  constructor(private readonly evaluators: EvaluatorApi) {
     super();
   }
 
@@ -112,7 +112,7 @@ class ProcessMonitorEvaluators extends MonitorEvaluatorPort {
 /** The evaluator copy, over the process's own replication of the graph behind it. */
 class ProcessMonitorReplication extends MonitorReplicationPort {
   constructor(
-    private readonly evaluators: EvaluatorService,
+    private readonly evaluators: EvaluatorApi,
     private readonly workflows: MonitorWorkflowReplication,
   ) {
     super();
@@ -131,7 +131,7 @@ class ProcessMonitorReplication extends MonitorReplicationPort {
         this.workflows.deleteReplicatedWorkflow(replication),
     }).copyToProject({
       evaluators: {
-        findById: async (lookup) => (await this.evaluators.tryGetById(lookup)) ?? undefined,
+        findById: (lookup) => this.evaluators.findById(lookup),
         create: (created) => this.evaluators.create(created),
       },
       evaluatorId: input.evaluatorId,

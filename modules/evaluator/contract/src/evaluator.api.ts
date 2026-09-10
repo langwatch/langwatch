@@ -112,6 +112,8 @@ export interface EvaluatorApi {
     config: EvaluatorConfig;
     id?: string;
   }): Promise<Evaluator>;
+  /** Creates an evaluator against models already resolved by the caller. */
+  createWithDefaults(input: EvaluatorCreateInput): Promise<Evaluator>;
   /** Updates an evaluator, refusing a code evaluator that carries no program. */
   update(input: EvaluatorUpdateInput): Promise<Evaluator>;
   /** Soft-deletes an evaluator. */

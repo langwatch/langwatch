@@ -1,4 +1,4 @@
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
@@ -34,7 +34,7 @@ export class PrismaGatewayAdapter {
   static create(options: {
     database: GatewayPersistence;
     projects: ProjectApi;
-    evaluators: EvaluatorService;
+    evaluators: EvaluatorApi;
     monitors: MonitorApi;
     changes: GatewayChangeEventsPort;
     audit: GatewayAuditPort;

@@ -565,7 +565,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     // named apart from the `experiment` that `prepareSavedStateExecution`
     // returns below: that one is the authoritative record the run is built
     // from, this one only answers "is this experiment runnable at all".
-    const savedExperiment = await experiments.tryGetBySlugAndType({
+    const savedExperiment = await experiments.findBySlugAndType({
       projectId: project.id,
       slug,
       type: "EVALUATIONS_V3",
@@ -908,7 +908,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     const experiments = ports.experiments();
 
     if (!experimentId && experimentSlug) {
-      const experiment = await experiments.tryGetIdBySlug({
+      const experiment = await experiments.findIdBySlug({
         projectId: project.id,
         slug: experimentSlug,
       });
@@ -934,7 +934,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     }
 
     try {
-      const run = await experiments.tryGetRun({
+      const run = await experiments.findRun({
         projectId: project.id,
         experimentId,
         runId,

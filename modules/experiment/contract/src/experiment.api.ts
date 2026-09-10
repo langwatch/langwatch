@@ -53,15 +53,15 @@ export interface ExperimentApi {
   getById(input: ExperimentLookup): Promise<Experiment>;
   getBySlug(input: ExperimentSlugLookup): Promise<Experiment>;
   getBySlugOrId(input: { projectId: string; slugOrId: string }): Promise<Experiment>;
-  tryGetById(input: ExperimentLookup): Promise<Experiment | null>;
-  tryGetBySlug(input: ExperimentSlugLookup): Promise<Experiment | null>;
-  tryGetBySlugAndType(
+  findById(input: ExperimentLookup): Promise<Experiment | null>;
+  findBySlug(input: ExperimentSlugLookup): Promise<Experiment | null>;
+  findBySlugAndType(
     input: ExperimentSlugLookup & { type: ExperimentType },
   ): Promise<Experiment | null>;
   list(input: { projectId: string }): Promise<Experiment[]>;
   getPage(input: ExperimentPageInput): Promise<ExperimentPage>;
-  tryGetLatest(input: { projectId: string }): Promise<Experiment | null>;
-  tryGetIdBySlug(input: ExperimentSlugLookup): Promise<{ id: string; slug: string } | null>;
+  findLatest(input: { projectId: string }): Promise<Experiment | null>;
+  findIdBySlug(input: ExperimentSlugLookup): Promise<{ id: string; slug: string } | null>;
   isActive(input: ExperimentLookup): Promise<boolean>;
   save(input: SaveExperimentInput): Promise<Experiment>;
   findOrCreateForWorkflow(
@@ -73,7 +73,7 @@ export interface ExperimentApi {
   getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>>;
   getRunsPage(input: ExperimentRunPageInput): Promise<{ runs: ExperimentRun[]; totalHits: number }>;
   /** A polling read: absent rows and disabled ClickHouse both read as null. */
-  tryGetRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null>;
+  findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null>;
   getRunsPageBySlug(input: ExperimentRunSlugPageInput): Promise<{
     experiment: { id: string; slug: string };
     runs: ExperimentRun[];

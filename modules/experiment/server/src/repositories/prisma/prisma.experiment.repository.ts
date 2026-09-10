@@ -39,14 +39,14 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     super();
   }
 
-  async tryFindById(input: { id: string; projectId: string }): Promise<Experiment | null> {
+  async findById(input: { id: string; projectId: string }): Promise<Experiment | null> {
     const row = await this.database.experiment.findFirst({
       where: { ...input, archivedAt: null },
     });
     return row ? mapExperiment(row) : null;
   }
 
-  async tryFindBySlug(input: {
+  async findBySlug(input: {
     slug: string;
     projectId: string;
     type?: ExperimentType;
@@ -81,7 +81,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     });
   }
 
-  async tryFindLatest(input: { projectId: string }): Promise<Experiment | null> {
+  async findLatest(input: { projectId: string }): Promise<Experiment | null> {
     const row = await this.database.experiment.findFirst({
       where: { projectId: input.projectId, archivedAt: null },
       orderBy: { createdAt: "desc" },
@@ -89,7 +89,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     return row ? mapExperiment(row) : null;
   }
 
-  async tryFindForWorkflow(input: {
+  async findForWorkflow(input: {
     projectId: string;
     workflowId: string;
   }): Promise<Experiment | null> {
@@ -103,7 +103,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     return row ? mapExperiment(row) : null;
   }
 
-  async tryFindIdBySlug(input: {
+  async findIdBySlug(input: {
     projectId: string;
     slug: string;
   }): Promise<{ id: string; slug: string } | null> {
@@ -131,7 +131,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     throw new ExperimentNotFoundError(input.slugOrId);
   }
 
-  async tryGetRowState(input: {
+  async findRowState(input: {
     projectId: string;
     id: string;
   }): Promise<ExperimentRowState | null> {

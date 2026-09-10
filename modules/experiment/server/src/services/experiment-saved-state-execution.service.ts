@@ -195,7 +195,7 @@ async function readSavedWorkbench({
   projectId: string;
   slug: string;
 }): Promise<SavedWorkbench | SavedStateExecutionRefusal> {
-  const experiment = await experiments.tryGetBySlugAndType({
+  const experiment = await experiments.findBySlugAndType({
     projectId,
     slug,
     type: "EVALUATIONS_V3",

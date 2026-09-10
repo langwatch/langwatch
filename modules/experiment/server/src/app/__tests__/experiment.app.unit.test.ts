@@ -4,10 +4,11 @@
  */
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
-import type { DatasetService } from "@langwatch/dataset-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Experiment } from "@langwatch/experiment-contract";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
 import { ExperimentApp } from "../experiment.app.ts";
 
@@ -60,7 +61,7 @@ function harness({
   workflows?: Record<string, unknown>;
 } = {}) {
   const experimentService = {
-    tryGetById: vi.fn(async () => experiment),
+    findById: vi.fn(async () => experiment),
     archive: vi.fn(async () => ({ success: true as const })),
     getRunAggregates: vi.fn(async () => ({})),
     saveWorkbenchState: vi.fn(async () => ({
@@ -103,11 +104,16 @@ function harness({
     workflows: workflowService,
     monitors,
     app: ExperimentApp.create({
-      experiments: experimentService,
-      workflows: workflowService,
-      dataset: {} as unknown as DatasetService,
-      monitors,
-      broadcast,
+      dependencies: {},
+      infrastructure: {
+        experiments: experimentService,
+        workflows: workflowService,
+        dataset: {} as unknown as DatasetApi,
+        monitors,
+        broadcast,
+      },
+      config: undefined,
+      resources: new ResourceScope(),
     }),
   };
 }
@@ -290,7 +296,7 @@ describe("ExperimentApp", () => {
     /** @scenario Archiving cascades to the associated workflow and hard-deletes the monitor */
     it("archives the workflow it wrote versions into and drops its monitor", async () => {
       const { app, experiments, workflows, monitors } = harness({
-        experiments: { tryGetById: vi.fn(async () => workflowBacked) },
+        experiments: { findById: vi.fn(async () => workflowBacked) },
       });
 
       await expect(app.archive({ id: "experiment-2", projectId: "project-1" })).resolves.toEqual({
@@ -322,7 +328,7 @@ describe("ExperimentApp", () => {
 
     it("cascades into nothing when the project had no such experiment", async () => {
       const { app, workflows, monitors } = harness({
-        experiments: { tryGetById: vi.fn(async () => null) },
+        experiments: { findById: vi.fn(async () => null) },
       });
 
       await app.archive({ id: "ghost", projectId: "project-1" });
@@ -343,7 +349,7 @@ describe("ExperimentApp", () => {
       });
 
       await expect(
-        app.tryGetWorkflow({ id: "workflow-1", projectId: "project-1" }),
+        app.findWorkflow({ id: "workflow-1", projectId: "project-1" }),
       ).resolves.toBeNull();
     });
 
@@ -357,7 +363,7 @@ describe("ExperimentApp", () => {
       });
 
       await expect(
-        app.tryGetWorkflow({ id: "workflow-1", projectId: "project-1" }),
+        app.findWorkflow({ id: "workflow-1", projectId: "project-1" }),
       ).rejects.toThrow("the workflow store is unreachable");
     });
   });

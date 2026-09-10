@@ -13,7 +13,7 @@ import { PrismaTraceEditOverlayRepository } from "@langwatch/trace-server/compos
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { CodingAgentService } from "@langwatch/coding-agent-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,
@@ -122,7 +122,7 @@ export type ApiTraceReadStackOptions = Readonly<{
   /** The evaluation summaries the grid labels its rows with, if composed. */
   evaluations?: EvaluationService | undefined;
   /** The coding-agent sessions the Sessions lens joins, if composed. */
-  codingAgents?: CodingAgentService | undefined;
+  codingAgents?: CodingAgentApi | undefined;
   /** Where a reserved-metadata amendment is recorded, if a queue was composed. */
   ingest?: TraceSpanIngestPort | undefined;
   /** Analytics's filter translator; absent, a FILTERED list refuses. */
@@ -739,8 +739,8 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     );
   }
 
-  private refusingCodingAgents(): CodingAgentService {
-    return refuseAll<CodingAgentService>(
+  private refusingCodingAgents(): CodingAgentApi {
+    return refuseAll<CodingAgentApi>(
       (capability) => this.refuse(capability),
       "the coding-agent session join",
     );

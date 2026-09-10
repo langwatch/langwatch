@@ -87,13 +87,13 @@ function mount(
     options.experiment === undefined
       ? { id: "experiment-1", slug: SLUG, workbenchState: savedWorkbenchState }
       : options.experiment;
-  const tryGetBySlugAndType = vi.fn(async () => experiment);
+  const findBySlugAndType = vi.fn(async () => experiment);
   const experimentService = {
-    tryGetBySlugAndType,
+    findBySlugAndType,
     isActive: async () => true,
   };
   const experiments = {
-    tryGetBySlugAndType,
+    findBySlugAndType,
     isActive: async () => true,
     experimentService,
   } as unknown as ExperimentApp;

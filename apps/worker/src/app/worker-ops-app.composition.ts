@@ -31,7 +31,7 @@ import {
   ManagerExplorerService,
   OpsReplayRuntimePort,
   type OpsAppDependencies,
-  PostgresOpsAdapter,
+  OpsOperations,
   ProcessAuditRepository,
   ProcessOpsPrismaRepository,
   QueuePayloadDecoderPort,
@@ -93,7 +93,7 @@ export function installWorkerOps<Infrastructure>(
   return builder.withModule(opsServer, {
     infrastructure: {
       createCapability: (peers: OpsAppDependencies) => {
-        const operations = PostgresOpsAdapter.create({
+        const operations = OpsOperations.create({
           adminEmails: options.adminEmails,
           database,
           audit: WorkerOpsAuditSink.create({ auditLog: peers.auditLog }),

@@ -1,38 +1,13 @@
 /**
  * @vitest-environment node
  */
-import {
-  newEvaluatorId,
-  type Evaluator,
-  type EvaluatorWithFields,
-} from "@langwatch/evaluator-contract";
+import { newEvaluatorId } from "@langwatch/evaluator-contract";
 import {
   ModelNotConfiguredError,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  createEvaluatorTestApp,
-  testModelResolution,
-  type EvaluatorRuntimeStubs,
-} from "./evaluator.fixture.ts";
-
-const NOW = new Date("2026-08-24T00:00:00.000Z");
-
-const evaluator = {
-  id: "evaluator_1",
-  projectId: "project-1",
-  name: "Exact match",
-  slug: "exact-match",
-  type: "evaluator",
-  config: { evaluatorType: "langevals/exact_match", settings: {} },
-  workflowId: null,
-  copiedFromEvaluatorId: null,
-  createdAt: NOW,
-  updatedAt: NOW,
-} as unknown as Evaluator;
-
-const withFields = { ...evaluator, fields: [], outputFields: [] } as EvaluatorWithFields;
+import { createEvaluatorTestApp, testModelResolution } from "./evaluator.fixture.ts";
 
 /** A program a code evaluator can actually run. */
 const runnableCode = {
@@ -42,32 +17,19 @@ const runnableCode = {
 };
 
 /**
- * The application over the six runtime answers these cases put in front of it.
- * Neither the permission service nor the graph is reached: the cases exercise
- * the model resolution and the id-or-slug lookup.
+ * The application over a real, empty repository. Neither the permission
+ * service nor the graph is reached: the cases exercise the model resolution
+ * and the id-or-slug lookup.
  */
 function harness({
-  evaluators = {},
   modelProviders = {},
 }: {
-  evaluators?: EvaluatorRuntimeStubs;
   modelProviders?: Partial<ModelProviderService>;
 } = {}) {
-  return createEvaluatorTestApp({
-    evaluators: {
-      tryGetByIdWithFields: vi.fn(async () => withFields),
-      getByIdWithFields: vi.fn(async () => withFields),
-      tryGetBySlug: vi.fn(async () => evaluator),
-      create: vi.fn(async () => evaluator),
-      createWithDefaults: vi.fn(async () => evaluator),
-      update: vi.fn(async () => evaluator),
-      ...evaluators,
-    },
-    modelProviders,
-  });
+  return createEvaluatorTestApp({ modelProviders });
 }
 
-/** The single argument a stubbed method was called with. */
+/** The single argument a spied method was called with. */
 function firstCall(method: unknown): Record<string, unknown> {
   const mock = method as { mock: { calls: unknown[][] } };
   return mock.mock.calls[0]?.[0] as Record<string, unknown>;
@@ -83,39 +45,48 @@ describe("EvaluatorApp", () => {
 
   describe("when an evaluator is addressed the way the public API addresses it", () => {
     it("answers the id match without ever reaching for a slug", async () => {
-      const { app, evaluators } = harness();
+      const { app, repository } = harness();
+      await repository.create({
+        id: "evaluator_1",
+        projectId: "project-1",
+        name: "Exact match",
+        slug: "exact-match",
+        type: "evaluator",
+        config: {},
+      });
+      const findBySlug = vi.spyOn(repository, "findBySlug");
 
-      await expect(
-        app.findByIdOrSlugWithFields({ idOrSlug: "evaluator_1", projectId: "project-1" }),
-      ).resolves.toEqual(withFields);
-      expect(evaluators.tryGetBySlug).not.toHaveBeenCalled();
+      const found = await app.findByIdOrSlugWithFields({
+        idOrSlug: "evaluator_1",
+        projectId: "project-1",
+      });
+
+      expect(found?.id).toBe("evaluator_1");
+      expect(findBySlug).not.toHaveBeenCalled();
     });
 
     it("falls back to the slug, then reads the row back with its fields", async () => {
-      const { app, evaluators } = harness({
-        evaluators: { tryGetByIdWithFields: vi.fn(async () => null) },
-      });
-
-      await expect(
-        app.findByIdOrSlugWithFields({ idOrSlug: "exact-match", projectId: "project-1" }),
-      ).resolves.toEqual(withFields);
-      expect(evaluators.tryGetBySlug).toHaveBeenCalledWith({
-        slug: "exact-match",
-        projectId: "project-1",
-      });
-      expect(evaluators.getByIdWithFields).toHaveBeenCalledWith({
+      const { app, repository } = harness();
+      await repository.create({
         id: "evaluator_1",
         projectId: "project-1",
+        name: "Exact match",
+        slug: "exact-match",
+        type: "evaluator",
+        config: {},
       });
+
+      const found = await app.findByIdOrSlugWithFields({
+        idOrSlug: "exact-match",
+        projectId: "project-1",
+      });
+
+      expect(found?.id).toBe("evaluator_1");
+      expect(found?.slug).toBe("exact-match");
     });
 
     it("answers undefined when neither the id nor the slug names one", async () => {
-      const { app } = harness({
-        evaluators: {
-          tryGetByIdWithFields: vi.fn(async () => null),
-          tryGetBySlug: vi.fn(async () => null),
-        },
-      });
+      const { app } = harness();
 
       await expect(
         app.findByIdOrSlugWithFields({ idOrSlug: "ghost", projectId: "project-1" }),
@@ -125,7 +96,8 @@ describe("EvaluatorApp", () => {
 
   describe("when a create names a config but no model", () => {
     it("runs the evaluator on the project's resolved default", async () => {
-      const { app, evaluators, modelProviders } = harness();
+      const { app, repository, modelProviders } = harness();
+      const create = vi.spyOn(repository, "create");
 
       await app.createWithResolvedDefaults({
         projectId: "project-1",
@@ -137,7 +109,7 @@ describe("EvaluatorApp", () => {
         projectId: "project-1",
         featureKey: "evaluator.create_default",
       });
-      expect(firstCall(evaluators.createWithDefaults)).toMatchObject({
+      expect(firstCall(create)).toMatchObject({
         projectId: "project-1",
         name: "Faithfulness",
         type: "evaluator",
@@ -150,7 +122,8 @@ describe("EvaluatorApp", () => {
     });
 
     it("mints the id itself when the caller supplies none", async () => {
-      const { app, evaluators } = harness();
+      const { app, repository } = harness();
+      const create = vi.spyOn(repository, "create");
 
       await app.createWithResolvedDefaults({
         projectId: "project-1",
@@ -158,11 +131,12 @@ describe("EvaluatorApp", () => {
         config: { evaluatorType: "ragas/faithfulness" },
       });
 
-      expect(firstCall(evaluators.createWithDefaults).id).toMatch(/^evaluator_.+/);
+      expect(firstCall(create).id).toMatch(/^evaluator_.+/);
     });
 
     it("keeps the id the caller did supply", async () => {
-      const { app, evaluators } = harness();
+      const { app, repository } = harness();
+      const create = vi.spyOn(repository, "create");
 
       await app.createWithResolvedDefaults({
         projectId: "project-1",
@@ -171,7 +145,7 @@ describe("EvaluatorApp", () => {
         config: { evaluatorType: "ragas/faithfulness" },
       });
 
-      expect(firstCall(evaluators.createWithDefaults).id).toBe("evaluator_chosen");
+      expect(firstCall(create).id).toBe("evaluator_chosen");
     });
   });
 
@@ -183,7 +157,7 @@ describe("EvaluatorApp", () => {
      */
     /** @scenario A type whose settings carry no embeddings_model asks for no embeddings model */
     it("creates the evaluator with a null embeddings model", async () => {
-      const { app, evaluators } = harness({
+      const { app, repository } = harness({
         modelProviders: {
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
             if (featureKey === "analytics.topic_clustering_embeddings") {
@@ -198,6 +172,7 @@ describe("EvaluatorApp", () => {
           }),
         },
       });
+      const create = vi.spyOn(repository, "create");
 
       await app.createWithResolvedDefaults({
         projectId: "project-1",
@@ -205,14 +180,14 @@ describe("EvaluatorApp", () => {
         config: { evaluatorType: "ragas/faithfulness" },
       });
 
-      expect(firstCall(evaluators.createWithDefaults)).toMatchObject({
+      expect(firstCall(create)).toMatchObject({
         resolved: { defaultModel: "anthropic/claude-sonnet-4-5", embeddingsModel: null },
       });
     });
 
     /** @scenario A type with neither field asks for no model at all */
     it("creates a type with neither model field, tolerating the missing embeddings default", async () => {
-      const { app, evaluators } = harness({
+      const { app, repository } = harness({
         modelProviders: {
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
             if (featureKey === "analytics.topic_clustering_embeddings") {
@@ -227,6 +202,7 @@ describe("EvaluatorApp", () => {
           }),
         },
       });
+      const create = vi.spyOn(repository, "create");
 
       await app.createWithResolvedDefaults({
         projectId: "project-1",
@@ -234,7 +210,7 @@ describe("EvaluatorApp", () => {
         config: { evaluatorType: "langevals/exact_match" },
       });
 
-      expect(firstCall(evaluators.createWithDefaults)).toMatchObject({
+      expect(firstCall(create)).toMatchObject({
         resolved: { defaultModel: "anthropic/claude-sonnet-4-5", embeddingsModel: null },
       });
     });
@@ -251,7 +227,7 @@ describe("EvaluatorApp", () => {
      */
     /** @scenario A type whose settings carry embeddings_model asks for both */
     it("refuses for a type whose settings do carry an embeddings model", async () => {
-      const { app, evaluators } = harness({
+      const { app, repository } = harness({
         modelProviders: {
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
             if (featureKey === "analytics.topic_clustering_embeddings") {
@@ -266,6 +242,7 @@ describe("EvaluatorApp", () => {
           }),
         },
       });
+      const create = vi.spyOn(repository, "create");
 
       await expect(
         app.createWithResolvedDefaults({
@@ -274,7 +251,7 @@ describe("EvaluatorApp", () => {
           config: { evaluatorType: "ragas/response_relevancy" },
         }),
       ).rejects.toMatchObject({ code: "model_not_configured", meta: { role: "EMBEDDINGS" } });
-      expect(evaluators.createWithDefaults).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
     });
 
     /**
@@ -286,7 +263,7 @@ describe("EvaluatorApp", () => {
      */
     /** @scenario An unknown or custom evaluator asks for no model at all */
     it("creates a type the catalogue does not describe, rather than demanding embeddings for it", async () => {
-      const { app, evaluators } = harness({
+      const { app, repository } = harness({
         modelProviders: {
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
             if (featureKey === "analytics.topic_clustering_embeddings") {
@@ -301,6 +278,7 @@ describe("EvaluatorApp", () => {
           }),
         },
       });
+      const create = vi.spyOn(repository, "create");
 
       await app.createWithResolvedDefaults({
         projectId: "project-1",
@@ -308,13 +286,13 @@ describe("EvaluatorApp", () => {
         config: { evaluatorType: "custom/not-in-the-catalogue" },
       });
 
-      expect(firstCall(evaluators.createWithDefaults)).toMatchObject({
+      expect(firstCall(create)).toMatchObject({
         resolved: { defaultModel: "anthropic/claude-sonnet-4-5", embeddingsModel: null },
       });
     });
 
     it("still refuses when the DEFAULT model itself is unconfigured", async () => {
-      const { app, evaluators } = harness({
+      const { app, repository } = harness({
         modelProviders: {
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
             throw new ModelNotConfiguredError(
@@ -326,6 +304,7 @@ describe("EvaluatorApp", () => {
           }),
         },
       });
+      const create = vi.spyOn(repository, "create");
 
       await expect(
         app.createWithResolvedDefaults({
@@ -334,7 +313,7 @@ describe("EvaluatorApp", () => {
           config: { evaluatorType: "ragas/faithfulness" },
         }),
       ).rejects.toMatchObject({ code: "model_not_configured" });
-      expect(evaluators.createWithDefaults).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
     });
 
     it("lets an embeddings failure that is not a missing configuration through", async () => {
@@ -361,7 +340,8 @@ describe("EvaluatorApp", () => {
 
   describe("when a code evaluator carries no program", () => {
     it("refuses the create before the service is reached", async () => {
-      const { app, evaluators } = harness();
+      const { app, repository } = harness();
+      const create = vi.spyOn(repository, "create");
 
       await expect(
         app.create({
@@ -372,11 +352,12 @@ describe("EvaluatorApp", () => {
           config: { evaluatorType: "code" },
         }),
       ).rejects.toMatchObject({ code: "evaluator_config_invalid" });
-      expect(evaluators.create).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
     });
 
     it("refuses an update that would leave it without one", async () => {
-      const { app, evaluators } = harness();
+      const { app, repository } = harness();
+      const update = vi.spyOn(repository, "update");
 
       await expect(
         app.update({
@@ -385,11 +366,12 @@ describe("EvaluatorApp", () => {
           data: { type: "code", config: { evaluatorType: "code" } },
         }),
       ).rejects.toMatchObject({ code: "evaluator_config_invalid" });
-      expect(evaluators.update).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
     });
 
     it("accepts one that does carry a program", async () => {
-      const { app, evaluators } = harness();
+      const { app, repository } = harness();
+      const create = vi.spyOn(repository, "create");
 
       await app.create({
         id: "evaluator_2",
@@ -399,7 +381,7 @@ describe("EvaluatorApp", () => {
         config: runnableCode,
       });
 
-      expect(evaluators.create).toHaveBeenCalled();
+      expect(create).toHaveBeenCalled();
     });
   });
 });

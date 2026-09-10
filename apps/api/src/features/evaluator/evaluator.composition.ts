@@ -7,15 +7,11 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import { EvaluatorWorkflowVersionRequiredError } from "@langwatch/evaluator-contract";
-import {
-  evaluatorServer,
-  type EvaluatorActor,
-  type EvaluatorGraph,
-} from "@langwatch/evaluator-server";
+import { evaluatorServer, type EvaluatorGraph } from "@langwatch/evaluator-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createApp } from "@langwatch/runtime-composition";
 import { nowInstant, toDate } from "@langwatch/time";
-import type { UserApi } from "@langwatch/user-contract";
+import { UserApi } from "@langwatch/user-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { WorkflowApp, WorkflowNlpRuntimePort } from "@langwatch/workflow-server";
 import { nanoid } from "nanoid";
@@ -65,10 +61,10 @@ export async function installApiEvaluator(options: {
     .withInfrastructure({})
     .withProvided(AuthzApi, peers.permissions)
     .withProvided(AuditLogApi, infrastructure.auditLog)
+    .withProvided(UserApi, peers.users)
     .withModule(evaluatorServer, {
       infrastructure: {
         workflows: peers.workflows,
-        actors: apiEvaluatorActors(peers.users),
         graph: ProcessEvaluatorGraph.create({
           prisma: infrastructure.prisma,
           workflows: peers.workflowApp,
@@ -85,26 +81,8 @@ export async function installApiEvaluator(options: {
   return {
     router: (mount) => createEvaluatorTrpcRouter(mount.runtime),
     app,
-    evaluators: app.getRuntime(),
+    evaluators: app,
     restServices: { evaluators: () => app },
-  };
-}
-
-/**
- * Who made each change, off the process's own user directory. Three fields,
- * because three fields are what a history row renders.
- */
-function apiEvaluatorActors(users: UserApi) {
-  return {
-    findByIds: async (input: { userIds: string[] }): Promise<EvaluatorActor[]> => {
-      const profiles = await users.getProfiles({ userIds: input.userIds });
-
-      return profiles.map((profile) => ({
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-      }));
-    },
   };
 }
 

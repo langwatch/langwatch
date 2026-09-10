@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Evaluator } from "@langwatch/evaluator-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { EvaluatorService } from "../evaluator.service.ts";
 import type {
   EvaluatorRepository,
@@ -71,7 +73,7 @@ function buildService() {
     workflows,
     history: EvaluatorHistoryService.create({
       auditLog: { record: async () => void 0, listEntityHistory: async () => [] },
-      actors: { findByIds: async () => [] },
+      users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
     }),
     codeExecution,
     generateId: () => "generated-id",

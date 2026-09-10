@@ -111,7 +111,7 @@ export async function createWorkerObservabilityApps(
   });
   const policy = PostgresGovernanceAdapter.create({ database: options.connection.client }).build()
     .policy;
-  const codingAgents = createWorkerCodingAgentApp({
+  const codingAgents = await createWorkerCodingAgentApp({
     database: options.connection.client,
     organizations: foundation.organizations,
     projects: foundation.projects,
@@ -128,7 +128,6 @@ export async function createWorkerObservabilityApps(
       webhookSecret: options.config.github.webhookSecret,
     },
     signingKey: options.githubSigningKey,
-    resources: options.resources,
   });
   // Assigned once the runtime below has booted. The cost-rule preview reads
   // spans through this runtime's OWN trace application, and that application

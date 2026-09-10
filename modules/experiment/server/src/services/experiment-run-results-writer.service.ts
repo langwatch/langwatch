@@ -14,10 +14,10 @@ import {
   StaleWorkbenchStateError,
   type EvaluationV3Event,
   type ExecutionScope,
-  type ExperimentService,
   type RunResultsDraft,
   type WorkbenchActor,
 } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "./experiment.service.ts";
 import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port.ts";
 
 const logger = createLogger("langwatch:experiment:run-results-writer");

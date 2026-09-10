@@ -19,7 +19,8 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ScenarioApi } from "@langwatch/scenario-contract";
-import type { SimulationService, ScenarioService } from "@langwatch/scenario-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
+import { ScenarioService } from "@langwatch/scenario-server";
 import { PromptApi } from "@langwatch/prompt-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
@@ -28,7 +29,7 @@ import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
 import {
   NodeScenarioChildProcessAdapter,
   OtelScenarioProcessorMetricsAdapter,
-  PrismaScenarioAdapter,
+  PostgresScenarioRepositories,
   RedisCancellationPublisherAdapter,
   RedisCancellationSubscriberAdapter,
   ScenarioClockPort,
@@ -234,8 +235,8 @@ export async function createWorkerScenarioExecutionGraph(input: {
   const encryption = AesGcmSecretEncryptionAdapter.create({ key: deps.encryptionKey });
   const secretCipher = new WorkerScenarioSecretCipher(encryption);
 
-  const scenarios = PrismaScenarioAdapter.create({
-    prisma,
+  const scenarios = ScenarioService.create({
+    repository: PostgresScenarioRepositories.create({ prisma }).scenarios,
     simulations,
     ids: new KsuidScenarioId(),
     testSuiteIds: new NanoidScenarioTestSuiteId(),

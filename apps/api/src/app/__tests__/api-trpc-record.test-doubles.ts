@@ -63,7 +63,8 @@ import { refusingExperimentFeature } from "../../features/experiment/experiment.
 import { createEvaluationTrpcRouter } from "../../features/evaluation/evaluation-trpc.mount.ts";
 import { refusingOrganizationFeature } from "../../features/organization/organization.composition.ts";
 import { refusingProjectFeature } from "../../features/project/project.composition.ts";
-import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition.ts";
+import { CodingAgentApp } from "@langwatch/coding-agent-server";
+import { createCodingAgentTrpcRouter } from "../../features/coding-agent/coding-agent-trpc.mount.ts";
 import { refusingAutomationFeature } from "../../features/automation/automation.composition.ts";
 import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition.ts";
 import { composeAuthFeature } from "../../features/auth/auth.composition.ts";
@@ -400,7 +401,10 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     integrationsChecks: refusingIntegrationsChecksFeature(),
     organization: refusingOrganizationFeature(),
     project: refusingProjectFeature(),
-    codingAgent: refusingCodingAgentFeature(),
+    codingAgent: {
+      app: CodingAgentApp.refusing(),
+      router: (mount) => createCodingAgentTrpcRouter(mount.runtime),
+    },
     automation: refusingAutomationFeature(),
     enterprise: refusingEnterpriseFeature(),
     auth: composeAuthFeature(testAuthApi()),

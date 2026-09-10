@@ -21,7 +21,7 @@ describe("given an SDK naming an experiment by slug", () => {
         experimentRow({ slug: input.requestedSlug }),
       );
       const service = ExperimentFindOrCreateService.create(
-        experimentService({ tryGetBySlug: async () => null, save }),
+        experimentService({ findBySlug: async () => null, save }),
       );
 
       const experiment = await service.resolve({
@@ -50,7 +50,7 @@ describe("given an SDK naming an experiment by slug", () => {
       const save = vi.fn();
       const existing = experimentRow({ id: "experiment_1", slug: "my-batch-run" });
       const service = ExperimentFindOrCreateService.create(
-        experimentService({ tryGetBySlug: async () => existing, save }),
+        experimentService({ findBySlug: async () => existing, save }),
       );
 
       const experiment = await service.resolve({
@@ -95,7 +95,7 @@ describe("given an SDK naming an experiment by slug", () => {
       const existing = experimentRow({ id: "experiment_1", slug: "my-batch-run" });
       const save = vi.fn(async () => experimentRow({ id: "experiment_1", slug: "my-batch-run" }));
       const service = ExperimentFindOrCreateService.create(
-        experimentService({ tryGetBySlug: async () => existing, save }),
+        experimentService({ findBySlug: async () => existing, save }),
       );
 
       await service.resolve({
@@ -141,7 +141,7 @@ function experimentService(overrides: Partial<ExperimentService>): ExperimentSer
     getById: async () => {
       throw new Error("getById is not part of this scenario");
     },
-    tryGetBySlug: async () => null,
+    findBySlug: async () => null,
     save: async () => {
       throw new Error("save is not part of this scenario");
     },

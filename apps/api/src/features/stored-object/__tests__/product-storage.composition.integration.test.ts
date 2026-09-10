@@ -7,7 +7,7 @@ import { join } from "node:path";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -374,10 +374,10 @@ async function composeHalf(
       // rather than from a second one built here.
       monitors: PostgresMonitorAdapter.create({
         database: prisma.client,
-        evaluators: { archive: vi.fn(async () => undefined) } as unknown as EvaluatorService,
+        evaluators: { archive: vi.fn(async () => undefined) } as unknown as EvaluatorApi,
         generateId: () => "monitor-2",
       }),
-      evaluators: { archive: vi.fn(async () => undefined) } as unknown as EvaluatorService,
+      evaluators: { archive: vi.fn(async () => undefined) } as unknown as EvaluatorApi,
       evaluatorReplication: {
         replicateEvaluatorWorkflow: vi.fn(async () => "workflow-copy"),
         deleteReplicatedWorkflow: vi.fn(async () => undefined),

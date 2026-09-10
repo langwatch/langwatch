@@ -9,7 +9,7 @@ import {
   KsuidAuthzBindingIdAdapter,
   PostgresAuthzAdapter,
 } from "@langwatch/authz-server";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   VirtualKeyTrpcApi,
   type VirtualKeyTrpcContext,
@@ -89,7 +89,7 @@ function buildGateway() {
     prisma,
     authz: buildAuthz(),
     projects,
-    evaluators: {} as unknown as EvaluatorService,
+    evaluators: {} as unknown as EvaluatorApi,
     monitors: {} as unknown as MonitorService,
     clickhouse: null,
     virtualKeyPepper: "test-virtual-key-pepper",

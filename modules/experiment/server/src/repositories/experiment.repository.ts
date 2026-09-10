@@ -31,8 +31,8 @@ export class ArchivedExperimentWriteError extends Error {
 }
 
 export abstract class ExperimentRepository {
-  abstract tryFindById(input: { id: string; projectId: string }): Promise<Experiment | null>;
-  abstract tryFindBySlug(input: {
+  abstract findById(input: { id: string; projectId: string }): Promise<Experiment | null>;
+  abstract findBySlug(input: {
     slug: string;
     projectId: string;
     type?: ExperimentType;
@@ -44,17 +44,17 @@ export abstract class ExperimentRepository {
     take: number;
   }): Promise<Experiment[]>;
   abstract count(input: { projectId: string }): Promise<number>;
-  abstract tryFindLatest(input: { projectId: string }): Promise<Experiment | null>;
-  abstract tryFindForWorkflow(input: {
+  abstract findLatest(input: { projectId: string }): Promise<Experiment | null>;
+  abstract findForWorkflow(input: {
     projectId: string;
     workflowId: string;
   }): Promise<Experiment | null>;
-  abstract tryFindIdBySlug(input: {
+  abstract findIdBySlug(input: {
     projectId: string;
     slug: string;
   }): Promise<{ id: string; slug: string } | null>;
   abstract getBySlugOrId(input: { projectId: string; slugOrId: string }): Promise<Experiment>;
-  abstract tryGetRowState(input: {
+  abstract findRowState(input: {
     projectId: string;
     id: string;
   }): Promise<ExperimentRowState | null>;

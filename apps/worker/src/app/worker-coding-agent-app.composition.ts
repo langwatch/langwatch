@@ -1,20 +1,21 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
-  CodingAgentApp,
-  type CodingAgentBillingPolicyPort,
   CodingAgentCallerScopeDirectoryPort,
   CodingAgentScopePermissionsPort,
+  codingAgentServer,
+  type CodingAgentBillingPolicyPort,
   type CodingAgentClickHousePort,
   type CodingAgentScopeCaller,
   type CodingAgentScopePermission,
   type CodingAgentScopeProject,
 } from "@langwatch/coding-agent-server";
+import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { PostgresGithubAdapter, type GithubDatabase } from "@langwatch/github-server";
-import type { GithubApi, GithubServerConfig } from "@langwatch/github-contract";
+import { GithubApi, type GithubServerConfig } from "@langwatch/github-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { ResourceOwnership } from "@langwatch/runtime-composition";
+import { ProjectApi } from "@langwatch/project-contract";
+import { createApp } from "@langwatch/runtime-composition";
 
 /** Minimal Redis surface owned by GitHub's private adapter. */
 export type WorkerGithubRedisConnection = {
@@ -27,16 +28,18 @@ export type WorkerGithubRedisConnection = {
 
 /** The composed worker capability and its shared projection persistence. */
 export type WorkerCodingAgent = Readonly<{
-  app: CodingAgentApp;
+  app: CodingAgentApi;
   github: GithubApi;
 }>;
 
 /**
- * Builds the coding-agent read application over the worker's existing graph.
+ * Builds the coding-agent read application over the worker's existing graph, booted
+ * through the same `createApp().withModule().boot()` path every other module boots
+ * through, rather than a hand-built `CodingAgentApp.create(...)` call.
  * The app owns its projection adapter, while the event pipeline owns its
  * processing adapter over the same tenant-keyed ClickHouse storage.
  */
-export function createWorkerCodingAgentApp(options: {
+export async function createWorkerCodingAgentApp(options: {
   database: PrismaConnection["client"] & GithubDatabase;
   organizations: OrganizationApi;
   projects: ProjectApi;
@@ -47,8 +50,7 @@ export function createWorkerCodingAgentApp(options: {
   redis: WorkerGithubRedisConnection | null;
   github: GithubServerConfig;
   signingKey: string;
-  resources: ResourceOwnership;
-}): WorkerCodingAgent {
+}): Promise<WorkerCodingAgent> {
   const github = PostgresGithubAdapter.create({
     database: options.database,
     redis: options.redis,
@@ -64,34 +66,36 @@ export function createWorkerCodingAgentApp(options: {
     ...(options.github.host === undefined ? {} : { hostConfig: { host: options.github.host } }),
   });
 
-  const app = CodingAgentApp.create({
-    infrastructure: {
-      clickHouse: options.clickHouse,
-      defaultTraceRetentionDays: options.defaultTraceRetentionDays,
-      billing: options.billing,
-      scopeDirectory: new WorkerCodingAgentScopeDirectory(options.database),
-      scopePermissions: new WorkerCodingAgentScopePermissions(options.authorization),
-      // The worker serves nobody: it projects sessions and never answers a read
-      // on behalf of a viewer, so a visibility question here is a wiring bug
-      // rather than a redaction, and the audit trail belongs to the door that
-      // does answer one.
-      visibility: {
-        readVisibility: () =>
-          Promise.reject(
-            new Error("The worker resolves no viewer, so it reads no content visibility"),
-          ),
+  const runtime = await createApp({ name: "langwatch-worker" })
+    .withInfrastructure({})
+    .withProvided(ProjectApi, options.projects)
+    .withProvided(GithubApi, github)
+    .withModule(codingAgentServer, {
+      infrastructure: {
+        clickHouse: options.clickHouse,
+        defaultTraceRetentionDays: options.defaultTraceRetentionDays,
+        billing: options.billing,
+        scopeDirectory: new WorkerCodingAgentScopeDirectory(options.database),
+        scopePermissions: new WorkerCodingAgentScopePermissions(options.authorization),
+        // The worker serves nobody: it projects sessions and never answers a read
+        // on behalf of a viewer, so a visibility question here is a wiring bug
+        // rather than a redaction, and the audit trail belongs to the door that
+        // does answer one.
+        visibility: {
+          readVisibility: () =>
+            Promise.reject(
+              new Error("The worker resolves no viewer, so it reads no content visibility"),
+            ),
+        },
+        audit: {
+          auditLog: () =>
+            Promise.reject(new Error("The worker answers no read that names people")),
+        },
       },
-      audit: {
-        auditLog: () =>
-          Promise.reject(new Error("The worker answers no read that names people")),
-      },
-    },
-    dependencies: { github, projects: options.projects },
-    config: undefined,
-    resources: options.resources,
-  });
+    })
+    .boot({ role: "worker" });
 
-  return { app, github };
+  return { app: runtime.module(codingAgentServer).provided, github };
 }
 
 class WorkerCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectoryPort {

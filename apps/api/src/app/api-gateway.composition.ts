@@ -37,7 +37,7 @@ import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/c
 import { PrismaGatewayVirtualKeyRepository } from "@langwatch/gateway-server/composition/gateway-virtual-keys";
 import { PrismaGatewayProviderLabelRepository } from "@langwatch/gateway-server/composition/gateway-provider-labels";
 import type { IdempotentRunner } from "@langwatch/api/rest";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -140,7 +140,7 @@ export type ApiGatewayCompositionOptions = Readonly<{
   /** The project directory the tenancy graph composed. */
   projects: ProjectApi;
   /** The evaluators a guardrail rule runs, as the budget-decision store reads them. */
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   /** The monitors a guardrail attachment names. */
   monitors: MonitorService;
   /**
@@ -420,7 +420,7 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
       });
       return page.map((virtualKey) => virtualKeyDtos.toVirtualKeySnakeDto({ virtualKey, facts }));
     },
-    resolveApplicableBudgets: ({ target }) =>
+    listApplicableBudgets: ({ target }) =>
       GatewayApplicableBudgetsService.create({
         budgetDecisions,
         providerLabels: PrismaGatewayProviderLabelRepository.create(prisma),

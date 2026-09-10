@@ -5,9 +5,9 @@
 import { describe, expect, it } from "vitest";
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { DatasetService } from "@langwatch/dataset-contract";
-import { EvaluatorNotFoundError, EvaluatorService } from "@langwatch/evaluator-contract";
-import { PromptService } from "@langwatch/prompt-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import { WorkflowNotFoundError, WorkflowService } from "@langwatch/workflow-contract";
 import {
   persistedEvaluationsV3StateSchema,
@@ -25,18 +25,18 @@ type Answers = {
 };
 
 function servicesAnswering(answers: Answers = {}) {
-  const prompts: PromptService = Object.create(PromptService.prototype);
+  const prompts = {} as PromptApi;
   prompts.getAllPrompts = async () => (answers.prompts ?? []) as never;
 
   const agents = createApiFixture<AgentApi>({ exists: async () => answers.agentExists ?? false });
 
-  const dataset: DatasetService = Object.create(DatasetService.prototype);
+  const dataset = {} as DatasetApi;
   dataset.getByIds = async ({ datasetIds }: { datasetIds: string[] }) =>
     datasetIds
       .filter((id) => (answers.datasetIds ?? []).includes(id))
       .map((id) => ({ id })) as never;
 
-  const evaluators: EvaluatorService = Object.create(EvaluatorService.prototype);
+  const evaluators: EvaluatorApi = createApiFixture<EvaluatorApi>();
   evaluators.getById = async () => {
     if (answers.evaluator === "found") return {} as never;
     if (answers.evaluator === "down") throw new Error("evaluator service unreachable");

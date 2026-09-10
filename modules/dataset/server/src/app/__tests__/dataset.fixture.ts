@@ -35,7 +35,7 @@ export function createDatasetTestExperiments(
 ) {
   return Object.assign(createApiFixture<ExperimentApi>(), {
     getById: vi.fn(async () => experiment ?? datasetTestExperiment(null)),
-    tryGetBySlug: vi.fn(async () => experiment),
+    findBySlug: vi.fn(async () => experiment),
   });
 }
 

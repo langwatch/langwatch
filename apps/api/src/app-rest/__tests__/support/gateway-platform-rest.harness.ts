@@ -17,7 +17,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { Hono } from "hono";
 
@@ -128,7 +128,7 @@ export async function mountGatewayPlatformRest(): Promise<GatewayRestHarness> {
     prisma,
     authz: authzBuild.authz,
     projects: tenancy.projects,
-    evaluators: {} as unknown as EvaluatorService,
+    evaluators: {} as unknown as EvaluatorApi,
     monitors: {} as unknown as MonitorService,
     clickhouse: { resolve: async () => clickhouse as never },
     virtualKeyPepper: VIRTUAL_KEY_PEPPER,

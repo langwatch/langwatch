@@ -1,4 +1,4 @@
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   archiveGatewayGuardrailInputSchema,
   createGatewayGuardrailInputSchema,
@@ -22,7 +22,7 @@ import { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.re
 export class GatewayGuardrailService {
   static create(input: {
     repository: GatewayGuardrailRepository;
-    evaluators: EvaluatorService;
+    evaluators: EvaluatorApi;
     monitors: MonitorApi;
     projects: ProjectApi;
     audit: GatewayAuditPort;
@@ -38,7 +38,7 @@ export class GatewayGuardrailService {
 
   private constructor(
     private readonly repository: GatewayGuardrailRepository,
-    private readonly evaluators: EvaluatorService,
+    private readonly evaluators: EvaluatorApi,
     private readonly monitors: MonitorApi,
     private readonly projects: ProjectApi,
     private readonly audit: GatewayAuditPort,
@@ -125,7 +125,7 @@ export class GatewayGuardrailService {
   }
 
   private async assertEvaluatorEligible(evaluatorId: string, projectId: string): Promise<void> {
-    const evaluator = await this.evaluators.tryGetById({ id: evaluatorId, projectId });
+    const evaluator = await this.evaluators.findById({ id: evaluatorId, projectId });
     if (!evaluator) {
       throw new GatewayGuardrailEvaluatorInvalidError();
     }

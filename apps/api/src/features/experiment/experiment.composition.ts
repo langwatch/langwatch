@@ -7,11 +7,10 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import type { DatasetExperimentLookup } from "@langwatch/dataset-server";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import {
   ExperimentApp,
@@ -26,7 +25,7 @@ import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import { PostgresPromptAdapter } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
@@ -71,11 +70,11 @@ export type ExperimentPeers = Readonly<{
   /** The studio graph service a run dispatches on. */
   workflows: WorkflowService;
   /** The ONE dataset service a run loads its rows through. */
-  datasets: DatasetService;
+  datasets: DatasetApi;
   /** The monitor service an experiment upserts its own monitor through. */
   monitors: MonitorService;
   /** The evaluators a run scores its cells with. */
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   /** The agents a wizard references and a run resolves. */
   agents: AgentApi;
   /** The gateway a run's dispatch and its price table read. */
@@ -130,7 +129,7 @@ export function composeExperimentFeature(options: {
   // A run resolves a prompt handle through the same rows the workbench read
   // resolves, so one service answers both: two would be two answers to which
   // version a handle points at.
-  const prompts: PromptService = PostgresPromptAdapter.create({
+  const prompts: PromptApi = PostgresPromptAdapter.create({
     database: prisma,
     modelProvider: options.peers.modelProviders,
   }).build();
@@ -210,7 +209,7 @@ export function composeExperimentFeature(options: {
   // The tRPC ports this feature used to build went with the transport that
   // took them; they return with the converted one.
 
-  return { app, experiments, experimentLookup: experiments, run };
+  return { app, experiments, run };
 }
 
 /**
@@ -226,7 +225,6 @@ export function refusingExperimentFeature(): ComposedExperimentFeature {
 
   return {
     app: refuseEvery<ExperimentApp>(),
-    experimentLookup: refuseEvery<DatasetExperimentLookup>(),
     run: refuseEvery<ApiExperimentRun>(),
   };
 }

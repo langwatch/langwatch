@@ -1,7 +1,7 @@
 import { mappingsReadEvaluationsSource } from "@langwatch/dataset-contract";
 import {
   AVAILABLE_EVALUATORS,
-  type EvaluatorService,
+  type EvaluatorApi,
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
@@ -51,7 +51,7 @@ export interface EvaluationExecutionDeps {
   modelEnvResolver: EvaluationModelEnvPort;
   langevalsClient: EvaluationLangevalsPort;
   workflows: WorkflowApi;
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   workflowExecutor: EvaluationWorkflowExecutorPort;
   /**
    * The install environment the optional evaluators read their opt-out

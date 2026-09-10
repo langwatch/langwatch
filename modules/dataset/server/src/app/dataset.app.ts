@@ -432,7 +432,7 @@ export class DatasetApp implements DatasetApi {
     projectId: string;
     experimentSlug: string;
   }): Promise<BatchEvaluationRecord[]> {
-    const experiment = await this.#experiments.tryGetBySlug({
+    const experiment = await this.#experiments.findBySlug({
       projectId: input.projectId,
       slug: input.experimentSlug,
     });

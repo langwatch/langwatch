@@ -52,7 +52,7 @@ function mount(
     getRunsPageBySlug,
     getPage: vi.fn(async () => ({ experiments: [], totalHits: 0 })),
     withRunAggregates: vi.fn(async () => []),
-    tryGetBySlug: vi.fn(async () => null),
+    findBySlug: vi.fn(async () => null),
   } as unknown as ExperimentApp;
 
   const workbench: ApiExperimentV3RestCollaborators = {

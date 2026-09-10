@@ -204,7 +204,7 @@ import {
 import type { GithubApi } from "@langwatch/github-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { ExperimentApi } from "@langwatch/experiment-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
 
 import { createPlatformUrlBuilder } from "./api-rest-ports.ts";
@@ -645,7 +645,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composedWorkflowRuntime: ApiWorkflowRuntime | undefined;
   private composedDatasets: DatasetApi | undefined;
-  private composedEvaluators: EvaluatorService | undefined;
+  private composedEvaluators: EvaluatorApi | undefined;
   private composedWorkflow!: ComposedWorkflowFeature;
   private composedExperiment!: ComposedExperimentFeature;
   /**

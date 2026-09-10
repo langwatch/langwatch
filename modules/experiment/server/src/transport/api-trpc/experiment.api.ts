@@ -581,7 +581,7 @@ export class ExperimentTrpcApi {
               .getById({ projectId: input.projectId, id: input.experimentId })
               .catch(mapExperimentError);
             const workflow = experiment.workflowId
-              ? await ctx.app.experiments.tryGetWorkflow({
+              ? await ctx.app.experiments.findWorkflow({
                   id: experiment.workflowId,
                   projectId: input.projectId,
                   includeVersion: true,
@@ -680,7 +680,7 @@ export class ExperimentTrpcApi {
               .catch(mapExperimentError);
 
             const workflow = experiment.workflowId
-              ? await ctx.app.experiments.tryGetWorkflow({
+              ? await ctx.app.experiments.findWorkflow({
                   id: experiment.workflowId,
                   projectId: input.projectId,
                   includeVersion: true,
@@ -730,7 +730,7 @@ export class ExperimentTrpcApi {
                 async (experiment) => ({
                   ...experiment,
                   workflow: experiment.workflowId
-                    ? await ctx.app.experiments.tryGetWorkflow({
+                    ? await ctx.app.experiments.findWorkflow({
                         id: experiment.workflowId,
                         projectId: input.projectId,
                         includeVersion: true,
@@ -798,7 +798,7 @@ export class ExperimentTrpcApi {
           .withPermission("experiments:view")
           .handle(
             async ({ ctx, input }) =>
-              await ctx.app.experiments.tryGetLatest({ projectId: input.projectId }),
+              await ctx.app.experiments.findLatest({ projectId: input.projectId }),
           ),
       )
 
@@ -872,7 +872,7 @@ export class ExperimentTrpcApi {
             if (!experiment.workflowId) {
               throw new TRPCError({ code: "NOT_FOUND", message: "Experiment workflow not found" });
             }
-            const sourceWorkflow = await ctx.app.experiments.tryGetWorkflow({
+            const sourceWorkflow = await ctx.app.experiments.findWorkflow({
               id: experiment.workflowId,
               projectId: input.sourceProjectId,
               includeVersion: true,
@@ -1050,7 +1050,7 @@ export class ExperimentTrpcApi {
               .getById({ projectId: input.projectId, id: input.experimentId })
               .catch(mapExperimentError);
 
-            return ctx.app.experiments.tryGetRun({
+            return ctx.app.experiments.findRun({
               projectId: input.projectId,
               experimentId: experiment.id,
               runId: input.runId,

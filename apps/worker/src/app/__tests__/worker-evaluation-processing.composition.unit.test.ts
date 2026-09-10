@@ -14,7 +14,7 @@ import {
   type EvaluationTraceEvidencePort,
   type LangevalsEvaluateParams,
 } from "@langwatch/evaluation-server";
-import type { EvaluatorService, SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -110,7 +110,7 @@ const evaluators = {
   executeNative: vi.fn(),
   executeCode: vi.fn(),
   augmentResult: vi.fn(async (input: { result: SingleEvaluationResult }) => input.result),
-} as unknown as EvaluatorService;
+} as unknown as EvaluatorApi;
 
 const monitors: EvaluationMonitorLookupPort = {
   tryGetMonitorById: async () => ({

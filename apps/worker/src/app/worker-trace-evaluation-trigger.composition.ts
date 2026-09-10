@@ -55,7 +55,7 @@ export function createWorkerTraceEvaluationTrigger(options: {
    * The one monitor listing this path reads.
    *
    * Not the whole `MonitorService`: creating and replicating a monitor is what
-   * puts an `EvaluatorService` behind it, and this asks which of a project's
+   * puts an `EvaluatorApi` behind it, and this asks which of a project's
    * monitors run on every message. `MonitorService` satisfies it, and so does
    * the catalogue-only service the feature publishes.
    */

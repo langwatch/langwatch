@@ -31,7 +31,7 @@ import {
  * requires an organization directory because `setForScope` has to decide which
  * organization a team scope belongs to; `ModelProviderService` requires nine
  * collaborators including an `AuthzService` because writing a cost authorizes
- * a scope; `MonitorService` requires an `EvaluatorService` because creating a
+ * a scope; `MonitorService` requires an `EvaluatorApi` because creating a
  * monitor resolves the evaluator behind it. Ingestion creates no project,
  * writes no policy, authors no cost and creates no monitor. Each feature now
  * publishes the read half as its own service and composes the wide service on

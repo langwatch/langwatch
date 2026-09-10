@@ -19,7 +19,7 @@
  */
 // @vitest-environment node
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -72,7 +72,7 @@ function composeGateway() {
     prisma,
     authz: { hasPermission: async () => true } as unknown as AuthzService,
     projects: new TestProjectApi(),
-    evaluators: {} as unknown as EvaluatorService,
+    evaluators: {} as unknown as EvaluatorApi,
     monitors: {} as unknown as MonitorService,
     clickhouse: null,
     virtualKeyPepper: "test-virtual-key-pepper",

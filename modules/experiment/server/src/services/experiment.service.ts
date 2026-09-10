@@ -123,7 +123,7 @@ export class ExperimentService {
 
   async getById(input: ExperimentLookup): Promise<Experiment> {
     const lookup = experimentLookupSchema.parse(input);
-    const experiment = await this.options.repository.tryFindById(lookup);
+    const experiment = await this.options.repository.findById(lookup);
     if (!experiment) {
       throw new ExperimentNotFoundError(lookup.id);
     }
@@ -133,7 +133,7 @@ export class ExperimentService {
 
   async getBySlug(input: ExperimentSlugLookup): Promise<Experiment> {
     const lookup = experimentSlugLookupSchema.parse(input);
-    const experiment = await this.options.repository.tryFindBySlug(lookup);
+    const experiment = await this.options.repository.findBySlug(lookup);
     if (!experiment) {
       throw new ExperimentNotFoundError(lookup.slug);
     }
@@ -145,20 +145,20 @@ export class ExperimentService {
     return this.options.repository.getBySlugOrId(input);
   }
 
-  async tryGetById(input: ExperimentLookup): Promise<Experiment | null> {
-    return this.options.repository.tryFindById(experimentLookupSchema.parse(input));
+  async findById(input: ExperimentLookup): Promise<Experiment | null> {
+    return this.options.repository.findById(experimentLookupSchema.parse(input));
   }
 
-  async tryGetBySlug(input: ExperimentSlugLookup): Promise<Experiment | null> {
-    return this.options.repository.tryFindBySlug(experimentSlugLookupSchema.parse(input));
+  async findBySlug(input: ExperimentSlugLookup): Promise<Experiment | null> {
+    return this.options.repository.findBySlug(experimentSlugLookupSchema.parse(input));
   }
 
-  async tryGetBySlugAndType(
+  async findBySlugAndType(
     input: ExperimentSlugLookup & { type: ExperimentType },
   ): Promise<Experiment | null> {
     const lookup = experimentSlugLookupSchema.parse(input);
 
-    return this.options.repository.tryFindBySlug({
+    return this.options.repository.findBySlug({
       ...lookup,
       type: input.type,
     });
@@ -183,21 +183,21 @@ export class ExperimentService {
     return { experiments, totalHits };
   }
 
-  async tryGetLatest(input: { projectId: string }): Promise<Experiment | null> {
-    return this.options.repository.tryFindLatest(input);
+  async findLatest(input: { projectId: string }): Promise<Experiment | null> {
+    return this.options.repository.findLatest(input);
   }
 
-  async tryGetIdBySlug(input: ExperimentSlugLookup): Promise<{ id: string; slug: string } | null> {
-    return this.options.repository.tryFindIdBySlug(experimentSlugLookupSchema.parse(input));
+  async findIdBySlug(input: ExperimentSlugLookup): Promise<{ id: string; slug: string } | null> {
+    return this.options.repository.findIdBySlug(experimentSlugLookupSchema.parse(input));
   }
 
   async isActive(input: ExperimentLookup): Promise<boolean> {
-    return (await this.tryGetById(input)) !== null;
+    return (await this.findById(input)) !== null;
   }
 
   async save(input: SaveExperimentInput): Promise<Experiment> {
     const command = saveExperimentInputSchema.parse(input);
-    const state = await this.options.repository.tryGetRowState(command);
+    const state = await this.options.repository.findRowState(command);
     if (state?.archived) {
       throw new ExperimentNotFoundError(command.id);
     }
@@ -239,7 +239,7 @@ export class ExperimentService {
     input: FindOrCreateWorkflowExperimentInput,
   ): Promise<{ id: string; slug: string }> {
     const command = findOrCreateWorkflowExperimentInputSchema.parse(input);
-    const existing = await this.options.repository.tryFindForWorkflow(command);
+    const existing = await this.options.repository.findForWorkflow(command);
     if (existing) {
       await this.options.repository.updateWorkbenchState({
         projectId: command.projectId,
@@ -286,7 +286,7 @@ export class ExperimentService {
 
   async archive(input: ExperimentLookup): Promise<{ success: true }> {
     const command = experimentLookupSchema.parse(input);
-    const state = await this.options.repository.tryGetRowState(command);
+    const state = await this.options.repository.findRowState(command);
     if (!state) {
       throw new ExperimentNotFoundError(command.id);
     }
@@ -425,7 +425,7 @@ export class ExperimentService {
     return this.options.runRepository.getPage(experimentRunPageInputSchema.parse(input));
   }
 
-  tryGetRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
+  findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
     return this.options.runRepository.tryGet(experimentRunLookupSchema.parse(input));
   }
 
@@ -435,7 +435,7 @@ export class ExperimentService {
     totalHits: number;
   }> {
     const query = experimentRunSlugPageInputSchema.parse(input);
-    const experiment = await this.tryGetIdBySlug({
+    const experiment = await this.findIdBySlug({
       projectId: query.projectId,
       slug: query.experimentSlug,
     });

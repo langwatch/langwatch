@@ -6,7 +6,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PersistedEvaluationsV3State } from "@langwatch/experiment-contract";
 import {
   ExperimentApp,
@@ -123,7 +123,7 @@ function mount(): MountedRestFamily {
     references: {
       prompts: unreached<PromptService>("The prompt service"),
       agents: unreached<AgentApi>("The agent API"),
-      evaluators: unreached<EvaluatorService>("The evaluator service"),
+      evaluators: unreached<EvaluatorApi>("The evaluator service"),
       workflows: unreached<WorkflowService>("The workflow service"),
       dataset: unreached<DatasetService>("The dataset service"),
     },

@@ -26,7 +26,7 @@ describe("given the SDK's experiment create-or-take door", () => {
       const save = vi.fn(async (input: { requestedSlug: string }) =>
         experimentRow({ id: "experiment_1", slug: input.requestedSlug }),
       );
-      const api = mount({ experiments: { tryGetBySlug: async () => null, save } });
+      const api = mount({ experiments: { findBySlug: async () => null, save } });
 
       const response = await api.fetch(
         "/api/experiment/init",
@@ -52,7 +52,7 @@ describe("given the SDK's experiment create-or-take door", () => {
       const startExperimentRun = vi.fn(async () => {});
       const api = mount({
         experiments: {
-          tryGetBySlug: async ({ slug }: { slug: string }) => stored.get(slug) ?? null,
+          findBySlug: async ({ slug }: { slug: string }) => stored.get(slug) ?? null,
           save,
           startExperimentRun,
         },
@@ -88,8 +88,8 @@ describe("given the SDK's experiment create-or-take door", () => {
   describe("when neither identifier is supplied", () => {
     it("refuses at 400 with the validation sentence, before anything is read", async () => {
       const save = vi.fn();
-      const tryGetBySlug = vi.fn();
-      const api = mount({ experiments: { tryGetBySlug, save } });
+      const findBySlug = vi.fn();
+      const api = mount({ experiments: { findBySlug, save } });
 
       const response = await api.fetch(
         "/api/experiment/init",
@@ -98,7 +98,7 @@ describe("given the SDK's experiment create-or-take door", () => {
 
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toMatchObject({ error: expect.any(String) });
-      expect(tryGetBySlug).not.toHaveBeenCalled();
+      expect(findBySlug).not.toHaveBeenCalled();
       expect(save).not.toHaveBeenCalled();
     });
   });
@@ -120,9 +120,9 @@ describe("given the SDK's experiment create-or-take door", () => {
 
   describe("when the key lacks experiments:manage", () => {
     it("answers the ceiling refusal as sent, with nothing read", async () => {
-      const tryGetBySlug = vi.fn();
+      const findBySlug = vi.fn();
       const api = mount({
-        experiments: { tryGetBySlug },
+        experiments: { findBySlug },
         credential: {
           ok: false,
           status: 403,
@@ -139,7 +139,7 @@ describe("given the SDK's experiment create-or-take door", () => {
       await expect(response.json()).resolves.toMatchObject({
         error: "api_key_permission_denied",
       });
-      expect(tryGetBySlug).not.toHaveBeenCalled();
+      expect(findBySlug).not.toHaveBeenCalled();
     });
   });
 });
@@ -162,7 +162,7 @@ function mount(options: {
     getById: async () => {
       throw new Error("getById is not part of this scenario");
     },
-    tryGetBySlug: async () => null,
+    findBySlug: async () => null,
     save: async () => {
       throw new Error("save is not part of this scenario");
     },

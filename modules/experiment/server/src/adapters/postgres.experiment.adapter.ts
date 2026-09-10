@@ -2,14 +2,11 @@ import {
   PrismaExperimentWorkflowVersionRepository,
   type ExperimentWorkflowVersionDatabase,
 } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
-import type {
-  ExperimentService as ExperimentServiceContract,
-  SerializedHandledError,
-} from "@langwatch/experiment-contract";
+import type { SerializedHandledError } from "@langwatch/experiment-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import {
   PrismaExperimentRepository,
@@ -153,16 +150,16 @@ export type PostgresExperimentAdapterOptions = {
   newId: () => string;
   now?: () => Date;
   references: {
-    prompts: PromptService;
+    prompts: PromptApi;
     agents: AgentApi;
-    evaluators: EvaluatorService;
+    evaluators: EvaluatorApi;
     workflows: WorkflowService;
-    dataset: DatasetService;
+    dataset: DatasetApi;
   };
 };
 
 export class PostgresExperimentAdapter {
-  static create(options: PostgresExperimentAdapterOptions): ExperimentServiceContract {
+  static create(options: PostgresExperimentAdapterOptions): ExperimentService {
     return ExperimentService.create({
       ...options,
       repository: PrismaExperimentRepository.create(options.database),

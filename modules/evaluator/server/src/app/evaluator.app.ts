@@ -14,25 +14,31 @@ import {
   EvaluatorSourcePermissionDeniedError,
   EvaluatorWorkflowEvaluatorExistsError,
   newEvaluatorId,
+  type CodeEvaluatorExecutionInput,
   type Evaluator,
   type EvaluatorCascadeArchive,
   type EvaluatorConfig,
   type EvaluatorCopy,
   type EvaluatorCreateInput,
   type EvaluatorHistoryEntry,
+  type EvaluatorIdOrSlugInput,
   type EvaluatorPushToCopiesResult,
   type EvaluatorRelatedEntities,
-  type EvaluatorService,
+  type EvaluatorResultAugmentationInput,
   type EvaluatorSyncFromSourceResult,
   type EvaluatorUpdateInput,
   type EvaluatorWithFields,
   type EvaluatorWorkflowFields,
+  type NativeEvaluatorExecutionInput,
+  type ResolvedEvaluatorExecution,
+  type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import {
   ModelNotConfiguredError,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { UserApi } from "@langwatch/user-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
@@ -40,10 +46,7 @@ import {
   EvaluatorCodeExecutionService,
   type EvaluatorNlpDispatcher,
 } from "../services/evaluator-code-execution.service.ts";
-import {
-  EvaluatorHistoryService,
-  type EvaluatorActorDirectory,
-} from "../services/evaluator-history.service.ts";
+import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
 
@@ -88,15 +91,13 @@ export interface EvaluatorGraph {
  * Ports the process supplies. `workflows` and `modelProviders` still carry a
  * peer module's own service rather than its API token, because `WorkflowApi`
  * publishes neither `getFields` nor `enrichStudioEvent` and `ModelProviderApi`
- * is a strict superset of the service the api composes. `graph` and `actors`
- * are rows no module's api publishes yet. Narrowing the four onto tokens is
- * the peer-narrowing wave, not this one.
+ * is a strict superset of the service the api composes. `graph` is a row no
+ * module's api publishes yet. Narrowing the three onto tokens is the
+ * peer-narrowing wave, not this one.
  */
 export interface EvaluatorAppInfrastructure {
   /** The workflow rows an evaluator's fields, its guard and its run read. */
   workflows: WorkflowService;
-  /** Who made each change the history panel lists. */
-  actors: EvaluatorActorDirectory;
   /** The workflow and monitor rows an evaluator is entangled with. */
   graph: EvaluatorGraph;
   /** Where a code evaluator's one-node Studio graph runs. */
@@ -122,7 +123,7 @@ type EvaluatorSetup = FeatureSetup<
 
 /** What the app is built from, once the setup has assembled it. */
 type EvaluatorAppParts = Readonly<{
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorRuntimeService;
   modelProviders: ModelProviderService;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
@@ -135,6 +136,8 @@ export class EvaluatorApp implements EvaluatorApi {
     permissions: AuthzApi,
     /** The trail one evaluator's change history is read off. */
     auditLog: AuditLogApi,
+    /** Names the person behind each row of that history. */
+    users: UserApi,
   };
 
   static create(setup: EvaluatorSetup): EvaluatorApp {
@@ -146,7 +149,7 @@ export class EvaluatorApp implements EvaluatorApi {
         workflows: infrastructure.workflows,
         history: EvaluatorHistoryService.create({
           auditLog: dependencies.auditLog,
-          actors: infrastructure.actors,
+          users: dependencies.users,
         }),
         ...(infrastructure.fallbackModels
           ? { fallbackModels: infrastructure.fallbackModels }
@@ -166,14 +169,24 @@ export class EvaluatorApp implements EvaluatorApi {
     this.#dependencies = dependencies;
   }
 
-  /**
-   * The evaluator runtime: the reads, the execution and the copy lineage the
-   * studio, the monitor half, the experiment wizard and the evaluation engine
-   * all run an evaluator through. Published so every process reaches the ONE
-   * built over this module's repositories.
-   */
-  getRuntime(): EvaluatorService {
-    return this.#dependencies.evaluators;
+  /** Runs a code evaluator's program in the process's own code sandbox. */
+  executeCode(input: CodeEvaluatorExecutionInput): Promise<SingleEvaluationResult> {
+    return this.#dependencies.evaluators.executeCode(input);
+  }
+
+  /** Runs a native evaluator through the NLP engine. */
+  executeNative(input: NativeEvaluatorExecutionInput): Promise<SingleEvaluationResult> {
+    return this.#dependencies.evaluators.executeNative(input);
+  }
+
+  /** Reshapes a native evaluator's raw result onto mapped data and dropped categories. */
+  augmentResult(input: EvaluatorResultAugmentationInput): SingleEvaluationResult {
+    return this.#dependencies.evaluators.augmentResult(input);
+  }
+
+  /** Resolves an evaluator by id or slug into what running it needs. */
+  resolveForExecution(input: EvaluatorIdOrSlugInput): Promise<ResolvedEvaluatorExecution> {
+    return this.#dependencies.evaluators.resolveForExecution(input);
   }
 
   // ── Reads ─────────────────────────────────────────────────────────────────
@@ -213,6 +226,11 @@ export class EvaluatorApp implements EvaluatorApi {
   /** One evaluator by its project-unique slug, or undefined. */
   async findBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | undefined> {
     return (await this.#dependencies.evaluators.tryGetBySlug(input)) ?? void 0;
+  }
+
+  /** One evaluator by its project-unique slug. */
+  getBySlug(input: { slug: string; projectId: string }): Promise<Evaluator> {
+    return this.#dependencies.evaluators.getBySlug(input);
   }
 
   /**
@@ -358,6 +376,11 @@ export class EvaluatorApp implements EvaluatorApi {
         embeddingsModel: resolvedEmbedding?.model ?? null,
       },
     });
+  }
+
+  /** Creates an evaluator against models already resolved by the caller. */
+  createWithDefaults(input: EvaluatorCreateInput): Promise<Evaluator> {
+    return this.#dependencies.evaluators.createWithDefaults(input);
   }
 
   /** Updates an evaluator, refusing a code evaluator that carries no program. */

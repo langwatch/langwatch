@@ -1,7 +1,7 @@
 /**
  * The experiment feature's application: what both of its doors call.
  */
-import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
+import type { Dataset, DatasetApi } from "@langwatch/dataset-contract";
 import {
   ExperimentApi,
   type CommitWorkbenchVersionInput,
@@ -89,7 +89,7 @@ export type ExperimentWithRuns = Readonly<{
 export interface ExperimentAppDependencies {
   experiments: ExperimentService;
   workflows: WorkflowService;
-  dataset: DatasetService;
+  dataset: DatasetApi;
   monitors: ExperimentMonitorCascade;
   broadcast: ExperimentBroadcast;
 }
@@ -138,8 +138,8 @@ export class ExperimentApp implements ExperimentApi {
   }
 
   /** One experiment by id, or null when it is archived or absent. */
-  tryGetById(input: ExperimentLookup): Promise<Experiment | null> {
-    return this.#dependencies.experiments.tryGetById(input);
+  findById(input: ExperimentLookup): Promise<Experiment | null> {
+    return this.#dependencies.experiments.findById(input);
   }
 
   /** One experiment by slug. */
@@ -150,22 +150,22 @@ export class ExperimentApp implements ExperimentApi {
   /**
    * One experiment by slug, or null when the project has none by that name.
    */
-  tryGetBySlug(input: ExperimentSlugLookup): Promise<Experiment | null> {
-    return this.#dependencies.experiments.tryGetBySlug(input);
+  findBySlug(input: ExperimentSlugLookup): Promise<Experiment | null> {
+    return this.#dependencies.experiments.findBySlug(input);
   }
 
   /**
    * One experiment by slug, only when it is of the kind the caller expects.
    */
-  tryGetBySlugAndType(
+  findBySlugAndType(
     input: ExperimentSlugLookup & Readonly<{ type: ExperimentType }>,
   ): Promise<Experiment | null> {
-    return this.#dependencies.experiments.tryGetBySlugAndType(input);
+    return this.#dependencies.experiments.findBySlugAndType(input);
   }
 
   /** One experiment's id and slug, for a caller that holds only the slug. */
-  tryGetIdBySlug(input: ExperimentSlugLookup): Promise<{ id: string; slug: string } | null> {
-    return this.#dependencies.experiments.tryGetIdBySlug(input);
+  findIdBySlug(input: ExperimentSlugLookup): Promise<{ id: string; slug: string } | null> {
+    return this.#dependencies.experiments.findIdBySlug(input);
   }
 
   /**
@@ -181,8 +181,8 @@ export class ExperimentApp implements ExperimentApi {
   }
 
   /** The project's most recent experiment, or null when it has none. */
-  tryGetLatest(input: Readonly<{ projectId: string }>): Promise<Experiment | null> {
-    return this.#dependencies.experiments.tryGetLatest(input);
+  findLatest(input: Readonly<{ projectId: string }>): Promise<Experiment | null> {
+    return this.#dependencies.experiments.findLatest(input);
   }
 
   /** The name the next unnamed experiment in the project gets. */
@@ -207,7 +207,7 @@ export class ExperimentApp implements ExperimentApi {
    * the monitor it was published as.
    */
   async archive(input: ExperimentLookup): Promise<{ success: true }> {
-    const experiment = await this.#dependencies.experiments.tryGetById(input);
+    const experiment = await this.#dependencies.experiments.findById(input);
     const result = await this.#dependencies.experiments.archive(input);
 
     if (experiment?.workflowId) {
@@ -234,8 +234,8 @@ export class ExperimentApp implements ExperimentApi {
   }
 
   /** One run of one experiment. A missing run reads as null. */
-  tryGetRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
-    return this.#dependencies.experiments.tryGetRun(input);
+  findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
+    return this.#dependencies.experiments.findRun(input);
   }
 
   /** The runs of each named experiment, keyed by experiment id, with their aggregate. */
@@ -408,7 +408,7 @@ export class ExperimentApp implements ExperimentApi {
   /**
    * The workflow behind an experiment, or null when it is gone.
    */
-  async tryGetWorkflow(
+  async findWorkflow(
     input: Readonly<{ id: string; projectId: string; includeVersion?: boolean }>,
   ): Promise<WorkflowWithVersion | null> {
     try {

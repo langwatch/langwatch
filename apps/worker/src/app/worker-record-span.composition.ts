@@ -31,7 +31,7 @@ import type { WorkerTraceCapabilityServices } from "./worker-trace-capability-se
  * Every one of those five is now composable from the one Prisma client, the
  * queue's Redis, the deployment's own variables and the stored-object runtime
  * this process already holds. `ProjectApi`, `OrganizationService`,
- * `AuthzService` and `EvaluatorService` are not among them and never were on
+ * `AuthzService` and `EvaluatorApi` are not among them and never were on
  * this path — they stood behind the WRITE halves of the four features, which
  * ingestion does not reach.
  *

@@ -42,11 +42,11 @@ export class ExperimentFindOrCreateService {
     let slug: string | null = null;
     if (input.experimentSlug) {
       slug = ExperimentFindOrCreateService.slugify(input.experimentSlug);
-      // `tryGetBySlug` filters `archivedAt` at the service layer. An archived
+      // `findBySlug` filters `archivedAt` at the service layer. An archived
       // row also carries a `-archived-<nanoid>` slug, so it would not collide
       // even on a raw read — the lookup still goes through the service so the
       // archive rule stays one source of truth.
-      experiment = await this.experiments.tryGetBySlug({ projectId, slug });
+      experiment = await this.experiments.findBySlug({ projectId, slug });
     }
 
     if (!experiment && !slug) {

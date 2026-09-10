@@ -9,7 +9,8 @@ import { GatewayGuardrailService } from "../services/gateway-guardrail.service.t
 import { GatewayService } from "../services/gateway.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 import type { GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
-import { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { describe, expect, it } from "vitest";
 import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
@@ -132,78 +133,6 @@ class EmptyGuardrailRepository extends GatewayGuardrailRepository {
   }
 }
 
-class UnusedEvaluatorService extends EvaluatorService {
-  executeCode(): never {
-    throw new Error("not used");
-  }
-  executeNative(): never {
-    throw new Error("not used");
-  }
-  augmentResult(): never {
-    throw new Error("not used");
-  }
-  tryGetById(): never {
-    throw new Error("not used");
-  }
-  getById(): never {
-    throw new Error("not used");
-  }
-  tryGetByIdWithFields(): never {
-    throw new Error("not used");
-  }
-  getByIdWithFields(): never {
-    throw new Error("not used");
-  }
-  resolveForExecution(): never {
-    throw new Error("not used");
-  }
-  tryGetBySlug(): never {
-    throw new Error("not used");
-  }
-  tryGetByWorkflow(): never {
-    throw new Error("not used");
-  }
-  getBySlug(): never {
-    throw new Error("not used");
-  }
-  getAll(): never {
-    throw new Error("not used");
-  }
-  getAllWithFields(): never {
-    throw new Error("not used");
-  }
-  create(): never {
-    throw new Error("not used");
-  }
-  createWithDefaults(): never {
-    throw new Error("not used");
-  }
-  update(): never {
-    throw new Error("not used");
-  }
-  archive(): never {
-    throw new Error("not used");
-  }
-  getWorkflowFields(): never {
-    throw new Error("not used");
-  }
-  getCopies(): never {
-    throw new Error("not used");
-  }
-  pushToCopies(): never {
-    throw new Error("not used");
-  }
-  syncFromSource(): never {
-    throw new Error("not used");
-  }
-  getCopySource(): never {
-    throw new Error("not used");
-  }
-  getHistory(): never {
-    throw new Error("not used");
-  }
-}
-
 /** Every monitor read refuses: this suite exercises the budget half only. */
 function unusedMonitors(): MonitorApi {
   const refuse = (): never => {
@@ -232,7 +161,7 @@ function serviceFor(result: GatewayBudgetCheckResult): {
       cacheRules: GatewayCacheRuleService.create(new EmptyCacheRuleRepository()),
       guardrails: GatewayGuardrailService.create({
         repository: new EmptyGuardrailRepository(),
-        evaluators: new UnusedEvaluatorService(),
+        evaluators: createApiFixture<EvaluatorApi>(),
         monitors: unusedMonitors(),
         projects,
         audit: new NullGatewayAuditPort(),
@@ -268,7 +197,7 @@ function serviceOverCatalogues({
     cacheRules: GatewayCacheRuleService.create(cacheRuleRepository),
     guardrails: GatewayGuardrailService.create({
       repository: guardrailRepository,
-      evaluators: new UnusedEvaluatorService(),
+      evaluators: createApiFixture<EvaluatorApi>(),
       monitors: unusedMonitors(),
       projects,
       audit: new NullGatewayAuditPort(),

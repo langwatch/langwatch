@@ -31,7 +31,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { EvaluationTraceReadInput, Span, TraceApi } from "@langwatch/trace-contract";
 import { TraceReadableSpanService } from "@langwatch/trace-server";
 import { WorkflowEvaluationAdapter } from "@langwatch/evaluation-server/workflow-evaluation";
-import type { EvaluatorService, SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { nanoid } from "nanoid";
 import {
   createWorkerEvaluationInputsOffload,
@@ -56,7 +56,7 @@ export function createWorkerEvaluationExecutionCollaborators(input: {
   /** The ONE monitor application this process installed. */
   monitors: MonitorApi;
   /** The ONE evaluator runtime this process installed. */
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   workflows: WorkerEvaluationWorkflows;
   models: WorkerModelProviders;
   featureFlags: FeatureFlagApi;

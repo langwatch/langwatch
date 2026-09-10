@@ -11,7 +11,7 @@ import {
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { TargetConfig } from "@langwatch/experiment-contract";
 import {
@@ -204,7 +204,7 @@ export type ApiExperimentRunOptions = Readonly<{
   datasets: DatasetService;
   prompts: PromptService;
   agents: AgentApi;
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   /** The credential a run lends the code it executes. Absent means it lends none. */
   apiKeys: ApiKeyApi | undefined;
   /**

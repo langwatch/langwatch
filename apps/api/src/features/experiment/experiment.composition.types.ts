@@ -1,5 +1,4 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { DatasetExperimentLookup } from "@langwatch/dataset-server";
 import type { ExperimentApp, ExperimentService } from "@langwatch/experiment-server";
 import type { ApiExperimentRun } from "../../app/api-experiment-run.composition.ts";
 
@@ -8,8 +7,6 @@ import type { ApiExperimentRun } from "../../app/api-experiment-run.composition.
 export type ComposedExperimentFeature = Readonly<{
   /** For `ctx.app.experiments`, and for the packaged experiment REST family. */
   app: ExperimentApp;
-  /** The experiment lookup a dataset resolves a borrowed name through. */
-  experimentLookup: DatasetExperimentLookup;
   /** The run loop the three REST run doors dispatch through. */
   run: ApiExperimentRun;
   /**

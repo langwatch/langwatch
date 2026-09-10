@@ -7,37 +7,19 @@
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EvaluatorHistoryEntry } from "@langwatch/evaluator-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
 /** How far back one evaluator's panel reads. */
 const HISTORY_LIMIT = 100;
 
-/** One person, as a history row names them. */
-export type EvaluatorActor = Readonly<{
-  id: string;
-  name: string | null;
-  email: string | null;
-}>;
-
-/**
- * Who made each change, answered by the process from its own user directory.
- * Three fields, because three fields are what a history row renders; the
- * module holds no user rows and asks for no more of them.
- */
-export interface EvaluatorActorDirectory {
-  findByIds(input: { userIds: string[] }): Promise<EvaluatorActor[]>;
-}
-
 export class EvaluatorHistoryService {
-  static create(options: {
-    auditLog: AuditLogApi;
-    actors: EvaluatorActorDirectory;
-  }): EvaluatorHistoryService {
-    return new EvaluatorHistoryService(options.auditLog, options.actors);
+  static create(options: { auditLog: AuditLogApi; users: UserApi }): EvaluatorHistoryService {
+    return new EvaluatorHistoryService(options.auditLog, options.users);
   }
 
   private constructor(
     private readonly auditLog: AuditLogApi,
-    private readonly actors: EvaluatorActorDirectory,
+    private readonly users: UserApi,
   ) {}
 
   async listForEvaluator(input: {
@@ -54,8 +36,13 @@ export class EvaluatorHistoryService {
     const userIds = [
       ...new Set(entries.map((entry) => entry.userId).filter((id): id is string => Boolean(id))),
     ];
-    const actors = await this.actors.findByIds({ userIds });
-    const byId = new Map(actors.map((actor) => [actor.id, actor]));
+    const profiles = await this.users.getProfiles({ userIds });
+    const byId = new Map(
+      profiles.map((profile) => [
+        profile.id,
+        { id: profile.id, name: profile.name, email: profile.email },
+      ]),
+    );
 
     return entries.map((entry) => ({
       id: entry.id,

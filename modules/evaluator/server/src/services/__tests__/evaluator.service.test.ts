@@ -6,6 +6,8 @@ import {
   standardEvaluatorOutputFields,
   type Evaluator,
 } from "@langwatch/evaluator-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { EvaluatorRepository } from "../../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
@@ -72,7 +74,7 @@ function service(
     workflows: options.workflows ?? workflows(),
     history: EvaluatorHistoryService.create({
       auditLog: { record: async () => void 0, listEntityHistory: async () => [] },
-      actors: { findByIds: async () => [] },
+      users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
     }),
     codeExecution: options.codeExecution ?? {
       async execute() {

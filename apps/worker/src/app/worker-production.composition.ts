@@ -1295,7 +1295,7 @@ export class WorkerProductionComposition {
             evaluation: {
               database: options.connection.client,
               workflows: evaluationWorkflows,
-              evaluators: evaluationEvaluators.getRuntime(),
+              evaluators: evaluationEvaluators,
               datasets,
               monitors,
               modelProviders: modelProviders.modelProviders,

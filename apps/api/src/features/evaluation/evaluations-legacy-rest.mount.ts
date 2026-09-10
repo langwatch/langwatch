@@ -9,7 +9,7 @@ import {
   type EvaluationRunRestPorts,
   type EvaluationsLegacyCredentialPort,
 } from "@langwatch/evaluation-server";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type {
   ExperimentFindOrCreateService,
   ExperimentService,
@@ -38,7 +38,7 @@ export type ApiEvaluationRunRestCollaborators = Readonly<{
   /** The process's ONE evaluator runtime. */
   execution: ApiEvaluatorExecution;
   /** The saved-evaluator directory the `evaluators/{slug|id}` form resolves on. */
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   /** The experiment a dataset evaluation's rows are grouped under. */
   experiments: ExperimentService;
   /** The cascade a project's default evaluator model is resolved through. */
@@ -126,7 +126,7 @@ function evaluationRunPorts(run: ApiEvaluationRunRestCollaborators): EvaluationR
         select: { id: true },
       }),
     tryGetExperimentBySlug: (input) =>
-      run.experiments.tryGetBySlug({ projectId: input.projectId, slug: input.slug }),
+      run.experiments.findBySlug({ projectId: input.projectId, slug: input.slug }),
     listCustomEvaluators: (input) =>
       listCustomEvaluators({ prisma: run.prisma, projectId: input.projectId }),
     // Null rather than a thrown "not configured": the caller's only answer to

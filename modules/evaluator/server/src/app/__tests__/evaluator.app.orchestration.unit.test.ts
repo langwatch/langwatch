@@ -6,55 +6,38 @@
  * per-project filtering every replication path applies. These rules used to
  * live in the tRPC class, so the assertions are on their stable error codes.
  */
-import type { Evaluator } from "@langwatch/evaluator-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { EvaluatorGraph } from "../evaluator.app.ts";
+import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
 import {
   createEvaluatorTestApp,
   testEvaluatorGraph,
   testEvaluatorPermissions,
-  type EvaluatorRuntimeStubs,
 } from "./evaluator.fixture.ts";
-
-const anEvaluator: Evaluator = {
-  id: "evaluator-1",
-  projectId: "project-1",
-  name: "Exact match",
-  slug: "exact-match",
-  type: "evaluator",
-  config: { evaluatorType: "langevals/exact_match" },
-  workflowId: null,
-  copiedFromEvaluatorId: null,
-  archivedAt: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
 
 const graph = testEvaluatorGraph;
 
 function anApp(options: {
-  evaluators?: EvaluatorRuntimeStubs;
   permits?: (projectId: string) => boolean;
   ports?: EvaluatorGraph;
-}) {
+  repository?: MemoryEvaluatorRepository;
+} = {}) {
   const ports = options.ports ?? graph();
   const permissions = testEvaluatorPermissions(options.permits ?? (() => true));
   const composed = createEvaluatorTestApp({
-    // No workflow answers for an evaluator unless a case says one does: every
-    // create names a workflow the project has not used before.
-    evaluators: { tryGetByWorkflow: async () => null, ...options.evaluators },
+    repository: options.repository,
     permissions,
     graph: ports,
   });
 
-  return { ports, permissions, app: composed.app };
+  return { ports, permissions, app: composed.app, repository: composed.repository };
 }
 
 describe("given a code evaluator that arrives without its program", () => {
   it("refuses the create before anything is written", async () => {
-    const create = vi.fn();
-    const { app } = anApp({ evaluators: { create } });
+    const { app, repository } = anApp();
+    const create = vi.spyOn(repository, "create");
 
     await expect(
       app.create({
@@ -71,10 +54,16 @@ describe("given a code evaluator that arrives without its program", () => {
 
 describe("given a workflow that already backs an evaluator", () => {
   it("refuses a second one against the same workflow", async () => {
-    const create = vi.fn();
-    const { app } = anApp({
-      evaluators: { create, tryGetByWorkflow: async () => ({ ...anEvaluator, name: "Existing" }) },
+    const { app, repository } = anApp();
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Existing",
+      type: "workflow",
+      config: {},
+      workflowId: "workflow-1",
     });
+    const create = vi.spyOn(repository, "create");
 
     await expect(
       app.create({
@@ -98,9 +87,14 @@ describe("when the archive confirmation is opened", () => {
     const ports = graph({
       findMonitorsUsingEvaluator: vi.fn(async () => [{ id: "monitor-1", name: "Guard" }]),
     });
-    const { app } = anApp({
-      evaluators: { tryGetById: async () => ({ ...anEvaluator, workflowId: "workflow-1" }) },
-      ports,
+    const { app, repository } = anApp({ ports });
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+      workflowId: "workflow-1",
     });
 
     await expect(
@@ -113,7 +107,14 @@ describe("when the archive confirmation is opened", () => {
 
   it("reads no workflow for an evaluator that has none", async () => {
     const ports = graph();
-    const { app } = anApp({ evaluators: { tryGetById: async () => anEvaluator }, ports });
+    const { app, repository } = anApp({ ports });
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+    });
 
     const related = await app.getRelatedEntities({ id: "evaluator-1", projectId: "project-1" });
 
@@ -125,12 +126,14 @@ describe("when the archive confirmation is opened", () => {
 describe("when an evaluator is cascade archived", () => {
   it("deletes its monitors, archives it, and archives its workflow", async () => {
     const ports = graph({ deleteMonitorsUsingEvaluator: vi.fn(async () => ({ count: 2 })) });
-    const { app } = anApp({
-      evaluators: {
-        getById: async () => ({ ...anEvaluator, workflowId: "workflow-1" }),
-        archive: async () => ({ ...anEvaluator, archivedAt: new Date() }),
-      },
-      ports,
+    const { app, repository } = anApp({ ports });
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+      workflowId: "workflow-1",
     });
 
     const result = await app.cascadeArchive({ id: "evaluator-1", projectId: "project-1" });
@@ -142,28 +145,49 @@ describe("when an evaluator is cascade archived", () => {
 });
 
 describe("given replicas that live in projects the caller cannot see", () => {
-  const copies = [
-    { id: "copy-1", name: "Mine", projectId: "project-2", fullPath: "a" },
-    { id: "copy-2", name: "Theirs", projectId: "project-3", fullPath: "b" },
-  ];
+  async function seedCopies(repository: MemoryEvaluatorRepository) {
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Source",
+      type: "evaluator",
+      config: {},
+    });
+    await repository.create({
+      id: "copy-1",
+      projectId: "project-2",
+      name: "Mine",
+      type: "evaluator",
+      config: {},
+      copiedFromEvaluatorId: "evaluator-1",
+    });
+    await repository.create({
+      id: "copy-2",
+      projectId: "project-3",
+      name: "Theirs",
+      type: "evaluator",
+      config: {},
+      copiedFromEvaluatorId: "evaluator-1",
+    });
+  }
 
   it("lists only the ones they may view", async () => {
-    const { app } = anApp({
-      evaluators: { getCopies: async () => copies },
-      permits: (projectId) => projectId === "project-2",
+    const { app, repository } = anApp({ permits: (projectId) => projectId === "project-2" });
+    await seedCopies(repository);
+
+    const copies = await app.getCopies({
+      projectId: "project-1",
+      evaluatorId: "evaluator-1",
+      actorId: "user-1",
     });
 
-    await expect(
-      app.getCopies({ projectId: "project-1", evaluatorId: "evaluator-1", actorId: "user-1" }),
-    ).resolves.toEqual([copies[0]]);
+    expect(copies.map((copy) => copy.id)).toEqual(["copy-1"]);
   });
 
   it("pushes only into the ones they may manage", async () => {
-    const pushToCopies = vi.fn(async () => ({ pushedTo: 1, selectedCopies: 2 }));
-    const { app } = anApp({
-      evaluators: { getCopies: async () => copies, pushToCopies },
-      permits: (projectId) => projectId === "project-2",
-    });
+    const { app, repository } = anApp({ permits: (projectId) => projectId === "project-2" });
+    await seedCopies(repository);
+    const updateNameAndConfig = vi.spyOn(repository, "updateNameAndConfig");
 
     await app.pushToCopies({
       projectId: "project-1",
@@ -171,16 +195,17 @@ describe("given replicas that live in projects the caller cannot see", () => {
       actorId: "user-1",
     });
 
-    expect(pushToCopies).toHaveBeenCalledWith(
-      expect.objectContaining({ allowedProjectIds: ["project-2"] }),
+    expect(updateNameAndConfig).toHaveBeenCalledTimes(1);
+    expect(updateNameAndConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "copy-1", projectId: "project-2" }),
     );
   });
 });
 
 describe("when copying out of a project the caller cannot manage", () => {
   it("refuses before the source evaluator is read", async () => {
-    const tryGetById = vi.fn();
-    const { app } = anApp({ evaluators: { tryGetById }, permits: () => false });
+    const { app, repository } = anApp({ permits: () => false });
+    const findById = vi.spyOn(repository, "findById");
 
     await expect(
       app.copy({
@@ -191,21 +216,27 @@ describe("when copying out of a project the caller cannot manage", () => {
         actorId: "user-1",
       }),
     ).rejects.toMatchObject({ code: "evaluator_source_permission_denied", httpStatus: 401 });
-    expect(tryGetById).not.toHaveBeenCalled();
+    expect(findById).not.toHaveBeenCalled();
   });
 
   it("refuses to sync from a source it cannot read", async () => {
-    const syncFromSource = vi.fn();
-    const { app } = anApp({
-      evaluators: {
-        getCopySource: async () => ({
-          copy: anEvaluator,
-          source: { ...anEvaluator, projectId: "source" },
-        }),
-        syncFromSource,
-      },
-      permits: () => false,
+    const { app, repository } = anApp({ permits: () => false });
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Copy",
+      type: "evaluator",
+      config: {},
+      copiedFromEvaluatorId: "evaluator-source",
     });
+    await repository.create({
+      id: "evaluator-source",
+      projectId: "source",
+      name: "Source",
+      type: "evaluator",
+      config: {},
+    });
+    const update = vi.spyOn(repository, "updateNameAndConfig");
 
     await expect(
       app.syncFromSource({
@@ -214,13 +245,13 @@ describe("when copying out of a project the caller cannot manage", () => {
         actorId: "user-1",
       }),
     ).rejects.toMatchObject({ code: "permission_denied" });
-    expect(syncFromSource).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
   });
 });
 
 describe("when copying an evaluator into another project", () => {
   it("names the missing source rather than failing anonymously", async () => {
-    const { app } = anApp({ evaluators: { tryGetById: async () => null } });
+    const { app } = anApp();
 
     await expect(
       app.copy({
@@ -234,10 +265,13 @@ describe("when copying an evaluator into another project", () => {
   });
 
   it("refuses a workflow evaluator that names no workflow", async () => {
-    const { app } = anApp({
-      evaluators: {
-        tryGetById: async () => ({ ...anEvaluator, type: "workflow", workflowId: null }),
-      },
+    const { app, repository } = anApp();
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "source",
+      name: "Source",
+      type: "workflow",
+      config: {},
     });
 
     await expect(
@@ -252,15 +286,17 @@ describe("when copying an evaluator into another project", () => {
   });
 
   it("clones the backing workflow and points the replica at it", async () => {
-    const create = vi.fn(async () => anEvaluator);
     const ports = graph();
-    const { app } = anApp({
-      evaluators: {
-        tryGetById: async () => ({ ...anEvaluator, type: "workflow", workflowId: "workflow-1" }),
-        create,
-      },
-      ports,
+    const { app, repository } = anApp({ ports });
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "source",
+      name: "Source",
+      type: "workflow",
+      config: {},
+      workflowId: "workflow-1",
     });
+    const create = vi.spyOn(repository, "create");
 
     await app.copy({
       evaluatorId: "evaluator-1",
@@ -288,14 +324,17 @@ describe("when copying an evaluator into another project", () => {
 
   it("removes the cloned workflow when the replica cannot be written", async () => {
     const ports = graph();
-    const { app } = anApp({
-      evaluators: {
-        tryGetById: async () => ({ ...anEvaluator, type: "workflow", workflowId: "workflow-1" }),
-        create: async () => {
-          throw new Error("insert failed");
-        },
-      },
-      ports,
+    const { app, repository } = anApp({ ports });
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "source",
+      name: "Source",
+      type: "workflow",
+      config: {},
+      workflowId: "workflow-1",
+    });
+    vi.spyOn(repository, "create").mockImplementationOnce(() => {
+      throw new Error("insert failed");
     });
 
     await expect(

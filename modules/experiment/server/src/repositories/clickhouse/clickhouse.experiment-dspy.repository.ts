@@ -137,7 +137,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return;
-      const existing = await this.tryGetWithClient(client, input);
+      const existing = await this.findWithClient(client, input);
       const examples = mergeByHash<ExperimentDspyExample>(existing?.examples ?? [], input.examples);
       const llmCalls = mergeByHash<ExperimentDspyLlmCall>(existing?.llmCalls ?? [], input.llmCalls);
       const summary = llmSummary(llmCalls);
@@ -237,7 +237,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return null;
-      return this.tryGetWithClient(client, input);
+      return this.findWithClient(client, input);
     } catch (error) {
       this.options.telemetry.warn(
         { projectId: input.tenantId, error },
@@ -247,7 +247,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     }
   }
 
-  private async tryGetWithClient(
+  private async findWithClient(
     client: ExperimentDspyClickHouseClient,
     input: ExperimentDspyStepLookup,
   ): Promise<ExperimentDspyStep | null> {

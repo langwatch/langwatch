@@ -243,7 +243,7 @@ describe("DatasetApp", () => {
       await expect(
         app.listBatchEvaluations({ projectId: "project-1", experimentSlug: "nightly" }),
       ).resolves.toEqual([]);
-      expect(experiments.tryGetBySlug).toHaveBeenCalledWith({
+      expect(experiments.findBySlug).toHaveBeenCalledWith({
         projectId: "project-1",
         slug: "nightly",
       });

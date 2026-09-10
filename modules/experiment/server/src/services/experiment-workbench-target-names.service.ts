@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { pickTargetName, type TargetConfig } from "@langwatch/experiment-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ExperimentTargetEntityNamesPort } from "../ports/experiment-target-entity-names.port.ts";
 
 const logger = createLogger("langwatch:experiment:workbench-target-names");
@@ -26,7 +26,7 @@ export class ExperimentWorkbenchTargetNamesService {
     /**
      * The process's own Prompt service, injected rather than built here.
      */
-    prompts: PromptService;
+    prompts: PromptApi;
     /** Agent and evaluator names, which are rows this feature does not own. */
     entities: ExperimentTargetEntityNamesPort;
   }): Promise<Record<string, string>> {
@@ -105,7 +105,7 @@ const loadPrompts = async ({
 }: {
   projectId: string;
   targets: TargetConfig[];
-  promptService: PromptService;
+  promptService: PromptApi;
 }): Promise<Map<string, { handle?: string | null }>> => {
   // One lookup per distinct prompt, all in flight at once: the agent branch and
   // the evaluator branch beside this one batch their rows, so a serial loop

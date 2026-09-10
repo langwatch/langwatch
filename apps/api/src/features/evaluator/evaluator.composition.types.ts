@@ -1,5 +1,5 @@
 /** Kept separate from the composition so importing the router/app type never pulls in the installer. */
-import type { EvaluatorApi, EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { createEvaluatorTrpcRouter } from "./evaluator-trpc.mount.ts";
 
@@ -9,11 +9,11 @@ export type ComposedEvaluatorFeature = Readonly<{
   /** For `ctx.app.evaluatorApp`, which the evaluator REST family also reads. */
   app: EvaluatorApi;
   /**
-   * The evaluator runtime the studio, the monitor half, the experiment wizard
-   * and the re-score all run an evaluator through. The SAME one the app is
-   * built over, published as a member so this process composes exactly one.
+   * The studio, the monitor half, the experiment wizard and the re-score all
+   * run an evaluator through this. The SAME object as `app` - published as its
+   * own member because those callers ask for it by name, not by the app's.
    */
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   /**
    * The lazy service entry the process's one REST list takes for this feature.
    * A provider rather than the application itself, so building the list never

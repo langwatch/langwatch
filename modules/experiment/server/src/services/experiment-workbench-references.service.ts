@@ -3,9 +3,9 @@
  */
 
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import { EvaluatorNotFoundError, type EvaluatorService } from "@langwatch/evaluator-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
 import {
   collectWorkbenchReferences,
@@ -14,11 +14,11 @@ import {
 } from "@langwatch/experiment-contract";
 
 export type ExperimentWorkbenchReferenceServices = {
-  prompts: PromptService;
+  prompts: PromptApi;
   agents: AgentApi;
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   workflows: WorkflowService;
-  dataset: DatasetService;
+  dataset: DatasetApi;
 };
 
 type ReferenceType = "prompt" | "agent" | "evaluator" | "workflow" | "dataset";
@@ -65,7 +65,7 @@ export class ExperimentWorkbenchReferencesService {
     projectId: string;
     type: ReferenceType;
     id: string;
-    prompts: Awaited<ReturnType<PromptService["getAllPrompts"]>>;
+    prompts: Awaited<ReturnType<PromptApi["getAllPrompts"]>>;
   }): Promise<boolean> {
     switch (type) {
       case "prompt":
