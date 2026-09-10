@@ -114,7 +114,7 @@ export type Caller = Readonly<{
 }>;
 
 /** The authorization decisions one request asks for, and nothing else. */
-export interface AuthorizePort {
+export interface Authorize {
   getDecision(input: AuthzGetDecisionInput): Promise<PermissionDecision>;
   getProjectAnyDecision(input: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision>;
   checkScopeLineage(input: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
@@ -301,7 +301,7 @@ export async function decide({
   declaration: AccessDeclaration;
   caller: Caller;
   input: unknown;
-  authorize?: AuthorizePort;
+  authorize?: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const credentialScope = caller.scope ?? null;
@@ -365,7 +365,7 @@ async function decidePermission({
   declaration: Extract<AccessDeclaration, { kind: "permission" }>;
   caller: Caller;
   input: unknown;
-  authorize?: AuthorizePort;
+  authorize?: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const { actor } = requireCaller(caller);
@@ -400,7 +400,7 @@ async function decidePermissionAny({
   declaration: Extract<AccessDeclaration, { kind: "permission-any" }>;
   caller: Caller;
   input: unknown;
-  authorize?: AuthorizePort;
+  authorize?: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const { actor } = requireCaller(caller);
@@ -443,7 +443,7 @@ async function decidePermissionAll({
   declaration: PermissionAllDeclaration;
   caller: Caller;
   input: unknown;
-  authorize?: AuthorizePort;
+  authorize?: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
   const { actor } = requireCaller(caller);
@@ -519,7 +519,7 @@ async function assertScopeLineage({
 }: {
   declaration: AccessDeclaration;
   input: unknown;
-  authorize: AuthorizePort;
+  authorize: Authorize;
 }): Promise<void> {
   const lineage = await authorize.checkScopeLineage(
     typeof input === "object" && input !== null ? (input as AuthzScopeLineageInput) : {},
@@ -596,9 +596,9 @@ function requireAuthorize({
   authorize,
   kind,
 }: {
-  authorize: AuthorizePort | undefined;
+  authorize: Authorize | undefined;
   kind: AccessDeclaration["kind"];
-}): AuthorizePort {
+}): Authorize {
   if (authorize) return authorize;
 
   throw new Error(

@@ -16,7 +16,7 @@ import {
   optionalCredential,
   securityRequirement,
   type AccessDenial,
-  type AuthorizePort,
+  type Authorize,
   type Caller,
 } from "../access.ts";
 
@@ -28,9 +28,9 @@ const denials: AccessDenial = {
 };
 
 function authorize(
-  overrides: Partial<AuthorizePort> = {},
+  overrides: Partial<Authorize> = {},
   seen: { decisions: unknown[] } = { decisions: [] },
-): AuthorizePort {
+): Authorize {
   return {
     getDecision: async (input) => {
       seen.decisions.push(input);

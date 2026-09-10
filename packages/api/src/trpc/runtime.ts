@@ -55,7 +55,7 @@ import {
   type AccessDeclaration,
   type AccessDenial,
   type ApiEntitlement,
-  type AuthorizePort,
+  type Authorize,
   type Caller,
   type Entitlements,
   type PublicRouteAccess,
@@ -834,7 +834,7 @@ export type TrpcRuntimePorts<TContext> = Readonly<{
   /** Who is calling, and the scope their credential resolved. */
   identity: Readonly<{ caller(ctx: TContext): Caller }>;
   /** Resolves the authorization decisions for one request. */
-  authorization: Readonly<{ forRequest(ctx: TContext): AuthorizePort }>;
+  authorization: Readonly<{ forRequest(ctx: TContext): Authorize }>;
   /** The two refusals whose concrete error class is the process's to choose. */
   denials: AccessDenial;
   /** What the process reads a tenant's entitlements from, for a procedure that asks. */

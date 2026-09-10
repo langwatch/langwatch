@@ -32,7 +32,7 @@ import {
   decideEntitlement,
   routeScopeOf,
   type AccessDenial,
-  type AuthorizePort,
+  type Authorize,
   type Credential,
   type Entitlements,
 } from "../access/access.ts";
@@ -179,7 +179,7 @@ export type RestRuntimePorts = Readonly<{
   /** Where every route that declared an action leaves its row. */
   audit?: RestAuditSink;
   /** Only a family whose routes carry a check of their own supplies these. */
-  authorization?: Readonly<{ forRequest(request: Request): AuthorizePort }>;
+  authorization?: Readonly<{ forRequest(request: Request): Authorize }>;
   /** The counter behind every route that declared how often one caller may ask. */
   rateLimiter?: RateLimiter;
   /** The store behind every route that declared how long its answer stands. */

@@ -23,7 +23,7 @@ export {
   type AccessDenial,
   type ApiEntitlement,
   type AuthenticatedRouteAccess,
-  type AuthorizePort,
+  type Authorize,
   type Caller,
   type Credential,
   type DeferredScopeAccess,
