@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { TraceApp } from "./app/trace.app.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import { spansTrpcTransport } from "./transport/spans.trpc.ts";
@@ -15,7 +15,7 @@ export type { TraceInfrastructure } from "./app/trace-composition.types.ts";
  * app/trace-read.composition.ts, which still constructs its own Prisma
  * repository directly, for the remaining wiring.
  */
-export const traceServer = defineModule("trace")
+export const traceServer = defineServerModule("trace")
   .withRepositories(traceRepositories)
   .withApp(TraceApp)
   .withTransports(tracesTrpcTransport, spansTrpcTransport, traceEditOverlayTrpcTransport)

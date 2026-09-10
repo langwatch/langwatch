@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 
 import { AutomationApp } from "./app/automation.app.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
@@ -14,7 +14,7 @@ export type { AutomationInfrastructure } from "./app/automation.app.ts";
  * only the mounting process can build, so it is declared by
  * `createAutomationRest(platformUrl)` and mounted beside these.
  */
-export const automationServer = defineModule("automation")
+export const automationServer = defineServerModule("automation")
   .withRepositories(automationRepositories)
   .withApp(AutomationApp)
   .withTransports(

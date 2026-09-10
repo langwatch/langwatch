@@ -31,7 +31,7 @@ function install(kind: "legacy" | "defined" = "legacy", extra = ""): void {
   }
   write(
     `${server}/src/widget.server.ts`,
-    `import { defineModule } from "@langwatch/runtime-composition"; import { WidgetApi, WidgetService } from "@langwatch/widget-contract"; export class ComposedWidgetApp implements WidgetApi { static readonly contract = WidgetApi; static readonly dependencies = {}; static readonly configSchema = undefined; private constructor(service: WidgetService) { this.#service = service; } #service: WidgetService; get() { return this.#service.get(); } ${extra} static create() { return new ComposedWidgetApp(service); } } export const widgetServer = defineModule("widget").withApp(ComposedWidgetApp).build();`,
+    `import { defineServerModule } from "@langwatch/runtime-composition"; import { WidgetApi, WidgetService } from "@langwatch/widget-contract"; export class ComposedWidgetApp implements WidgetApi { static readonly contract = WidgetApi; static readonly dependencies = {}; static readonly configSchema = undefined; private constructor(service: WidgetService) { this.#service = service; } #service: WidgetService; get() { return this.#service.get(); } ${extra} static create() { return new ComposedWidgetApp(service); } } export const widgetServer = defineServerModule("widget").withApp(ComposedWidgetApp).build();`,
   );
 }
 function api(
@@ -98,8 +98,8 @@ describe("feature API contract lint", () => {
     write(
       file,
       readFileSync(join(root, file), "utf8").replace(
-        'defineModule("widget").withApp',
-        'defineModule("widget").withRepositories(WidgetRepositories).withApp',
+        'defineServerModule("widget").withApp',
+        'defineServerModule("widget").withRepositories(WidgetRepositories).withApp',
       ),
     );
 
@@ -337,7 +337,7 @@ describe("feature API contract lint", () => {
     });
     write(
       `${server}/src/widget.server.ts`,
-      `import { defineModule } from "@langwatch/runtime-composition"; import { WidgetApi, WidgetService } from "@langwatch/widget-contract"; import { PeerApi as OtherApi } from "../../../peer/contract/src/index"; const dependencies = { peer: OtherApi }; export class ComposedWidgetApp implements WidgetApi { static readonly contract = WidgetApi; static readonly dependencies = dependencies; static readonly configSchema = undefined; private constructor(service: WidgetService) { this.#service = service; } #service: WidgetService; get() { return this.#service.get(); } static create() { return new ComposedWidgetApp(service); } } export const widgetServer = defineModule("widget").withApp(ComposedWidgetApp).build();`,
+      `import { defineServerModule } from "@langwatch/runtime-composition"; import { WidgetApi, WidgetService } from "@langwatch/widget-contract"; import { PeerApi as OtherApi } from "../../../peer/contract/src/index"; const dependencies = { peer: OtherApi }; export class ComposedWidgetApp implements WidgetApi { static readonly contract = WidgetApi; static readonly dependencies = dependencies; static readonly configSchema = undefined; private constructor(service: WidgetService) { this.#service = service; } #service: WidgetService; get() { return this.#service.get(); } static create() { return new ComposedWidgetApp(service); } } export const widgetServer = defineServerModule("widget").withApp(ComposedWidgetApp).build();`,
     );
     expect(findings()).toEqual([]);
   });
@@ -353,7 +353,7 @@ describe("feature API contract lint", () => {
           `static readonly dependencies = { peer: ${value} };`,
         ),
       );
-      expect(findings().some((item) => item.message.includes("defineModule installer"))).toBe(true);
+      expect(findings().some((item) => item.message.includes("defineServerModule installer"))).toBe(true);
     },
   );
   it.each([
@@ -420,7 +420,7 @@ describe("feature API contract lint", () => {
         "extends BaseApp implements WidgetApi",
       ),
     );
-    expect(findings().some((item) => item.message.includes("defineModule installer"))).toBe(true);
+    expect(findings().some((item) => item.message.includes("defineServerModule installer"))).toBe(true);
   });
   it.each(["then", '"then"', '["then"]', "constructor", '"prototype"', '"__proto__"'])(
     "rejects reserved API operation name %s",
@@ -462,6 +462,6 @@ describe("feature API contract lint", () => {
       `${server}/src/widget.server.ts`,
       readFileSync(file, "utf8").replace("implements WidgetApi", "extends WidgetApi"),
     );
-    expect(findings().some((item) => item.message.includes("defineModule installer"))).toBe(true);
+    expect(findings().some((item) => item.message.includes("defineServerModule installer"))).toBe(true);
   });
 });

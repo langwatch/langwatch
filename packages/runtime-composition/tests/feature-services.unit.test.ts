@@ -3,7 +3,7 @@ import { createApp } from "../src/application.ts";
 import { memberSourceOf } from "./member-source.ts";
 import { moduleApi } from "../src/module-api-token.ts";
 import {
-  defineModule,
+  defineServerModule,
   type FeatureSetup,
   type ServerRole,
 } from "../src/feature-installer.ts";
@@ -92,7 +92,7 @@ class ProjectApp implements ProjectApi {
   }
 }
 
-const project = defineModule("project").withApp(ProjectApp).build();
+const project = defineServerModule("project").withApp(ProjectApp).build();
 function graph(harness: Harness, role: ServerRole = "api") {
   return createApp({
     role,

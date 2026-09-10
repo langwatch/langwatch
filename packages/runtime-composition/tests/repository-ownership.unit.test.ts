@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApp, defineModule, moduleApi, type FeatureSetup } from "../src/index.ts";
+import { createApp, defineServerModule, moduleApi, type FeatureSetup } from "../src/index.ts";
 import { memberSourceOf } from "./member-source.ts";
 import {
   assertRepositoryOwnership,
@@ -43,8 +43,8 @@ describe("repository ownership", () => {
     async (role) => {
       created.mockClear();
       const runtime = createApp({ role, members: memberSourceOf({}) }).withModules([
-        defineModule("user").withApp(UserApp).build(),
-        defineModule("annotation").withApp(AnnotationApp).build(),
+        defineServerModule("user").withApp(UserApp).build(),
+        defineServerModule("annotation").withApp(AnnotationApp).build(),
       ]);
       await expect(runtime.boot()).rejects.toThrow(RepositoryOwnershipConflictError);
       expect(created).not.toHaveBeenCalled();
@@ -85,7 +85,7 @@ describe("repository ownership", () => {
       repositories: { rows: { tables: { store: "prisma", tables } } },
       create: UserApp.create,
     };
-    const declaration = defineModule("user").withApp(app).build();
+    const declaration = defineServerModule("user").withApp(app).build();
     tables.push("User");
     expect(declaration.repositories?.rows?.tables.tables).toEqual(["AuditLog"]);
     expect(Object.isFrozen(declaration.repositories?.rows?.tables.tables)).toBe(true);

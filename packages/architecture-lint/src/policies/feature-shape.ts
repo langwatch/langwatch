@@ -76,7 +76,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "memory-twin-untested":
     "A memory twin is proven by repositories/__tests__/<x>.repository.contract.test.ts running the same cases against the memory and the Prisma backends; an installation test booting over the twin proves nothing about the twin.",
   "no-installer":
-    'The server package is installed through src/<feature>.server.ts: defineModule("<feature>").withRepositories(registry).withApp(<Feature>App).withTransports(...).build().',
+    'The server package is installed through src/<feature>.server.ts: defineServerModule("<feature>").withRepositories(registry).withApp(<Feature>App).withTransports(...).build().',
   "no-app":
     "One app: src/app/<feature>.app.ts is class <Feature>App implements <Feature>Api with static contract, static dependencies, a private constructor and static create(setup).",
   "installer-not-booted":

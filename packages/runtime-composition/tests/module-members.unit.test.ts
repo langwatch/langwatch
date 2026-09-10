@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
 import { DuplicateProviderError } from "../src/boot-errors.ts";
-import { defineModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { MissingMemberError } from "../src/module-members.ts";
 import { moduleApi } from "../src/module-api-token.ts";
 import type { MemberSource } from "../src/module-members.ts";
@@ -48,7 +48,7 @@ class AnnotationApp implements AnnotationApi {
 /** What the app was handed, read back outside its API reference. */
 let handed: Readonly<Record<string, unknown>> = {};
 
-const annotation = defineModule("annotation").withApp(AnnotationApp).build();
+const annotation = defineServerModule("annotation").withApp(AnnotationApp).build();
 
 /** A source that records which members were asked for, and in which order. */
 function recordingSource(

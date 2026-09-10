@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { AuthApp } from "./app/auth.app.ts";
 import { authRepositories } from "./repositories/auth-repositories.registry.ts";
 import { frontDoorTrpcTransport } from "./transport/front-door.trpc.ts";
@@ -9,7 +9,7 @@ import { frontDoorTrpcTransport } from "./transport/front-door.trpc.ts";
  * the deployment's own Better Auth instance and its device-grant store rather
  * than this application. They mount on the process's REST door table.
  */
-export const authServer = defineModule("auth")
+export const authServer = defineServerModule("auth")
   .withRepositories(authRepositories)
   .withApp(AuthApp)
   .withTransports(frontDoorTrpcTransport)

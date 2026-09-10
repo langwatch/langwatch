@@ -1,5 +1,5 @@
 import { ExperimentApi } from "@langwatch/experiment-contract";
-import { defineModule, type FeatureSetup } from "@langwatch/runtime-composition";
+import { defineServerModule, type FeatureSetup } from "@langwatch/runtime-composition";
 import { ExperimentApp, type ExperimentAppDependencies } from "#app/experiment.app";
 import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "./transport/experiment-init.rest.ts";
@@ -8,7 +8,7 @@ import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 
 export type { ExperimentAppDependencies };
 
-export const experimentServer = defineModule("experiment")
+export const experimentServer = defineServerModule("experiment")
   .withApp({
     contract: ExperimentApi,
     dependencies: {},

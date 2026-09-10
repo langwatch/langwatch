@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { PromptApp } from "./app/prompt.app.ts";
 import { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
 import { promptRest } from "./transport/prompt.rest.ts";
@@ -14,7 +14,7 @@ import { promptTrpcTransport } from "./transport/prompt.trpc.ts";
  * `withTransports` does not carry, and it is mounted directly by the process
  * that composes a browser session for it.
  */
-export const promptServer = defineModule("prompt")
+export const promptServer = defineServerModule("prompt")
   .withApp(PromptApp)
   .withTransports(promptRest, promptTrpcTransport, promptTagTrpcTransport)
   .build();

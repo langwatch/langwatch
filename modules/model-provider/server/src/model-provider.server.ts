@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { ModelProviderApp } from "./app/model-provider.app.ts";
 import { modelProviderRepositories } from "./repositories/model-provider-repositories.registry.ts";
 import { llmModelCostTrpcTransport } from "./transport/llm-model-cost.trpc.ts";
@@ -10,7 +10,7 @@ import { translateTrpcTransport } from "./transport/translate.trpc.ts";
 
 export type { ModelProviderInfrastructure } from "./app/model-provider.app.ts";
 
-export const modelProviderServer = defineModule("model-provider")
+export const modelProviderServer = defineServerModule("model-provider")
   .withRepositories(modelProviderRepositories)
   .withApp(ModelProviderApp)
   .withTransports(

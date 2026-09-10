@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
 import { memberSourceOf } from "./member-source.ts";
-import { defineModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
 
 abstract class DirectoryApp {
   abstract readonly name: string;
@@ -36,17 +36,17 @@ class ComposedDirectoryApp extends DirectoryApp {
   }
 }
 
-const directoryServer = defineModule("annotation").withApp(ComposedDirectoryApp).build();
+const directoryServer = defineServerModule("annotation").withApp(ComposedDirectoryApp).build();
 const directoryApis = [
   { protocol: "rest", router: (host: string) => ({ host }) },
   { protocol: "trpc", router: (host: string) => ({ host }) },
 ] as const;
-const directoryWithTransports = defineModule("annotation")
+const directoryWithTransports = defineServerModule("annotation")
   .withApp(ComposedDirectoryApp)
   .withTransports(...directoryApis)
   .build();
 
-describe("defineModule", () => {
+describe("defineServerModule", () => {
   it("constructs the declared app once during boot and publishes its contract", async () => {
     const runtime = await createApp({ role: "api", config: { annotation: { suffix: "directory" } }, members: memberSourceOf({ prefix: "tenant-" }) })
       .withModules([directoryServer])
@@ -74,7 +74,7 @@ describe("defineModule", () => {
       }
     }
 
-    const declaration = defineModule("presence").withApp(ResourceApp).build();
+    const declaration = defineServerModule("presence").withApp(ResourceApp).build();
     const runtime = await createApp({ role: "api", members: memberSourceOf({ prefix: "unused" }) })
       .withModules([declaration])
       .boot();
@@ -86,7 +86,7 @@ describe("defineModule", () => {
   it("validates semantic config before invoking the app factory", async () => {
     const create = vi.fn(ComposedDirectoryApp.create);
     const app = { ...ComposedDirectoryApp, create };
-    const declaration = defineModule("annotation").withApp(app).build();
+    const declaration = defineServerModule("annotation").withApp(app).build();
 
     await expect(
       createApp({ role: "api", config: { annotation: {} }, members: memberSourceOf({ prefix: "unused" }) })

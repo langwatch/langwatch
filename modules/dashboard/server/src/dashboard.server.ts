@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 
 import { DashboardApp } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
@@ -9,7 +9,7 @@ import { graphTrpcTransport } from "./transport/graph.trpc.ts";
 import { savedViewTrpcTransport } from "./transport/saved-view.trpc.ts";
 import { savedWorkbenchChartTrpcTransport } from "./transport/saved-workbench-chart.trpc.ts";
 
-export const dashboardServer = defineModule("dashboard")
+export const dashboardServer = defineServerModule("dashboard")
   .withRepositories(dashboardRepositories)
   .withApp(DashboardApp)
   .withTransports(

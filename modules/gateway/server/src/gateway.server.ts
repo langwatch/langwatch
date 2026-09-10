@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { GatewayApp } from "./app/gateway.app.ts";
 import { agentCacheRest } from "./transport/agent-cache.rest.ts";
 import { elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
@@ -10,7 +10,7 @@ import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 
 export type { GatewayInfrastructure } from "./app/gateway.app.ts";
 
-export const gatewayServer = defineModule("gateway")
+export const gatewayServer = defineServerModule("gateway")
   .withApp(GatewayApp)
   .withTransports(
     agentCacheRest,

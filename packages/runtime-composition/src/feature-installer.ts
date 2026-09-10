@@ -725,18 +725,7 @@ export function serverFeature<Members>(
   });
 }
 
-/** Names a feature whose App owns its factory and peer API declarations. */
-export function defineModule<const Name extends ModuleName>(
-  name: Name,
-): DefinedFeatureBuilder<Name> {
-  publicNamespaceFromUnknown(name);
-  return new DefinedFeatureBuilder(name);
-}
-
-/**
- * Names a module's server half. The canonical name for `defineModule`, which
- * keeps answering until every module is repointed at this one.
- */
+/** Names a module's server half: its App, repositories, channels and transports. */
 export function defineServerModule<const Name extends ModuleName>(
   name: Name,
 ): DefinedFeatureBuilder<Name> {

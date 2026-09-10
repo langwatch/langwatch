@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { LangyApp } from "./app/langy.app.ts";
 import { langyRepositories } from "./repositories/langy-repositories.registry.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
@@ -9,7 +9,7 @@ export type { LangyInfrastructure } from "./app/langy.app.ts";
 // not listed here yet; the eight REST families and the local-control
 // WebSocket transport are unconverted too. See
 // dev/docs/plans/lane-brief.md and the langy lane's report for state.
-export const langyServer = defineModule("langy")
+export const langyServer = defineServerModule("langy")
   .withRepositories(langyRepositories)
   .withApp(LangyApp)
   .withTransports(setupSkillsTrpcTransport)

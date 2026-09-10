@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { ServerOrganizationApp } from "./app/organization.app.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
@@ -11,7 +11,7 @@ import { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-wor
 import { createTeamRest } from "./transport/team.rest.ts";
 import { teamTrpcTransport } from "./transport/team.trpc.ts";
 
-export const organizationServer = defineModule("organization")
+export const organizationServer = defineServerModule("organization")
   .withRepositories(organizationRepositories)
   .withApp(ServerOrganizationApp)
   .withTransports(

@@ -1,8 +1,8 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { AuditLogApp } from "./app/audit-log.app.ts";
 import { auditLogRepositories } from "./repositories/audit-log-repositories.registry.ts";
 
-export const auditLogServer = defineModule("audit-log")
+export const auditLogServer = defineServerModule("audit-log")
   .withRepositories(auditLogRepositories)
   .withApp(AuditLogApp)
   .build();

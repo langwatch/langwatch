@@ -1,10 +1,10 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { PlatformHealthApp } from "./app/platform-health.app.ts";
 import { platformHealthRest } from "./transport/platform-health.rest.ts";
 
 export type { PlatformHealthInfrastructure } from "./app/platform-health.app.ts";
 
-export const platformHealthServer = defineModule("platform-health")
+export const platformHealthServer = defineServerModule("platform-health")
   .withApp(PlatformHealthApp)
   .withTransports(platformHealthRest)
   .build();

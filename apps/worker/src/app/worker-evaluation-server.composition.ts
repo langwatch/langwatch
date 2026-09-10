@@ -6,7 +6,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { defineModule, type FeatureSetup } from "@langwatch/runtime-composition";
+import { defineServerModule, type FeatureSetup } from "@langwatch/runtime-composition";
 import { TraceApi } from "@langwatch/trace-contract";
 import type {
   WorkflowEnvironmentDecryptor,
@@ -134,6 +134,6 @@ const workerEvaluationApp = {
   },
 };
 
-export const workerEvaluationServer = defineModule("evaluation")
+export const workerEvaluationServer = defineServerModule("evaluation")
   .withApp(workerEvaluationApp)
   .build();

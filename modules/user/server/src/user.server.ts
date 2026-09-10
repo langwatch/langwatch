@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { UserApp } from "./app/user.app.ts";
 import { userRepositories } from "./repositories/user-repositories.registry.ts";
 import { identityTrpcTransport } from "./transport/identity.trpc.ts";
@@ -29,7 +29,7 @@ export type {
   UserVerificationCeremony,
 } from "./app/user.app.ts";
 
-export const userServer = defineModule("user")
+export const userServer = defineServerModule("user")
   .withRepositories(userRepositories)
   .withApp(UserApp)
   .withTransports(meRest, userAvatarRest, userTrpcTransport, identityTrpcTransport)

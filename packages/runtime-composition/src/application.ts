@@ -714,7 +714,7 @@ function assertLegacyProviders(declaration: DeclaredFeature): void {
   );
   if (providesApi) {
     throw new Error(
-      `Feature "${declaration.name}" must provide its API through defineModule().withApp().`,
+      `Feature "${declaration.name}" must provide its API through defineServerModule().withApp().`,
     );
   }
 }

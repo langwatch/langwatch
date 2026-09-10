@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/application.ts";
 import { memberSourceOf } from "./member-source.ts";
 import { moduleApi } from "../src/module-api-token.ts";
-import { defineModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
 import {
   DuplicateTransportNamespaceError,
   MissingTransportHostError,
@@ -72,7 +72,7 @@ function recordingTrpcHost(): FeatureTrpcHost<Readonly<{ app: unknown }>> {
 describe("given a feature whose server declares transports", () => {
   describe("when the application was handed the process's own doors", () => {
     it("mounts every declared family on the REST door", async () => {
-      const server = defineModule("dataset")
+      const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest)
         .build();
@@ -88,7 +88,7 @@ describe("given a feature whose server declares transports", () => {
     });
 
     it("binds the handler's application to the feature's own app", async () => {
-      const server = defineModule("dataset")
+      const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueTrpc)
         .build();
@@ -104,7 +104,7 @@ describe("given a feature whose server declares transports", () => {
     });
 
     it("keys each mounted namespace by the name its declaration carries", async () => {
-      const server = defineModule("dataset")
+      const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueTrpc)
         .build();
@@ -119,7 +119,7 @@ describe("given a feature whose server declares transports", () => {
 
     it("mounts with no install-side options", async () => {
       const rest = recordingRestHost();
-      const server = defineModule("dataset")
+      const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest)
         .build();
@@ -135,7 +135,7 @@ describe("given a feature whose server declares transports", () => {
 
   describe("when the process opened no door for a declared protocol", () => {
     it("refuses at boot, naming the feature and the protocol", async () => {
-      const server = defineModule("dataset")
+      const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueTrpc)
         .build();
@@ -151,11 +151,11 @@ describe("given a feature whose server declares transports", () => {
 
   describe("when two installed features claim one namespace", () => {
     it("refuses at boot, naming both", async () => {
-      const dataset = defineModule("dataset")
+      const dataset = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueTrpc)
         .build();
-      const monitor = defineModule("monitor")
+      const monitor = defineServerModule("monitor")
         .withApp(
           class MonitorApp {
             static readonly contract = moduleApi<CatalogueApi>("monitor");
@@ -179,7 +179,7 @@ describe("given a feature whose server declares transports", () => {
 
   describe("when the same feature is installed on a worker", () => {
     it("mounts nothing, because a worker serves no door", async () => {
-      const server = defineModule("dataset")
+      const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest, catalogueTrpc)
         .build();

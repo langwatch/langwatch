@@ -1221,7 +1221,7 @@ function collectInstallerImport(
       legacyNames.add(item.name.text);
     }
 
-    if (imported === "defineModule") {
+    if (imported === "defineServerModule") {
       definedNames.add(item.name.text);
     }
   }
@@ -1258,7 +1258,7 @@ function isInstallerCall(
     return { call: node, kind: "legacy" };
   }
 
-  if (callee.name.text === "defineModule") {
+  if (callee.name.text === "defineServerModule") {
     return { call: node, kind: "defined" };
   }
 
@@ -1343,7 +1343,7 @@ function installerViolations(
         appViolation(
           declaration.file,
           "Legacy serverFeature installers are not accepted for catalogue features.",
-          `Use defineModule("${pkg.feature}").withApp(${appName(pkg.feature ?? "")}).build() in the canonical installer.`,
+          `Use defineServerModule("${pkg.feature}").withApp(${appName(pkg.feature ?? "")}).build() in the canonical installer.`,
         ),
       ];
 }
@@ -1375,7 +1375,7 @@ function definedInstallerViolations(
         appViolation(
           file,
           "The installer does not use its canonical feature name and location.",
-          `Declare defineModule("${pkg.feature}") in src/${pkg.feature}.server.ts.`,
+          `Declare defineServerModule("${pkg.feature}") in src/${pkg.feature}.server.ts.`,
         ),
       ];
   const app = declaration.app;
@@ -1413,8 +1413,8 @@ function definedInstallerViolations(
     violations.push(
       appViolation(
         file,
-        "A defineModule installer must bind exactly one valid concrete app with no legacy builder stages.",
-        `Use defineModule("${pkg.feature}").withApp(${appName(pkg.feature ?? "")}).build(); implement ${apiName(pkg.feature ?? "")} operations and expose only static API metadata and create.`,
+        "A defineServerModule installer must bind exactly one valid concrete app with no legacy builder stages.",
+        `Use defineServerModule("${pkg.feature}").withApp(${appName(pkg.feature ?? "")}).build(); implement ${apiName(pkg.feature ?? "")} operations and expose only static API metadata and create.`,
       ),
     );
 
@@ -1573,11 +1573,11 @@ function lintFeatureOwner(
       appViolation(
         installerFile,
         hidden
-          ? "The canonical installer hides its defineModule declaration."
+          ? "The canonical installer hides its defineServerModule declaration."
           : `Catalogue feature "${owner.id}" has no canonical server installer.`,
         hidden
-          ? "Call the runtime-composition defineModule factory directly in the canonical installer; do not hide registration behind wrappers or local aliases."
-          : "Move the existing construction into defineModule(...).withApp(...), then rewire API, worker and task composition to reuse that installer.",
+          ? "Call the runtime-composition defineServerModule factory directly in the canonical installer; do not hide registration behind wrappers or local aliases."
+          : "Move the existing construction into defineServerModule(...).withApp(...), then rewire API, worker and task composition to reuse that installer.",
       ),
     );
 

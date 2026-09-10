@@ -5,7 +5,7 @@
  * secret and the management audit ledger installs this and mounts what it
  * wants; one that composes none of them installs nothing.
  */
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 
 import { ScimApp } from "./app/scim.app.ts";
 import { scimProtocolRest } from "./transport/scim-protocol.rest.ts";
@@ -19,7 +19,7 @@ export type {
   ScimPlanProvider,
 } from "./app/scim.app.ts";
 
-export const scimServer = defineModule("scim")
+export const scimServer = defineServerModule("scim")
   .withApp(ScimApp)
   .withTransports(scimTokenRest, scimTokenTrpcTransport, scimProtocolRest, scimWebhookRest)
   .build();

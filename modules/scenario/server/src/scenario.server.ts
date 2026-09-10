@@ -1,4 +1,4 @@
-import { defineModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { ScenarioApp } from "./app/scenario.app.ts";
 import { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
 import { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
@@ -9,7 +9,7 @@ import { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
  * served from the contract's own declaration. The REST families the same
  * module publishes are still on the legacy builders; see the module handover.
  */
-export const scenarioServer = defineModule("scenario")
+export const scenarioServer = defineServerModule("scenario")
   .withRepositories(scenarioRepositories)
   .withApp(ScenarioApp)
   .withTransports(scenarioTrpcTransport)

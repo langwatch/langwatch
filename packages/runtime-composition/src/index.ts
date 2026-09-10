@@ -59,7 +59,6 @@ export {
   type FeatureConfigSchema,
   type AppDefinition,
   type AppDefinitionWithoutConfig,
-  defineModule,
   defineServerModule,
   type FeatureTransportDescriptor,
   type FeatureSetup,

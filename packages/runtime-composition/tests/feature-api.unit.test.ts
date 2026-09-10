@@ -9,7 +9,7 @@ import {
 } from "../src/boot-errors.ts";
 import { moduleApi } from "../src/module-api-token.ts";
 import {
-  defineModule,
+  defineServerModule,
   serverFeature,
   type FeatureSetup,
   type ServerRole,
@@ -222,8 +222,8 @@ class OrganizationApp implements OrganizationApi {
   }
 }
 
-const project = defineModule("project").withApp(ProjectApp).build();
-const organization = defineModule("organization").withApp(OrganizationApp).build();
+const project = defineServerModule("project").withApp(ProjectApp).build();
+const organization = defineServerModule("organization").withApp(OrganizationApp).build();
 
 /** Every member these modules declared, so the process can answer all of them. */
 function processMembers(harness: Harness = { events: [] }) {
@@ -291,7 +291,7 @@ describe("feature APIs", () => {
       createApp({ role: "api", members: memberSourceOf({}) })
         .withModules([legacy])
         .boot(),
-    ).rejects.toThrow("defineModule().withApp()");
+    ).rejects.toThrow("defineServerModule().withApp()");
     expect(events).toEqual([]);
   });
 
@@ -422,14 +422,14 @@ describe("feature APIs", () => {
     };
     const builder = createApp({ role: "api", members: processMembers() }).withModules([
       project,
-      defineModule("project").withApp(ProjectApp).build(),
+      defineServerModule("project").withApp(ProjectApp).build(),
     ]);
     await expect(builder.boot()).rejects.toBeInstanceOf(DuplicateProviderError);
   });
 
   it("rejects a declaration/API name mismatch before invoking the factory", async () => {
     const events: string[] = [];
-    const declaration = defineModule("organization").withApp(ProjectApp).build();
+    const declaration = defineServerModule("organization").withApp(ProjectApp).build();
 
     await expect(
       createApp({ role: "api", members: processMembers({ events }) })

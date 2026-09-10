@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createApp,
-  defineModule,
+  defineServerModule,
   defineRepositories,
   withMemoryRepositories,
   type FeatureSetup,
@@ -72,8 +72,8 @@ class ConfiguredApp {
   constructor(readonly value: string) {}
 }
 
-const feature = defineModule("annotation").withRepositories(repositories).withApp(App).build();
-const configuredFeature = defineModule("agent")
+const feature = defineServerModule("annotation").withRepositories(repositories).withApp(App).build();
+const configuredFeature = defineServerModule("agent")
   .withRepositories(repositories)
   .withApp(ConfiguredApp)
   .build();
@@ -106,7 +106,7 @@ const duplicateRepositories = defineRepositories({
   live: DuplicateRepositories,
   memory: DuplicateRepositories,
 });
-const duplicateFeature = defineModule("project")
+const duplicateFeature = defineServerModule("project")
   .withRepositories(duplicateRepositories)
   .withApp(DuplicateApp)
   .build();
@@ -126,7 +126,7 @@ const canonicalPrismaRepositories = defineRepositories({
   live: CanonicalPrismaRepositories,
   memory: CanonicalPrismaRepositories,
 });
-const canonicalPrismaFeature = defineModule("user")
+const canonicalPrismaFeature = defineServerModule("user")
   .withRepositories(canonicalPrismaRepositories)
   .withApp(DuplicateApp)
   .build();
@@ -213,7 +213,7 @@ describe("given a module that declares both repository tiers", () => {
           return new StorelessApp();
         }
       }
-      const plain = defineModule("share").withApp(StorelessApp).build();
+      const plain = defineServerModule("share").withApp(StorelessApp).build();
 
       expect(() => withMemoryRepositories(plain)).toThrow("has no memory tier");
     });
@@ -258,7 +258,7 @@ describe("given a module that declares both repository tiers", () => {
   describe("when two selected tiers claim the same table", () => {
     it("refuses before either repository factory runs", async () => {
       duplicateCreates = 0;
-      const conflictingFeature = defineModule("user")
+      const conflictingFeature = defineServerModule("user")
         .withRepositories(duplicateRepositories)
         .withApp(DuplicateApp)
         .build();
@@ -295,7 +295,7 @@ describe("given a module that declares both repository tiers", () => {
         }
         constructor(readonly value: string) {}
       }
-      const methodFeature = defineModule("share")
+      const methodFeature = defineServerModule("share")
         .withRepositories(repositories)
         .withApp(MethodApp)
         .build();
