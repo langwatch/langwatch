@@ -380,8 +380,8 @@ describe("given the Copilot Studio directory switch", () => {
      * The switch it most resembles — the licence one — is in Advanced by its
      * own documented decision. This one is not, and the difference is the
      * point: turning it off empties every screen that names a person.
-     * @scenario "A new source starts set to record people and departments"
      */
+    /** @scenario "A new source starts set to record people and departments" */
     it("stands in the visible fields rather than inside Advanced", () => {
       renderFields("copilot_studio_dataverse");
 

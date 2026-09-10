@@ -67,8 +67,8 @@ describe("given an ingestion source with no events", () => {
     /**
      * The pane offers nothing to press, because a reader cannot make an event
      * happen from this screen — something upstream has to send one.
-     * @scenario "An idle source explains itself in a pane, not in a wall of setup text"
      */
+    /** @scenario "An idle source explains itself in a pane, not in a wall of setup text" */
     it("offers no action", () => {
       renderUi(<EmptyEventsState />);
 
@@ -83,8 +83,8 @@ describe("given an ingestion source with no events", () => {
      * Prose naming a control goes stale the moment the control is renamed, and
      * no rule about controls catches a sentence. The old paragraph told the
      * reader to click "Rotate secret".
-     * @scenario "An idle source explains itself in a pane, not in a wall of setup text"
      */
+    /** @scenario "An idle source explains itself in a pane, not in a wall of setup text" */
     it("names no control in its sentence", () => {
       renderUi(<EmptyEventsState />);
 
@@ -129,8 +129,8 @@ describe("given the setup instructions behind the heading's (i)", () => {
     /**
      * The reason this is a popover and not a hover tooltip: a link inside a
      * hover-only tooltip cannot be reached by keyboard or by touch.
-     * @scenario "Setup instructions sit behind the heading, whatever the source is doing"
      */
+    /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
     it("puts its documentation links in the tab order", async () => {
       const user = userEvent.setup();
       renderUi(<EventsSetupPopover source={OTEL_SOURCE} />);
@@ -201,8 +201,8 @@ describe("given a source's ingest endpoint", () => {
      * type names this file used to hardcode, so it rendered a URL with a
      * literal `<mode>` in it — a 404 handed to a reader told to paste it.
      *
-     * @scenario "Setup instructions sit behind the heading, whatever the source is doing"
      */
+    /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
     it("routes every push type in the catalog, not just the two once listed here", () => {
       const endpoint = ingestEndpointFor({
         id: "src_3",
@@ -220,8 +220,8 @@ describe("given a source's ingest endpoint", () => {
      * pull source has no endpoint to name and the placeholder that used to
      * stand in for one could never resolve.
      *
-     * @scenario "Setup instructions sit behind the heading, whatever the source is doing"
      */
+    /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
     it("has no endpoint rather than a placeholder one", () => {
       for (const sourceType of [
         "copilot_studio_dataverse",
@@ -240,8 +240,8 @@ describe("given a source's ingest endpoint", () => {
      * deciding this from the catalog's `mode` instead of from the handler's
      * own guard drops a real endpoint, which is a mistake made once already.
      *
-     * @scenario "Setup instructions sit behind the heading, whatever the source is doing"
      */
+    /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
     it("keeps the callback endpoint an S3 source really does listen on", () => {
       expect(
         ingestEndpointFor({ id: "src_6", sourceType: "s3_custom" }),
@@ -279,8 +279,8 @@ describe("given an endpoint too long for the popover", () => {
      * it painted outside the card. Asserted on the style the element actually
      * carries, since the overflow itself has no layout in jsdom.
      *
-     * @scenario "Setup instructions sit behind the heading, whatever the source is doing"
      */
+    /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
     it("lets the endpoint break mid-token", async () => {
       const user = userEvent.setup();
       renderUi(<EventsSetupPopover source={OTEL_SOURCE} />);
