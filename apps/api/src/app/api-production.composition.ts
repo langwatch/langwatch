@@ -171,6 +171,7 @@ import {
   composeAutomationFeature,
   refusingAutomationFeature,
 } from "../features/automation/automation.composition.ts";
+import { installApiWebhook, type ComposedWebhookFeature } from "../features/webhook/webhook.composition.ts";
 import {
   composeEnterpriseFeature,
   refusingEnterpriseFeature,
@@ -319,7 +320,6 @@ import {
   type ApiOpsExplainRest,
 } from "../features/ops/ops-clickhouse-explain-rest.mount.ts";
 import { ApiHandlerManagedCredentials } from "./api-handler-managed-credential.ts";
-import { apiClientAddress } from "./api-client-address.ts";
 import { extractApiKeyRequestCredentials } from "./api-key-request-credentials.ts";
 import {
   composeApiTraceIngest,
@@ -329,7 +329,6 @@ import { composeApiTraceSpool } from "./api-trace-spool.composition.ts";
 import { ApiTraceMediaStore } from "./api-packaged-rest.composition.ts";
 import { AdminAccessService, PrismaBugReportRepository } from "@langwatch/ops-server";
 import type { BugReportRestPorts } from "../features/bug-report/bug-report-rest.ports.ts";
-import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
 import { HandledError } from "@langwatch/handled-error";
 import {
   SkipPermissionsService,
@@ -729,6 +728,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedProject!: ComposedProjectFeature;
   private composedCodingAgent!: ComposedCodingAgentFeature;
   private composedAutomation!: ComposedAutomationFeature;
+  private composedWebhook: ComposedWebhookFeature | undefined;
   private composedEnterprise!: ComposedEnterpriseFeature;
   /**
    * The directory-sync application, where this process composed one. Read by
@@ -1911,7 +1911,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       report: LoggedApiTraceIngestAbsence.create(createLogger(serviceName)),
     });
     const bugReports = this.composeBugReports(tenancy);
-    const unsubscribe = this.composeUnsubscribe();
+    const webhookDoorApp = this.composedWebhook?.app;
     const cron = this.composeCron();
     const langyRest = this.composeLangyRest(publicBaseUrl);
     const githubRest = this.composeGithubRest(authz);
@@ -2386,6 +2386,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           ...(workflowRun ? { workflowRun } : {}),
           ...(traceReads ? { traceReads } : {}),
           ...(traceLegacy ? { traceLegacy } : {}),
+          // The outbound-webhook endpoint registry, over this process's own
+          // installed application (ADR-133), not the Enterprise-gated packaged
+          // one `/api/webhooks/v1` reads through when governance composes it.
+          ...(webhookDoorApp ? { webhooks: () => webhookDoorApp } : {}),
           organizations: () => tenancy.organizations,
           // The three applications the process used to route after everything
           // else. They are entries on the registry now, so their doors are
@@ -2410,7 +2414,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           ...(otlpIngest ? { otlpIngest: otlpIngest.otlp } : {}),
           ...(collector ? { collector } : {}),
           ...(bugReports ? { bugReports } : {}),
-          ...(unsubscribe ? { unsubscribe } : {}),
           ...(cron ? { cron } : {}),
           ...(langyRest ? { langy: langyRest } : {}),
           ...(githubRest ? { github: githubRest } : {}),
@@ -2695,22 +2698,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         }
         await cleanup.sweep();
       },
-    };
-  }
-
-  /**
-   * The one-click unsubscribe door's collaborators, or `undefined` where this
-   * process composed no automation application.
-   */
-  private composeUnsubscribe(): UnsubscribeRestPorts | undefined {
-    const automation = this.composedAutomation.service;
-    if (!automation) return undefined;
-    return {
-      automation: () => automation,
-      // The process's ONE counter: two limiters would give one address two
-      // budgets for the same rule.
-      rateLimit: (input) => this.rateLimiter.consume(input),
-      clientAddress: (c) => apiClientAddress(c),
     };
   }
 
@@ -3767,6 +3754,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       baseHost: options.config.infrastructure.execution.publicBaseUrl ?? "",
       processName: options.config.serviceName,
     });
+
+    // The outbound-webhook endpoint registry. Absent without a cipher for an
+    // endpoint's signing secret: a registry that cannot encrypt one is worse
+    // than a door that is honestly not there.
+    this.composedWebhook = encryption
+      ? await installApiWebhook({
+          prisma: database.client,
+          encryption,
+          resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+        })
+      : undefined;
 
     this.composedSeatAllowances = ApiEnterpriseSeatAllowance.create(
       ApiOrganizationSeatLicense.create({

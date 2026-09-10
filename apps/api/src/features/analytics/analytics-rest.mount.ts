@@ -1,39 +1,21 @@
 /**
- * Builds the request body from the package's own `timeseriesInputSchema`
- * (ADR-128), never the browser metric registry.
- */
-import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import { createAnalyticsLegacyRestApp } from "@langwatch/analytics-server/api-rest/analytics-legacy";
-import { createAnalyticsRestApp } from "@langwatch/analytics-server/api-rest/analytics";
-import { timeseriesInputSchema } from "@langwatch/analytics-server";
-import {
-  flexibleDateSchema,
-  type AppRestSecurity,
-  type MountableRestApp,
-} from "@langwatch/api/rest";
-
-/**
+ * Binds the `/api/analytics` REST declarations to this process's own root.
  * Canonical and legacy are separate apps, not an alias pair — their refusal
  * bodies differ.
  */
-export function mountAnalyticsRest(options: {
-  security: AppRestSecurity;
-  analytics: () => AnalyticsApi;
-}): MountableRestApp[] {
-  const requestSchema = timeseriesInputSchema.omit({ projectId: true }).extend({
-    startDate: flexibleDateSchema,
-    endDate: flexibleDateSchema,
-  });
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import { analyticsRest, analyticsLegacyRest } from "@langwatch/analytics-server";
+import type { MountableRestApp } from "@langwatch/api/rest";
+
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
+
+/** Mounts `/api/analytics/*` and its `/api/analytics` legacy sibling. */
+export function mountAnalyticsRest(
+  runtime: ApiRestRuntime,
+  options: Readonly<{ analytics: () => AnalyticsApi }>,
+): MountableRestApp[] {
   return [
-    createAnalyticsRestApp({
-      security: options.security,
-      analytics: options.analytics,
-      requestSchema,
-    }),
-    createAnalyticsLegacyRestApp({
-      security: options.security,
-      analytics: options.analytics,
-      requestSchema,
-    }),
+    runtime.mount(analyticsRest.router(), options.analytics),
+    runtime.mount(analyticsLegacyRest.router(), options.analytics),
   ];
 }

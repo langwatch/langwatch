@@ -12,8 +12,13 @@ import { createMonitorsRest } from "@langwatch/monitor-server";
 import type { Logger } from "@langwatch/observability";
 import { secretRest, secretsAliasRest } from "@langwatch/secret-server";
 
+import { mountAnalyticsRest } from "../features/analytics/analytics-rest.mount.ts";
 import { mountLangWatchQLRest } from "../features/analytics/langwatch-ql-rest.mount.ts";
 import { mountQueryRest } from "../features/analytics/query-rest.mount.ts";
+import { mountApiTraceExportRest } from "../features/export/trace-export-rest.mount.ts";
+import { mountTriggersRest } from "../features/automation/triggers-rest.mount.ts";
+import { mountUnsubscribeRest } from "../features/automation/unsubscribe-rest.mount.ts";
+import { mountWebhookRest } from "../features/webhook/webhook-rest.mount.ts";
 import { mountEvaluationsLegacyRest } from "../features/evaluation/evaluations-legacy-rest.mount.ts";
 import {
   mountModelProviderRest,
@@ -171,7 +176,13 @@ export const API_REST_DOORS = [
     mount: ({ runtime, services }: ApiRestDoorContext) =>
       services.platformHealth ? [mountPlatformHealthRest(runtime, services.platformHealth)] : null,
   },
-  { family: "analytics", owner: "process", paths: ["/api/analytics", "/api/v1/analytics"] },
+  {
+    family: "analytics",
+    owner: "process",
+    paths: ["/api/analytics", "/api/v1/analytics"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.analytics ? mountAnalyticsRest(runtime, { analytics: services.analytics }) : null,
+  },
   {
     family: "langwatch-ql",
     owner: "process",
@@ -218,7 +229,13 @@ export const API_REST_DOORS = [
       return [mountOrganizationManagementRest(runtime, organizationManagement)];
     },
   },
-  { family: "trace-export", owner: "process", paths: ["/api/export/traces/download"] },
+  {
+    family: "trace-export",
+    owner: "process",
+    paths: ["/api/export/traces/download"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.traceExport ? [mountApiTraceExportRest(runtime, services.traceExport)] : null,
+  },
   { family: "scenario-run-export", owner: "process", paths: ["/api/export/scenario-runs"] },
   {
     family: "workflow-studio",
@@ -281,7 +298,15 @@ export const API_REST_DOORS = [
   },
   { family: "admin", owner: "process", paths: ["/api/admin", "/api/v1/admin"] },
   { family: "bug-reports", owner: "process", paths: ["/api/bug-reports"] },
-  { family: "unsubscribe", owner: "process", paths: ["/api/unsubscribe", "/api/v1/unsubscribe"] },
+  {
+    family: "unsubscribe",
+    owner: "process",
+    paths: ["/api/unsubscribe", "/api/v1/unsubscribe"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const automation = packaged?.services.automation;
+      return automation ? [mountUnsubscribeRest(runtime, { automation })] : null;
+    },
+  },
   { family: "cron", owner: "process", paths: ["/api/cron/*"] },
   {
     family: "github",
@@ -644,8 +669,22 @@ export const API_REST_DOORS = [
     absent:
       "API process serves neither /api/events/track nor /api/track_event: recording a feedback event needs the trace command queue this process did not register, and a door mounted without one would answer 200 to a rating it then dropped.",
   },
-  { family: "triggers", owner: "module", paths: ["/api/triggers", "/api/trigger/slack"] },
-  { family: "webhooks", owner: "module", paths: ["/api/webhooks/v1/*"] },
+  {
+    family: "triggers",
+    owner: "module",
+    paths: ["/api/triggers", "/api/trigger/slack"],
+    mount: ({ runtime, packaged, ports }: ApiRestDoorContext) => {
+      const automation = packaged?.services.automation;
+      return automation ? mountTriggersRest(runtime, { automation, platformUrl: ports.platformUrl }) : null;
+    },
+  },
+  {
+    family: "webhooks",
+    owner: "module",
+    paths: ["/api/webhooks/v1/*"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.webhooks ? [mountWebhookRest(runtime, { webhooks: services.webhooks })] : null,
+  },
   { family: "workflows", owner: "module", paths: ["/api/workflows", "/api/v1/workflows"] },
   { family: "ops-clickhouse-explain", owner: "process", paths: ["/api/ops/clickhouse/explain"] },
   {

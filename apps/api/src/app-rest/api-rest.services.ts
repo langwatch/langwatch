@@ -13,8 +13,8 @@ import type {
 
 import type { AdminRestPorts } from "@langwatch/ops-server";
 import type { BugReportRestPorts } from "../features/bug-report/bug-report-rest.ports.ts";
-import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
 import type { GithubInstallApi } from "@langwatch/github-server";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 import type { BillingStripeWebhookApi } from "@langwatch/enterprise-billing-server";
 import type { AuthCliDeviceFlowApi, AuthDoorApi } from "@langwatch/auth-server";
 import type {
@@ -169,6 +169,8 @@ export type ApiRestServices = Readonly<{
    * order and the resolved organization never disagree between doors.
    */
   suites?: (() => SuiteApi) | undefined;
+  /** The outbound-webhook endpoint registry `/api/webhooks/v1` answers over, or none. */
+  webhooks?: (() => WebhookApi) | undefined;
 }>;
 
 export type ApiRestPorts = Readonly<{
@@ -211,11 +213,6 @@ export type ApiRestPorts = Readonly<{
    * believes they filed, which is worse than a door that is honestly not there.
    */
   bugReports?: BugReportRestPorts | undefined;
-  /**
-   * The one-click unsubscribe door's collaborators, or none. None where this process
-   * composed no automation application.
-   */
-  unsubscribe?: UnsubscribeRestPorts | undefined;
   /**
    * The internal cron family's collaborators, or none. None where this deployment
    * configured no shared cron secret or no sweep to run: a destructive door that
