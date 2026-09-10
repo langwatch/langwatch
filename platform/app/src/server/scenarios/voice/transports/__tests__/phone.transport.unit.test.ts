@@ -95,6 +95,9 @@ describe("phoneTransport", () => {
         expect(adapter.placeCallArgs[0]).toMatchObject({
           to: TARGET,
           attachStream: "a-leg",
+          // Recording stays enabled; our option name is `shouldRecord`, mapped
+          // to the SDK's published `record` at the vendor boundary (#8014).
+          shouldRecord: true,
         });
       });
 

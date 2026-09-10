@@ -20,6 +20,7 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
+import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
 import {
   VOICE_TRANSPORTS,
@@ -55,6 +56,7 @@ import {
 import { verifyVoiceSessionToken } from "~/server/scenarios/voice/voice-session-token";
 import { wholeCallAudioPorts } from "~/server/scenarios/voice/whole-call-audio.ports";
 import { resolveWholeCallAudio } from "~/server/scenarios/voice/whole-call-audio.service";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 const secured = createServiceApp({ basePath: "/api/voice" });
 
@@ -151,9 +153,10 @@ async function requireProject({
   req: Request;
   projectId: string;
   permissions: readonly VoicePermission[];
-}): Promise<void> {
+}): Promise<VoiceAuthWitness> {
   const witness = await authenticateVoiceRequest({ req, projectId });
   await requirePermissions({ witness, projectId, permissions });
+  return witness;
 }
 
 // POST /api/voice/session — mint a signed-URL session from the form values.
@@ -333,6 +336,10 @@ export const route = secured
           conversationId,
         )}/audio`,
         headers: { "xi-api-key": credential.apiKey },
+        // The provider base URL is customer-configured, so never echo the
+        // upstream content type back on our own origin; always label the
+        // ElevenLabs stream with a safe audio type (AC13/AC15).
+        forceContentType: "audio/mpeg",
         fallbackContentType: "audio/mpeg",
       });
     },
@@ -361,7 +368,7 @@ secured
     async (c) => {
       const { scenarioRunId } = c.req.valid("param");
       const { projectId } = c.req.valid("query");
-      await requireProject({
+      const witness = await requireProject({
         req: c.req.raw,
         projectId,
         permissions: ["scenarios:view"],
@@ -375,6 +382,18 @@ secured
         ports: wholeCallAudioPorts,
       });
       if (!handle) throw new VoiceRecordingUnavailableError();
+
+      // A call recording is PII, so record who accessed it once authorization
+      // has fully succeeded (permission + the run-ownership handle) and before
+      // the body streams. Fire-and-forget, the same way `project.apiKey.*` and
+      // the management-API writes audit: the access already succeeded, so an
+      // audit-write failure must not turn a working download into a 500.
+      void auditLog({
+        action: "voice.recording.accessed",
+        userId: witness.session.user.id,
+        projectId,
+        args: { scenarioRunId, transport: handle.kind },
+      }).catch(captureException);
 
       if (handle.kind === "elevenlabs") {
         // Reuse the same conversation-audio path as the per-turn route.
@@ -391,6 +410,9 @@ secured
             handle.conversationId,
           )}/audio`,
           headers: { "xi-api-key": credential.apiKey },
+          // Never echo the customer-configured upstream's content type on our
+          // own origin; always label the ElevenLabs stream safely (AC13/AC15).
+          forceContentType: "audio/mpeg",
           fallbackContentType: "audio/mpeg",
         });
       }

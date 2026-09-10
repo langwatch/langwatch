@@ -81,9 +81,11 @@ export interface TwilioAdapterLike {
     attachStream?: "a-leg" | "b-leg";
     maxCallDurationSeconds?: number;
     /** Ask Twilio to record the call, so its whole-call audio can be played
-     *  back later in the run drawer (#8014). The vendored SDK is patched in
-     *  parallel to accept this; a build without the patch ignores it. */
-    record?: boolean;
+     *  back later in the run drawer (#8014). Our own option name; the vendored
+     *  SDK's published option is `record`, which
+     *  {@link defaultTwilioAgentFactory} maps this to at the vendor boundary. A
+     *  build without the recording patch ignores it. */
+    shouldRecord?: boolean;
   }): Promise<void>;
 }
 
@@ -101,8 +103,31 @@ export type TwilioAgentFactory = (options: {
   role: AgentRole;
 }) => TwilioAdapterLike;
 
-const defaultTwilioAgentFactory: TwilioAgentFactory = (options) =>
-  ScenarioRunner.voice.twilioAgent(options) as unknown as TwilioAdapterLike;
+/** The real SDK adapter's `placeCall` shape. Its recording option is `record`
+ *  — the SDK's published name, which must not change; our interface exposes it
+ *  as `shouldRecord` and this factory translates at the vendor boundary. */
+type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
+  placeCall(args: {
+    to: string;
+    attachStream?: "a-leg" | "b-leg";
+    maxCallDurationSeconds?: number;
+    record?: boolean;
+  }): Promise<void>;
+};
+
+const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
+  const sdk = ScenarioRunner.voice.twilioAgent(
+    options,
+  ) as unknown as SdkTwilioAdapter;
+  return {
+    connect: () => sdk.connect(),
+    disconnect: () => sdk.disconnect(),
+    // Translate our `shouldRecord` to the SDK's published `record` option; this
+    // one line is the only place the vendor option name appears.
+    placeCall: ({ shouldRecord, ...rest }) =>
+      sdk.placeCall({ ...rest, record: shouldRecord }),
+  };
+};
 
 /**
  * The app's public HTTPS base URL the SDK routes Twilio's media stream to.
@@ -191,8 +216,9 @@ function withOutboundDial(
         attachStream: "a-leg",
         maxCallDurationSeconds,
         // Record the call so the whole-call audio is available for playback in
-        // the run drawer once Twilio publishes the recording (#8014).
-        record: true,
+        // the run drawer once Twilio publishes the recording (#8014). Our
+        // option; the factory maps it to the SDK's published `record`.
+        shouldRecord: true,
       });
     } catch (error) {
       await adapter.disconnect().catch(() => {

@@ -14,6 +14,7 @@
  */
 
 import type { TwilioCredential } from "~/server/gateway/twilioCredential.service";
+import { VOICE_HTTP_TIMEOUT_MS } from "./voice-limits";
 
 /** The Twilio REST API host. Recording `uri`s come back relative to it. */
 const TWILIO_API_BASE = "https://api.twilio.com";
@@ -45,15 +46,30 @@ export async function resolveTwilioRecordingWavUrl({
     credential.accountSid,
   )}/Recordings.json?CallSid=${encodeURIComponent(callSid)}`;
 
+  // Race the connect/headers phase with a timeout the same way
+  // {@link proxyAudioStream} does, since this fetch runs before the proxy
+  // applies its own: a Twilio edge that withholds response headers must not
+  // hang this request indefinitely. The caller's abort still propagates.
+  const timeoutController = new AbortController();
+  const timeout = setTimeout(
+    () => timeoutController.abort(),
+    VOICE_HTTP_TIMEOUT_MS,
+  );
+  const onCallerAbort = () => timeoutController.abort();
+  signal.addEventListener("abort", onCallerAbort);
+
   let response: Response;
   try {
     response = await fetch(listUrl, {
       headers: { authorization: twilioBasicAuthHeader(credential) },
-      signal,
+      signal: timeoutController.signal,
       redirect: "error",
     });
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
+    signal.removeEventListener("abort", onCallerAbort);
   }
   if (!response.ok) return null;
 
