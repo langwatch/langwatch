@@ -32,6 +32,7 @@ import {
   type FeatureTransportHosts,
   type MountedTransports,
 } from "./transport-mounting.ts";
+import { transportPeersOf, type TransportPeers } from "./transport-peers.ts";
 import {
   buildClaimedMembers,
   membersFor,
@@ -205,8 +206,23 @@ interface BuilderState<Rest, Trpc> {
   readonly services: RuntimeService[];
   /** Peers the process hands in itself, rather than by installing their module. */
   readonly provisions: ProcessProvision[];
-  hosts: FeatureTransportHosts<Rest, Trpc>;
+  hosts: TransportHostSource<Rest, Trpc>;
 }
+
+/**
+ * A process's doors, stated either as the hosts themselves or as the factory
+ * that builds them once every module's App exists. The factory is what a
+ * process whose doors read a module - every credential this one resolves -
+ * has to state, because there is no earlier moment at which it could.
+ */
+export type TransportHostFactory<Rest, Trpc> = (
+  peers: TransportPeers,
+) => FeatureTransportHosts<Rest, Trpc>;
+
+/** Either shape a caller may name its doors in. */
+export type TransportHostSource<Rest, Trpc> =
+  | FeatureTransportHosts<Rest, Trpc>
+  | TransportHostFactory<Rest, Trpc>;
 
 /**
  * What a process is: a role, its parsed config, and where its members come
@@ -251,10 +267,15 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
   /**
    * The doors this process opens. Every transport an installed feature
    * declares is mounted on them at boot, and a feature declaring one for a
-   * protocol named here is refused by name.
+   * protocol this process opened no door for is refused by name.
+   *
+   * A process whose doors are built from what its own modules resolve - every
+   * credential this api answers behind - states a FACTORY instead of the
+   * hosts. Boot runs it once, after every module is installed and its App
+   * bound, and before anything is mounted or served.
    */
   withTransports<NextRest, NextTrpc>(
-    hosts: FeatureTransportHosts<NextRest, NextTrpc>,
+    hosts: TransportHostSource<NextRest, NextTrpc>,
   ): ApplicationBuilder<Members, NextRest, NextTrpc> {
     return new ApplicationBuilder<Members, NextRest, NextTrpc>(
       { role: this.role, config: this.config, members: this.source },
@@ -412,8 +433,17 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
       scope.own("feature API bindings", () => apis.close());
       // After every application exists, so a handler reaching a peer through
       // its own app gets the same instance every other caller holds.
-      if (this.opensDoors(role)) {
-        transports = mountDeclaredTransports({ declared, hosts: this.state.hosts });
+      if (role === "api") {
+        // The one moment both are true: every App exists, and nothing is
+        // serving yet. A door built from a module could not be built before
+        // this line, and a route mounted after it would never be reached.
+        // `provided` holds one reference per installed module's contract token
+        // and per peer the process handed in itself, so it IS the answer to
+        // what this build installed.
+        const hosts = this.openDoors((token) => provided.get(token));
+        if (hosts.rest !== void 0 || hosts.trpc !== void 0) {
+          transports = mountDeclaredTransports({ declared, hosts });
+        }
       }
     } catch (error) {
       apis.close();
@@ -434,13 +464,15 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
   }
 
   /**
-   * Whether this application mounts what its features declared. Only a process
-   * that named a door does, and only in the role that serves one.
+   * The doors this process opens, resolved once. A caller that named the hosts
+   * outright gets them back; one that named a factory has it run here, with
+   * every installed module's App reachable by its own contract token.
    */
-  private opensDoors(role: ServerRole): boolean {
-    if (role !== "api") return false;
-
-    return this.state.hosts.rest !== undefined || this.state.hosts.trpc !== undefined;
+  private openDoors(
+    resolve: (token: TokenIdentity) => unknown,
+  ): FeatureTransportHosts<Rest, Trpc> {
+    const source = this.state.hosts;
+    return typeof source === "function" ? source(transportPeersOf(resolve)) : source;
   }
 
   /**

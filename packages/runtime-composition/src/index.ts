@@ -5,7 +5,14 @@ export {
   createApp,
   type InstalledFeature,
   type RuntimeService,
+  type TransportHostFactory,
+  type TransportHostSource,
 } from "./application.ts";
+export {
+  MissingTransportPeerError,
+  transportPeersOf,
+  type TransportPeers,
+} from "./transport-peers.ts";
 export {
   DuplicateTransportNamespaceError,
   MissingTransportHostError,

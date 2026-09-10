@@ -24,8 +24,14 @@ class ApiProductionComposition extends ApiRuntimeComposition {
       config: options.config,
       secrets: options.secrets,
     });
+    // The process's own lifecycle routes first, then every family boot
+    // mounted, in install order. Each mounted family carries its own absolute
+    // paths, so this is a route table and not a prefix scheme.
+    const application = ApiProcessLifecycleRoutes.create({});
+    for (const family of runtime.transports.rest) application.route("/", family);
+
     const listener = ApiHttpListener.create({
-      application: ApiProcessLifecycleRoutes.create({}),
+      application,
       port: options.config.port,
     });
 

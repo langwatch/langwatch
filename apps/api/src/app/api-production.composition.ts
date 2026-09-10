@@ -16,8 +16,10 @@ import {
   type ProcessConfig,
   type ProcessMembers,
 } from "@langwatch/infrastructure";
+import type { MountableRestApp } from "@langwatch/api/rest";
 import { serverModules } from "@langwatch/installed-modules/server";
 import type { BootedRuntime } from "@langwatch/runtime-composition";
+import { apiRestHosts, type ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
 import type { ApiConfig } from "../platform/config/api.config.ts";
 
 /** The api process's own rate allowance, until a deployment states one. */
@@ -150,12 +152,32 @@ export function bootApiProcess(options: {
   readonly config: ApiConfig;
   readonly secrets: Readonly<Record<string, string>>;
   readonly members?: ApiProcessMemberOverrides;
-}): Promise<BootedRuntime<ProcessMembers>> {
+  /** What a browser cookie resolved, where this deployment composed a verifier. */
+  readonly browserSession?:
+    | ((request: Request) => Promise<ApiRestBrowserCaller | null>)
+    | undefined;
+}): Promise<BootedRuntime<ProcessMembers, MountableRestApp, never>> {
+  const config = options.config;
+
   return createProcess({
     role: "api",
-    config: apiProcessConfig({ config: options.config, secrets: options.secrets }),
+    config: apiProcessConfig({ config, secrets: options.secrets }),
     members: options.members,
   })
     .withModules(serverModules)
+    .withTransports(
+      apiRestHosts({
+        config: {
+          // Which secret guards which internal family. One door, several
+          // secrets: a cron bearer must not reach the agent manager.
+          internalSecrets: {
+            cron: config.cronApiKey,
+            "langy-internal": config.langyInternalSecret,
+          },
+          instanceAdminKey: config.instanceAdminApiKey,
+          ...(options.browserSession ? { browserSession: options.browserSession } : {}),
+        },
+      }),
+    )
     .boot();
 }
