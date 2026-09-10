@@ -52,28 +52,28 @@ export function CostProviderDayPanel({
   } | null>(null);
 
   const buckets = useMemo(
-    () => aggregateBuckets(providerDayBuckets(rows), interval),
+    () => providerSplitBuckets(rows, interval),
     [rows, interval],
   );
   const periods = useMemo(
     () => providerPeriods(rows, interval),
     [rows, interval],
   );
-
-  if (rows.length === 0) return null;
-
   // A provider whose window total was withheld still has periods that each
   // hold a real number, so a reader who adds the bars up rebuilds exactly the
   // partial sum the total refused to show them. Saying so under the chart is
   // what stops the bars from BEING that sum.
   //
-  // TWO WAYS TO BE SHORT, one note. A bar is missing money either because a
-  // cell held no amount at all — `amountUsd === null` — or because a cell was
-  // billed in a currency we could not convert, which leaves the bar drawn at a
-  // real but incomplete number with nothing null about it. The second kind
-  // reads as complete unless it is said, and it is the one a reader can act
-  // on, so the currency is named rather than merely counted.
-  const partialProviders = partialProviderNotes(rows);
+  // Read off the buckets the chart draws, not off the rows again: the bars
+  // and the note under them are then two readings of one fold, and a period
+  // the chart marks short is a period the note names. See `rowIsShort` for
+  // the two ways a period gets short.
+  const partialProviders = useMemo(
+    () => partialProviderNotes(buckets),
+    [buckets],
+  );
+
+  if (rows.length === 0) return null;
 
   const openedPeriod =
     opened === null
@@ -99,15 +99,7 @@ export function CostProviderDayPanel({
         interval={interval}
         onSelectSeries={(provider, period) => setOpened({ provider, period })}
       />
-      {partialProviders.length > 0 && (
-        <Text
-          fontSize="xs"
-          color="fg.muted"
-          aria-label="Some bars cover only part of what was spent"
-        >
-          Part of {partialProviders.join(", ")} spend has no dollar figure
-        </Text>
-      )}
+      <PartialSpendNote providers={partialProviders} />
       {openedPeriod && (
         <PeriodRecords
           organizationId={organizationId}
@@ -116,6 +108,32 @@ export function CostProviderDayPanel({
         />
       )}
     </VStack>
+  );
+}
+
+/**
+ * The line under a chart whose bars are short, naming who left them short.
+ *
+ * Shared by the total chart and the provider split beside it: they are folded
+ * from the same rows, so a period short in one is short in the other, and the
+ * two panels have to say so in the same words. Renders nothing when no bar is
+ * short, so the caller need not guard it.
+ */
+export function PartialSpendNote({
+  providers,
+}: {
+  /** From `partialProviderNotes`: one phrase per short provider. */
+  providers: readonly string[];
+}) {
+  if (providers.length === 0) return null;
+  return (
+    <Text
+      fontSize="xs"
+      color="fg.muted"
+      aria-label="Some bars cover only part of what was spent"
+    >
+      Part of {providers.join(", ")} spend has no dollar figure
+    </Text>
   );
 }
 
@@ -137,7 +155,7 @@ export type ProviderPeriod = {
   toDay: string;
   /** The sum of the days that held a figure. See `partial`. */
   amountUsd: number;
-  /** Whether some day inside this period held no dollar figure at all. */
+  /** Whether some day inside this period is short. See `rowIsShort`. */
   partial: boolean;
 };
 
@@ -176,11 +194,14 @@ export const TOTAL_SPEND_KEY = "total";
 export function costTotalBuckets(
   rows: readonly GovernanceCostProviderDayRowDto[],
   interval: TimeInterval,
-): DailyBucket[] {
+): WithheldBucket[] {
   const byDay = new Map<string, number>();
   for (const row of rows) {
     // A withheld day adds nothing rather than being guessed at, exactly as it
-    // does in the stack. The line under that chart says the height is short.
+    // does in the stack — and the bucket SAYS it is short, below. A bar
+    // quietly drawn at the sum of the days that held a figure reads as a
+    // cheap period, which is the one thing a withheld figure exists to
+    // prevent.
     byDay.set(row.day, (byDay.get(row.day) ?? 0) + (row.amountUsd ?? 0));
   }
   const daily = [...byDay.entries()]
@@ -189,7 +210,125 @@ export function costTotalBuckets(
       day,
       points: [{ key: TOTAL_SPEND_KEY, label: "Spend", value }],
     }));
-  return aggregateBuckets(daily, interval);
+  return markWithheldPeriods(aggregateBuckets(daily, interval), rows, interval);
+}
+
+/**
+ * The same rows folded to one period per interval, one series per provider:
+ * what `Cost over time · by provider` draws.
+ *
+ * Marked by the SAME fold as the total chart. The two panels are folded from
+ * one set of rows, so a period short in one is short in the other, and for a
+ * while only the total chart said so: this one was built straight from
+ * `aggregateBuckets`, which knows nothing of withheld days, so the same period
+ * was drawn faded on the left and plain on the right.
+ */
+export function providerSplitBuckets(
+  rows: readonly GovernanceCostProviderDayRowDto[],
+  interval: TimeInterval,
+): WithheldBucket[] {
+  return markWithheldPeriods(
+    aggregateBuckets(providerDayBuckets(rows), interval),
+    rows,
+    interval,
+  );
+}
+
+/**
+ * Whether a row's figure is not the whole of what was spent that day.
+ *
+ * THE ONE DEFINITION OF SHORT. There are two ways a day gets short: a cell
+ * held no amount at all, so `amountUsd` is null, or a cell was billed in a
+ * currency we could not convert, which leaves `amountUsd` a real but
+ * incomplete number with nothing null about it. Each fold on this screen used
+ * to spell the rule out for itself, and two of them spelled out only the
+ * first half — so a day billed in dollars and euros drew a whole bar over a
+ * note saying part of its spend had no dollar figure. Every fold asks here
+ * now, and a bar, a period and the note under them cannot disagree.
+ */
+export function rowIsShort(
+  row: Pick<
+    GovernanceCostProviderDayRowDto,
+    "amountUsd" | "currenciesWithoutUsdAmount"
+  >,
+): boolean {
+  return row.amountUsd === null || row.currenciesWithoutUsdAmount.length > 0;
+}
+
+/**
+ * One provider that left a period short, and the currencies its shortfall
+ * was billed in when it has any. Empty currencies means a cell with no amount
+ * at all.
+ */
+export type ProviderShortfall = {
+  provider: string;
+  /** Sorted. */
+  currencies: string[];
+};
+
+/**
+ * One period of a cost chart, carrying whether its bar is the whole figure.
+ *
+ * `withheld` is true when any row folded into the period is short (see
+ * `rowIsShort`). The bar is then the sum of the figures we do hold, which is
+ * SHORT by however much was left out, and the chart draws it as short rather
+ * than as a period nobody spent much in. `withheldProviders` names who left it
+ * short, sorted by provider, and is what the note under the chart is built
+ * from — so the note names exactly the providers whose bars are marked.
+ */
+export type WithheldBucket = DailyBucket & {
+  withheld: boolean;
+  withheldProviders: ProviderShortfall[];
+};
+
+/**
+ * Attach to each folded period whether the rows behind it left it short, and
+ * who did. Keyed by the period's first day — the same fold `aggregateBuckets`
+ * applies to the figures, so a mark and the bar it sits on can never disagree
+ * about which period they mean.
+ *
+ * Shared by the total chart and the provider split beside it on purpose:
+ * one fold, two charts, no way for a period to be short in one and whole in
+ * the other.
+ */
+function markWithheldPeriods(
+  buckets: DailyBucket[],
+  rows: readonly GovernanceCostProviderDayRowDto[],
+  interval: TimeInterval,
+): WithheldBucket[] {
+  const shortfallsByPeriod = new Map<string, Map<string, Set<string>>>();
+  for (const row of rows) {
+    if (!rowIsShort(row)) continue;
+    const period = bucketStartOf(row.day, interval);
+    const byProvider =
+      shortfallsByPeriod.get(period) ?? new Map<string, Set<string>>();
+    const currencies = byProvider.get(row.provider) ?? new Set<string>();
+    for (const currency of row.currenciesWithoutUsdAmount)
+      currencies.add(currency);
+    byProvider.set(row.provider, currencies);
+    shortfallsByPeriod.set(period, byProvider);
+  }
+  return buckets.map((bucket) => {
+    const withheldProviders = shortfallsOf(shortfallsByPeriod.get(bucket.day));
+    return {
+      ...bucket,
+      withheld: withheldProviders.length > 0,
+      withheldProviders,
+    };
+  });
+}
+
+/** A provider→currencies map as a sorted list, or nothing for no map. */
+function shortfallsOf(
+  byProvider: ReadonlyMap<string, ReadonlySet<string>> | undefined,
+): ProviderShortfall[] {
+  if (!byProvider) return [];
+  return [...byProvider.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([provider, currencies]) => ({
+      provider,
+      currencies: [...currencies].sort(),
+    }));
 }
 
 /** The rows as one stackable bucket per day, one series per provider. */
@@ -204,7 +343,7 @@ export function providerDayBuckets(
       byDay.set(row.day, bucket);
     }
     // A withheld day contributes nothing to the height rather than being
-    // guessed at. The line under the chart is what says the height is short.
+    // guessed at. `markWithheldPeriods` is what says the height is short.
     bucket.points.push({
       key: row.provider,
       label: providerName(row.provider),
@@ -231,14 +370,14 @@ export function providerPeriods(
         fromDay: row.day,
         toDay: row.day,
         amountUsd: row.amountUsd ?? 0,
-        partial: row.amountUsd === null,
+        partial: rowIsShort(row),
       });
       continue;
     }
     if (row.day < held.fromDay) held.fromDay = row.day;
     if (row.day > held.toDay) held.toDay = row.day;
     held.amountUsd += row.amountUsd ?? 0;
-    held.partial = held.partial || row.amountUsd === null;
+    held.partial = held.partial || rowIsShort(row);
   }
   return [...byKey.values()].sort(
     (a, b) =>
@@ -250,34 +389,34 @@ export function providerPeriods(
  * One phrase per provider whose bars are short, naming the currency when the
  * shortfall has one.
  *
- * Exported for the same reason the bucket builders above are: it is the whole
- * of a claim the screen makes in prose, and a claim about money is worth
- * testing without a chart in the way.
+ * Built from the buckets the chart draws rather than from the rows a second
+ * time, so the note under a chart names exactly the providers whose bars it
+ * marked: one fold, read twice. Exported for the same reason the bucket
+ * builders above are — it is the whole of a claim the screen makes in prose,
+ * and a claim about money is worth testing without a chart in the way.
  *
  * A provider short both ways — some cells with no amount at all, some billed
- * in a currency we could not convert — is listed ONCE, with its currencies. Two
- * entries for one provider would read as two providers, and the reader is being
- * told which names to go and look at.
+ * in a currency we could not convert — is listed ONCE, with its currencies,
+ * however many periods it was short in. Two entries for one provider would
+ * read as two providers, and the reader is being told which names to go and
+ * look at.
  */
 export function partialProviderNotes(
-  rows: readonly GovernanceCostProviderDayRowDto[],
+  buckets: readonly WithheldBucket[],
 ): string[] {
   const currenciesByProvider = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const short =
-      row.amountUsd === null || row.currenciesWithoutUsdAmount.length > 0;
-    if (!short) continue;
-    const held = currenciesByProvider.get(row.provider) ?? new Set<string>();
-    for (const currency of row.currenciesWithoutUsdAmount) held.add(currency);
-    currenciesByProvider.set(row.provider, held);
+  for (const bucket of buckets) {
+    for (const { provider, currencies } of bucket.withheldProviders) {
+      const held = currenciesByProvider.get(provider) ?? new Set<string>();
+      for (const currency of currencies) held.add(currency);
+      currenciesByProvider.set(provider, held);
+    }
   }
-  return [...currenciesByProvider.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([provider, currencies]) => {
-      const name = providerName(provider);
-      if (currencies.size === 0) return name;
-      return `${name} (${[...currencies].sort().join(", ")})`;
-    });
+  return shortfallsOf(currenciesByProvider).map(({ provider, currencies }) => {
+    const name = providerName(provider);
+    if (currencies.length === 0) return name;
+    return `${name} (${currencies.join(", ")})`;
+  });
 }
 
 /**

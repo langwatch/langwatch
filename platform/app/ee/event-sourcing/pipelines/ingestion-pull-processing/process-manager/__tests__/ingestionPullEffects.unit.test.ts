@@ -2,6 +2,7 @@ import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 
 import {
   createIngestionPullRunHandler,
@@ -134,6 +135,129 @@ describe("ingestion pull outbox effect", () => {
         retryable: false,
       }),
     );
+  });
+
+  describe("when the provider refuses the source's credentials on the first attempt", () => {
+    const refusal = () =>
+      new DispatchError({
+        message: "HTTP 401 (anthropic cost_report): key refused",
+        retryable: false,
+        customerMessage:
+          "Anthropic refused this key. Check the admin key and its permissions.",
+      });
+
+    /** @scenario "A refused key ends the run at once and the source keeps its schedule" */
+    it("records the failure at once with the customer sentence and does not rethrow", async () => {
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: { run: vi.fn().mockRejectedValue(refusal()) },
+        commands: () => commandsStub({ recordRunFailed }),
+        clock: () => 200,
+      });
+
+      await expect(handler(intent, context(1))).resolves.toBeUndefined();
+      expect(recordRunFailed).toHaveBeenCalledTimes(1);
+      expect(recordRunFailed).toHaveBeenCalledWith({
+        tenantId: "gov-project",
+        occurredAt: 200,
+        sourceId: "source-1",
+        runId: "run-1",
+        scheduledFor: 100,
+        error:
+          "Anthropic refused this key. Check the admin key and its permissions.",
+        errorCode: "pull_refused",
+        retryable: false,
+        retryAfterMs: null,
+      });
+    });
+
+    /** @scenario "A refusal with no customer sentence shows the generic failure text" */
+    it("records a refusal without a customer sentence under the generic failed code, never the refused one", async () => {
+      // The status layer shows the refused code's text as written, so a
+      // refusal that only carries the adapter's diagnostic must not be
+      // filed under it: the diagnostic goes to the event for the log, and
+      // the generic code makes the page fall back to its fixed sentence.
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: {
+          run: vi.fn().mockRejectedValue(
+            new DispatchError({
+              message: "HTTP 403 (anthropic cost_report): sk-admin refused",
+              retryable: false,
+            }),
+          ),
+        },
+        commands: () => commandsStub({ recordRunFailed }),
+      });
+
+      await expect(handler(intent, context(1))).resolves.toBeUndefined();
+      expect(recordRunFailed).toHaveBeenCalledTimes(1);
+      expect(recordRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: "HTTP 403 (anthropic cost_report): sk-admin refused",
+          errorCode: "pull_failed",
+          retryable: false,
+        }),
+      );
+    });
+
+    it("counts it as a final failure, never as retryable noise", async () => {
+      const before = await metricValue({
+        name: "ingestion_pull_total",
+        labels: { outcome: "failed_final" },
+      });
+      const retryableBefore = await metricValue({
+        name: "ingestion_pull_total",
+        labels: { outcome: "failed_retryable" },
+      });
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: { run: vi.fn().mockRejectedValue(refusal()) },
+        commands: () => commandsStub(),
+      });
+
+      await handler(intent, context(1));
+      expect(
+        await metricValue({
+          name: "ingestion_pull_total",
+          labels: { outcome: "failed_final" },
+        }),
+      ).toBe(before + 1);
+      expect(
+        await metricValue({
+          name: "ingestion_pull_total",
+          labels: { outcome: "failed_retryable" },
+        }),
+      ).toBe(retryableBefore);
+    });
+
+    it("still retries a rejection the provider marked as worth retrying", async () => {
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: {
+          run: vi.fn().mockRejectedValue(
+            new DispatchError({
+              message: "Anthropic rate limit exceeded (HTTP 429).",
+              retryable: true,
+              retryAfterMs: 120_000,
+            }),
+          ),
+        },
+        commands: () => commandsStub({ recordRunFailed }),
+      });
+
+      await expect(handler(intent, context(1))).rejects.toMatchObject({
+        retryAfterMs: 120_000,
+      });
+      expect(recordRunFailed).not.toHaveBeenCalled();
+    });
   });
 
   it("does not translate a completion-command failure into a pull failure", async () => {

@@ -83,8 +83,22 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({
           data: {
             unavailableReason: null,
-            billed: { amountUsd: 123.45, cellsWithoutAmount: 0 },
-            gateway: { amountUsd: 67.89, cellsWithoutAmount: 0 },
+            billed: {
+              amountUsd: 123.45,
+              cellsWithoutAmount: 0,
+              currenciesWithoutUsdAmount: [],
+              currencyTotals: [
+                { currencyCode: "USD", amount: 123.45, cellsWithoutAmount: 0 },
+              ],
+            },
+            gateway: {
+              amountUsd: 67.89,
+              cellsWithoutAmount: 0,
+              currenciesWithoutUsdAmount: [],
+              currencyTotals: [
+                { currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 },
+              ],
+            },
             seats: { status: "awaiting_data" },
             series: [
               { day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 },

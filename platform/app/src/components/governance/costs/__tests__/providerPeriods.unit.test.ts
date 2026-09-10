@@ -14,8 +14,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   costTotalBuckets,
+  partialProviderNotes,
   providerDayBuckets,
   providerPeriods,
+  providerSplitBuckets,
+  rowIsShort,
+  type WithheldBucket,
 } from "../CostProviderDayPanel";
 import { aggregateBuckets } from "../costsWindow";
 
@@ -161,6 +165,166 @@ describe("the provider breakdown fold", () => {
     expect(inWindow(q1.fromDay, q1.toDay)).not.toContainEqual(
       expect.objectContaining({ day: "2026-04-02" }),
     );
+  });
+
+  it("marks the period holding a withheld day as withheld, naming the provider", () => {
+    const withWithheld = [
+      {
+        day: "2026-01-15",
+        provider: "openai_admin",
+        amountUsd: 60,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
+      {
+        day: "2026-01-16",
+        provider: "anthropic_admin",
+        amountUsd: null,
+        cellsWithoutAmount: 1,
+        currenciesWithoutUsdAmount: [],
+      },
+      {
+        day: "2026-04-02",
+        provider: "anthropic_admin",
+        amountUsd: 9,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
+    ];
+
+    const folded = costTotalBuckets(withWithheld, "quarter");
+
+    // The first quarter is SHORT: one of its days holds no dollar figure, so
+    // the bar it draws is not the whole of what was spent. The bucket says
+    // so, and says who, rather than leaving the height to speak for itself.
+    expect(folded.map((bucket) => bucket.day)).toEqual([
+      "2026-01-01",
+      "2026-04-01",
+    ]);
+    expect(folded[0]).toMatchObject({
+      withheld: true,
+      withheldProviders: [{ provider: "anthropic_admin", currencies: [] }],
+    });
+    expect(seriesIn(folded[0]!)).toEqual({ total: 60 });
+    // The second quarter holds every figure and carries no mark.
+    expect(folded[1]).toMatchObject({ withheld: false, withheldProviders: [] });
+    // And the note under the chart is read off those same buckets, so it
+    // names exactly the provider whose bar is marked.
+    expect(partialProviderNotes(folded)).toEqual(["Anthropic"]);
+  });
+
+  /** @scenario "The provider split marks a short period the same way the total chart does" */
+  it("marks the same period short in the provider split as in the total chart", () => {
+    const withWithheld = [
+      {
+        day: "2026-01-15",
+        provider: "openai_admin",
+        amountUsd: 60,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
+      {
+        day: "2026-01-16",
+        provider: "anthropic_admin",
+        amountUsd: null,
+        cellsWithoutAmount: 1,
+        currenciesWithoutUsdAmount: [],
+      },
+      {
+        day: "2026-04-02",
+        provider: "anthropic_admin",
+        amountUsd: 9,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
+    ];
+
+    const total = costTotalBuckets(withWithheld, "quarter");
+    const split = providerSplitBuckets(withWithheld, "quarter");
+
+    // Same periods, same marks, same names: one fold read two ways. The
+    // split used to be built straight from the day buckets, which know
+    // nothing of withheld days, so the same quarter was faded on one chart
+    // and plain on the other.
+    const marksOf = (buckets: WithheldBucket[]) =>
+      buckets.map(({ day, withheld, withheldProviders }) => ({
+        day,
+        withheld,
+        withheldProviders,
+      }));
+    expect(marksOf(split)).toEqual(marksOf(total));
+    expect(split[0]).toMatchObject({ day: "2026-01-01", withheld: true });
+    // And the split still carries a figure per provider inside the period.
+    expect(seriesIn(split[0]!)).toEqual({
+      openai_admin: 60,
+      anthropic_admin: 0,
+    });
+  });
+
+  /** @scenario "A day billed partly in a currency with no dollar figure leaves its period short" */
+  it("marks a period short when a day holds a dollar figure beside a bill in a currency with none", () => {
+    const partlyInEuros = [
+      {
+        day: "2026-01-15",
+        provider: "anthropic_admin",
+        // A real figure — the dollar half of the day — with nothing null
+        // about it. The euro half is the shortfall.
+        amountUsd: 50,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: ["EUR"],
+      },
+    ];
+
+    // The one predicate every fold asks.
+    expect(rowIsShort(partlyInEuros[0]!)).toBe(true);
+    expect(rowIsShort({ amountUsd: 50, currenciesWithoutUsdAmount: [] })).toBe(
+      false,
+    );
+    expect(
+      rowIsShort({ amountUsd: null, currenciesWithoutUsdAmount: [] }),
+    ).toBe(true);
+
+    // The total chart's bucket is short and says in what currency...
+    const total = costTotalBuckets(partlyInEuros, "quarter");
+    expect(total[0]).toMatchObject({
+      withheld: true,
+      withheldProviders: [{ provider: "anthropic_admin", currencies: ["EUR"] }],
+    });
+    // ...as is the split's...
+    expect(providerSplitBuckets(partlyInEuros, "quarter")[0]).toMatchObject({
+      withheld: true,
+    });
+    // ...the note names the provider and the currency...
+    expect(partialProviderNotes(total)).toEqual(["Anthropic (EUR)"]);
+    // ...and the period a reader would open is partial. Before the one
+    // predicate, the bucket and the period said whole while the note said
+    // short: a whole bar drawn over a note contradicting it.
+    expect(providerPeriods(partlyInEuros, "quarter")[0]?.partial).toBe(true);
+  });
+
+  it("lists a provider short in two ways once, with its currencies", () => {
+    const shortBothWays = [
+      {
+        day: "2026-01-15",
+        provider: "anthropic_admin",
+        amountUsd: null,
+        cellsWithoutAmount: 1,
+        currenciesWithoutUsdAmount: [],
+      },
+      {
+        day: "2026-04-02",
+        provider: "anthropic_admin",
+        amountUsd: 9,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: ["GBP", "EUR"],
+      },
+    ];
+
+    // Two periods, two kinds of short, one provider: one entry. Two would
+    // read as two providers to a reader told which names to go and look at.
+    expect(
+      partialProviderNotes(costTotalBuckets(shortBothWays, "quarter")),
+    ).toEqual(["Anthropic (EUR, GBP)"]);
   });
 
   it("counts a withheld day as no money rather than guessing at one", () => {

@@ -3135,7 +3135,19 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       label: "SQL warehouse ID (optional)",
       advanced: true,
       placeholder: "095eb666b2ed2762",
-      hint: "Any warehouse this credential can run a query on. It is where the billing lookup itself runs — NOT the warehouse being priced, which is every warehouse the questions used. Set it to attribute the compute behind each question to the person who asked; leave it empty and questions are recorded at zero cost, which is what Genie itself charges. Naming one makes every run submit a query, so a stopped warehouse is started and billed on the source's schedule. The token additionally needs SELECT on the `system` catalogue, which only a metastore admin can grant — without it questions are still recorded, without cost. The figure is a share of the hourly bill at list prices, so it is an estimate, not the invoice.",
+      hint: "Any warehouse this credential can run a query on. It is where the billing lookup itself runs — NOT the warehouse being priced, which is every warehouse the questions used. Set it to attribute the compute behind each question to the person who asked; leave it empty and questions are recorded without an amount, since the compute behind them was never read. Naming one makes every run submit a query, so a stopped warehouse is started and billed on the source's schedule. The token additionally needs SELECT on the `system` catalogue, which only a metastore admin can grant — without it questions are still recorded, without cost. The figure is a share of the hourly bill at list prices, so it is an estimate, not the invoice.",
+    },
+    {
+      key: "readPaidGenieBill",
+      label: "Also record Genie's own bill line",
+      placeholder: "",
+      hint: "Reads the usage Databricks bills under the Genie product itself — the per-message and inference charges, separate from the warehouse compute the questions run on — and records it per person, per day, per price line, at list price. It runs on the same SQL warehouse as the question pricing and needs the same SELECT on the `system` catalogue; with no warehouse named the read cannot start and the run says so. Off by default because most workspaces are still on Genie's free line, which this read records as usage with no amount.",
+      control: "switch",
+      defaultOn: false,
+      // Advanced for the same reason the warehouse id beside it is: it is a
+      // billing read a metastore admin has to grant, not part of getting the
+      // source to record conversations at all.
+      advanced: true,
     },
   ],
   s3_custom: [
@@ -3716,6 +3728,13 @@ function buildDatabricksGeniePullConfig(
     // "do not price these questions", and an empty string is a warehouse id it
     // would then ask the workspace about.
     ...(warehouseId ? { warehouseId } : {}),
+    // A real boolean, from the same constant the field declares, so what the
+    // adapter reads is what the switch showed: off unless the admin turned it
+    // on, never the absence of a form value read as a setting.
+    readPaidGenieBill: switchFieldIsOn({
+      value: p.readPaidGenieBill,
+      defaultOn: false,
+    }),
     credentials,
   };
 }
@@ -4400,7 +4419,15 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // `warehouseId` is here because the builder DROPS it when empty. Left to
     // the merge, the raw form value would persist `warehouseId: ""`, which the
     // adapter reads as a warehouse to go ask the workspace about.
-    databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId"],
+    // `readPaidGenieBill` for the reason `readSeats` is owned further down:
+    // the builder turns the switch's form value into a real boolean, and the
+    // raw value winning the merge would hand the adapter a string.
+    databricks_genie: [
+      "workspaceUrl",
+      "spaceIds",
+      "warehouseId",
+      "readPaidGenieBill",
+    ],
     // The builder normalises `environmentUrl` (trailing slashes stripped) and
     // turns `botIds` from a comma-separated string into an array. The raw form
     // values winning the merge would leave a string where the adapter's schema

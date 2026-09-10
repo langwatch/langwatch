@@ -1,5 +1,8 @@
 import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
-import type { AgentsListingOutcome } from "@ee/governance/services/pullers/agentsListingOutcome";
+import type {
+  AgentsListingOutcome,
+  AgentsListingRefusalCause,
+} from "@ee/governance/services/pullers/agentsListingOutcome";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
@@ -325,6 +328,21 @@ function useAgentSync({
   );
   const mutation = api.governanceAgents.requestListing.useMutation({
     onSuccess: (result) => {
+      // Zero is not an ask. The service only asks the sources the scheduler
+      // will pull, so a provider can be connected and still leave this at
+      // zero — and then nothing was recorded, nothing will answer, and there
+      // is nothing for a reload to show. Latching `hasAsked` here would put
+      // the control into "already asked, reload to see" over a press that
+      // asked nobody, and "Asked 0 providers" reads as the page miscounting.
+      if (result.requested === 0) {
+        toaster.create({
+          title: "Nothing to ask",
+          description:
+            "No connected provider is scheduled to be asked right now.",
+          type: "info",
+        });
+        return;
+      }
       setAsked(true);
       toaster.create({
         title: "Sync requested",
@@ -487,14 +505,44 @@ function AgentsPane({
  * function sees the whole set, which is why the gate is here and not in the
  * copy.
  *
- * MIXED CAUSES RESOLVE TO `access`. Two providers refusing for different
- * reasons produce one pane, and it has to carry the instruction that is worth
- * acting on: a permission that will keep refusing forever outranks a provider
- * that was briefly unreachable, and "ask again in a moment" would bury it.
+ * MIXED CAUSES RESOLVE TO THE ONE MOST WORTH ACTING ON. Two providers
+ * refusing for different reasons produce one pane, and it has to carry the
+ * instruction the reader would regret not seeing: a permission that will keep
+ * refusing forever outranks a provider that was briefly unreachable, and a
+ * wait outranks a listing our own page limit cut short, which no press can
+ * change. The order lives in {@link REFUSAL_CAUSE_RANK}, keyed over the whole
+ * cause union so a fourth cause cannot silently fall into somebody else's
+ * advice — which is exactly how `incomplete` used to be told "ask again".
  *
  * The copy itself lives in `emptyStates.ts`; what belongs here is the reading
  * of the page's own state, and the press that goes with each one.
  */
+/**
+ * Which refusal cause wins the pane when several providers refused.
+ *
+ * Higher is more worth acting on. A `Record` over the whole union rather
+ * than a `some(access)` check, so that adding a cause to
+ * `AgentsListingRefusalCause` is a compile error here rather than a silent
+ * fall-through into whichever arm the ternary defaulted to.
+ */
+const REFUSAL_CAUSE_RANK: Record<AgentsListingRefusalCause, number> = {
+  // Somebody has to fix something; asking again changes nothing until then.
+  access: 3,
+  // Asking again later is the whole remedy.
+  unreachable: 2,
+  // Nothing is wrong and asking again walks the same pages to the same bound.
+  incomplete: 1,
+};
+
+/** `causes` is never empty here: the caller only asks once a refusal exists. */
+function mostActionableCause(
+  causes: readonly AgentsListingRefusalCause[],
+): AgentsListingRefusalCause {
+  return causes.reduce((best, cause) =>
+    REFUSAL_CAUSE_RANK[cause] > REFUSAL_CAUSE_RANK[best] ? cause : best,
+  );
+}
+
 function chooseNoAgentsState({
   connected,
   canAsk,
@@ -530,13 +578,13 @@ function chooseNoAgentsState({
         // blame it for a fault it does not have, and send its owner to audit a
         // credential that is working.
         providerNames: refused.map((source) => source.name),
-        cause: refused.some(
-          (source) =>
-            source.lastListing?.outcome === "refused" &&
-            source.lastListing.cause === "access",
-        )
-          ? "access"
-          : "unreachable",
+        cause: mostActionableCause(
+          refused.flatMap((source) =>
+            source.lastListing?.outcome === "refused"
+              ? [source.lastListing.cause]
+              : [],
+          ),
+        ),
         canAsk,
       }),
       onAct: onSync,

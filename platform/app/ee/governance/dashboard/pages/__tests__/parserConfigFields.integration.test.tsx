@@ -84,11 +84,14 @@ describe("given the Genie source-specific fields", () => {
     });
 
     /** @scenario "Genie setup asks for the service principal first" */
-    it("keeps the token, space IDs, and warehouse ID hidden until Advanced expands", async () => {
+    it("keeps the token, space IDs, warehouse ID, and bill-line switch hidden until Advanced expands", async () => {
       renderFields("databricks_genie");
       expect(screen.queryByText("Workspace token")).toBeNull();
       expect(screen.queryByText(/Genie space IDs/)).toBeNull();
       expect(screen.queryByText(/SQL warehouse ID/)).toBeNull();
+      expect(
+        screen.queryByText(/Also record Genie's own bill line/),
+      ).toBeNull();
 
       const user = userEvent.setup();
       await user.click(screen.getByText("Advanced"));
@@ -97,6 +100,9 @@ describe("given the Genie source-specific fields", () => {
       });
       expect(screen.getByText(/Genie space IDs/)).toBeTruthy();
       expect(screen.getByText(/SQL warehouse ID/)).toBeTruthy();
+      expect(
+        screen.getByText(/Also record Genie's own bill line/),
+      ).toBeTruthy();
     });
   });
 

@@ -923,6 +923,65 @@ Feature: One cost screen, three honest lanes
     # up rebuilds exactly the partial sum the lane refused to show them.
     # The mark on the bars is what stops the chart from being that sum.
 
+  @integration
+  Scenario: A day with a withheld amount shows as withheld in cost over time, not as a smaller bar
+    Given a window in which one provider has a day we hold no dollar figure for
+    When a permitted viewer reads the cost over time
+    Then the period holding that day is drawn as short, not as a smaller bar
+    And a note under the chart names the provider that withheld
+    # The total chart folds the same rows as the provider split beside it,
+    # and a withheld day added nothing to either. The split said so under its
+    # bars; the total chart said nothing, so the same period read as a cheap
+    # one there and as an incomplete one a panel to the right. A figure
+    # without a bill behind it is withheld, never zero, and a bar drawn at
+    # the sum of the days that held a figure is a zero for the day that did
+    # not — quietly, at the bottom of the bar.
+    #
+    # The bar itself is checked on the fold rather than on the render: the
+    # bucket carries whether it is short and who left it so, and the chart
+    # draws a short bucket faded and dash-edged and says so in its tooltip.
+    # A chart draws nothing under a test renderer with no layout, so the
+    # note under it is the part of this scenario the screen test can see.
+
+  @integration
+  Scenario: A period whose every day is withheld still shows a withheld mark
+    Given a window in which a provider's only days hold no dollar figure
+    When a permitted viewer reads the cost over time
+    Then a dashed mark stands where that period's bar would be
+    And the mark says the amount is withheld, in words a screen reader reads out
+    # The rule above says a short period is drawn faded and dash-edged. For a
+    # period with SOME figure that is enough, because there is a bar to fade.
+    # A period with no figure at all has no bar: the chart draws nothing for a
+    # height of zero, so a single-provider tenant with one unanswered bill got
+    # an empty slot, indistinguishable from a period nobody spent anything
+    # in — the exact reading a withheld figure exists to prevent. The mark is
+    # a dash and a label, not a colour, so it survives greyscale and a screen
+    # reader alike.
+
+  @integration
+  Scenario: The provider split marks a short period the same way the total chart does
+    Given a window in which one provider has a day we hold no dollar figure for
+    When a permitted viewer reads the cost over time by provider
+    Then the period holding that day is drawn as short there too
+    # One fold, two charts. Both panels are built from the same rows, and for
+    # a while only the total chart carried the mark: the split was folded
+    # straight from the day buckets, which know nothing of withheld days, so
+    # the same period was faded on the left and plain on the right.
+
+  @unit
+  Scenario: A day billed partly in a currency with no dollar figure leaves its period short
+    Given a day at one provider holding a dollar figure and a bill in a currency we hold no dollar figure for
+    When the cost over time is folded
+    Then the period holding that day is marked as short
+    And the note under the chart names that provider and the currency
+    And the period a reader would open is marked as partial
+    # ONE DEFINITION OF SHORT. There are two ways a day gets short: a cell with
+    # no amount at all, and a cell billed in a currency we could not convert,
+    # which leaves a real but incomplete dollar figure. Each fold used to spell
+    # the rule out for itself and two of them spelled out only the first half,
+    # so a day billed in dollars and euros drew a whole bar over a note saying
+    # part of its spend had no dollar figure. Every fold asks one predicate now.
+
   @unit
   Scenario: The period a reader opens is the span its bar was drawn from
     Given a provider billed on several days inside one period
@@ -953,15 +1012,24 @@ Feature: One cost screen, three honest lanes
     And no figure on the screen combines the two
     And no exchange rate is applied to produce either
 
-  @unit
+  @integration
   Scenario: A currency nobody converted still totals in the currency it was billed in
     Given spend billed in a currency the provider published no dollar figure for
-    When the window totals are read
+    And nothing else was billed in the window
+    When a permitted viewer opens the cost screen
     Then that currency has a total of its own
     And the dollar total is unchanged by it
+    And the screen shows the bill rather than treating the window as unbilled
     # The amount in the provider's own currency has been stored on every row
     # since the summary was built and has never been read by any total. The
     # dollar column being empty is not the same as there being no money.
+    #
+    # The last line is the regression this scenario now guards. A lane billed
+    # only in euros has no dollar figure and no unpriced cell — every cell
+    # holds an amount, in euros — and the check that decides whether a bill
+    # was reported asked only those two questions. A real euro bill read as
+    # no bill, and the screen fell back to invented figures over the top of
+    # it.
 
   @unit
   Scenario: A currency total is withheld when part of what it covers holds no amount

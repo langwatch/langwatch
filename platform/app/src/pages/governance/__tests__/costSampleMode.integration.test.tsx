@@ -136,8 +136,23 @@ const withReadsBackInFlight = (rerender: (ui: React.ReactElement) => void) => {
 /** A headline summary whose lanes hold the given money, or nothing. */
 const costSummary = ({ billedUsd }: { billedUsd: number | null }) => ({
   unavailableReason: null,
-  billed: { amountUsd: billedUsd, cellsWithoutAmount: 0 },
-  gateway: { amountUsd: null, cellsWithoutAmount: 0 },
+  // In the DTO's own shape: the US dollar line IS the lane's dollar figure,
+  // and a lane that reported nothing has no line at all.
+  billed: {
+    amountUsd: billedUsd,
+    cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
+    currencyTotals:
+      billedUsd === null
+        ? []
+        : [{ currencyCode: "USD", amount: billedUsd, cellsWithoutAmount: 0 }],
+  },
+  gateway: {
+    amountUsd: null,
+    cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
+    currencyTotals: [],
+  },
   seats: { status: "awaiting_data" },
   series:
     billedUsd === null

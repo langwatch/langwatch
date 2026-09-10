@@ -866,15 +866,17 @@ describe("given a Genie workspace the credential can fully read", () => {
       expect(row.ActorEmail).toBe("priya.nair@acme.test");
     });
 
-    /** @scenario "A question costs nothing when no warehouse is named" */
-    it("records the questions with no cost attached", async () => {
+    /** @scenario "A question carries no amount when no warehouse is named" */
+    it("lands no money row for the questions: no amount, not zero", async () => {
       const totals = await pulledTotalsFor({
         tenantId: seeded.govProjectId,
         scopeIds: [seeded.teamId, seeded.organizationId],
       });
-      expect(totals.items).toBe(4);
+      // The four questions sit in the audit trail (asserted above). With no
+      // warehouse named there is no bill behind them, so nothing reaches the
+      // money ledger: a zero row here would be a measurement nobody made.
+      expect(totals.items).toBe(0);
       expect(totals.spentNanoUsd).toBe(0);
-      expect(totals.spentUsd).toBe("0");
     });
 
     it("anchors the watermark to when the sweep began, not to the newest message", () => {
