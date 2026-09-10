@@ -17,7 +17,7 @@ import { AuthzGrantsCommandDispatcherPort } from "../ports/authz-grants-command-
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port.ts";
-import type { AuthzEpochPort } from "../ports/authz-epoch.port.ts";
+import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import {
   BindingMissingError,
   type BindingPrincipalWhere,
@@ -29,7 +29,7 @@ import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-gran
 import { liveGrants } from "../repositories/eventing/eventing.authz-live-rows.mapper.ts";
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
 import { AUTHZ_AUDIT_ACTION_PREFIX, type AuthzAuditVerb } from "./eventing.authz-audit.adapter.ts";
-import { PostgresAuthzCutoverAdapter } from "./postgres.authz-cutover.adapter.ts";
+import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import { type Instant, Temporal, nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:authz:ledger");
@@ -105,8 +105,8 @@ export type AuthzLedgerDatabase = Omit<
 export type EventingAuthzLedgerAdapterOptions = {
   database: AuthzLedgerDatabase;
   dispatcher: AuthzGrantsCommandDispatcherPort;
-  cutover: PostgresAuthzCutoverAdapter;
-  epoch: AuthzEpochPort;
+  cutover: AuthzCutoverGateService;
+  epoch: AuthzEpochRepository;
   revocation: PrismaAuthzRevocationRepository;
   now?: () => number;
   newCommandId?: () => string;

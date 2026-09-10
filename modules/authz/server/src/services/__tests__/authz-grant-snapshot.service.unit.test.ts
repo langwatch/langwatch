@@ -45,7 +45,7 @@ function snapshotWith(options: Options = {}) {
     collector as never,
     {
       cacheEnabled: () => options.cacheEnabled ?? true,
-      epoch: { tryRead: async () => nextEpoch },
+      epoch: { findEpoch: async () => nextEpoch },
       demoProjectId: () => "demo-project",
     } as never,
   );

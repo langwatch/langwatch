@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
-import { RedisAuthzEpochAdapter } from "../redis.authz-epoch.adapter.ts";
+import { RedisAuthzEpochRepository } from "../redis.authz-epoch.repository.ts";
 
 const ORGANIZATION_ID = "org_epoch";
 const KEY = `authz:epoch:${ORGANIZATION_ID}`;
 
-describe("RedisAuthzEpochAdapter", () => {
+describe("RedisAuthzEpochRepository", () => {
   it("reads safe integer epochs and bumps the organization key", async () => {
     const redis = {
       get: vi.fn().mockResolvedValue("42"),
       incr: vi.fn().mockResolvedValue(43),
     };
-    const epoch = RedisAuthzEpochAdapter.create({ redis });
+    const epoch = RedisAuthzEpochRepository.create({ redis });
 
-    await expect(epoch.tryRead({ organizationId: ORGANIZATION_ID })).resolves.toBe(42);
+    await expect(epoch.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBe(42);
     await expect(epoch.bump({ organizationId: ORGANIZATION_ID })).resolves.toBeUndefined();
     expect(redis.get).toHaveBeenCalledWith(KEY);
     expect(redis.incr).toHaveBeenCalledWith(KEY);
@@ -21,14 +21,14 @@ describe("RedisAuthzEpochAdapter", () => {
   it.each([null, "", "1.5", "12x", "9007199254740992"])(
     "disables caching for an absent or malformed epoch (%s)",
     async (value) => {
-      const epoch = RedisAuthzEpochAdapter.create({
+      const epoch = RedisAuthzEpochRepository.create({
         redis: {
           get: vi.fn().mockResolvedValue(value),
           incr: vi.fn(),
         },
       });
 
-      await expect(epoch.tryRead({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
+      await expect(epoch.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
     },
   );
 
@@ -38,16 +38,16 @@ describe("RedisAuthzEpochAdapter", () => {
       get: vi.fn().mockRejectedValue(new Error("unavailable")),
       incr: vi.fn().mockRejectedValue(new Error("unavailable")),
     };
-    const epoch = RedisAuthzEpochAdapter.create({ redis });
+    const epoch = RedisAuthzEpochRepository.create({ redis });
 
-    await expect(epoch.tryRead({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
+    await expect(epoch.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
     await expect(epoch.bump({ organizationId: ORGANIZATION_ID })).resolves.toBeUndefined();
   });
 
   it("does not touch storage when Redis is not composed", async () => {
-    const epoch = RedisAuthzEpochAdapter.create({ redis: null });
+    const epoch = RedisAuthzEpochRepository.create({ redis: null });
 
-    await expect(epoch.tryRead({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
+    await expect(epoch.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
     await expect(epoch.bump({ organizationId: ORGANIZATION_ID })).resolves.toBeUndefined();
   });
 });

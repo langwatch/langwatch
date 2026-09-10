@@ -32,7 +32,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
   const prisma = new PrismaClient({
     adapter: PrismaDriverAdapterService.create().create(DB_URL ?? "").adapter,
   });
-  const bindings = PrismaAuthzBindingRepository.create(prisma as unknown as AuthzBindingDatabase);
+  const bindings = PrismaAuthzBindingRepository.create({ database: prisma as unknown as AuthzBindingDatabase });
   const writer = AuthzBindingWriterService.create({
     bindings,
     ledger: refusingLedger,

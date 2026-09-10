@@ -1,5 +1,5 @@
-import { EventingAuthzAdapter } from "./eventing.authz.adapter.ts";
-import type { AuthzPipeline } from "./postgres.authz.adapter.ts";
+import { EventingAuthzAdapter } from "../adapters/eventing.authz.adapter.ts";
+import type { AuthzPipeline } from "./postgres-authz.build.ts";
 import {
   type AuthzAuditDatabase,
   PrismaAuthzAuditRepository,

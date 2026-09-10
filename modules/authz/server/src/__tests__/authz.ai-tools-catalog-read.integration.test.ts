@@ -29,7 +29,7 @@ describe.skipIf(!DB_URL)("given an organization publishing an AI tools catalog",
   const authz = AuthzService.create({
     repository: PrismaAuthzReadRepository.create(database),
     listing: PrismaAuthzListingRepository.create(database),
-    bindings: PrismaAuthzBindingRepository.create(prisma as unknown as AuthzBindingDatabase),
+    bindings: PrismaAuthzBindingRepository.create({ database: prisma as unknown as AuthzBindingDatabase }),
     isOnEngine: async () => false,
   });
 

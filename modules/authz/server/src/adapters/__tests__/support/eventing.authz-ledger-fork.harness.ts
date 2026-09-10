@@ -8,14 +8,13 @@ import {
   AuthzGrantsCommandDispatcherPort,
   type AuthzGrantsCommandSenders,
 } from "../../../ports/authz-grants-command-dispatcher.port.ts";
-import {
-  AuthzCutoverFailureReporter,
-  PostgresAuthzCutoverAdapter,
-} from "../../postgres.authz-cutover.adapter.ts";
-import type { AuthzEpochPort } from "../../../ports/authz-epoch.port.ts";
+import { AuthzCutoverFailureReporter } from "../../../ports/authz-cutover-telemetry.port.ts";
+import { AuthzCutoverGateService } from "../../../services/authz-cutover-gate.service.ts";
+import { PrismaAuthzCutoverRepository } from "../../../repositories/prisma/prisma.authz-cutover.repository.ts";
+import type { AuthzEpochRepository } from "../../../repositories/authz-epoch.repository.ts";
 import { AuthzRevocationTelemetryPort } from "../../../ports/authz-revocation-telemetry.port.ts";
 import { PrismaAuthzRevocationRepository } from "../../../repositories/prisma/prisma.authz-revocation.repository.ts";
-import { StubAuthzEpoch } from "../../../ports/__tests__/support/authz-epoch.stub.ts";
+import { StubAuthzEpoch } from "../../../repositories/__tests__/support/authz-epoch.stub.ts";
 
 export const ORG_ID = "org_fork";
 export const ACTOR: LedgerActor = { type: "user", id: "user_admin" };
@@ -75,7 +74,7 @@ export function harness({
   onLedger: boolean;
   poll?: { intervalMs: number; timeoutMs: number };
   dispatcher?: AuthzGrantsCommandDispatcherPort;
-  epoch?: AuthzEpochPort;
+  epoch?: AuthzEpochRepository;
 }) {
   const sent: Array<{ verb: string; data: unknown }> = [];
   const db = {
@@ -106,12 +105,14 @@ export function harness({
   };
   const database = db as unknown as AuthzLedgerDatabase;
   const epoch = epochOverride ?? new StubAuthzEpoch();
-  const cutover = PostgresAuthzCutoverAdapter.create({
-    database: {
-      systemMigrationTenantState: {
-        findUnique: vi.fn().mockResolvedValue(onLedger ? { status: "finalized" } : null),
+  const cutover = AuthzCutoverGateService.create({
+    repository: PrismaAuthzCutoverRepository.create({
+      database: {
+        systemMigrationTenantState: {
+          findUnique: vi.fn().mockResolvedValue(onLedger ? { status: "finalized" } : null),
+        },
       },
-    },
+    }),
     reporter: new SilentReporter(),
   });
   const revocation = PrismaAuthzRevocationRepository.create({

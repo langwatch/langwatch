@@ -7,12 +7,12 @@
  * @see specs/migration/authz-grants-rollout.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthzCutoverFailureReporter } from "../../ports/authz-cutover-telemetry.port.ts";
 import {
-  AuthzCutoverFailureReporter,
-  ENGINE_GATE_CACHE_TTL_MS,
-  PostgresAuthzCutoverAdapter,
   type AuthzCutoverDatabase,
-} from "../postgres.authz-cutover.adapter.ts";
+  PrismaAuthzCutoverRepository,
+} from "../../repositories/prisma/prisma.authz-cutover.repository.ts";
+import { AuthzCutoverGateService, ENGINE_GATE_CACHE_TTL_MS } from "../authz-cutover-gate.service.ts";
 
 const ORGANIZATION_ID = "org_acme";
 
@@ -20,9 +20,11 @@ class SilentReporter extends AuthzCutoverFailureReporter {
   report(): void {}
 }
 
-function adapterOver(findUnique: ReturnType<typeof vi.fn>): PostgresAuthzCutoverAdapter {
-  return PostgresAuthzCutoverAdapter.create({
-    database: { systemMigrationTenantState: { findUnique } } as unknown as AuthzCutoverDatabase,
+function adapterOver(findUnique: ReturnType<typeof vi.fn>): AuthzCutoverGateService {
+  return AuthzCutoverGateService.create({
+    repository: PrismaAuthzCutoverRepository.create({
+      database: { systemMigrationTenantState: { findUnique } } as unknown as AuthzCutoverDatabase,
+    }),
     reporter: new SilentReporter(),
   });
 }

@@ -2,7 +2,7 @@
  * Test builders for the AuthZ application.
  *
  * The app is still composed from the two contract services rather than from
- * repositories (`adapters/postgres.authz.adapter.ts` is what a process builds
+ * repositories (`app/postgres-authz.build.ts` is what a process builds
  * them with), so a test states the slice of each it exercises and the builder
  * refuses every other member by name instead of answering undefined.
  */

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { RedisAuthzEpochAdapter } from "../redis.authz-epoch.adapter.ts";
+import { RedisAuthzEpochRepository } from "../../repositories/redis/redis.authz-epoch.repository.ts";
 import { ACTOR, ORG_ID, harness } from "./support/eventing.authz-ledger-fork.harness.ts";
 
 describe("EventingAuthzLedgerAdapter instant revocation", () => {
@@ -9,7 +9,7 @@ describe("EventingAuthzLedgerAdapter instant revocation", () => {
       get: vi.fn().mockRejectedValue(new Error("redis stopped")),
       incr: vi.fn().mockRejectedValue(new Error("redis stopped")),
     };
-    const epoch = RedisAuthzEpochAdapter.create({ redis });
+    const epoch = RedisAuthzEpochRepository.create({ redis });
     const { writer, db, sent } = harness({ onLedger: true, epoch });
 
     await expect(

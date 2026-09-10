@@ -28,7 +28,7 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
   const authz = AuthzService.create({
     repository: PrismaAuthzReadRepository.create(database),
     listing: PrismaAuthzListingRepository.create(database),
-    bindings: PrismaAuthzBindingRepository.create(prisma as unknown as AuthzBindingDatabase),
+    bindings: PrismaAuthzBindingRepository.create({ database: prisma as unknown as AuthzBindingDatabase }),
     // The legacy RoleBinding head, which is what these rows are. No cache is
     // configured either, so each read below sees the role as it stands.
     isOnEngine: async () => false,

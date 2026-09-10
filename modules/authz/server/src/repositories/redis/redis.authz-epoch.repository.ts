@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { AuthzEpochPort } from "../ports/authz-epoch.port.ts";
+import { AuthzEpochRepository } from "../authz-epoch.repository.ts";
 
 const logger = createLogger("langwatch:authz:epoch");
 const EPOCH_KEY_PREFIX = "authz:epoch:";
@@ -9,21 +9,21 @@ export type AuthzEpochRedis = {
   incr(key: string): Promise<unknown>;
 };
 
-export type RedisAuthzEpochAdapterOptions = {
+export type RedisAuthzEpochRepositoryOptions = {
   redis: AuthzEpochRedis | null;
 };
 
 /** Redis-backed epoch; unavailable or malformed state disables caching. */
-export class RedisAuthzEpochAdapter extends AuthzEpochPort {
-  static create(options: RedisAuthzEpochAdapterOptions): RedisAuthzEpochAdapter {
-    return new RedisAuthzEpochAdapter(options.redis);
+export class RedisAuthzEpochRepository extends AuthzEpochRepository {
+  static create(options: RedisAuthzEpochRepositoryOptions): RedisAuthzEpochRepository {
+    return new RedisAuthzEpochRepository(options.redis);
   }
 
   private constructor(private readonly redis: AuthzEpochRedis | null) {
     super();
   }
 
-  async tryRead({ organizationId }: { organizationId: string }): Promise<number | null> {
+  async findEpoch({ organizationId }: { organizationId: string }): Promise<number | null> {
     if (!this.redis) return null;
     try {
       const raw = await this.redis.get(`${EPOCH_KEY_PREFIX}${organizationId}`);

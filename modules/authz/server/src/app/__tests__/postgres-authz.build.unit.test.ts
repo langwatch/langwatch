@@ -7,8 +7,8 @@ import {
   AuthzGrantsCommandDispatcherPort,
   type AuthzGrantsCommandSenders,
 } from "../../ports/authz-grants-command-dispatcher.port.ts";
-import { AUTHZ_GRANT_PIPELINE_NAME } from "../eventing.authz.adapter.ts";
-import { PostgresAuthzAdapter } from "../postgres.authz.adapter.ts";
+import { AUTHZ_GRANT_PIPELINE_NAME } from "../../adapters/eventing.authz.adapter.ts";
+import { PostgresAuthzAdapter } from "../postgres-authz.build.ts";
 import { type AuthzCounter, AuthzMetricsPort } from "../../ports/authz-metrics.port.ts";
 import type { PostgresAuthzDatabasePort } from "../../ports/postgres-authz-database.port.ts";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";

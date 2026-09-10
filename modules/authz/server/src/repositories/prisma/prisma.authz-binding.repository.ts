@@ -68,8 +68,8 @@ export type AuthzBindingDatabase = {
 };
 
 export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
-  static create(database: AuthzBindingDatabase): PrismaAuthzBindingRepository {
-    return new PrismaAuthzBindingRepository(database);
+  static create(options: { database: AuthzBindingDatabase }): PrismaAuthzBindingRepository {
+    return new PrismaAuthzBindingRepository(options.database);
   }
 
   private constructor(private readonly database: AuthzBindingDatabase) {

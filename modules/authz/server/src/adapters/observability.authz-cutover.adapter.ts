@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   AuthzCutoverFailureReporter,
   type AuthzCutoverReadFailure,
-} from "./postgres.authz-cutover.adapter.ts";
+} from "../ports/authz-cutover-telemetry.port.ts";
 
 export type AuthzCutoverCounter = { inc(): void };
 

@@ -35,18 +35,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "authz|persistence-adapter",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "authz|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "authz|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "automation|fixtures-directory",
       "measured": "2026-09-08"
     },

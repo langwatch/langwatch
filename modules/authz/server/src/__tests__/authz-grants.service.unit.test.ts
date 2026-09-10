@@ -14,7 +14,7 @@ import {
 } from "../repositories/authz-grant.repository.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";
-import { StubAuthzEpoch } from "../ports/__tests__/support/authz-epoch.stub.ts";
+import { StubAuthzEpoch } from "../repositories/__tests__/support/authz-epoch.stub.ts";
 import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";

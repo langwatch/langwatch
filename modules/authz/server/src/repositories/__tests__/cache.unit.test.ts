@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
 import { AuthzService, type AuthzServiceOptions } from "../../services/authz.service.ts";
 import { StubAuthzBindingRepository } from "./support/authz-binding.stub.ts";
-import { StubAuthzEpoch } from "../../ports/__tests__/support/authz-epoch.stub.ts";
+import { StubAuthzEpoch } from "./support/authz-epoch.stub.ts";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub.ts";
 import { makeReader } from "./support/authz-read.stub.ts";
 
@@ -41,7 +41,7 @@ function makeService({
   cacheMaxAgeMs?: AuthzServiceOptions["cacheMaxAgeMs"];
 }) {
   const epochPort = new StubAuthzEpoch();
-  epochPort.tryRead.mockImplementation(() => epoch());
+  epochPort.findEpoch.mockImplementation(() => epoch());
   return AuthzService.create({
     // These suites exercise the engine path, which is what the absent
     // gate used to default to.

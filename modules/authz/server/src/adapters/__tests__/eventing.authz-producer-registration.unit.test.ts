@@ -25,7 +25,7 @@ import {
 import { AuthzGrantsCommandDispatcherPort } from "../../ports/authz-grants-command-dispatcher.port.ts";
 import type { AuthzGrantsCommandSenders } from "../../ports/authz-grants-command-dispatcher.port.ts";
 import type { PostgresAuthzDatabasePort } from "../../ports/postgres-authz-database.port.ts";
-import { PostgresAuthzAdapter } from "../postgres.authz.adapter.ts";
+import { PostgresAuthzAdapter } from "../../app/postgres-authz.build.ts";
 import { EventingAuthzCommandDispatcherAdapter } from "../eventing.authz-command-dispatcher.adapter.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../eventing.authz.adapter.ts";
 

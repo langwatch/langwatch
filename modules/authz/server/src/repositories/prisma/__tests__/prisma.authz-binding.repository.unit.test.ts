@@ -24,7 +24,7 @@ function setup() {
   } satisfies AuthzBindingDatabase;
   return {
     database,
-    repository: PrismaAuthzBindingRepository.create(database),
+    repository: PrismaAuthzBindingRepository.create({ database }),
   };
 }
 

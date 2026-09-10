@@ -6,6 +6,7 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { type AuthzMetricsPort, UncountedAuthzMetrics } from "../ports/authz-metrics.port.ts";
 import type { PostgresAuthzDatabasePort } from "../ports/postgres-authz-database.port.ts";
+import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
 import type {
@@ -16,8 +17,8 @@ import {
   type AuthzEngineLedger,
   LegacyImportAuthzGrantMigration,
 } from "../migrations/legacy-import.authz-grant.migration.ts";
-import type { AuthzEpochRedis } from "./redis.authz-epoch.adapter.ts";
-import { RedisAuthzEpochAdapter } from "./redis.authz-epoch.adapter.ts";
+import type { AuthzEpochRedis } from "../repositories/redis/redis.authz-epoch.repository.ts";
+import { RedisAuthzEpochRepository } from "../repositories/redis/redis.authz-epoch.repository.ts";
 import type { AuthzGrantWriteDatabase } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import type { AuthzMigrationDatabase } from "../repositories/prisma/prisma.authz-migration.repository.ts";
@@ -41,14 +42,15 @@ import {
   type AuthzLedgerDatabase,
   type EventingAuthzLedgerAdapterOptions,
   EventingAuthzLedgerAdapter,
-} from "./eventing.authz-ledger.adapter.ts";
-import { EventingAuthzAdapter } from "./eventing.authz.adapter.ts";
+} from "../adapters/eventing.authz-ledger.adapter.ts";
+import { EventingAuthzAdapter } from "../adapters/eventing.authz.adapter.ts";
+import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import {
   type AuthzCutoverDatabase,
-  PostgresAuthzCutoverAdapter,
-} from "./postgres.authz-cutover.adapter.ts";
-import { ObservabilityAuthzCutoverAdapter } from "./observability.authz-cutover.adapter.ts";
-import { ObservabilityAuthzRevocationAdapter } from "./observability.authz-revocation.adapter.ts";
+  PrismaAuthzCutoverRepository,
+} from "../repositories/prisma/prisma.authz-cutover.repository.ts";
+import { ObservabilityAuthzCutoverAdapter } from "../adapters/observability.authz-cutover.adapter.ts";
+import { ObservabilityAuthzRevocationAdapter } from "../adapters/observability.authz-revocation.adapter.ts";
 import { fromDate } from "@langwatch/time";
 
 /**
@@ -66,6 +68,12 @@ type InternalPostgresAuthzDatabase = AuthzLedgerDatabase &
 
 export type PostgresAuthzAdapterOptions = {
   database: PostgresAuthzDatabasePort;
+  /**
+   * The rows the process selected at boot. A caller that composes this graph
+   * by hand may omit them, and the two selectable rows are then built from the
+   * structural database above.
+   */
+  repositories?: AuthzRepositories;
   redis: AuthzEpochRedis | null;
   dispatcher: AuthzGrantsCommandDispatcherPort;
   /**
@@ -188,9 +196,10 @@ export class PostgresAuthzAdapter {
   build(): PostgresAuthzBuild {
     const database = this.options.database as unknown as InternalPostgresAuthzDatabase;
     const metrics = this.options.metrics ?? UncountedAuthzMetrics.create();
-    const epoch = RedisAuthzEpochAdapter.create({ redis: this.options.redis });
-    const cutover = PostgresAuthzCutoverAdapter.create({
-      database,
+    const epoch = RedisAuthzEpochRepository.create({ redis: this.options.redis });
+    const cutover = AuthzCutoverGateService.create({
+      repository:
+        this.options.repositories?.cutover ?? PrismaAuthzCutoverRepository.create({ database }),
       // Composed here rather than received, so the WHEN of each counter is
       // described once for every process. A caller that passed its own
       // reporter would be a second description of "warn, then increment".
@@ -224,7 +233,8 @@ export class PostgresAuthzAdapter {
       writer: ledger,
       selectHead,
     });
-    const bindingRepository = PrismaAuthzBindingRepository.create(database);
+    const bindingRepository =
+      this.options.repositories?.bindings ?? PrismaAuthzBindingRepository.create({ database });
 
     const authzOptions: AuthzServiceOptions = {
       repository: RoutedAuthzReadRepository.create({
@@ -239,7 +249,7 @@ export class PostgresAuthzAdapter {
       epoch,
       isOnEngine: selectHead,
       findEngineCutoverAt: async (organizationId) => {
-        const finalizedAt = await cutover.tryGetFinalizedAt({ organizationId });
+        const finalizedAt = await cutover.findFinalizedAt({ organizationId });
 
         return finalizedAt === null ? null : fromDate(finalizedAt);
       },

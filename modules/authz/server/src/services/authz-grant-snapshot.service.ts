@@ -4,7 +4,7 @@ import {
   type CollectedGrants,
   type ResourceGrant,
 } from "@langwatch/authz-contract";
-import type { AuthzEpochPort } from "../ports/authz-epoch.port.ts";
+import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
 import { nowInstant } from "@langwatch/time";
@@ -19,7 +19,7 @@ type CacheEntry = {
 };
 
 export type AuthzGrantSnapshotServiceOptions = {
-  epoch?: AuthzEpochPort;
+  epoch?: AuthzEpochRepository;
   cacheEnabled?: () => boolean;
   demoProjectId?: () => string | undefined;
   cacheMaxAgeMs?: number;
@@ -57,7 +57,7 @@ export class AuthzGrantSnapshotService {
       return this.collector.collectGrants({ principal, organizationId });
     }
 
-    const currentEpoch = await epoch.tryRead({ organizationId });
+    const currentEpoch = await epoch.findEpoch({ organizationId });
     if (currentEpoch === null) {
       return this.collector.collectGrants({ principal, organizationId });
     }

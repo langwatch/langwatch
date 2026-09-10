@@ -8,13 +8,15 @@ import type {
 } from "@langwatch/authz-contract";
 import { AuthzApi as AuthzApiToken } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import {
   PostgresAuthzAdapter,
   type PostgresAuthzAdapterOptions,
-} from "../adapters/postgres.authz.adapter.ts";
+} from "./postgres-authz.build.ts";
 
-export type AuthzInfrastructure = PostgresAuthzAdapterOptions;
-export type AuthzSetup = FeatureSetup<Readonly<{}>, AuthzInfrastructure, undefined>;
+export type AuthzInfrastructure = Omit<PostgresAuthzAdapterOptions, "repositories">;
+export type AuthzSetup = FeatureSetup<Readonly<{}>, AuthzInfrastructure, undefined> &
+  Readonly<{ repositories: AuthzRepositories }>;
 
 /** The composed callable authorization boundary. */
 export class AuthzApp implements AuthzApi {
@@ -27,7 +29,10 @@ export class AuthzApp implements AuthzApi {
     this.#grants = grants;
   }
   static create(setup: AuthzSetup): AuthzApp {
-    const built = PostgresAuthzAdapter.create(setup.infrastructure).build();
+    const built = PostgresAuthzAdapter.create({
+      ...setup.infrastructure,
+      repositories: setup.repositories,
+    }).build();
     return new AuthzApp(built.authz, built.grants);
   }
 

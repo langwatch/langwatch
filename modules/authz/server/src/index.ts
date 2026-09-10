@@ -12,12 +12,12 @@ export {
   type AuthzPipeline,
   type PostgresAuthzAdapterOptions,
   type PostgresAuthzBuild,
-} from "./adapters/postgres.authz.adapter.ts";
+} from "./app/postgres-authz.build.ts";
 export {
   PostgresAuthzPipelineAdapter,
   type AuthzGrantPipelineDatabase,
   type PostgresAuthzPipelineOptions,
-} from "./adapters/postgres.authz-pipeline.adapter.ts";
+} from "./app/postgres-authz-pipeline.build.ts";
 export {
   AuthzGrantsCommandDispatcherPort,
   AuthzLedgerUnavailableError,
@@ -45,6 +45,8 @@ export {
   type AuthzCutoverCounter,
 } from "./adapters/observability.authz-cutover.adapter.ts";
 export { EventingAuthzGrantAdapter } from "./adapters/eventing.authz-grant.adapter.ts";
+export { authzRepositories } from "./repositories/authz-repositories.registry.ts";
+export type { AuthzRepositories } from "./repositories/authz.repositories.ts";
 export { AuthzApp } from "./app/authz.app.ts";
 export { authzServer, type AuthzInfrastructure } from "./authz.server.ts";
 export {

@@ -39,7 +39,7 @@ import {
   scopeOrganizationId,
 } from "@langwatch/authz-contract";
 import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port.ts";
-import type { AuthzEpochPort } from "../ports/authz-epoch.port.ts";
+import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
 import type {
   AuthzGrantRepository,
@@ -59,7 +59,7 @@ export type AuthzGrantsServiceOptions = {
   repository: AuthzGrantRepository;
   /** Private compatibility writer; its operations surface only through this service. */
   ledger: AuthzCompatibilityLedgerPort;
-  epoch: AuthzEpochPort;
+  epoch: AuthzEpochRepository;
   newBindingId: () => string;
   bindings: AuthzBindingRepository;
 };

@@ -8,8 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type AuthzGrantPipelineDatabase,
   PostgresAuthzPipelineAdapter,
-} from "../postgres.authz-pipeline.adapter.ts";
-import type { AuthzGrantsEvent } from "../eventing.authz.adapter.ts";
+} from "../postgres-authz-pipeline.build.ts";
+import type { AuthzGrantsEvent } from "../../adapters/eventing.authz.adapter.ts";
 import type { AuthzGrantProjection } from "../../projections/authz-grant.projection.ts";
 
 const ORGANIZATION = "organization_acme";

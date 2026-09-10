@@ -56,7 +56,7 @@ import {
   scopeOrganizationId,
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
-import type { AuthzEpochPort } from "../ports/authz-epoch.port.ts";
+import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
 import type { AuthzListingRepository } from "../repositories/authz-listing.repository.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
@@ -90,7 +90,7 @@ export type AuthzServiceOptions = {
   listing: AuthzListingRepository;
   bindings: AuthzBindingRepository;
   /** Omitted = never cache. */
-  epoch?: AuthzEpochPort;
+  epoch?: AuthzEpochRepository;
   /** Internal rollout knob; omitted = cache off. The composition root
    *  supplies the env read. */
   cacheEnabled?: () => boolean;

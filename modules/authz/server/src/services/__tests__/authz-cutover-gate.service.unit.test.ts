@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
 import {
   AuthzCutoverFailureReporter,
-  AUTHZ_ENGINE_MIGRATION_NAME,
-  ENGINE_GATE_CACHE_TTL_MS,
-  PostgresAuthzCutoverAdapter,
-  type AuthzCutoverDatabase,
   type AuthzCutoverReadFailure,
-} from "../postgres.authz-cutover.adapter.ts";
+} from "../../ports/authz-cutover-telemetry.port.ts";
+import {
+  type AuthzCutoverDatabase,
+  PrismaAuthzCutoverRepository,
+} from "../../repositories/prisma/prisma.authz-cutover.repository.ts";
+import { AuthzCutoverGateService, ENGINE_GATE_CACHE_TTL_MS } from "../authz-cutover-gate.service.ts";
 
 const ORG_ID = "org_gate";
 
@@ -21,16 +23,16 @@ class RecordingReporter extends AuthzCutoverFailureReporter {
 function stateTable(status: string | null) {
   const findUnique = vi.fn().mockResolvedValue(status === null ? null : { status });
   const reporter = new RecordingReporter();
-  const adapter = PostgresAuthzCutoverAdapter.create({
-    database: {
-      systemMigrationTenantState: { findUnique },
-    } as AuthzCutoverDatabase,
+  const adapter = AuthzCutoverGateService.create({
+    repository: PrismaAuthzCutoverRepository.create({
+      database: { systemMigrationTenantState: { findUnique } } as AuthzCutoverDatabase,
+    }),
     reporter,
   });
   return { adapter, findUnique, reporter };
 }
 
-describe("PostgresAuthzCutoverAdapter", () => {
+describe("AuthzCutoverGateService", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -66,12 +68,12 @@ describe("PostgresAuthzCutoverAdapter", () => {
   it("reports a failed state read and fails safe to legacy", async () => {
     const error = new Error("pg is down");
     const reporter = new RecordingReporter();
-    const adapter = PostgresAuthzCutoverAdapter.create({
-      database: {
-        systemMigrationTenantState: {
-          findUnique: vi.fn().mockRejectedValue(error),
-        },
-      },
+    const adapter = AuthzCutoverGateService.create({
+      repository: PrismaAuthzCutoverRepository.create({
+        database: {
+          systemMigrationTenantState: { findUnique: vi.fn().mockRejectedValue(error) },
+        } as AuthzCutoverDatabase,
+      }),
       reporter,
     });
 
@@ -87,24 +89,26 @@ describe("PostgresAuthzCutoverAdapter", () => {
       .fn()
       .mockResolvedValueOnce({ status: "finalized", occurredAt })
       .mockResolvedValueOnce({ status: "migrated", occurredAt });
-    const adapter = PostgresAuthzCutoverAdapter.create({
-      database: { systemMigrationTenantState: { findUnique } },
+    const adapter = AuthzCutoverGateService.create({
+      repository: PrismaAuthzCutoverRepository.create({
+        database: { systemMigrationTenantState: { findUnique } } as AuthzCutoverDatabase,
+      }),
       reporter: new RecordingReporter(),
     });
 
-    await expect(adapter.tryGetFinalizedAt({ organizationId: ORG_ID })).resolves.toEqual(
+    await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toEqual(
       occurredAt,
     );
-    await expect(adapter.tryGetFinalizedAt({ organizationId: ORG_ID })).resolves.toBeNull();
+    await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toBeNull();
   });
 
   it("raises through the uncached read used by revocation routing", async () => {
-    const adapter = PostgresAuthzCutoverAdapter.create({
-      database: {
-        systemMigrationTenantState: {
-          findUnique: vi.fn().mockRejectedValue(new Error("pg is down")),
-        },
-      },
+    const adapter = AuthzCutoverGateService.create({
+      repository: PrismaAuthzCutoverRepository.create({
+        database: {
+          systemMigrationTenantState: { findUnique: vi.fn().mockRejectedValue(new Error("pg is down")) },
+        } as AuthzCutoverDatabase,
+      }),
       reporter: new RecordingReporter(),
     });
 
@@ -126,8 +130,10 @@ describe("PostgresAuthzCutoverAdapter", () => {
       .fn()
       .mockResolvedValueOnce({ status: "finalized" })
       .mockResolvedValue({ status: "rolled_back" });
-    const adapter = PostgresAuthzCutoverAdapter.create({
-      database: { systemMigrationTenantState: { findUnique } },
+    const adapter = AuthzCutoverGateService.create({
+      repository: PrismaAuthzCutoverRepository.create({
+        database: { systemMigrationTenantState: { findUnique } } as AuthzCutoverDatabase,
+      }),
       reporter: new RecordingReporter(),
     });
 
