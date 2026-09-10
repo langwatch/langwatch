@@ -52,8 +52,11 @@ export {
 // family's declaration behind the one execution path.
 export {
   createRestRuntime,
+  type RestAuditRow,
+  type RestAuditSink,
   type RestCaller,
   type RestDeprecationLogPort,
+  type RestIdentityPort,
   type RestMountOptions,
   type RestRuntime,
   type RestRuntimePorts,
@@ -249,6 +252,7 @@ export {
   isInternalSecretValid,
   managementActor,
   registerRoutePolicy,
+  restAddressInventory,
   undeclaredRoutes,
   type ApiErrorEnvelope,
   type AppRestManagementAuditPort,
@@ -257,6 +261,7 @@ export {
   type AuthDiagnostics,
   type MountedRouteTable,
   type RegisteredRoute,
+  type RestAddress,
   type RestApiServicePorts,
 } from "./security.ts";
 

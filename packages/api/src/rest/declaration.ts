@@ -143,7 +143,7 @@ export type RestDeprecation = Readonly<{
  */
 export type RestDoorCredential = Extract<
   Credential,
-  "projectKey" | "organizationKey" | "scimToken" | "internalSecret" | "instanceAdminKey" | "session"
+  "project" | "organization" | "scimToken" | "internalSecret" | "instance-admin" | "browser"
 >;
 
 /**
@@ -153,12 +153,12 @@ export type RestDoorCredential = Extract<
  * credential names no tenant at all - a deployment's own shared secret.
  */
 export const DOOR_SCOPE_TIER = {
-  projectKey: "project",
-  organizationKey: "organization",
+  project: "project",
+  organization: "organization",
   scimToken: "organization",
-  session: "project",
+  browser: "project",
   internalSecret: null,
-  instanceAdminKey: null,
+  "instance-admin": null,
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */
@@ -352,6 +352,10 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly middleware?: readonly RestTransportMiddleware[];
   readonly bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
   readonly deprecated?: RestDeprecation;
+  /** The door this ONE route answers behind; the family's own when absent. */
+  readonly credential?: RestDoorCredential;
+  /** Present exactly when the route declared the trail it leaves. */
+  readonly audit?: string;
   readonly handler: StoredHandler<Api>;
 }>;
 
@@ -402,6 +406,8 @@ type RouteState = Readonly<{
   middleware?: readonly RestTransportMiddleware[];
   bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
   deprecated?: RestDeprecation;
+  credential?: RestDoorCredential;
+  audit?: string;
 }>;
 
 type RouteReady<
@@ -427,10 +433,11 @@ class RouteBuilder<
   Permission extends boolean = false,
   Middleware extends readonly RestTransportMiddleware[] = [],
   Access extends RouteAccessKind = "scoped",
-  Door extends RestDoorCredential = "projectKey",
+  Family extends RestDoorCredential = "project",
+  Door extends RestDoorCredential = Family,
 > {
   constructor(
-    private readonly router: RestTransportRouter<Api, Door>,
+    private readonly router: RestTransportRouter<Api, Family>,
     private readonly method: Method,
     private readonly path: Path,
     private readonly operation: string,
@@ -452,6 +459,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertSourceUnset("params", this.state.params);
@@ -477,6 +485,7 @@ class RouteBuilder<
       Permission,
       Middleware,
       Access,
+      Family,
       Door
     >,
     schema: Schema & DistinctSchema<Schema, Params> & DistinctSchema<Schema, Query>,
@@ -491,6 +500,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertBodyMethod(this.method, this.path);
@@ -522,6 +532,7 @@ class RouteBuilder<
       Permission,
       Middleware,
       Access,
+      Family,
       Door
     >,
     form: Form,
@@ -537,6 +548,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertBodyMethod(this.method, this.path);
@@ -566,6 +578,7 @@ class RouteBuilder<
       Permission,
       Middleware,
       Access,
+      Family,
       Door
     >,
     multipart: Readonly<{ fields: Fields; files: Files }>,
@@ -580,6 +593,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertBodyMethod(this.method, this.path);
@@ -613,6 +627,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertSourceUnset("rateLimit", this.state.rateLimit);
@@ -641,6 +656,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertSourceUnset("cache", this.state.cache);
@@ -670,6 +686,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertSourceUnset("entitlement", this.state.entitlement);
@@ -698,6 +715,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertSourceUnset("idempotency", this.state.idempotency);
@@ -721,6 +739,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertSourceUnset("query", this.state.query);
@@ -741,7 +760,7 @@ class RouteBuilder<
   withPermission(
     permission: AuthzPermission,
     target?: RestPermissionTarget,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, true, Middleware, Access, Door> {
+  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, true, Middleware, Access, Family, Door> {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       permission,
@@ -768,6 +787,7 @@ class RouteBuilder<
     true,
     Middleware,
     Kind["kind"],
+    Family,
     Door
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
@@ -789,6 +809,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertVersionLabel(version);
@@ -812,6 +833,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
@@ -834,6 +856,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
@@ -855,6 +878,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertSourceUnset("output", this.state.output ?? this.state.answers);
@@ -885,6 +909,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertSourceUnset("output", this.state.output ?? this.state.answers);
@@ -915,6 +940,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     assertSourceUnset("rawResponse", this.state.rawResponse);
@@ -948,6 +974,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     const methods = names.map((name) => name.toLowerCase() as HttpMethod);
@@ -977,6 +1004,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
@@ -998,6 +1026,7 @@ class RouteBuilder<
           Permission,
           Middleware,
           Access,
+          Family,
           Door
         >
       : never,
@@ -1008,7 +1037,7 @@ class RouteBuilder<
         RawResponseArguments<Output>,
       ...facts: MiddlewareFacts<Middleware>
     ) => TResult,
-  ): RestTransportRouter<Api, Door> {
+  ): RestTransportRouter<Api, Family> {
     assertRouteReady({
       method: this.method,
       path: this.path,
@@ -1066,6 +1095,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     if (!Number.isInteger(status) || status < 200 || status > 299) {
@@ -1093,6 +1123,7 @@ class RouteBuilder<
     Permission,
     Middleware,
     Access,
+    Family,
     Door
   > {
     if (!Number.isSafeInteger(limit.maxBytes) || limit.maxBytes < 0)
@@ -1117,12 +1148,83 @@ class RouteBuilder<
     Permission,
     [...Middleware, ...Added],
     Access,
+    Family,
     Door
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       middleware: [...(this.state.middleware ?? []), ...middleware],
     });
+  }
+
+  /**
+   * The door THIS route answers behind, where it differs from the family's own.
+   * It retypes the handler's actor and scope through `DOOR_SCOPE_TIER`, so a
+   * route that raises its own door reads the scope that door resolves rather
+   * than the family's.
+   */
+  withCredential<NewDoor extends RestDoorCredential>(
+    credential: NewDoor,
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Family,
+    NewDoor
+  > {
+    assertSourceUnset("credential", this.state.credential);
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      credential,
+    });
+  }
+
+  /**
+   * The trail this route leaves. The runtime writes the row from the actor, the
+   * route's own parameters and the answer's id, so the App carries none of it;
+   * a declared action with no audit sink on the runtime is refused at mount.
+   */
+  withAudit(
+    action: string,
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Family,
+    Door
+  > {
+    assertAuditAction(action);
+    assertSourceUnset("audit", this.state.audit);
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      audit: action,
+    });
+  }
+}
+
+/**
+ * An audit action names what happened, as `<subject>.<verb>`: the trail is read
+ * by subject, and a free-form sentence cannot be grouped.
+ */
+function assertAuditAction(action: string): void {
+  if (!/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/.test(action)) {
+    throw new Error(`REST audit action "${action}" must be dotted lower kebab case`);
   }
 }
 
@@ -1140,6 +1242,8 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.idempotency ? { idempotency: state.idempotency } : {}),
     ...(state.rawResponse ? { rawResponse: state.rawResponse } : {}),
+    ...(state.credential ? { credential: state.credential } : {}),
+    ...(state.audit ? { audit: state.audit } : {}),
   };
 }
 
@@ -1151,7 +1255,7 @@ type OpenRoute<
   Door extends RestDoorCredential,
 > = RouteBuilder<Api, Method, Path, Missing, Missing, Missing, Missing, false, [], "scoped", Door>;
 
-class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
+class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
   readonly routes: RestTransportRoute<Api>[] = [];
   private addressing: RestAddressing = "dated";
   private v1Twin = true;
@@ -1330,10 +1434,10 @@ export function defineRestRouter<Api>(api: FeatureApiWitness<Api>) {
       assertNamespace(namespace);
 
       return {
-        withVersion(version: DateVersion): RestTransportRouter<Api, "projectKey"> {
+        withVersion(version: DateVersion): RestTransportRouter<Api, "project"> {
           assertVersionLabel(version);
 
-          return new RestTransportRouter<Api, "projectKey">(api, namespace, version, "projectKey");
+          return new RestTransportRouter<Api, "project">(api, namespace, version, "project");
         },
       };
     },

@@ -232,8 +232,8 @@ describe("deciding access for one call", () => {
 
 describe("the security requirement one credential publishes", () => {
   it("names the scheme an API client presents", () => {
-    expect(securityRequirement("projectKey")).toEqual([{ project_api_key: [] }]);
-    expect(securityRequirement("organizationKey")).toEqual([{ admin_api_key: [] }]);
+    expect(securityRequirement("project")).toEqual([{ project_api_key: [] }]);
+    expect(securityRequirement("organization")).toEqual([{ admin_api_key: [] }]);
     expect(securityRequirement("public")).toEqual([]);
   });
 
@@ -244,7 +244,7 @@ describe("the security requirement one credential publishes", () => {
   });
 
   it("refuses a credential no API client can present", () => {
-    expect(() => securityRequirement("session")).toThrow(/no security scheme/);
+    expect(() => securityRequirement("browser")).toThrow(/no security scheme/);
   });
 });
 
@@ -273,6 +273,6 @@ describe("the two access kinds that answer for nobody in particular", () => {
 describe("the security requirement the instance administrator's key publishes", () => {
   /** @scenario "A family behind the instance administrator's own key names no tenant" */
   it("names the scheme the operator presents", () => {
-    expect(securityRequirement("instanceAdminKey")).toEqual([{ instance_admin_key: [] }]);
+    expect(securityRequirement("instance-admin")).toEqual([{ instance_admin_key: [] }]);
   });
 });

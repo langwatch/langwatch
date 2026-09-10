@@ -75,7 +75,7 @@ function runtimeApp(app: () => AnnotationApi = () => application): Hono {
 
   return runtime.mount(annotations.router(), {
     app,
-    credential: "projectKey",
+    credential: "project",
     onError: (error) => {
       throw error;
     },
@@ -135,7 +135,7 @@ function secretsApp(): Hono {
 
   return runtime.mount(secrets.router(), {
     app: () => secretApplication,
-    credential: "projectKey",
+    credential: "project",
     onError: createErrorHandler(),
   });
 }
@@ -348,7 +348,7 @@ function reportsApp(): Hono {
 
   return runtime.mount(reports.router(), {
     app: () => ({ read: async ({ id }: { id: string }) => ({ id }) }),
-    credential: "projectKey",
+    credential: "project",
     onError: createErrorHandler(),
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
@@ -417,7 +417,7 @@ function runPlansApp(): Hono {
 
   return runtime.mount(runPlans.router(), {
     app: () => ({ read: async ({ id }: { id: string }) => ({ id }) }),
-    credential: "projectKey",
+    credential: "project",
     onError: createErrorHandler(),
   });
 }
@@ -501,7 +501,7 @@ function legacyReportsApp(deprecationLog?: RestDeprecationLogPort): {
 
   const app = runtime.mount(legacyReports.router(), {
     app: () => ({ read: async ({ id }: { id: string }) => ({ id }) }),
-    credential: "projectKey",
+    credential: "project",
     onError: createErrorHandler(),
   });
 
@@ -630,7 +630,7 @@ const ORGANIZATION_ID = "organization-1";
 const roles = defineRestRouter(RoleApi)
   .withNamespace("roles")
   .withVersion(VERSION)
-  .withCredential("organizationKey")
+  .withCredential("organization")
 
   .get("/", "listRoles")
   .withPermission("organization:manage")
@@ -775,7 +775,7 @@ describe("a family whose declaration names the organization door", () => {
         }),
       ).toEqual([{ admin_api_key: [] }]);
 
-      expect(securityRequirement("organizationKey")).toEqual([{ admin_api_key: [] }]);
+      expect(securityRequirement("organization")).toEqual([{ admin_api_key: [] }]);
     });
   });
 
@@ -807,7 +807,7 @@ const codingAgent = defineRestRouter(RoleApi)
   .withNamespace("coding-agent")
   .withVersion(VERSION)
   .withAddressing("v1-only")
-  .withCredential("organizationKey")
+  .withCredential("organization")
   .get("/usage", "readCodingAgentUsage")
   .withPermission("organization:manage")
   .withOutput(z.object({ organizationId: z.string() }))
@@ -873,7 +873,7 @@ const projects = defineRestRouter(ProjectApi)
   .withNamespace("projects")
   .withVersion(VERSION)
   .withAddressing("dated", { v1Twin: false })
-  .withCredential("organizationKey")
+  .withCredential("organization")
 
   .get("/", "listProjects")
   .withAccess(anyAuthenticated({ reason: LISTING_IS_THE_GATE }))
@@ -1934,7 +1934,7 @@ const OWNER_IN_HANDLER =
 const files = defineRestRouter(FilesApi)
   .withNamespace("stored-object")
   .withVersion(VERSION)
-  .withCredential("session")
+  .withCredential("browser")
   .withAddressing("dated", { v1Twin: false })
   .get("/:id/content", "readStoredObject")
   .withParams(z.object({ id: z.string() }))
@@ -2292,7 +2292,7 @@ const InstanceApi = moduleApi<InstanceApi>("organization");
 const instanceSetup = defineRestRouter(InstanceApi)
   .withNamespace("instance")
   .withVersion(VERSION)
-  .withCredential("instanceAdminKey")
+  .withCredential("instance-admin")
   .withAddressing("v1-only")
   .post("/organizations", "createFirstOrganization")
   .withInput(z.object({ name: z.string() }))
@@ -2357,7 +2357,7 @@ describe("a family behind the instance administrator's own key", () => {
         credentialClass: route!.credentialClass,
       }),
     ).toEqual([{ instance_admin_key: [] }]);
-    expect(securityRequirement("instanceAdminKey")).toEqual([{ instance_admin_key: [] }]);
+    expect(securityRequirement("instance-admin")).toEqual([{ instance_admin_key: [] }]);
   });
 
   /** @scenario "A family behind the instance administrator's own key names no tenant" */

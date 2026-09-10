@@ -10,6 +10,7 @@ import type {
   AuthzPermission,
   PermissionDecision,
 } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
@@ -112,36 +113,71 @@ export type RestCaller = Readonly<{
   markUsed?: () => void;
 }>;
 
+/**
+ * What one door does: authenticate a caller behind a credential kind, identify
+ * one with nothing asked of it, and answer a permission at a scope a route's
+ * own path named.
+ */
+export type RestIdentityPort = Readonly<{
+  authenticate(input: {
+    request: Request;
+    permission: AuthzPermission;
+  }): Promise<RestCaller> | RestCaller;
+  /**
+   * The door, opened with no permission asked of it. Only a declaration
+   * carrying an `anyAuthenticated` route needs it, and a mount that supplies
+   * none is refused by name.
+   */
+  identify?(input: { request: Request }): Promise<RestCaller> | RestCaller;
+  /**
+   * The same door, opened for a caller who may have presented nothing: it
+   * answers `null` for a request carrying no credential at all, and refuses
+   * one carrying a credential it will not accept.
+   */
+  identifyOptional?(input: { request: Request }): Promise<RestCaller | null> | RestCaller | null;
+  /**
+   * Whether the caller holds `permission` at the scope a route's own path
+   * named. Only a declaration carrying such a route needs it, and a mount that
+   * supplies none is refused by name.
+   */
+  authorize?(input: {
+    caller: RestCaller;
+    permission: AuthzPermission;
+    target: AuthzDeclaredScopeId;
+  }): Promise<PermissionDecision> | PermissionDecision;
+}>;
+
+/**
+ * What one finished route leaves on the trail. The runtime writes it; a route
+ * that declared an action and reaches a runtime with no sink is refused at
+ * mount, so a declared trail is never silently lost.
+ */
+export type RestAuditSink = Readonly<{
+  record(row: RestAuditRow): Promise<void> | void;
+}>;
+
+/** One audit row: who, what, where, on which resource, and how it ended. */
+export type RestAuditRow = Readonly<{
+  actorId: string | null;
+  action: string;
+  scope: AuthzDeclaredScopeId | null;
+  params: Readonly<Record<string, unknown>>;
+  resultId: string | null;
+  /** The handled error's own code, on a refusal; absent on an answer. */
+  errorCode?: string;
+}>;
+
 /** Everything the process supplies for the path to run. */
 export type RestRuntimePorts = Readonly<{
-  identity: Readonly<{
-    authenticate(input: {
-      request: Request;
-      permission: AuthzPermission;
-    }): Promise<RestCaller> | RestCaller;
-    /**
-     * The family's own door, opened with no permission asked of it. Only a
-     * declaration carrying an `anyAuthenticated` route needs it, and a mount
-     * that supplies none is refused by name.
-     */
-    identify?(input: { request: Request }): Promise<RestCaller> | RestCaller;
-    /**
-     * The same door, opened for a caller who may have presented nothing: it
-     * answers `null` for a request carrying no credential at all, and refuses
-     * one carrying a credential it will not accept.
-     */
-    identifyOptional?(input: { request: Request }): Promise<RestCaller | null> | RestCaller | null;
-    /**
-     * Whether the caller holds `permission` at the scope a route's own path
-     * named. Only a declaration carrying such a route needs it, and a mount
-     * that supplies none is refused by name.
-     */
-    authorize?(input: {
-      caller: RestCaller;
-      permission: AuthzPermission;
-      target: AuthzDeclaredScopeId;
-    }): Promise<PermissionDecision> | PermissionDecision;
-  }>;
+  /** The family's own door: the one every route falls back to. */
+  identity: RestIdentityPort;
+  /**
+   * One door per credential kind a ROUTE may raise for itself. A route naming a
+   * kind this table does not open is refused at mount, by kind.
+   */
+  doors?: Partial<Readonly<Record<RestDoorCredential, RestIdentityPort>>>;
+  /** Where every route that declared an action leaves its row. */
+  audit?: RestAuditSink;
   /** Only a family whose routes carry a check of their own supplies these. */
   authorization?: Readonly<{ forRequest(request: Request): AuthorizePort }>;
   /** The counter behind every route that declared how often one caller may ask. */
@@ -194,6 +230,14 @@ export type RestMountOptions<Api> = Readonly<{
   reason?: string;
 }>;
 
+/**
+ * The credential kind ONE route answers behind: the door it raised for itself,
+ * or the one the mount named for the whole family.
+ */
+function routeCredential(route: RestTransportRoute<unknown>, family: Credential): Credential {
+  return route.credential ?? family;
+}
+
 /** Mounts declared REST families on one process's own doors. */
 export interface RestRuntime {
   mount<Api>(declaration: RestTransportDeclaration<Api>, options: RestMountOptions<Api>): HonoApp;
@@ -242,7 +286,9 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
             }),
             policy: registryPolicy({ route, options, credential }),
             credentialClass:
-              route.access?.kind === "public" ? "none" : CREDENTIAL_CLASS[credential],
+              route.access?.kind === "public" ? "none" : CREDENTIAL_CLASS[routeCredential(route, credential)],
+            credential:
+              route.access?.kind === "public" ? "public" : routeCredential(route, credential),
             family: declaration.namespace,
             served,
           });
@@ -275,6 +321,13 @@ function assertPortsBound<Api>({
 
   for (const route of declaration.routes) {
     const address = `${route.method.toUpperCase()} ${base}${route.path}`;
+
+    if (route.credential && route.credential !== declaration.credential && !ports.doors?.[route.credential]) {
+      throw new Error(
+        `REST ${address} answers behind the "${route.credential}" door, and this runtime opens ` +
+          "no door of that kind",
+      );
+    }
 
     if (route.permissionTarget && !ports.identity.authorize) {
       throw new Error(
@@ -338,6 +391,13 @@ function assertCapabilityPorts({
     throw new Error(
       `REST ${address} declares itself replayable under a caller's key, and this runtime ` +
         "supplied no idempotency port to keep its receipts",
+    );
+  }
+
+  if (route.audit && !ports.audit) {
+    throw new Error(
+      `REST ${address} declares the audit action "${route.audit}", and this runtime supplied ` +
+        "no audit sink to write its row to",
     );
   }
 }
@@ -406,7 +466,7 @@ function routeStack<Api>({
   // handler stands behind every method the path can be sent. A family behind a
   // browser session publishes none either - no API client can present a
   // cookie, so an advertised operation would be one nothing can call.
-  const publishable = route.anyMethod !== true && declaration.credential !== "session";
+  const publishable = route.anyMethod !== true && declaration.credential !== "browser";
   const documents = documented && publishable;
 
   return [
@@ -454,7 +514,7 @@ function routeStack<Api>({
     inputMiddleware({ route, paramSource }),
     handlerMiddleware({
       route,
-      credential: declaration.credential,
+      credential: route.credential ?? declaration.credential,
       ports,
       options,
       facts,
@@ -702,7 +762,8 @@ function handlerMiddleware<Api>({
     }
 
     const permission = route.access ? void 0 : permissionOf(route.permission);
-    const caller = await callerOf({ route, ports, request: context.req.raw });
+    const door = doorOf({ credential, ports });
+    const caller = await callerOf({ route, door, request: context.req.raw });
 
     // An optional door the caller presented nothing at: the handler is told
     // there is no one behind the request rather than handed a guess.
@@ -737,7 +798,7 @@ function handlerMiddleware<Api>({
       ...(ports.denials ? { denials: ports.denials } : {}),
     });
 
-    const target = await checkRouteScope({ route, caller, ports, input });
+    const target = await checkRouteScope({ route, caller, door, ports, input });
     const capabilities = { route, ports, context, family, version, caller, input } as const;
 
     // The scope access resolved: the one a route's own path named when it named
@@ -755,19 +816,28 @@ function handlerMiddleware<Api>({
 
     if (stored) return stored;
 
+    const actor = doorActorOf({ credential, actor: decision.actor });
     const run = async (): Promise<Response | undefined> => {
-      const result = await route.handler(
-        handlerArguments({
-          context,
-          route,
-          options,
-          input,
-          actor: doorActorOf({ credential, actor: decision.actor }),
-          scope: handlerScopeOf({ route, credential, caller }),
-          target,
-        }),
-        ...(await resolveFacts({ route, facts, context })),
-      );
+      const result = await auditing({
+        route,
+        ports,
+        actor,
+        scope: resolved,
+        context,
+        run: async () =>
+          route.handler(
+            handlerArguments({
+              context,
+              route,
+              options,
+              input,
+              actor,
+              scope: handlerScopeOf({ route, credential, caller }),
+              target,
+            }),
+            ...(await resolveFacts({ route, facts, context })),
+          ),
+      });
 
       caller.markUsed?.();
 
@@ -780,6 +850,110 @@ function handlerMiddleware<Api>({
 
     return keepAnswer({ ...capabilities, answer });
   };
+}
+
+/**
+ * The trail a route declared. The row is written from the actor the door
+ * resolved, the parameters the path named and the id the answer carries; a
+ * refusal writes the same row with the handled error's own code, so the trail
+ * records what was attempted as well as what succeeded.
+ *
+ * A route with no declared action runs untouched, and the ONE place that
+ * decides whether a row is written is this function.
+ */
+async function auditing<TResult>({
+  route,
+  ports,
+  actor,
+  scope,
+  context,
+  run,
+}: {
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimePorts;
+  actor: Actor | null;
+  scope: AuthzDeclaredScopeId | null;
+  context: Context;
+  run: () => Promise<TResult>;
+}): Promise<TResult> {
+  const action = route.audit;
+
+  if (!action) return run();
+
+  const sink = requireAudit(ports);
+  const params = auditParams({ route, context });
+
+  try {
+    const result = await run();
+
+    await sink.record({
+      actorId: normalizedActor(actor)?.id ?? null,
+      action,
+      scope,
+      params,
+      resultId: resultIdOf(result),
+    });
+
+    return result;
+  } catch (error) {
+    if (error instanceof HandledError) {
+      await sink.record({
+        actorId: normalizedActor(actor)?.id ?? null,
+        action,
+        scope,
+        params,
+        resultId: null,
+        errorCode: error.code,
+      });
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * The parameters the route's own path named, as the row records them: the
+ * declared parameters and nothing else, so the version segment a dated address
+ * carries never reaches the trail.
+ */
+function auditParams({
+  route,
+  context,
+}: {
+  route: RestTransportRoute<unknown>;
+  context: Context;
+}): Readonly<Record<string, unknown>> {
+  const declared = route.params;
+
+  if (!declared) return {};
+
+  const dispatched = context.get(ROUTE_PARAMS) as Record<string, string> | undefined;
+  const named = dispatched ?? context.req.param();
+  const params: Record<string, unknown> = {};
+
+  for (const key of Object.keys(declared.shape)) {
+    if (key in named) params[key] = named[key];
+  }
+
+  return params;
+}
+
+/** The id the answer carries, when it carries one: what the action acted on. */
+function resultIdOf(result: unknown): string | null {
+  if (typeof result !== "object" || result === null) return null;
+
+  const id: unknown = (result as Record<string, unknown>).id;
+
+  return typeof id === "string" ? id : null;
+}
+
+/** @see assertCapabilityPorts, which refuses this before a request arrives. */
+function requireAudit(ports: RestRuntimePorts): RestAuditSink {
+  const audit = ports.audit;
+
+  if (!audit) throw new Error("REST runtime supplied no audit sink");
+
+  return audit;
 }
 
 /**
@@ -1047,11 +1221,13 @@ async function answerWith<Api>({
 async function checkRouteScope({
   route,
   caller,
+  door,
   ports,
   input,
 }: {
   route: RestTransportRoute<unknown>;
   caller: RestCaller;
+  door: RestIdentityPort;
   ports: RestRuntimePorts;
   input: unknown;
 }): Promise<AuthzDeclaredScopeId | null> {
@@ -1060,7 +1236,7 @@ async function checkRouteScope({
   const permission = permissionOf(route.permission);
   const target = routeScopeOf({ param: route.permissionTarget.param, input });
 
-  const decision = await requireAuthorize(ports)({ caller, permission, target });
+  const decision = await requireAuthorize(door)({ caller, permission, target });
 
   assertRouteScopePermission({
     permission,
@@ -1079,20 +1255,34 @@ async function checkRouteScope({
  */
 async function callerOf({
   route,
-  ports,
+  door,
   request,
 }: {
   route: RestTransportRoute<unknown>;
-  ports: RestRuntimePorts;
+  door: RestIdentityPort;
   request: Request;
 }): Promise<RestCaller | null> {
   const kind = route.access?.kind;
 
-  if (kind === "optional") return requireIdentifyOptional(ports)({ request });
+  if (kind === "optional") return requireIdentifyOptional(door)({ request });
 
-  if (kind === "authenticated" || kind === "deferred") return requireIdentify(ports)({ request });
+  if (kind === "authenticated" || kind === "deferred") return requireIdentify(door)({ request });
 
-  return ports.identity.authenticate({ request, permission: permissionOf(route.permission) });
+  return door.authenticate({ request, permission: permissionOf(route.permission) });
+}
+
+/**
+ * The door this ONE route answers behind: the kind it declared for itself, or
+ * the family's own. A kind the runtime opens no door for is refused at mount.
+ */
+function doorOf({
+  credential,
+  ports,
+}: {
+  credential: RestDoorCredential;
+  ports: RestRuntimePorts;
+}): RestIdentityPort {
+  return ports.doors?.[credential] ?? ports.identity;
 }
 
 /**
@@ -1115,35 +1305,31 @@ function handlerScopeOf({
 
 /** @see assertPortsBound, which refuses these before a request arrives. */
 function requireIdentifyOptional(
-  ports: RestRuntimePorts,
-): NonNullable<RestRuntimePorts["identity"]["identifyOptional"]> {
-  const identifyOptional = ports.identity.identifyOptional;
+  door: RestIdentityPort,
+): NonNullable<RestIdentityPort["identifyOptional"]> {
+  const identifyOptional = door.identifyOptional;
 
   if (!identifyOptional) throw new Error("REST runtime supplied no identity.identifyOptional");
 
-  return identifyOptional.bind(ports.identity);
+  return identifyOptional.bind(door);
 }
 
 /** @see assertPortsBound, which refuses these before a request arrives. */
-function requireIdentify(
-  ports: RestRuntimePorts,
-): NonNullable<RestRuntimePorts["identity"]["identify"]> {
-  const identify = ports.identity.identify;
+function requireIdentify(door: RestIdentityPort): NonNullable<RestIdentityPort["identify"]> {
+  const identify = door.identify;
 
   if (!identify) throw new Error("REST runtime supplied no identity.identify");
 
-  return identify.bind(ports.identity);
+  return identify.bind(door);
 }
 
 /** @see assertPortsBound, which refuses these before a request arrives. */
-function requireAuthorize(
-  ports: RestRuntimePorts,
-): NonNullable<RestRuntimePorts["identity"]["authorize"]> {
-  const authorize = ports.identity.authorize;
+function requireAuthorize(door: RestIdentityPort): NonNullable<RestIdentityPort["authorize"]> {
+  const authorize = door.authorize;
 
   if (!authorize) throw new Error("REST runtime supplied no identity.authorize");
 
-  return authorize.bind(ports.identity);
+  return authorize.bind(door);
 }
 
 /**
@@ -1412,6 +1598,7 @@ function mountVersionGuards<Api>({
       ),
       family: declaration.namespace,
       credentialClass: "none",
+      credential: "public",
       isNamespaceGuard: true,
     });
   }
@@ -1580,6 +1767,7 @@ function mountRoute({
   stack,
   policy,
   credentialClass,
+  credential,
   family,
   served,
 }: {
@@ -1591,6 +1779,7 @@ function mountRoute({
   stack: MiddlewareHandler[];
   policy: AccessPolicy;
   credentialClass: CredentialClass;
+  credential: Credential;
   family: string;
   served: Map<string, Set<HttpMethod>>;
 }): void {
@@ -1612,6 +1801,7 @@ function mountRoute({
       policy,
       family,
       credentialClass,
+      credential,
     });
   }
 
@@ -1695,21 +1885,21 @@ function allowHeaderOf(methods: ReadonlySet<HttpMethod>): string {
 }
 
 const HANDLER_CREDENTIAL = {
-  projectKey: "apiKey",
-  organizationKey: "apiKey",
+  project: "apiKey",
+  organization: "apiKey",
   scimToken: "apiKey",
-  instanceAdminKey: "apiKey",
-  session: "session",
+  "instance-admin": "apiKey",
+  browser: "session",
   internalSecret: "internal",
 } as const satisfies Record<Exclude<Credential, "public">, HandlerCredential>;
 
 /** Which security scheme a consumer of each credential presents. */
 const CREDENTIAL_CLASS = {
-  projectKey: "project_api_key",
-  organizationKey: "organization_api_key",
+  project: "project_api_key",
+  organization: "organization_api_key",
   scimToken: "scim_token",
-  instanceAdminKey: "instance_admin_api_key",
-  session: "session",
+  "instance-admin": "instance_admin_api_key",
+  browser: "session",
   internalSecret: "internal_secret",
   public: "none",
 } as const satisfies Record<Credential, CredentialClass>;

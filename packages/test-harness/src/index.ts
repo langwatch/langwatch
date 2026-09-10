@@ -60,6 +60,7 @@ export {
 } from "./unit-shard-hard-floor.ts";
 export { createWeigher, loadDurationManifest, type DurationManifest } from "./shard-weights.ts";
 export { scanTestSourceForUnsafeDeleteMany, type TeardownViolation } from "./teardown-scan.ts";
+export { createTestAuditSink, type TestAuditRow, type TestAuditSink } from "./test-audit-sink.ts";
 export { createTestLogger, type TestLogLine, type TestLogLines } from "./test-logger.ts";
 export { allowConsole } from "./console-guard.ts";
 export { closeTsAstSession, parseSourceText, parseSourceTexts } from "./ts-ast.ts";

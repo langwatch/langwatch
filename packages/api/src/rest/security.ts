@@ -12,6 +12,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Context, ErrorHandler, Hono, MiddlewareHandler } from "hono";
 
 import type { AccessPolicy, CredentialClass } from "../access-policy.ts";
+import type { Credential } from "../access/access.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -141,6 +142,12 @@ export interface RegisteredRoute {
    */
   readonly credentialClass: CredentialClass;
   /**
+   * The credential KIND the route answers behind: the door it names, or its
+   * family's own. The address inventory is keyed on this, so a conversion that
+   * changes which door serves a path is a failing diff.
+   */
+  readonly credential: Credential;
+  /**
    * The `/api/v1` path this same route also answers at. One logical route with
    * two addresses, so an authorization audit and the document's drift guard
    * count it once and still recognise the canonical published URL.
@@ -178,6 +185,33 @@ export function getRoutePolicy(method: string, path: string): RegisteredRoute | 
 
 export function allRegisteredRoutes(): RegisteredRoute[] {
   return [...registry.values()];
+}
+
+/** One mounted address, as the checked-in inventory records it. */
+export type RestAddress = Readonly<{
+  method: string;
+  path: string;
+  credential: Credential;
+}>;
+
+/**
+ * Every address this process mounted, sorted by path then method. Generated
+ * from the mounted declarations rather than written by hand, so a conversion
+ * that moves a route, drops a `v1` twin or changes a door is a failing diff.
+ */
+export function restAddressInventory(): RestAddress[] {
+  return allRegisteredRoutes()
+    .flatMap((route) => [
+      { method: route.method, path: route.path, credential: route.credential },
+      ...(route.canonicalPath
+        ? [{ method: route.method, path: route.canonicalPath, credential: route.credential }]
+        : []),
+    ])
+    .sort((left, right) =>
+      left.path === right.path
+        ? left.method.localeCompare(right.method)
+        : left.path.localeCompare(right.path),
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

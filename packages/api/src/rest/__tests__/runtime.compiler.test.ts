@@ -175,7 +175,7 @@ import { defineRestRouter } from "../src/rest/declaration.ts";
 const api = moduleApi<object>("role");
 const tier = z.object({ tier: z.literal("organization") });
 defineRestRouter(api).withNamespace("roles").withVersion("2026-09-08")
-  .withCredential("organizationKey")
+  .withCredential("organization")
   .get("/", "listRoles").withPermission("organization:manage").withOutput(tier)
   .handle(({ scope }) => ({ tier: scope.tier }));
 defineRestRouter(api).withNamespace("secrets").withVersion("2026-09-08")

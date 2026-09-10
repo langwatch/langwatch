@@ -33,7 +33,7 @@ Feature: Composing a process declaratively
     When the module names only "prefix"
     Then the declaration reports the member it has not named
 
-  @unimplemented
+  @unit
   Scenario: A pool that lacks a member an installed module names
     Given a module whose infrastructure interface names a member the pool lacks
     When the module list is installed
@@ -52,14 +52,14 @@ Feature: Composing a process declaratively
     When the process boots
     Then boot refuses naming the peer
 
-  @unimplemented
+  @unit
   Scenario: A role reads only the declarations addressed to it
     Given a module that declares transports, workers and tasks
     When the process boots with role "worker"
     Then the declared workers start
     And no transport is mounted
 
-  @unimplemented
+  @integration
   Scenario: A route declares the credential kind it answers behind
     Given a family whose default credential is "organization"
     And a route that declares "instance-admin"
@@ -67,13 +67,13 @@ Feature: Composing a process declaratively
     Then the runtime resolves the instance-admin credential
     And the handler reads the actor and scope that kind resolves
 
-  @unimplemented
+  @integration
   Scenario: A route declares the trail it leaves
     Given a route that declares an audit action
     When the route answers successfully
     Then the runtime writes one audit row from the actor, the params and the result id
 
-  @unimplemented
+  @integration
   Scenario: A refused route leaves the refusal on the trail
     Given a route that declares an audit action
     When the route throws a handled error

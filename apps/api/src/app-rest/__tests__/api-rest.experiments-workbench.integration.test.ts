@@ -10,9 +10,13 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PersistedEvaluationsV3State } from "@langwatch/experiment-contract";
 import {
+  ClickHouseExperimentDspyRepository,
+  ClickHouseExperimentRunRepository,
   ExperimentApp,
+  ExperimentService,
   ExperimentWorkbenchUpdatesPort,
-  PostgresExperimentAdapter,
+  PrismaExperimentRepository,
+  PrismaExperimentWorkflowVersionRepository,
 } from "@langwatch/experiment-server";
 import {
   PrismaConfigService,
@@ -109,12 +113,22 @@ function mount(): MountedRestFamily {
     projects: [PROJECT],
     keys: [{ token: PROJECT_KEY, projectId: PROJECT_ID, apiKeyId: `key_${suffix}` }],
   });
-  const experiments = PostgresExperimentAdapter.create({
-    database: prisma!,
-    resolveClickHouseClient: () => Promise.resolve(null),
-    tupleParam: (values) => values as never,
-    dspyRetention: { getTraceRetentionDays: () => Promise.resolve(30) } as never,
-    runHistoryTelemetry: { warn: () => undefined, error: () => undefined } as never,
+  const resolveClickHouseClient = () => Promise.resolve(null);
+  const tupleParam = (values: string[]) => values as never;
+  const runHistoryTelemetry = { warn: () => undefined, error: () => undefined } as never;
+  const experiments = ExperimentService.create({
+    repository: PrismaExperimentRepository.create(prisma!),
+    runRepository: ClickHouseExperimentRunRepository.create({
+      workflowVersions: PrismaExperimentWorkflowVersionRepository.create(prisma!),
+      resolveClient: resolveClickHouseClient,
+      tupleParam,
+      telemetry: runHistoryTelemetry,
+    }),
+    dspyRepository: ClickHouseExperimentDspyRepository.create({
+      resolveClient: resolveClickHouseClient,
+      retention: { getTraceRetentionDays: () => Promise.resolve(30) } as never,
+      telemetry: runHistoryTelemetry,
+    }),
     slugify: (value) =>
       value
         .toLowerCase()

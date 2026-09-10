@@ -191,7 +191,7 @@ describe("defineRestRouter", () => {
       const declaration = defineRestRouter(OpsApi)
         .withNamespace("projects")
         .withVersion("2026-08-07")
-        .withCredential("organizationKey")
+        .withCredential("organization")
         .get("/", "listProjects")
         .withAccess(anyAuthenticated({ reason: "the listing answers exactly what the key holds" }))
         .handle(() => {})
@@ -228,7 +228,7 @@ describe("defineRestRouter", () => {
         defineRestRouter(ProjectApi)
           .withNamespace("projects")
           .withVersion("2026-08-07")
-          .withCredential("organizationKey")
+          .withCredential("organization")
           .get("/:id", "getProject")
           .withParams(z.object({ id: z.string() }))
           .withPermission("project:view", { at: "route", param: "projectId" })
@@ -241,7 +241,7 @@ describe("defineRestRouter", () => {
       const declaration = defineRestRouter(ProjectApi)
         .withNamespace("projects")
         .withVersion("2026-08-07")
-        .withCredential("organizationKey")
+        .withCredential("organization")
         .get("/:projectId", "getProject")
         .withParams(z.object({ projectId: z.string() }))
         .withPermission("project:view", { at: "route", param: "projectId" })
@@ -411,7 +411,7 @@ describe("defineRestRouter", () => {
       const organization = defineRestRouter(OrganizationApi)
         .withNamespace("roles")
         .withVersion("2026-08-07")
-        .withCredential("organizationKey")
+        .withCredential("organization")
         .get("/", "listRoles")
         .withPermission("organization:manage")
         .handle(() => {})
@@ -427,8 +427,8 @@ describe("defineRestRouter", () => {
         .build()
         .router();
 
-      expect(organization.credential).toBe("organizationKey");
-      expect(project.credential).toBe("projectKey");
+      expect(organization.credential).toBe("organization");
+      expect(project.credential).toBe("project");
     });
 
     /** @scenario "A declaration names the credential its routes accept" */
@@ -440,7 +440,7 @@ describe("defineRestRouter", () => {
         .withPermission("organization:manage")
         .handle(() => {});
 
-      expect(() => router.withCredential("organizationKey")).toThrow(
+      expect(() => router.withCredential("organization")).toThrow(
         /must declare its credential before its routes/,
       );
     });
@@ -451,14 +451,14 @@ describe("defineRestRouter", () => {
         .withNamespace("coding-agent")
         .withVersion("2026-08-07")
         .withAddressing("v1-only")
-        .withCredential("organizationKey")
+        .withCredential("organization")
         .get("/", "listRoles")
         .withPermission("organization:manage")
         .handle(() => {})
         .build()
         .router();
 
-      expect(declaration).toMatchObject({ addressing: "v1-only", credential: "organizationKey" });
+      expect(declaration).toMatchObject({ addressing: "v1-only", credential: "organization" });
     });
 
     /** @scenario "A mount cannot answer a declaration behind the other door" */
@@ -466,7 +466,7 @@ describe("defineRestRouter", () => {
       const declaration = defineRestRouter(OrganizationApi)
         .withNamespace("roles")
         .withVersion("2026-08-07")
-        .withCredential("organizationKey")
+        .withCredential("organization")
         .get("/", "listRoles")
         .withPermission("organization:manage")
         .handle(() => {})
@@ -482,12 +482,12 @@ describe("defineRestRouter", () => {
       expect(() =>
         runtime.mount(declaration, {
           app: () => ({ listRoles: async () => {} }),
-          credential: "projectKey",
+          credential: "project",
           onError: (error) => {
             throw error;
           },
         }),
-      ).toThrow(/declares the "organizationKey" door and this mount names "projectKey"/);
+      ).toThrow(/declares the "organization" door and this mount names "project"/);
     });
   });
 
@@ -593,7 +593,7 @@ describe("a mount binding the facts a declaration names", () => {
     return () => {
       runtime.mount(declaration(), {
         app: () => ({ ping: async () => {} }),
-        credential: "projectKey",
+        credential: "project",
         onError: (error) => {
           throw error;
         },
@@ -685,7 +685,7 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
     return defineRestRouter(RolesApi)
       .withNamespace("roles")
       .withVersion("2026-08-07")
-      .withCredential("organizationKey")
+      .withCredential("organization")
       .get("/", "listRoles")
       .withPermission("organization:manage")
       .withEntitlement("enterprise")
@@ -711,7 +711,7 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
       }),
       {
         app: () => ({ listRoles: async () => {} }),
-        credential: "organizationKey",
+        credential: "organization",
         onError: createErrorHandler(),
       },
     );
@@ -774,7 +774,7 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
         declaration(() => ({ ran: true })),
         {
           app: () => ({ listRoles: async () => {} }),
-          credential: "organizationKey",
+          credential: "organization",
           onError: createErrorHandler(),
         },
       ),
@@ -843,7 +843,7 @@ describe("a create declared replayable under a caller's key", () => {
     return defineRestRouter(WebhookApi)
       .withNamespace("webhooks")
       .withVersion("2026-08-07")
-      .withCredential("organizationKey")
+      .withCredential("organization")
       .post("/endpoints", "createEndpoint")
       .withPermission("webhookEndpoints:manage")
       .withIdempotency({ operation: "webhooks.v1.endpoints.create" })
@@ -879,7 +879,7 @@ describe("a create declared replayable under a caller's key", () => {
 
     return runtime.mount(declaration(handle), {
       app: () => ({ createEndpoint: async () => {} }),
-      credential: "organizationKey",
+      credential: "organization",
       onError: createErrorHandler(),
     });
   }
@@ -994,7 +994,7 @@ describe("a create declared replayable under a caller's key", () => {
         declaration((name) => name),
         {
           app: () => ({ createEndpoint: async () => {} }),
-          credential: "organizationKey",
+          credential: "organization",
           onError: createErrorHandler(),
         },
       ),

@@ -91,12 +91,12 @@ export function sharedGrantTiers(
 
 /** Which credential reaches a REST route, as the document names it. */
 export type Credential =
-  | "session"
-  | "projectKey"
-  | "organizationKey"
+  | "browser"
+  | "project"
+  | "organization"
   | "scimToken"
   | "internalSecret"
-  | "instanceAdminKey"
+  | "instance-admin"
   | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
@@ -331,9 +331,9 @@ export async function decide({
  */
 export function securityRequirement(credential: Credential): readonly Record<string, never[]>[] {
   switch (credential) {
-    case "projectKey":
+    case "project":
       return [{ project_api_key: [] }];
-    case "organizationKey":
+    case "organization":
       return [{ admin_api_key: [] }];
     case "scimToken":
       return [{ scim_bearer: [] }];
@@ -343,11 +343,11 @@ export function securityRequirement(credential: Credential): readonly Record<str
       return [{ internal_secret: [] }];
     // The self-hosted operator's own key. It creates the first organization,
     // before any organization key exists to be presented instead.
-    case "instanceAdminKey":
+    case "instance-admin":
       return [{ instance_admin_key: [] }];
     case "public":
       return [];
-    case "session":
+    case "browser":
       throw new Error(
         `a "${credential}" route has no security scheme an API client can satisfy, ` +
           "so it cannot be advertised in the published document",

@@ -102,13 +102,13 @@ export type ApiRestDoor = RestDoorCredential | "public";
  * instead of reaching a request that resolves nobody.
  */
 const OPENED_DOORS = {
-  projectKey: true,
-  session: true,
+  project: true,
+  browser: true,
   public: true,
-  organizationKey: true,
+  organization: true,
   scimToken: true,
   internalSecret: false,
-  instanceAdminKey: true,
+  "instance-admin": true,
 } as const satisfies Record<ApiRestDoor, boolean>;
 
 /** The doors above that this process actually opens. */
@@ -224,7 +224,7 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
   const openDoors: Record<OpenApiRestDoor, RestRuntime> = {
     // Every project-scoped family: the key is resolved once, its refusal is
     // rendered once, and its facts are bound once.
-    projectKey: createRestRuntime({
+    project: createRestRuntime({
       identity: {
         authenticate: async ({ request, permission }): Promise<RestCaller> => {
           const credential = await ports.projectCredential({ request, permission });
@@ -245,7 +245,7 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
     // Every organization-scoped family: the key is resolved once, its refusal
     // is rendered once, and the credential a second question is asked about is
     // kept against the request the declaration is handed.
-    organizationKey: createRestRuntime({
+    organization: createRestRuntime({
       identity: {
         // The permission is asked of the credential at the ORGANIZATION, the
         // only scope this door resolves. A route that names its own scope asks
@@ -304,7 +304,7 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
     // The instance administrator bearer: holding it IS the authority, so
     // every route identifies rather than authenticates, and the check
     // itself runs as this door's own middleware, ahead of any route.
-    instanceAdminKey: createRestRuntime({
+    "instance-admin": createRestRuntime({
       identity: {
         authenticate: () => {
           throw new Error(
@@ -317,7 +317,7 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
     }),
     // The byte doors a page and a key both reach: the verifier below has
     // already decided, so this reads its answer rather than asking again.
-    session: createRestRuntime({
+    browser: createRestRuntime({
       identity: {
         authenticate: () => {
           throw new Error("The byte door asks no permission of the credential it was opened on.");
@@ -366,7 +366,7 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
           options,
         }),
         facts: [
-          ...(door === "projectKey" ? [projectFacts(resolved)] : []),
+          ...(door === "project" ? [projectFacts(resolved)] : []),
           ...(options.facts ?? []),
         ],
       });
@@ -391,7 +391,7 @@ function openDoorFor<Api>(
     );
   }
 
-  if (door === "session" && !opened.verified) {
+  if (door === "browser" && !opened.verified) {
     throw new Error(
       `REST "${declaration.namespace}" answers behind a browser session, and this process ` +
         "composed no dual-credential verifier to open one with",
@@ -405,7 +405,7 @@ function openDoorFor<Api>(
     );
   }
 
-  if (door === "instanceAdminKey" && !opened.instanceAdmin) {
+  if (door === "instance-admin" && !opened.instanceAdmin) {
     throw new Error(
       `REST "${declaration.namespace}" answers behind the instance administrator bearer, and ` +
         "this process composed no instance-admin credential check to open it with",
@@ -440,9 +440,9 @@ function mountMiddleware({
 }): { middleware?: readonly MiddlewareHandler[] } {
   const own = options.middleware ?? [];
   const middleware =
-    door === "session" && verifier
+    door === "browser" && verifier
       ? [...verifier, ...own]
-      : door === "instanceAdminKey" && instanceAdminCredential
+      : door === "instance-admin" && instanceAdminCredential
         ? [instanceAdminCredential, ...own]
         : own;
 
