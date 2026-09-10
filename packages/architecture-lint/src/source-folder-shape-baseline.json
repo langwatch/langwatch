@@ -39,14 +39,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|enterprise/modules/billing/server/src/adapters",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|enterprise/modules/billing/server/src/ports",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|enterprise/modules/billing/server/src/services",
       "measured": "2026-09-08"
     },
@@ -55,23 +47,11 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|enterprise/modules/governance/server/src/adapters",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|enterprise/modules/governance/server/src/ports",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|enterprise/modules/governance/server/src/repositories/prisma",
       "measured": "2026-09-08"
     },
     {
       "key": "crowded-folder|enterprise/modules/governance/server/src/services",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|enterprise/modules/governance/server/src/transport/api-trpc",
       "measured": "2026-09-08"
     },
     {
@@ -175,14 +155,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|modules/automation/server/src/adapters",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|modules/automation/server/src/ports",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|modules/automation/server/src/services",
       "measured": "2026-09-08"
     },
@@ -236,10 +208,6 @@
     },
     {
       "key": "crowded-folder|modules/experiment/contract/src/workbench/actions/transforms",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|modules/experiment/server/src/ports",
       "measured": "2026-09-08"
     },
     {
@@ -307,10 +275,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|modules/identity/server/src/adapters",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|modules/identity/server/src/intents",
       "measured": "2026-09-08"
     },
@@ -332,10 +296,6 @@
     },
     {
       "key": "crowded-folder|modules/langy/contract/src",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|modules/langy/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
@@ -491,14 +451,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|modules/scenario/server/src/adapters",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|modules/scenario/server/src/ports",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|modules/scenario/server/src/services",
       "measured": "2026-09-08"
     },
@@ -540,14 +492,6 @@
     },
     {
       "key": "crowded-folder|modules/trace/contract/src",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|modules/trace/server/src/adapters",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|modules/trace/server/src/ports",
       "measured": "2026-09-08"
     },
     {
@@ -924,10 +868,6 @@
     },
     {
       "key": "fragment-file|modules/experiment/contract/src/experiment-run-eventing.events.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|modules/experiment/server/src/adapters/noop-experiment-workbench-updates.adapter.ts",
       "measured": "2026-09-08"
     },
     {
