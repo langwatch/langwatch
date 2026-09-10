@@ -14,9 +14,9 @@ import {
   type ResultsGroupBy,
   type ResultsOverview,
   type RunParameterValues,
-  type RunSecretCiphertext,
   type RunTarget,
   type Scenario,
+  type ScenarioCaller,
   type ScenarioCreateInput,
   type ScenarioDuplicateInput,
   type ScenarioExecutionPrefetchInput,
@@ -52,14 +52,12 @@ import {
   type SimulationLastResultSummary,
   type SimulationLastUpdatedInput,
   type SimulationProjectDateRangeInput,
-  type SimulationQueueRun,
+  type QueueSimulationRunInput,
   type SimulationRunData,
   type SimulationScenarioRunInput,
   type SimulationScenarioSetRunsInput,
   type SimulationService,
   type SimulationSetData,
-  type ResolvedRunModels,
-  type RunActor,
   withActor,
   withNote,
   withResolvedModels,
@@ -79,6 +77,10 @@ import type { ScenarioRepositories } from "../repositories/scenario.repositories
 import type { ScenarioIdPort, ScenarioTestSuiteIdPort } from "../ports/scenario-id.port.ts";
 import type { ScenarioClockPort } from "../ports/scenario-clock.port.ts";
 import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port.ts";
+import {
+  SilentScenarioActivity,
+  type ScenarioActivityPort,
+} from "../ports/scenario-activity.port.ts";
 
 /**
  * The process's per-tenant fan-out, as this feature uses it: one emitter per project that relays
@@ -88,11 +90,6 @@ import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.p
 export type ScenarioBroadcast = Readonly<{
   getTenantEmitter(projectId: string): EventEmitter;
 }>;
-
-/** Who a write is attributed to. */
-export interface ScenarioCaller {
-  readonly id: string;
-}
 
 /** What the process composes this feature's application from. */
 export interface ScenarioAppDependencies {
@@ -107,6 +104,8 @@ export interface ScenarioAppDependencies {
   resultAtoms: ResultAtomsService;
   /** The run dialog's configuration history. */
   runConfigurations: RunConfigurationsService;
+  /** Product analytics and lifecycle nurturing, both fire-and-forget. */
+  activity: ScenarioActivityPort;
 }
 
 /**
@@ -131,34 +130,15 @@ export interface ScenarioAppInfrastructure {
   testSuiteIds: ScenarioTestSuiteIdPort;
   clock: ScenarioClockPort;
   secretCipher: ScenarioSecretCipherPort;
+  /**
+   * Where a created scenario is reported to, for a process that composed
+   * product analytics and the lifecycle sender. Absent reports nothing.
+   */
+  activity?: ScenarioActivityPort;
 }
 
 /** The one peer API this feature reads directly. */
 export const scenarioAppDependencyTokens = { users: UserApi };
-
-/** What one queued run needs to know about itself. */
-export interface QueueSimulationRunInput {
-  projectId: string;
-  scenarioId: string;
-  scenarioRunId: string;
-  batchRunId: string;
-  setId: string;
-  name: string;
-  /** The same union the queued command declares, so a door cannot widen it. */
-  target: NonNullable<SimulationQueueRun["target"]>;
-  parameters: RunParameterValues;
-  secretParameters: RunSecretCiphertext;
-  note: string | undefined;
-  scenarioVersion: number | undefined;
-  /** Who started the run. Absent when the surface names no person. */
-  actor?: RunActor | undefined;
-  /**
-   * The models the validation prefetch resolved. Null when the run resolved
-   * none, which reads back the way every run recorded before this field
-   * existed reads back.
-   */
-  resolvedModels?: ResolvedRunModels | null;
-}
 
 export class ScenarioApp implements ScenarioApi {
   static readonly contract = ScenarioApi;
@@ -191,6 +171,7 @@ export class ScenarioApp implements ScenarioApi {
       broadcast: setup.infrastructure.broadcast,
       resultAtoms: setup.infrastructure.resultAtoms,
       runConfigurations: setup.infrastructure.runConfigurations,
+      activity: setup.infrastructure.activity ?? new SilentScenarioActivity(),
     });
   }
 
@@ -306,11 +287,43 @@ export class ScenarioApp implements ScenarioApi {
    * than in each door because "who last touched this" is a property of the act, not of the
    * transport it arrived over.
    */
-  create(
+  async create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
-    return this.#dependencies.scenarios.create({ ...input, lastUpdatedById: by.id });
+    const scenario = await this.#dependencies.scenarios.create({
+      ...input,
+      lastUpdatedById: by.id,
+    });
+
+    this.reportScenarioCreated({ scenario, projectId: input.projectId, userId: by.id });
+
+    return scenario;
+  }
+
+  /**
+   * Reports the write to the process, without making the caller wait for it
+   * and without letting either report fail the create.
+   */
+  private reportScenarioCreated(input: {
+    scenario: Scenario;
+    projectId: string;
+    userId: string;
+  }): void {
+    const { activity } = this.#dependencies;
+    activity.trackScenarioCreated({ userId: input.userId, projectId: input.projectId });
+
+    void this.#dependencies.scenarios
+      .count({ projectId: input.projectId })
+      .then((scenarioCount) => {
+        activity.fireScenarioCreatedNurturing({
+          userId: input.userId,
+          scenarioCount,
+          scenarioId: input.scenario.id,
+          projectId: input.projectId,
+        });
+      })
+      .catch((error: unknown) => activity.captureException(error as Error));
   }
 
   /**

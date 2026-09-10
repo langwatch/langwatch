@@ -53,6 +53,7 @@ export function createAppTrpcFeatures(options: {
   const monitorRouters = composed.monitor.routers(mount);
   const organizationRouters = composed.organization.routers(mount);
   const roleRouters = composed.role.routers(mount);
+  const scenarioRouters = composed.scenario.routers(mount);
   const secretRouters = composed.secret.routers(mount);
   const shareRouters = composed.share.routers(mount);
   const userRouters = composed.user.routers(mount);
@@ -161,6 +162,10 @@ export function createAppTrpcFeatures(options: {
     role: roleRouters.role,
     roleBinding: roleRouters.roleBinding,
     savedViews: dashboardRouters.savedViews,
+    // A project's test cases, their version history, the runs they produced
+    // and the live stream of those runs: one flat namespace, as the browser
+    // has always called it.
+    scenarios: scenarioRouters.scenarios,
     // The directory-sync credentials the settings page mints, over the SAME
     // application the `/api/scim-tokens` family answers from.
     scimToken: mount.runtime.mount(scimTokenTrpcTransport, (ctx) => ctx.app.scim),

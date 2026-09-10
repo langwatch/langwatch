@@ -50,6 +50,13 @@ export type AtomOutcome = "passed" | "failed" | "pending";
  * and the storage grain are the same. That is why cost needs no coarser total
  * to fall back to.
  */
+/**
+ * The most atoms one page may carry. The read clamps to it, and the Results
+ * tab's own request schema refuses a larger page rather than silently
+ * returning fewer rows than it asked for.
+ */
+export const MAX_ATOM_PAGE = 500;
+
 export interface ResultAtom {
   /** `SimulationSuite.slug`, or the raw scenario set id for a code-pushed set. */
   planSlug: string;

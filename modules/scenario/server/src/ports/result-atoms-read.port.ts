@@ -4,9 +4,6 @@ import type {
   ScenarioRunStatus,
 } from "@langwatch/scenario-contract";
 
-/** Hard ceiling on one page of atoms, whatever the caller asks for. */
-export const MAX_ATOM_PAGE = 500;
-
 /** Most bars a sparkline draws. See the group trend contract. */
 export const MAX_TREND_POINTS = 14;
 

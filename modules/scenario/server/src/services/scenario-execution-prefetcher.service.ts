@@ -1,5 +1,6 @@
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -13,7 +14,7 @@ import type { ScenarioService } from "./scenario.service.ts";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 
 import { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
 import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
@@ -49,7 +50,7 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   agents: AgentApi;
   workflows: WorkflowService;
   projects: ProjectApi;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   secrets: SecretApi;
   traces: TraceApi;
 };

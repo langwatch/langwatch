@@ -1,9 +1,10 @@
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
   type ModelProvider,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { projectSchema, type ProjectApi } from "@langwatch/project-contract";
 import { versionedPromptSchema, type PromptService } from "@langwatch/prompt-contract";
@@ -16,13 +17,7 @@ import type { SecretService } from "@langwatch/secret-contract";
 import { suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import {
-  workflowDslSchema,
-  workflowSchema,
-  workflowVersionSchema,
-  WorkflowNotFoundError,
-  type WorkflowService,
-} from "@langwatch/workflow-contract";
+import { workflowDslSchema, workflowSchema, workflowVersionSchema, WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
@@ -133,7 +128,7 @@ export interface ScenarioPrefetchFixture {
    * boundary — the codex execution backstop, say — has to be handed the real
    * service or it proves the stand-in instead.
    */
-  modelProviders?: ModelProviderService;
+  modelProviders?: ModelProviderApi;
 }
 
 class TestScenarioSecretCipher extends ScenarioSecretCipherPort {
@@ -380,9 +375,9 @@ function disabledProvider(provider: string): ModelProvider {
   };
 }
 
-function modelProviderService(deps: ScenarioPrefetchFixture): ModelProviderService {
+function modelProviderService(deps: ScenarioPrefetchFixture): ModelProviderApi {
   if (deps.modelProviders) return deps.modelProviders;
-  return fakeService<ModelProviderService>({
+  return fakeService<ModelProviderApi>({
     tryGetResolvedDefault: async (input) => ({
       model: await deps.modelResolver.resolve(input.featureKey, input.projectId),
       source: "feature_override",

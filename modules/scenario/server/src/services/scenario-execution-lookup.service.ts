@@ -1,4 +1,4 @@
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   mergeRunParameters,
@@ -22,7 +22,7 @@ export class ScenarioExecutionLookupService {
     scenarios: ScenarioService;
     projects: ProjectApi;
     suites: SuiteApi;
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
   }): ScenarioExecutionLookupService {
     return new ScenarioExecutionLookupService(options);
   }
@@ -32,7 +32,7 @@ export class ScenarioExecutionLookupService {
       scenarios: ScenarioService;
       projects: ProjectApi;
       suites: SuiteApi;
-      modelProviders: ModelProviderService;
+      modelProviders: ModelProviderApi;
     },
   ) {}
 

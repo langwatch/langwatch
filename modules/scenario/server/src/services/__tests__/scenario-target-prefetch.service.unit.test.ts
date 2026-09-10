@@ -1,12 +1,13 @@
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { describe, expect, it } from "vitest";
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretService } from "@langwatch/secret-contract";
-import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
+import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
 import { ScenarioTargetPrefetchService } from "../scenario-target-prefetch.service.ts";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ScenarioModelParametersService } from "../scenario-model-parameters.service.ts";
 import { ScenarioWorkflowHydratorService } from "../scenario-workflow-hydrator.service.ts";
 
@@ -52,7 +53,7 @@ function serviceAnswering(answers: Answers = {}) {
     // Never reached: every workflow lookup below answers not-found, so the
     // target is refused before anything is hydrated.
     workflowHydrator: ScenarioWorkflowHydratorService.create(
-      ScenarioModelParametersService.create({} as unknown as ModelProviderService),
+      ScenarioModelParametersService.create({} as unknown as ModelProviderApi),
     ),
     legacyDefaultModel: "openai/gpt-5-mini",
   });

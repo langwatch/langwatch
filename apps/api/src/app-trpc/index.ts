@@ -13,7 +13,6 @@ export { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount.ts";
 export { createTranslateTrpcRouter } from "../features/model-provider/translate-trpc.mount.ts";
 export { listCustomEvaluators } from "../platform/infrastructure/postgres.custom-evaluators.adapter.ts";
 export { createPromptTrpcRouters } from "../features/prompt/prompt-trpc.mount.ts";
-export { createScenarioTrpcRouter } from "../features/scenario/scenario-trpc.mount.ts";
 export {
   createPinnedTraceTrpcRouter,
   createShareTrpcRouter,

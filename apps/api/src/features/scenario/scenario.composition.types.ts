@@ -3,9 +3,13 @@ import type { ScenarioApp, ScenarioService } from "@langwatch/scenario-server";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { ScenarioTabRegistry, SimulationService } from "@langwatch/scenario-contract";
 
-/** The two `ctx.app` slices and the services the doors take. `scenarios.*`,
- * `suites.*` and `setupSkills.*` are not here: their transports are
- * unconverted. */
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+
+/**
+ * The `scenarios` namespace, the two `ctx.app` slices and the services the
+ * unconverted doors take. `suites.*` and `setupSkills.*` are not here: their
+ * transports are owned by other modules and still unconverted.
+ */
 export type ComposedScenarioFeature = Readonly<{
   /** For `ctx.app.scenarios`. */
   scenarios: ScenarioApp;
@@ -25,4 +29,8 @@ export type ComposedScenarioFeature = Readonly<{
    * registry opens over the same application.
    */
   suites: SuiteApi;
+  /** The one flat namespace this module serves, mounted on the process root. */
+  routers(mount: ApiTrpcFeatureMount): Readonly<{
+    scenarios: ReturnType<ApiTrpcFeatureMount["runtime"]["mount"]>;
+  }>;
 }>;

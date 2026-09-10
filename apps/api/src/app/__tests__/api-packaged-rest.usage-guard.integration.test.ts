@@ -16,6 +16,7 @@ import {
   stubDashboardFeature,
   stubEvaluatorFeature,
   stubMonitorFeature,
+  stubScenarioFeature,
   stubPresenceFeature,
   stubStoredObjectFeature,
 } from "./api-trpc-record.test-doubles.ts";
@@ -24,7 +25,7 @@ import { refusingAutomationFeature } from "../../features/automation/automation.
 import { CodingAgentApp } from "@langwatch/coding-agent-server";
 import { createCodingAgentTrpcRouter } from "../../features/coding-agent/coding-agent-trpc.mount.ts";
 import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition.ts";
-import { refusingScenarioFeature } from "../../features/scenario/scenario.composition.ts";
+
 
 const project = {
   id: "project-1",
@@ -47,7 +48,7 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     agents: undefined,
     connectedAgents: undefined,
     monitor: stubMonitorFeature(),
-    scenario: refusingScenarioFeature(),
+    scenario: stubScenarioFeature(),
     storedObject: stubStoredObjectFeature(),
     analytics: refusingAnalyticsFeature(),
     authz: { authorizeProjectPermission: async () => undefined } as never,

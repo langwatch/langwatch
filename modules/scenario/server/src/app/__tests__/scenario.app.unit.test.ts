@@ -4,6 +4,7 @@
  * @see specs/scenarios/simulation-runner.feature
  */
 import type {
+  QueueSimulationRunInput,
   ScenarioExecutionService,
   ScenarioTabRegistry,
   SimulationQueueRun,
@@ -21,7 +22,7 @@ import type { ScenarioRepository } from "../../repositories/scenario.repository.
 import type { ScenarioIdPort, ScenarioTestSuiteIdPort } from "../../ports/scenario-id.port.ts";
 import type { ScenarioClockPort } from "../../ports/scenario-clock.port.ts";
 import type { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port.ts";
-import { ScenarioApp, type QueueSimulationRunInput } from "../scenario.app.ts";
+import { ScenarioApp } from "../scenario.app.ts";
 
 function harness() {
   const commands: SimulationQueueRun[] = [];
@@ -258,4 +259,54 @@ describe("ScenarioApp.queueSimulationRun", () => {
       expect(queued().occurredAt).toBeGreaterThanOrEqual(before);
     });
   });
+
+  describe("given a run started against a named target", () => {
+    /** @scenario "A single-scenario run records which target it ran against" */
+    it("records the target the run was pointed at", async () => {
+      const { queue, metadata } = harness();
+
+      await queue({ target: { type: "prompt", referenceId: "prompt-9" } });
+
+      expect(metadata()).toMatchObject({
+        langwatch: expect.objectContaining({ targetType: "prompt", targetReferenceId: "prompt-9" }),
+      });
+    });
+
+    /** @scenario "A single-scenario run records that scenario version" */
+    it("records the scenario version the run was started from", async () => {
+      const { queue, metadata } = harness();
+
+      await queue({ scenarioVersion: 7 });
+
+      expect(metadata()).toMatchObject({
+        langwatch: expect.objectContaining({ scenarioVersion: 7 }),
+      });
+    });
+  });
+
+  describe("given a run someone started in the application", () => {
+    /** @scenario "A one-off run started in the app records the person who started it" */
+    /** @scenario "The actor sits beside the scenario version, not at the top level" */
+    it("records the person beside the scenario version rather than at the top level", async () => {
+      const { queue, metadata } = harness();
+
+      await queue({ actor: { id: "user-1", label: "user" }, scenarioVersion: 3 });
+
+      const langwatch = metadata().langwatch as Record<string, unknown>;
+      expect(langwatch).toMatchObject({ actorId: "user-1", actorLabel: "user" });
+      expect(metadata()).not.toHaveProperty("actorId");
+    });
+  });
+
+  describe("given a run carrying a note", () => {
+    /** @scenario "A note on a single scenario run is stored with that run" */
+    it("stores the note with the queued run", async () => {
+      const { queue, metadata } = harness();
+
+      await queue({ note: "nightly regression" });
+
+      expect(metadata().note).toBe("nightly regression");
+    });
+  });
+
 });

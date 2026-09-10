@@ -2,10 +2,12 @@
  * The SCENARIO half of {@link ApiTrpcCollaborators}: the three surfaces an
  * agent's test cases are written, watched and driven through.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -19,7 +21,6 @@ import {
   PostgresScenarioRepositories,
   ResultAtomsClickHouseAdapter,
   RunConfigurationsClickHouseAdapter,
-  ScenarioApp,
   scenarioServer,
   type ScenarioAppInfrastructure,
   ScenarioClockPort,
@@ -45,11 +46,11 @@ import {
   type SimulationReadClient,
   type SimulationWindowedReadInput,
 } from "@langwatch/scenario-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { ConnectedPresenceReader, SuiteClickHouseClient } from "@langwatch/suite-server";
@@ -60,8 +61,7 @@ import {
 } from "@langwatch/suite-server";
 
 import { installApiSuite } from "../suite/suite.composition.ts";
-import type { ScenarioTabRegistry, SimulationService } from "@langwatch/scenario-contract";
-import { ScenarioService } from "@langwatch/scenario-server";
+import { ScenarioService, scenarioTrpcTransport } from "@langwatch/scenario-server";
 import { UserApi } from "@langwatch/user-contract";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
@@ -73,21 +73,6 @@ import { nowInstant, toDate } from "@langwatch/time";
  */
 const SCENARIO_KSUID_RESOURCE = "scenario";
 const SCENARIO_RUN_KSUID_RESOURCE = "scenariorun";
-
-/**
- * A capability this deployment did not compose, refused by name.
- */
-class ApiScenarioUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `${capability} is not available on this deployment`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiScenarioUnavailableError";
-  }
-}
 
 /** Reports each absence in this half, with what it costs. */
 export abstract class ApiScenarioAbsenceReport {
@@ -123,7 +108,7 @@ export type ApiScenarioExecutionCollaborators = Readonly<{
   /** The workflow behind a workflow target, hydrated with its default model. */
   workflows: WorkflowService;
   /** The ONE model gateway the adapter, simulator and judge roles resolve on. */
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   /** The project secret store a run's secret parameters are read from. */
   secrets: SecretApi;
   /** The canonical trace reads an HTTP target's ingest wait is measured on. */
@@ -181,8 +166,16 @@ export type ScenarioFeatureCollaborators = Readonly<{
 
 import type { ComposedScenarioFeature } from "./scenario.composition.types.ts";
 
-/** Composes the scenario feature over this process's own graph. */
-export async function composeScenarioFeature(
+/**
+ * Composes the scenario feature over this process's own graph and boots it
+ * through the module runtime: persistence is selected once, `ScenarioApp` is
+ * built over it, and the declared `scenarios.*` namespace is served from the
+ * contract. The rest of the feature's technical collaborators still arrive as
+ * one `infrastructure` bag, because `ScenarioApp` has not yet absorbed the
+ * construction of agent testing, the run executor, the ClickHouse-backed reads
+ * and the Suite peer; that move is the module's next step.
+ */
+export async function installApiScenario(
   options: ScenarioFeatureCollaborators,
 ): Promise<ComposedScenarioFeature> {
   const logger = createLogger(`${options.processName}:scenario`);
@@ -246,7 +239,13 @@ export async function composeScenarioFeature(
   });
   const suiteApp = suite.app;
 
-  const scenarioApp = ScenarioApp.create({
+  /**
+   * The technical collaborators the module still takes as one bag: the private
+   * services this feature builds over several other verticals, and the four
+   * small ports the scenario store itself is built over. The repository seam
+   * is the runtime's.
+   */
+  const infrastructure: ScenarioAppInfrastructure = {
     agentTesting: AgentTestService.create({
       agents: options.agents,
       projects: options.projects,
@@ -261,7 +260,6 @@ export async function composeScenarioFeature(
       }),
       maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
     }),
-    scenarios,
     simulations,
     scenarioExecution: composeScenarioExecution(options, {
       scenarios,
@@ -270,11 +268,23 @@ export async function composeScenarioFeature(
       simulations,
     }),
     scenarioTabs,
-    users: options.users,
     broadcast: options.broadcast,
     resultAtoms: composeResultAtoms(options),
     runConfigurations: composeRunConfigurations(options),
-  });
+    ids: new KsuidScenarioId(),
+    testSuiteIds: new NanoidScenarioTestSuiteId(),
+    clock: new SystemScenarioClock(),
+    secretCipher: composeScenarioSecretCipher(options),
+  };
+
+  const runtime = await createApp({ name: options.processName })
+    .withPersistence("postgres", { prisma: options.prisma })
+    .withInfrastructure({})
+    .withProvided(UserApi, options.users)
+    .withModule(scenarioServer, { infrastructure })
+    .boot({ role: "api" });
+
+  const scenarioApp = runtime.module(scenarioServer).provided;
 
   clients.bind(ScenarioApi, scenarioApp);
   clients.ready();
@@ -285,30 +295,9 @@ export async function composeScenarioFeature(
     scenarioTabs,
     simulations,
     suites: suiteApp,
-  };
-}
-
-/**
- * The scenario surfaces on a process that composed no graph to run them over.
- */
-export function refusingScenarioFeature(): ComposedScenarioFeature {
-  const refuse = <T>(capability: string): T =>
-    new Proxy(
-      {},
-      {
-        get: () => (): never => {
-          throw new ApiScenarioUnavailableError(capability);
-        },
-        has: () => true,
-      },
-    ) as T;
-
-  return {
-    scenarios: refuse<ScenarioApp>("The scenario surface"),
-    scenarioService: refuse<ScenarioService>("The scenario store"),
-    scenarioTabs: refuse<ScenarioTabRegistry>("The scenario tab registry"),
-    simulations: refuse<SimulationService>("The simulation run store"),
-    suites: refuse<SuiteApi>("The suite surface"),
+    routers: (mount) => ({
+      scenarios: mount.runtime.mount(scenarioTrpcTransport, (ctx) => ctx.app.scenarios),
+    }),
   };
 }
 
@@ -506,40 +495,3 @@ function composeScenarioExecution(
     simulations: composed.simulations,
   });
 }
-
-// ---------------------------------------------------------------------------
-// The annotated installer (ADR-133)
-// ---------------------------------------------------------------------------
-
-/**
- * `scenarios.*`, booted through `defineModule`/`withRepositories`/`withApp`
- * rather than hand-built. Persistence is selected once (postgres or memory);
- * the rest of the feature's technical collaborators still arrive as a single
- * `infrastructure` bag, because `ScenarioApp` has not yet absorbed the
- * construction of agent testing, the run executor, the ClickHouse-backed
- * reads and the Suite peer the way `composeScenarioFeature` above does by
- * hand - that move is the module's next step, tracked in its handover.
- * `composeScenarioFeature`/`refusingScenarioFeature` remain what
- * `api-production.composition.ts` actually calls; this installer is not
- * wired into it yet.
- */
-export async function installApiScenario(options: {
-  persistence: { backend: "postgres"; prisma: PrismaClient } | { backend: "memory" };
-  users: UserApi;
-  infrastructure: ScenarioAppInfrastructure;
-}): Promise<ScenarioApp> {
-  const app = createApp({ name: "langwatch-api" });
-  const withPersistence =
-    options.persistence.backend === "postgres"
-      ? app.withPersistence("postgres", { prisma: options.persistence.prisma })
-      : app.withPersistence("memory", {});
-
-  const runtime = await withPersistence
-    .withInfrastructure({})
-    .withProvided(UserApi, options.users)
-    .withModule(scenarioServer, { infrastructure: options.infrastructure })
-    .boot({ role: "api" });
-
-  return runtime.module(scenarioServer).provided;
-}
-

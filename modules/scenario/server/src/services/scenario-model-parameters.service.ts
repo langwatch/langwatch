@@ -1,7 +1,7 @@
 import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -20,11 +20,11 @@ export type ModelParamsResult =
   | { success: false; reason: ModelParamsFailureReason; message: string };
 
 export class ScenarioModelParametersService {
-  static create(modelProviders: ModelProviderService): ScenarioModelParametersService {
+  static create(modelProviders: ModelProviderApi): ScenarioModelParametersService {
     return new ScenarioModelParametersService(modelProviders);
   }
 
-  private constructor(private readonly modelProviders: ModelProviderService) {}
+  private constructor(private readonly modelProviders: ModelProviderApi) {}
 
   async prepare(input: { projectId: string; model: string }): Promise<ModelParamsResult> {
     const { projectId, model } = input;

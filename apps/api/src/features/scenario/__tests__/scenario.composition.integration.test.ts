@@ -1,6 +1,7 @@
 /**
  * The scenario feature of the packaged tRPC record, served by the API process.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { EventEmitter } from "node:events";
 import { EventEmitter as NodeEventEmitter } from "node:events";
 import { createTenantId, EventSourcing } from "@langwatch/eventing";
@@ -12,7 +13,7 @@ import type {
   PermissionDecision,
 } from "@langwatch/authz-contract";
 import { AgentNotFoundError, type AgentApi } from "@langwatch/agent-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -20,9 +21,9 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import type { TraceService } from "@langwatch/trace-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication } from "../../../api.application.ts";
@@ -31,7 +32,7 @@ import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-brows
 import { ApiRestSecurity } from "../../../api-rest.security.ts";
 import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
-import { ApiScenarioAbsenceReport, composeScenarioFeature } from "../scenario.composition.ts";
+import { ApiScenarioAbsenceReport, installApiScenario } from "../scenario.composition.ts";
 import { composeApiAgentPipelines } from "../../../app/api-agent-pipelines.composition.ts";
 import { composeLangyFeature } from "../../langy/langy.composition.ts";
 import {
@@ -222,7 +223,7 @@ function composeApplication(
     processName: "langwatch-api-test",
   });
 
-  const scenario = composeScenarioFeature({
+  const scenario = installApiScenario({
     prisma: prisma.client,
     authz,
     // The agent directory a suite's cases and an HTTP target resolve through.
@@ -254,9 +255,9 @@ function composeApplication(
     // failure handler — is real.
     scenarioExecution: {
       workflows: stub<WorkflowService>("workflows"),
-      modelProviders: stub<ModelProviderService>("modelProviders"),
+      modelProviders: stub<ModelProviderApi>("modelProviders"),
       secrets: stub<SecretApi>("secrets"),
-      traces: stub<TraceService>("traces"),
+      traces: stub<TraceApi>("traces"),
       config: {
         langwatchEndpoint: "https://ingest.acme.test",
         nlpServiceUrl: "http://nlp.acme.test:5561",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { SimulationBatchRunData, SimulationRunData } from "@langwatch/scenario-contract";
-import { filterRunsByTimestamp } from "../scenario-events.api.ts";
+import { filterRunsByTimestamp } from "../simulation-run-timestamp-filter.rules.ts";
 
 function createRun(overrides: Partial<SimulationRunData> = {}): SimulationRunData {
   return {

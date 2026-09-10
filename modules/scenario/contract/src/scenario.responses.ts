@@ -169,6 +169,9 @@ export type RunTargetResponse = z.infer<typeof runTargetSchema>;
  * is stated as opaque data here rather than duplicating `SuiteTarget`'s parser
  * from `@langwatch/suite-contract` into a package that does not depend on it.
  */
+/** The most configurations one history read may carry back. */
+export const MAX_RUN_CONFIGURATIONS = 200;
+
 export const runConfigurationEntrySchema = z
   .object({
     key: z.string(),

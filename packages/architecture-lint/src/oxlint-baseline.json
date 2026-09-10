@@ -2267,14 +2267,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/scenario/server/src/transport/api-trpc/scenario-crud.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/scenario/server/src/transport/api-trpc/scenario-events.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/scenario/web/src/behavior/agents/use-workflow-target-agent-data.ts",
       "measured": "2026-09-06"
     },
@@ -9620,14 +9612,6 @@
     },
     {
       "key": "temporal-only|modules/scenario/server/src/transport/api-rest/scenario-run-export.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|modules/scenario/server/src/transport/api-trpc/result-atoms.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|modules/scenario/server/src/transport/api-trpc/scenario-events.api.ts",
       "measured": "2026-09-06"
     },
     {

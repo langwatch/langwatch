@@ -4,9 +4,13 @@ import type {
   AgentTestTurnResult,
   AgentWithFields,
 } from "@langwatch/agent-contract";
+import type { EventEmitter } from "node:events";
 import type { RunActor } from "./run-actor.ts";
 import type {
   Scenario,
+  ScenarioIdInput,
+  ScenarioCreateInput,
+  ScenarioUpdateInput,
   ScenarioReferenceState,
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
@@ -18,8 +22,52 @@ import type {
 } from "./scenario.ts";
 import type { RunParameterValues } from "./scenario.parameters.ts";
 import type { RunSecretCiphertext } from "./run-secret-ciphertext.ts";
-import type { SimulationExternalSetSummary } from "./simulation.ts";
-import type { SimulationProjectDateRangeInput } from "./simulation.service.ts";
+import type { ResolvedRunModels } from "./run-models.ts";
+import type { SimulationQueueRun } from "./simulation.commands.ts";
+import type {
+  SimulationAllSuitesRunData,
+  SimulationBatchHistory,
+  SimulationBatchRunData,
+  SimulationExternalSetSummary,
+  SimulationLastResultSummary,
+  SimulationRunData,
+  SimulationSetData,
+} from "./simulation.ts";
+import type {
+  SimulationAllSuitesInput,
+  SimulationBatchHistoryInput,
+  SimulationBatchRunInput,
+  SimulationExternalSetCountInput,
+  SimulationLastResultSummariesInput,
+  SimulationLastUpdatedInput,
+  SimulationProjectDateRangeInput,
+  SimulationScenarioRunInput,
+  SimulationScenarioSetRunsInput,
+} from "./simulation.service.ts";
+import type {
+  ScenarioExecutionPrefetchInput,
+  ScenarioExecutionPrefetchResult,
+} from "./scenario-execution.service.ts";
+import type {
+  ScenarioDuplicateInput,
+  ScenarioMoveInput,
+  ScenarioVersionDetail,
+  ScenarioVersionInput,
+  ScenarioVersionListInput,
+  ScenarioVersionRestoreInput,
+  ScenarioVersionSummary,
+} from "./scenario.version.ts";
+import type { ScenarioTabPresence, ScenarioTabRegistration } from "./scenario-tab-presence.ts";
+import type {
+  CodeScenario,
+  ResultAtom,
+  ResultsFilter,
+  ResultsGroupBy,
+  ResultsOverview,
+  RunTarget,
+} from "./result-atoms.ts";
+import type { RunConfigurationEntryResponse } from "./scenario.responses.ts";
+import type { UserFullProfile, UserProfilesInput } from "@langwatch/user-contract";
 
 export interface TestAgentRunInput {
   projectId: string;
@@ -63,7 +111,38 @@ export type ResolvedScenarioRunParametersForScenario = ResolvedScenarioRunParame
   scenarioId: string;
 };
 
-/** Callable scenario capability used by peer features such as Suite. */
+
+/** Who a write is attributed to. */
+export interface ScenarioCaller {
+  readonly id: string;
+}
+
+/** What one queued run needs to know about itself. */
+export interface QueueSimulationRunInput {
+  projectId: string;
+  scenarioId: string;
+  scenarioRunId: string;
+  batchRunId: string;
+  setId: string;
+  name: string;
+  /** The same union the queued command declares, so a door cannot widen it. */
+  target: NonNullable<SimulationQueueRun["target"]>;
+  parameters: RunParameterValues;
+  secretParameters: RunSecretCiphertext;
+  note: string | undefined;
+  scenarioVersion: number | undefined;
+  /** Who started the run. Absent when the surface names no person. */
+  actor?: RunActor | undefined;
+  /**
+   * The models the validation prefetch resolved. Null when the run resolved
+   * none, which reads back the way every run recorded before this field
+   * existed reads back.
+   */
+  resolvedModels?: ResolvedRunModels | null;
+}
+
+/** The scenario application: what every scenario door calls, and what peer
+ * features such as Suite reach it by. */
 export interface ScenarioApi {
   testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult>;
   testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult>;
@@ -103,6 +182,113 @@ export interface ScenarioApi {
   getInternalSuiteSummaries(
     input: SimulationProjectDateRangeInput,
   ): Promise<SimulationExternalSetSummary[]>;
+
+  // -- the scenarios a project defines ---------------------------------------
+  /** How many scenarios the project holds. */
+  count(input: { projectId: string }): Promise<number>;
+  /** One scenario, or null when the project holds no such live scenario. */
+  tryGetById(input: ScenarioIdInput): Promise<Scenario | null>;
+  /** The same read, archived rows included. */
+  tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null>;
+  create(input: Omit<ScenarioCreateInput, "lastUpdatedById">, by: ScenarioCaller): Promise<Scenario>;
+  update(
+    input: Omit<ScenarioUpdateInput, "lastUpdatedById" | "actor">,
+    by: ScenarioCaller,
+  ): Promise<Scenario>;
+  archive(input: ScenarioIdInput): Promise<Scenario>;
+  batchArchive(input: {
+    projectId: string;
+    ids: string[];
+  }): Promise<{ archived: string[]; failed: { id: string; reason: string }[] }>;
+  moveToTestSuite(input: ScenarioMoveInput): Promise<Scenario>;
+  duplicate(
+    input: Omit<ScenarioDuplicateInput, "lastUpdatedById">,
+    by: ScenarioCaller,
+  ): Promise<Scenario>;
+
+  // -- version history -------------------------------------------------------
+  listVersions(
+    input: ScenarioVersionListInput,
+  ): Promise<{ versions: ScenarioVersionSummary[]; nextCursor: number | null }>;
+  getVersion(input: ScenarioVersionInput): Promise<ScenarioVersionDetail>;
+  restoreVersion(
+    input: Omit<ScenarioVersionRestoreInput, "actor">,
+    by: ScenarioCaller,
+  ): Promise<Scenario>;
+  /** The people a version history names, for the author column. */
+  getUserProfiles(input: UserProfilesInput): Promise<UserFullProfile[]>;
+
+  // -- running one --------------------------------------------------------
+  prefetchExecution(
+    input: ScenarioExecutionPrefetchInput,
+  ): Promise<ScenarioExecutionPrefetchResult>;
+  queueSimulationRun(input: QueueSimulationRunInput): Promise<void>;
+  cancelJob(input: CancelScenarioRunInput): Promise<{ cancelled: boolean }>;
+  cancelBatchRun(
+    input: CancelScenarioBatchInput,
+  ): Promise<{ cancelledCount: number; skippedCount: number }>;
+
+  // -- reading what ran ------------------------------------------------------
+  readSuiteRunData(input: {
+    projectId: string;
+    scenarioSetId?: string;
+    limit: number;
+    cursor?: string;
+    startDate?: number;
+    endDate?: number;
+    sinceTimestamp?: number;
+  }): Promise<SimulationAllSuitesRunData>;
+  getScenarioSetsData(input: SimulationProjectDateRangeInput): Promise<SimulationSetData[]>;
+  getLastResultSummaries(
+    input: SimulationLastResultSummariesInput,
+  ): Promise<SimulationLastResultSummary[]>;
+  getLastUpdatedAt(input: SimulationLastUpdatedInput): Promise<number>;
+  getRunDataForScenarioSet(
+    input: SimulationScenarioSetRunsInput,
+  ): Promise<{ runs: SimulationRunData[]; nextCursor: string | null }>;
+  tryGetScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null>;
+  getBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number>;
+  getBatchHistoryForScenarioSet(
+    input: SimulationBatchHistoryInput,
+  ): Promise<SimulationBatchHistory>;
+  getRunDataForBatchRun(input: SimulationBatchRunInput): Promise<SimulationBatchRunData>;
+  getExternalSetSummaries(
+    input: SimulationProjectDateRangeInput,
+  ): Promise<SimulationExternalSetSummary[]>;
+  getRunDataForAllSuites(input: SimulationAllSuitesInput): Promise<SimulationAllSuitesRunData>;
+
+  // -- the live stream -------------------------------------------------------
+  /** The project's own fan-out, which the run stream reads its events off. */
+  tenantEmitter(projectId: string): EventEmitter;
+  /** Registers one open browser tab, and hands back how to retire it. */
+  startTabPresence(registration: ScenarioTabRegistration): Promise<ScenarioTabPresence>;
+
+  // -- the results tab -------------------------------------------------------
+  getResultsOverview(input: {
+    filter: ResultsFilter;
+    groupBy: ResultsGroupBy;
+  }): Promise<ResultsOverview>;
+  getResultAtoms(input: {
+    filter: ResultsFilter;
+    limit: number;
+    cursor?: string;
+  }): Promise<{ atoms: ResultAtom[]; nextCursor?: string; hasMore: boolean }>;
+  getCodeScenarios(input: {
+    projectId: string;
+    startDate: number;
+    endDate?: number;
+  }): Promise<CodeScenario[]>;
+  getRunTargets(input: {
+    projectId: string;
+    startDate: number;
+    endDate?: number;
+  }): Promise<RunTarget[]>;
+  getRunConfigurations(input: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+    limit?: number;
+  }): Promise<RunConfigurationEntryResponse[]>;
 }
 
 export const ScenarioApi = moduleApi<ScenarioApi>("scenario");

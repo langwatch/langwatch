@@ -2131,6 +2131,12 @@ const presentations = {
     title: "You can't export this project's simulation runs",
     describe: () => "Ask an admin for access to simulations on this project.",
   },
+  scenario_run_rejected: {
+    title: "This run cannot start as asked",
+    describe: (error) =>
+      error.message ||
+      "Check the scenario, its parameters and the target the run points at, then try again.",
+  },
   // ---- secret run parameters ----
   // Only names reach these strings. The value is the thing the whole feature
   // exists to keep out of anything a person or a log can read.

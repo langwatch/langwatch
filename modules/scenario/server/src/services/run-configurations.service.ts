@@ -1,4 +1,5 @@
 import {
+  MAX_RUN_CONFIGURATIONS,
   parseRunParametersJson,
   withoutParameterNames,
   type ResultsFilter,
@@ -16,7 +17,6 @@ import {
   type SuiteTarget,
 } from "@langwatch/suite-contract";
 import {
-  MAX_RUN_CONFIGURATIONS,
   type RawRunConfigurationRow,
   type RunConfigurationsReadPort,
 } from "../ports/run-configurations-read.port.ts";

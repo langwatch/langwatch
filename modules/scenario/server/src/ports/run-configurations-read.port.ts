@@ -1,13 +1,6 @@
 import type { ResultsFilter } from "@langwatch/scenario-contract";
 
 /**
- * How many configurations one read returns, at most. The cap applies AFTER the store has already
- * folded runs into distinct configurations, so it bounds the answer rather than the history: a plan
- * run nightly for a year with one setup costs one row, not three hundred and sixty-five.
- */
-export const MAX_RUN_CONFIGURATIONS = 200;
-
-/**
  * One configuration as the store folds it, before the plan row is joined. Every value is a string
  * because ClickHouse serialises UInt64 that way, and because the parameters are handed over as the
  * raw JSON they were stored as.

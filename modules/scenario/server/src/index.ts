@@ -6,11 +6,11 @@ export * from "./ports/scenario-id.port.ts";
 export * from "./ports/scenario-execution-runner.port.ts";
 export * from "./ports/scenario-execution-pool.port.ts";
 export * from "./ports/scenario-processor-metrics.port.ts";
+export * from "./ports/scenario-activity.port.ts";
 export * from "./ports/scenario-secret-cipher.port.ts";
 export * from "./ports/scenario-tab-store.port.ts";
 export {
   ResultAtomsReadPort,
-  MAX_ATOM_PAGE,
   MAX_TREND_POINTS,
   MAX_CODE_SCENARIOS,
   MAX_RUN_TARGETS,
@@ -25,7 +25,6 @@ export {
 } from "./ports/result-atoms-read.port.ts";
 export {
   RunConfigurationsReadPort,
-  MAX_RUN_CONFIGURATIONS,
   type RawRunConfigurationRow,
 } from "./ports/run-configurations-read.port.ts";
 export * from "./services/scenario-execution-pool.service.ts";
@@ -108,11 +107,9 @@ export {
 export {
   ScenarioApp,
   scenarioAppDependencyTokens,
-  type QueueSimulationRunInput,
   type ScenarioAppDependencies,
   type ScenarioAppInfrastructure,
   type ScenarioBroadcast,
-  type ScenarioCaller,
 } from "./app/scenario.app.ts";
 export type { ScenarioRepositories } from "./repositories/scenario.repositories.ts";
 export { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
@@ -138,11 +135,9 @@ export {
   type ResultAtomsClickHouseClient,
 } from "./adapters/result-atoms.clickhouse.adapter.ts";
 export { RunConfigurationsClickHouseAdapter } from "./adapters/run-configurations.clickhouse.adapter.ts";
-export type {
-  ScenarioTrpcContext,
-  ScenarioTrpcPorts,
-  ScenarioTrpcProcedures,
-} from "./rules/scenario-trpc-context.rules.ts";
+export { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
+export { ScenarioRunRejectedError } from "./rules/scenario-run-request.rules.ts";
+export { filterRunsByTimestamp } from "./rules/simulation-run-timestamp-filter.rules.ts";
 
 // --------------------------------------------------------------------------- The run-history
 // download The keyset sweep behind `POST /api/export/scenario-runs/download`, its two CSV row axes,

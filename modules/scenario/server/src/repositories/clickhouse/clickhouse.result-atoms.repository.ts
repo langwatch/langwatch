@@ -4,6 +4,7 @@
  * batch/set reads) since this reads the whole window flat for filter/group; SQL builders stay static methods per `restructure-bug-hunt-2026-09-03.md`.
  */
 import {
+  MAX_ATOM_PAGE,
   AGENT_TEST_SET_SUFFIX,
   expandSetIdFilter,
   UNKNOWN_TARGET_KEY,
@@ -11,7 +12,6 @@ import {
   type ResultsGroupBy,
 } from "@langwatch/scenario-contract";
 import {
-  MAX_ATOM_PAGE,
   MAX_CODE_SCENARIOS,
   MAX_RUN_TARGETS,
   MAX_TREND_POINTS,

@@ -3,6 +3,7 @@
  * agent, through the same live dispatcher a simulation's connected column uses),
  * @see specs/agents/agent-test-run.feature
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import {
   AgentCallTimeoutError,
   AgentTestRefusedError,
@@ -17,7 +18,7 @@ import type {
   AgentTestRunResult,
   AgentTestTurnResult,
 } from "@langwatch/agent-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
@@ -36,7 +37,7 @@ import {
   type TestAgentTurnInput,
 } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 
 import type { AgentAdapterFactoryPort } from "../ports/agent-adapter-factory.port.ts";
 import { z } from "zod";
@@ -56,7 +57,7 @@ export type AgentTestServiceOptions = {
   workflows: WorkflowService;
   prompts: PromptApi;
   secrets: SecretApi;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   simulations: SimulationService;
   config: ScenarioExecutionPrefetchConfig;
   /** Builds the adapter that speaks to the agent under test. */

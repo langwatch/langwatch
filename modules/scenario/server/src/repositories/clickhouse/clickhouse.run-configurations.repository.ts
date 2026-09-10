@@ -1,3 +1,4 @@
+import { MAX_RUN_CONFIGURATIONS } from "@langwatch/scenario-contract";
 /**
  * The expressions that read a configuration off a run row, and the repository that reads the
  * configurations a project's plans already ran with.
@@ -5,7 +6,6 @@
  */
 import type { ResultsFilter } from "@langwatch/scenario-contract";
 import {
-  MAX_RUN_CONFIGURATIONS,
   RunConfigurationsReadPort,
   type RawRunConfigurationRow,
 } from "../../ports/run-configurations-read.port.ts";

@@ -16,7 +16,6 @@ import {
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 
 import { createTrpcRoot, type ApiTrpcContext } from "../../../api.application.ts";
-import { composeGatewayFeature } from "../../../features/gateway/gateway.composition.ts";
 import { composeAuthFeature } from "../../../features/auth/auth.composition.ts";
 import { testAuthApi } from "../../../features/auth/__tests__/support/test-auth-api.ts";
 import { refusingUserFeature } from "../../../features/user/user.composition.ts";
@@ -31,6 +30,7 @@ import {
   stubDataRetentionFeature,
   stubEntitlementFeature,
   stubFeatureFlagFeature,
+  stubGatewayFeature,
   stubApiKeyFeature,
   stubOpsFeature,
   stubPresenceFeature,
@@ -43,10 +43,10 @@ import { refusingAnalyticsFeature } from "../../../features/analytics/analytics.
 import { refusingDatasetFeature } from "../../../features/dataset/dataset.composition.ts";
 import { refusingPromptFeature } from "../../../features/prompt/prompt.composition.ts";
 import { refusingHomeFeature } from "../../../features/project/home.composition.ts";
-import { refusingScenarioFeature } from "../../../features/scenario/scenario.composition.ts";
+import { stubScenarioFeature } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingIntegrationsChecksFeature } from "../../../features/project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../../features/annotation/annotation-absence.ts";
-import { refusingHttpProxyFeature } from "../../../features/agent/http-proxy.composition.ts";
+import { composeHttpProxyFeature } from "../../../features/agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../../features/model-provider/model-provider.composition.ts";
 import { refusingTraceFeature } from "../../../features/trace/trace.composition.ts";
 import { refusingWorkflowFeature } from "../../../features/workflow/workflow.composition.ts";
@@ -167,19 +167,14 @@ export function buildAppTrpcFeatures(
     // existed. The gateway's application refuses like every port below; its
     // PARSERS are real, because a procedure cannot be built without them.
     composed: {
-      gateway: composeGatewayFeature({
-        infrastructure: undefined,
-        peers: undefined,
-        clickhouse: null,
-        virtualKeyPepper: undefined,
-      }),
+      gateway: stubGatewayFeature(),
       auth: composeAuthFeature(testAuthApi()),
       user: refusingUserFeature("langwatch-api"),
       presence: stubPresenceFeature(),
       apiKey: stubApiKeyFeature(),
       langy: refusingLangyFeature(),
       ops: stubOpsFeature(),
-      scenario: refusingScenarioFeature(),
+      scenario: stubScenarioFeature(),
       analytics: refusingAnalyticsFeature(),
       featureFlag: stubFeatureFlagFeature(),
       dataset: refusingDatasetFeature(),
@@ -195,7 +190,7 @@ export function buildAppTrpcFeatures(
       annotation: refusingAnnotationFeature(),
       dashboard: stubDashboardFeature(),
       entitlement: stubEntitlementFeature(),
-      httpProxy: refusingHttpProxyFeature(),
+      httpProxy: composeHttpProxyFeature(),
       modelProvider: refusingModelProviderFeature(),
       share: stubShareFeature(),
       topic: stubTopicFeature(),

@@ -131,8 +131,7 @@ export const ABSENT_API_TRPC_NAMESPACES = [
     module: "ops",
     consequence: "the support inbox lists no filed report",
   },
-  { namespace: "scenarios", module: "scenario", consequence: "no simulation is listed or watched" },
-  { namespace: "setupSkills", module: "scenario", consequence: "no setup skill is listed" },
+  { namespace: "setupSkills", module: "langy", consequence: "no setup skill is listed" },
   {
     namespace: "suites",
     module: "suite",

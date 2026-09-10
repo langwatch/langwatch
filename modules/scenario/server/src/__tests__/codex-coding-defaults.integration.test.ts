@@ -36,7 +36,7 @@ import {
   UnmanagedModelProviderGatewayAdapter,
   VercelAiModelTranslationAdapter,
 } from "@langwatch/model-provider-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
@@ -102,7 +102,7 @@ function database(): PrismaClient {
 }
 
 /** The real service, over the real repositories, with only the outbound edges stood down. */
-function realModelProviders(prisma: PrismaClient): ModelProviderService {
+function realModelProviders(prisma: PrismaClient): ModelProviderApi {
   return PostgresModelProviderAdapter.create({
     database: prisma,
     projects: {
@@ -180,7 +180,7 @@ describe.skipIf(!databaseUrl)("given a project whose FAST role default is a code
   let teamId: string;
   let projectId: string;
   let userId: string;
-  let modelProviders: ModelProviderService;
+  let modelProviders: ModelProviderApi;
 
   beforeAll(async () => {
     const organization = await prisma.organization.create({

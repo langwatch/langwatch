@@ -137,9 +137,8 @@ import {
   type ApiModelProviderCompositionOptions,
 } from "./api-model-provider.composition.ts";
 import {
-  composeScenarioFeature,
+  installApiScenario,
   LoggedApiScenarioAbsence,
-  refusingScenarioFeature,
 } from "../features/scenario/scenario.composition.ts";
 import { installApiRole } from "../features/role/role.composition.ts";
 import { installApiDataRetention } from "../features/data-retention/data-retention.composition.ts";
@@ -3384,7 +3383,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // event ride one emitter per tenant.
     const auth = this.composedAuth?.compose();
     if (!database || !tenancy || !agents || !auth) {
-      return refusingScenarioFeature();
+      throw new Error(
+        "api scenario composition needs a database, tenancy, the agent directory and auth: this process installed none",
+      );
     }
 
     // The four collaborators a scenario RUN is prepared against, and the NARROWING for them.
@@ -3396,9 +3397,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const modelProviders = this.composedModelProviders;
     const secrets = this.composedSecret?.app;
     const traces = this.composedTrace.traces;
-    if (!workflows || !modelProviders || !secrets || !traces) return refusingScenarioFeature();
+    if (!workflows || !modelProviders || !secrets || !traces) {
+      throw new Error(
+        "api scenario composition needs workflows, model providers, secrets and traces: this process installed none",
+      );
+    }
 
-    return await composeScenarioFeature({
+    return await installApiScenario({
       prisma: database.client,
       resources: options.resources,
       authz,
