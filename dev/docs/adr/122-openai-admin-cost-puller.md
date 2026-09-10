@@ -114,7 +114,7 @@ restated here because it is easy to reintroduce and silent when wrong.
 > carries `user_email`". The adapter shipped the opposite and deliberately
 > so: `actor` carries the provider's **opaque `user-…` id**, and the email is
 > now dropped from the row before it is stringified into `raw_payload`
-> (`openaiAdmin.puller.ts:417,885-891` and the comments above them), so
+> (`openaiAdmin.puller.ts:416-428,885-891` and the comments above them), so
 > the address is never stored. The id is the
 > stable key, the erasure suppression list is keyed on exactly that string,
 > and a raw address is heavier on a money row. The decision below stands with
@@ -552,7 +552,7 @@ adapter duplicates cursor logic a third provider may justify factoring out.
   decision survives.
   - **Decision 6's `actor` is the raw `user_id`, not `user_email`.** The
     adapter reads the id deliberately and says why in its own comment
-    (`openaiAdmin.puller.ts:390-401,835-851`): the id is stable, the erasure
+    (`openaiAdmin.puller.ts:416-428,885-891`): the id is stable, the erasure
     suppression list is keyed on exactly that string, and the address is
     heavier on a money row. At v3 the email was not dropped — it survived into
     `raw_payload` through the row schema's `.passthrough()`. **[No longer true:
@@ -642,3 +642,13 @@ adapter duplicates cursor logic a third provider may justify factoring out.
     intact; no owner and no date are attached to changing that.
   - Stale citations refreshed: `ingestionSourceCatalog.tsx:142-149` →
     `:171-181`; `ingestionSourceCatalog.tsx:293` → `:324`.
+
+- **v6 (2026-09-10) — the stored payload no longer carries the address.** No
+  decision is taken here. `costEvent` drops `user_email` before the row is
+  stringified into `raw_payload` (`openaiAdmin.puller.ts:885-891`), so the
+  address is stored nowhere and does not reach a wired-up SIEM; the four
+  places this ADR said otherwise are corrected in place
+  (langwatch/langwatch-saas#1225, item 1).
+  - Stale citations refreshed: `openaiAdmin.puller.ts:403,864` →
+    `:416-428,885-891`; `openaiAdmin.puller.ts:390-401,835-851` →
+    `:416-428,885-891`.
