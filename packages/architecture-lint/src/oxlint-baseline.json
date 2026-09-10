@@ -479,6 +479,14 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|modules/analytics/web/src/ui/elements/summary-metric.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/analytics/web/src/ui/sections/analytics-header.tsx",
+      "measured": "2026-09-06"
+    },
+    {
       "key": "cognitive-complexity|modules/analytics/web/src/ui/sections/analytics/analytics-evaluations.screen.tsx",
       "measured": "2026-09-06"
     },
@@ -488,14 +496,6 @@
     },
     {
       "key": "cognitive-complexity|modules/analytics/web/src/ui/sections/analytics/custom-graph.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/analytics/web/src/ui/elements/summary-metric.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/analytics/web/src/ui/sections/analytics-header.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -543,15 +543,15 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/annotation/web/src/ui/sections/annotation-score-form.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/annotation/web/src/ui/sections/annotation-list.tsx",
       "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|modules/annotation/web/src/ui/sections/annotation-queue-editor.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/annotation/web/src/ui/sections/annotation-score-form.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -807,10 +807,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/dataset/web/src/ui/sections/dataset-editor.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/dataset/web/src/ui/blocks/dataset-preview-table.tsx",
       "measured": "2026-09-06"
     },
@@ -840,6 +836,10 @@
     },
     {
       "key": "cognitive-complexity|modules/dataset/web/src/ui/sections/dataset-editor-table.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/dataset/web/src/ui/sections/dataset-editor.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -895,10 +895,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/evaluator/web/src/ui/sections/evaluators.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/evaluator/web/src/ui/blocks/evaluator-api-usage-dialog.tsx",
       "measured": "2026-09-06"
     },
@@ -944,6 +940,10 @@
     },
     {
       "key": "cognitive-complexity|modules/evaluator/web/src/ui/sections/evaluator-push-to-copies-dialog.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/evaluator/web/src/ui/sections/evaluators.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1032,14 +1032,6 @@
     },
     {
       "key": "cognitive-complexity|modules/experiment/web/src/model/experiments-v3/mapping-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/experiment/web/src/ui/sections/experiments/workbench.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1144,6 +1136,14 @@
     },
     {
       "key": "cognitive-complexity|modules/experiment/web/src/ui/sections/experiments-v3/run-evaluation-button.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/experiment/web/src/ui/sections/experiments/workbench.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1523,11 +1523,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/monitor/web/src/ui/sections/online-evaluations.screen.tsx",
+      "key": "cognitive-complexity|modules/monitor/web/src/ui/blocks/online-evaluations-table.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/monitor/web/src/ui/blocks/online-evaluations-table.tsx",
+      "key": "cognitive-complexity|modules/monitor/web/src/ui/sections/online-evaluations.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1587,10 +1587,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/onboarding/web/src/ui/sections/onboarding/project.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/onboarding/web/src/ui/blocks/onboarding-container.tsx",
       "measured": "2026-09-06"
     },
@@ -1620,6 +1616,10 @@
     },
     {
       "key": "cognitive-complexity|modules/onboarding/web/src/ui/sections/observability/waiting-for-traces-chip.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/onboarding/web/src/ui/sections/onboarding/project.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1767,22 +1767,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/audit-log.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/groups.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/members.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/teams.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/organization/web/src/ui/sections/add-members-form.tsx",
       "measured": "2026-09-06"
     },
@@ -1800,6 +1784,22 @@
     },
     {
       "key": "cognitive-complexity|modules/organization/web/src/ui/sections/member-detail-dialog.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/audit-log.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/groups.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/members.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/teams.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -2087,10 +2087,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/scenario/web/src/ui/sections/simulations/scenario-library.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/scenario/web/src/ui/elements/cascade-archive-dialog.tsx",
       "measured": "2026-09-06"
     },
@@ -2152,6 +2148,10 @@
     },
     {
       "key": "cognitive-complexity|modules/scenario/web/src/ui/sections/shared/ai-create-modal.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/scenario/web/src/ui/sections/simulations/scenario-library.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3559,10 +3559,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/evaluator/web/src/ui/sections/evaluators.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|modules/evaluator/web/src/ui/sections/checks/check-config-form.tsx",
       "measured": "2026-09-06"
     },
@@ -3579,6 +3575,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "complexity|modules/evaluator/web/src/ui/sections/evaluators.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
       "key": "complexity|modules/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx",
       "measured": "2026-09-06"
     },
@@ -3592,10 +3592,6 @@
     },
     {
       "key": "complexity|modules/experiment/web/src/model/experiments-v3/mapping-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3648,6 +3644,10 @@
     },
     {
       "key": "complexity|modules/experiment/web/src/ui/sections/experiments-v3/table-meta-wrappers.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "complexity|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -4615,11 +4615,11 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/annotation/web/src/ui/sections/annotation-score-form.tsx",
+      "key": "condition-shape|modules/annotation/web/src/ui/elements/annotation-hover-chip.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/annotation/web/src/ui/elements/annotation-hover-chip.tsx",
+      "key": "condition-shape|modules/annotation/web/src/ui/sections/annotation-score-form.tsx",
       "measured": "2026-09-07"
     },
     {
@@ -5055,14 +5055,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/experiment/web/src/ui/sections/experiments/experiment-detail.screen.tsx",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/experiment/web/src/ui/elements/experiments/BatchEvaluationV2/batch-evaluation-v2-evaluation-result.tsx",
       "measured": "2026-09-06"
     },
@@ -5109,6 +5101,14 @@
     {
       "key": "condition-shape|modules/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
       "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|modules/experiment/web/src/ui/sections/experiments/experiment-detail.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
+      "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|modules/feature-flag/contract/src/feature-flag-experiment.ts",
@@ -5207,15 +5207,15 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-keys.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/gateway/web/src/ui/sections/budget-overview/budget-exceeded-banner.tsx",
       "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|modules/gateway/web/src/ui/sections/budget-overview/budget-overview-list.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-keys.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -7435,15 +7435,15 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "no-nested-ternary|enterprise/modules/billing/web/src/ui/sections/seat-proration-preview/seat-proration-preview.tsx",
+      "measured": "2026-09-06"
+    },
+    {
       "key": "no-nested-ternary|enterprise/modules/billing/web/src/ui/sections/subscription-page.tsx",
       "measured": "2026-09-06"
     },
     {
       "key": "no-nested-ternary|enterprise/modules/billing/web/src/ui/sections/usage.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|enterprise/modules/billing/web/src/ui/sections/seat-proration-preview/seat-proration-preview.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -7831,14 +7831,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/experiments/experiment-detail.screen.tsx",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "no-nested-ternary|modules/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
       "measured": "2026-09-07"
     },
@@ -7873,6 +7865,14 @@
     {
       "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
       "measured": "2026-09-07"
+    },
+    {
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/experiments/experiment-detail.screen.tsx",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
+      "measured": "2026-09-06"
     },
     {
       "key": "no-nested-ternary|modules/feature-flag/web/src/experiments-dialog.tsx",
@@ -8067,15 +8067,15 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "no-nested-ternary|modules/onboarding/web/src/ui/sections/onboarding/project.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "no-nested-ternary|modules/onboarding/web/src/ui/blocks/onboarding-container.tsx",
       "measured": "2026-09-06"
     },
     {
       "key": "no-nested-ternary|modules/onboarding/web/src/ui/elements/shared/selectable-icon-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "no-nested-ternary|modules/onboarding/web/src/ui/sections/onboarding/project.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8095,20 +8095,20 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/organization/web/src/ui/sections/organization/audit-log.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/organization/web/src/ui/sections/organization/teams.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "no-nested-ternary|modules/organization/web/src/ui/sections/group-detail-dialog.tsx",
       "measured": "2026-09-07"
     },
     {
       "key": "no-nested-ternary|modules/organization/web/src/ui/sections/member-detail-dialog.tsx",
       "measured": "2026-09-07"
+    },
+    {
+      "key": "no-nested-ternary|modules/organization/web/src/ui/sections/organization/audit-log.screen.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "no-nested-ternary|modules/organization/web/src/ui/sections/organization/teams.screen.tsx",
+      "measured": "2026-09-06"
     },
     {
       "key": "no-nested-ternary|modules/project/web/src/screens/home/briefing/attention-inbox.ts",
@@ -8819,10 +8819,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|modules/analytics/web/src/ui/sections/analytics/custom-graph.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|modules/analytics/web/src/ui/elements/langwatch-ql-time-window-editor.tsx",
       "measured": "2026-09-06"
     },
@@ -8832,6 +8828,10 @@
     },
     {
       "key": "temporal-only|modules/analytics/web/src/ui/sections/analytics-period-picker.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "temporal-only|modules/analytics/web/src/ui/sections/analytics/custom-graph.screen.tsx",
       "measured": "2026-09-06"
     },
     {
