@@ -10,7 +10,7 @@ import {
   type CreateIngestionSourceRecord,
   type UpdateIngestionSourceRecord,
 } from "../ingestion-source.port.ts";
-import { GovernanceEncryptionPort } from "../governance-encryption.port.ts";
+import { GovernanceEncryptionPort } from "../../app/governance.infrastructure.ts";
 import { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,
@@ -111,7 +111,7 @@ class FakeEntitlements extends IngestionSourceEntitlementsPort {
 class FakeLifecycle extends IngestionSourceLifecyclePort {
   sync = vi.fn(async () => undefined);
 }
-class FakeEncryption extends GovernanceEncryptionPort {
+class FakeEncryption implements GovernanceEncryptionPort {
   encrypt(value: string): string {
     return Buffer.from(value).toString("base64url");
   }

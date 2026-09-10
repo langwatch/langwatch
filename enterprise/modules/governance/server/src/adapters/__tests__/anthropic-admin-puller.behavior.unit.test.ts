@@ -16,14 +16,14 @@ import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.adapter.t
 import {
   GovernanceHttpPort,
   type GovernanceHttpResponse,
-} from "../../ports/governance-http.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
 import { Temporal } from "@langwatch/time";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 
-class TestHttpPort extends GovernanceHttpPort {
+class TestHttpPort implements GovernanceHttpPort {
   async fetch(
     url: string,
     init: Parameters<GovernanceHttpPort["fetch"]>[1],

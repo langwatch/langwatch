@@ -1,5 +1,5 @@
 import { SoftWarnPercent } from "@langwatch/enterprise-governance-contract";
-import type { GatewayBudgetCrossingCandidate } from "../ports/gateway-debit.port.ts";
+import type { GatewayBudgetCrossingCandidate } from "../app/governance.infrastructure.ts";
 import type { GovernanceBudgetCrossingData } from "../ports/governance-webhook.port.ts";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 import { NullGovernanceDiagnosticsAdapter } from "../ports/governance-diagnostics.port.ts";

@@ -18,7 +18,7 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type { GovernanceHttpPort, GovernanceHttpResponse } from "../ports/governance-http.port.ts";
+import type { GovernanceHttpPort, GovernanceHttpResponse } from "../app/governance.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 import {
   NullIngestionPullDiagnosticsAdapter,

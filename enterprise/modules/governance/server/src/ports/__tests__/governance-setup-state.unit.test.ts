@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { GovernanceSetupActivityPort } from "../governance-audit-signal.port.ts";
+import { GovernanceSetupActivityPort } from "../../app/governance.infrastructure.ts";
 import {
   GovernanceSetupStateRepository,
   type GovernanceSetupCounts,
@@ -25,7 +25,7 @@ class FixedSetupRepository extends GovernanceSetupStateRepository {
   }
 }
 
-class RecordingActivityPort extends GovernanceSetupActivityPort {
+class RecordingActivityPort implements GovernanceSetupActivityPort {
   readonly hasRecentActivity = vi.fn().mockResolvedValue(false);
 }
 

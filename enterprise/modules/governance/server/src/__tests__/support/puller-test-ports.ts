@@ -7,7 +7,7 @@ import {
   GovernanceHttpPort,
   GovernanceObjectStoragePort,
   GovernanceOcsfEventSinkPort,
-  GovernanceEncryptionPort,
+  type GovernanceEncryptionPort,
   IngestionCredentialsService,
   IngestionPullSourcePort,
   IngestionPullWorkerService,
@@ -23,14 +23,13 @@ import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts
 import { PullerRegistryService } from "../../services/puller-registry.service.ts";
 import { TestProjectApi as CompleteTestProjectService } from "../../ports/__tests__/support/test-project-api.ts";
 
-export class TestHttpPort extends GovernanceHttpPort {
+export class TestHttpPort implements GovernanceHttpPort {
   constructor(
     private readonly handler: (
       url: string,
       init: Parameters<GovernanceHttpPort["fetch"]>[1],
     ) => Promise<GovernanceHttpResponse>,
   ) {
-    super();
   }
 
   fetch(
@@ -41,7 +40,7 @@ export class TestHttpPort extends GovernanceHttpPort {
   }
 }
 
-export class FetchHttpPort extends GovernanceHttpPort {
+export class FetchHttpPort implements GovernanceHttpPort {
   async fetch(
     url: string,
     init: Parameters<GovernanceHttpPort["fetch"]>[1],
@@ -57,7 +56,7 @@ export class FetchHttpPort extends GovernanceHttpPort {
   }
 }
 
-export class TestObjectStoragePort extends GovernanceObjectStoragePort {
+export class TestObjectStoragePort implements GovernanceObjectStoragePort {
   objects: Array<{ key: string; body: string }> = [];
   lastList:
     | {
@@ -174,15 +173,14 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
       traceSharingEnabled: false,
     };
   };
-  const encryption = new (class extends GovernanceEncryptionPort {
+  const encryption: GovernanceEncryptionPort = {
     encrypt(value: string): string {
       return value;
-    }
-
+    },
     decrypt(value: string): string {
       return value;
-    }
-  })();
+    },
+  };
   return IngestionPullWorkerService.create({
     sources: new TestSourcePort(async () => doubles.source),
     registry,

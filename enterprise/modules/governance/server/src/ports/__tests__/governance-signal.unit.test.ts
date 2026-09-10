@@ -4,7 +4,7 @@ import {
   GovernanceSignalPort,
   type GovernanceResolvedBudgetCrossing,
 } from "../governance-signal.port.ts";
-import type { GatewayBudgetCrossingCandidate } from "../gateway-debit.port.ts";
+import type { GatewayBudgetCrossingCandidate } from "../../app/governance.infrastructure.ts";
 import type {
   GovernanceBudgetCrossingData,
   GovernanceVkLifecycleData,

@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { GatewayDebitIntent, writeGatewayDebitsSchema } from "../gateway-debit.intent.ts";
-import { GatewayDebitPort, type GatewayResolvedBudget } from "../../ports/gateway-debit.port.ts";
+import { GatewayDebitPort, type GatewayResolvedBudget } from "../../app/governance.infrastructure.ts";
 
 function budget(onBreach: "BLOCK" | "WARN", id = `budget-${onBreach}`): GatewayResolvedBudget {
   return {

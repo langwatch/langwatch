@@ -6,7 +6,7 @@ import type {
   GatewayBudgetCrossingCandidate,
   GatewayBudgetScope,
   GatewayBudgetWindow,
-} from "./gateway-debit.port.ts";
+} from "../app/governance.infrastructure.ts";
 import type { Instant } from "@langwatch/time";
 
 export type GovernanceVirtualKeyLifecycleSignal = {

@@ -4,7 +4,7 @@ import {
   cliUserTokensIndexKey,
 } from "@langwatch/auth-contract";
 import { type CliUserInput, cliUserInputSchema } from "@langwatch/enterprise-governance-contract";
-import type { CliTokenStorePort } from "../ports/cli-token-store.port.ts";
+import type { CliTokenStorePort } from "../app/governance.infrastructure.ts";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 
 export class DefaultGovernanceCliTokenRevocationService {

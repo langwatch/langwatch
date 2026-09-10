@@ -57,7 +57,7 @@ import { createLogger } from "@langwatch/observability";
 import { Buffer } from "node:buffer";
 import { z } from "zod";
 
-import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
+import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
 import { DATABRICKS_GENIE_ADAPTER_ID } from "../services/pull-destination.service.ts";
 import { TERMINAL_MESSAGE_STATUSES } from "../services/genie-trace-mapper.service.ts";
 import { DatabricksWarehouseCostService } from "../services/puller-databricks-warehouse-cost.service.ts";

@@ -15,7 +15,7 @@ import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts
 import {
   GovernanceHttpPort,
   type GovernanceHttpResponse,
-} from "../../ports/governance-http.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
@@ -36,7 +36,7 @@ import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.adapter.ts";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
 import { Temporal } from "@langwatch/time";
 
-class StubHttp extends GovernanceHttpPort {
+class StubHttp implements GovernanceHttpPort {
   async fetch(
     url: string,
     init: Parameters<GovernanceHttpPort["fetch"]>[1],

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AnomalyAlertHttpPort,
   type AnomalyAlertHttpResponse,
-} from "../../ports/anomaly-alert-http.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 
 type Call = {
@@ -12,7 +12,7 @@ type Call = {
   body: string;
 };
 
-class RecordingHttpPort extends AnomalyAlertHttpPort {
+class RecordingHttpPort implements AnomalyAlertHttpPort {
   readonly calls: Call[] = [];
 
   constructor(
@@ -21,7 +21,6 @@ class RecordingHttpPort extends AnomalyAlertHttpPort {
       index: number,
     ) => AnomalyAlertHttpResponse | Promise<AnomalyAlertHttpResponse>,
   ) {
-    super();
   }
 
   async post(input: Call & { signal: AbortSignal }) {

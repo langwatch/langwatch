@@ -7,7 +7,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
-import type { AdminWorkspaceViewOcsfPort } from "../ports/governance-audit-signal.port.ts";
+import type { AdminWorkspaceViewOcsfPort } from "../app/governance.infrastructure.ts";
 import type { AdminWorkspaceViewAuditRepository } from "../repositories/audit/admin-workspace-view-audit.repository.ts";
 
 const skipped = (): RecordWorkspaceViewResult => ({

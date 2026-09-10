@@ -27,7 +27,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
+import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
 import { COPILOT_CONVERSATION_ACTION } from "../services/copilot-studio-trace-mapper.service.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
 import {

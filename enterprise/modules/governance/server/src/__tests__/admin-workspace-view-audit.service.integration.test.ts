@@ -16,7 +16,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ADMIN_WORKSPACE_VIEW_ACTION } from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { AdminWorkspaceViewOcsfPort } from "../ports/governance-audit-signal.port.ts";
+import { AdminWorkspaceViewOcsfPort } from "../app/governance.infrastructure.ts";
 import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 
@@ -46,7 +46,7 @@ const SHARED_TEAM_ID = `team-awva-shared-${suffix}`;
 /** The mirror the service writes best-effort, as a spy. */
 type MirrorInput = Parameters<AdminWorkspaceViewOcsfPort["mirror"]>[0];
 const mirror = vi.fn(async (_input: MirrorInput): Promise<void> => undefined);
-class SpyOcsf extends AdminWorkspaceViewOcsfPort {
+class SpyOcsf implements AdminWorkspaceViewOcsfPort {
   mirror(input: MirrorInput): Promise<void> {
     return mirror(input);
   }

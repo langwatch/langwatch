@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { PostgresGovernanceAdapter } from "../adapters/postgres.governance.adapter.ts";
-import { GovernanceEncryptionPort } from "../ports/governance-encryption.port.ts";
+import { GovernanceEncryptionPort } from "../app/governance.infrastructure.ts";
 import { CostAttributionPolicyRepository } from "../repositories/policy/cost-attribution-policy.repository.ts";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
@@ -16,7 +16,7 @@ class MemoryPolicyRepository extends CostAttributionPolicyRepository {
   }
 }
 
-class ReversibleEncryption extends GovernanceEncryptionPort {
+class ReversibleEncryption implements GovernanceEncryptionPort {
   encrypt(plaintext: string): string {
     return [...plaintext].reverse().join("");
   }

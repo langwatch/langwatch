@@ -29,16 +29,16 @@ import { PostgresGovernanceAdapter } from "./postgres.governance.adapter.ts";
 import { PostgresIngestionSourceActivityAdapter } from "./postgres.ingestion-source-activity.adapter.ts";
 import { PostgresPersonalVirtualKeyAdapter } from "./postgres.governance-personal-key.adapter.ts";
 import { PostgresRoutingPolicyAdapter } from "./postgres.governance-routing.adapter.ts";
-import type { AdminWorkspaceViewOcsfPort } from "../ports/governance-audit-signal.port.ts";
+import type { AdminWorkspaceViewOcsfPort } from "../app/governance.infrastructure.ts";
 import type { AiToolProviderCatalogPort, AiToolSlugPort } from "../ports/ai-tool-catalog.port.ts";
-import type { CliAdminContactPort } from "../ports/cli-bootstrap.port.ts";
-import type { CliTokenStorePort } from "../ports/cli-token-store.port.ts";
+import type { CliAdminContactPort } from "../app/governance.infrastructure.ts";
+import type { CliTokenStorePort } from "../app/governance.infrastructure.ts";
 import { GovernanceBudgetOverviewPort } from "../ports/governance-budget-overview.port.ts";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
-import type { GovernanceEncryptionPort } from "../ports/governance-encryption.port.ts";
-import type { GovernanceEventingPort } from "../ports/governance-eventing.port.ts";
-import type { GovernanceOcsfEventsReaderPort } from "../ports/governance-audit-signal.port.ts";
-import type { GovernanceSetupActivityPort } from "../ports/governance-audit-signal.port.ts";
+import type { GovernanceEncryptionPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceEventingPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceOcsfEventsReaderPort } from "../app/governance.infrastructure.ts";
+import type { GovernanceSetupActivityPort } from "../app/governance.infrastructure.ts";
 import type { GovernanceClickHouseResolverPort } from "../ports/ingestion-source-activity.port.ts";
 import type {
   IngestionSourceEntitlementsPort,

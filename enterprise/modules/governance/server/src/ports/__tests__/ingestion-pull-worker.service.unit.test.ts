@@ -10,7 +10,7 @@ import type {
   PulledUsageObservedEventData,
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
-import { GovernanceEncryptionPort } from "../governance-encryption.port.ts";
+import { GovernanceEncryptionPort } from "../../app/governance.infrastructure.ts";
 import {
   GovernanceOcsfEventSinkPort,
   GovernanceTraceIngestionPort,
@@ -157,7 +157,7 @@ class FakeTraceIngestion extends GovernanceTraceIngestionPort {
   }));
 }
 
-class IdentityEncryption extends GovernanceEncryptionPort {
+class IdentityEncryption implements GovernanceEncryptionPort {
   encrypt(value: string): string {
     return value;
   }

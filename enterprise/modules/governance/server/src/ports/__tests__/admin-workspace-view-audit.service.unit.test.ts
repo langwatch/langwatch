@@ -1,6 +1,6 @@
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AdminWorkspaceViewOcsfPort } from "../governance-audit-signal.port.ts";
+import { AdminWorkspaceViewOcsfPort } from "../../app/governance.infrastructure.ts";
 import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceTarget,
@@ -38,7 +38,7 @@ class StubProjects extends TestProjectApi {
     });
 }
 
-class StubOcsf extends AdminWorkspaceViewOcsfPort {
+class StubOcsf implements AdminWorkspaceViewOcsfPort {
   readonly mirror = vi.fn(async () => undefined);
 }
 

@@ -7,7 +7,7 @@ import {
   safeParseDestinationConfig,
   type WebhookDestination,
 } from "@langwatch/enterprise-governance-contract";
-import type { AnomalyAlertHttpPort } from "../ports/anomaly-alert-http.port.ts";
+import type { AnomalyAlertHttpPort } from "../app/governance.infrastructure.ts";
 import {
   GovernanceDiagnosticsPort,
   NullGovernanceDiagnosticsAdapter,

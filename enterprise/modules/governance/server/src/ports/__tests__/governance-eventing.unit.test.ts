@@ -30,7 +30,7 @@ import {
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,
   type GatewaySpendProcessingEvent,
-} from "../gateway-debit.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { GovernanceWebhookPort, type GovernanceWebhookSendBatch } from "../governance-webhook.port.ts";
 import {
   IngestionPullMetricsPort,
@@ -149,7 +149,7 @@ class RecordingPulledUsageLedger extends PulledUsageLedgerPort {
   }
 }
 
-class RecordingGatewayDebitPort extends GatewayDebitPort {
+class RecordingGatewayDebitPort implements GatewayDebitPort {
   readonly inserted: GatewayBudgetDebitRow[] = [];
   readonly crossings: GatewayBudgetCrossingCandidate[] = [];
   readonly updates: string[] = [];

@@ -3,7 +3,7 @@ import {
   type GovernanceOcsfExportInput,
   type GovernanceOcsfExportPage,
 } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceOcsfEventsReaderPort } from "../ports/governance-audit-signal.port.ts";
+import type { GovernanceOcsfEventsReaderPort } from "../app/governance.infrastructure.ts";
 import type { GovernanceOcsfExportRepository } from "../repositories/audit/governance-setup-state.repository.ts";
 
 export class DefaultGovernanceOcsfExportService {

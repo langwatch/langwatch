@@ -26,7 +26,7 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type { GovernanceObjectStoragePort } from "../ports/governance-object-storage.port.ts";
+import type { GovernanceObjectStoragePort } from "../app/governance.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 import {
   NullIngestionPullDiagnosticsAdapter,

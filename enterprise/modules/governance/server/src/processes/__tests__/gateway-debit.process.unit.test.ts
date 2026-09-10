@@ -30,9 +30,9 @@ import {
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,
   type GatewaySpendProcessingEvent,
-} from "../../ports/gateway-debit.port.ts";
+} from "../../app/governance.infrastructure.ts";
 
-class StubGatewayDebitPort extends GatewayDebitPort {
+class StubGatewayDebitPort implements GatewayDebitPort {
   resolve(): Promise<GatewayResolvedBudget[]> {
     return Promise.resolve([]);
   }

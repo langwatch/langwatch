@@ -18,7 +18,7 @@ import type {
   GatewayBudgetCrossingCandidate,
   GatewayBudgetScope,
   GatewayBudgetWindow,
-} from "../../ports/gateway-debit.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import {
   GovernanceSignalPort,
   type GovernanceResolvedBudgetCrossing,

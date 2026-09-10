@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { CliTokenStorePort } from "../../ports/cli-token-store.port.ts";
+import { CliTokenStorePort } from "../../app/governance.infrastructure.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../cli-session-inventory.service.ts";
 import { DefaultGovernanceCliTokenRevocationService } from "../cli-token-revocation.service.ts";
 
-class MemoryTokenStore extends CliTokenStorePort {
+class MemoryTokenStore implements CliTokenStorePort {
   readonly values = new Map<string, string>();
   readonly sets = new Map<string, Set<string>>();
   members(key: string): Promise<string[]> {

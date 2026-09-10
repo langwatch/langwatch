@@ -14,7 +14,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GovernanceHttpPort } from "../../ports/governance-http.port.ts";
+import { GovernanceHttpPort } from "../../app/governance.infrastructure.ts";
 
 interface FetchCall {
   url: string;
@@ -263,7 +263,7 @@ async function newAdapter() {
   return CopilotStudioDataversePullerAdapter.create(new StubHttp());
 }
 
-class StubHttp extends GovernanceHttpPort {
+class StubHttp implements GovernanceHttpPort {
   async fetch(url: string, init: RequestInit & { followRedirects?: boolean }): Promise<Response> {
     capturedCalls.push({ url, init });
     if (transcripts && url.includes("/conversationtranscripts")) {

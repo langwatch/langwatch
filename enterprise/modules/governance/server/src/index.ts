@@ -51,20 +51,20 @@ export {
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
 export * from "./adapters/governance-events.adapter.ts";
-export * from "./ports/gateway-debit.port.ts";
+export type { GatewaySpendUsage, GatewaySpendAttribution, GatewaySpendAdmittedData, GatewaySpendOutcomeData, GatewaySpendFailedData, GatewaySpendSettledData, GatewaySpendProcessingEvent, GatewayBudgetScope, GatewayBudgetWindow, GatewayBudgetDefinition, GatewayResolvedBudget, GatewayBudgetDebitRow, GatewayBudgetCrossingCandidate, GatewayDebitPort } from "./app/governance.infrastructure.ts";
 export * from "./ports/governance-budget-overview.port.ts";
-export * from "./ports/governance-eventing.port.ts";
+export type { GovernanceEventingPort } from "./app/governance.infrastructure.ts";
 export * from "./ports/ingestion-source-activity.port.ts";
 export * from "./repositories/audit/admin-workspace-view-audit.repository.ts";
 export * from "./ports/ai-tool-catalog.port.ts";
-export * from "./ports/cli-bootstrap.port.ts";
-export * from "./ports/cli-token-store.port.ts";
+export type { CliBudgetOverview, CliBudgetOverviewPort, CliAdminContactPort } from "./app/governance.infrastructure.ts";
+export type { CliTokenStorePort } from "./app/governance.infrastructure.ts";
 export * from "./repositories/policy/anomaly-rule.repository.ts";
 export * from "./repositories/directory/department.repository.ts";
-export * from "./ports/anomaly-alert-http.port.ts";
+export type { AnomalyAlertHttpResponse, AnomalyAlertHttpPort } from "./app/governance.infrastructure.ts";
 export * from "./ports/governance-diagnostics.port.ts";
-export * from "./ports/governance-encryption.port.ts";
-export * from "./ports/governance-http.port.ts";
+export type { GovernanceEncryptionPort } from "./app/governance.infrastructure.ts";
+export type { GovernanceHttpResponse, GovernanceHttpPort } from "./app/governance.infrastructure.ts";
 export * from "./ports/governance-object-storage.port.ts";
 export * from "./ports/governance-signal.port.ts";
 export * from "./repositories/audit/governance-setup-state.repository.ts";
@@ -74,7 +74,7 @@ export * from "./ports/ingestion-pull-lifecycle.port.ts";
 export * from "./ports/ingestion-pull-worker.port.ts";
 export * from "./ports/ingestion-source.port.ts";
 export * from "./ports/ingestion-template.port.ts";
-export * from "./ports/governance-audit-signal.port.ts";
+export type { GovernanceOcsfEventsReaderPort, AdminWorkspaceViewOcsfPort, GovernanceSetupActivityPort } from "./app/governance.infrastructure.ts";
 export * from "./ports/ingestion-source-key.port.ts";
 export * from "./ports/personal-usage.port.ts";
 export * from "./repositories/directory/personal-virtual-key.repository.ts";

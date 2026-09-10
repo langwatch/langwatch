@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { PLATFORM_TOOL_POLICY_DEFAULTS } from "@langwatch/enterprise-governance-contract";
-import { CliAdminContactPort, CliBudgetOverviewPort } from "../cli-bootstrap.port.ts";
+import { CliAdminContactPort, CliBudgetOverviewPort } from "../../app/governance.infrastructure.ts";
 import { DefaultGovernanceCliBootstrapService } from "../../services/governance-cli-tool-bootstrap.service.ts";
 
 class MemoryCatalog {
@@ -26,14 +26,14 @@ class MemoryCatalog {
   }));
 }
 
-class MemoryBudgets extends CliBudgetOverviewPort {
+class MemoryBudgets implements CliBudgetOverviewPort {
   overviewForUser = vi.fn(async () => ({
     gatewayAccess: true,
     budgets: [{ window: "MONTH", limitUsd: "25", spentUsd: "4.5" }],
   }));
 }
 
-class MemoryContacts extends CliAdminContactPort {
+class MemoryContacts implements CliAdminContactPort {
   tryResolveAdminEmail = vi.fn(async () => "admin@example.com");
 }
 

@@ -5,7 +5,7 @@ import {
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,
   type GatewaySpendUsage,
-} from "../ports/gateway-debit.port.ts";
+} from "../app/governance.infrastructure.ts";
 import { Temporal } from "@langwatch/time";
 
 export const writeGatewayDebitsSchema = z.object({

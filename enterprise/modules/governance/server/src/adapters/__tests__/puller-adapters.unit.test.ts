@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HttpPollingPullerAdapter } from "../http-poller.adapter.ts";
 import { S3PollingPullerAdapter } from "../s3-puller.adapter.ts";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port.ts";
-import { GovernanceObjectStoragePort } from "../../ports/governance-object-storage.port.ts";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
+import { GovernanceObjectStoragePort } from "../../app/governance.infrastructure.ts";
 
 const httpConfig = {
   adapter: "http_polling",
@@ -71,7 +71,7 @@ function event(id: string) {
   };
 }
 
-class FakeHttp extends GovernanceHttpPort {
+class FakeHttp implements GovernanceHttpPort {
   readonly calls: Array<{
     url: string;
     init: Parameters<GovernanceHttpPort["fetch"]>[1];
@@ -90,7 +90,7 @@ class FakeHttp extends GovernanceHttpPort {
   }
 }
 
-class FakeObjects extends GovernanceObjectStoragePort {
+class FakeObjects implements GovernanceObjectStoragePort {
   readonly list = vi.fn(
     async (_input: Parameters<GovernanceObjectStoragePort["list"]>[0]): Promise<string[]> => [],
   );

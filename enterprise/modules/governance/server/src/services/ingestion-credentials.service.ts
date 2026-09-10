@@ -1,4 +1,4 @@
-import type { GovernanceEncryptionPort } from "../ports/governance-encryption.port.ts";
+import type { GovernanceEncryptionPort } from "../app/governance.infrastructure.ts";
 
 const ENCRYPTED_PREFIX = "enc:v1:";
 

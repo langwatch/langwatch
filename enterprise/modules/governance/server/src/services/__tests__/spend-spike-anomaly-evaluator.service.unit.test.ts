@@ -4,7 +4,7 @@ import type {
   SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AnomalyAlertHttpPort } from "../../ports/anomaly-alert-http.port.ts";
+import { AnomalyAlertHttpPort } from "../../app/governance.infrastructure.ts";
 import {
   AnomalySpendReaderPort,
   type AnomalySpendSourceFilter,
@@ -90,7 +90,7 @@ class FixedSpendReader extends AnomalySpendReaderPort {
   );
 }
 
-class SuccessfulHttpPort extends AnomalyAlertHttpPort {
+class SuccessfulHttpPort implements AnomalyAlertHttpPort {
   async post() {
     return { status: 200, ok: true, statusText: "OK" };
   }

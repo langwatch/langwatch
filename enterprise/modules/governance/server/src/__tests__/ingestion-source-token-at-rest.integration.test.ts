@@ -18,7 +18,7 @@ import type { InternalProject, InternalProjectQuery } from "@langwatch/project-c
 import { cleanupTestRows } from "@langwatch/test-harness";
 
 import { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
-import { GovernanceEncryptionPort } from "../ports/governance-encryption.port.ts";
+import { GovernanceEncryptionPort } from "../app/governance.infrastructure.ts";
 import {
   IngestionSourceEntitlementsPort,
   IngestionSourceLifecyclePort,
@@ -49,7 +49,7 @@ const prisma = connection?.client as PrismaClient;
 
 // A real, reversible cipher (AES-256-GCM) — not an identity or base64 fake —
 // so the stored ciphertext actually looks nothing like the plaintext.
-class AesEncryption extends GovernanceEncryptionPort {
+class AesEncryption implements GovernanceEncryptionPort {
   private readonly key = randomBytes(32);
 
   encrypt(plaintext: string): string {

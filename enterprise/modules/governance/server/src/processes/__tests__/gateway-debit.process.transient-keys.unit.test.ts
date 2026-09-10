@@ -3,7 +3,7 @@ import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   type GatewayDebitPort,
-} from "../../ports/gateway-debit.port.ts";
+} from "../../app/governance.infrastructure.ts";
 import { GatewayDebitProcess } from "../gateway-debit.process.ts";
 
 /**

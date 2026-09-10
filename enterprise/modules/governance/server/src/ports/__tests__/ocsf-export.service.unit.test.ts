@@ -1,6 +1,6 @@
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import { GovernanceOcsfEventsReaderPort } from "../governance-audit-signal.port.ts";
+import { GovernanceOcsfEventsReaderPort } from "../../app/governance.infrastructure.ts";
 import { GovernanceOcsfExportRepository } from "../../repositories/audit/governance-setup-state.repository.ts";
 import { DefaultGovernanceOcsfExportService } from "../../services/ocsf-export.service.ts";
 
@@ -14,7 +14,7 @@ class FixedTenantRepository extends GovernanceOcsfExportRepository {
   }
 }
 
-class FixedEventReader extends GovernanceOcsfEventsReaderPort {
+class FixedEventReader implements GovernanceOcsfEventsReaderPort {
   readonly findAll = vi.fn(async (): Promise<GovernanceOcsfExportRow[]> => []);
 }
 
