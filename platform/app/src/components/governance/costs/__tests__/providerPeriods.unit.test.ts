@@ -12,7 +12,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { providerDayBuckets, providerPeriods } from "../CostProviderDayPanel";
+import {
+  costTotalBuckets,
+  providerDayBuckets,
+  providerPeriods,
+} from "../CostProviderDayPanel";
 import { aggregateBuckets } from "../costsWindow";
 
 /** Two providers billed across two quarters, every day carrying a figure. */
@@ -70,6 +74,25 @@ describe("the provider breakdown fold", () => {
       );
     expect(acrossWindow("openai_admin")).toBe(90);
     expect(acrossWindow("anthropic_admin")).toBe(50);
+  });
+
+  /** @scenario "The untotalled cost chart is bucketed by the interval too" */
+  it("folds the untotalled chart to one period per quarter as well", () => {
+    const insideOneQuarter = ROWS.filter((row) => row.day < "2026-04-01");
+
+    // The interval goes IN, so this covers what the panel actually hands the
+    // chart. An earlier version of this took the fold as a second step the
+    // caller applied, which is the step the panel had forgotten — so it
+    // passed against the very screen it was written for.
+    const folded = costTotalBuckets(insideOneQuarter, "quarter");
+
+    // ONE bar, not three: three days of rows fall inside this quarter.
+    expect(folded).toHaveLength(1);
+    expect(folded[0]!.day).toBe("2026-01-01");
+    // And its height is both providers added together: 60 + 30 + 41.
+    expect(folded[0]!.points).toEqual([
+      { key: "total", label: "Spend", value: 131 },
+    ]);
   });
 
   /** @scenario "The provider breakdown is bucketed by the interval the reader chose" */

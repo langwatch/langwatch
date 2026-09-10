@@ -841,6 +841,19 @@ Feature: One cost screen, three honest lanes
     # where it lives.
 
   @unit
+  Scenario: The untotalled cost chart is bucketed by the interval too
+    Given billed days at two providers that all fall inside one quarter
+    When the window total is folded for a reader reading by quarter
+    Then those days become a single period
+    And its figure is what the two providers came to together
+    # Its own scenario rather than a line on the one below, because the two
+    # charts fold the same rows through different functions and only one of
+    # them was ever folded. The unfolded one drew a bar per day under an axis
+    # ticked by quarter: three hundred hairline bars, the quarter's name
+    # repeated over each run of them, and one heavy day reading as the whole
+    # quarter.
+
+  @unit
   Scenario: The provider breakdown is bucketed by the interval the reader chose
     Given billed days at two providers that all fall inside one quarter
     When the provider breakdown is folded for a reader reading by quarter

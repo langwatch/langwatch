@@ -162,9 +162,18 @@ export const TOTAL_SPEND_KEY = "total";
  * already returned for the screen, so the total here and the stack beside it
  * can never disagree about a period — they are the same numbers added up two
  * ways.
+ *
+ * IT TAKES THE INTERVAL AND FOLDS, rather than answering days for the caller
+ * to fold. The rollup stores days and the screen has no day interval to draw,
+ * so unfolded output is never what a caller wants — and a caller that forgot
+ * got a bar per day under an axis ticked by quarter, which repeated the
+ * quarter's name over each run of three hundred hairline bars and made one
+ * heavy day read as the whole quarter. There is now no unfolded value to
+ * forget to fold.
  */
 export function costTotalBuckets(
   rows: readonly GovernanceCostProviderDayRowDto[],
+  interval: TimeInterval,
 ): DailyBucket[] {
   const byDay = new Map<string, number>();
   for (const row of rows) {
@@ -172,12 +181,13 @@ export function costTotalBuckets(
     // does in the stack. The line under that chart says the height is short.
     byDay.set(row.day, (byDay.get(row.day) ?? 0) + (row.amountUsd ?? 0));
   }
-  return [...byDay.entries()]
+  const daily = [...byDay.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([day, value]) => ({
       day,
       points: [{ key: TOTAL_SPEND_KEY, label: "Spend", value }],
     }));
+  return aggregateBuckets(daily, interval);
 }
 
 /** The rows as one stackable bucket per day, one series per provider. */

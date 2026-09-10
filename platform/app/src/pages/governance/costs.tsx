@@ -1318,7 +1318,7 @@ function CostTotalPanel({
               ? sample.overTime
               : providerDays === null
                 ? null
-                : costTotalBuckets(providerDays)
+                : costTotalBuckets(providerDays, interval)
           }
           interval={interval}
           // The measured chart is ONE series and the axis already says it
