@@ -207,29 +207,26 @@ describe("governance cost tables keep data indefinitely by default", () => {
     "governance_cost_rollup_restatement_index",
   ] as const;
 
-  it.each(GOVERNANCE_COST_TABLES)(
-    "%s is in the TTL reconciler config",
-    (table) => {
-      expect(TABLE_TTL_CONFIG.find((c) => c.table === table)).toBeDefined();
-    },
-  );
+  it.each(
+    GOVERNANCE_COST_TABLES,
+  )("%s is in the TTL reconciler config", (table) => {
+    expect(TABLE_TTL_CONFIG.find((c) => c.table === table)).toBeDefined();
+  });
 
-  it.each(GOVERNANCE_COST_TABLES)(
-    "%s is outside the customer retention cascade and the storage meter",
-    (table) => {
-      expect(RETENTION_MANAGED_TABLES).not.toContain(table);
-      expect(RETENTION_TABLE_CATEGORY_MAP).not.toHaveProperty(table);
-      expect(PRODUCTION_STORAGE_METER_TABLES).not.toContain(table);
-    },
-  );
+  it.each(
+    GOVERNANCE_COST_TABLES,
+  )("%s is outside the customer retention cascade and the storage meter", (table) => {
+    expect(RETENTION_MANAGED_TABLES).not.toContain(table);
+    expect(RETENTION_TABLE_CATEGORY_MAP).not.toHaveProperty(table);
+    expect(PRODUCTION_STORAGE_METER_TABLES).not.toContain(table);
+  });
 
-  it.each(GOVERNANCE_COST_TABLES)(
-    "%s is in the indefinite-default list and therefore in the reconciler's gate",
-    (table) => {
-      expect(INDEFINITE_DEFAULT_RETENTION_TABLES).toContain(table);
-      expect(RETENTION_TTL_MANAGED_TABLES).toContain(table);
-    },
-  );
+  it.each(
+    GOVERNANCE_COST_TABLES,
+  )("%s is in the indefinite-default list and therefore in the reconciler's gate", (table) => {
+    expect(INDEFINITE_DEFAULT_RETENTION_TABLES).toContain(table);
+    expect(RETENTION_TTL_MANAGED_TABLES).toContain(table);
+  });
 
   // The gate must be a strict superset, not a replacement: widening it must not
   // have dropped any customer-managed table on the way through.
@@ -243,19 +240,18 @@ describe("governance cost tables keep data indefinitely by default", () => {
     );
   });
 
-  it.each(GOVERNANCE_COST_TABLES)(
-    "%s anchors its retention TTL on Day, with the indefinite sentinel",
-    (table) => {
-      const config = TABLE_TTL_CONFIG.find((c) => c.table === table)!;
-      const expr = buildRetentionTTLExpression(config);
-      expect(expr).toBe(
-        "IF(_retention_days > 0, toDateTime(Day) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
-      );
-      // `hasRetentionTTL` matches on this substring, so it is what stops the
-      // reconciler re-issuing MODIFY TTL on every boot.
-      expect(hasRetentionTTL(expr!)).toBe(true);
-    },
-  );
+  it.each(
+    GOVERNANCE_COST_TABLES,
+  )("%s anchors its retention TTL on Day, with the indefinite sentinel", (table) => {
+    const config = TABLE_TTL_CONFIG.find((c) => c.table === table)!;
+    const expr = buildRetentionTTLExpression(config);
+    expect(expr).toBe(
+      "IF(_retention_days > 0, toDateTime(Day) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
+    );
+    // `hasRetentionTTL` matches on this substring, so it is what stops the
+    // reconciler re-issuing MODIFY TTL on every boot.
+    expect(hasRetentionTTL(expr!)).toBe(true);
+  });
 
   describe("when the migration that installs the column is read", () => {
     /**
@@ -277,25 +273,23 @@ describe("governance cost tables keep data indefinitely by default", () => {
         )
         .join("\n");
 
-    it.each(GOVERNANCE_COST_TABLES)(
-      "adds _retention_days to %s with DEFAULT 0, the keep-forever sentinel",
-      (table) => {
-        expect(executedSql()).toContain(
-          `ALTER TABLE \${CLICKHOUSE_DATABASE}.${table}\n` +
-            "  ADD COLUMN IF NOT EXISTS `_retention_days` UInt16 DEFAULT 0 CODEC(Delta(2), ZSTD(1))",
-        );
-      },
-    );
+    it.each(
+      GOVERNANCE_COST_TABLES,
+    )("adds _retention_days to %s with DEFAULT 0, the keep-forever sentinel", (table) => {
+      expect(executedSql()).toContain(
+        `ALTER TABLE \${CLICKHOUSE_DATABASE}.${table}\n` +
+          "  ADD COLUMN IF NOT EXISTS `_retention_days` UInt16 DEFAULT 0 CODEC(Delta(2), ZSTD(1))",
+      );
+    });
 
-    it.each(GOVERNANCE_COST_TABLES)(
-      "rewrites %s's TTL to the retention expression in the same migration",
-      (table) => {
-        expect(executedSql()).toContain(
-          `ALTER TABLE \${CLICKHOUSE_DATABASE}.${table}\n` +
-            "  MODIFY TTL IF(_retention_days > 0, toDateTime(Day) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
-        );
-      },
-    );
+    it.each(
+      GOVERNANCE_COST_TABLES,
+    )("rewrites %s's TTL to the retention expression in the same migration", (table) => {
+      expect(executedSql()).toContain(
+        `ALTER TABLE \${CLICKHOUSE_DATABASE}.${table}\n` +
+          "  MODIFY TTL IF(_retention_days > 0, toDateTime(Day) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
+      );
+    });
 
     // The point of the change: after this migration nothing the platform runs
     // installs a fixed timer on these tables. The phrase may survive in the
