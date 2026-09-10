@@ -1,5 +1,5 @@
 /** The secret feature application shared by all transports. */
-import { reads, type MembersRead } from "@langwatch/infrastructure";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import {
   RESERVED_PROJECT_SECRET_NAMES,

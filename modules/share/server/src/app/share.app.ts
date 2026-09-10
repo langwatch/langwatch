@@ -4,7 +4,7 @@ import {
   type PinnedTrace,
   type PinTraceInput,
 } from "@langwatch/data-retention-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import {

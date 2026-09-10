@@ -770,6 +770,12 @@ importers:
       '@langwatch/identity-server':
         specifier: workspace:*
         version: link:../../modules/identity/server
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure
+      '@langwatch/installed-modules':
+        specifier: workspace:*
+        version: link:../../modules
       '@langwatch/ksuid':
         specifier: 'catalog:'
         version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
@@ -3413,6 +3419,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -9611,6 +9620,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/ksuid':
         specifier: 'catalog:'
         version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
@@ -9740,6 +9752,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/ksuid':
         specifier: 'catalog:'
         version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
@@ -11874,6 +11889,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../redis-client
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../runtime-composition
     devDependencies:
       '@types/node':
         specifier: ^26.0.1

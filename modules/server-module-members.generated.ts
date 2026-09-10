@@ -9,7 +9,7 @@
  * process cannot supply one.
  */
 export const serverModuleMembers = {
-  agent: [],
+  agent: ["redis"],
   analytics: [],
   annotation: [],
   "api-key": [],
@@ -44,8 +44,8 @@ export const serverModuleMembers = {
   prompt: [],
   role: [],
   scenario: [],
-  secret: [],
-  share: [],
+  secret: ["encryption"],
+  share: ["redis"],
   "stored-object": [],
   suite: [],
   topic: [],

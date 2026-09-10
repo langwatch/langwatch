@@ -1,5 +1,5 @@
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { SecretEncryption } from "../secret.app.ts";
+import type { SecretEncryption } from "../secret.app.ts";
 import { MemorySecretRepositories } from "../../repositories/memory/memory.secret.repositories.ts";
 import type { SecretRepositories } from "../../repositories/secret.repositories.ts";
 import { SecretApp } from "../secret.app.ts";
@@ -28,7 +28,7 @@ export function createSecretTestApp(
   return SecretApp.create({
     repositories: input.repositories ?? MemorySecretRepositories.create(),
     dependencies: {},
-    infrastructure: { encryption: input.encryption ?? new ReversibleTestSecretEncryption() },
+    members: { encryption: input.encryption ?? new ReversibleTestSecretEncryption() },
     config: void 0,
     resources: new ResourceScope(),
   });

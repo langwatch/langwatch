@@ -14,6 +14,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./members": {
+      "types": "./dist/members.d.ts",
+      "default": "./src/members.ts"
     }
   },
   "scripts": {

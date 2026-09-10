@@ -14,9 +14,9 @@ import {
   workflowVersionSchema,
   type WorkflowApi,
 } from "@langwatch/workflow-contract";
-import type { MembersRead } from "@langwatch/infrastructure";
-import type { RedisConnection } from "@langwatch/redis-client";
+import type { MembersRead } from "@langwatch/infrastructure/members";
 import { AgentApp, type AgentAppConfig } from "../agent.app.ts";
+import { memoryRedis } from "./memory-redis.ts";
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
 import type { AgentRepositories } from "../../repositories/agent.repositories.ts";
 
@@ -64,7 +64,7 @@ export function createAgentAppFixture(
       users: options.users ?? createApiFixture<UserApi>(),
       workflows: options.workflows ?? createApiFixture<WorkflowApi>(),
     },
-    members: options.members ?? { redis: createApiFixture<RedisConnection>({}, "redis member") },
+    members: options.members ?? { redis: memoryRedis() },
     config: options.config ?? { publicBaseUrl: "https://langwatch.test", connected: null },
     resources,
     repositories,

@@ -46,7 +46,7 @@ import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";

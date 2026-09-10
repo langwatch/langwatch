@@ -9,8 +9,9 @@
  * that declares `withAudit`.
  *
  * Nothing in this file opens a socket or names a vendor SDK, so a module that
- * imports `reads` to say what it reads pulls in no client library. The
- * construction lives behind `@langwatch/infrastructure/process`.
+ * imports `reads` to say what it reads pulls in no client library. A module
+ * imports it from `@langwatch/infrastructure/members`, which is this file and
+ * nothing else; the root export carries the construction and its clients.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";
