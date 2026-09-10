@@ -6,6 +6,7 @@
 import {
   apiContextServicesRule,
   awaitedReturnChainRule,
+  bannedLegacyNamesRule,
   booleanWallRule,
   boundaryRule,
   cognitiveComplexityRule,
@@ -22,6 +23,11 @@ import {
   featureSideHoldsNoAppRule,
   handledErrorOutsideContractRule,
   layerClassRule,
+  noAliasReexportRule,
+  noBootHookOutsideGuardRule,
+  noLoggerSpyRule,
+  noPrototypeStubRule,
+  noRawErrorOutputRule,
   noRuntimeReflectionRule,
   transportMiddlewareIsAGateRule,
   logicalStatementSpacingRule,
@@ -42,6 +48,7 @@ import {
   serviceQualityRule,
   temporalOnlyRule,
   typedPrismaSeamRule,
+  typeOnlyValueImportRule,
   webImportsServerShapedValueRule,
   zodObjectCompositionRule,
 } from "@langwatch/lint-core";
@@ -84,9 +91,16 @@ export const rules = {
   "awaited-return-chain": awaitedReturnChainRule,
   "web-imports-server-shaped-value": webImportsServerShapedValueRule,
   "zod-object-composition": zodObjectCompositionRule,
+  "banned-legacy-names": bannedLegacyNamesRule,
   "feature-side-holds-no-app": featureSideHoldsNoAppRule,
+  "no-alias-reexport": noAliasReexportRule,
+  "no-boot-hook-outside-guard": noBootHookOutsideGuardRule,
+  "no-logger-spy": noLoggerSpyRule,
+  "no-prototype-stub": noPrototypeStubRule,
+  "no-raw-error-output": noRawErrorOutputRule,
   "no-runtime-reflection": noRuntimeReflectionRule,
   "transport-middleware-is-a-gate": transportMiddlewareIsAGateRule,
+  "type-only-value-import": typeOnlyValueImportRule,
 };
 
 // "nested-ternary" (superseded by the built-in no-nested-ternary) and

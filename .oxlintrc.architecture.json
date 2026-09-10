@@ -47,7 +47,14 @@
     "langwatch/id-generation-origin": "error",
     "langwatch/no-runtime-reflection": "error",
     "langwatch/feature-side-holds-no-app": "error",
-    "langwatch/transport-middleware-is-a-gate": "error"
+    "langwatch/transport-middleware-is-a-gate": "error",
+    "langwatch/type-only-value-import": "error",
+    "langwatch/no-alias-reexport": "error",
+    "langwatch/no-prototype-stub": "error",
+    "langwatch/no-logger-spy": "error",
+    "langwatch/no-raw-error-output": "error",
+    "langwatch/no-boot-hook-outside-guard": "error",
+    "langwatch/banned-legacy-names": "error"
   },
   "overrides": [
     {
