@@ -12,7 +12,7 @@ import { AnnualEventsBillingThresholdService } from "./annual-events-billing-thr
 import { BestEffortService } from "./best-effort.service.ts";
 import { BillingSubscriptionLifecycleService } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
-import type { BillingWebhookHost } from "../ports/billing-webhook-host.port.ts";
+import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingWebhookOrganization } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscription } from "../repositories/billing-webhook-subscription.repository.ts";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";

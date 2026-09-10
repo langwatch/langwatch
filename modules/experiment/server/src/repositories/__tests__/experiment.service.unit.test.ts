@@ -14,13 +14,13 @@ import type { ExperimentRepository, ExperimentRowState } from "../experiment.rep
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { ExperimentService } from "../../services/experiment.service.ts";
-import { ExperimentExecution } from "../../ports/experiment-execution.port.ts";
+import { ExperimentExecution } from "../../services/experiment.service.ts";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 
-import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter.ts";
+import { NoopExperimentWorkbenchUpdates } from "../../services/experiment-workbench.service.ts";
 import type { Instant } from "@langwatch/time";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
@@ -376,7 +376,7 @@ const build = (
       newId: () => "generated",
       now: () => new Date(1),
       references,
-      updates: NoopExperimentWorkbenchUpdatesAdapter.create(),
+      updates: NoopExperimentWorkbenchUpdates.create(),
     }),
   };
 };

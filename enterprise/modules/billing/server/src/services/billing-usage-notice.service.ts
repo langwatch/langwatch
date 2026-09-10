@@ -11,11 +11,11 @@ import type {
 import {
   NullBillingErrorReporter,
   type BillingErrorReporter,
-} from "../ports/error-reporter.port.ts";
+} from "./billing-error-reporter.service.ts";
 import {
-  NullUsageLimitEmailAdapter,
-  type UsageLimitEmailPort,
-} from "../ports/usage-limit-email.port.ts";
+  MemoryUsageLimitEmailChannel,
+  type UsageLimitEmailChannel,
+} from "../channels/usage-limit-email.channel.ts";
 import {
   type HubspotFormBody,
   billingThresholdFailureText,
@@ -90,7 +90,7 @@ type NotificationServiceOptions = {
   createSlackWebhook?: (url: string) => Pick<IncomingWebhook, "send">;
   fetchFn?: typeof fetch;
   errorReporter?: BillingErrorReporter;
-  usageLimitEmail?: UsageLimitEmailPort;
+  usageLimitEmail?: UsageLimitEmailChannel;
 };
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ export class NotificationService {
   private readonly createSlackWebhook: (url: string) => Pick<IncomingWebhook, "send">;
   private readonly fetchFn: typeof fetch;
   private readonly errorReporter: BillingErrorReporter;
-  private readonly usageLimitEmail: UsageLimitEmailPort;
+  private readonly usageLimitEmail: UsageLimitEmailChannel;
 
   private constructor(options: NotificationServiceOptions) {
     this.config = options.config;
@@ -118,7 +118,7 @@ export class NotificationService {
         }));
     this.fetchFn = options?.fetchFn ?? (((...args) => fetch(...args)) as typeof fetch);
     this.errorReporter = options.errorReporter ?? NullBillingErrorReporter.create();
-    this.usageLimitEmail = options.usageLimitEmail ?? NullUsageLimitEmailAdapter.create();
+    this.usageLimitEmail = options.usageLimitEmail ?? MemoryUsageLimitEmailChannel.create();
   }
 
   /**

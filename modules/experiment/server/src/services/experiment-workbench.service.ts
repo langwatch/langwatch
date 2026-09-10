@@ -25,6 +25,7 @@ import {
   type RestoreWorkbenchVersionInput,
   type SaveWorkbenchStateInput,
   type WorkbenchActor,
+  type WorkbenchActorLabel,
   type WorkbenchSaveResult,
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
@@ -33,10 +34,33 @@ import {
   isPostgresUniqueConflict,
   postgresUniqueConflictTargets,
 } from "../rules/postgres-unique-conflict.rules.ts";
-import type { ExperimentWorkbenchUpdates } from "../ports/experiment-workbench-updates.port.ts";
 import type { ExperimentRepository } from "../repositories/experiment.repository.ts";
 import type { ExperimentSlugService } from "./experiment-slug.service.ts";
 import type { ExperimentWorkbenchReferencesService } from "./experiment-workbench-references.service.ts";
+
+/**
+ * Where a workbench save's freshness notice is published, so an editor tab that
+ * is watching sees the version it now has to catch up to.
+ */
+export abstract class ExperimentWorkbenchUpdates {
+  abstract publish(input: {
+    projectId: string;
+    experimentId: string;
+    slug: string;
+    version: number;
+    actorLabel: WorkbenchActorLabel;
+    runId?: string;
+  }): Promise<void>;
+}
+
+/** Drops workbench update notices where no live update transport is composed. */
+export class NoopExperimentWorkbenchUpdates extends ExperimentWorkbenchUpdates {
+  static create(): NoopExperimentWorkbenchUpdates {
+    return new NoopExperimentWorkbenchUpdates();
+  }
+
+  async publish(): Promise<void> {}
+}
 
 /**
  * The one thing this needs from the experiment service that owns it: an

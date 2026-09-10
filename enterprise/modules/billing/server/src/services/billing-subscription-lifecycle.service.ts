@@ -21,7 +21,7 @@ import { BestEffortService } from "./best-effort.service.ts";
 import { NurturingSubscriptionSyncService } from "./nurturing-subscription-sync.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
-import type { BillingWebhookHost } from "../ports/billing-webhook-host.port.ts";
+import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingWebhookOrganization } from "../repositories/billing-webhook-organization.repository.ts";
 import type {
   BillingWebhookSubscription,

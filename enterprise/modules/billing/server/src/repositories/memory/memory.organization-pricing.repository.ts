@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { OrganizationPricing } from "../../ports/organization-pricing.port.ts";
+import { OrganizationPricing } from "../organization/organization-pricing.repository.ts";
 import type { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /**

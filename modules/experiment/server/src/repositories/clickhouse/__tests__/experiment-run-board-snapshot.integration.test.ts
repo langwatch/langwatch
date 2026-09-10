@@ -36,9 +36,9 @@ import {
   type TargetResultEventData,
 } from "../../../processes/experiment-run-events.process.ts";
 import {
-  ExperimentClickHouse,
+  ExperimentClickHouseRepository,
   type ExperimentEventingClickHouseClient,
-} from "../../../ports/experiment-clickhouse.port.ts";
+} from "../../experiment-clickhouse.repository.ts";
 import { ExperimentRunResultStorageMapProjection } from "../../../projections/experiment-run-result-storage.projection.ts";
 import { ExperimentRunItemStore } from "../../../stores/eventing/eventing.experiment-run-item.store.ts";
 import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
@@ -58,7 +58,7 @@ let client: ClickHouseClient;
 let repository: ClickHouseExperimentRunRepository;
 
 /** The one client every read and write in this suite resolves to. */
-class SuiteClickHouse extends ExperimentClickHouse {
+class SuiteClickHouse extends ExperimentClickHouseRepository {
   resolveClient(): Promise<ExperimentEventingClickHouseClient> {
     return Promise.resolve(client);
   }

@@ -5,8 +5,8 @@ import {
   BILLING_ORG_CACHE_PREFIX,
   BILLING_ORG_CACHE_TTL_MS,
   type BillingOrganizationCache,
-} from "../../adapters/eventing.report-usage-for-month.adapter.ts";
-import type { BillingReportOrganizationLookup } from "../../ports/billing-report-organization.port.ts";
+} from "../organization/billing-organization-cache.repository.ts";
+import type { BillingReportOrganizationLookup } from "../organization/billing-report-organization.repository.ts";
 
 /** Only what this cache calls, so a test double is a two-method object. */
 export type BillingOrganizationCacheRedis = Pick<Redis | Cluster, "get" | "setex">;

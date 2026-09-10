@@ -5,7 +5,7 @@ import {
   type InternalProjectQuery,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import type { ProjectCredentials } from "../ports/project.port.ts";
+import type { ProjectCredentials } from "./project-credentials.service.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
 /**

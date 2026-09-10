@@ -40,16 +40,31 @@ import {
   TeamNotInOrganizationError,
 } from "@langwatch/project-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import {
-  type ProjectCredentials,
-  type ProjectDiagnostics,
-  type ProjectKeyMap,
-  type ProjectStoredObjects,
-} from "../ports/project.port.ts";
 import { codingAgentActivityStaleBefore } from "../repositories/coding-agent-activity.repository.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
+import type { ProjectCredentials } from "./project-credentials.service.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
 import { ProjectSlugService } from "./project-slug.service.ts";
+
+/** The LWQL column mapping a project's ingestion key is synced to. Nothing in
+ * this module implements it yet — it is the one caller-supplied capability
+ * `create` reaches for, kept optional until a concrete channel exists. */
+export abstract class ProjectKeyMap {
+  abstract syncProject(input: { projectId: string; lwqlKey: string }): Promise<void>;
+}
+
+/** The project's own stored objects (attachments, blobs) in whatever object
+ * store owns them. Optional for the same reason as `ProjectKeyMap`: `archive`
+ * reaches for it, nothing in this module implements it yet. */
+export abstract class ProjectStoredObjects {
+  abstract deleteOwnedBy(input: { projectId: string }): Promise<void>;
+}
+
+/** Where a read that must not fail the caller reports its cause instead. */
+export abstract class ProjectDiagnostics {
+  abstract error(context: Record<string, unknown>, message: string): void;
+  abstract capture(error: Error, context: Record<string, unknown>): void;
+}
 
 export class ProjectService {
   listPaths(input: { projectIds: string[] }) {

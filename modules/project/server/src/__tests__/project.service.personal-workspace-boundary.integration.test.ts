@@ -14,7 +14,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository.ts";
-import type { ProjectCredentials } from "../ports/project.port.ts";
+import type { ProjectCredentials } from "../services/project-credentials.service.ts";
 import { ProjectService } from "../services/project.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;

@@ -15,12 +15,23 @@ import {
 } from "@langwatch/experiment-contract";
 import type { ExperimentService } from "./experiment.service.ts";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type { ExperimentEvaluationReporting } from "../ports/experiment-evaluation-reporting.port.ts";
+import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import type { SeededTargetOutput } from "./experiment-cell-plan.service.ts";
 import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import { nowInstant } from "@langwatch/time";
+
+/**
+ * Where a workbench cell's evaluator result is reported as an evaluation.
+ *
+ * The Evaluation feature owns the command and its pipeline; a core feature
+ * server may not import another feature's server, so the run reports through
+ * this declaration and the process binds it to the Evaluation application.
+ */
+export abstract class ExperimentEvaluationReporting {
+  abstract reportEvaluation(data: ReportEvaluationCommandData): Promise<unknown>;
+}
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 

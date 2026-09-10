@@ -7,7 +7,7 @@ import type { EvaluatorConfig } from "@langwatch/experiment-contract";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
-import type { ExperimentRunPorts } from "../../rules/experiment-run-input.rules.ts";
+import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
 
 const scripted: {
@@ -38,7 +38,7 @@ const ports = {
       for (const serverEvent of scripted.component) onEvent(serverEvent);
     },
   },
-} as unknown as ExperimentRunPorts;
+} as unknown as ExperimentRunCollaborators;
 
 const workflows = {
   enrichStudioEvent: async ({ event }: { event: unknown }) => event,

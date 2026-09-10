@@ -1,7 +1,7 @@
 import {
-  ExperimentClickHouse,
+  ExperimentClickHouseRepository,
   type ExperimentEventingClickHouseClient,
-} from "../../ports/experiment-clickhouse.port.ts";
+} from "../experiment-clickhouse.repository.ts";
 
 /** How the application hands the feature a tenant-scoped ClickHouse client. */
 export type ExperimentEventingClickHouseResolver = (
@@ -9,7 +9,7 @@ export type ExperimentEventingClickHouseResolver = (
 ) => Promise<ExperimentEventingClickHouseClient>;
 
 /** Binds the port to the application's tenant-scoped client resolver. */
-export class ClickhouseExperimentClickHouseRepository extends ExperimentClickHouse {
+export class ClickhouseExperimentClickHouseRepository extends ExperimentClickHouseRepository {
   private constructor(private readonly resolver: ExperimentEventingClickHouseResolver) {
     super();
   }

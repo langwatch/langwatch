@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationPricing } from "../ports/organization-pricing.port.ts";
+import type { OrganizationPricing } from "../repositories/organization/organization-pricing.repository.ts";
 import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 
 const logger = createLogger("langwatch:billing:seatSync");

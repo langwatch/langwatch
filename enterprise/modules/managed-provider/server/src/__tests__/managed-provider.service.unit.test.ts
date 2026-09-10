@@ -1,8 +1,8 @@
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
 import { describe, expect, it } from "vitest";
 import {
-  EnvironmentManagedProviderConfigurationAdapter,
-  ManagedProviderCredentialsPort,
+  ManagedProviderConfigurationService,
+  ManagedProviderCredentialVendor,
   ManagedProviderService,
   type ManagedProviderCredentials,
   ManagedProviderConfigurationReporter,
@@ -24,7 +24,7 @@ class Projects extends TestProjectApi {
   }
 }
 
-class CredentialAdapter extends ManagedProviderCredentialsPort {
+class CredentialVendorTestDouble extends ManagedProviderCredentialVendor {
   configs: ManagedBedrockConfig[] = [];
   async assumeCustomerRole(config: ManagedBedrockConfig): Promise<ManagedProviderCredentials> {
     this.configs.push(config);
@@ -47,8 +47,8 @@ const CONFIGURED_ORGANIZATION_SOURCE = {
   }),
 };
 
-function configurationForConfiguredOrganization(): EnvironmentManagedProviderConfigurationAdapter {
-  return EnvironmentManagedProviderConfigurationAdapter.create({
+function configurationForConfiguredOrganization(): ManagedProviderConfigurationService {
+  return ManagedProviderConfigurationService.create({
     source: CONFIGURED_ORGANIZATION_SOURCE,
     reporter: new SilentReporter(),
   });
@@ -62,7 +62,7 @@ describe("ManagedProviderService", () => {
         const service = ManagedProviderService.create({
           configuration: configurationForConfiguredOrganization(),
           projects: new Projects(),
-          credentials: new CredentialAdapter(),
+          credentials: new CredentialVendorTestDouble(),
         });
 
         expect(service.isManagedProvider({ organizationId: "org_1", provider: "bedrock" })).toBe(
@@ -82,7 +82,7 @@ describe("ManagedProviderService", () => {
     describe("when LiteLLM parameters are prepared", () => {
       /** @scenario "Ignore unrelated providers" */
       it("returns the caller's parameters untouched and assumes no role", async () => {
-        const credentials = new CredentialAdapter();
+        const credentials = new CredentialVendorTestDouble();
         const service = ManagedProviderService.create({
           configuration: configurationForConfiguredOrganization(),
           projects: new Projects(),
@@ -106,7 +106,7 @@ describe("ManagedProviderService", () => {
 
   /** @scenario "Build credentials through both roles" */
   it("replaces an API key with chained Bedrock credentials", async () => {
-    const configuration = EnvironmentManagedProviderConfigurationAdapter.create({
+    const configuration = ManagedProviderConfigurationService.create({
       source: {
         MANAGED_BEDROCK__customer__org_1: JSON.stringify({
           proxyRoleArn: "proxy",
@@ -122,7 +122,7 @@ describe("ManagedProviderService", () => {
     const service = ManagedProviderService.create({
       configuration,
       projects: new Projects(),
-      credentials: new CredentialAdapter(),
+      credentials: new CredentialVendorTestDouble(),
     });
     const result = await service.buildLitellmParameters({
       params: { api_key: "old" },

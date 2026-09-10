@@ -4,7 +4,7 @@ import { SubscriptionStatus, type StripePriceMap } from "@langwatch/enterprise-b
 import {
   SeatEventSubscriptionService,
   StripeCustomerCurrencyService,
-  StripeErrorAdapter,
+  StripeErrorTranslatorService,
 } from "../index.ts";
 
 const prices = {
@@ -85,7 +85,7 @@ describe("seatEventSubscription", () => {
       stripe: stripe as any,
       database: db as any,
       prices,
-      customerCurrency: StripeCustomerCurrencyService.create(StripeErrorAdapter.create()),
+      customerCurrency: StripeCustomerCurrencyService.create(StripeErrorTranslatorService.create()),
     });
   });
 

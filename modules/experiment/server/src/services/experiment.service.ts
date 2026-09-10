@@ -59,18 +59,57 @@ import {
 } from "../repositories/experiment.repository.ts";
 import type { ExperimentRunRepository } from "../repositories/experiment-run.repository.ts";
 import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository.ts";
-import type { ExperimentExecution } from "../ports/experiment-execution.port.ts";
-import type { ExperimentWorkbenchUpdates } from "../ports/experiment-workbench-updates.port.ts";
 import { isPostgresUniqueConflict } from "../rules/postgres-unique-conflict.rules.ts";
 import { ExperimentSlugService } from "./experiment-slug.service.ts";
-import { ExperimentWorkbenchService } from "./experiment-workbench.service.ts";
+import {
+  ExperimentWorkbenchService,
+  NoopExperimentWorkbenchUpdates,
+  type ExperimentWorkbenchUpdates,
+} from "./experiment-workbench.service.ts";
 import {
   ExperimentWorkbenchReferencesService,
   type ExperimentWorkbenchReferenceServices,
 } from "./experiment-workbench-references.service.ts";
 import { nowInstant, type Instant } from "@langwatch/time";
-import { UnavailableExperimentExecutionAdapter } from "../adapters/unavailable-experiment-execution.adapter.ts";
-import { NoopExperimentWorkbenchUpdatesAdapter } from "../adapters/noop-experiment-workbench-updates.adapter.ts";
+
+/**
+ * Private boundary between the canonical Experiment service and the app's
+ * Eventing pipeline. The feature owns validation; this only dispatches
+ * already-valid commands with their original IDs and timestamps unchanged.
+ */
+export abstract class ExperimentExecution {
+  abstract startExperimentRun(input: StartExperimentRunInput): Promise<void>;
+  abstract recordTargetResult(input: RecordTargetResultInput): Promise<void>;
+  abstract recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void>;
+  abstract completeExperimentRun(input: CompleteExperimentRunInput): Promise<void>;
+}
+
+/** Refuses execution where the application composes no Eventing pipeline. */
+export class UnavailableExperimentExecution extends ExperimentExecution {
+  static create(): UnavailableExperimentExecution {
+    return new UnavailableExperimentExecution();
+  }
+
+  private unavailable(): never {
+    throw new Error("Experiment execution is not configured for this application instance");
+  }
+
+  async startExperimentRun(_input: StartExperimentRunInput): Promise<void> {
+    this.unavailable();
+  }
+
+  async recordTargetResult(_input: RecordTargetResultInput): Promise<void> {
+    this.unavailable();
+  }
+
+  async recordEvaluatorResult(_input: RecordEvaluatorResultInput): Promise<void> {
+    this.unavailable();
+  }
+
+  async completeExperimentRun(_input: CompleteExperimentRunInput): Promise<void> {
+    this.unavailable();
+  }
+}
 
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
@@ -106,8 +145,8 @@ export class ExperimentService {
   private readonly workbench: ExperimentWorkbenchService;
 
   private constructor(private readonly options: ExperimentServiceOptions) {
-    this.execution = options.execution ?? UnavailableExperimentExecutionAdapter.create();
-    this.updates = options.updates ?? NoopExperimentWorkbenchUpdatesAdapter.create();
+    this.execution = options.execution ?? UnavailableExperimentExecution.create();
+    this.updates = options.updates ?? NoopExperimentWorkbenchUpdates.create();
     this.slugs = ExperimentSlugService.create({
       repository: options.repository,
       newId: options.newId,

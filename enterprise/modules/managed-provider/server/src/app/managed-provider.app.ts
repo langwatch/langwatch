@@ -4,9 +4,11 @@ import {
 } from "@langwatch/enterprise-managed-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import { AwsStsManagedProviderCredentialAdapter } from "../adapters/aws-sts.aws-sts.adapter.ts";
-import { EnvironmentManagedProviderConfigurationAdapter } from "../adapters/environment-config.environment-config.adapter.ts";
-import type { ManagedProviderConfigurationReporter } from "../ports/managed-provider-configuration.port.ts";
+import { HttpManagedProviderCredentialsChannel } from "../channels/http/http.managed-provider-credentials.channel.ts";
+import {
+  ManagedProviderConfigurationService,
+  type ManagedProviderConfigurationReporter,
+} from "../services/managed-provider-configuration.service.ts";
 import { ManagedProviderService } from "../services/managed-provider.service.ts";
 
 export type ManagedProviderInfrastructure = Readonly<{
@@ -31,11 +33,11 @@ export class ManagedProviderApp implements ManagedProviderApiContract {
   }
 
   static create({ infrastructure, dependencies }: ManagedProviderSetup): ManagedProviderApp {
-    const configuration = EnvironmentManagedProviderConfigurationAdapter.create({
+    const configuration = ManagedProviderConfigurationService.create({
       source: infrastructure.source,
       reporter: infrastructure.reporter,
     });
-    const credentials = AwsStsManagedProviderCredentialAdapter.create();
+    const credentials = HttpManagedProviderCredentialsChannel.create();
 
     return new ManagedProviderApp(
       ManagedProviderService.create({

@@ -26,7 +26,7 @@ import {
 } from "../processes/experiment-result-mapping.process.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
-import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
@@ -62,7 +62,7 @@ export class ExperimentWorkflowCellService {
     workflows,
     cells,
   }: {
-    ports: ExperimentRunPorts;
+    ports: ExperimentRunCollaborators;
     workflows: WorkflowService;
     cells: ExperimentCellExecutionService;
   }): ExperimentWorkflowCellService {
@@ -70,7 +70,7 @@ export class ExperimentWorkflowCellService {
   }
 
   private constructor(
-    private readonly ports: ExperimentRunPorts,
+    private readonly ports: ExperimentRunCollaborators,
     private readonly workflows: WorkflowService,
     private readonly cells: ExperimentCellExecutionService,
   ) {}

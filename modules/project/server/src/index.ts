@@ -11,16 +11,23 @@ export { RecentItemsService } from "./services/recent-items.service.ts";
 export type { GetRecentItemsParams, RecentItemType } from "./rules/recent-items.rules.ts";
 export { ProjectMetadataService } from "./services/project-metadata.service.ts";
 export { ProjectService } from "./services/project.service.ts";
-export { ProjectCredentialsAdapter } from "./adapters/project-credentials.adapter.ts";
+export {
+  ProjectCredentials,
+  ProjectCredentialsService,
+  // `apps/api/src/features/evaluator/__tests__/evaluator-create-model-resolution.integration.test.ts`
+  // still imports the old name and sits under `apps/api/src/features/`, which
+  // this lane does not touch (owned elsewhere, on its way out). Drop this
+  // alias when that tree goes.
+  ProjectCredentialsService as ProjectCredentialsAdapter,
+} from "./services/project-credentials.service.ts";
 export { ProjectApp, type ProjectInfrastructure } from "./app/project.app.ts";
 export { ProjectOperationsService } from "./services/project-operations.service.ts";
 export { projectServer } from "./project.server.ts";
 export {
-  ProjectCredentials,
   ProjectDiagnostics,
   ProjectKeyMap,
   ProjectStoredObjects,
-} from "./ports/project.port.ts";
+} from "./services/project.service.ts";
 export {
   ProjectManagementApi,
   projectRest,

@@ -16,9 +16,9 @@ import {
   SubscriptionStatus,
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
-import type { StripeErrorTranslator } from "../ports/stripe-error-translator.port.ts";
-import type { BillingOrganization } from "../ports/organization.port.ts";
-import type { BillingSubscriptionNotifier } from "../ports/subscription-notifier.port.ts";
+import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
+import type { BillingOrganization } from "../repositories/organization/billing-account-facts.repository.ts";
+import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import type {
   BillingSubscriptionRecord,
   SubscriptionRepository,

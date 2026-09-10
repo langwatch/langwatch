@@ -8,8 +8,10 @@ import type { WorkflowService } from "@langwatch/workflow-server";
 import type { ExecutionCell, EvaluationV3Event } from "@langwatch/experiment-contract";
 import type {
   ExecutionState,
+  StudioClientEvent,
   StudioServerEvent,
   StudioWorkflow,
+  WorkflowRunOrigin,
 } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
@@ -26,10 +28,35 @@ import {
   evaluatorTargetNoInputsResult,
   noInputsResolvedResult,
 } from "../processes/experiment-cell-error-events.process.ts";
-import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
+
+/**
+ * How the workbench run reaches the studio engine.
+ *
+ * The run loop composes a studio event per cell and watches the frames come
+ * back; who dials the engine, which model providers it strips parameters for
+ * and which NLP runtime carries the stream are all facts of the process, not of
+ * the run. The retired application threaded an `nlpLambda` runtime and a
+ * `ModelProviderApi` through nine call sites to reach one function; both
+ * were pass-through, so both are behind this instead.
+ *
+ * A stream failure is reported to the caller AS a studio event rather than
+ * thrown — a run is watched, not awaited, and a rejected promise would leave a
+ * lit node and a Stop button exactly as they were.
+ */
+export abstract class ExperimentStudioDispatch {
+  abstract postEvent(input: {
+    projectId: string;
+    event: StudioClientEvent;
+    onEvent: (event: StudioServerEvent) => void;
+    /** Asked before and during every read; absent means the run cannot be stopped. */
+    isAborted?: () => Promise<boolean>;
+    origin?: WorkflowRunOrigin;
+  }): Promise<void>;
+}
 
 const sandboxKey = ExperimentRunSandboxKeyService.create();
 
@@ -61,14 +88,14 @@ export class ExperimentCellExecutionService {
     ports,
     workflows,
   }: {
-    ports: ExperimentRunPorts;
+    ports: ExperimentRunCollaborators;
     workflows: WorkflowService;
   }): ExperimentCellExecutionService {
     return new ExperimentCellExecutionService(ports, workflows);
   }
 
   private constructor(
-    private readonly ports: ExperimentRunPorts,
+    private readonly ports: ExperimentRunCollaborators,
     private readonly workflows: WorkflowService,
   ) {}
 

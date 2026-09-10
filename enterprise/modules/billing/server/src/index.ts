@@ -17,7 +17,6 @@ export {
   subscriptionTrpcTransport,
   type BillingSubscriber,
 } from "./transport/subscription.trpc.ts";
-export { StripeErrorAdapter } from "./adapters/stripe-error.stripe-error.adapter.ts";
 export {
   ClickhouseClickHouseRepository as ClickHouseBillingAdapter,
   type BillingClickHouseClientResolver,
@@ -27,42 +26,51 @@ export {
   PrismaPostgresRepository as PostgresBillingAdapter,
   type PostgresBillingPersistence,
 } from "./repositories/prisma/prisma.postgres.repository.ts";
-export { StripeErrorTranslator } from "./ports/stripe-error-translator.port.ts";
-export { BillingCheckpointPort, type BillingCheckpoint } from "./ports/billing-checkpoint.port.ts";
+export {
+  StripeErrorTranslator,
+  StripeErrorTranslatorService,
+} from "./services/stripe-error-translator.service.ts";
+export { BillingCheckpointRepository, type BillingCheckpoint } from "./repositories/billing-checkpoint.repository.ts";
 export {
   BILLING_ORG_CACHE_PREFIX,
   BILLING_ORG_CACHE_TTL_MS,
-  EventingReportUsageForMonthAdapter,
   type BillingOrganizationCache,
-  type ReportUsageForMonthCommandDeps,
-} from "./adapters/eventing.report-usage-for-month.adapter.ts";
+} from "./repositories/organization/billing-organization-cache.repository.ts";
 export {
-  BillingReportOrganizationPort,
+  ReportUsageForMonthCommandHandler,
+  type ReportUsageForMonthCommandDeps,
+} from "./eventing/report-usage-for-month.commands.ts";
+export {
+  BillingReportOrganizationRepository,
   type BillingReportOrganization,
-} from "./ports/billing-report-organization.port.ts";
+} from "./repositories/organization/billing-report-organization.repository.ts";
 export type { BillingCheckpointDatabase } from "./repositories/prisma/prisma.billing-checkpoint.repository.ts";
 export type { BillingReportOrganizationDatabase } from "./repositories/prisma/prisma.billing-report-organization.repository.ts";
 export {
   RedisBillingOrganizationCacheRepository as RedisBillingOrganizationCacheAdapter,
   type BillingOrganizationCacheRedis,
 } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
+export { BillingReportingPipeline } from "./eventing/billing-reporting.pipeline.ts";
 export {
-  StripeUsageReportingAdapter,
-  StripeUsageReportingUnavailable,
-} from "./adapters/stripe.usage-reporting.adapter.ts";
-export { ObservabilityBillingErrorAdapter } from "./adapters/observability.billing-error.adapter.ts";
-export { EventingBillingReportingAdapter } from "./adapters/eventing.billing-reporting.adapter.ts";
-export { BillingErrorReporter, NullBillingErrorReporter } from "./ports/error-reporter.port.ts";
-export { BillingOrganization } from "./ports/organization.port.ts";
-export { NullBillingOrganizationAdapter } from "./adapters/null-organization.adapter.ts";
-export { BillingSubscriptionNotifier } from "./ports/subscription-notifier.port.ts";
-export { NullBillingSubscriptionNotifierAdapter } from "./adapters/null-subscription-notifier.adapter.ts";
-export { NullUsageLimitEmailAdapter, UsageLimitEmailPort } from "./ports/usage-limit-email.port.ts";
+  BillingErrorReporter,
+  BillingErrorReporterService,
+  NullBillingErrorReporter,
+} from "./services/billing-error-reporter.service.ts";
+export {
+  BillingOrganization,
+  NullBillingOrganizationAdapter,
+} from "./repositories/organization/billing-account-facts.repository.ts";
+export { BillingSubscriptionNotifier } from "./channels/billing-subscription-notifier.channel.ts";
+export { MemoryBillingSubscriptionNotifierChannel } from "./channels/memory/memory.billing-subscription-notifier.channel.ts";
+export { billingSubscriptionNotifierChannels } from "./channels/billing-subscription-notifier-channels.registry.ts";
+export { UsageLimitEmailChannel } from "./channels/usage-limit-email.channel.ts";
+export { MemoryUsageLimitEmailChannel } from "./channels/memory/memory.usage-limit-email.channel.ts";
+export { usageLimitEmailChannels } from "./channels/usage-limit-email-channels.registry.ts";
 export { BillableEventsRepository as BillableEvents, type BillableEventsWindow } from "./repositories/billable-events.repository.ts";
 export {
   BillableEventsMeter,
   type BillableEventRecord,
-} from "./ports/billable-events-meter.port.ts";
+} from "./repositories/billable-events-meter.repository.ts";
 export {
   BillableEventsMeterClickHouseRepository,
   type BillableEventsMeterClickHouseClient,
@@ -70,14 +78,14 @@ export {
 } from "./repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
 export {
   BILLABLE_EVENTS_METER_PROJECTION_NAME,
-  EventingBillableEventsMeterAdapter,
-} from "./adapters/eventing.billable-events-meter.adapter.ts";
+  BillableEventsMeterProjection,
+} from "./eventing/billable-events-meter.projection.ts";
 export {
   BILLING_METER_DISPATCH_SUBSCRIBER_NAME,
   BILLING_METER_DISPATCH_SUPPRESS_MS,
-  EventingBillingMeterDispatchAdapter,
-} from "./adapters/eventing.billing-meter-dispatch.adapter.ts";
-export { BillingTenantOrganization } from "./ports/tenant-organization.port.ts";
+  BillingMeterDispatchSubscriber,
+} from "./eventing/billing-meter-dispatch.subscriber.ts";
+export { BillingTenantOrganization } from "./repositories/organization/tenant-organization.repository.ts";
 export {
   BillingTenantOrganizationService,
   type BillingTenantOrganizationCache,
@@ -89,8 +97,8 @@ export {
   type BillingTenantOrganizationCacheRedis,
 } from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
 export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
-export { PlanLimitsPlanCatalogueAdapter } from "./adapters/plan-limits.plan-catalogue.adapter.ts";
-export { OrganizationPricing } from "./ports/organization-pricing.port.ts";
+export { PlanLimitsCatalogueService } from "./services/plan-limits-catalogue.service.ts";
+export { OrganizationPricing } from "./repositories/organization/organization-pricing.repository.ts";
 export { SubscriptionRepository as BillingSubscription } from "./repositories/subscription.repository.ts";
 export {
   ANNUAL_EVENTS_BILLING_THRESHOLD,
@@ -155,7 +163,9 @@ export {
   type SubscriptionItemUpdate,
 } from "./services/subscription-item-calculator.service.ts";
 export {
+  StripeUsageReportingBuilder,
   StripeUsageReportingService,
+  StripeUsageReportingUnavailable,
   type UsageReportingService,
   type MeterEventResult,
   type UsageSummary,
@@ -171,16 +181,15 @@ export {
 } from "./services/billing-stripe-webhook.service.ts";
 export type { InviteApprover } from "./services/billing-checkout-completion.service.ts";
 export {
-  createBillingStripeClient,
+  BillingStripeClientService,
   STRIPE_API_VERSION,
-} from "./adapters/stripe.stripe-client.adapter.ts";
+} from "./services/stripe-client.service.ts";
 export { BillingWebhookOrganization } from "./repositories/billing-webhook-organization.repository.ts";
 export type { BillingWebhookOrganizationDatabase } from "./repositories/prisma/prisma.billing-webhook-organization.repository.ts";
 export type { BillingWebhookTrialLicenseDatabase } from "./repositories/prisma/prisma.billing-webhook-subscription.repository.ts";
-export {
-  BillingWebhookHost,
-  SilentBillingWebhookHost,
-} from "./ports/billing-webhook-host.port.ts";
+export { BillingWebhookHost } from "./channels/billing-webhook-host.channel.ts";
+export { MemoryBillingWebhookHostChannel } from "./channels/memory/memory.billing-webhook-host.channel.ts";
+export { billingWebhookHostChannels } from "./channels/billing-webhook-host-channels.registry.ts";
 export {
   BillingWebhookSubscription,
   NullBillingWebhookSubscriptionAdapter,

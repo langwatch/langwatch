@@ -5,7 +5,7 @@ import {
   type ExperimentDspyClickHouseResult,
   type ExperimentDspyClickHouseClient,
 } from "../clickhouse.experiment-dspy.repository.ts";
-import { ExperimentDspyRetention } from "../../../ports/experiment-dspy-retention.port.ts";
+import { ExperimentDspyRetentionRepository } from "../../experiment-dspy-retention.repository.ts";
 
 const step = (overrides: Partial<ExperimentDspyStep> = {}): ExperimentDspyStep => ({
   tenantId: "project_1",
@@ -25,7 +25,7 @@ const step = (overrides: Partial<ExperimentDspyStep> = {}): ExperimentDspyStep =
   ...overrides,
 });
 
-class FixedRetention extends ExperimentDspyRetention {
+class FixedRetention extends ExperimentDspyRetentionRepository {
   getTraceRetentionDays = vi.fn(async () => 49);
 }
 

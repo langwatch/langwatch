@@ -4,10 +4,12 @@
  * that still call the full surface directly (dataset find-or-create,
  * evaluation reporting) import the type from here now.
  */
-export { ExperimentService, type ExperimentServiceOptions } from "./services/experiment.service.ts";
-export { ExperimentDspyRetention } from "./ports/experiment-dspy-retention.port.ts";
-export { ExperimentWorkbenchUpdates } from "./ports/experiment-workbench-updates.port.ts";
-export { ExperimentExecution } from "./ports/experiment-execution.port.ts";
+export {
+  ExperimentExecution,
+  ExperimentService,
+  type ExperimentServiceOptions,
+} from "./services/experiment.service.ts";
+export { ExperimentDspyRetentionRepository } from "./repositories/experiment-dspy-retention.repository.ts";
 export {
   PrismaExperimentRepository,
   type ExperimentDatabase,
@@ -50,6 +52,7 @@ export { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 export { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 export { createBlankWorkbenchState } from "./rules/experiment-blank-workbench-state.rules.ts";
 export { workbenchActorFrom } from "./rules/experiment-workbench-actor.rules.ts";
+export { ExperimentWorkbenchUpdates } from "./services/experiment-workbench.service.ts";
 export {
   createExperimentBodySchema,
   createExperimentResponseSchema,
@@ -88,35 +91,38 @@ export {
 } from "./processes/experiment-evaluator-score-filter.process.ts";
 export { getRunUrl } from "./rules/experiment-run-url.rules.ts";
 export { ExperimentRunAbortRepository as ExperimentRunAbort } from "./repositories/experiment-run-abort.repository.ts";
-export { ExperimentConnectedDispatch } from "./ports/experiment-connected-dispatch.port.ts";
+export { ExperimentConnectedDispatch } from "./services/experiment-connected-cell.service.ts";
 export {
   ExperimentConnectedAgentOwnership,
   type ExperimentConnectedAgentSubject,
-} from "./ports/experiment-connected-agent-ownership.port.ts";
+} from "./services/experiment-run-driver.service.ts";
 export { RedisExperimentRunAbortRepository as RedisExperimentRunAbortAdapter } from "./repositories/redis/redis.experiment-run-abort.repository.ts";
 
-export { ExperimentEvaluationReporting } from "./ports/experiment-evaluation-reporting.port.ts";
-export { ExperimentModelCost } from "./ports/experiment-model-cost.port.ts";
+export { ExperimentEvaluationReporting } from "./services/experiment-run-storage.service.ts";
 export {
   ExperimentRunProgressRepository as ExperimentRunProgress,
   type ExperimentRunProgressFailure,
   type ExperimentRunProgressState,
   type ExperimentRunProgressSummary,
 } from "./repositories/experiment-run-progress.repository.ts";
-export { ExperimentRunErrorReporting } from "./ports/experiment-run-error-reporting.port.ts";
-export { ExperimentSandboxCredential } from "./ports/experiment-sandbox-credential.port.ts";
-export { ExperimentStudioDispatch } from "./ports/experiment-studio-dispatch.port.ts";
-export { ExperimentTargetEntityNames } from "./ports/experiment-target-entity-names.port.ts";
-export { ExperimentWorkflowDsl } from "./ports/experiment-workflow-dsl.port.ts";
+export { ExperimentSandboxCredential } from "./services/experiment-run-sandbox-key.service.ts";
+export { ExperimentStudioDispatch } from "./services/experiment-cell-execution.service.ts";
 export { RedisExperimentRunProgressRepository as RedisExperimentRunProgressAdapter } from "./repositories/redis/redis.experiment-run-progress.repository.ts";
 
-export { ExperimentRunOrchestratorService } from "./services/experiment-run-orchestrator.service.ts";
-export type { ExperimentRunPorts, OrchestratorInput } from "./rules/experiment-run-input.rules.ts";
+export {
+  ExperimentModelCost,
+  ExperimentRunOrchestratorService,
+} from "./services/experiment-run-orchestrator.service.ts";
+export type {
+  ExperimentRunCollaborators,
+  OrchestratorInput,
+} from "./rules/experiment-run-input.rules.ts";
 export {
   ExperimentPollingRunService,
   type StartPollingRunInput,
 } from "./services/experiment-polling-run.service.ts";
 export {
+  ExperimentRunErrorReporting,
   ExperimentRunResultsWriterService,
   type RunResultsPersistence,
   type RunResultsWriter,
@@ -130,6 +136,7 @@ export {
   type ExecutionDataInputs,
   type ExecutionDataServices,
   ExperimentExecutionDataService,
+  ExperimentWorkflowDsl,
   type LoadedDataset,
   type LoadedExecutionData,
   type LoadedWorkflow,
@@ -138,7 +145,10 @@ export {
   ExperimentRunStateMirrorService,
   type RunStateMirror,
 } from "./services/experiment-run-state-mirror.service.ts";
-export { ExperimentWorkbenchTargetNamesService } from "./services/experiment-workbench-target-names.service.ts";
+export {
+  ExperimentTargetEntityNames,
+  ExperimentWorkbenchTargetNamesService,
+} from "./services/experiment-workbench-target-names.service.ts";
 export {
   EvaluationInputError,
   NoCommittedVersionError,

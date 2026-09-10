@@ -1,7 +1,7 @@
 /**
- * What a run is asked for: the ports it reaches the rest of the deployment through, the state and
- * loaded targets it evaluates, and the shape one connected-agent turn is dispatched in. Types only,
- * so every layer of the run can name them without reaching for the orchestrator itself.
+ * What a run is asked for: the collaborators it reaches the rest of the deployment through, the
+ * state and loaded targets it evaluates, and the shape one connected-agent turn is dispatched in.
+ * Types only, so every layer of the run can name them without reaching for the orchestrator itself.
  */
 
 import type { WorkflowService } from "@langwatch/workflow-server";
@@ -21,13 +21,13 @@ import type {
 } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
-import type { ExperimentEvaluationReporting } from "../ports/experiment-evaluation-reporting.port.ts";
-import type { ExperimentModelCost } from "../ports/experiment-model-cost.port.ts";
+import type { ExperimentEvaluationReporting } from "../services/experiment-run-storage.service.ts";
+import type { ExperimentModelCost } from "../services/experiment-run-orchestrator.service.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
-import type { ExperimentSandboxCredential } from "../ports/experiment-sandbox-credential.port.ts";
-import type { ExperimentConnectedDispatch } from "../ports/experiment-connected-dispatch.port.ts";
-import type { ExperimentConnectedAgentOwnership } from "../ports/experiment-connected-agent-ownership.port.ts";
-import type { ExperimentStudioDispatch } from "../ports/experiment-studio-dispatch.port.ts";
+import type { ExperimentSandboxCredential } from "../services/experiment-run-sandbox-key.service.ts";
+import type { ExperimentConnectedDispatch } from "../services/experiment-connected-cell.service.ts";
+import type { ExperimentConnectedAgentOwnership } from "../services/experiment-run-driver.service.ts";
+import type { ExperimentStudioDispatch } from "../services/experiment-cell-execution.service.ts";
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
 import type { LoadedWorkflow } from "../services/experiment-execution-data.service.ts";
 
@@ -35,7 +35,7 @@ import type { LoadedWorkflow } from "../services/experiment-execution-data.servi
  * Everything the run loop reaches outside itself, injected as one bag
  * rather than threaded per-signature or read off a process singleton.
  */
-export type ExperimentRunPorts = {
+export type ExperimentRunCollaborators = {
   /** The studio engine each cell is dispatched to. */
   studio: ExperimentStudioDispatch;
   /** The deployment's price table, for cells the engine reports untariffed. */
@@ -67,7 +67,7 @@ export type OrchestratorInput = {
   datasetColumns: Array<{ id: string; name: string; type: string }>;
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
-  ports: ExperimentRunPorts;
+  ports: ExperimentRunCollaborators;
   workflows: WorkflowService;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
@@ -121,6 +121,6 @@ export interface ConnectedCellInput {
   sleep?: (ms: number) => Promise<void>;
   /** The clock the retry budget reads, replaceable in tests. */
   now?: () => number;
-  ports: ExperimentRunPorts;
+  ports: ExperimentRunCollaborators;
   workflows: WorkflowService;
 }

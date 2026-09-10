@@ -14,7 +14,6 @@ import {
 } from "@langwatch/experiment-contract";
 import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ExperimentModelCost } from "../ports/experiment-model-cost.port.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
 import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
@@ -43,10 +42,27 @@ import {
 } from "../processes/experiment-comparison-skip.process.ts";
 import type {
   ConnectedCellInput,
-  ExperimentRunPorts,
+  ExperimentRunCollaborators,
   OrchestratorInput,
 } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentRunDriverService } from "./experiment-run-driver.service.ts";
+
+/**
+ * What a cell's tokens cost, in the deployment's own rate table.
+ *
+ * The rates live with the tracer's cost catalogue, which is neither the
+ * Experiment feature's data nor portable: a self-hosted deployment prices the
+ * same model differently from the cloud one. The run asks for a number and
+ * takes `undefined` for "no known rate", which is what it already did.
+ */
+export abstract class ExperimentModelCost {
+  abstract findTokenPrice(input: {
+    projectId: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+  }): Promise<number | undefined>;
+}
 
 const cellPlan = ExperimentCellPlanService.create();
 
@@ -61,10 +77,10 @@ const comparisonPlan = ({
 /** Re-exported so it moved with its owner without duplicating the type. */
 export type { ComparisonSkipReason } from "../processes/experiment-comparison-skip.process.ts";
 
-const cellExecution = (ports: ExperimentRunPorts, workflows: WorkflowService) =>
+const cellExecution = (ports: ExperimentRunCollaborators, workflows: WorkflowService) =>
   ExperimentCellExecutionService.create({ ports, workflows });
 
-const workflowCell = (ports: ExperimentRunPorts, workflows: WorkflowService) =>
+const workflowCell = (ports: ExperimentRunCollaborators, workflows: WorkflowService) =>
   ExperimentWorkflowCellService.create({
     ports,
     workflows,
@@ -230,7 +246,7 @@ export class ExperimentRunOrchestratorService {
   static async *executeCell(
     cell: ExecutionCell,
     projectId: string,
-    ports: ExperimentRunPorts,
+    ports: ExperimentRunCollaborators,
     datasetColumns: Array<{ id: string; name: string; type: string }>,
     loadedData: LoadedCellData,
     workflows: WorkflowService,
@@ -267,7 +283,7 @@ export class ExperimentRunOrchestratorService {
     loadedEvaluators?: LoadedEvaluators;
     resultMapperConfig?: ResultMapperConfig;
     isAborted?: () => Promise<boolean>;
-    ports: ExperimentRunPorts;
+    ports: ExperimentRunCollaborators;
     workflows: WorkflowService;
     /** The run's agent cache credential, when it minted one. */
     sandboxApiKey?: string;

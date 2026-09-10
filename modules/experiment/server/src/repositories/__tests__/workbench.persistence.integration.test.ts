@@ -24,8 +24,8 @@ import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import { PrismaExperimentRepository } from "../prisma/prisma.experiment.repository.ts";
 import { ExperimentService, type ExperimentService as ExperimentServiceContract } from "../../services/experiment.service.ts";
-import { UnavailableExperimentExecutionAdapter } from "../../adapters/unavailable-experiment-execution.adapter.ts";
-import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter.ts";
+import { UnavailableExperimentExecution } from "../../services/experiment.service.ts";
+import { NoopExperimentWorkbenchUpdates } from "../../services/experiment-workbench.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -71,8 +71,8 @@ const service = (): ExperimentServiceContract =>
         .replaceAll(/^-|-$/g, ""),
     newId: () => `experiment_${randomUUID()}`,
     references,
-    execution: UnavailableExperimentExecutionAdapter.create(),
-    updates: NoopExperimentWorkbenchUpdatesAdapter.create(),
+    execution: UnavailableExperimentExecution.create(),
+    updates: NoopExperimentWorkbenchUpdates.create(),
   });
 
 const state = (

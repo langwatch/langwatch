@@ -13,7 +13,7 @@ import type {
 } from "@langwatch/notification-contract";
 import { NotificationService } from "./billing-usage-notice.service.ts";
 import { UsageWarningService } from "./usage-warning.service.ts";
-import type { BillingErrorReporter } from "../ports/error-reporter.port.ts";
+import type { BillingErrorReporter } from "./billing-error-reporter.service.ts";
 import {
   MIN_DAYS_BETWEEN_ALERTS,
   planLimitCooldown,

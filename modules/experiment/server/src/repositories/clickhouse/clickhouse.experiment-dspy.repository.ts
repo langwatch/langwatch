@@ -6,7 +6,7 @@ import type {
   ExperimentDspyStepSummary,
   ExperimentDspyStepsLookup,
 } from "@langwatch/experiment-contract";
-import type { ExperimentDspyRetention } from "../../ports/experiment-dspy-retention.port.ts";
+import type { ExperimentDspyRetentionRepository } from "../experiment-dspy-retention.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { Temporal, toDate } from "@langwatch/time";
 
@@ -117,7 +117,7 @@ function llmSummary(calls: ExperimentDspyLlmCall[]): {
 export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository {
   static create(options: {
     resolveClient: ExperimentDspyClickHouseResolver;
-    retention: ExperimentDspyRetention;
+    retention: ExperimentDspyRetentionRepository;
     telemetry: ExperimentDspyTelemetry;
   }): ClickHouseExperimentDspyRepository {
     return new ClickHouseExperimentDspyRepository(options);
@@ -126,7 +126,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
   private constructor(
     private readonly options: {
       resolveClient: ExperimentDspyClickHouseResolver;
-      retention: ExperimentDspyRetention;
+      retention: ExperimentDspyRetentionRepository;
       telemetry: ExperimentDspyTelemetry;
     },
   ) {

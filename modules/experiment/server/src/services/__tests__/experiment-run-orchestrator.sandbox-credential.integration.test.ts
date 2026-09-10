@@ -6,7 +6,7 @@ import type { WorkflowService } from "@langwatch/workflow-server";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
-import type { ExperimentRunPorts } from "../../rules/experiment-run-input.rules.ts";
+import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
 import type { ExecutionCell } from "@langwatch/experiment-contract";
 
 const datasetColumns = [{ id: "input", name: "input", type: "string" }];
@@ -31,7 +31,7 @@ const ports = {
     },
   },
   cost: { priceMetrics: async () => undefined },
-} as unknown as ExperimentRunPorts;
+} as unknown as ExperimentRunCollaborators;
 
 const workflows = {
   enrichStudioEvent: async ({ event }: { event: unknown }) => event,

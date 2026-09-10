@@ -36,9 +36,22 @@ import {
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
-import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { nowInstant } from "@langwatch/time";
+
+/**
+ * Dispatches one turn to a connected agent, through the runtime a live SDK
+ * process registered its instances on (ADR-128).
+ */
+export abstract class ExperimentConnectedDispatch {
+  abstract dispatch(input: {
+    projectId: string;
+    agent: DispatchAgent;
+    call: DispatchCall;
+    signal: AbortSignal;
+  }): Promise<CallOutcome>;
+}
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 
@@ -74,7 +87,7 @@ export class ExperimentConnectedCellService {
     sleep,
     now,
   }: {
-    ports: ExperimentRunPorts;
+    ports: ExperimentRunCollaborators;
     workflows: WorkflowService;
     cells: ExperimentCellExecutionService;
     dispatch?: ConnectedDispatch;

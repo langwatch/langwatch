@@ -18,7 +18,18 @@ import {
   type WorkbenchActor,
 } from "@langwatch/experiment-contract";
 import type { ExperimentService } from "./experiment.service.ts";
-import type { ExperimentRunErrorReporting } from "../ports/experiment-run-error-reporting.port.ts";
+
+/**
+ * Where a run's unexpected failure is reported, beyond the log line.
+ *
+ * The retired application sent these to its product-analytics capture. Nothing
+ * downstream of the run reads the report, and a deployment that composes none
+ * loses no behaviour the customer can see — so the collaborator is optional and
+ * says so, rather than a null object that reads as wired.
+ */
+export abstract class ExperimentRunErrorReporting {
+  abstract captureException(error: unknown, context: { extra: Record<string, unknown> }): void;
+}
 
 const logger = createLogger("langwatch:experiment:run-results-writer");
 

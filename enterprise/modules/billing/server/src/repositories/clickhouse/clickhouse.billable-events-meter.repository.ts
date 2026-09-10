@@ -16,7 +16,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   BillableEventsMeter,
   type BillableEventRecord,
-} from "../../ports/billable-events-meter.port.ts";
+} from "../billable-events-meter.repository.ts";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:billable-events-repository");

@@ -2,8 +2,8 @@
 
 import {
   type BillingCheckpoint,
-  BillingCheckpointPort,
-} from "../../ports/billing-checkpoint.port.ts";
+  BillingCheckpointRepository,
+} from "../billing-checkpoint.repository.ts";
 import { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /** The state a month starts in, before the roll-up has reported anything. */
@@ -17,7 +17,7 @@ const UNREPORTED: BillingCheckpoint = {
  * The two-phase meter checkpoint, held in a map keyed by organization month.
  * Absent means never reported, which is what the Prisma twin's null says.
  */
-export class MemoryBillingCheckpointRepository extends BillingCheckpointPort {
+export class MemoryBillingCheckpointRepository extends BillingCheckpointRepository {
   private constructor(private readonly store: MemoryBillingStore) {
     super();
   }

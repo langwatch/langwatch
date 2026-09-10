@@ -23,7 +23,7 @@ import {
 } from "@langwatch/experiment-contract";
 import { z } from "zod";
 
-import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
 import { ExperimentExecutionDataService } from "../services/experiment-execution-data.service.ts";
 import { ExperimentRunResultsWriterService } from "../services/experiment-run-results-writer.service.ts";
@@ -253,7 +253,7 @@ function executeEventStream(options: {
   loadedAgents: Map<string, TypedAgent>;
   loadedEvaluators: unknown;
   loadedWorkflows: unknown;
-  runPorts: ExperimentRunPorts;
+  runPorts: ExperimentRunCollaborators;
   mirror: ReturnType<typeof ExperimentRunStateMirrorService.create>;
   resultsWriter: ReturnType<typeof ExperimentRunResultsWriterService.findWriterFor>;
   userId: string;

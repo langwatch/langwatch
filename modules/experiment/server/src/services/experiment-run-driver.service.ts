@@ -12,6 +12,7 @@ import type {
 } from "@langwatch/experiment-contract";
 import { generateHumanReadableId } from "@langwatch/experiment-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import type { RunActor } from "@langwatch/scenario-contract";
 import { buildStripScoreEvaluatorIds } from "../processes/experiment-evaluator-score-filter.process.ts";
 import { createEventStream } from "../processes/experiment-run-event-stream.process.ts";
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
@@ -24,6 +25,25 @@ import { ExperimentRunStorageService } from "./experiment-run-storage.service.ts
 import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
 import { ExperimentTargetDataService } from "./experiment-target-data.service.ts";
 import { nowInstant } from "@langwatch/time";
+
+/** The agent fields the ownership check reads. */
+export type ExperimentConnectedAgentSubject = {
+  id: string;
+  name: string;
+  type: string;
+  ownerUserId?: string | null;
+};
+
+/**
+ * Refuses a run against a personal development agent of someone other than the
+ * actor, before any cell exists.
+ */
+export abstract class ExperimentConnectedAgentOwnership {
+  abstract assertRunnable(input: {
+    agents: readonly ExperimentConnectedAgentSubject[];
+    actor: RunActor | undefined;
+  }): Promise<void>;
+}
 
 const logger = createLogger("langwatch:experiment:run-driver");
 

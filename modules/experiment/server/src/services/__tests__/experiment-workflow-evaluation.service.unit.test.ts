@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ExperimentWorkflowDsl } from "../../ports/experiment-workflow-dsl.port.ts";
+import type { ExperimentWorkflowDsl } from "../experiment-execution-data.service.ts";
 import type { ExperimentRunProgressRepository } from "../../repositories/experiment-run-progress.repository.ts";
 import {
   WorkflowEvaluationService,

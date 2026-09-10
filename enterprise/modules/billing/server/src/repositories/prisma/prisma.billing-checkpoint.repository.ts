@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { BillingCheckpointPort, type BillingCheckpoint } from "../../ports/billing-checkpoint.port.ts";
+import { BillingCheckpointRepository, type BillingCheckpoint } from "../billing-checkpoint.repository.ts";
 
 /** Prisma implementation of the two-phase billing meter checkpoint. */
 /**
@@ -8,7 +8,7 @@ import { BillingCheckpointPort, type BillingCheckpoint } from "../../ports/billi
  */
 export type BillingCheckpointDatabase = Pick<PrismaClient, "billingMeterCheckpoint">;
 
-export class PrismaBillingCheckpointRepository extends BillingCheckpointPort {
+export class PrismaBillingCheckpointRepository extends BillingCheckpointRepository {
   private constructor(private readonly prisma: BillingCheckpointDatabase) {
     super();
   }

@@ -6,7 +6,7 @@ import {
   type Currency as CurrencyType,
   UnsupportedBillingCurrencyError,
 } from "@langwatch/enterprise-billing-contract";
-import type { StripeErrorTranslator } from "../ports/stripe-error-translator.port.ts";
+import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
 
 const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
 

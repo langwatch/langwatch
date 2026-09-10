@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { ProjectCredentialsAdapter } from "../../adapters/project-credentials.adapter.ts";
+import { ProjectCredentialsService } from "../../services/project-credentials.service.ts";
 import { PrismaProjectRepository } from "./prisma.project.repository.ts";
 import {
   GovernanceInternalProjectService,
@@ -35,7 +35,7 @@ export class PrismaGovernanceInternalProjectRepository {
   build(): GovernanceInternalProjectService {
     return GovernanceInternalProjectService.create({
       repository: PrismaProjectRepository.create({ prisma: this.options.database }),
-      credentials: ProjectCredentialsAdapter.create(),
+      credentials: ProjectCredentialsService.create(),
       teams: this.options.teams,
     });
   }

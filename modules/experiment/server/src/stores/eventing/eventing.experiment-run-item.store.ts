@@ -1,6 +1,6 @@
 import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ExperimentClickHouse } from "../../ports/experiment-clickhouse.port.ts";
+import type { ExperimentClickHouseRepository } from "../../repositories/experiment-clickhouse.repository.ts";
 import type { ClickHouseExperimentRunResultRecord } from "../../projections/experiment-run-result-storage.projection.ts";
 
 const TABLE_NAME = "experiment_run_items" as const;
@@ -12,12 +12,12 @@ const logger = createLogger("langwatch:experiment-run-processing:experiment-run-
  */
 export class ExperimentRunItemStore implements AppendStore<ClickHouseExperimentRunResultRecord> {
   private constructor(
-    private readonly clickhouse: ExperimentClickHouse | null,
+    private readonly clickhouse: ExperimentClickHouseRepository | null,
     private readonly defaultRetentionDays: number,
   ) {}
 
   static create(options: {
-    clickhouse: ExperimentClickHouse | null;
+    clickhouse: ExperimentClickHouseRepository | null;
     defaultRetentionDays: number;
   }): ExperimentRunItemStore {
     return new ExperimentRunItemStore(options.clickhouse, options.defaultRetentionDays);

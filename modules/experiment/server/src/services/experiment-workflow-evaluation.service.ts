@@ -9,10 +9,10 @@ import {
   type TargetConfig,
 } from "@langwatch/experiment-contract";
 import type { Entry, Field, StudioWorkflow as WorkflowDSL } from "@langwatch/workflow-contract";
-import type { ExperimentRunErrorReporting } from "../ports/experiment-run-error-reporting.port.ts";
+import type { ExperimentRunErrorReporting } from "./experiment-run-results-writer.service.ts";
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
-import type { ExperimentWorkflowDsl } from "../ports/experiment-workflow-dsl.port.ts";
-import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import type { ExperimentWorkflowDsl } from "./experiment-execution-data.service.ts";
+import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 import type {
   ExecutionDataServices,
@@ -73,7 +73,7 @@ export type WorkflowEvaluationDependencies = {
   /** The workflow rows and versions this run reads, which it does not own. */
   workflowSource: ExperimentWorkflowDsl;
   /** Everything the run loop reaches outside itself. */
-  ports: ExperimentRunPorts;
+  ports: ExperimentRunCollaborators;
   workflows: WorkflowService;
   /** The datasets, prompts, agents and evaluators the load reads through. */
   services: ExecutionDataServices;

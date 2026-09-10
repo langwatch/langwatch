@@ -5,7 +5,7 @@ import {
   type ProjectWithTeam,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
-import type { ProjectDiagnostics } from "../ports/project.port.ts";
+import type { ProjectDiagnostics } from "./project.service.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
 /**

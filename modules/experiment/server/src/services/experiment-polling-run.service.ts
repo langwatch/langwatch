@@ -13,7 +13,7 @@ import {
   type ExecutionSummary,
 } from "@langwatch/experiment-contract";
 import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
-import type { ExperimentRunErrorReporting } from "../ports/experiment-run-error-reporting.port.ts";
+import type { ExperimentRunErrorReporting } from "./experiment-run-results-writer.service.ts";
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process.ts";
 import {

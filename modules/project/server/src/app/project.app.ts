@@ -25,7 +25,7 @@ import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { ProjectOperationsService } from "../services/project-operations.service.ts";
-import { ProjectCredentialsAdapter } from "../adapters/project-credentials.adapter.ts";
+import { ProjectCredentialsService } from "../services/project-credentials.service.ts";
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
 
@@ -82,7 +82,7 @@ export class ProjectApp implements ProjectApiContract {
   static create({ infrastructure, dependencies, repositories }: ProjectSetup): ProjectApp {
     const projects = ProjectApplicationService.create({
       repository: repositories.projects,
-      credentials: ProjectCredentialsAdapter.create(),
+      credentials: ProjectCredentialsService.create(),
       organizations: dependencies.organizations,
     });
     const operations = ProjectOperationsService.create({

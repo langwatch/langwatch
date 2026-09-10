@@ -4,8 +4,8 @@ import { GROWTH_SEAT_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   type BillingReportOrganizationLookup,
-  BillingReportOrganizationPort,
-} from "../../ports/billing-report-organization.port.ts";
+  BillingReportOrganizationRepository,
+} from "../organization/billing-report-organization.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -39,7 +39,7 @@ export type BillingReportOrganizationDatabase = Pick<PrismaClient, "organization
  * is the stored column's spelling, and this repository is the seam that names
  * it.
  */
-export class PrismaBillingReportOrganizationRepository extends BillingReportOrganizationPort {
+export class PrismaBillingReportOrganizationRepository extends BillingReportOrganizationRepository {
   private constructor(private readonly prisma: BillingReportOrganizationDatabase) {
     super();
   }

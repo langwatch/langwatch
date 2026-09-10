@@ -20,7 +20,7 @@ import type { CallOutcome } from "@langwatch/agent-contract";
 import { AgentBusyError, AgentOfflineError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
 import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
 import type { ConnectedDispatch } from "../experiment-connected-cell.service.ts";
-import type { ExperimentRunPorts, OrchestratorInput } from "../../rules/experiment-run-input.rules.ts";
+import type { ExperimentRunCollaborators, OrchestratorInput } from "../../rules/experiment-run-input.rules.ts";
 import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
 
 /**
@@ -40,7 +40,7 @@ const ports = {
       for (const serverEvent of scripted.component) onEvent(serverEvent);
     },
   },
-} as unknown as ExperimentRunPorts;
+} as unknown as ExperimentRunCollaborators;
 
 /** The enrichment the run does before posting: identity, in a test. */
 const workflows = {
@@ -399,7 +399,7 @@ describe("given a personal development agent of another person", () => {
   const ownershipPorts = {
     ...ports,
     connectedAgentOwnership: { assertRunnable },
-  } as unknown as ExperimentRunPorts;
+  } as unknown as ExperimentRunCollaborators;
 
   const stateWithConnectedTarget = (): EvaluationsV3State => ({
     name: "Evaluation",

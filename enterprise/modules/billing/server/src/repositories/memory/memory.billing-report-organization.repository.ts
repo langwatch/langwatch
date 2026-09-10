@@ -3,8 +3,8 @@
 import { GROWTH_SEAT_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
 import {
   type BillingReportOrganizationLookup,
-  BillingReportOrganizationPort,
-} from "../../ports/billing-report-organization.port.ts";
+  BillingReportOrganizationRepository,
+} from "../organization/billing-report-organization.repository.ts";
 import type { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /** The one pricing model that makes a month reportable at all. */
@@ -15,7 +15,7 @@ const USAGE_BILLED = "SEAT_EVENT";
  * Prisma twin states is part of the answer here too: the pricing model decides
  * the outcome, and the subscription must be ACTIVE on a growth-seat plan.
  */
-export class MemoryBillingReportOrganizationRepository extends BillingReportOrganizationPort {
+export class MemoryBillingReportOrganizationRepository extends BillingReportOrganizationRepository {
   private constructor(private readonly store: MemoryBillingStore) {
     super();
   }

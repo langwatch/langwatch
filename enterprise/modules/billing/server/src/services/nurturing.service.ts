@@ -8,7 +8,7 @@ import type {
 import {
   NullBillingErrorReporter,
   type BillingErrorReporter,
-} from "../ports/error-reporter.port.ts";
+} from "./billing-error-reporter.service.ts";
 
 const logger = createLogger("ee:nurturing-service");
 

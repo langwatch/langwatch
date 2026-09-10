@@ -12,7 +12,7 @@ import {
   ValidationError,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ExperimentClickHouse } from "../../ports/experiment-clickhouse.port.ts";
+import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import type {
   ExperimentRunState,
   ExperimentRunStateData,
@@ -88,12 +88,12 @@ export class ClickHouseExperimentRunStateRepository<
   ProjectionType extends Projection = Projection,
 > implements ExperimentRunStateRepository<ProjectionType> {
   private constructor(
-    private readonly clickhouse: ExperimentClickHouse,
+    private readonly clickhouse: ExperimentClickHouseRepository,
     private readonly defaultRetentionDays: number,
   ) {}
 
   static create<ProjectionType extends Projection = Projection>(options: {
-    clickhouse: ExperimentClickHouse;
+    clickhouse: ExperimentClickHouseRepository;
     defaultRetentionDays: number;
   }): ClickHouseExperimentRunStateRepository<ProjectionType> {
     return new ClickHouseExperimentRunStateRepository<ProjectionType>(

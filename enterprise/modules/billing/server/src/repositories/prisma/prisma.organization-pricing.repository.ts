@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { OrganizationPricing } from "../../ports/organization-pricing.port.ts";
+import { OrganizationPricing } from "../organization/organization-pricing.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs

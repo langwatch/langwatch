@@ -35,7 +35,7 @@ import { z } from "zod";
 import type { ExperimentApp } from "#app/experiment.app";
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
-import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import type { StartPollingRunInput } from "../services/experiment-polling-run.service.ts";
 import { ExperimentSavedStateExecutionService } from "../services/experiment-saved-state-execution.service.ts";
 import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
@@ -61,7 +61,7 @@ export type ExperimentV3StartRunInput = Omit<
  * The run loop this process composed, or the holes where it did not.
  */
 export type ExperimentV3RunLoop = Readonly<{
-  ports: ExperimentRunPorts | null;
+  ports: ExperimentRunCollaborators | null;
   progress: ExperimentRunProgressRepository | null;
   services: ExecutionDataServices;
   // `WorkflowService` is server-private to the workflow module; this transport
@@ -207,7 +207,7 @@ const saveWorkbenchStateBodySchema = z.object({
 
 /** The run loop, or the refusal a process without one owes the caller. */
 export function runLoopOf(run: ExperimentV3RunLoop): {
-  ports: ExperimentRunPorts;
+  ports: ExperimentRunCollaborators;
   progress: ExperimentRunProgressRepository;
 } {
   if (!run.ports || !run.progress) {
@@ -831,7 +831,7 @@ function runEventStream(options: {
   loadedAgents: unknown;
   loadedEvaluators: unknown;
   loadedWorkflows: unknown;
-  runPorts: ExperimentRunPorts;
+  runPorts: ExperimentRunCollaborators;
   carriedOverCells: unknown[];
 }): ReadableStream {
   const { app, projectId, slug } = options;

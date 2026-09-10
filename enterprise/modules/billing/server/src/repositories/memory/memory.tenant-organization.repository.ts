@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { BillingTenantOrganization } from "../../ports/tenant-organization.port.ts";
+import { BillingTenantOrganization } from "../organization/tenant-organization.repository.ts";
 import type { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /**

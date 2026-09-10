@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Stripe from "stripe";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
-import { StripeErrorAdapter } from "../adapters/stripe-error.stripe-error.adapter.ts";
+import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import {
   BillingSubscriptionService,
   SeatEventSubscriptionService,
@@ -100,7 +100,7 @@ const createServiceWithSeatEventFns = ({
     itemCalculator: calc as unknown as SubscriptionItemCalculatorService,
     seatEventService,
     notifier: createMockNotifier(),
-    stripeErrors: StripeErrorAdapter.create(),
+    stripeErrors: StripeErrorTranslatorService.create(),
   });
 
 describe("BillingSubscriptionService", () => {
@@ -120,7 +120,7 @@ describe("BillingSubscriptionService", () => {
         stripe: createMockStripe() as unknown as Stripe,
         itemCalculator: createMockItemCalculator() as unknown as SubscriptionItemCalculatorService,
         notifier: createMockNotifier(),
-        stripeErrors: StripeErrorAdapter.create(),
+        stripeErrors: StripeErrorTranslatorService.create(),
       });
 
       expect(typeof localService.updateSubscriptionItems).toBe("function");
@@ -143,7 +143,7 @@ describe("BillingSubscriptionService", () => {
       stripe: stripe as unknown as Stripe,
       itemCalculator: itemCalculator as unknown as SubscriptionItemCalculatorService,
       notifier: createMockNotifier(),
-      stripeErrors: StripeErrorAdapter.create(),
+      stripeErrors: StripeErrorTranslatorService.create(),
     });
   });
 

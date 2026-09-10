@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { Instant } from "@langwatch/time";
-import type { BillingCheckpoint } from "../../ports/billing-checkpoint.port.ts";
+import type { BillingCheckpoint } from "../billing-checkpoint.repository.ts";
 import type { BillingSubscriptionRecord } from "../subscription.repository.ts";
 import type { NurturingProfile } from "../nurturing-profile.repository.ts";
 
