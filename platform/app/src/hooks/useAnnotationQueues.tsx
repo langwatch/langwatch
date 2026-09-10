@@ -44,7 +44,6 @@ const queueReadInput = ({
     ? { queueIds: options.queueIds }
     : {}),
   showQueueAndUser: options.showQueueAndUser ?? false,
-  allQueueItems: options.allQueueItems ?? false,
   ...dateRangeInput(options),
 });
 
@@ -54,7 +53,6 @@ interface UseAnnotationQueuesOptions {
   /** The reviewer's pick of queues to read. Empty or absent reads them all. */
   queueIds?: string[];
   showQueueAndUser?: boolean;
-  allQueueItems?: boolean;
   /** Narrows the read to items queued inside this range. */
   startDate?: Date;
   endDate?: Date;
@@ -66,7 +64,6 @@ export function useAnnotationQueues(
   options: UseAnnotationQueuesOptions = {
     selectedAnnotations: "pending",
     showQueueAndUser: false,
-    allQueueItems: false,
   },
 ) {
   const { enabled = true } = options;

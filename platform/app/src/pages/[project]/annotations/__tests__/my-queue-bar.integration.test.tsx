@@ -24,6 +24,11 @@ type TestQueueItem = {
 const mocks = vi.hoisted(() => ({
   items: [] as unknown[],
   queuesLoading: false,
+  /**
+   * Whether the step being served is the item the reviewer has left, with the
+   * one the URL names still being read.
+   */
+  stepIsStale: false,
   canUpdateAnnotations: true,
   /** Which queue item the URL names, which is what the walk moves between. */
   query: {} as Record<string, string>,
@@ -37,13 +42,36 @@ const mocks = vi.hoisted(() => ({
   invalidateQueues: vi.fn(),
 }));
 
-vi.mock("~/hooks/useAnnotationQueues", () => ({
-  useAnnotationQueues: () => ({
-    assignedQueueItems: mocks.items,
-    totalCount: mocks.items.length,
-    scoreOptions: { data: [] },
-    queuesLoading: mocks.queuesLoading,
-  }),
+/**
+ * The walk reads one step at a time, so the fixture queue stands in for the
+ * server and the step is derived from it the way the procedure derives it:
+ * the item the URL names or the first one waiting, its rank, and the ids
+ * either side. Items the reviewer has finished leave the walk.
+ */
+vi.mock("~/hooks/useAnnotationQueueWalk", () => ({
+  useAnnotationQueueWalk: ({ queueItemId }: { queueItemId?: string }) => {
+    const pending = (
+      mocks.items as { id: string; doneAt: Date | null; trace: unknown }[]
+    ).filter((item) => !item.doneAt);
+    const index = Math.max(
+      0,
+      pending.findIndex((item) => item.id === queueItemId),
+    );
+    const item = pending[index] ?? null;
+
+    return {
+      item,
+      position: item ? index + 1 : 0,
+      total: pending.length,
+      previousItemId: pending[index - 1]?.id ?? null,
+      nextItemId: item ? (pending[index + 1]?.id ?? null) : null,
+      // Nothing readable left is what ends the walk, which an empty queue and
+      // a queue of unresolvable traces both are.
+      queueFinished: pending.every((entry) => !entry.trace),
+      queueLoading: mocks.queuesLoading,
+      stepIsStale: mocks.stepIsStale,
+    };
+  },
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -106,7 +134,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       annotation: {
-        getOptimizedAnnotationQueues: { invalidate: mocks.invalidateQueues },
+        getQueueWalkStep: { invalidate: mocks.invalidateQueues },
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },
@@ -237,6 +265,7 @@ const finishQueueWithHandoff = async ({ traceIds }: { traceIds: string[] }) => {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.queuesLoading = false;
+  mocks.stepIsStale = false;
   mocks.canUpdateAnnotations = true;
   mocks.query = {};
   mocks.openDrawers = [];
@@ -284,6 +313,21 @@ describe("given a reviewer walking their annotation queue", () => {
       renderPage();
 
       expect(screen.getByText("1 of 3")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the reviewer has stepped on and the new item is still being read", () => {
+    it("holds every action that would otherwise act on the item left behind", () => {
+      // The URL already names the item asked for, while the step in hand is
+      // still the one being left. Acting now finishes, or annotates, the item
+      // the reviewer has stepped away from.
+      mocks.query = { "queue-item": "item-2" };
+      mocks.stepIsStale = true;
+      renderPage();
+
+      expect(screen.getByRole("button", { name: /Next/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Edit trace/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Previous/ })).toBeDisabled();
     });
   });
 

@@ -40,13 +40,29 @@ const mocks = vi.hoisted(() => ({
 const conversationProps = () =>
   mocks.conversationProps as ConversationViewProps;
 
-vi.mock("~/hooks/useAnnotationQueues", () => ({
-  useAnnotationQueues: () => ({
-    assignedQueueItems: mocks.items,
-    totalCount: mocks.items.length,
-    scoreOptions: { data: [] },
-    queuesLoading: false,
-  }),
+/**
+ * The walk reads one step at a time, so the fixture queue stands in for the
+ * server: the step is the item the URL names, or the first one waiting.
+ */
+vi.mock("~/hooks/useAnnotationQueueWalk", () => ({
+  useAnnotationQueueWalk: ({ queueItemId }: { queueItemId?: string }) => {
+    const items = mocks.items as { id: string; trace: unknown }[];
+    const index = Math.max(
+      0,
+      items.findIndex((item) => item.id === queueItemId),
+    );
+    const item = items[index] ?? null;
+
+    return {
+      item,
+      position: item ? index + 1 : 0,
+      total: items.length,
+      previousItemId: items[index - 1]?.id ?? null,
+      nextItemId: item ? (items[index + 1]?.id ?? null) : null,
+      queueFinished: items.every((entry) => !entry.trace),
+      queueLoading: false,
+    };
+  },
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -113,7 +129,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       annotation: {
-        getOptimizedAnnotationQueues: { invalidate: vi.fn() },
+        getQueueWalkStep: { invalidate: vi.fn() },
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },

@@ -109,6 +109,18 @@ Feature: Walking an annotation queue into a dataset
       When I leave the queue before it settles
       Then nothing is left waiting to settle the page
 
+  Rule: A link into the queue opens on work
+
+    A link names one item, and by the time it is followed that item may have
+    been finished or taken out of the queue. Following it opens what is still
+    waiting rather than nothing at all.
+
+    @unit
+    Scenario: A link to an item that is no longer waiting opens the first item still waiting
+      Given the item a link names has since been finished or removed
+      When I follow that link
+      Then the first item still waiting is opened instead
+
   Rule: The trace behind a queue item is corrected in the trace drawer
 
     @integration
