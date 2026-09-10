@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    fsModuleCache: true,
     environment: "jsdom",
     watch: false,
     testTimeout: 10_000,

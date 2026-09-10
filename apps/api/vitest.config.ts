@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    fsModuleCache: true,
     watch: false,
     testTimeout: 10_000,
     // `*.stress.test.ts` drives a LIVE deployment over HTTP with a real API
