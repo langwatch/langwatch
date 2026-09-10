@@ -108,7 +108,7 @@ describe("agent listing commands", () => {
     return new Command().handle({ tenantId: "gov-project", data })[0] as Event;
   };
 
-  describe("the request that starts a listing", () => {
+  describe("when a caller asks for a listing", () => {
     it("commits to the pull aggregate, so one source is one ordered stream", () => {
       const event = emit(RequestIngestionPullAgentsListingCommand, {
         ...envelope,
@@ -125,12 +125,21 @@ describe("agent listing commands", () => {
           requestId,
         }).idempotencyKey;
 
-      expect(key("req-1")).toBe(key("req-1"));
-      expect(key("req-1")).not.toBe(key("req-2"));
+      // Two independent derivations from the same request id, named so the
+      // assertion reads as "these agree" rather than as a value compared to
+      // itself. The claim is that the key is a function of the request and of
+      // nothing else — no clock, no counter, no randomness — which is what
+      // makes a redelivery settle instead of running the listing twice.
+      const firstDelivery = key("req-1");
+      const redelivery = key("req-1");
+      const differentPress = key("req-2");
+
+      expect(redelivery).toBe(firstDelivery);
+      expect(differentPress).not.toBe(firstDelivery);
     });
   });
 
-  describe("the two outcomes", () => {
+  describe("when an outcome is recorded", () => {
     it("cannot collide with each other", () => {
       const listed = emit(RecordIngestionPullAgentsListedCommand, {
         ...envelope,
@@ -198,7 +207,7 @@ describe("the people listing commands", () => {
     return new Command().handle({ tenantId: "gov-project", data })[0] as Event;
   };
 
-  describe("the request that starts a listing", () => {
+  describe("when a caller asks for a listing", () => {
     it("commits to the pull aggregate, so one source is one ordered stream", () => {
       const event = emit(RequestIngestionPullPeopleListingCommand, {
         ...envelope,
@@ -215,8 +224,17 @@ describe("the people listing commands", () => {
           requestId,
         }).idempotencyKey;
 
-      expect(key("req-1")).toBe(key("req-1"));
-      expect(key("req-1")).not.toBe(key("req-2"));
+      // Two independent derivations from the same request id, named so the
+      // assertion reads as "these agree" rather than as a value compared to
+      // itself. The claim is that the key is a function of the request and of
+      // nothing else — no clock, no counter, no randomness — which is what
+      // makes a redelivery settle instead of running the listing twice.
+      const firstDelivery = key("req-1");
+      const redelivery = key("req-1");
+      const differentPress = key("req-2");
+
+      expect(redelivery).toBe(firstDelivery);
+      expect(differentPress).not.toBe(firstDelivery);
     });
 
     /**
@@ -236,7 +254,7 @@ describe("the people listing commands", () => {
     });
   });
 
-  describe("the two outcomes", () => {
+  describe("when an outcome is recorded", () => {
     it("cannot collide with each other", () => {
       const listed = emit(RecordIngestionPullPeopleListedCommand, {
         ...envelope,
