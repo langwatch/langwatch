@@ -19,7 +19,10 @@ import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { applyOverlayToTrace } from "./edit-overlay/applyTraceEditOverlay";
 import { redactPatchForViewer } from "./edit-overlay/redactTraceEditOverlayPatch";
 import { TraceEditOverlayService } from "./edit-overlay/traceEditOverlay.service";
-import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
+import {
+  resolveOffloadedSpanAttributes,
+  resolveOffloadedTraces,
+} from "./resolve-offloaded-traces";
 import { resolveOffloadedTracesBatch } from "./resolve-offloaded-traces-batch";
 
 /**
@@ -148,6 +151,28 @@ class OffloadedSpanResolver {
   }
 
   /**
+   * Returns the single-span callback compatible with ClickHouseTraceService's
+   * `resolveSpanAttributes` parameter, for reads that consume one span's
+   * content and have no trace-level IO to recompute (#5753).
+   */
+  toAttributesResolverFn(): (params: {
+    projectId: string;
+    traceId: string;
+    spanId: string;
+    attributes: Record<string, unknown>;
+  }) => ReturnType<typeof resolveOffloadedSpanAttributes> {
+    return ({ projectId, traceId, spanId, attributes }) =>
+      resolveOffloadedSpanAttributes({
+        projectId,
+        traceId,
+        spanId,
+        attributes,
+        blobStore: this.deps.blobStore,
+        logger: this.logger,
+      });
+  }
+
+  /**
    * Returns the bulk-resolution callback compatible with ClickHouseTraceService's
    * `resolveTraceSpansBatchFn` parameter. Resolves a whole result set in one
    * bounded-concurrency pass over event_log (#4991 AC6).
@@ -202,11 +227,14 @@ export class TraceService {
         : undefined;
     const resolveTraceSpansFn = offloadedSpanResolver?.toResolverFn();
     const resolveTraceSpansBatchFn = offloadedSpanResolver?.toBatchResolverFn();
+    const resolveSpanAttributesFn =
+      offloadedSpanResolver?.toAttributesResolverFn();
 
     this.clickHouseService = ClickHouseTraceService.create({
       prisma,
       resolveTraceSpans: resolveTraceSpansFn,
       resolveTraceSpansBatch: resolveTraceSpansBatchFn,
+      resolveSpanAttributes: resolveSpanAttributesFn,
     });
     this.evaluationService = EvaluationService.create();
     // Injected store for the read-time Claude Code content enrichment; the
@@ -772,6 +800,11 @@ export class TraceService {
 
   /**
    * Get a span for prompt studio by span ID.
+   *
+   * When the service was built with blob-resolution deps, the llm span's IO is
+   * restored from event_log first, so a prompt whose messages were offloaded
+   * at ingestion (>64KB, ADR-022) opens in full rather than on the bounded
+   * preview stored in `stored_spans` (#5753).
    *
    * @param projectId - The project ID
    * @param spanId - The span ID to find

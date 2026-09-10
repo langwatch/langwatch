@@ -90,6 +90,24 @@ export type ResolveTraceSpansBatchFn = (
 ) => Promise<ResolvedTraceSpans[]>;
 
 /**
+ * Callback injected from TraceService that resolves offloaded blob refs for a
+ * SINGLE span's attribute map (ADR-022), for reads that consume one span's
+ * content rather than a trace's recomputed input/output.
+ *
+ * `getSpanForPromptStudio` is the caller: it reads raw ClickHouse rows and
+ * turns the llm span's attributes straight into playground messages and llm
+ * config, so there is no NormalizedSpan to hand {@link ResolveTraceSpansFn}
+ * and no trace-level IO to recompute. Same primitive underneath, same
+ * keep-the-preview-on-failure policy.
+ */
+export type ResolveSpanAttributesFn = (params: {
+  projectId: string;
+  traceId: string;
+  spanId: string;
+  attributes: Record<string, unknown>;
+}) => Promise<{ attributes: Record<string, unknown> }>;
+
+/**
  * Cursor structure for keyset pagination.
  * Encoded as base64 JSON in the scrollId.
  */
@@ -405,6 +423,11 @@ export class ClickHouseTraceService {
    * paths fall back to the per-trace resolver.
    */
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
+  /**
+   * Per-span attribute resolver for content-consuming single-span reads. See
+   * {@link ResolveSpanAttributesFn}.
+   */
+  private readonly resolveSpanAttributes: ResolveSpanAttributesFn | undefined;
 
   private readonly prisma: PrismaClient;
 
@@ -412,11 +435,13 @@ export class ClickHouseTraceService {
     prisma,
     resolveTraceSpans,
     resolveTraceSpansBatch,
+    resolveSpanAttributes,
     retentionResolver,
   }: {
     prisma: PrismaClient;
     resolveTraceSpans?: ResolveTraceSpansFn;
     resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
+    resolveSpanAttributes?: ResolveSpanAttributesFn;
     /**
      * Widens the span read's retention floor to this tenant's own policy.
      * Optional: without it the floor stays at {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
@@ -426,6 +451,7 @@ export class ClickHouseTraceService {
     this.prisma = prisma;
     this.resolveTraceSpans = resolveTraceSpans;
     this.resolveTraceSpansBatch = resolveTraceSpansBatch;
+    this.resolveSpanAttributes = resolveSpanAttributes;
     this.retentionFloor = createRetentionFloorService(retentionResolver);
   }
 
@@ -470,6 +496,7 @@ export class ClickHouseTraceService {
     prisma = defaultPrisma,
     resolveTraceSpans,
     resolveTraceSpansBatch,
+    resolveSpanAttributes,
     retentionResolver = new RetentionPolicyCache(
       new DataRetentionPolicyRepository(prisma),
     ),
@@ -477,12 +504,14 @@ export class ClickHouseTraceService {
     prisma?: PrismaClient;
     resolveTraceSpans?: ResolveTraceSpansFn;
     resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
+    resolveSpanAttributes?: ResolveSpanAttributesFn;
     retentionResolver?: RetentionPolicyResolver;
   } = {}): ClickHouseTraceService {
     return new ClickHouseTraceService({
       prisma,
       resolveTraceSpans,
       resolveTraceSpansBatch,
+      resolveSpanAttributes,
       retentionResolver,
     });
   }
@@ -1609,9 +1638,25 @@ export class ClickHouseTraceService {
             return null;
           }
 
+          // Restore any IO this span had offloaded to event_log before
+          // reading messages and llm config out of it (ADR-022). Without
+          // this the playground opens on the bounded preview
+          // `leanForProjection` wrote into stored_spans, which for a
+          // >64KB prompt is the first ~64KB of it and no way to see the
+          // rest. It is the same gap #5752 closed on the evaluation reads.
+          //
+          // Only the llm span is resolved, not every row this query
+          // returned: the ancestor walk below reads `langwatch.prompt.*`
+          // scalars, which are never offloaded, so resolving the siblings
+          // would buy nothing and cost an event_log read each.
+          const resolvedRow = await this.resolvePromptStudioRowIO({
+            projectId,
+            row,
+          });
+
           // Extract span data from attributes
           const result = this.extractPromptStudioDataFromClickHouse(
-            row,
+            resolvedRow,
             protections,
           );
 
@@ -1667,6 +1712,51 @@ export class ClickHouseTraceService {
         }
       },
     );
+  }
+
+  /**
+   * Returns the row with its offloaded attribute values restored, or the row
+   * unchanged when no resolver is wired (the caller built this service without
+   * blob-resolution deps) or the span carries no eventref.
+   *
+   * Failure keeps the preview. The production resolver already swallows a
+   * missing or unreadable event_log row per field, but the resolver is
+   * injected, so a rejection is caught here too: this call sits inside
+   * getSpanForPromptStudio's try, where an escaping error would turn a
+   * playground that used to show the preview into one that shows nothing.
+   * Content that is merely unavailable must not fail the read.
+   *
+   * @internal
+   */
+  private async resolvePromptStudioRowIO<
+    T extends {
+      SpanId: string;
+      TraceId: string;
+      SpanAttributes: Record<string, unknown>;
+    },
+  >({ projectId, row }: { projectId: string; row: T }): Promise<T> {
+    if (!this.resolveSpanAttributes) return row;
+
+    try {
+      const { attributes } = await this.resolveSpanAttributes({
+        projectId,
+        traceId: row.TraceId,
+        spanId: row.SpanId,
+        attributes: row.SpanAttributes,
+      });
+      return { ...row, SpanAttributes: attributes };
+    } catch (error) {
+      this.logger.warn(
+        {
+          projectId,
+          spanId: row.SpanId,
+          traceId: row.TraceId,
+          error: error instanceof Error ? error.message : error,
+        },
+        "Failed to resolve offloaded IO for prompt studio, keeping preview value",
+      );
+      return row;
+    }
   }
 
   /**
