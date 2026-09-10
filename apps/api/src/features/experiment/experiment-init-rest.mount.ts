@@ -28,16 +28,18 @@
  * here — what it does NOT do is re-render the message from the organization's
  * allowance, which needs the licence layer's own message builder.
  */
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import { bindRestMiddleware, type MountableRestApp, type RestErrorHandler } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { ExperimentApi } from "@langwatch/experiment-contract";
 import {
   ExperimentFindOrCreateService,
-  createExperimentInitRestApp,
-  type ExperimentInitRestCredential,
+  experimentInitCaller,
+  experimentInitRest,
   type ExperimentService,
 } from "@langwatch/experiment-server";
 
 import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential.ts";
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 
 /** The project credential this door reads. */
 export type ApiExperimentInitCredentialPort = (input: {
@@ -66,20 +68,46 @@ export function composeApiExperimentFindOrCreate(
   return ExperimentFindOrCreateService.create(experiments);
 }
 
-/** `POST /api/experiment/init`, bound to one process. */
-export function mountExperimentInitRest(options: {
-  security: AppRestSecurity;
-  collaborators: ApiExperimentInitRestCollaborators;
-}): MountableRestApp {
-  const { security, collaborators } = options;
+/**
+ * A credential the process refused, carried out of the caller binding to the
+ * door's own error handler, which answers the status and body the credential
+ * port chose: the SDK parses that body, so no envelope may reshape it.
+ */
+class ApiExperimentInitRefusal extends Error {
+  constructor(
+    readonly status: Extract<HandlerManagedCredential, { ok: false }>["status"],
+    readonly body: object,
+  ) {
+    super("experiment init credential refused");
+  }
+}
 
-  return createExperimentInitRestApp({
-    security,
-    ports: {
-      authenticateCredential: async (input) =>
-        (await collaborators.credential(input)) as ExperimentInitRestCredential,
-      findOrCreate: () => collaborators.findOrCreate,
-      ...(collaborators.reportError ? { reportError: collaborators.reportError } : {}),
-    },
+/** `POST /api/experiment/init`, bound to one process. */
+export function mountExperimentInitRest(
+  runtime: ApiRestRuntime,
+  options: Readonly<{
+    experiments: () => ExperimentApi;
+    collaborators: ApiExperimentInitRestCollaborators;
+    errors: RestErrorHandler;
+  }>,
+): MountableRestApp {
+  const { collaborators } = options;
+  const onError: RestErrorHandler = (error, context) => {
+    if (error instanceof ApiExperimentInitRefusal) return context.json(error.body, error.status);
+    return options.errors(error, context);
+  };
+
+  return runtime.mount(experimentInitRest.router(), options.experiments, {
+    onError,
+    facts: [
+      bindRestMiddleware(experimentInitCaller, async (context) => {
+        const credential = await collaborators.credential({
+          request: context.req.raw,
+          permission: "experiments:manage",
+        });
+        if (!credential.ok) throw new ApiExperimentInitRefusal(credential.status, credential.body);
+        return { projectId: credential.project.id, projectSlug: credential.project.slug };
+      }),
+    ],
   });
 }
