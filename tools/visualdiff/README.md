@@ -23,10 +23,13 @@ not be completed — the same ladder as `apidiff`.
 
 1. `git worktree add --detach` for each ref, into `.visualdiff/<timestamp>/`.
 2. Brings each ref's worktree up as its own stack. Wherever `haven` is on
-   PATH (the default - see "Booting through haven" below), each ref is a
-   `haven up --agent --detach` stack under its own run-scoped slug, and
-   haven's own automatic prep does the install, codegen, migrate and seed.
-   With `-no-haven`, visualdiff provisions the old way instead:
+   PATH (the default - see "Booting through haven" below), each ref's fresh
+   worktree is prepared first - install, generated files, the built
+   workspace packages the api and worker import a dist from, and the
+   developer's own `.env` copied in (see "Preparing a fresh worktree" below)
+   - and only then does it become a `haven up --agent --detach` stack under
+   its own run-scoped slug, with haven's own automatic prep doing migrate and
+   seed. With `-no-haven`, visualdiff provisions the old way instead:
    `pnpm install --offline` and `pnpm run start:prepare:files` in each
    worktree, then each ref's stack starts on its own ports - the base at
    `-base-port` (5670 by default), the candidate ten above it, so the two can
@@ -86,6 +89,50 @@ haven's own, surfaced through the ordinary boot timeout and backend log tail,
 not a bespoke refusal that would need updating the day haven learns to start
 what a monolith checkout defines. See
 `specs/tooling/visualdiff-on-haven.feature` for the bound scenarios.
+
+## Preparing a fresh worktree
+
+haven's own automatic prep is migrate-and-seed, not install-and-build. A
+worktree `git worktree add` just created carries none of the generated or
+built artefacts a developer's own checkout has - `node_modules`, the Prisma
+client, the `langwatch` SDK's `dist` - because they are all gitignored, so
+`haven up` there used to fail in its own prepare phase before it ever reached
+migrate. Run 20260910-013825 is the record of it: the base died on
+`Error: Cannot find module '~/generated/prisma/client'`, the candidate on
+`Error [ERR_MODULE_NOT_FOUND]: Cannot find module '.../langwatch/dist/index.mjs'`,
+both then `haven: migrations failed - nothing was dropped`.
+
+So before either worktree becomes a haven stack, `checkoutForHaven` runs, per
+stack:
+
+1. Copies the developer's own untracked `.env*` files from the workspace
+   root into the worktree - the same job `.githooks/post-checkout` does for a
+   worktree added by hand, without depending on a machine having opted into
+   `core.hooksPath` (`CopyEnvFiles` in `haven.go`). A tracked file
+   (`.env.example`) is left alone. First, because the next step's
+   `prisma generate` reads `DATABASE_URL` out of the schema's `env()` call at
+   generate time.
+2. `env -u CI pnpm install --frozen-lockfile` - pnpm's workspace symlinks are
+   per worktree, so a developer's own `node_modules` is no help here. `CI` is
+   unset so `dev/scripts/install-check-shims.mjs` and friends behave as they
+   do for a person, not for a pipeline.
+3. `pnpm run start:prepare:files` - the generated files (Prisma client,
+   evaluator types, the langy skill/setup generators). The same command on
+   both refs: the script name is identical in both layouts' root
+   `package.json`, and each ref's own version resolves to what that ref
+   actually needs.
+4. Modular layout only: `node dev/scripts/ensure-built.mjs`, building the
+   workspace packages the api and worker import a built `dist` from
+   (`langwatch`, `@langwatch/mcp-server`, `@langwatch/mail` - see that
+   script and the three applications' `predev`/`pretest` hooks). The
+   monolith layout's own `start:prepare:files` (`platform/app`'s, on
+   `origin/main`) already builds the SDK and the MCP server inline, and
+   `ensure-built.mjs` does not exist there at all.
+
+Every step's name and exit status go to the run log as it runs; nothing here
+ever logs a byte of `.env`'s contents. See
+`specs/tooling/visualdiff-on-haven.feature`'s "A fresh worktree is prepared
+before its stack boots" rule for the bound scenarios.
 
 `.githooks/post-checkout` (`git config core.hooksPath .githooks`) copies the
 main checkout's untracked `.env*` files into a newly added worktree - but

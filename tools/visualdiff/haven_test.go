@@ -83,6 +83,12 @@ func havenTestSession(fake *fakeHavenRunner, timeout time.Duration) *session {
 				"CLICKHOUSE_URL=http://127.0.0.1:8123/lw_feat_x",
 			}
 		},
+		// The env-copy step's real implementation reads the developer's own
+		// workspace root off disk (see CopyEnvFiles in haven.go); these tests
+		// care about the haven boot sequence, not that, and "/repos/langwatch"
+		// above is not a real directory, so it is stubbed out here. The
+		// dedicated env-copy tests exercise the real implementation directly.
+		CopyEnv: func(context.Context, string, string) (int, error) { return 0, nil },
 	}
 	base := Stack{Name: "base", Ref: "origin/main", Dir: "/repos/langwatch/.visualdiff/run/base", HavenSlug: HavenSlug(testRunID, "base")}
 	candidate := Stack{Name: "candidate", Ref: "HEAD", Dir: "/repos/langwatch/.visualdiff/run/candidate", HavenSlug: HavenSlug(testRunID, "candidate")}
@@ -239,11 +245,15 @@ func TestIsolationComesFromHavenNotAllocateRedisDBs(t *testing.T) {
 				t.Errorf("%s holds a port of visualdiff's own allocation: %+v", stack.Name, stack.Ports)
 			}
 		}
-		// The worktree checkout and its removal still run through git - the
-		// haven path only replaces install/migrate/seed/provision, which
-		// haven's own automatic prep does instead.
+		// The worktree checkout and its removal still run through git, and
+		// each worktree still runs its own install/generated-files/build
+		// prepare steps (haven's own automatic prep is migrate-and-seed, not
+		// install-and-build - see HavenPrepareCommands in haven.go) - but
+		// none of that is a datastore address of visualdiff's own choosing.
 		for _, spec := range fake.commands {
-			if spec.name != havenrun.Command && spec.name != "git" {
+			switch spec.name {
+			case havenrun.Command, "git", "env", "pnpm", "node":
+			default:
 				t.Errorf("unexpected command %q on the haven path", haventArgv(spec))
 			}
 		}

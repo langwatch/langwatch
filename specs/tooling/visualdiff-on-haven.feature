@@ -81,6 +81,40 @@ Feature: visualdiff boots its stacks through haven
       When the run gives up
       Then the failure tail comes from haven logs app for that stack, not haven logs backend
 
+  Rule: A fresh worktree is prepared before its stack boots
+
+    # Run 20260910-013825 died in haven's own prepare phase on both refs: the
+    # base on "Cannot find module '~/generated/prisma/client'", the candidate
+    # on "Cannot find module '.../langwatch/dist/index.mjs'", both then
+    # "migrations failed - nothing was dropped". A fresh `git worktree add`
+    # carries none of a developer checkout's generated or built artefacts -
+    # they are all gitignored - and haven's own automatic prep is
+    # migrate-and-seed, not install-and-build.
+
+    @unit
+    Scenario: A fresh worktree is prepared before its stack boots
+      Given a fresh worktree with none of a developer checkout's generated or built artefacts
+      When the worktree is prepared, before haven up runs
+      Then it installs with a frozen lockfile and CI unset
+      And it runs the generated-files step
+      And a modular checkout also builds the workspace packages the api and worker import a built dist from
+      And the developer's own .env is copied into the worktree
+      And every step's name and exit status are written to the run log, never a byte of .env's contents
+
+    @unit
+    Scenario: A monolith worktree's own generated-files step already builds the SDK
+      Given a checkout on the monolith layout
+      When the worktree is prepared
+      Then it runs the same generated-files command as the modular layout, "pnpm run start:prepare:files"
+      And it runs no separate build step for the langwatch SDK or the MCP server, because that checkout's own generated-files step already builds them
+
+    @unit
+    Scenario: A tracked dotenv file is never overwritten
+      Given the workspace root holds both an untracked .env and the tracked .env.example
+      When the developer's own .env is copied into the worktree
+      Then .env is copied into the worktree
+      And .env.example is left alone
+
   Rule: A monolith ref is not refused up front - haven's own answer decides
 
     @unit

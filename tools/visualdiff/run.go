@@ -63,6 +63,11 @@ type Deps struct {
 	// developer's own DATABASE_URL etc. never has to exist on the machine
 	// running the test.
 	Environ func() []string
+	// CopyEnv copies the developer's own .env* files from root (the main
+	// checkout) into dir (a fresh worktree) before that worktree's haven
+	// prepare steps run - see CopyEnvFiles in haven.go. Tests supply their
+	// own so a fake root path never has to exist on disk.
+	CopyEnv func(ctx context.Context, root, dir string) (int, error)
 }
 
 // Request is everything Execute needs: what to run, what to render, and what
@@ -130,8 +135,18 @@ func (deps *Deps) fill() {
 	if deps.AllocateRedis == nil {
 		deps.AllocateRedis = ResolveRedisAllocation
 	}
+	deps.fillHaven()
+}
+
+// fillHaven defaults the two dependencies only the haven path uses, split out
+// of fill so that function's cognitive complexity stays under the repository
+// limit.
+func (deps *Deps) fillHaven() {
 	if deps.Environ == nil {
 		deps.Environ = os.Environ
+	}
+	if deps.CopyEnv == nil {
+		deps.CopyEnv = CopyEnvFiles
 	}
 }
 
