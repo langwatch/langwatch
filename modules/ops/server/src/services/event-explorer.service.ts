@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { AggregateSearchResult } from "@langwatch/ops-contract";
 import type { EventExplorerRepository } from "../repositories/observe/event-explorer.repository.ts";
-import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
+import type { OpsEventingIntrospectionPort } from "../app/ops.app.ts";
 import { toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:event-explorer");

@@ -10,7 +10,7 @@ import {
 import type {
   UsageStatsOrganization,
   UsageStatsProjectCounts,
-} from "../../ports/usage-stats-worker.port.ts";
+} from "../../app/ops.app.ts";
 
 /** One organization's ClickHouse-backed counts, keyed by organization id. */
 export interface MemoryUsageStatsClickHouseCounts {

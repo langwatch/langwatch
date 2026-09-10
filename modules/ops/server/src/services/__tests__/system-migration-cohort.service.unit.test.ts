@@ -3,15 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   type OrganizationDataplane,
   OrganizationDataplanePort,
-} from "../../ports/organization-dataplane.port.ts";
+} from "../../app/ops.app.ts";
 import { SystemMigrationCohortService } from "../system-migration-cohort.service.ts";
 
 /** The routing table as a fake: organizations it names are on their own instance. */
-class FakeDataplanePort extends OrganizationDataplanePort {
+class FakeDataplanePort implements OrganizationDataplanePort {
   readonly asked: string[] = [];
 
   constructor(private readonly endpoints: Record<string, string>) {
-    super();
   }
 
   dataplaneFor(organizationId: string): OrganizationDataplane {

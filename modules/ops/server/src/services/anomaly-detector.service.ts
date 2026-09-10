@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Anomaly } from "@langwatch/ops-contract";
-import type { AnomalyHardTierAlertPort } from "../ports/anomaly-hard-tier-alert.port.ts";
+import type { AnomalyHardTierAlertPort } from "../app/ops.app.ts";
 import type {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,

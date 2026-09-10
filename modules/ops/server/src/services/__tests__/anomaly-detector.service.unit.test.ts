@@ -2,7 +2,7 @@ import type { Anomaly } from "@langwatch/ops-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import { AnomalyHardTierAlertPort } from "../../ports/anomaly-hard-tier-alert.port.ts";
+import { AnomalyHardTierAlertPort } from "../../app/ops.app.ts";
 import {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,
@@ -60,7 +60,7 @@ class AnomalyStateFake extends AnomalyStateRepository {
   readonly list = vi.fn<() => Promise<Anomaly[]>>(async () => [...this.anomalies.values()]);
 }
 
-class HardTierAlertsFake extends AnomalyHardTierAlertPort {
+class HardTierAlertsFake implements AnomalyHardTierAlertPort {
   readonly notify = vi.fn<(anomaly: Anomaly) => Promise<void>>(async () => undefined);
 }
 

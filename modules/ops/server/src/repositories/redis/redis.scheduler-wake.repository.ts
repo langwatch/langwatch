@@ -1,4 +1,4 @@
-import { SchedulerWakePort } from "../../ports/scheduler-wake.port.ts";
+import { SchedulerWakePort } from "../../app/ops.app.ts";
 
 const SCHEDULER_WAKE_CHANNEL = "scheduler:wake";
 
@@ -7,9 +7,8 @@ export interface SchedulerWakeRedis {
 }
 
 /** Best-effort cross-process wake for the app-owned scheduler loop. */
-export class RedisSchedulerWakeRepository extends SchedulerWakePort {
+export class RedisSchedulerWakeRepository implements SchedulerWakePort {
   private constructor(private readonly redis: SchedulerWakeRedis) {
-    super();
   }
 
   static create(redis: SchedulerWakeRedis): RedisSchedulerWakeRepository {

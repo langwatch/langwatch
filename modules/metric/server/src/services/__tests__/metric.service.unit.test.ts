@@ -1,12 +1,12 @@
 import type { MetricDataPointPreparation } from "@langwatch/metric-contract";
 import { describe, expect, it } from "vitest";
 import {
-  MetricPreparationPort,
+  MetricPreparation,
   type MetricPreparationInput,
-} from "../../ports/metric-preparation.port.ts";
+} from "../../app/metric.infrastructure.ts";
 import { MetricService } from "../metric.service.ts";
 
-class RecordingPreparationPort extends MetricPreparationPort {
+class RecordingPreparationPort implements MetricPreparation {
   input: MetricPreparationInput | null = null;
 
   async prepare(input: MetricPreparationInput): Promise<MetricDataPointPreparation> {

@@ -31,7 +31,7 @@ vi.mock("@langwatch/observability", () => ({
 import type { StoredObjectStorageRepository } from "../../repositories/stored-object-storage.repository.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
-import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port.ts";
+import type { StoredObjectsTelemetry } from "../../app/stored-object.infrastructure.ts";
 import { StoredObjectsService } from "../stored-objects.service.ts";
 
 const PROJECT_ID = "proj-1";
@@ -72,7 +72,7 @@ function makeService(): StoredObjectsService {
       recordWriteFailure: vi.fn(),
       recordReadFailure: vi.fn(),
       observeSizeBytes: vi.fn(),
-    } as unknown as StoredObjectsTelemetryPort,
+    } as unknown as StoredObjectsTelemetry,
   });
 }
 

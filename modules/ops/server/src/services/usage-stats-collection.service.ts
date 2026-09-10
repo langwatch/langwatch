@@ -1,4 +1,4 @@
-import type { UsageStatsReport } from "../ports/usage-stats-worker.port.ts";
+import type { UsageStatsReport } from "../app/ops.app.ts";
 import type {
   UsageStatsClickHouseRepository,
   UsageStatsProjectRepository,

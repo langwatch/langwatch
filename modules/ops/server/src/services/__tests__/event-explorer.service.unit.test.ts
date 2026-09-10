@@ -8,7 +8,7 @@ import {
   OpsEventingIntrospectionPort,
   type OpsDejaViewProjection,
   type OpsProjectionMetadata,
-} from "../../ports/eventing-introspection.port.ts";
+} from "../../app/ops.app.ts";
 
 const DEFAULT_DEJA_VIEW: OpsDejaViewProjection[] = [
   {
@@ -21,7 +21,7 @@ const DEFAULT_DEJA_VIEW: OpsDejaViewProjection[] = [
   },
 ];
 
-class FakeIntrospection extends OpsEventingIntrospectionPort {
+class FakeIntrospection implements OpsEventingIntrospectionPort {
   dejaView: OpsDejaViewProjection[] = DEFAULT_DEJA_VIEW;
 
   killSwitches(): never[] {

@@ -10,13 +10,13 @@ import {
   type StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+import { StoredObjectLegacyLocationPort } from "../repositories/stored-object-legacy-location.repository.ts";
 import {
-  StoredObjectLegacyLocationPort,
   StoredObjectLegacySourcePort,
-  StoredObjectLegacyWriterDrainPort,
-  StoredObjectProjectSourcePort,
   type LegacyStoredObjectRow,
-} from "../ports/stored-object.port.ts";
+} from "../repositories/stored-object-legacy-source.repository.ts";
+import { StoredObjectLegacyWriterDrainPort } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
+import { StoredObjectProjectSourcePort } from "../repositories/stored-object-project-source.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,

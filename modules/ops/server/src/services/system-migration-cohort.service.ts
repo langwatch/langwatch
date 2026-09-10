@@ -3,7 +3,7 @@ import { organizationMigrates } from "../rules/ops-system-migration-cohort.rules
 import type {
   OrganizationDataplane,
   OrganizationDataplanePort,
-} from "../ports/organization-dataplane.port.ts";
+} from "../app/ops.app.ts";
 
 /** One organization's place in one migration's cohort, and where it lives. */
 export type OrganizationCohortAdmission = Readonly<{

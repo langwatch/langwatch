@@ -24,7 +24,7 @@ import type {
 } from "@langwatch/ops-contract";
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
-import { QueuePayloadDecoderPort } from "../../ports/queue-payload-decoder.port.ts";
+import { QueuePayloadDecoderPort } from "../../app/ops.app.ts";
 import { QueueRepository } from "../process/queue.repository.ts";
 import { nowInstant } from "@langwatch/time";
 import type {
@@ -38,7 +38,7 @@ import type {
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
 
-class NullQueuePayloadDecoder extends QueuePayloadDecoderPort {
+class NullQueuePayloadDecoder implements QueuePayloadDecoderPort {
   async tryDecode(): Promise<Record<string, unknown> | null> {
     return null;
   }

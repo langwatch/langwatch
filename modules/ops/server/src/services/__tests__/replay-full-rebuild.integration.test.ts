@@ -14,7 +14,7 @@ import {
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { OpsReplayRuntimePort, type OpsReplayRuntime } from "../../ports/replay-runtime.port.ts";
+import { OpsReplayRuntimePort, type OpsReplayRuntime } from "../../app/ops.app.ts";
 import { ReplayRedisRepository } from "../../repositories/redis/redis.replay.repository.ts";
 import { ReplayService } from "../replay.service.ts";
 

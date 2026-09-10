@@ -2,18 +2,18 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { AnomalyHardTierAlertPort } from "../../ports/anomaly-hard-tier-alert.port.ts";
+import type { AnomalyHardTierAlertPort } from "../../app/ops.app.ts";
 import {
   OpsWorkerPort,
   type OpsWorkerHandle,
   type UsageStatsWorkerConfig,
-} from "../../ports/ops-worker.port.ts";
+} from "../../app/ops.app.ts";
 import type {
   UsageStatsClickHouseClientResolverPort,
   UsageStatsErrorReporterPort,
   UsageStatsTelemetryClientPort,
   UsageStatsWorkerDatabase,
-} from "../../ports/usage-stats-worker.port.ts";
+} from "../../app/ops.app.ts";
 import { ClickHouseUsageStatsRepository } from "../clickhouse/clickhouse.usage-stats.repository.ts";
 import { PrismaUsageStatsOrganizationRepository } from "./prisma.usage-stats-organization.repository.ts";
 import { PrismaUsageStatsProjectRepository } from "./prisma.usage-stats-project.repository.ts";
@@ -23,10 +23,10 @@ import { UsageStatsCollectionService } from "../../services/usage-stats-collecti
 import {
   AnomalyWorkerContributionAdapter,
   UsageStatsWorkerContributionAdapter,
-} from "../../adapters/ops-worker-contribution.adapter.ts";
+} from "../../services/ops-worker-contribution.service.ts";
 import { RedisAnomalyRateTrackerRepository } from "../redis/redis.anomaly-rate-tracker.repository.ts";
 import { RedisOpsSnapshotRedisRepository } from "../redis/redis.ops-snapshot-redis.repository.ts";
-import { QueueOpsMetricsSourceAdapter } from "../../adapters/queue.ops-queue-metrics-source.adapter.ts";
+import { QueueOpsMetricsSourceAdapter } from "../../services/queue.ops-queue-metrics-source.service.ts";
 import { RedisOpsSnapshotRepository } from "../redis/redis.ops-snapshot.repository.ts";
 import { DefaultOpsSnapshotService } from "../../services/ops-snapshot-reader.service.ts";
 import { QueueRedisRepository } from "../redis/queue.repository.ts";
@@ -58,9 +58,8 @@ export interface OpsWorkerAdapterOptions {
 }
 
 /** Composes the complete Ops worker graph from injected infrastructure. */
-export class PrismaOpsWorkerRepository extends OpsWorkerPort {
+export class PrismaOpsWorkerRepository implements OpsWorkerPort {
   private constructor(private readonly options: OpsWorkerAdapterOptions) {
-    super();
   }
 
   static create(options: OpsWorkerAdapterOptions): PrismaOpsWorkerRepository {

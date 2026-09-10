@@ -6,7 +6,7 @@ import {
   tryParseDetailSnapshot,
   tryParseLiveSnapshot,
 } from "@langwatch/ops-contract";
-import { OpsSnapshotRedisPort } from "../../ports/ops-snapshot-redis.port.ts";
+import { OpsSnapshotRedisPort } from "../../app/ops.app.ts";
 import { OpsSnapshotRepository } from "../observe/ops-snapshot.repository.ts";
 
 /**

@@ -1,14 +1,13 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
-import { OpsSnapshotRedisPort } from "../../ports/ops-snapshot-redis.port.ts";
+import { OpsSnapshotRedisPort } from "../../app/ops.app.ts";
 
 /** The snapshot store's four commands over a live connection. */
-export class RedisOpsSnapshotRedisRepository extends OpsSnapshotRedisPort {
+export class RedisOpsSnapshotRedisRepository implements OpsSnapshotRedisPort {
   static create(redis: IORedis | Cluster): RedisOpsSnapshotRedisRepository {
     return new RedisOpsSnapshotRedisRepository(redis);
   }
 
   private constructor(private readonly redis: IORedis | Cluster) {
-    super();
   }
 
   eval(script: string, numberOfKeys: number, ...args: string[]): Promise<unknown> {

@@ -1,4 +1,4 @@
-import type { UsageStatsProjectDatabase, UsageStatsProjectCounts } from "../../ports/usage-stats-worker.port.ts";
+import type { UsageStatsProjectDatabase, UsageStatsProjectCounts } from "../../app/ops.app.ts";
 import { UsageStatsProjectRepository } from "../observe/usage-stats.repository.ts";
 
 export class PrismaUsageStatsProjectRepository extends UsageStatsProjectRepository {

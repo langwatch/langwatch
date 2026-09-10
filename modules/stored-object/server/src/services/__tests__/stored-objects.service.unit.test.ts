@@ -46,7 +46,7 @@ import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import type { StoredObjectStorageRepository } from "../../repositories/stored-object-storage.repository.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
-import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port.ts";
+import type { StoredObjectsTelemetry } from "../../app/stored-object.infrastructure.ts";
 import type { MintStorageUri } from "../stored-objects.service.ts";
 import { deriveStoredObjectId, StoredObjectsService } from "../stored-objects.service.ts";
 
@@ -73,14 +73,14 @@ function makeRegistry(): StoredObjectStorageRepository {
   } as unknown as StoredObjectStorageRepository;
 }
 
-function makeTelemetry(): StoredObjectsTelemetryPort {
+function makeTelemetry(): StoredObjectsTelemetry {
   return {
     recordExtract: vi.fn(),
     recordDedupHit: vi.fn(),
     recordWriteFailure: vi.fn(),
     recordReadFailure: vi.fn(),
     observeSizeBytes: vi.fn(),
-  } as unknown as StoredObjectsTelemetryPort;
+  } as unknown as StoredObjectsTelemetry;
 }
 
 function makeRow(overrides: Partial<StoredObject> = {}): StoredObject {

@@ -15,13 +15,13 @@ import type { UserApi } from "@langwatch/user-contract";
 import { OpsApp, type OpsAppInfrastructure, type OpsCapability } from "../ops.app.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
-import { OpsEventingIntrospectionPort } from "../../ports/eventing-introspection.port.ts";
+import { OpsEventingIntrospectionPort } from "../ops.app.ts";
 
 /** The staff address every fixture operator is measured against. */
 export const OPS_STAFF_ADDRESS = "staff@langwatch.ai";
 
 /** Nothing registered: the graph a test does not care about. */
-class EmptyOpsIntrospection extends OpsEventingIntrospectionPort {
+class EmptyOpsIntrospection implements OpsEventingIntrospectionPort {
   projections() {
     return [];
   }

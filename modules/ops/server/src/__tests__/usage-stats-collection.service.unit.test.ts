@@ -4,7 +4,7 @@ import {
   UsageStatsClickHouseClientResolverPort,
   type UsageStatsClickHouseQuery,
 } from "../index.ts";
-import type { UsageStatsProjectDatabase, UsageStatsProjectCounts } from "../ports/usage-stats-worker.port.ts";
+import type { UsageStatsProjectDatabase, UsageStatsProjectCounts } from "../app/ops.app.ts";
 import {
   UsageStatsClickHouseRepository,
   UsageStatsProjectRepository,
@@ -43,11 +43,11 @@ class CountsFake extends UsageStatsClickHouseRepository {
   readonly findScenarioRunCount = vi.fn(async () => 75);
 }
 
-class ClickHouseClientFake extends UsageStatsClickHouseClientPort {
+class ClickHouseClientFake implements UsageStatsClickHouseClientPort {
   readonly query = vi.fn<(input: UsageStatsClickHouseQuery) => ReturnType<typeof queryResult>>();
 }
 
-class ClickHouseClientsFake extends UsageStatsClickHouseClientResolverPort {
+class ClickHouseClientsFake implements UsageStatsClickHouseClientResolverPort {
   readonly tryResolve =
     vi.fn<(organizationId: string) => Promise<UsageStatsClickHouseClientPort | null>>();
 }

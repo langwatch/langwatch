@@ -3,7 +3,7 @@ export { ClickhouseMetricProcessingRepository as ClickHouseMetricProcessingAdapt
 export {
   type MetricProcessingPipeline,
   resolveMetricCommandShardCount,
-} from "./adapters/metric-processing.adapter.ts";
+} from "./services/metric-processing.service.ts";
 
 /**
  * The OTLP METRIC signal's collection: one export request in, metric

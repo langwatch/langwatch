@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AbsentPayloadStagingAdapter,
   PayloadStagingUnavailableError,
-} from "#adapters/absent.payload-staging.adapter";
+} from "#services/absent-payload-staging.service";
 import { PayloadStagingS3TargetPort, S3PayloadStagingAdapter } from "#repositories/s3/s3.payload-staging.repository";
 
 function s3(): { client: S3Client; sent: unknown[] } {

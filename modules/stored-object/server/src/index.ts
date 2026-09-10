@@ -32,13 +32,13 @@ export {
   StoredObjectAzureDestinationPort,
   StoredObjectProjectS3ConfigPort,
   type StoredObjectStorageSelection,
-} from "./adapters/stored-object-destination-policy.adapter.ts";
-export { StoredObjectStorageRegistryAdapter } from "./adapters/stored-object-storage-registry.adapter.ts";
+} from "./services/stored-object-destination-policy.service.ts";
+export { StoredObjectStorageRegistryAdapter } from "./services/stored-object-storage-registry.service.ts";
 export type {
   StoredObjectStorageDriver,
   StoredObjectStorageDriverFactory,
 } from "./repositories/stored-object-blob.repository.ts";
-export { StoredObjectStoragePortAdapter } from "./adapters/stored-object-storage.port.adapter.ts";
+export { StoredObjectStoragePortAdapter } from "./services/stored-object-storage.service.ts";
 export { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
 export {
   ALLOW_INSECURE_TOKEN_ENDPOINT_ENV,
@@ -48,18 +48,18 @@ export {
   type AzureCredentials,
   type AzureInjectedIdentity,
   type AzureTokenAuthMode,
-} from "./adapters/azure-blob-credentials.adapter.ts";
+} from "./services/azure-blob-credentials.service.ts";
 export {
   AzureBlobTokenProviderAdapter,
   AzureTokenExchangeError,
   type TokenModeCredentials,
-} from "./adapters/azure-blob-token-provider.adapter.ts";
+} from "./services/azure-blob-token-provider.service.ts";
 export {
   StoredObjectProjectDestinationResolverPort,
   StoredObjectStorageRuntimeAdapter,
   type StoredObjectStorageProject,
   type StoredObjectStorageRuntimeOptions,
-} from "./adapters/stored-object-storage-runtime.adapter.ts";
+} from "./services/stored-object-storage-runtime.service.ts";
 export {
   ClickHouseImportStoredObjectMigration,
   STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME,
@@ -67,38 +67,40 @@ export {
 } from "./migrations/clickhouse-import.stored-object.migration.ts";
 export {
   StoredObjectDeliveryPort,
-  StoredObjectLegacyLocationPort,
-  StoredObjectLegacySourcePort,
-  StoredObjectLegacyWriterDrainPort,
-  StoredObjectProjectSourcePort,
   StoredObjectStoragePort,
   StoredObjectUploadTokenPort,
-  type LegacyStoredObjectRow,
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
-} from "./ports/stored-object.port.ts";
+} from "./app/stored-object.infrastructure.ts";
+export { StoredObjectLegacyLocationPort } from "./repositories/stored-object-legacy-location.repository.ts";
+export {
+  StoredObjectLegacySourcePort,
+  type LegacyStoredObjectRow,
+} from "./repositories/stored-object-legacy-source.repository.ts";
+export { StoredObjectLegacyWriterDrainPort } from "./repositories/stored-object-legacy-writer-drain.repository.ts";
+export { StoredObjectProjectSourcePort } from "./repositories/stored-object-project-source.repository.ts";
 export {
   StoredObjectOwnerInstanceDirectoryRepository as StoredObjectOwnerInstanceDirectoryPort,
   type StoredObjectOwnerClickHouseClient,
   type StoredObjectOwnerClickHouseInstance,
 } from "./repositories/stored-object-owner-instance-directory.repository.ts";
 export {
-  StoredObjectOwnerLookupTelemetryPort,
+  type StoredObjectOwnerLookupTelemetry as StoredObjectOwnerLookupTelemetryPort,
   type StoredObjectOwnerLookupSpan,
-} from "./ports/stored-object-owner-lookup-telemetry.port.ts";
+} from "./app/stored-object.infrastructure.ts";
 /**
  * The CONTENT-ADDRESSED store, moved here whole from the platform application.
  */
 export {
-  StoredObjectsClickHousePort,
+  type StoredObjectsClickHouse as StoredObjectsClickHousePort,
   type StoredObjectsClickHouseClient,
-} from "./ports/stored-objects-clickhouse.port.ts";
-export { StoredObjectsTelemetryPort } from "./ports/stored-objects-telemetry.port.ts";
+} from "./app/stored-object.infrastructure.ts";
+export { type StoredObjectsTelemetry as StoredObjectsTelemetryPort } from "./app/stored-object.infrastructure.ts";
 export {
-  StoredObjectS3TargetPort,
+  type StoredObjectS3TargetPort,
   type StoredObjectS3Credentials,
   type StoredObjectS3Target,
-} from "./ports/stored-object-s3-target.port.ts";
+} from "./app/stored-object.infrastructure.ts";
 export { storedObjectSchema, type StoredObject } from "./rules/stored-object-row.rules.ts";
 export {
   StoredObjectsService,
@@ -106,7 +108,7 @@ export {
   type MintStorageUri,
   type StoredObjectsServiceOptions,
 } from "./services/stored-objects.service.ts";
-export { PrometheusStoredObjectsTelemetryAdapter } from "./adapters/prometheus.stored-objects-telemetry.adapter.ts";
+export { PrometheusStoredObjectsTelemetryAdapter } from "./services/prometheus.stored-objects-telemetry.service.ts";
 export { StoredObjectBlobFilesystemRepository } from "#repositories/filesystem/filesystem.stored-object-blob.repository";
 export {
   StoredObjectBlobS3Repository,
@@ -149,7 +151,7 @@ export {
 export {
   GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
-} from "./adapters/group-queue.object-storage-migration.adapter.ts";
+} from "./services/group-queue.object-storage-migration.service.ts";
 export { PayloadStagingPort, type StagedPayload } from "./repositories/payload-staging.repository.ts";
 export {
   PayloadStagingS3TargetPort,
@@ -159,4 +161,4 @@ export {
 export {
   AbsentPayloadStagingAdapter,
   PayloadStagingUnavailableError,
-} from "./adapters/absent.payload-staging.adapter.ts";
+} from "./services/absent-payload-staging.service.ts";

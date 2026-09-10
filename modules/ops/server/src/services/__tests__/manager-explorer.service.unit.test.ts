@@ -8,11 +8,11 @@ import { MemoryProcessOpsRepository } from "../../repositories/memory/memory.pro
 import {
   OpsEventingIntrospectionPort,
   type OpsProcessManagerMetadata,
-} from "../../ports/eventing-introspection.port.ts";
+} from "../../app/ops.app.ts";
 
 const metadataMock = vi.fn<() => OpsProcessManagerMetadata[]>(() => []);
 
-class FakeIntrospection extends OpsEventingIntrospectionPort {
+class FakeIntrospection implements OpsEventingIntrospectionPort {
   killSwitches(): never[] {
     return [];
   }

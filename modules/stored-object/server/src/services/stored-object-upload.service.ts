@@ -22,7 +22,7 @@ import {
   type StoredObjectsCreateUploadOutput,
 } from "@langwatch/stored-object-contract";
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
-import type { StoredObjectUploadTokenClaims } from "../ports/stored-object.port.ts";
+import type { StoredObjectUploadTokenClaims } from "../app/stored-object.infrastructure.ts";
 import type { StoredObjectRecord } from "../repositories/stored-object-record.repository.ts";
 import type { StoredObjectServiceOptions } from "./stored-object.service.ts";
 import { type Instant, Temporal, toDate } from "@langwatch/time";

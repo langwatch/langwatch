@@ -16,7 +16,7 @@ import type {
   ProcessWakeRow,
 } from "@langwatch/ops-contract";
 import type { ProcessOpsRepository } from "../repositories/process/process-ops.repository.ts";
-import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
+import type { OpsEventingIntrospectionPort } from "../app/ops.app.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**

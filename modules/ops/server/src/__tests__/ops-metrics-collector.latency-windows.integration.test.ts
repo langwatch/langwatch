@@ -12,7 +12,7 @@ import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metri
 import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
-import type { OpsSnapshotRedisPort } from "../ports/ops-snapshot-redis.port.ts";
+import type { OpsSnapshotRedisPort } from "../app/ops.app.ts";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;

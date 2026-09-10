@@ -8,7 +8,7 @@ import type { ProcessNameCounts } from "../../repositories/process/process-ops.r
 import {
   OpsEventingIntrospectionPort,
   type OpsProcessManagerMetadata,
-} from "../../ports/eventing-introspection.port.ts";
+} from "../../app/ops.app.ts";
 
 function fakeStore(): ProcessStore {
   return {
@@ -51,7 +51,7 @@ function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = 
     hasWake: true,
   }));
 
-  class FakeIntrospection extends OpsEventingIntrospectionPort {
+  class FakeIntrospection implements OpsEventingIntrospectionPort {
     killSwitches(): never[] {
       return [];
     }

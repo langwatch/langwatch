@@ -12,8 +12,8 @@ import {
   migrationRunsOnThisInstallation,
   userMigrates,
 } from "../rules/ops-system-migration-cohort.rules.ts";
-import { NullOrganizationDataplaneAdapter } from "../adapters/null.organization-dataplane.adapter.ts";
-import type { OrganizationDataplanePort } from "../ports/organization-dataplane.port.ts";
+import { NullOrganizationDataplaneAdapter } from "../services/null.organization-dataplane.service.ts";
+import type { OrganizationDataplanePort } from "./ops.app.ts";
 import { SystemMigrationCohortService } from "../services/system-migration-cohort.service.ts";
 import { PrismaMigrationMembershipRepository } from "../repositories/prisma/prisma.migration-membership.repository.ts";
 import { PrismaUserTenantSourceRepository } from "../repositories/prisma/prisma.user-tenant-source.repository.ts";

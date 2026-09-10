@@ -24,14 +24,14 @@ import { NullBlobStoreRepository } from "../repositories/admin/blob-store.reposi
 import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.admin-backoffice.repository.ts";
 import { AdminBackofficeService } from "../services/admin-backoffice.service.ts";
 import type { SchedulerOpsRepository } from "../repositories/process/scheduler-ops.repository.ts";
-import type { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
+import type { SchedulerWakePort } from "./ops.app.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
-import { QueueAuditAdapter } from "../adapters/audit-log.queue-audit.adapter.ts";
+import { QueueAuditAdapter } from "../services/audit-log.queue-audit.service.ts";
 import { NullQueueRepository } from "../repositories/process/queue.repository.ts";
 import { QueueService } from "../services/queue.service.ts";
-import type { QueuePayloadDecoderPort } from "../ports/queue-payload-decoder.port.ts";
+import type { QueuePayloadDecoderPort } from "./ops.app.ts";
 import {
   PrismaSchedulerAuditRepository,
   type SchedulerAuditDatabase,

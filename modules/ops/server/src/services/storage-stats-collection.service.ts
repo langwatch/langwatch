@@ -5,7 +5,7 @@
 
 import { createLogger } from "@langwatch/observability";
 
-import type { StorageStatsMetricsPort } from "../ports/storage-stats-metrics.port.ts";
+import type { StorageStatsMetricsPort } from "../app/ops.app.ts";
 import { toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:storage-stats");

@@ -2,8 +2,8 @@ import {
   StoredObjectOwnerLookupUnavailableError,
   StoredObjectOwnerResolver,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectOwnerLookupSpan } from "../ports/stored-object-owner-lookup-telemetry.port.ts";
-import { StoredObjectOwnerLookupTelemetryPort } from "../ports/stored-object-owner-lookup-telemetry.port.ts";
+import type { StoredObjectOwnerLookupSpan } from "../app/stored-object.infrastructure.ts";
+import { StoredObjectOwnerLookupTelemetry } from "../app/stored-object.infrastructure.ts";
 import {
   StoredObjectOwnerRepository,
   type StoredObjectOwnerLookupResult,
@@ -16,14 +16,14 @@ import {
 export class StoredObjectOwnerLookupService extends StoredObjectOwnerResolver {
   static create(input: {
     repository: StoredObjectOwnerRepository;
-    telemetry: StoredObjectOwnerLookupTelemetryPort;
+    telemetry: StoredObjectOwnerLookupTelemetry;
   }): StoredObjectOwnerLookupService {
     return new StoredObjectOwnerLookupService(input.repository, input.telemetry);
   }
 
   private constructor(
     private readonly repository: StoredObjectOwnerRepository,
-    private readonly telemetry: StoredObjectOwnerLookupTelemetryPort,
+    private readonly telemetry: StoredObjectOwnerLookupTelemetry,
   ) {
     super();
   }

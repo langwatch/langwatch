@@ -7,7 +7,7 @@ import {
 import {
   MetricProcessingAdapter,
   type MetricProcessingPipeline,
-} from "../../adapters/metric-processing.adapter.ts";
+} from "../../services/metric-processing.service.ts";
 
 /**
  * Durable metric processing, composed from nothing but a tenant-keyed

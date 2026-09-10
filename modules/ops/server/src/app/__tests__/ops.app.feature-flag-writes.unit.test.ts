@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   OpsEventingIntrospectionPort,
   type OpsKillSwitchDescriptor,
-} from "../../ports/eventing-introspection.port.ts";
+} from "../ops.app.ts";
 import type { OpsApp, OpsCapability } from "../ops.app.ts";
 import { createOpsTestApp } from "./ops.fixture.ts";
 
@@ -22,7 +22,7 @@ const liveSwitch: OpsKillSwitchDescriptor = {
   pipelineName: "trace-processing",
 };
 
-class OneSwitchIntrospection extends OpsEventingIntrospectionPort {
+class OneSwitchIntrospection implements OpsEventingIntrospectionPort {
   projections() {
     return [];
   }

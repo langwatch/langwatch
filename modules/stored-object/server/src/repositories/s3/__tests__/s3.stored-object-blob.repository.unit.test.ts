@@ -9,7 +9,7 @@ import {
   ObjectNotFoundError,
   UnsupportedStorageSchemeError,
 } from "@langwatch/stored-object-contract";
-import { StoredObjectS3TargetPort } from "#ports/stored-object-s3-target.port";
+import type { StoredObjectS3TargetPort } from "../../../app/stored-object.infrastructure.ts";
 import { StoredObjectBlobS3Repository } from "#repositories/s3/s3.stored-object-blob.repository";
 
 // ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ function makeMockS3Client() {
 }
 
 /** The one project this suite resolves, on the deployment's shared endpoint. */
-class FixedS3Target extends StoredObjectS3TargetPort {
+class FixedS3Target implements StoredObjectS3TargetPort {
   async resolve() {
     return { region: "auto" };
   }

@@ -5,7 +5,7 @@ import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 import type { ReplayRepository } from "../repositories/process/replay.repository.ts";
-import type { OpsReplayRuntime, OpsReplayRuntimePort } from "../ports/replay-runtime.port.ts";
+import type { OpsReplayRuntime, OpsReplayRuntimePort } from "../app/ops.app.ts";
 import { ReplayLockHeartbeatService } from "./replay-lock-heartbeat.service.ts";
 import { nowInstant } from "@langwatch/time";
 

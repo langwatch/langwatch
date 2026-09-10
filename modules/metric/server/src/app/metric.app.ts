@@ -6,7 +6,7 @@ import {
 } from "@langwatch/metric-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import { CanonicalMetricAdapter } from "../adapters/canonical-metric.adapter.ts";
+import { CanonicalMetricAdapter } from "../services/canonical-metric.service.ts";
 import { MetricService } from "../services/metric.service.ts";
 
 export type MetricInfrastructure = Readonly<Record<never, never>>;

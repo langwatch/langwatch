@@ -21,7 +21,7 @@ import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
-import { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
+import { OpsEventingIntrospectionPort } from "../app/ops.app.ts";
 
 /** The audit log this suite records on: the same rows, written straight to Postgres. */
 class PrismaAuditLogTestSink implements AuditLogApi {
@@ -48,7 +48,7 @@ class PrismaAuditLogTestSink implements AuditLogApi {
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
-class NoopIntrospection extends OpsEventingIntrospectionPort {
+class NoopIntrospection implements OpsEventingIntrospectionPort {
   killSwitches() {
     return [];
   }

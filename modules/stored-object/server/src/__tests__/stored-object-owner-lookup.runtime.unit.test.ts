@@ -9,7 +9,7 @@ import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-objec
 
 const resolveInstances = vi.fn();
 
-class RecordingTelemetry extends StoredObjectOwnerLookupTelemetryPort {
+class RecordingTelemetry implements StoredObjectOwnerLookupTelemetryPort {
   readonly attributes = new Map<string, string | number | boolean>();
   readonly inputIds: string[] = [];
 

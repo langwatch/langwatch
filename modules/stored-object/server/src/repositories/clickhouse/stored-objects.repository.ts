@@ -3,7 +3,7 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { StoredObjectsClickHousePort } from "../../ports/stored-objects-clickhouse.port.ts";
+import type { StoredObjectsClickHouse } from "../../app/stored-object.infrastructure.ts";
 import { StoredObjectsRepository } from "../stored-objects.repository.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import { storedObjectSchema } from "../../rules/stored-object-row.rules.ts";
@@ -17,7 +17,7 @@ const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
  * ClickHouse repository for stored_objects rows.
  */
 export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
-  static create(clickhouse: StoredObjectsClickHousePort): ClickHouseStoredObjectsRepository {
+  static create(clickhouse: StoredObjectsClickHouse): ClickHouseStoredObjectsRepository {
     return new ClickHouseStoredObjectsRepository(clickhouse);
   }
 
@@ -26,7 +26,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
    * a private-route tenant's rows live on its own cluster, so which client
    * answers is a function of the project the read names.
    */
-  private constructor(private readonly clickhouse: StoredObjectsClickHousePort) {
+  private constructor(private readonly clickhouse: StoredObjectsClickHouse) {
     super();
   }
 

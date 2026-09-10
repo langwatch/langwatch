@@ -29,7 +29,7 @@ import type {
   StoredObjectDeliveryPort,
   StoredObjectStoragePort,
   StoredObjectUploadTokenPort,
-} from "../ports/stored-object.port.ts";
+} from "./stored-object.infrastructure.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
 

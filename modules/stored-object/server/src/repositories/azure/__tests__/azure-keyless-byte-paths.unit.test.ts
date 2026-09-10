@@ -24,17 +24,17 @@ import {
   AzureBackendMisconfiguredError,
   type AzureBlobCredentialsConfig,
   type AzureInjectedIdentity,
-} from "#adapters/azure-blob-credentials.adapter";
-import { AzureBlobCredentialsAdapter } from "#adapters/azure-blob-credentials.adapter";
+} from "#services/azure-blob-credentials.service";
+import { AzureBlobCredentialsAdapter } from "#services/azure-blob-credentials.service";
 const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
-import { AzureBlobTokenProviderAdapter } from "#adapters/azure-blob-token-provider.adapter";
+import { AzureBlobTokenProviderAdapter } from "#services/azure-blob-token-provider.service";
 const { resetAzureTokenCacheForTests } = AzureBlobTokenProviderAdapter;
 import {
   StoredObjectAzureDestinationPort,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
-} from "#adapters/stored-object-destination-policy.adapter";
-import { StoredObjectStorageRegistryAdapter } from "#adapters/stored-object-storage-registry.adapter";
+} from "#services/stored-object-destination-policy.service";
+import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 
 const PROJECT_ID = "proj-1";
 const HISTORICAL_URI = `azure-blob://lwacct/written-long-ago/${PROJECT_ID}/abc123`;

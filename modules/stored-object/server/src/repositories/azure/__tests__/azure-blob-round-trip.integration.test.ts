@@ -14,8 +14,8 @@ import {
   StoredObjectAzureDestinationPort,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
-} from "#adapters/stored-object-destination-policy.adapter";
-import { StoredObjectStorageRegistryAdapter } from "#adapters/stored-object-storage-registry.adapter";
+} from "#services/stored-object-destination-policy.service";
+import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 import { StoredObjectsService } from "#services/stored-objects.service";
 import type { StoredObject } from "#rules/stored-object-row.rules";
 import type { StoredObjectsRepository } from "#repositories/stored-objects.repository";

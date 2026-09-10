@@ -26,7 +26,7 @@ import {
   StoredObjectStoragePort,
   StoredObjectUploadTokenPort,
   type StoredObjectStorageAddress,
-} from "../ports/stored-object.port.ts";
+} from "../app/stored-object.infrastructure.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,

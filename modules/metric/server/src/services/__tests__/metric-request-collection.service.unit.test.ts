@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
-import { CanonicalMetricAdapter } from "../../adapters/canonical-metric.adapter.ts";
+import { CanonicalMetricAdapter } from "../canonical-metric.service.ts";
 import { MetricService } from "../metric.service.ts";
 import type { RecordMetricCorrelationCommandData } from "@langwatch/trace-contract";
 import {
   type MetricRequestCollectionResult,
   MetricRequestCollectionService,
 } from "../metric-request-collection.service.ts";
-import type { MetricRedactionPort } from "../../ports/metric-redaction.port.ts";
+import type { MetricRedaction } from "../../app/metric.infrastructure.ts";
 
 /** The request context below asks for no redaction, so the port never rewrites. */
-const disabledRedaction: MetricRedactionPort = { redactMetricAttributes: async () => {} };
+const disabledRedaction: MetricRedaction = { redactMetricAttributes: async () => {} };
 
 /** Narrows the result union so a test can assert on the collected counters. */
 function expectCollected(

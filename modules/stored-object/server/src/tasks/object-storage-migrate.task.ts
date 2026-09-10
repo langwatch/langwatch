@@ -7,8 +7,8 @@ import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.st
 import {
   type AzureCredentials,
   type AzureInjectedIdentity,
-} from "#adapters/azure-blob-credentials.adapter";
-import { AzureBlobCredentialsAdapter } from "#adapters/azure-blob-credentials.adapter";
+} from "#services/azure-blob-credentials.service";
+import { AzureBlobCredentialsAdapter } from "#services/azure-blob-credentials.service";
 const { assertTokenModeTransportSafety } = AzureBlobCredentialsAdapter;
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import { z } from "zod";

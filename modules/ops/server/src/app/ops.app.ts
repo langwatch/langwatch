@@ -39,30 +39,7 @@ import type {
 import { listFeatureFlags } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import type { OpsService } from "../services/ops.service.ts";
-import type {
-  AdminIdentity,
-  AggregateDiscovery,
-  AggregateEventView,
-  AggregateProcessManager,
-  AggregateSearchResult,
-  Anomaly,
-  AnomalyKind,
-  DashboardData,
-  DeadLetterCount,
-  GroupInfo,
-  DeadOutboxMessageView,
-  OpsSnapshotService,
-  OutboxAttemptView,
-  ProcessAuditEntryView,
-  ProcessFleetSummary,
-  ProcessInstanceDetail,
-  ProcessInstanceRow,
-  ProcessOutboxMessageView,
-  ProcessWakeRow,
-  ProjectionStateAtEvent,
-  ReplayHistoryEntry,
-  ReplayStatus,
-} from "@langwatch/ops-contract";
+import type { AdminIdentity, AggregateDiscovery, AggregateEventView, AggregateProcessManager, AggregateSearchResult, Anomaly, AnomalyKind, DashboardData, DeadLetterCount, DeadOutboxMessageView, GroupInfo, OpsSnapshotService, OutboxAttemptView, ProcessAuditEntryView, ProcessFleetSummary, ProcessInstanceDetail, ProcessInstanceRow, ProcessOutboxMessageView, ProcessWakeRow, ProjectionStateAtEvent, ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 import type {
   BugReport,
   BugReportListing,
@@ -98,16 +75,17 @@ import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
-import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
+import type { OpsEventingIntrospectionPort } from "./ops.app.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { timingSafeEqual } from "node:crypto";
-import { nowInstant } from "@langwatch/time";
+import { Instant, nowInstant } from "@langwatch/time";
 import {
   buildExplainQuery,
   redactQueryForAudit,
 } from "../rules/ops-clickhouse-explain.rules.ts";
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
 
+import type { RegisteredFoldProjection, RegisteredMapProjection, RegisteredStateProjection, ReplayService as EventingReplayService } from "@langwatch/eventing";
 /**
  * Who an operator request is attributed to: the impersonator where there is
  * one, so a back-office read is recorded against the human who made it rather
@@ -402,6 +380,18 @@ export interface OpsAppInfrastructure {
    * package reads none.
    */
   isProduction: boolean;
+  anomalyHardTierAlert: AnomalyHardTierAlertPort;
+  opsReplayRuntime: OpsReplayRuntimePort;
+  opsSnapshotRedis: OpsSnapshotRedisPort;
+  opsWorker: OpsWorkerPort;
+  organizationDataplane: OrganizationDataplanePort;
+  queuePayloadDecoder: QueuePayloadDecoderPort;
+  schedulerWake: SchedulerWakePort;
+  storageStatsMetrics: StorageStatsMetricsPort;
+  usageStatsClickHouseClient: UsageStatsClickHouseClientPort;
+  usageStatsClickHouseClientResolver: UsageStatsClickHouseClientResolverPort;
+  usageStatsErrorReporter: UsageStatsErrorReporterPort;
+  usageStatsTelemetryClient: UsageStatsTelemetryClientPort;
 }
 type OpsRuntimeDependencies = Readonly<{
   ops: OpsCapability;
@@ -1336,4 +1326,346 @@ export class OpsApp implements OpsApi {
     if (this.#dependencies.eventingIntrospection.killSwitches().some((d) => d.key === key)) return;
     throw new OpsUnknownFeatureFlagError(key);
   }
+}
+
+/** External alert delivery for a newly surfaced hard-tier anomaly. */
+export interface AnomalyHardTierAlertPort {
+  notify(anomaly: Anomaly): Promise<void>;
+}
+
+/**
+ * The live pipeline surface the ops explorers read.
+ *
+ * The application derived these off a module-global registry backed by
+ * `getApp().eventSourcing.definitions`; a package may not reach a process
+ * global, so the walk is an adapter over the definitions the composition
+ * already holds and this is the seam the explorers take.
+ */
+export interface OpsProjectionMetadata {
+  projectionName: string;
+  pipelineName: string;
+  aggregateType: string;
+  source: "pipeline" | "global";
+  pauseKey: string;
+  kind: "fold" | "map" | "state";
+}
+
+export interface OpsProcessManagerMetadata {
+  processName: string;
+  pipelineName: string;
+  aggregateType: string;
+  /** Event types that drive the machine's transitions. */
+  eventTypes: readonly string[];
+  /**
+   * Intent types the machine can emit — its cross-aggregate commands,
+   * dispatched through the transactional outbox.
+   */
+  intentTypes: string[];
+  /**
+   * True for a fixed-interval singleton (one instance, project `__global__`);
+   * false for a per-aggregate machine keyed by aggregate id.
+   */
+  scheduled: boolean;
+  /** Fixed wake interval in ms for a scheduled singleton, else null. */
+  everyMs: number | null;
+  /** True when the machine computes its own wake-ups from within `evolve`. */
+  hasWake: boolean;
+}
+
+export interface OpsDejaViewProjection {
+  projectionName: string;
+  eventTypes: readonly string[];
+  init: () => unknown;
+  apply: (state: unknown, event: { type: string }) => unknown;
+}
+
+/**
+ * One togglable kill switch the live pipeline graph will read at runtime.
+ * Advertised before any row exists, because a write refuses a key that is
+ * neither a registry entry nor a live descriptor.
+ */
+export interface OpsKillSwitchDescriptor {
+  key: string;
+  aggregateType: string;
+  componentType: "projection" | "mapProjection" | "command" | "subscriber";
+  componentName: string;
+  pipelineName: string;
+}
+
+
+export interface OpsEventingIntrospectionPort {
+  /** Every fold, map and state projection mounted across the pipelines. */
+  projections(): OpsProjectionMetadata[];
+
+  /** Every kill-switch key the mounted components will consult at runtime. */
+  killSwitches(): OpsKillSwitchDescriptor[];
+
+  /** The process-manager state machines mounted across the pipelines. */
+  processManagers(): OpsProcessManagerMetadata[];
+
+  /**
+   * The fold projections a DejaView replay can re-run in memory, carrying
+   * their `init`/`apply` so the explorer can rebuild state without a store.
+   */
+  dejaViewProjections(): OpsDejaViewProjection[];
+}
+
+
+export interface OpsSnapshotRedisPort {
+  eval(script: string, numberOfKeys: number, ...args: string[]): Promise<unknown>;
+  set(
+    key: string,
+    value: string,
+    expiryMode: "EX",
+    expirySeconds: number,
+    condition: "NX",
+  ): Promise<unknown>;
+  tryGet(key: string): Promise<string | null>;
+  incr(key: string): Promise<number>;
+}
+
+export interface OpsWorkerHandle {
+  stop(): void | Promise<void>;
+}
+
+export interface UsageStatsWorkerConfig {
+  disabled: boolean;
+  installMethod: string;
+  hostname: string | undefined;
+  environment: string | undefined;
+  now: () => Instant;
+}
+
+/** Process controls for the complete Ops worker graph. */
+export interface OpsWorkerPort {
+  tryStartAnomalyWorker(): OpsWorkerHandle | undefined;
+  tryStartUsageStatsWorker(): OpsWorkerHandle | undefined;
+  /**
+   * The fleet's queue-metrics writer. One process publishes the snapshot every other one reads, so
+   * the handle's `stop` hands the lease back rather than letting the fleet wait out its TTL.
+   */
+  tryStartQueueMetricsWriter(): OpsWorkerHandle | undefined;
+}
+
+/**
+ * Where one organization's data lives.
+ *
+ * The answer used to decide whether an organization ran at all, which on the
+ * automatic axis would have stranded exactly the private-dataplane customers
+ * on the legacy path forever.
+ *
+ * It decides nothing now. These migrations are rooted in the organization and
+ * the routing places an organization-rooted append on that organization's own
+ * instance, so the dataplane is what a pass REPORTS, not what it filters by.
+ */
+export type OrganizationDataplane =
+  | Readonly<{ kind: "shared" }>
+  | Readonly<{ kind: "private"; endpoint: string }>;
+
+
+export interface OrganizationDataplanePort {
+  /**
+   * Synchronous: the routing table is an environment fact read once at boot,
+   * so a pass that asks per organization must not pay a round trip for it.
+   */
+  dataplaneFor(organizationId: string): OrganizationDataplane;
+}
+
+
+export interface QueuePayloadDecoderPort {
+  tryDecode(input: {
+    queueName: string;
+    value: string;
+  }): Promise<Record<string, unknown> | null>;
+}
+
+/**
+ * One replay run's engine, built fresh per run: its own Redis connection, its
+ * own ClickHouse readers and the projections it can rebuild.
+ */
+export interface OpsReplayRuntime {
+  service: EventingReplayService;
+  projections: RegisteredFoldProjection[];
+  mapProjections: RegisteredMapProjection[];
+  /**
+   * Discovered Postgres operational state projections, carrying their
+   * definition and store for a paused, from-init canonical rebuild.
+   */
+  stateProjections: RegisteredStateProjection[];
+  close: () => Promise<void>;
+}
+
+/**
+ * Builds the runtime a replay run drives. The engine reaches the deployment's
+ * ClickHouse resolver, its Redis and every feature's projection stores, so the
+ * composition owns it; ops owns when a replay starts, what it covers and how it
+ * is reported.
+ *
+ * `create` THROWS when the deployment cannot serve a replay (no Redis, no
+ * ClickHouse route). `ReplayService` finalises the run with that message rather
+ * than leaving a lock held on a run that never began.
+ */
+export interface OpsReplayRuntimePort {
+  create(): OpsReplayRuntime;
+}
+
+/** Wakes the scheduler loop after an operator makes work due. */
+export interface SchedulerWakePort {
+  wake(): void;
+}
+
+/**
+ * Where a storage-stats tick writes what it read.
+ */
+export interface StorageStatsMetricsPort {
+  /** Clears the per-table and per-disk series this tick is about to rewrite. */
+  beginTick(instance: string): void;
+
+  recordTable(input: {
+    instance: string;
+    table: string;
+    rows: number;
+    bytes: number;
+    parts: number;
+  }): void;
+
+  recordDisk(input: {
+    instance: string;
+    disk: string;
+    totalBytes: number;
+    usedBytes: number;
+    freeBytes: number;
+  }): void;
+
+  recordBackupStatus(input: { instance: string; status: string; count: number }): void;
+
+  recordLastBackup(input: {
+    instance: string;
+    succeededAtSeconds: number;
+    sizeBytes: number;
+  }): void;
+}
+
+export interface UsageStatsOrganization {
+  id: string;
+  name: string;
+}
+
+export interface UsageStatsProjectCounts {
+  projectIds: string[];
+  annotations: number;
+  annotationQueues: number;
+  annotationQueueItems: number;
+  annotationScores: number;
+  batchEvaluations: number;
+  customGraphs: number;
+  datasets: number;
+  datasetRecords: number;
+  experiments: number;
+  triggers: number;
+  workflows: number;
+}
+
+export interface UsageStatsCountDelegate {
+  count(input: { where: { projectId: { in: string[] } } }): Promise<number>;
+}
+
+export interface UsageStatsOrganizationDatabase {
+  organization: {
+    findMany(input: { select: { id: true; name: true } }): Promise<UsageStatsOrganization[]>;
+  };
+}
+
+export interface UsageStatsProjectDatabase {
+  project: {
+    findMany(input: {
+      where: { team: { organizationId: string } };
+      select: { id: true };
+    }): Promise<Array<{ id: string }>>;
+  };
+  annotation: UsageStatsCountDelegate;
+  annotationQueue: UsageStatsCountDelegate;
+  annotationQueueItem: UsageStatsCountDelegate;
+  annotationScore: UsageStatsCountDelegate;
+  batchEvaluation: UsageStatsCountDelegate;
+  customGraph: {
+    count(input: { where: { projectId: { in: string[] }; kind: string } }): Promise<number>;
+  };
+  dataset: UsageStatsCountDelegate;
+  datasetRecord: UsageStatsCountDelegate;
+  experiment: UsageStatsCountDelegate;
+  trigger: UsageStatsCountDelegate;
+  workflow: UsageStatsCountDelegate;
+}
+
+export interface UsageStatsWorkerDatabase
+  extends UsageStatsOrganizationDatabase, UsageStatsProjectDatabase {}
+
+export interface UsageStatsReport extends Omit<UsageStatsProjectCounts, "projectIds"> {
+  totalTraces: number;
+  totalScenarioEvents: number;
+  timestamp: string;
+}
+
+export interface UsageStatsCountInput {
+  organizationId: string;
+  projectIds: string[];
+}
+
+export interface UsageStatsClickHouseQuery {
+  query: string;
+  query_params: { projectIds: string[] };
+  format: "JSONEachRow";
+}
+
+export interface UsageStatsClickHouseQueryResult {
+  json(): Promise<unknown>;
+}
+
+
+export interface UsageStatsClickHouseClientPort {
+  query(input: UsageStatsClickHouseQuery): Promise<UsageStatsClickHouseQueryResult>;
+}
+
+/** Resolves the ClickHouse client for the organization owning a report. */
+export interface UsageStatsClickHouseClientResolverPort {
+  tryResolve(organizationId: string): Promise<UsageStatsClickHouseClientPort | null>;
+}
+
+export interface UsageStatsCollector {
+  collect(input: { organizationId: string }): Promise<UsageStatsReport>;
+}
+
+/** Infrastructure boundary for the self-hosted telemetry receiver. */
+export interface UsageStatsTelemetryClientPort {
+  send(report: Record<string, unknown>): Promise<void>;
+}
+
+/** Infrastructure boundary for reporting a per-organization delivery failure. */
+export interface UsageStatsErrorReporterPort {
+  capture(input: { instanceId: string; error: unknown }): Promise<void>;
+}
+
+export type QueueControlAction =
+  | "queue_redrive_dlq_groups"
+  | "queue_discard_dlq_groups"
+  | "queue_drain_group"
+  | "queue_drain_tenant"
+  | "queue_move_group_to_dlq"
+  | "queue_move_all_blocked_to_dlq"
+  | "queue_unblock_group"
+  | "queue_unblock_all";
+
+/**
+ * Audit sink for GroupQueue operator actions (specs/ops/dead-letter-recovery.feature). The Redis substrate forgets
+ * DLQ entries at their TTL, so for a discard THIS row is the retained mark: the queue, the groups, how many jobs
+ * they held, and their last errors survive here after the entries themselves are gone.
+ */
+export abstract class QueueAuditSinkPort {
+  abstract append(entry: {
+    actorUserId: string;
+    action: QueueControlAction;
+    queueName: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<void>;
 }

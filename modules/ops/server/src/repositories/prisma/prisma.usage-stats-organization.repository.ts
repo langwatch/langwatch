@@ -1,7 +1,7 @@
 import type {
   UsageStatsOrganization,
   UsageStatsOrganizationDatabase,
-} from "../../ports/usage-stats-worker.port.ts";
+} from "../../app/ops.app.ts";
 import { UsageStatsOrganizationRepository } from "../observe/usage-stats.repository.ts";
 
 export class PrismaUsageStatsOrganizationRepository extends UsageStatsOrganizationRepository {

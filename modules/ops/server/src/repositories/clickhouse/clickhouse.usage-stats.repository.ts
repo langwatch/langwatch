@@ -1,7 +1,7 @@
 import type {
   UsageStatsClickHouseClientResolverPort,
   UsageStatsCountInput,
-} from "../../ports/usage-stats-worker.port.ts";
+} from "../../app/ops.app.ts";
 import { UsageStatsClickHouseRepository } from "../observe/usage-stats.repository.ts";
 import { z } from "zod";
 

@@ -9,7 +9,7 @@ import type {
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
 import type { Instant } from "@langwatch/time";
-import type { StoredObjectStorageAddress } from "../ports/stored-object.port.ts";
+import type { StoredObjectStorageAddress } from "../app/stored-object.infrastructure.ts";
 
 export type StoredObjectSource = "canonical" | "imported";
 

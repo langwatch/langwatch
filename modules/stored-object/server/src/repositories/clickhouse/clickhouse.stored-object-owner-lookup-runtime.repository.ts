@@ -1,6 +1,6 @@
 import { ClickHouseStoredObjectOwnerRepository } from "./clickhouse.stored-object-owner.repository.ts";
 import { StoredObjectOwnerLookupService } from "../../services/stored-object-owner-lookup.service.ts";
-import { StoredObjectOwnerLookupTelemetryPort } from "../../ports/stored-object-owner-lookup-telemetry.port.ts";
+import { StoredObjectOwnerLookupTelemetry } from "../../app/stored-object.infrastructure.ts";
 import { StoredObjectOwnerInstanceDirectoryRepository } from "../stored-object-owner-instance-directory.repository.ts";
 import type { StoredObjectOwnerResolver } from "@langwatch/stored-object-contract";
 
@@ -8,7 +8,7 @@ import type { StoredObjectOwnerResolver } from "@langwatch/stored-object-contrac
 export class ClickhouseStoredObjectOwnerLookupRuntimeRepository {
   static create(input: {
     instanceDirectory: StoredObjectOwnerInstanceDirectoryRepository;
-    telemetry: StoredObjectOwnerLookupTelemetryPort;
+    telemetry: StoredObjectOwnerLookupTelemetry;
   }): ClickhouseStoredObjectOwnerLookupRuntimeRepository {
     const repository = ClickHouseStoredObjectOwnerRepository.create(input.instanceDirectory);
     const resolver = StoredObjectOwnerLookupService.create({

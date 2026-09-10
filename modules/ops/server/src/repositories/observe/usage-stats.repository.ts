@@ -2,7 +2,7 @@ import type {
   UsageStatsCountInput,
   UsageStatsOrganization,
   UsageStatsProjectCounts,
-} from "../../ports/usage-stats-worker.port.ts";
+} from "../../app/ops.app.ts";
 
 /** Private Ops repository boundary for project-scoped relational usage. */
 export abstract class UsageStatsProjectRepository {

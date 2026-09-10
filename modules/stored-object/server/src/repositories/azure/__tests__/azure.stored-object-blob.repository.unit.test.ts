@@ -26,7 +26,7 @@ vi.mock("#adapters/azure-blob-token-provider.adapter", () => ({
 }));
 
 import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
-import { StoredObjectStorageRegistryAdapter } from "#adapters/stored-object-storage-registry.adapter";
+import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 

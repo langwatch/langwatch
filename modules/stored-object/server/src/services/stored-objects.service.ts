@@ -10,7 +10,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { StoredObjectStorageRepository } from "../repositories/stored-object-storage.repository.ts";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import type { StoredObjectsTelemetryPort } from "../ports/stored-objects-telemetry.port.ts";
+import type { StoredObjectsTelemetry } from "../app/stored-object.infrastructure.ts";
 import type { StoredObject } from "../rules/stored-object-row.rules.ts";
 import type { StoredObjectsRepository } from "../repositories/stored-objects.repository.ts";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -60,7 +60,7 @@ export type StoredObjectsServiceOptions = Readonly<{
    */
   mintStorageUri: MintStorageUri;
   /** The five series this store publishes about its own work. */
-  telemetry: StoredObjectsTelemetryPort;
+  telemetry: StoredObjectsTelemetry;
 }>;
 
 /**
@@ -77,7 +77,7 @@ export class StoredObjectsService {
     return this.options.repository;
   }
 
-  private get telemetry(): StoredObjectsTelemetryPort {
+  private get telemetry(): StoredObjectsTelemetry {
     return this.options.telemetry;
   }
 

@@ -40,7 +40,7 @@ const schedulerRepository: SchedulerOpsRepository = {
 const projects: ProjectApi = Object.create(ProjectApi.prototype);
 projects.listNamesByIds = async () => [];
 
-class NoopQueuePayloadDecoder extends QueuePayloadDecoderPort {
+class NoopQueuePayloadDecoder implements QueuePayloadDecoderPort {
   async tryDecode(): Promise<Record<string, unknown> | null> {
     return null;
   }
