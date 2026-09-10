@@ -54,6 +54,35 @@ Feature: Voice agents: reach an agent by phone
     Then the runner ends the call by hanging it up
 
   # ---------------------------------------------------------------------------
+  # Default Twilio adapter factory (identity and delegation)
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: The default phone factory returns the SDK's own adapter instance
+    Given the default Twilio agent factory builds an adapter for a phone target
+    When the SDK constructs its own adapter for that target
+    Then the transport returns that exact SDK adapter, not a wrapper around it
+
+  @unit
+  Scenario: The default phone factory preserves the SDK adapter's role
+    Given the default Twilio agent factory builds an adapter for a phone target
+    When the SDK's adapter reports its own role
+    Then the role stays readable on the adapter the transport returns
+
+  @unit
+  Scenario: The default phone factory translates shouldRecord to the SDK's record option
+    Given a phone target configured with shouldRecord for the call
+    When the runner places the call through the default Twilio agent factory
+    Then the SDK receives a record option carrying that value
+    And the SDK never receives a shouldRecord option
+
+  @unit
+  Scenario: The default phone factory still delegates connect and disconnect to the SDK adapter
+    Given the default Twilio agent factory builds an adapter for a phone target
+    When the call connects and is later ended
+    Then connecting and disconnecting are delegated to the SDK's own adapter
+
+  # ---------------------------------------------------------------------------
   # Whole-call audio (#8014 — "they can listen to the whole call")
   # ---------------------------------------------------------------------------
 
