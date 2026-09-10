@@ -1,5 +1,6 @@
 import { chakra, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
+import { hardNavigate } from "~/utils/browserNavigation";
 
 interface ImpersonationBannerProps {
   user: {
@@ -41,7 +42,7 @@ export const ImpersonationBanner = ({ user }: ImpersonationBannerProps) => {
             method: "DELETE",
           });
           if (response.ok) {
-            window.location.href = "/admin#/user";
+            hardNavigate("/admin#/user");
           }
         }}
         fontSize="11px"

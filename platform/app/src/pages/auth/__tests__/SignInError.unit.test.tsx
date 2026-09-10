@@ -11,6 +11,8 @@
  * logout (/api/auth/logout, which also clears the Auth0 session) instead of
  * bouncing straight back to /auth/signin. Otherwise the live IdP session
  * silently re-authenticates the same failing identity and the loop repeats.
+ *
+ * Corresponds to specs/auth/sso-wrong-provider-recovery.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -37,6 +39,7 @@ describe("<SignInError/>", () => {
       expect(screen.getByText("Account already exists")).toBeTruthy();
     });
 
+    /** @scenario Recovery signs the user out of the identity provider before trying again */
     it("recovers via a federated logout, not a bare bounce back to sign-in", () => {
       renderError("OAuthAccountNotLinked");
       const recovery = screen.getByRole("link", {
@@ -48,20 +51,31 @@ describe("<SignInError/>", () => {
       expect(recovery.getAttribute("href")).not.toContain("/auth/signin");
     });
 
+    // Nothing here knows which method the organization requires, so the
+    // guidance falls back to the one the account was made with.
+    /** @scenario Recovery works the same when the org's required method is not yet known */
     it("steers the user to sign out and use their original / SSO method", () => {
       renderError("OAuthAccountNotLinked");
       expect(
         screen.getByText(/sign out completely and sign in again/i),
       ).toBeTruthy();
       expect(screen.getByText(/method you used originally/i)).toBeTruthy();
+      expect(
+        screen.getByRole("link", { name: /sign out.*try again/i }),
+      ).toBeTruthy();
     });
   });
 
   describe("when the organization enforces SSO and the wrong method was used", () => {
+    /** @scenario Signing in with the wrong method explains what to do and names the right method */
     it("shows a friendly heading instead of the raw error code", () => {
       renderError("SSO_PROVIDER_NOT_ALLOWED");
       expect(screen.getByText(/use your organization's sign-in/i)).toBeTruthy();
       expect(screen.queryByText("SSO_PROVIDER_NOT_ALLOWED")).toBeNull();
+      // An SSO-enforced account cannot link another method, so offering the
+      // settings page would send them somewhere they cannot act.
+      expect(screen.queryByRole("link", { name: /settings/i })).toBeNull();
+      expect(screen.queryByText(/link/i)).toBeNull();
     });
 
     it("recovers via a federated logout so the next attempt can pick SSO", () => {
