@@ -186,6 +186,14 @@ export interface VoiceSessionPorts {
     projectId: string;
     agentRowId: string;
   }): Promise<{ id: string; agentExternalId: string } | null>;
+  /** Whether this project saved a voice agent for the given vendor agent id,
+   *  matched on the row's identity key. A drawer call writes no run to check
+   *  playback against (#8020), so this is what authorizes its recording. */
+  hasVoiceAgentForExternalId(input: {
+    projectId: string;
+    transport: VoiceTransport;
+    agentExternalId: string;
+  }): Promise<boolean>;
   /** The run already written for this id, or null. Returns the agent id it
    *  attached so a duplicate finish can answer with it, and the run status so a
    *  finish short-circuits on a written run but re-drives a half-written one
@@ -805,4 +813,91 @@ export async function finishVoiceSession(input: {
     audioUrl: record.audioUrl,
     scenarioSetId: scenarioContext.scenarioSetId,
   };
+}
+
+/**
+ * Whether a drawer call's recording belongs to this project. A drawer call is
+ * never written as a run (#8020), so there is nothing to authorize its playback
+ * against; instead the provider is asked which agent the conversation ran
+ * against, and playback is allowed only when this project saved that voice
+ * agent. A refused redirect, a not-yet-ready record or a fetch failure all read
+ * the same way: not this project's to play. Traces are deliberately not
+ * consulted, since a trace write goes through the ingest pipeline and can lag
+ * the hang-up.
+ */
+async function drawerRecordingBelongsToProject(
+  ports: VoiceSessionPorts,
+  {
+    projectId,
+    transport,
+    conversationId,
+    credential,
+  }: {
+    projectId: string;
+    transport: VoiceTransport;
+    conversationId: string;
+    credential: VoiceTransportCredential;
+  },
+): Promise<boolean> {
+  let record: CallRecord | null;
+  try {
+    record = await runnerFor(ports, transport).fetchCallRecord({
+      conversationId,
+      credential,
+      audioProxyUrl: ports.audioProxyUrl({ conversationId, projectId }),
+    });
+  } catch {
+    return false;
+  }
+  const agentExternalId = record?.agentExternalId;
+  if (!agentExternalId) return false;
+  return ports.hasVoiceAgentForExternalId({
+    projectId,
+    transport,
+    agentExternalId,
+  });
+}
+
+/**
+ * Authorize a recording-playback request and return the provider credential the
+ * route streams the audio with. A scenario "Call it myself" run authorizes
+ * playback directly (a run for the conversation exists in this project). A
+ * drawer call writes no run (#8020), so it is authorized only when the provider
+ * conversation ran against a voice agent this project saved. Anything else
+ * throws {@link VoiceRecordingUnavailableError}; the credential is returned only
+ * on success, so it never leaks on a refusal. Throws
+ * {@link VoiceRecordingKeyMissingError} when the project has no provider key.
+ * Drawer calls only run on ElevenLabs today.
+ */
+export async function authorizeRecordingPlayback({
+  ports,
+  projectId,
+  conversationId,
+}: {
+  ports: VoiceSessionPorts;
+  projectId: string;
+  conversationId: string;
+}): Promise<VoiceTransportCredential> {
+  const transport: VoiceTransport = "elevenlabs_convai";
+  const existing = await ports.findExistingRun({
+    projectId,
+    scenarioRunId: scenarioRunIdForConversation(conversationId),
+  });
+
+  const credential = await ports.resolveCredential({ projectId, transport });
+  if (!credential) throw new VoiceRecordingKeyMissingError();
+
+  // A scenario run authorizes playback directly; no provider call needed.
+  if (existing) return credential;
+
+  // No run was written (a drawer call, #8020): authorize only when the provider
+  // conversation ran against a voice agent this project actually saved.
+  const allowed = await drawerRecordingBelongsToProject(ports, {
+    projectId,
+    transport,
+    conversationId,
+    credential,
+  });
+  if (!allowed) throw new VoiceRecordingUnavailableError();
+  return credential;
 }

@@ -30,6 +30,7 @@ function fakeAgentService(over: {
   }) => Promise<AgentWithFields | null>;
   create?: (input: unknown) => Promise<AgentWithFields>;
   createVoiceAgent?: (input: unknown) => Promise<{ id: string }>;
+  hasVoiceAgentForExternalId?: (input: unknown) => Promise<boolean>;
 }) {
   return {
     getById: over.getById ?? vi.fn(async () => null),
@@ -43,6 +44,8 @@ function fakeAgentService(over: {
       vi.fn(async () => {
         throw new Error("not stubbed");
       }),
+    hasVoiceAgentForExternalId:
+      over.hasVoiceAgentForExternalId ?? vi.fn(async () => false),
   };
 }
 
@@ -165,6 +168,31 @@ describe("Feature: voice-session ports composition", () => {
             agentId: "el_agent_1",
           }),
         );
+      });
+    });
+  });
+
+  describe("given hasVoiceAgentForExternalId", () => {
+    describe("when the request carries a project, transport and vendor agent id", () => {
+      it("delegates the identity-key match to the service", async () => {
+        const hasVoiceAgentForExternalId = vi.fn(async () => true);
+        const ports = createVoiceSessionPortsFromServices({
+          agentService: fakeAgentService({ hasVoiceAgentForExternalId }),
+          scenarioService: fakeScenarioService({}),
+        });
+
+        const matched = await ports.hasVoiceAgentForExternalId({
+          projectId: "project_1",
+          transport: "elevenlabs_convai",
+          agentExternalId: "el_agent_1",
+        });
+
+        expect(matched).toBe(true);
+        expect(hasVoiceAgentForExternalId).toHaveBeenCalledWith({
+          projectId: "project_1",
+          transport: "elevenlabs_convai",
+          agentExternalId: "el_agent_1",
+        });
       });
     });
   });

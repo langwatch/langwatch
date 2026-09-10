@@ -273,6 +273,27 @@ export class AgentService {
   }
 
   /**
+   * Whether this project saved a voice agent for the given vendor agent id,
+   * matched on the identity key drawer hang-up dedupes rows by. Used to
+   * authorize recording playback for a drawer call, which writes no run (#8020).
+   */
+  async hasVoiceAgentForExternalId(input: {
+    projectId: string;
+    transport: VoiceTransport;
+    agentExternalId: string;
+  }): Promise<boolean> {
+    const identityKey = voiceAgentIdentityKey({
+      transport: input.transport,
+      agentExternalId: input.agentExternalId,
+    });
+    const agent = await this.repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey,
+    });
+    return agent?.type === "voice";
+  }
+
+  /**
    * Updates an existing agent.
    *
    * A connected agent takes no edit at all: the row is what the SDK

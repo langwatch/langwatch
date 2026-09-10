@@ -27,22 +27,20 @@ import {
 } from "~/server/agents/voice/voice-agent.config";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getApp } from "~/server/app-layer/app";
 import { ProjectPermissionDeniedError } from "~/server/app-layer/permissions/errors";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { isVoiceAgentsEnabledForProject } from "~/server/featureFlag/voiceAgents";
-import { scenarioRunIdForConversation } from "~/server/scenarios/voice/call-record";
 import {
   VOICE_HTTP_TIMEOUT_MS,
   voiceCallMaxSeconds,
 } from "~/server/scenarios/voice/voice-limits";
 import { voiceSessionPorts as ports } from "~/server/scenarios/voice/voice-session.ports";
 import {
+  authorizeRecordingPlayback,
   finishVoiceSession,
   mintVoiceSession,
   VoiceAgentsGateDisabledError,
-  VoiceRecordingKeyMissingError,
   VoiceRecordingUnavailableError,
   VoiceSessionInvalidError,
   VoiceUnauthenticatedError,
@@ -309,20 +307,16 @@ export const route = secured
         permissions: ["scenarios:view"],
       });
 
-      // Only proxy when a run for this conversation exists in the authorised
-      // project — otherwise one project could stream another's recording.
-      const run = await getApp().simulations.runs.getScenarioRunData({
+      // Authorize playback and resolve the provider credential in the service:
+      // a scenario run for the conversation allows it directly, and a drawer
+      // call (which writes no run) only when the conversation ran against a
+      // voice agent this project saved, so one project cannot stream another's
+      // recording (#8020). The credential is returned only when authorized.
+      const credential = await authorizeRecordingPlayback({
+        ports,
         projectId,
-        scenarioRunId: scenarioRunIdForConversation(conversationId),
+        conversationId,
       });
-      if (!run) throw new VoiceRecordingUnavailableError();
-
-      // Drawer calls only run on ElevenLabs today.
-      const credential = await ports.resolveCredential({
-        projectId,
-        transport: "elevenlabs_convai",
-      });
-      if (!credential) throw new VoiceRecordingKeyMissingError();
 
       // A timeout on the connect/headers phase only: once the response
       // arrives we stop racing the timeout against the body so a long

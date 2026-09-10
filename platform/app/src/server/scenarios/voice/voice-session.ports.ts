@@ -56,6 +56,13 @@ export interface VoiceSessionServices {
       transport: VoiceTransport;
       agentId: string;
     }): Promise<{ id: string }>;
+    /** Whether this project saved a voice agent for the given vendor agent id.
+     *  Authorizes drawer recording playback, which writes no run (#8020). */
+    hasVoiceAgentForExternalId(input: {
+      projectId: string;
+      transport: VoiceTransport;
+      agentExternalId: string;
+    }): Promise<boolean>;
   };
   scenarioService: {
     getById(input: { id: string; projectId: string }): Promise<Scenario | null>;
@@ -115,6 +122,17 @@ export function createVoiceSessionPortsFromServices({
       if (agent?.type !== "voice") return null;
       const config = parseVoiceAgentConfig(agent.config);
       return { id: agent.id, agentExternalId: config.agentId };
+    },
+
+    /** Whether the project saved a voice agent for this vendor agent id: the
+     *  provider conversation's agent id is matched to the row a drawer hang-up
+     *  created, so its recording plays back without a run to check (#8020). */
+    hasVoiceAgentForExternalId({ projectId, transport, agentExternalId }) {
+      return agentService.hasVoiceAgentForExternalId({
+        projectId,
+        transport,
+        agentExternalId,
+      });
     },
 
     async findExistingRun({ projectId, scenarioRunId }) {

@@ -793,3 +793,12 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Given a scenario run whose caller kind is "human"
     When the conversation body renders a caller turn
     Then it reads "You" with a person icon, not "User Simulator" with a flask
+
+  # #8020 regression: a drawer call writes no run, so its recording must be
+  # authorized by matching the provider conversation to a saved voice agent.
+  @unit @regression
+  Scenario: A drawer call's recording still plays after hang-up
+    Given a finished drawer call whose conversation ran against a voice agent saved in the project
+    When the recording is requested and no run exists for that conversation id
+    Then playback is authorized by matching the provider agent id to the saved voice agent row
+    And the provider credential is returned only when the match holds

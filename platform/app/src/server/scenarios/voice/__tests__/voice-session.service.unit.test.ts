@@ -6,11 +6,14 @@ import { describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { CallRecord } from "../call-record";
 import {
+  authorizeRecordingPlayback,
   finishVoiceSession,
   mintVoiceSession,
   VoiceAgentRowNotFoundError,
   VoiceConversationMismatchError,
   VoiceKeyMissingError,
+  VoiceRecordingKeyMissingError,
+  VoiceRecordingUnavailableError,
   VoiceScenarioNotFoundError,
   type VoiceSessionPorts,
 } from "../voice-session.service";
@@ -51,6 +54,7 @@ function fakePorts({
       id: "agent_row",
       agentExternalId: "agent_xyz",
     })),
+    hasVoiceAgentForExternalId: vi.fn(async () => false),
     findExistingRun: vi.fn(async () => null),
     createVoiceAgent: vi.fn(async () => ({ id: "agent_created" })),
     // One deterministic trace id per turn, so a caller/assertion can read them
@@ -999,6 +1003,136 @@ describe("finishVoiceSession", () => {
         expect(writeCallRun.mock.calls[0]?.[0].turnTraceIds).toEqual([
           "trace_x",
         ]);
+      });
+    });
+  });
+});
+
+describe("authorizeRecordingPlayback", () => {
+  describe("given a recording-playback request", () => {
+    describe("when a scenario run exists for the conversation", () => {
+      it("authorizes with the credential and never calls the provider", async () => {
+        const fetchCallRecord = vi.fn(async () => null);
+        const ports = fakePorts({
+          runner: fakeRunner({ fetchCallRecord }),
+          over: {
+            findExistingRun: vi.fn(async () => ({
+              agentId: "agent_row",
+              status: ScenarioRunStatus.SUCCESS,
+              source: "provider" as const,
+              audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+              scenarioId: "scenario_1",
+              scenarioSetId: "set_x",
+            })),
+          },
+        });
+
+        const credential = await authorizeRecordingPlayback({
+          ports,
+          projectId: "p1",
+          conversationId: "conv_1",
+        });
+
+        expect(credential).toEqual(CREDENTIAL);
+        expect(fetchCallRecord).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when there is no run but the provider agent id matches a saved row", () => {
+      /** @scenario "A drawer call's recording still plays after hang-up" */
+      it("authorizes with the credential", async () => {
+        const hasVoiceAgentForExternalId = vi.fn(async () => true);
+        const fetchCallRecord = vi.fn(
+          async () =>
+            ({
+              agentExternalId: "agent_xyz",
+              turns: [],
+              source: "provider",
+            }) as CallRecord,
+        );
+        const ports = fakePorts({
+          runner: fakeRunner({ fetchCallRecord }),
+          over: { hasVoiceAgentForExternalId },
+        });
+
+        const credential = await authorizeRecordingPlayback({
+          ports,
+          projectId: "p1",
+          conversationId: "conv_1",
+        });
+
+        expect(credential).toEqual(CREDENTIAL);
+        expect(hasVoiceAgentForExternalId).toHaveBeenCalledWith({
+          projectId: "p1",
+          transport: "elevenlabs_convai",
+          agentExternalId: "agent_xyz",
+        });
+      });
+    });
+
+    describe("when there is no run and no saved row matches", () => {
+      it("refuses and never returns the credential", async () => {
+        const ports = fakePorts({
+          runner: fakeRunner({
+            fetchCallRecord: vi.fn(
+              async () =>
+                ({
+                  agentExternalId: "agent_other",
+                  turns: [],
+                  source: "provider",
+                }) as CallRecord,
+            ),
+          }),
+          over: { hasVoiceAgentForExternalId: vi.fn(async () => false) },
+        });
+
+        await expect(
+          authorizeRecordingPlayback({
+            ports,
+            projectId: "p1",
+            conversationId: "conv_1",
+          }),
+        ).rejects.toBeInstanceOf(VoiceRecordingUnavailableError);
+      });
+    });
+
+    describe("when there is no run and the provider fetch fails", () => {
+      it("refuses without consulting the agent rows", async () => {
+        const hasVoiceAgentForExternalId = vi.fn(async () => true);
+        const ports = fakePorts({
+          runner: fakeRunner({
+            fetchCallRecord: vi.fn(async () => {
+              throw new Error("provider down");
+            }),
+          }),
+          over: { hasVoiceAgentForExternalId },
+        });
+
+        await expect(
+          authorizeRecordingPlayback({
+            ports,
+            projectId: "p1",
+            conversationId: "conv_1",
+          }),
+        ).rejects.toBeInstanceOf(VoiceRecordingUnavailableError);
+        expect(hasVoiceAgentForExternalId).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the project has no provider key", () => {
+      it("refuses with the key-missing error", async () => {
+        const ports = fakePorts({
+          runner: fakeRunner(),
+          over: { resolveCredential: vi.fn(async () => null) },
+        });
+
+        await expect(
+          authorizeRecordingPlayback({
+            ports,
+            projectId: "p1",
+            conversationId: "conv_1",
+          }),
+        ).rejects.toBeInstanceOf(VoiceRecordingKeyMissingError);
       });
     });
   });
