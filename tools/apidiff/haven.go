@@ -269,11 +269,13 @@ func (state *bootState) havenBackendLog(ctx context.Context, plan havenPlan, ins
 
 // destroyHavenStacks tears down exactly the slugs this run started, in the
 // order it started them. Best-effort per slug: one stack that will not go must
-// not leave the other running.
+// not leave the other running. Run from the work root, never the invoking
+// checkout: destroy targets a stack by its slug argument, but a diff tool
+// must never run a haven command from the directory it was started in.
 func (state *bootState) destroyHavenStacks(ctx context.Context) {
 	for _, slug := range state.havenSlugs {
 		state.logf("teardown: haven destroy %s", slug)
-		spec := commandSpec{name: havenCommand, args: havenDestroyArgs(slug), dir: state.cfg.BranchDir, env: havenEnv(state.environ(), slug)}
+		spec := commandSpec{name: havenCommand, args: havenDestroyArgs(slug), dir: state.workRoot, env: havenEnv(state.environ(), slug)}
 		if err := state.run(ctx, spec, state.stderr); err != nil {
 			state.logf("teardown: haven destroy %s: %v", slug, err)
 		}

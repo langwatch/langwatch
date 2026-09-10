@@ -58,6 +58,10 @@ type probeFlags struct {
 	reportFile      string
 	ledgerFile      string
 	ledgerBaseline  string
+	// onOperationDone streams one finding per operation as its comparison
+	// completes; nil for the plain `probe` subcommand, which has no run
+	// directory to stream into. Set by `run` after Boot succeeds.
+	onOperationDone func(Operation, []Finding)
 }
 
 func (probe *probeFlags) filter() OpFilter {
@@ -91,7 +95,7 @@ const usage = `apidiff — live two-instance API behavior diff
 usage:
   apidiff run   [-main-ref REF] [-branch-dir DIR] [-work-root DIR]
                 [-keep] [-reuse-worktrees] [-skip-install] [-boot-timeout DUR]
-                [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
+                [-dry-run] [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
                 [-compose-project NAME] [probe flags...]
   apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
                 [-timeout DUR] [-settle-timeout DUR] [-path-prefix P] [-method M]
@@ -145,41 +149,9 @@ func runProbeSubcommand(ctx context.Context, args []string, out streams) int {
 }
 
 func runBootSubcommand(ctx context.Context, args []string, out streams) int {
-	flags := flag.NewFlagSet("apidiff run", flag.ContinueOnError)
-	flags.SetOutput(out.stderr)
-	boot := BootConfig{}
-	probe := &probeFlags{excludePrefixes: stringSlice{"/api/gateway"}}
-	flags.StringVar(&boot.MainRef, "main-ref", "main", "git ref to boot as the base instance")
-	flags.StringVar(&boot.BranchDir, "branch-dir", ".", "checkout to boot as the candidate instance")
-	flags.StringVar(&boot.WorkRoot, "work-root", "", "worktree/log root (default <repo>/.apidiff/<timestamp>)")
-	flags.BoolVar(&boot.Keep, "keep", false, "keep infra, databases and worktree after the run")
-	flags.BoolVar(&boot.ReuseWorktrees, "reuse-worktrees", false, "reuse the existing <work-root>/main worktree")
-	flags.BoolVar(&boot.SkipInstall, "skip-install", false, "skip pnpm install in both worktrees")
-	flags.DurationVar(&boot.BootTimeout, "boot-timeout", 5*time.Minute, "per-instance health-wait timeout")
-	flags.StringVar(&boot.PGURL, "pg-url", "", "external postgres server URL (with -ch-url/-redis-url skips compose)")
-	flags.StringVar(&boot.CHURL, "ch-url", "", "external ClickHouse server URL")
-	flags.StringVar(&boot.RedisURL, "redis-url", "", "external redis server URL")
-	flags.StringVar(&boot.ComposeProject, "compose-project", "apidiff", "compose project name for the managed infra stack")
-	noHaven := false
-	flags.BoolVar(&noHaven, "no-haven", false, "do not boot the instances as haven stacks; provision compose or the -pg-url/-ch-url/-redis-url servers instead")
-	envFile := ""
-	flags.StringVar(&envFile, "env-file", "", "dotenv file whose DATABASE_URL, CLICKHOUSE_URL and REDIS_URL fill an empty -pg-url, -ch-url and -redis-url (never printed); not usable with the haven path")
-	registerProbeFlags(flags, probe)
-	if err := flags.Parse(args); err != nil {
-		return exitError
-	}
-	external, err := externalInfra(boot)
-	if err != nil {
-		fmt.Fprintln(out.stderr, err)
-		return exitError
-	}
-	boot.UseHaven = havenSelected(havenOnPath(), noHaven, external)
-	if boot.UseHaven && envFile != "" {
-		fmt.Fprintln(out.stderr, "-env-file and the haven path are exclusive: -env-file points the instances at the servers that dotenv names, which is the developer's own stack, and haven exists so a run never reaches it. Pass -no-haven to boot on those servers.")
-		return exitError
-	}
-	if envFile != "" {
-		applyEnvFile(envFile, &boot)
+	boot, probe, code, done := parseRunFlags(args, out)
+	if done {
+		return code
 	}
 
 	// The child processes inherit this context; canceling it kills them.
@@ -192,6 +164,16 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	}
 	defer booted.Teardown()
 
+	// One JSON line per operation, appended as its comparison completes, so a
+	// reader can tail .apidiff/<runID>/findings.jsonl during the run rather
+	// than waiting for the final report.
+	findings, closeFindings, err := openRunFindingsStream(booted.WorkRoot, out.stderr)
+	if err != nil {
+		fmt.Fprintln(out.stderr, "findings stream:", err)
+		return exitError
+	}
+	defer closeFindings()
+
 	probe.a = booted.A.URL
 	probe.b = booted.B.URL
 	if boot.UseHaven {
@@ -201,9 +183,15 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 		// still compare like against like - unauthorized against unauthorized.
 		fmt.Fprintln(out.stderr, "haven path: SCIM and permission-probe fixtures are not provisioned; those operations compare unauthorized on both sides")
 	}
-	// Run mode injected a throwaway instance admin key into both instances,
-	// seeded a fixed SCIM token, and provisioned the permission-probe
-	// fixtures; default the probe credentials to them.
+	probe.applyRunDefaults()
+	probe.onOperationDone = findingsHook(findings, boot.BranchDir, out.stderr)
+	return probePipeline(ctx, probe, out)
+}
+
+// applyRunDefaults fills the probe credentials `run` mode itself provisioned:
+// a throwaway instance-admin key, a fixed SCIM token, and the
+// permission-probe project keys.
+func (probe *probeFlags) applyRunDefaults() {
 	if probe.keys.AdminKey == "" {
 		probe.keys.AdminKey = throwawayInstanceAdminKey
 	}
@@ -216,7 +204,85 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	if probe.keys.ProjectKeyC == "" {
 		probe.keys.ProjectKeyC = ProjectKeyC
 	}
-	return probePipeline(ctx, probe, out)
+}
+
+// openRunFindingsStream opens the run's findings.jsonl and returns a single
+// close func that writes the run-complete line and closes the file, so the
+// caller carries one defer instead of two.
+func openRunFindingsStream(runDir string, stderr io.Writer) (*FindingsStream, func(), error) {
+	stream, closeFile, err := NewFindingsStream(runDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	closeAll := func() {
+		if err := stream.Close(); err != nil {
+			fmt.Fprintln(stderr, "findings stream:", err)
+		}
+		if err := closeFile(); err != nil {
+			fmt.Fprintln(stderr, "findings stream:", err)
+		}
+	}
+	return stream, closeAll, nil
+}
+
+// parseRunFlags parses `apidiff run`'s flags and settles everything decided
+// before a real boot starts. done is true when the caller must return code
+// immediately — a usage error, or a completed -dry-run — without booting
+// anything.
+func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bool) {
+	flags := flag.NewFlagSet("apidiff run", flag.ContinueOnError)
+	flags.SetOutput(out.stderr)
+	boot := BootConfig{}
+	probe := &probeFlags{excludePrefixes: stringSlice{"/api/gateway"}}
+	flags.StringVar(&boot.MainRef, "main-ref", "main", "git ref to boot as the base instance")
+	flags.StringVar(&boot.BranchDir, "branch-dir", ".", "checkout to diff (haven path: its HEAD is checked out into its own worktree; the checkout itself is never booted)")
+	flags.StringVar(&boot.WorkRoot, "work-root", "", "worktree/log root (default <repo>/.apidiff/<timestamp>)")
+	flags.BoolVar(&boot.Keep, "keep", false, "keep infra, databases and worktree after the run")
+	flags.BoolVar(&boot.ReuseWorktrees, "reuse-worktrees", false, "reuse the existing <work-root>/main worktree")
+	flags.BoolVar(&boot.SkipInstall, "skip-install", false, "skip pnpm install in both worktrees")
+	flags.DurationVar(&boot.BootTimeout, "boot-timeout", 5*time.Minute, "per-instance health-wait timeout")
+	flags.StringVar(&boot.PGURL, "pg-url", "", "external postgres server URL (with -ch-url/-redis-url skips compose)")
+	flags.StringVar(&boot.CHURL, "ch-url", "", "external ClickHouse server URL")
+	flags.StringVar(&boot.RedisURL, "redis-url", "", "external redis server URL")
+	flags.StringVar(&boot.ComposeProject, "compose-project", "apidiff", "compose project name for the managed infra stack")
+	flags.BoolVar(&boot.DryRun, "dry-run", false, "print the plan (refs, worktree paths, slugs, commands) and start nothing")
+	noHaven := false
+	flags.BoolVar(&noHaven, "no-haven", false, "do not boot the instances as haven stacks; provision compose or the -pg-url/-ch-url/-redis-url servers instead")
+	envFile := ""
+	flags.StringVar(&envFile, "env-file", "", "dotenv file whose DATABASE_URL, CLICKHOUSE_URL and REDIS_URL fill an empty -pg-url, -ch-url and -redis-url (never printed); not usable with the haven path")
+	registerProbeFlags(flags, probe)
+	if err := flags.Parse(args); err != nil {
+		return boot, probe, exitError, true
+	}
+	external, err := externalInfra(boot)
+	if err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return boot, probe, exitError, true
+	}
+	boot.UseHaven = havenSelected(havenOnPath(), noHaven, external)
+	if boot.UseHaven && envFile != "" {
+		fmt.Fprintln(out.stderr, "-env-file and the haven path are exclusive: -env-file points the instances at the servers that dotenv names, which is the developer's own stack, and haven exists so a run never reaches it. Pass -no-haven to boot on those servers.")
+		return boot, probe, exitError, true
+	}
+	if boot.DryRun {
+		return boot, probe, writeDryRunPlanOrError(boot, out), true
+	}
+	if envFile != "" {
+		applyEnvFile(envFile, &boot)
+	}
+	return boot, probe, exitEqual, false
+}
+
+// writeDryRunPlanOrError computes and prints -dry-run's plan, returning the
+// exit code the caller reports.
+func writeDryRunPlanOrError(boot BootConfig, out streams) int {
+	plan, err := PlanBoot(boot)
+	if err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return exitError
+	}
+	WriteDryRunPlan(out.stdout, plan)
+	return exitEqual
 }
 
 // probePipeline is the shared compare flow: fetch both specs, diff them,
@@ -259,6 +325,7 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 		Client:          client,
 		Progress:        out.stderr,
 		SettleTimeout:   probe.settleTimeout,
+		OnOperationDone: probe.onOperationDone,
 	}, operations)
 
 	verdict := runVerdict{report: BuildReport(changes, result), probe: probe}

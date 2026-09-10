@@ -3,6 +3,8 @@ package apidiff
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -86,11 +88,13 @@ func havenState(fake *fakeHaven, timeout time.Duration) *bootState {
 	}
 }
 
-// bothInstances is the pair a run boots: the developer's own checkout and the
-// worktree it added for the base ref.
+// bothInstances is the pair a run boots: the worktree checked out at the
+// branch's own HEAD, and the worktree added for the base ref. Neither is the
+// developer's own checkout — that directory already carries its own haven
+// stack, which is exactly what the branch instance must never touch.
 func bothInstances() *Booted {
 	return &Booted{
-		A: Instance{Name: "branch", Dir: "/repos/langwatch"},
+		A: Instance{Name: "branch", Dir: "/repos/langwatch/.apidiff/run/branch"},
 		B: Instance{Name: "main", Dir: "/repos/langwatch/.apidiff/run/main"},
 	}
 }
@@ -139,8 +143,11 @@ func TestEachInstanceGetsARunScopedSlug(t *testing.T) {
 					t.Errorf("%s ran %q, want the agent-mode non-attached up", slug, got)
 				}
 			}
-			if ups["apidiff-20260909t2230-branch"].dir != "/repos/langwatch" {
-				t.Errorf("the branch stack must come up in the branch checkout, got %q", ups["apidiff-20260909t2230-branch"].dir)
+			if got := ups["apidiff-20260909t2230-branch"].dir; got != "/repos/langwatch/.apidiff/run/branch" {
+				t.Errorf("the branch stack must come up in its own HEAD worktree, got %q", got)
+			}
+			if ups["apidiff-20260909t2230-branch"].dir == "/repos/langwatch" {
+				t.Fatal("the branch stack must never come up in the invoking checkout")
 			}
 			if ups["apidiff-20260909t2230-main"].dir != "/repos/langwatch/.apidiff/run/main" {
 				t.Errorf("the main stack must come up in the worktree apidiff added, got %q", ups["apidiff-20260909t2230-main"].dir)
@@ -547,5 +554,251 @@ func TestHavenIsTheDefaultAndTheOtherPathsAreOptIn(t *testing.T) {
 				t.Errorf("refusal %q must name %q", stderr.String(), want)
 			}
 		}
+	})
+}
+
+// worktreeCreatingRunner wraps a fakeHaven so `git worktree add` also creates
+// a real modular-layout worktree on disk (a package.json detectProfile
+// accepts), while every haven command still goes through the fake. This is
+// what lets a test drive the real boot() end to end.
+func worktreeCreatingRunner(fake *fakeHaven) runner {
+	return func(ctx context.Context, spec commandSpec, log io.Writer) error {
+		if spec.name == "git" && len(spec.args) >= 4 && spec.args[0] == "worktree" && spec.args[1] == "add" {
+			dir := spec.args[3]
+			if err := os.MkdirAll(filepath.Join(dir, "apps", "api"), 0o750); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(dir, "apps", "api", "package.json"), []byte(`{"name":"@langwatch/platform-api"}`), 0o600)
+		}
+		return fake.run(ctx, spec, log)
+	}
+}
+
+// @scenario "apidiff runs and the developer's own stack is untouched"
+func TestApidiffRunsAndTheDeveloperStackIsUntouched(t *testing.T) {
+	t.Run("given a developer stack is up in the invoking checkout", func(t *testing.T) {
+		invoking := t.TempDir()
+		fake := &fakeHaven{readySlugs: map[string]int{
+			"apidiff-run-branch": 6560,
+			"apidiff-run-main":   6660,
+		}}
+		state := &bootState{
+			cfg: BootConfig{
+				UseHaven: true, MainRef: "main", BranchDir: invoking, BootTimeout: time.Minute,
+				WorkRoot: filepath.Join(invoking, ".apidiff", "run"),
+			},
+			stderr:  io.Discard,
+			run:     worktreeCreatingRunner(fake),
+			inherit: []string{"HOME=/home/user"},
+		}
+
+		t.Run("when apidiff run boots both instances through haven", func(t *testing.T) {
+			booted, err := state.boot(context.Background())
+			if err != nil {
+				t.Fatalf("boot: %v", err)
+			}
+
+			wantMain := filepath.Join(state.workRoot, "main")
+			wantBranch := filepath.Join(state.workRoot, "branch")
+
+			t.Run("then the base instance checks out into <work-root>/main", func(t *testing.T) {
+				if booted.B.Dir != wantMain {
+					t.Errorf("main dir = %q, want %q", booted.B.Dir, wantMain)
+				}
+			})
+
+			t.Run("then the branch instance checks out HEAD into <work-root>/branch, a worktree of its own", func(t *testing.T) {
+				if booted.A.Dir != wantBranch {
+					t.Errorf("branch dir = %q, want %q", booted.A.Dir, wantBranch)
+				}
+			})
+
+			t.Run("then no haven command ever runs with the invoking checkout as its directory", func(t *testing.T) {
+				for _, spec := range fake.commands {
+					if spec.name != havenCommand {
+						continue
+					}
+					if spec.dir == invoking {
+						t.Errorf("%s ran with the invoking checkout %q as its directory", argv(spec), invoking)
+					}
+				}
+			})
+
+			t.Run("then every haven up and haven destroy command names one of the two worktree directories", func(t *testing.T) {
+				for _, spec := range fake.commands {
+					if spec.name != havenCommand || len(spec.args) == 0 {
+						continue
+					}
+					if spec.args[0] != "up" && spec.args[0] != "destroy" {
+						continue
+					}
+					if spec.args[0] == "destroy" {
+						// destroy targets a stack by its slug argument and never needs
+						// a worktree directory; it still must not run from inside the
+						// invoking checkout (asserted above).
+						continue
+					}
+					if spec.dir != wantMain && spec.dir != wantBranch {
+						t.Errorf("%s ran from %q, want one of %q / %q", argv(spec), spec.dir, wantMain, wantBranch)
+					}
+				}
+			})
+
+			t.Run("then the developer's own stack is never started, restarted or destroyed", func(t *testing.T) {
+				for _, spec := range fake.commands {
+					if spec.name != havenCommand || len(spec.args) < 2 {
+						continue
+					}
+					if spec.args[0] == "destroy" && strings.HasPrefix(spec.args[1], "feat-") {
+						t.Errorf("a developer-derived slug was destroyed: %s", argv(spec))
+					}
+				}
+			})
+
+			booted.Teardown()
+		})
+	})
+}
+
+// @scenario "A worktree that would alias the invoking checkout refuses to boot"
+func TestAWorktreeThatWouldAliasTheInvokingCheckoutRefusesToBoot(t *testing.T) {
+	t.Run("given a work root that resolves the branch worktree path to the invoking checkout", func(t *testing.T) {
+		invoking := t.TempDir()
+		workRoot := filepath.Join(invoking, "collide")
+		state := &bootState{
+			cfg:    BootConfig{UseHaven: true, MainRef: "main", BranchDir: invoking, WorkRoot: workRoot},
+			stderr: io.Discard,
+			run:    func(context.Context, commandSpec, io.Writer) error { return nil },
+		}
+		state.workRoot = workRoot
+		state.runID = RunID(workRoot)
+		// Force the collision the way a future refactor might accidentally
+		// produce one: the branch worktree resolves to the checkout itself.
+		state.mainDir = filepath.Join(workRoot, "main")
+		state.branchDir = invoking
+
+		t.Run("when apidiff run prepares its worktrees, it refuses before any haven command runs", func(t *testing.T) {
+			err := state.refuseSelfCheckout()
+			if err == nil {
+				t.Fatal("a branch worktree equal to the invoking checkout must be refused")
+			}
+			if !strings.Contains(err.Error(), invoking) {
+				t.Errorf("refusal %q must name the invoking checkout %q", err.Error(), invoking)
+			}
+		})
+	})
+}
+
+// @scenario "Teardown never runs from the invoking checkout"
+func TestTeardownOnHavenPathNeverRunsFromTheInvokingCheckout(t *testing.T) {
+	t.Run("given both instances are up as haven stacks under their own worktrees", func(t *testing.T) {
+		invoking := t.TempDir()
+		workRoot := filepath.Join(invoking, ".apidiff", "run")
+		mainDir := filepath.Join(workRoot, "main")
+		branchDir := filepath.Join(workRoot, "branch")
+		for _, dir := range []string{mainDir, branchDir} {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
+				t.Fatal(err)
+			}
+		}
+		fake := &fakeHaven{readySlugs: map[string]int{
+			"apidiff-run-branch": 6560,
+			"apidiff-run-main":   6660,
+		}}
+		state := &bootState{
+			cfg:        BootConfig{UseHaven: true, BranchDir: invoking, WorkRoot: workRoot},
+			stderr:     io.Discard,
+			run:        fake.run,
+			runID:      "run",
+			workRoot:   workRoot,
+			mainDir:    mainDir,
+			ownsMain:   true,
+			branchDir:  branchDir,
+			ownsBranch: true,
+			havenSlugs: []string{"apidiff-run-branch", "apidiff-run-main"},
+		}
+
+		t.Run("when the run tears down", func(t *testing.T) {
+			state.teardown()
+
+			t.Run("then haven destroy runs for exactly the branch and base slugs, never from the invoking checkout", func(t *testing.T) {
+				var destroyed []string
+				for _, spec := range fake.commands {
+					if len(spec.args) == 0 || spec.args[0] != "destroy" {
+						continue
+					}
+					destroyed = append(destroyed, spec.args[1])
+					if spec.dir == invoking {
+						t.Errorf("haven destroy %s ran from the invoking checkout", spec.args[1])
+					}
+				}
+				want := []string{"apidiff-run-branch", "apidiff-run-main"}
+				if strings.Join(destroyed, ",") != strings.Join(want, ",") {
+					t.Errorf("destroyed %v, want %v", destroyed, want)
+				}
+			})
+
+			t.Run("then both owned worktrees are removed and the invoking checkout is not one of them", func(t *testing.T) {
+				var removed []string
+				for _, spec := range fake.commands {
+					if spec.name == "git" && len(spec.args) >= 4 && spec.args[0] == "worktree" && spec.args[1] == "remove" {
+						removed = append(removed, spec.args[3])
+					}
+				}
+				want := []string{mainDir, branchDir}
+				if strings.Join(removed, ",") != strings.Join(want, ",") {
+					t.Errorf("removed %v, want %v", removed, want)
+				}
+				for _, dir := range removed {
+					if dir == invoking {
+						t.Error("the invoking checkout must never be removed as a worktree")
+					}
+				}
+			})
+		})
+	})
+}
+
+// @scenario "The plan names both worktrees and slugs, and no command runs"
+func TestThePlanNamesBothWorktreesAndSlugsAndNoCommandRuns(t *testing.T) {
+	t.Run("given haven is installed and a run is about to start", func(t *testing.T) {
+		invoking := t.TempDir()
+		cfg := BootConfig{UseHaven: true, MainRef: "main", BranchDir: invoking, WorkRoot: filepath.Join(invoking, ".apidiff", "20260910t0000")}
+
+		t.Run("when apidiff run -dry-run is invoked", func(t *testing.T) {
+			plan, err := PlanBoot(cfg)
+			if err != nil {
+				t.Fatalf("PlanBoot: %v", err)
+			}
+
+			t.Run("then it names the base and branch worktree paths and their haven slugs", func(t *testing.T) {
+				wantMain := filepath.Join(cfg.WorkRoot, "main")
+				wantBranch := filepath.Join(cfg.WorkRoot, "branch")
+				if plan.MainDir != wantMain || plan.BranchDir != wantBranch {
+					t.Errorf("plan dirs = %q / %q, want %q / %q", plan.MainDir, plan.BranchDir, wantMain, wantBranch)
+				}
+				if plan.MainSlug == "" || plan.BranchSlug == "" {
+					t.Error("both slugs must be named")
+				}
+				var out strings.Builder
+				WriteDryRunPlan(&out, plan)
+				rendered := out.String()
+				for _, want := range []string{wantMain, wantBranch, plan.MainSlug, plan.BranchSlug} {
+					if !strings.Contains(rendered, want) {
+						t.Errorf("plan output missing %q:\n%s", want, rendered)
+					}
+				}
+			})
+
+			t.Run("then no git command, no haven command and no process is actually run", func(t *testing.T) {
+				// PlanBoot took no runner at all — there is nothing to have run.
+				if _, err := os.Stat(plan.MainDir); err == nil {
+					t.Error("the main worktree must not exist after a dry run")
+				}
+				if _, err := os.Stat(plan.BranchDir); err == nil {
+					t.Error("the branch worktree must not exist after a dry run")
+				}
+			})
+		})
 	})
 }

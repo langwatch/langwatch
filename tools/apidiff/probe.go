@@ -80,6 +80,12 @@ type ProbeOptions struct {
 	// become visible in its collection (see settleForVisibility). Zero uses
 	// defaultSettleTimeout.
 	SettleTimeout time.Duration
+
+	// OnOperationDone fires once per operation in the main pass, right after
+	// its own findings are final — never for an excluded operation, and
+	// never for the post-pass findings (collection/permission checks), which
+	// describe a different comparison than the one operation just probed.
+	OnOperationDone func(Operation, []Finding)
 }
 
 // SuppressedCounts tallies comparisons the default semantics filtered out,
@@ -128,7 +134,11 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 		}
 		engine.progress("probe %s %s [%d/%d]\n", operation.Method, operation.Path, index+1, len(selected))
 		probed++
-		findings = append(findings, engine.probeOperation(operation)...)
+		operationFindings := engine.probeOperation(operation)
+		findings = append(findings, operationFindings...)
+		if options.OnOperationDone != nil {
+			options.OnOperationDone(operation, operationFindings)
+		}
 	}
 
 	// Post passes, after every mutation has had its chance to land.

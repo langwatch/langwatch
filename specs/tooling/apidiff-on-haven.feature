@@ -5,11 +5,23 @@
 # stack per slug and honours LANGWATCH_SLUG, so each instance becomes a haven
 # stack under a slug of its own.
 #
+# 2026-09-10 addendum: booting the branch instance IN the invoking checkout was
+# its own version of the same defect. haven registers one stack per directory,
+# so `haven up` there replaced a developer's own stack registration for that
+# directory, and the run's teardown `haven destroy` took it down with it (an
+# incident at 01:36 that day). The branch side now checks out its own HEAD into
+# a worktree of its own, the same way the base side always has, and a run
+# refuses outright if either worktree path would resolve to the invoking
+# checkout. -dry-run prints the plan without starting anything, and a findings
+# stream lets a reader tail one operation's comparison outcome at a time.
+#
 # Bound by Go tests in tools/apidiff (`go test ./...`), annotated `// @scenario`.
 
 Feature: apidiff boots its instances through haven
+
   As a developer diffing a branch against main
-  I want each apidiff instance to be a haven stack under its own slug
+  I want each apidiff instance to be a haven stack under its own slug, and
+  never one that boots inside my own checkout
   So that a run never touches the stack I am using
 
   Background:
@@ -96,3 +108,50 @@ Feature: apidiff boots its instances through haven
       When apidiff run is invoked
       Then it boots exactly as before, through compose or the three -pg-url -ch-url -redis-url servers
       And a run given -env-file together with haven refuses, naming the two as exclusive
+
+  Rule: Neither haven stack ever runs from the invoking checkout
+
+    @unit
+    Scenario: apidiff runs and the developer's own stack is untouched
+      Given a developer stack is up in the invoking checkout
+      When apidiff run boots both instances through haven
+      Then the base instance checks out its ref into <work-root>/main, as it already did
+      And the branch instance checks out HEAD into <work-root>/branch, a worktree of its own
+      And every haven up and haven destroy command names one of those two worktree directories
+      And no haven command ever runs with the invoking checkout as its directory
+      And the developer's own stack in the invoking checkout is never started, restarted or destroyed
+
+    @unit
+    Scenario: A worktree that would alias the invoking checkout refuses to boot
+      Given a work root that resolves either worktree path to the invoking checkout
+      When apidiff run prepares its worktrees
+      Then it refuses before any haven command runs
+      And the refusal names the invoking checkout path
+
+  Rule: Teardown destroys only the two worktree-scoped stacks
+
+    @unit
+    Scenario: Teardown never runs from the invoking checkout
+      Given both instances are up as haven stacks under their own worktrees
+      When the run tears down
+      Then haven destroy runs for exactly the branch and base slugs
+      And neither haven destroy command's directory is the invoking checkout
+      And both owned worktrees are removed, and the invoking checkout is not a worktree this run owns
+
+  Rule: -dry-run prints the plan and starts nothing
+
+    @unit
+    Scenario: The plan names both worktrees and slugs, and no command runs
+      When apidiff run -dry-run is invoked
+      Then it prints the base and branch worktree paths, their haven slugs, and the ordered commands a real run would issue
+      And no git command, no haven command and no process is actually run
+
+  Rule: Findings stream while the run is still going
+
+    @unit
+    Scenario: Findings stream while the run is still going
+      Given a run is probing the operation union
+      When one operation's comparison completes
+      Then one JSON line is appended to <work-root>/findings.jsonl naming its surface, name, kind, module, detail and capturedAt
+      And the line is flushed before the next operation is probed, so a reader tailing the file sees it immediately
+      And when the run finishes, a final line reports kind "run-complete" with the totals by kind

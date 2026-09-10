@@ -13,7 +13,7 @@ state never produces false diffs.
 ```text
 apidiff run   [-main-ref REF] [-branch-dir DIR] [-work-root DIR]
               [-keep] [-reuse-worktrees] [-skip-install] [-boot-timeout DUR]
-              [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
+              [-dry-run] [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
               [-compose-project NAME] [probe flags...]
 
 apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
@@ -24,11 +24,24 @@ apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
 ```
 
 `run` boots both instances itself — a detached git worktree for `-main-ref`
-(default `main`), the current checkout for the branch — with isolated
-Postgres/ClickHouse databases (run-scoped: `apidiff_<runid>_branch` /
-`apidiff_<runid>_main`, where the run id derives from the work-root name) and
-Redis logical DBs (14/15), migrates and seeds each, waits for health, probes,
-and tears everything down. `probe` compares two already-running instances.
+(default `main`), and, wherever haven is selected, a second worktree checking
+out `-branch-dir`'s own HEAD — with isolated Postgres/ClickHouse databases
+(run-scoped: `apidiff_<runid>_branch` / `apidiff_<runid>_main`, where the run
+id derives from the work-root name) and Redis logical DBs (14/15), migrates
+and seeds each, waits for health, probes, and tears everything down. `probe`
+compares two already-running instances.
+
+**Neither haven stack ever boots inside the invoking checkout.** haven
+registers one stack per directory: booting the branch instance in place used
+to let `haven up` there replace a developer's own stack registration for that
+directory, and the run's teardown `haven destroy` take it down with it (an
+incident on 2026-09-10 — a developer's own stack vanished mid-session). The
+branch side now checks out its own HEAD into `<work-root>/branch`, the same
+way the base side has always checked out into `<work-root>/main`, and a run
+refuses outright if either worktree path would resolve to the invoking
+checkout. `-dry-run` prints the plan — both refs, both worktree paths, both
+haven slugs, and the ordered commands a real run would issue — and starts
+nothing at all: no worktree, no haven command, no install.
 
 Exit status is `0` for no behavioral differences, `1` for differences found,
 and `2` for operational or usage errors. With `-ledger-baseline`, only a
@@ -45,10 +58,13 @@ the machine report with `-json` (optionally to `-report FILE`).
   codegen, migrate and seed itself - so `apidiff run` provisions nothing and a
   run can never reach the datastores the stack you are using sits on. Readiness
   is `haven status --json` reporting the stack's backend lane listening, and the
-  instance is addressed on the API port haven allocated. Teardown is
-  `haven destroy <slug>` for exactly those two slugs. `-no-haven` boots the old
-  way; `-env-file` is refused alongside haven, because pointing the instances at
-  the servers a dotenv names is the thing haven exists to stop.
+  instance is addressed on the API port haven allocated. `haven up` runs from
+  each instance's own worktree — never from the invoking checkout, which is
+  what a directory-registered stack must never share. Teardown is
+  `haven destroy <slug>` for exactly those two slugs, run from the work root.
+  `-no-haven` boots the old way; `-env-file` is refused alongside haven,
+  because pointing the instances at the servers a dotenv names is the thing
+  haven exists to stop.
 - The paths below describe `-no-haven`. Each worktree boots through a detected profile: `apps/api`
   (`@langwatch/platform-api`) is the **modular** layout (root migrate/seed
   scripts, `API_PORT` on process env — node `--env-file` never overrides it);
@@ -236,6 +252,29 @@ of slugs) and marks those causes **known**: they are still reported, still
 counted, and no longer fail the run. Only a cause the baseline does not name
 exits `1`. That is how a branch ratchets from 40 causes to 0 without the tool
 being red the whole way.
+
+## Findings stream
+
+`run` (not `probe`, which has no run directory) appends one JSON line to
+`<work-root>/findings.jsonl` as each operation's comparison completes — a
+reader can `tail -f` it during the run instead of waiting for the final
+report and ledger. Each line is its own `Write`, flushed immediately, so
+nothing is batched across findings:
+
+```json
+{"surface":"rest","name":"GET /api/prompts","kind":"identical","module":"prompt","detail":"","capturedAt":"2026-09-10T00:00:00Z"}
+```
+
+`surface` is `rest` or `trpc` (the latter reserved — see "Not covered"
+below). `kind` is one of `absent-on-branch`, `status-differs`,
+`shape-differs`, `identical`, `probe-failed`; a probe failure or a
+missing-on-branch result wins over a mere status or shape difference. `module`
+is the module directory under `modules/` that best-effort matches the
+operation's path (a first path segment, singular/plural tolerant), or empty
+when nothing matches — most of the REST surface predates the module layout,
+so that is the common case. `detail` is one line: the status pair, the
+changed field pointers, or the skip/failure reason. The stream closes with one
+`{"kind":"run-complete","counts":{...}}` line totalling every kind emitted.
 
 ## Not covered
 

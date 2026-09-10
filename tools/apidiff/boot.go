@@ -80,6 +80,9 @@ type BootConfig struct {
 	// slug instead of provisioning infrastructure here. Default wherever haven
 	// is installed; see haven.go for why.
 	UseHaven bool
+	// DryRun prints the plan (refs, worktree paths, slugs, commands) and runs
+	// nothing at all — no worktree, no haven command, no install.
+	DryRun bool
 }
 
 // Instance is one booted API copy.
@@ -342,17 +345,102 @@ func Boot(ctx context.Context, cfg BootConfig, stderr io.Writer) (*Booted, error
 	return state.boot(ctx)
 }
 
+// DryRunPlan is what `-dry-run` prints: the worktrees, slugs and commands a
+// run would use, computed without creating a worktree, starting anything, or
+// running any command at all.
+type DryRunPlan struct {
+	WorkRoot   string
+	RunID      string
+	MainRef    string
+	MainDir    string
+	MainSlug   string // empty on the -no-haven path
+	BranchDir  string
+	BranchSlug string // empty on the -no-haven path
+	UseHaven   bool
+	Commands   []string
+}
+
+// PlanBoot computes a run's plan with no side effect: no worktree, no
+// process, no command. It is the same layout Boot would compute, so a plan
+// that names the invoking checkout as a worktree path is refused here too,
+// before anything real would have run.
+func PlanBoot(cfg BootConfig) (DryRunPlan, error) {
+	invoking, err := filepath.Abs(cfg.BranchDir)
+	if err != nil {
+		return DryRunPlan{}, err
+	}
+	workRoot := cfg.WorkRoot
+	if workRoot == "" {
+		workRoot = filepath.Join(invoking, ".apidiff", time.Now().Format("20060102-150405"))
+	}
+	runID := RunID(workRoot)
+	mainDir := filepath.Join(workRoot, "main")
+	plan := DryRunPlan{
+		WorkRoot: workRoot, RunID: runID, MainRef: cfg.MainRef, MainDir: mainDir,
+		BranchDir: invoking, UseHaven: cfg.UseHaven,
+	}
+	if !cfg.UseHaven {
+		plan.Commands = []string{
+			"git " + strings.Join(worktreeAddArgs(mainDir, cfg.MainRef), " ") + " (in " + invoking + ")",
+			"pnpm install / migrate / seed / start, both instances (see README: Boot details)",
+		}
+		return plan, nil
+	}
+	plan.BranchDir = filepath.Join(workRoot, "branch")
+	plan.MainSlug = HavenSlug(runID, "main")
+	plan.BranchSlug = HavenSlug(runID, "branch")
+	if plan.MainDir == invoking || plan.BranchDir == invoking {
+		return plan, fmt.Errorf("refusing to boot a haven stack from the invoking checkout %s", invoking)
+	}
+	plan.Commands = []string{
+		"git " + strings.Join(worktreeAddArgs(mainDir, cfg.MainRef), " ") + " (in " + invoking + ")",
+		"git " + strings.Join(worktreeAddArgs(plan.BranchDir, "HEAD"), " ") + " (in " + invoking + ")",
+		havenCommand + " " + strings.Join(havenUpArgs(), " ") + " (in " + mainDir + ", stack " + plan.MainSlug + ")",
+		havenCommand + " " + strings.Join(havenUpArgs(), " ") + " (in " + plan.BranchDir + ", stack " + plan.BranchSlug + ")",
+		havenCommand + " " + strings.Join(havenDestroyArgs(plan.MainSlug), " ") + " (in " + workRoot + ")",
+		havenCommand + " " + strings.Join(havenDestroyArgs(plan.BranchSlug), " ") + " (in " + workRoot + ")",
+		"git worktree remove --force " + mainDir,
+		"git worktree remove --force " + plan.BranchDir,
+	}
+	return plan, nil
+}
+
+// WriteDryRunPlan renders a plan the way visualdiff's own -dry-run does: the
+// paths and slugs a run would use, then the ordered commands, with nothing
+// started.
+func WriteDryRunPlan(w io.Writer, plan DryRunPlan) {
+	fmt.Fprintf(w, "apidiff run plan (dry run — nothing started)\n")
+	fmt.Fprintf(w, "  work root  %s\n", plan.WorkRoot)
+	fmt.Fprintf(w, "  main       %s -> %s\n", plan.MainRef, plan.MainDir)
+	if plan.UseHaven {
+		fmt.Fprintf(w, "             haven stack %s\n", plan.MainSlug)
+		fmt.Fprintf(w, "  branch     HEAD -> %s\n", plan.BranchDir)
+		fmt.Fprintf(w, "             haven stack %s\n", plan.BranchSlug)
+	} else {
+		fmt.Fprintf(w, "  branch     %s (booted in place; -no-haven has no stack for a worktree to isolate)\n", plan.BranchDir)
+	}
+	fmt.Fprintf(w, "  commands\n")
+	for _, command := range plan.Commands {
+		fmt.Fprintf(w, "    %s\n", command)
+	}
+}
+
 type bootState struct {
-	cfg       BootConfig
-	stderr    io.Writer
-	run       runner
-	workRoot  string
-	runID     string
-	mainDir   string
-	override  string
-	infra     infraURLs
-	ownsMain  bool
-	processes []*exec.Cmd
+	cfg      BootConfig
+	stderr   io.Writer
+	run      runner
+	workRoot string
+	runID    string
+	mainDir  string
+	ownsMain bool
+	// branchDir and ownsBranch are the haven path only: the branch instance's
+	// own HEAD worktree, so it never boots inside the invoking checkout (see
+	// refuseSelfCheckout and the package comment in haven.go).
+	branchDir  string
+	ownsBranch bool
+	override   string
+	infra      infraURLs
+	processes  []*exec.Cmd
 	// havenSlugs are the stacks this run started, in order. The teardown
 	// destroys these and nothing else.
 	havenSlugs []string
@@ -407,13 +495,7 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 	booted.Teardown = state.teardown
 
 	if state.cfg.UseHaven {
-		if err := state.prepareHavenInstances(booted); err != nil {
-			return booted, err
-		}
-		if err := state.bootThroughHaven(ctx, booted); err != nil {
-			return booted, err
-		}
-		return booted, nil
+		return booted, state.bootHaven(ctx, booted)
 	}
 	if err := state.prepareInstances(booted); err != nil {
 		return booted, err
@@ -422,6 +504,18 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 		return booted, err
 	}
 	return booted, nil
+}
+
+// bootHaven is the haven-path half of boot(): the branch instance runs from
+// its own HEAD worktree, never from the invoking checkout — that directory
+// already carries the developer's own haven stack, and `haven up` there
+// replaced its registration.
+func (state *bootState) bootHaven(ctx context.Context, booted *Booted) error {
+	booted.A.Dir = state.branchDir
+	if err := state.prepareHavenInstances(booted); err != nil {
+		return err
+	}
+	return state.bootThroughHaven(ctx, booted)
 }
 
 // prepareLayout resolves the branch dir and creates the work root.
@@ -507,20 +601,61 @@ func (state *bootState) bootInstances(ctx context.Context, booted *Booted) error
 	return nil
 }
 
+// setupWorktree prepares the base-ref worktree everywhere, and — for the
+// haven path only — a second worktree checking out the branch's own HEAD.
+// haven registers one stack per directory: booting the branch instance in the
+// invoking checkout is what let `haven up` there replace a developer's own
+// stack registration for that directory, and `haven destroy` take it down
+// (01:36, 2026-09-10). The branch worktree removes that directory collision
+// the same way the main one always has.
 func (state *bootState) setupWorktree(ctx context.Context) error {
-	state.mainDir = filepath.Join(state.workRoot, "main")
-	if state.cfg.ReuseWorktrees {
-		if _, err := os.Stat(state.mainDir); err == nil {
-			state.logf("reusing worktree %s", state.mainDir)
-			return nil
-		}
-		return fmt.Errorf("-reuse-worktrees but %s does not exist", state.mainDir)
-	}
-	state.logf("git worktree add %s at %s", state.cfg.MainRef, state.mainDir)
-	if err := state.runHost(ctx, "git", worktreeAddArgs(state.mainDir, state.cfg.MainRef)...); err != nil {
+	dir, owned, err := state.addOrReuseWorktree(ctx, "main", state.cfg.MainRef)
+	if err != nil {
 		return fmt.Errorf("git worktree add: %w", err)
 	}
-	state.ownsMain = true
+	state.mainDir, state.ownsMain = dir, owned
+	if !state.cfg.UseHaven {
+		return nil
+	}
+	dir, owned, err = state.addOrReuseWorktree(ctx, "branch", "HEAD")
+	if err != nil {
+		return fmt.Errorf("git worktree add (branch): %w", err)
+	}
+	state.branchDir, state.ownsBranch = dir, owned
+	return state.refuseSelfCheckout()
+}
+
+// addOrReuseWorktree adds (or, with -reuse-worktrees, adopts) one
+// <workRoot>/<name> worktree at ref, run from the invoking checkout. The bool
+// result says whether this run owns the worktree and so must remove it at
+// teardown.
+func (state *bootState) addOrReuseWorktree(ctx context.Context, name, ref string) (string, bool, error) {
+	dir := filepath.Join(state.workRoot, name)
+	if state.cfg.ReuseWorktrees {
+		if _, err := os.Stat(dir); err == nil {
+			state.logf("reusing worktree %s", dir)
+			return dir, false, nil
+		}
+		return "", false, fmt.Errorf("-reuse-worktrees but %s does not exist", dir)
+	}
+	state.logf("git worktree add %s at %s", ref, dir)
+	if err := state.runHost(ctx, "git", worktreeAddArgs(dir, ref)...); err != nil {
+		return "", false, err
+	}
+	return dir, true, nil
+}
+
+// refuseSelfCheckout is the backstop the 01:36 incident argues for: whatever
+// computed a worktree path, it must never equal the invoking checkout. Both
+// are freshly built <workRoot>/... paths, so this only fires if a future
+// change makes one alias the checkout again.
+func (state *bootState) refuseSelfCheckout() error {
+	invoking := filepath.Clean(state.cfg.BranchDir)
+	for _, dir := range []string{state.mainDir, state.branchDir} {
+		if dir != "" && filepath.Clean(dir) == invoking {
+			return fmt.Errorf("refusing to boot a haven stack from the invoking checkout %s", invoking)
+		}
+	}
 	return nil
 }
 
@@ -1090,7 +1225,7 @@ func (state *bootState) teardown() {
 	}
 	if state.cfg.UseHaven {
 		state.destroyHavenStacks(ctx)
-		state.removeMainWorktree(ctx)
+		state.removeOwnedWorktrees(ctx)
 		return
 	}
 	state.killAPIProcesses()
@@ -1108,16 +1243,24 @@ func (state *bootState) teardown() {
 			state.logf("teardown: flush redis: %v", err)
 		}
 	}
-	state.removeMainWorktree(ctx)
+	state.removeOwnedWorktrees(ctx)
 }
 
-// removeMainWorktree removes the base-ref worktree this run added, if it added
-// one. The branch checkout is the developer's own and is never touched.
-func (state *bootState) removeMainWorktree(ctx context.Context) {
-	if !state.ownsMain {
-		return
+// removeOwnedWorktrees removes every worktree this run added — the base-ref
+// one always, and the branch's own HEAD worktree on the haven path — and
+// leaves alone anything -reuse-worktrees adopted instead. The invoking
+// checkout itself is never a worktree this run owns, so it is never touched.
+func (state *bootState) removeOwnedWorktrees(ctx context.Context) {
+	if state.ownsMain {
+		state.removeWorktree(ctx, state.mainDir)
 	}
-	if err := state.runHost(ctx, "git", "worktree", "remove", "--force", state.mainDir); err != nil {
+	if state.ownsBranch {
+		state.removeWorktree(ctx, state.branchDir)
+	}
+}
+
+func (state *bootState) removeWorktree(ctx context.Context, dir string) {
+	if err := state.runHost(ctx, "git", "worktree", "remove", "--force", dir); err != nil {
 		state.logf("teardown: worktree remove: %v", err)
 	}
 }
