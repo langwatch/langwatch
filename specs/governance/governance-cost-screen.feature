@@ -823,33 +823,66 @@ Feature: One cost screen, three honest lanes
     # figures they chose to bring up to date. The reads are also expensive
     # and this screen carries several of them.
 
-  @integration
-  Scenario: A viewer can see each day of the window split by provider
-    Given a window in which two providers were billed on the same days
+  @unit
+  Scenario: A viewer can see the window split by provider over time
+    Given a window in which two providers were billed in the same period
     And every day of that window carries a dollar figure
-    When a permitted viewer reads the provider breakdown
-    Then each day shows a separate figure per provider
-    And those daily figures add up to the window total each provider already reports
+    When the provider breakdown is folded for the screen
+    Then each period holds a separate figure per provider
+    And those figures add up to the window total each provider already reports
     # The screen could say a provider cost a certain amount over a quarter
     # and could say the organization spent a certain amount on a given day,
-    # and had no way to answer which provider caused a day that stood out.
+    # and had no way to answer which provider caused a period that stood out.
+    #
+    # Checked on the fold rather than on the rendered panel because the panel
+    # is now a chart, and a chart draws nothing at all under a test renderer
+    # with no layout: its container measures zero and recharts declines to
+    # plot into it. The arithmetic is the part that can be wrong, and this is
+    # where it lives.
+
+  @unit
+  Scenario: The provider breakdown is bucketed by the interval the reader chose
+    Given billed days at two providers that all fall inside one quarter
+    When the provider breakdown is folded for a reader reading by quarter
+    Then those days become a single period
+    And each provider keeps a figure of its own inside it
+    # The read answers in days, because days are what the rollup stores. The
+    # screen has no day interval to offer a reader — month, quarter and year
+    # are the only widths the Time Interval chip carries — so a panel that
+    # drew a column per day drew a width nobody had asked for, and over a
+    # year of history it drew several hundred of them side by side.
 
   @integration
-  Scenario: A provider holding a day with no dollar figure shows no window total
+  Scenario: A provider holding a period with no dollar figure shows no window total
     Given a window in which one provider has a day we hold no dollar figure for
     When a permitted viewer reads the provider breakdown
     Then that provider shows no total for the window
-    And its daily figures are marked as covering only part of what was spent
+    And its bars are marked as covering only part of what was spent
     # Its other days each hold a real number, so a reader who adds the bars
     # up rebuilds exactly the partial sum the lane refused to show them.
     # The mark on the bars is what stops the chart from being that sum.
 
-  @integration
-  Scenario: Opening one day at one provider lists the records behind its figure
-    Given a day at one provider whose figure comes from several records
-    When a permitted viewer opens that day and provider
-    Then the records that make up the figure are listed
-    And each record names what it was for and what it cost
+  @unit
+  Scenario: The period a reader opens is the span its bar was drawn from
+    Given a provider billed on several days inside one period
+    When that period is opened
+    Then the span read for it starts on the first of those days
+    And it ends on the last of them
+    # The bar and the records under it have to be the same money. Taking the
+    # span from the calendar bounds of the period instead would reach past
+    # both ends of the window on the first and last bars it draws, and the
+    # records would then total more than the bar a reader clicked.
+
+  @unit
+  Scenario: The records behind a period cover every day the period holds
+    Given a provider billed on several days inside one period
+    When the records behind that period are read
+    Then every day in the period is counted into them
+    And no day outside the period is
+    # A period is what the reader clicked, so the records under it have to be
+    # the whole of what they clicked. Reading only the day the period opens
+    # on would answer a question nobody asked and would disagree with the
+    # bar directly above it.
 
   @integration
   Scenario: A window billed in two currencies shows one total per currency
@@ -881,12 +914,19 @@ Feature: One cost screen, three honest lanes
     # charts as a genuine nothing in the provider's own currency — the one
     # thing the dollar figure was allowed to be empty in order to prevent.
 
-  Rule: The screen says where its numbers stop being complete
+  Rule: The summary says where its numbers stop being complete
     # ADR-128 4a. A source whose pulls keep failing brings nothing back, so it
-    # reports no spend, so the lanes fall. On screen that is indistinguishable
-    # from a cheap month, and a reader who takes a stalled pull for a saving is
-    # worse off than one with no cost screen at all. The source pages already
-    # carry this line; only someone already suspicious goes there.
+    # reports no spend, so the lanes fall. The summary carries that fact so a
+    # reader is not left taking a stalled pull for a cheap month.
+    #
+    # THE COST SCREEN NO LONGER DRAWS IT. Two warning banners stood above the
+    # lanes — one for a failing pull, one for days read while cost recording
+    # was off — and both are gone at the product owner's direction: that
+    # screen is read while a decision is being made, often with the window
+    # shared, and it opens with figures rather than with caveats about them.
+    # The source pages carry the same fact, beside the source a reader would
+    # have to go to anyway to act on it. What follows is therefore about what
+    # the summary REPORTS, and no longer about what the screen shows.
     #
     # These scenarios say "failing to pull", not "stopped pulling", and the
     # difference is a known gap rather than pedantry. What is detected is a run
@@ -902,22 +942,6 @@ Feature: One cost screen, three honest lanes
     # sources that do not, so a failing non-cost puller is named here too.
     # Deliberate: the alternative to a slightly wide caveat is silence, which
     # is the harm this Rule exists to stop.
-
-    @integration
-    Scenario: The cost screen says where its numbers stop being complete
-      Given a source whose pulls have been failing
-      When a permitted viewer opens the cost screen
-      Then the screen names that source and the day of its last successful pull
-      And the lanes are still shown
-      # The figures are caveated, not withdrawn. What was pulled before the
-      # failures is still the truth about those days.
-
-    @integration
-    Scenario: A screen whose sources are all pulling carries no warning
-      Given every source pulling successfully
-      When a permitted viewer opens the cost screen
-      Then the screen carries no stopped-pulling warning
-      # A caveat on whole figures teaches the reader to ignore caveats.
 
     @unit
     Scenario: The gap is dated from the first source that started failing

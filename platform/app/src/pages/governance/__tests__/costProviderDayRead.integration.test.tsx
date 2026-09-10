@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * What the cost-by-provider-and-day panel shows when its read does not answer.
+ * What the cost-by-provider panel shows when its read does not answer.
  *
  * The panel renders nothing at all on an empty row list, which is right for a
  * window nobody spent in and wrong for a read that failed: a missing panel
@@ -84,7 +84,7 @@ vi.mock("~/utils/api", () => ({
           isError: harness.providerDays.isError,
         }),
       },
-      dayRecords: {
+      periodRecords: {
         useQuery: () => ({
           data: undefined,
           isLoading: false,
@@ -158,10 +158,10 @@ const PROVIDER_DAY_ROWS = [
  */
 const providerDayPanel = () => {
   const card = screen
-    .getByText("Cost by provider and day")
+    .getByText("Cost over time · by provider")
     .closest<HTMLElement>('[data-testid="cost-panel"]');
   if (card === null) {
-    throw new Error("the provider-day heading stands outside any cost panel");
+    throw new Error("the provider heading stands outside any cost panel");
   }
   return within(card);
 };
@@ -172,7 +172,7 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-describe("the cost by provider and day panel", () => {
+describe("the cost by provider panel", () => {
   describe("given its read failed", () => {
     beforeEach(() => {
       harness.providerDays = { data: undefined, isError: true };
@@ -190,7 +190,7 @@ describe("the cost by provider and day panel", () => {
       // The whole point of the marker: the panel keeps its place on the
       // screen. Gone, it would read as a window nobody spent anything in.
       expect(
-        panel.queryByLabelText("Cost by provider and day"),
+        panel.queryByLabelText("Cost over time · by provider"),
       ).not.toBeInTheDocument();
       // Its neighbours answered, so this cannot pass against a screen that
       // failed as a whole.
@@ -206,56 +206,38 @@ describe("the cost by provider and day panel", () => {
       };
     });
 
-    it("draws the figures and says nothing about a failed refresh", () => {
+    it("draws the panel and says nothing about a failed refresh", () => {
       renderScreen();
 
-      const region = within(screen.getByLabelText("Cost by provider and day"));
       expect(
-        region.getByTestId("cost-provider-day-openai_admin-2026-01-15"),
-      ).toHaveTextContent("60");
-      expect(
-        region.getByTestId("cost-provider-day-openai_admin-2026-01-16"),
-      ).toHaveTextContent("30");
-
+        screen.getByLabelText("Cost over time · by provider"),
+      ).toBeInTheDocument();
       expect(
         providerDayPanel().queryByText(/could not be brought up to date/i),
       ).not.toBeInTheDocument();
     });
   });
 
-  describe("given two days at one provider cost exactly the same", () => {
+  describe("given every day of the window carries a figure", () => {
     beforeEach(() => {
       harness.providerDays = {
-        data: {
-          rows: PROVIDER_DAY_ROWS.map((row) => ({ ...row, amountUsd: 60 })),
-        },
+        data: { rows: PROVIDER_DAY_ROWS },
         isError: false,
       };
     });
 
-    it("still names each day's control apart, rather than repeating one name", () => {
+    it("says nothing about spend it holds no dollar figure for", () => {
       renderScreen();
 
-      const region = within(screen.getByLabelText("Cost by provider and day"));
-      const names = region
-        .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label") ?? "");
-
-      // The visible text on both is "$60.00". Reached by control rather than
-      // by eye, identical names leave a reader no way to tell which day they
-      // are about to open.
-      expect(names).toHaveLength(2);
-      expect(new Set(names).size).toBe(2);
-      // The day is the thing that tells them apart, so each name has to carry
-      // its own — a set of two that differ by a stray index would pass the
-      // check above and help nobody.
-      expect(names[0]).toContain("2026-01-15");
-      expect(names[1]).toContain("2026-01-16");
-      // And each still says whose spend it is and what the control does.
-      for (const name of names) {
-        expect(name).toMatch(/records/i);
-        expect(name).toContain("$60.00");
-      }
+      // The caveat is for a window that has one. Printing it over a window
+      // where every day was priced teaches a reader to read past it, which
+      // costs them the one window where it mattered.
+      const region = within(
+        screen.getByLabelText("Cost over time · by provider"),
+      );
+      expect(
+        region.queryByLabelText(/cover only part of what was spent/i),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -276,14 +258,16 @@ describe("the cost by provider and day panel", () => {
       expect(
         panel.getByText(/could not be brought up to date/i),
       ).toBeInTheDocument();
-      // Drawing these alongside the marker would state two contradictory
-      // things at once, and drawing them without it would present figures
-      // from before the failure as current.
+      // Drawing the chart alongside the marker would state two contradictory
+      // things at once, and drawing it without the marker would present
+      // figures from before the failure as current.
       expect(
-        screen.queryByTestId("cost-provider-day-openai_admin-2026-01-15"),
+        screen.queryByLabelText("Cost over time · by provider"),
       ).not.toBeInTheDocument();
       // One panel under this heading, not the marker and the chart as two.
-      expect(screen.getAllByText("Cost by provider and day")).toHaveLength(1);
+      expect(screen.getAllByText("Cost over time · by provider")).toHaveLength(
+        1,
+      );
     });
   });
 });

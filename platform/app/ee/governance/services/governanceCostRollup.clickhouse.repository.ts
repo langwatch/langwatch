@@ -1011,18 +1011,27 @@ export class GovernanceCostRollupClickHouseRepository {
   }
 
   /**
-   * The records behind ONE day at ONE provider: what each was for, and what it
-   * cost.
+   * The records behind ONE PERIOD at ONE provider: what each was for, and what
+   * it cost.
    *
    * A cell is the record here. The dimensions that make a cell — the model and
    * the agent the provider named — are exactly "what it was for", so the read
    * is the same dedup pass grouped one level finer than the figure it explains
    * and the parts always add up to the whole a reader clicked.
+   *
+   * THE PERIOD IS A RANGE, not a day, because the screen above it has no day
+   * to offer: its Time Interval chip carries month, quarter and year and
+   * nothing narrower, so the figure a reader clicks always covers many days.
+   * Reading a single day here would answer a question the screen never asked
+   * and would disagree with the bar it sits under. The range is inclusive at
+   * both ends, matching `sumDaysByProvider` directly above.
    */
-  async sumDayRecordsByProvider(input: {
+  async sumPeriodRecordsByProvider(input: {
     tenantId: string;
-    /** `YYYY-MM-DD`, one day. */
-    day: string;
+    /** `YYYY-MM-DD`, the period's first day, included. */
+    fromDay: string;
+    /** `YYYY-MM-DD`, the period's last day, included. */
+    toDay: string;
     provider: string;
   }): Promise<
     Array<{
@@ -1048,7 +1057,8 @@ export class GovernanceCostRollupClickHouseRepository {
             argMax(AmountNanoMinor, EventTimestamp) AS LatestAmountNanoMinor
           FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
           WHERE TenantId = {tenantid:String}
-            AND Day = {day:Date}
+            AND Day >= {fromday:Date}
+            AND Day <= {today:Date}
             AND Provider = {provider:String}
             AND CostSource = {costsource:String}
             AND Version = {version:String}
@@ -1059,7 +1069,8 @@ export class GovernanceCostRollupClickHouseRepository {
       `,
       query_params: {
         tenantid: input.tenantId,
-        day: input.day,
+        fromday: input.fromDay,
+        today: input.toDay,
         provider: input.provider,
         costsource: GOVERNANCE_COST_SOURCE.PULLED,
         version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,

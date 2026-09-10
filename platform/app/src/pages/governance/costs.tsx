@@ -12,9 +12,7 @@ import {
 import type {
   GovernanceCostDayDto,
   GovernanceCostProviderDayRowDto,
-  GovernanceCostStaleSourcesDto,
   GovernanceCostSummaryDto,
-  GovernanceCostUnpricedWindowDto,
 } from "@ee/governance/services/governanceCost.service";
 import numeral from "numeral";
 import {
@@ -64,7 +62,6 @@ import {
 import {
   ALL_DEPARTMENTS,
   aggregateBuckets,
-  aggregateLaneTrend,
   aggregateLine,
   aggregateSeatCounts,
   bucketStartOf,
@@ -792,20 +789,15 @@ function CostLanes({
   // share their own window read so ongoing ingestion cannot split them.
   const seriesOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
     data.series.map((day) => ({ day: day.day, value: pick(day) }));
-  const trendOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
-    aggregateLaneTrend(seriesOf(pick), interval);
-  // Measured on the unfolded series, and the fold is drawn from the same one.
-  // The sparkline is a picture of the calendar and wants the buckets; the
-  // badge is a comparison of two spans and cannot have them, because a bucket
-  // is whatever number of days the calendar left in it. Folding first made a
-  // year of unchanged spend report growth on every day the page could be
-  // opened, the size of it set by which quarter today happened to fall in.
+  // Measured on the UNFOLDED series. The badge compares two spans and cannot
+  // have buckets, because a bucket is whatever number of days the calendar
+  // left in it. Folding first made a year of unchanged spend report growth on
+  // every day the page could be opened, the size of it set by which quarter
+  // today happened to fall in.
   const trendPctOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
     laneTrendPct(seriesOf(pick));
   return (
     <VStack align="stretch" gap={6}>
-      <StaleSourcesNotice staleSources={data.staleSources} />
-      <UnpricedWindowNotice unpricedWindow={data.unpricedWindow} />
       <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
         <CostLanePanel
           testId="cost-lane-billed"
@@ -820,9 +812,7 @@ function CostLanes({
               ? azureBillingNoteSentence(data.azureBilling)
               : null
           }
-          trend={trendOf((day) => day.billedUsd)}
           trendPct={trendPctOf((day) => day.billedUsd)}
-          interval={interval}
           sample={sample}
         >
           <CostProviderBreakdown providers={data.providers ?? []} />
@@ -835,9 +825,7 @@ function CostLanes({
           cellsWithoutAmount={data.gateway.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.gateway.currenciesWithoutUsdAmount}
           currencyTotals={data.gateway.currencyTotals}
-          trend={trendOf((day) => day.gatewayUsd)}
           trendPct={trendPctOf((day) => day.gatewayUsd)}
-          interval={interval}
           sample={sample}
         />
         <SeatLanePanel
@@ -847,99 +835,6 @@ function CostLanes({
         />
       </SimpleGrid>
     </VStack>
-  );
-}
-
-/**
- * Where the numbers below stop being complete (ADR-128 §4a).
- *
- * A source that is failing to pull still has a lane on this screen; it just
- * contributes nothing to it, so the totals fall and nothing says why. Without
- * this line a broken credential reads as a cheap month, which is the one
- * reading of a cost screen that is worse than no cost screen.
- *
- * The wording says "failing to pull" rather than "stopped pulling" because
- * that is the whole of what the check behind it detects: a run of consecutive
- * pull failures. A source whose worker is never scheduled keeps a zero failure
- * count and is never named here, though its figures are just as incomplete —
- * see the known gap recorded on the Rule in
- * `specs/governance/governance-cost-screen.feature`. Claiming "stopped" would
- * promise a guarantee this line cannot keep.
- *
- * The sources are named because "something is failing" is not actionable and
- * "Azure Billing is failing" is.
- */
-function StaleSourcesNotice({
-  staleSources,
-}: {
-  staleSources: GovernanceCostStaleSourcesDto | null;
-}) {
-  if (!staleSources) return null;
-
-  const since = new Date(staleSources.oldestLastSuccessIso).toLocaleDateString(
-    undefined,
-    { year: "numeric", month: "short", day: "numeric" },
-  );
-
-  return (
-    <Alert.Root status="warning" data-testid="cost-stale-sources">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>No data since {since}</Alert.Title>
-        <Alert.Description>
-          {staleSources.sourceNames.join(", ")}{" "}
-          {staleSources.sourceNames.length === 1 ? "is" : "are"} failing to
-          pull, so spend after that point is unknown rather than zero.
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
-  );
-}
-
-/**
- * Days that were read but never priced, because pulled cost recording was off.
- *
- * The sibling of the notice above, for a gap nothing broke to cause. Those days
- * have their audit rows; only the money was dropped, and a dropped figure draws
- * as zero. Turning the setting on stops the loss from growing but does not undo
- * it — the pull cursor moved past those days and will not revisit them on its
- * own — so the line has to say both, or a reader fixes the setting and believes
- * the history is now correct.
- *
- * Dates rather than "since": this gap is bounded at both ends, and a gap that
- * closed last month should not read as an open wound.
- */
-function UnpricedWindowNotice({
-  unpricedWindow,
-}: {
-  unpricedWindow: GovernanceCostUnpricedWindowDto | null;
-}) {
-  if (!unpricedWindow) return null;
-
-  const asDay = (iso: string) =>
-    new Date(iso).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  const since = asDay(unpricedWindow.sinceIso);
-  const through = asDay(unpricedWindow.throughIso);
-  const span = since === through ? since : `${since} to ${through}`;
-
-  return (
-    <Alert.Root status="warning" data-testid="cost-unpriced-window">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>Spend not recorded for {span}</Alert.Title>
-        <Alert.Description>
-          {unpricedWindow.sourceNames.join(", ")} read those days while this
-          organization was not recording pulled cost, so their spend is unknown
-          rather than zero. Switching recording on stops the loss but leaves
-          these days empty — move a source&apos;s start date back across them to
-          read them again.
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
   );
 }
 
@@ -1351,6 +1246,9 @@ function BreakdownGrid({
   sample,
   showSample,
   spenders,
+  organizationId,
+  providerDays,
+  hasProviderDaysFailure,
 }: {
   interval: TimeInterval;
   /** Every measured series, already folded and filtered. Null is unanswered. */
@@ -1360,6 +1258,16 @@ function BreakdownGrid({
   sample: SampleSeries;
   showSample: boolean;
   spenders: SpenderReadState;
+  organizationId: string;
+  /** One figure per (day, provider) of the billed lane. */
+  providerDays: readonly GovernanceCostProviderDayRowDto[];
+  /**
+   * Whether that read FAILED, which an empty row list cannot say on its own.
+   * Without it a failed read is an empty list, an empty list hides the panel,
+   * and a hidden panel beside filled neighbours reads as no spend — the same
+   * confusion `CostPanelUnrefreshed` exists to prevent.
+   */
+  hasProviderDaysFailure: boolean;
 }) {
   const orSample = <T,>(measured: T[] | null, samples: T[]): T[] | null =>
     showSample ? samples : measured;
@@ -1392,6 +1300,26 @@ function BreakdownGrid({
           />
         )}
       </CostPanel>
+      {/* Beside `Cost over time · by team` on purpose: the two are the same
+          chart over the same axis, one split by who spent and one by who
+          billed, and reading them as a pair is how a period that stood out
+          gets attributed. In sample mode it stands down entirely — there is
+          no invented provider series to draw, and an empty panel between two
+          full ones reads as a provider nobody used. */}
+      {!showSample && hasProviderDaysFailure && (
+        <CostPanel title="Cost over time · by provider">
+          <CostPanelUnrefreshed />
+        </CostPanel>
+      )}
+      {!showSample && !hasProviderDaysFailure && providerDays.length > 0 && (
+        <CostPanel title="Cost over time · by provider">
+          <CostProviderDayPanel
+            organizationId={organizationId}
+            rows={providerDays}
+            interval={interval}
+          />
+        </CostPanel>
+      )}
       <CostPanel title="Cost by department" sample={showSample}>
         {unrefreshed("byDepartment") ? (
           <CostPanelUnrefreshed />
@@ -1550,24 +1478,6 @@ function CostBreakdowns({
       {showSample && (
         <SampleHeadlinePanels sample={sample} interval={filters.interval} />
       )}
-      {/* Not in the grid below it. The grid's panels each rank ONE dimension
-          and fit a third of a row; this one is a day axis crossed with a
-          provider axis, and squeezing it into a third of a row would put the
-          window's days behind a scrollbar — which is exactly where they were
-          before this panel existed. */}
-      {!showSample && hasProviderDaysFailure && (
-        <CostPanel title="Cost by provider and day">
-          <CostPanelUnrefreshed />
-        </CostPanel>
-      )}
-      {!showSample && !hasProviderDaysFailure && providerDays.length > 0 && (
-        <CostPanel title="Cost by provider and day">
-          <CostProviderDayPanel
-            organizationId={organizationId}
-            rows={providerDays}
-          />
-        </CostPanel>
-      )}
       <BreakdownGrid
         interval={filters.interval}
         rows={rows}
@@ -1575,6 +1485,9 @@ function CostBreakdowns({
         sample={sample}
         showSample={showSample}
         spenders={spenders}
+        organizationId={organizationId}
+        providerDays={providerDays}
+        hasProviderDaysFailure={hasProviderDaysFailure}
       />
     </VStack>
   );

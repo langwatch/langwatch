@@ -107,7 +107,7 @@ vi.mock("~/utils/api", () => {
           spenders: invalidator("governanceCost.spenders"),
           dailyByProvider: invalidator("governanceCost.dailyByProvider"),
           spendByModel: invalidator("governanceCost.spendByModel"),
-          dayRecords: invalidator("governanceCost.dayRecords"),
+          periodRecords: invalidator("governanceCost.periodRecords"),
         },
         activityMonitor: {
           summary: invalidator("activityMonitor.summary"),
@@ -156,7 +156,7 @@ vi.mock("~/utils/api", () => {
           ],
           windowDays: 30,
         }),
-        // `dayRecords` is deliberately NOT in `READS_ON_THE_SCREEN`, and this
+        // `periodRecords` is deliberately NOT in `READS_ON_THE_SCREEN`, and this
         // mock is what makes that absence enforceable rather than decorative.
         // The read is issued only once a reader opens a day, so a refresh
         // re-running it would be work for a panel nobody has opened — and were
@@ -164,7 +164,7 @@ vi.mock("~/utils/api", () => {
         // `reissued` and fail the equality below by naming a read the set does
         // not hold. The direction of the guard is that way round: it catches a
         // refresh that wrongly INCLUDES this read, not one that omits it.
-        dayRecords: read("governanceCost.dayRecords", { records: [] }),
+        periodRecords: read("governanceCost.periodRecords", { records: [] }),
       },
       activityMonitor: {
         summary: read("activityMonitor.summary", {

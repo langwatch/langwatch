@@ -805,22 +805,32 @@ export class GovernanceCostService {
   }
 
   /**
-   * The records behind ONE day at ONE provider: what each was for, and what it
-   * cost.
+   * The records behind ONE PERIOD at ONE provider: what each was for, and what
+   * it cost.
    *
    * "What it was for" is the model, and the agent beside it when the provider
    * named one — those are the dimensions the figure was grouped by, so the
    * records add up to exactly the figure a reader clicked and no residue is
    * left over for them to wonder about.
+   *
+   * A PERIOD, not a day: the screen this answers has no day interval to offer
+   * — month, quarter and year are the widths its Time Interval chip carries —
+   * so the bar a reader clicks always covers a span. The span arrives already
+   * resolved to its first and last day, because the fold that decided where
+   * one period ends and the next begins lives on the screen and there is no
+   * second copy of that arithmetic here to disagree with it.
    */
-  async dayRecords({
+  async periodRecords({
     organizationId,
-    day,
+    fromDay,
+    toDay,
     provider,
   }: {
     organizationId: string;
-    /** `YYYY-MM-DD`, the provider's business day in UTC. */
-    day: string;
+    /** `YYYY-MM-DD`, the period's first day in UTC, included. */
+    fromDay: string;
+    /** `YYYY-MM-DD`, the period's last day in UTC, included. */
+    toDay: string;
     provider: string;
   }): Promise<GovernanceCostDayRecordsDto> {
     const { costRollup, prisma } = this.deps;
@@ -832,9 +842,10 @@ export class GovernanceCostService {
       return { unavailableReason: "no_governance_project", records: [] };
     }
 
-    const groups = await costRollup.sumDayRecordsByProvider({
+    const groups = await costRollup.sumPeriodRecordsByProvider({
       tenantId,
-      day,
+      fromDay,
+      toDay,
       provider,
     });
 

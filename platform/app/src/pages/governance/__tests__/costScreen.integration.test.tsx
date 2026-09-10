@@ -13,7 +13,13 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -651,15 +657,32 @@ describe("the governance cost screen", () => {
       };
     };
 
+    /**
+     * What the billed lane's (i) says, opened.
+     *
+     * The lane's sentence and whatever the read side added about it moved off
+     * the face of the card and behind the (i) beside its title: three cards
+     * sit in a row and each closed on a paragraph, which set the row's height
+     * by the longest of them. The popover portals out of the card, so it is
+     * found on the document rather than inside the lane.
+     */
+    const billedLaneInfo = () => {
+      fireEvent.click(screen.getByTestId("cost-lane-billed-about"));
+      const body = document.querySelector<HTMLElement>(
+        '[data-scope="popover"][data-part="content"]',
+      );
+      if (body === null) throw new Error("the lane's (i) did not open");
+      return body;
+    };
+
     /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
     it("explains a declared-prepaid tenant's empty bill on the billed lane", () => {
       withNote("prepaid_declared");
       renderScreen();
 
-      const note = within(screen.getByTestId("cost-lane-billed")).getByTestId(
-        "cost-lane-billed-lane-note",
+      expect(billedLaneInfo()).toHaveTextContent(
+        /prepaid.*never appear.*bill/i,
       );
-      expect(note).toHaveTextContent(/prepaid.*never appear.*bill/i);
     });
 
     /** @scenario "A tenant that declared nothing is never told it is prepaid" */
@@ -667,11 +690,16 @@ describe("the governance cost screen", () => {
       withNote("no_spend_recorded");
       renderScreen();
 
-      const billed = screen.getByTestId("cost-lane-billed");
-      const note = within(billed).getByTestId("cost-lane-billed-lane-note");
-      expect(note).toHaveTextContent(/was read/i);
-      expect(note).toHaveTextContent(/no .*charges/i);
-      for (const readable of readableStrings(billed)) {
+      const info = billedLaneInfo();
+      expect(info).toHaveTextContent(/was read/i);
+      expect(info).toHaveTextContent(/no .*charges/i);
+      // The word must be absent from the card AND from what its (i) says: a
+      // tenant that declared nothing being told about prepaid packs is the
+      // defect, wherever the sentence happens to live.
+      for (const readable of [
+        ...readableStrings(screen.getByTestId("cost-lane-billed")),
+        ...readableStrings(info),
+      ]) {
         expect(readable).not.toMatch(/prepaid/i);
       }
     });
@@ -679,7 +707,8 @@ describe("the governance cost screen", () => {
     /** @scenario "A declared-prepaid tenant whose bill has amounts sees the amounts" */
     it("renders the figures with no note when the read side sent none", () => {
       // The read side withholds the note whenever the bill holds amounts;
-      // the screen's half of that contract is to render nothing extra.
+      // the screen's half of that contract is to add nothing to what the (i)
+      // already says about the lane itself.
       harness.query = {
         data: summaryFixture({ azureBilling: null }),
         isLoading: false,
@@ -689,19 +718,17 @@ describe("the governance cost screen", () => {
 
       const billed = screen.getByTestId("cost-lane-billed");
       expect(within(billed).getByText("$123.45")).toBeInTheDocument();
-      expect(
-        within(billed).queryByTestId("cost-lane-billed-lane-note"),
-      ).not.toBeInTheDocument();
+      expect(billedLaneInfo()).toHaveTextContent(
+        "Provider-reported costs recorded for this period.",
+      );
+      expect(billedLaneInfo()).not.toHaveTextContent(/could not be read/i);
     });
 
     it("reports a failed read as missing data on the lane", () => {
       withNote("billing_read_failed");
       renderScreen();
 
-      const note = within(screen.getByTestId("cost-lane-billed")).getByTestId(
-        "cost-lane-billed-lane-note",
-      );
-      expect(note).toHaveTextContent(/could not be read/i);
+      expect(billedLaneInfo()).toHaveTextContent(/could not be read/i);
     });
   });
 
@@ -736,8 +763,19 @@ describe("the governance cost screen", () => {
   });
 
   describe("given a source whose pulls have been failing", () => {
-    /** @scenario "The cost screen says where its numbers stop being complete" */
-    it("names the source and the day, next to the lanes it undercounts", () => {
+    /**
+     * THE SCREEN NO LONGER SAYS SO, by decision rather than by regression.
+     * Two warning banners stood above the lanes — this one, and one for days
+     * read while cost recording was off — and both were removed at the
+     * product owner's direction: the screen opens with figures rather than
+     * with caveats about them, and the source pages carry the same fact
+     * beside the source a reader would have to visit to act on it.
+     *
+     * The read still reports it (see the unit scenarios under the summary's
+     * own Rule), so this holds the screen's half: it draws neither banner,
+     * and it does not fall over on a summary that carries one.
+     */
+    it("draws no warning banner over the lanes", () => {
       harness.query = {
         data: summaryFixture({
           staleSources: {
@@ -751,30 +789,15 @@ describe("the governance cost screen", () => {
 
       renderScreen();
 
-      const notice = screen.getByTestId("cost-stale-sources");
-      expect(within(notice).getByText(/Azure Billing/)).toBeInTheDocument();
-      expect(
-        within(notice).getByText(/unknown rather than zero/i),
-      ).toBeInTheDocument();
-      // The day itself, not merely the words around it. Asserting only the
-      // phrase let a title that had lost its date pass. Matching the digits
-      // rather than a formatted string keeps this locale-independent: every
-      // locale renders a numeric day and year as those numerals.
-      const since = within(notice).getByText(/^No data since /);
-      expect(since.textContent).toMatch(/\b20\b/);
-      expect(since.textContent).toMatch(/\b2026\b/);
-      // The lanes still render. A stalled pull caveats the figures; it does
-      // not withdraw them.
-      expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
-    });
-
-    /** @scenario "A screen whose sources are all pulling carries no warning" */
-    it("stays silent while every source is still pulling", () => {
-      renderScreen();
-
       expect(
         screen.queryByTestId("cost-stale-sources"),
       ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("cost-unpriced-window"),
+      ).not.toBeInTheDocument();
+      // The lanes still render, which is what makes this a removal rather
+      // than a screen that fell over on the field it stopped reading.
+      expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
     });
   });
 

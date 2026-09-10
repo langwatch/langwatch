@@ -79,7 +79,7 @@ const harness = vi.hoisted(() => ({
    */
   dailyByProvider: undefined as unknown,
   /** Not yet implemented: the records behind one day at one provider. */
-  dayRecords: undefined as unknown,
+  periodRecords: undefined as unknown,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -134,9 +134,9 @@ vi.mock("~/utils/api", () => ({
           isError: false,
         }),
       },
-      dayRecords: {
+      periodRecords: {
         useQuery: () => ({
-          data: harness.dayRecords,
+          data: harness.periodRecords,
           isLoading: false,
           isError: false,
         }),
@@ -198,7 +198,7 @@ beforeEach(() => {
   harness.lanesReport = true;
   harness.providers = [];
   harness.dailyByProvider = undefined;
-  harness.dayRecords = undefined;
+  harness.periodRecords = undefined;
   harness.modelSpend = undefined;
   harness.modelSpendFails = false;
 });
@@ -626,70 +626,33 @@ describe("the cost breakdown panels", () => {
       };
     });
 
-    /** @scenario "A viewer can see each day of the window split by provider" */
-    it("splits each day by provider and adds those days back to the window total", () => {
+    /**
+     * The panel keeps its place in the grid and says whose spend it is.
+     *
+     * WHAT IT DRAWS IS NOT CHECKED HERE. It is a chart now, and a chart draws
+     * nothing under a renderer with no layout: its container measures zero
+     * and recharts declines to plot into it. The arithmetic behind the bars —
+     * the split per period, the span each bar covers — is checked directly in
+     * `src/components/governance/costs/__tests__/providerPeriods.unit.test.ts`,
+     * where it can be.
+     */
+    it("renders under its own heading beside the lane it splits", () => {
       renderScreen();
 
-      const region = within(screen.getByLabelText("Cost by provider and day"));
-
-      // Each day carries a separate figure per provider, not one figure for
-      // the day and one for the provider.
-      const figure = (provider: string, day: string) =>
-        Number(
-          region
-            .getByTestId(`cost-provider-day-${provider}-${day}`)
-            .textContent?.replace(/[^0-9.-]/g, "") ?? "",
-        );
-      expect(figure("openai_admin", "2026-01-15")).toBe(60);
-      expect(figure("anthropic_admin", "2026-01-15")).toBe(41);
-      expect(figure("openai_admin", "2026-01-16")).toBe(30);
-      expect(figure("anthropic_admin", "2026-01-16")).toBe(21);
-
-      // Read back out of the DOM and held against what the window panel says,
-      // rather than against the fixture: a split that draws one thing and
-      // totals another is exactly the defect a reader would find by adding
-      // the bars up themselves.
+      expect(
+        screen.getByLabelText("Cost over time · by provider"),
+      ).toBeInTheDocument();
+      // Its neighbour still states the window total the bars split up, so a
+      // reader has both halves of the comparison on one screen.
       const billed = within(screen.getByTestId("cost-lane-billed"));
-      expect(
-        figure("openai_admin", "2026-01-15") +
-          figure("openai_admin", "2026-01-16"),
-      ).toBe(90);
       expect(billed.getByText("$90.00")).toBeInTheDocument();
-      expect(
-        figure("anthropic_admin", "2026-01-15") +
-          figure("anthropic_admin", "2026-01-16"),
-      ).toBe(62);
       expect(billed.getByText("$62.00")).toBeInTheDocument();
-    });
-
-    /** @scenario "Opening one day at one provider lists the records behind its figure" */
-    it("lists the records behind one day at one provider, each with what it was for and what it cost", () => {
-      harness.dayRecords = {
-        records: [
-          { label: "gpt-5-mini", amountUsd: 36 },
-          { label: "gpt-5", amountUsd: 24 },
-        ],
-      };
-      renderScreen();
-
-      const region = within(screen.getByLabelText("Cost by provider and day"));
-      fireEvent.click(
-        region.getByTestId("cost-provider-day-openai_admin-2026-01-15"),
-      );
-
-      const records = within(screen.getByLabelText("Records behind this day"));
-      // What each record was for...
-      expect(records.getByText("gpt-5-mini")).toBeInTheDocument();
-      expect(records.getByText("gpt-5")).toBeInTheDocument();
-      // ...and what it cost.
-      expect(records.getByText("$36.00")).toBeInTheDocument();
-      expect(records.getByText("$24.00")).toBeInTheDocument();
     });
   });
 
   describe("given one provider holds a day we have no dollar figure for", () => {
-    /** @scenario "A provider holding a day with no dollar figure shows no window total" */
-    it("shows that provider no window total and marks its days as covering only part of the spend", () => {
+    /** @scenario "A provider holding a period with no dollar figure shows no window total" */
+    it("shows that provider no window total and marks its bars as covering only part of the spend", () => {
       harness.providers = [
         { provider: "openai_admin", amountUsd: 90, cellsWithoutAmount: 0 },
         // The window total is withheld: one of its days holds no figure, so
@@ -722,10 +685,16 @@ describe("the cost breakdown panels", () => {
       // up rebuilds exactly the partial sum the window total refused to show
       // them. The mark on the bars is what stops the chart from being that
       // sum.
-      const region = within(screen.getByLabelText("Cost by provider and day"));
+      const region = within(
+        screen.getByLabelText("Cost over time · by provider"),
+      );
       expect(
-        region.getByLabelText(/covers only part of what was spent/i),
+        region.getByLabelText(/cover only part of what was spent/i),
       ).toBeInTheDocument();
+      // And it names WHICH provider is short, because the chart stacks two of
+      // them and a bare caveat leaves a reader unable to tell which bar to
+      // distrust.
+      expect(region.getByText(/Anthropic/)).toBeInTheDocument();
     });
   });
 });

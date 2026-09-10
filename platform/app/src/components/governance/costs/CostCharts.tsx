@@ -462,6 +462,7 @@ export function CostStackedBars({
   grouped = false,
   colorFor,
   empty,
+  onSelectSeries,
 }: {
   buckets: DailyBucket[] | null;
   height?: string;
@@ -484,6 +485,16 @@ export function CostStackedBars({
   colorFor?: (key: string) => string | undefined;
   /** This panel's own empty state. See `costPanelEmpty`. */
   empty?: (unanswered: boolean) => ReactNode;
+  /**
+   * Called with a series key and a bucket when a reader clicks that series in
+   * that bucket. Unset on every panel that has nothing to open, which is most
+   * of them, and the bars then carry no pointer and no handler at all.
+   *
+   * The bar is the target rather than a row of controls under the chart: a
+   * reader chasing a bucket that stands out is already pointing at it, and a
+   * control row under a chart is a shape nothing else on this screen has.
+   */
+  onSelectSeries?: (key: string, bucket: string) => void;
 }) {
   const keys = useMemo(() => seriesKeysOf(buckets ?? []), [buckets]);
   const rows = useMemo(
@@ -536,6 +547,23 @@ export function CostStackedBars({
               stackId={grouped ? undefined : "cost"}
               fill={colorFor?.(k.key) ?? getHexColorForString(k.label)}
               isAnimationActive={false}
+              cursor={onSelectSeries ? "pointer" : undefined}
+              onClick={
+                onSelectSeries
+                  ? (data) => {
+                      // The widened row rides along as `payload`, so the
+                      // bucket comes off the row itself rather than out of an
+                      // index into `rows` — an index would silently point at
+                      // the wrong bucket the moment a series is missing from
+                      // one. Read through a cast because recharts types the
+                      // payload as the chart's own row shape, which is a
+                      // string-keyed bag it cannot narrow for us.
+                      const day = (data as { payload?: { day?: unknown } })
+                        ?.payload?.day;
+                      if (typeof day === "string") onSelectSeries(k.key, day);
+                    }
+                  : undefined
+              }
             />
           ))}
         </BarChart>
@@ -786,78 +814,6 @@ export function CostForecastArea({
               isAnimationActive={false}
             />
           ))}
-        </AreaChart>
-      </ResponsiveContainer>
-    </Box>
-  );
-}
-
-/**
- * The shape of a lane's window, at card size.
- *
- * A lane card states one figure, and one figure cannot say whether it is the
- * end of a climb, a spike already over, or a flat month. The cards used to
- * carry that question in a blank middle; this answers it in the same space.
- *
- * No axes, no grid, no legend — a sparkline that carried them would be a
- * chart, and the card already has a chart's worth of explanation underneath
- * it. The tooltip stays, because the one thing a reader wants from a shape
- * they have spotted is which period it was.
- *
- * Days with no figure are gaps rather than zeroes (ADR-128 §21): a withheld
- * amount drawn on the floor is a claim that nothing was spent that day.
- */
-export function LaneSparkline({
-  points,
-  interval,
-  height = "40px",
-}: {
-  points: Array<{ day: string; value: number | null }>;
-  /** The bucket width in view, which the tooltip's heading is read in. */
-  interval?: TimeInterval;
-  height?: string;
-}) {
-  if (points.length < 2) return null;
-  return (
-    <Box height={height} width="full" marginTop={1}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
-          data={points}
-          margin={{ top: 2, right: 0, bottom: 0, left: 0 }}
-        >
-          <defs>
-            <linearGradient id="cost-lane-spark" x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="0%"
-                stopColor={CHART_SPARK_STROKE}
-                stopOpacity={0.32}
-              />
-              <stop
-                offset="100%"
-                stopColor={CHART_SPARK_STROKE}
-                stopOpacity={0.02}
-              />
-            </linearGradient>
-          </defs>
-          <YAxis hide domain={["dataMin", "dataMax"]} />
-          <Tooltip
-            formatter={(value) => [fmtMoney(Number(value)), "Spend"]}
-            labelFormatter={(label) => formatDayTick(label as string, interval)}
-            contentStyle={CHART_TOOLTIP_CONTENT}
-            labelStyle={CHART_TOOLTIP_LABEL}
-            cursor={CHART_TOOLTIP_CURSOR}
-          />
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke={CHART_SPARK_STROKE}
-            strokeWidth={1.5}
-            fill="url(#cost-lane-spark)"
-            fillOpacity={1}
-            connectNulls={false}
-            isAnimationActive={false}
-            dot={false}
-          />
         </AreaChart>
       </ResponsiveContainer>
     </Box>

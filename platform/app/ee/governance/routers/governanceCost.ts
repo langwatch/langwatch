@@ -155,21 +155,39 @@ export const governanceCostRouter = createTRPCRouter({
     }),
 
   /**
-   * The records behind one day at one provider. Same grant as the figure they
-   * explain — a reader allowed to see a total is allowed to see what it is
-   * made of.
+   * The records behind one period at one provider. Same grant as the figure
+   * they explain — a reader allowed to see a total is allowed to see what it
+   * is made of.
+   *
+   * The period arrives as two days rather than as a width and an anchor: the
+   * screen already folded its days into periods to draw the bars, and sending
+   * the width here would mean folding them a second time, in a second place,
+   * with every chance of the two disagreeing about where a quarter starts.
    */
-  dayRecords: protectedProcedure
+  periodRecords: protectedProcedure
     .input(
-      z.object({
-        organizationId: z.string(),
-        /** `YYYY-MM-DD`, the provider's business day in UTC. */
-        day: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/)
-          .refine(isUtcCalendarDay, "Not a day on the calendar."),
-        provider: z.string(),
-      }),
+      z
+        .object({
+          organizationId: z.string(),
+          /** `YYYY-MM-DD`, the period's first day in UTC, included. */
+          fromDay: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .refine(isUtcCalendarDay, "Not a day on the calendar."),
+          /** `YYYY-MM-DD`, the period's last day in UTC, included. */
+          toDay: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .refine(isUtcCalendarDay, "Not a day on the calendar."),
+          provider: z.string(),
+        })
+        // A backwards range reads as an empty period rather than as an error,
+        // and an empty period is indistinguishable on screen from one nobody
+        // spent in. Refused here, where it can still be said out loud.
+        .refine(
+          (input) => input.fromDay <= input.toDay,
+          "A period cannot end before it starts.",
+        ),
     )
     .permission("governanceCost:view")
     .use(enterpriseGate)
@@ -179,9 +197,10 @@ export const governanceCostRouter = createTRPCRouter({
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
       });
-      return await service.dayRecords({
+      return await service.periodRecords({
         organizationId: input.organizationId,
-        day: input.day,
+        fromDay: input.fromDay,
+        toDay: input.toDay,
         provider: input.provider,
       });
     }),
