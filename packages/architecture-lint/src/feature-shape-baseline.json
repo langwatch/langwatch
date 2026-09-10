@@ -327,6 +327,10 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "workflow|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
       "key": "workflow|refusing-composition",
       "measured": "2026-09-08"
     },
