@@ -7,6 +7,7 @@ package procsupervisor
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -244,7 +245,10 @@ func containsAny(value string, needles []string) bool {
 // superviseChild runs one child, restarting it (1s backoff) on exit until ctx
 // is cancelled, then SIGTERMs the process group and SIGKILLs after 5s.
 func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
-	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain, preview: s.recent, sink: newLogSinkSince(ac.LogPath, s.startedAt)}
+	c := proc{
+		name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain,
+		preview: s.recent, sink: newLogSinkSince(ac.LogPath, s.startedAt), crash: &crashDedup{},
+	}
 	// Gate the start on a dependency being ready (e.g. the web lane on the API),
 	// so this process — and the hostname routed to it — never comes up before what
 	// it needs is serving.
@@ -279,7 +283,7 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 			if ctx.Err() != nil {
 				return
 			}
-			c.logln("exited — restarting in 1s")
+			c.logln(levelRecordLine("warn", "exited — restarting in 1s", time.Time{}))
 			select {
 			case <-ctx.Done():
 			case <-time.After(time.Second):
@@ -326,8 +330,79 @@ type proc struct {
 	isPlain                 bool
 	preview                 *recentLogs
 	// sink captures every line (timestamped) to the per-service log file the
-	// `haven logs` command reads — nil for one-shot lanes.
+	// `haven logs` command reads — nil for one-shot lanes. Capture always
+	// gets the full line, dedup or not: only the live echo below is folded.
 	sink *logSink
+	// crash collapses a fatal line repeated across consecutive restarts into
+	// a short counter instead of the same failure once per restart — nil for
+	// a proc that never restarts (RunOnce, RunOnceBounded, WaitReady).
+	crash *crashDedup
+}
+
+// crashDedup tracks the last fatal message a proc rendered, across restarts:
+// superviseChild's loop reuses the same proc value for the life of the lane,
+// so this state survives from one crash to the next.
+type crashDedup struct {
+	mu      sync.Mutex
+	lastMsg string
+	repeat  int
+}
+
+// observe records one fatal record's message and reports what to render: the
+// message itself the first time a failure is seen (or once it changes), or a
+// short "same failure, restart N" line — still worth a line, never worth
+// repeating the location — for every consecutive repeat of the same one.
+func (d *crashDedup) observe(msg string) (renderMsg string, isRepeat bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.repeat > 0 && msg == d.lastMsg {
+		d.repeat++
+		return fmt.Sprintf("same failure, restart %d", d.repeat), true
+	}
+	d.lastMsg = msg
+	d.repeat = 1
+	return msg, false
+}
+
+// dedupeFatal rewrites a line that is a repeat of the previous fatal message
+// into the short counter form; anything else — a first occurrence, a
+// different failure, or a line that is not a fatal record at all — passes
+// through unchanged.
+func (c proc) dedupeFatal(line string) string {
+	if c.crash == nil {
+		return line
+	}
+	rec, ok := logfmt.Parse(line)
+	if !ok || rec.Level != logfmt.LevelFatal {
+		return line
+	}
+	renderMsg, isRepeat := c.crash.observe(rec.Message)
+	if !isRepeat {
+		return line
+	}
+	return levelRecordLine("fatal", renderMsg, rec.Time)
+}
+
+// levelRecordLine builds the minimal structured line logfmt.Parse reads back
+// — level, message, a timestamp (now, for a zero one) — for a line this
+// supervisor decided to print itself, so it renders with the same one-line,
+// correctly-leveled discipline as everything a supervised child writes.
+func levelRecordLine(level, msg string, at time.Time) string {
+	if at.IsZero() {
+		at = time.Now()
+	}
+	encoded, err := json.Marshal(map[string]string{
+		"time":  at.UTC().Format(logfmt.TimeFormat),
+		"level": level,
+		"msg":   msg,
+	})
+	if err != nil {
+		// Only ever a plain string map; Marshal cannot fail on one. Kept as a
+		// safety net rather than asserted away, same as this file's other
+		// "cannot actually happen" branches.
+		return msg
+	}
+	return string(encoded)
 }
 
 func (c proc) command(ctx context.Context) *exec.Cmd {
@@ -423,11 +498,14 @@ func (c proc) stream(r io.Reader) {
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\r\n")
 	c.sink.writeLine(line)
-	// Captured first, echoed second: a tool banner is still in the log file
-	// `haven logs --raw` replays, it just does not reach the terminal.
+	// Captured first, echoed second: a tool banner — or a fatal line about to
+	// be folded into a repeat counter below — is still in the log file
+	// `haven logs --raw` replays in full, it just does not reach the terminal
+	// a second (or fifth) time.
 	if logfmt.Muted(c.name, line) {
 		return
 	}
+	line = c.dedupeFatal(line)
 	rendered := logfmt.Render(line, logfmt.Options{
 		Lane:      c.name,
 		LaneColor: c.color,

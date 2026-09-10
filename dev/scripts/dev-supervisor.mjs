@@ -106,12 +106,42 @@
  *
  *   LANGWATCH_DEV_BUNDLE_ENTRY=src/x.entrypoint.ts   entry, relative to cwd
  *   LANGWATCH_DEV_BUNDLE_OUT=dist-dev/x.cjs          bundle output, relative to cwd
+ *
+ * --- crash rendering: one line, not a raw dump ------------------------
+ *
+ * Two crash shapes reach the watched child's stdio before it ever gets a
+ * chance to log through its own structured logger:
+ *
+ *   - a record the process DID catch and write itself (see
+ *     packages/observability's `processFailureLine`) — one JSON object,
+ *     already at level fatal, with the trace as one `stack` string;
+ *   - one Node never lets the process catch at all: a module that does not
+ *     export the name imported from it, a package Node cannot resolve, or an
+ *     exception thrown before any try/catch runs — all of it Node's own
+ *     multi-line, unleveled dump straight to stderr.
+ *
+ * Both used to reach the rendered stream as-is: the first as a header line
+ * plus one indented continuation line per frame, the second as one unleveled
+ * line per line Node wrote. Either way a crash read as a wall of text with
+ * nothing marking the one fact worth acting on.
+ *
+ * This supervisor is what holds the child's stdout and stderr open (see
+ * `wireStdout`/`wireStderr` below), so it is the one place that can collapse
+ * either shape down to one line — the message plus the first stack frame
+ * inside this repository (skipping `node_modules` and Node's own internals)
+ * — before it reaches the terminal. The full trace or raw dump still goes
+ * somewhere: `crashLogPath` names a per-lane file it is appended to, never
+ * the rendered stream.
+ *
+ *   LANGWATCH_DEV_RAW_CRASH=1   show the raw output instead of collapsing it
+ *   LANGWATCH_DEV_CRASH_LOG=path   where the full trace/dump is appended
  */
 
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 /** How long the stack gets between SIGTERM and SIGKILL. */
@@ -159,6 +189,12 @@ const WATCH_IGNORE_PATTERNS = [
 const HANDSHAKE_FD = 3;
 const PREFIX = "dev-supervisor:";
 const SELF = fileURLToPath(import.meta.url);
+/** dev/scripts/dev-supervisor.mjs is two levels below the repo root. */
+const REPO_ROOT = path.resolve(path.dirname(SELF), "../..");
+/** Escape hatch: forward a crash's raw output instead of collapsing it. */
+const RAW_CRASH_ENV = "LANGWATCH_DEV_RAW_CRASH";
+/** Override for where the full trace/dump of a collapsed crash is appended. */
+const CRASH_LOG_ENV = "LANGWATCH_DEV_CRASH_LOG";
 
 const stderr = (msg) => process.stderr.write(msg);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -257,6 +293,256 @@ export function resolveBundleConfig(env) {
   const outfile = (env.LANGWATCH_DEV_BUNDLE_OUT ?? "").trim();
   if (entry === "" || outfile === "") return null;
   return { entry, outfile };
+}
+
+// --- crash rendering: collapse a crash down to one line -------------------
+
+/** Whether the raw-output escape hatch is on. */
+export function rawCrashEnabled(env) {
+  const raw = (env[RAW_CRASH_ENV] ?? "").trim().toLowerCase();
+  return raw === "1" || raw === "true";
+}
+
+/** Where the full trace/dump of a collapsed crash is appended, one lane at a
+ * time: an explicit override, or a file named after the watched package's own
+ * directory under the OS temp dir. */
+export function crashLogPath(env) {
+  const explicit = (env[CRASH_LOG_ENV] ?? "").trim();
+  if (explicit !== "") return explicit;
+  return path.join(os.tmpdir(), "langwatch-dev-crash", `${path.basename(process.cwd())}.log`);
+}
+
+/** Best-effort: a crash log write must never be what keeps a crash from being
+ * reported, so a failure here (a read-only temp dir, a missing parent) is
+ * swallowed rather than raised. */
+function appendCrashLog(logPath, text) {
+  try {
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    fs.appendFileSync(logPath, `--- ${new Date().toISOString()} ---\n${text}\n`);
+  } catch {
+    // Nowhere to put it. The collapsed line the developer still sees is what
+    // matters; losing the extra detail is the lesser failure.
+  }
+}
+
+/** A path made relative to the repo root when it is inside it, unchanged
+ * otherwise — so a frame under node_modules or outside the checkout still
+ * prints as something a person can find. */
+function relativeToRepo(absPath) {
+  if (!absPath || !path.isAbsolute(absPath)) return absPath;
+  const rel = path.relative(REPO_ROOT, absPath);
+  return rel.startsWith("..") ? absPath : rel;
+}
+
+/** One V8 stack frame line, as either `at fn (path:line:col)` or
+ * `at path:line:col`. Null for anything else (blank lines, the "Caused by:"
+ * banner some libraries add, …). */
+function parseFrame(line) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("at ")) return null;
+  const withParens = trimmed.match(/\(([^()]+):(\d+):(\d+)\)\s*$/);
+  if (withParens) return { path: withParens[1], line: withParens[2] };
+  const bare = trimmed.match(/^at\s+(?:async\s+)?([^\s()]+):(\d+):(\d+)$/);
+  return bare ? { path: bare[1], line: bare[2] } : null;
+}
+
+/** The first frame in a stack that is worth pointing someone at: inside this
+ * repo, not a dependency, not Node's own internals. Null when the trace has
+ * none — a rejection surfaced from library code alone, say. */
+export function firstAppFrame(stack) {
+  if (!stack) return null;
+  for (const rawLine of stack.split("\n")) {
+    const frame = parseFrame(rawLine);
+    if (!frame) continue;
+    if (frame.path.startsWith("node:")) continue;
+    if (frame.path.includes("/node_modules/")) continue;
+    return { file: relativeToRepo(frame.path), line: frame.line };
+  }
+  return null;
+}
+
+/**
+ * A record the child already wrote itself (`processFailureLine`'s shape:
+ * JSON, a `stack` field) collapsed to one line: the stack becomes a
+ * `— at file:line` suffix on the message instead of a field the renderer
+ * would indent under it. Null for anything that is not JSON, or carries no
+ * stack to collapse — passed through unchanged by the caller.
+ */
+export function collapseStackRecord(line) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return null;
+  let record;
+  try {
+    record = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (record === null || typeof record !== "object" || Array.isArray(record)) return null;
+  const stack = typeof record.stack === "string" ? record.stack : "";
+  if (stack === "") return null;
+
+  const frame = firstAppFrame(stack);
+  const baseMsg =
+    typeof record.msg === "string" ? record.msg : typeof record.message === "string" ? record.message : "";
+  const msg = frame ? `${baseMsg} — at ${frame.file}:${frame.line}` : baseMsg;
+
+  const collapsed = { ...record, msg };
+  delete collapsed.stack;
+  delete collapsed.message;
+  return { collapsed: JSON.stringify(collapsed), rawText: `${baseMsg}\n${stack}` };
+}
+
+/** Node's ESM loader refusing a named import the target module never
+ * exports. The file:line Node prints ahead of the SyntaxError is the
+ * importing location; the first such reference in the dump is it. */
+export function classifyMissingExport(text) {
+  const match = text.match(
+    /SyntaxError: The requested module '([^']+)' does not provide an export named '([^']+)'/,
+  );
+  if (!match) return null;
+  const [, specifier, exportName] = match;
+  const location = text.match(/^(\/\S+):(\d+)$/m);
+  return {
+    kind: "missing-export",
+    specifier,
+    exportName,
+    file: location ? relativeToRepo(location[1]) : null,
+    line: location ? location[2] : null,
+  };
+}
+
+/** Node's ESM loader refusing to resolve an import at all — a workspace
+ * package never built, a typo, a dependency never installed. */
+export function classifyMissingPackage(text) {
+  const match = text.match(/Error \[ERR_MODULE_NOT_FOUND\]: Cannot find package '([^']+)' imported from ([^\n]+)/);
+  if (!match) return null;
+  const [, specifier, importer] = match;
+  return { kind: "missing-package", specifier, importer: relativeToRepo(importer.trim()) };
+}
+
+/**
+ * The fallback shape: an exception Node dumped because it was thrown before
+ * anything in the process could catch it (a module's own top-level code, an
+ * unhandled rejection before the handler is installed). Looks for the first
+ * line that reads as an Error banner (`SomeError: message`) and takes the
+ * stack frames after it.
+ */
+export function classifyBootException(text) {
+  const lines = text.split("\n");
+  const bannerIndex = lines.findIndex((line) => /^\s*[A-Za-z_$][\w$.]*Error(?:\s*\[[A-Z_]+\])?:\s/.test(line));
+  if (bannerIndex === -1) return null;
+  const banner = lines[bannerIndex]
+    .trim()
+    .match(/^([A-Za-z_$][\w$.]*Error(?:\s*\[[A-Z_]+\])?):\s*(.*)$/);
+  if (!banner) return null;
+  const [, errorType, message] = banner;
+  return { kind: "boot-exception", errorType, message, frame: firstAppFrame(lines.slice(bannerIndex).join("\n")) };
+}
+
+/** Tries every raw-crash shape in order, most specific first. Null when none
+ * of them recognise the dump — the caller passes it through unchanged rather
+ * than guessing at a shape nobody named. */
+export function classifyRawCrash(text) {
+  return classifyMissingExport(text) ?? classifyMissingPackage(text) ?? classifyBootException(text);
+}
+
+/** The one line a classified crash renders as: the kind of failure and the
+ * facts a person acts on, never the raw dump. */
+export function crashMessage(classified) {
+  switch (classified.kind) {
+    case "missing-export": {
+      const where = classified.file
+        ? `${classified.file}${classified.line ? `:${classified.line}` : ""}`
+        : "an unknown location";
+      return `missing export: module '${classified.specifier}' does not export '${classified.exportName}' (imported at ${where})`;
+    }
+    case "missing-package":
+      return `missing package: cannot find '${classified.specifier}' (imported from ${classified.importer})`;
+    case "boot-exception": {
+      const where = classified.frame ? `${classified.frame.file}:${classified.frame.line}` : "an unknown location";
+      return `${classified.errorType}: ${classified.message} — at ${where}`;
+    }
+    default:
+      return "unrecognised crash";
+  }
+}
+
+/** A classified raw crash, rendered as the same one-JSON-line-at-fatal shape
+ * every other structured record uses. */
+export function crashRecordLine(classified) {
+  return JSON.stringify({ time: new Date().toISOString(), level: "fatal", msg: crashMessage(classified) });
+}
+
+/**
+ * Reads the watched child's stdout line by line. With the escape hatch on,
+ * every byte is piped straight through, unread. Otherwise a record carrying a
+ * `stack` (`collapseStackRecord`) is rewritten to one line and its full text
+ * appended to the crash log; everything else — the ordinary structured JSON
+ * the app logs while it runs — passes through untouched.
+ */
+function wireStdout(stream, { raw, crashLog }) {
+  if (raw) {
+    stream.pipe(process.stdout);
+    return;
+  }
+  const reader = createInterface({ input: stream, crlfDelay: Infinity });
+  reader.on("line", (line) => {
+    const collapsed = collapseStackRecord(line);
+    if (collapsed) {
+      process.stdout.write(`${collapsed.collapsed}\n`);
+      appendCrashLog(crashLog, collapsed.rawText);
+      return;
+    }
+    process.stdout.write(`${line}\n`);
+  });
+}
+
+/**
+ * Reads the watched child's stderr. A Node crash dump arrives as one burst
+ * and the telling line is often not the last one, so lines are held until
+ * the stream has been quiet for `quietMs` (or ends), then classified as a
+ * whole: a recognised crash renders as one line, anything else is echoed.
+ */
+function wireStderr(stream, { raw, crashLog, quietMs = 150 }) {
+  if (raw) {
+    stream.pipe(process.stderr);
+    return;
+  }
+  const pending = [];
+  let buffer = "";
+  let timer = null;
+  const flush = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (buffer !== "") {
+      pending.push(buffer);
+      buffer = "";
+    }
+    if (pending.length === 0) return;
+    const text = pending.join("\n");
+    const classified = classifyRawCrash(text);
+    if (classified) {
+      process.stderr.write(`${crashRecordLine(classified)}\n`);
+      appendCrashLog(crashLog, text);
+    } else {
+      for (const line of pending) process.stderr.write(`${line}\n`);
+    }
+    pending.length = 0;
+  };
+  stream.setEncoding("utf8");
+  stream.on("data", (chunk) => {
+    buffer += chunk;
+    let newline = buffer.indexOf("\n");
+    while (newline !== -1) {
+      pending.push(buffer.slice(0, newline));
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf("\n");
+    }
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(flush, quietMs);
+  });
+  stream.on("end", flush);
+  stream.on("close", flush);
 }
 
 /**
@@ -365,9 +651,13 @@ async function runWatchSupervisor(rawArgv, env) {
   let restarting = false;
   let settledCode = 0;
 
+  const crashOptions = { raw: rawCrashEnabled(env), crashLog: crashLogPath(env) };
+
   const spawnOne = () => {
-    child = startChild(argv, env, false);
+    child = startChild(argv, env, false, { captureIO: true });
     if (child === null) return false;
+    if (child.stdout) wireStdout(child.stdout, crashOptions);
+    if (child.stderr) wireStderr(child.stderr, crashOptions);
     child.on("close", (code, signal) => {
       if (restarting) return; // this exit was ours; the restart owns what happens next
       settledCode = exitCodeFor({ code, signal });
@@ -433,11 +723,17 @@ async function runWatchSupervisor(rawArgv, env) {
   return await exited;
 }
 
-/** Starts the command, or reports why it could not start and returns null. */
-function startChild(argv, env, detached) {
+/**
+ * Starts the command, or reports why it could not start and returns null.
+ * `captureIO` is what lets the crash renderer see the child's stdout/stderr
+ * at all: plain `stdio: "inherit"` is a direct fd passthrough that this
+ * process never reads a byte of, so with it off (every caller but the
+ * watched child) nothing here changes from before.
+ */
+function startChild(argv, env, detached, { captureIO = false } = {}) {
   try {
     return spawn(argv[0], argv.slice(1), {
-      stdio: "inherit",
+      stdio: captureIO ? ["inherit", "pipe", "pipe"] : "inherit",
       detached,
       env: { ...env, [NESTED]: "1" },
     });
