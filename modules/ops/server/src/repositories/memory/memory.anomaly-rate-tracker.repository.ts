@@ -1,4 +1,4 @@
-import { AnomalyRateTrackerRepository } from "../anomaly.repository.ts";
+import { AnomalyRateTrackerRepository } from "../observe/anomaly.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
 /**

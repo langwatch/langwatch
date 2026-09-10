@@ -11,7 +11,7 @@ import type {
 import type {
   ProcessNameCounts,
   ProcessOpsRepository,
-} from "../../repositories/process-ops.repository.ts";
+} from "../../repositories/process/process-ops.repository.ts";
 
 /** `00-<32 hex trace id>-<16 hex span id>-<flags>` per W3C traceparent. */
 const TRACEPARENT_RE = /^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/;

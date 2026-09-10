@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryOpsStore } from "../memory/memory.ops.store.ts";
 import { MemoryProcessAuditRepository } from "../memory/memory.process-audit.repository.ts";
 import { MemorySchedulerAuditRepository } from "../memory/memory.scheduler-audit.repository.ts";
-import type { ProcessAuditSink, SchedulerAuditSink } from "../ops-audit.repository.ts";
+import type { ProcessAuditSink, SchedulerAuditSink } from "../process/ops-audit.repository.ts";
 
 interface Backend {
   processes: () => ProcessAuditSink;

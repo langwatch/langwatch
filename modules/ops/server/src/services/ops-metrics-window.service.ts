@@ -13,7 +13,7 @@ import type {
   ThroughputPoint,
 } from "@langwatch/ops-contract";
 import type { RedisCpuSample } from "../rules/ops-redis-engine-cpu.rules.ts";
-import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
+import type { OpsMetricsRepository } from "../repositories/observe/ops-metrics.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:metrics-window");

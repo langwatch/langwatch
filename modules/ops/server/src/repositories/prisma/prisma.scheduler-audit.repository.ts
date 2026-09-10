@@ -1,6 +1,6 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
-import { SchedulerAuditSink } from "../ops-audit.repository.ts";
+import { SchedulerAuditSink } from "../process/ops-audit.repository.ts";
 
 /** The rows the scheduler history reads back, and the people it names. */
 export type SchedulerAuditDatabase = {

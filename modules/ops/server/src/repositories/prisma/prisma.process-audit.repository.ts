@@ -3,7 +3,7 @@ import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
-import { ProcessAuditSink, type ProcessControlAction } from "../ops-audit.repository.ts";
+import { ProcessAuditSink, type ProcessControlAction } from "../process/ops-audit.repository.ts";
 
 const TARGET_KIND = "process_instance";
 

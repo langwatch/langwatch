@@ -21,7 +21,7 @@ export {
 } from "./app/ops.app.ts";
 export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-report.repository.ts";
 export { BugReportInboxService } from "./services/bug-report-inbox.service.ts";
-export type { BugReportRepository } from "./repositories/bug-report.repository.ts";
+export type { BugReportRepository } from "./repositories/admin/bug-report.repository.ts";
 export type { OpsRepositories } from "./repositories/ops.repositories.ts";
 export { OpsOperations, type OpsOperationsOptions } from "./app/ops-operations.ts";
 export {
@@ -37,14 +37,14 @@ export {
   ProcessAuditSink,
   SchedulerAuditSink,
   type ProcessControlAction,
-} from "./repositories/ops-audit.repository.ts";
+} from "./repositories/process/ops-audit.repository.ts";
 export { MemoryProcessAuditRepository } from "./repositories/memory/memory.process-audit.repository.ts";
 export { MemorySchedulerAuditRepository } from "./repositories/memory/memory.scheduler-audit.repository.ts";
 export { MemoryOpsStore } from "./repositories/memory/memory.ops.store.ts";
 export type {
   SchedulerOpsRepository,
   ScheduledJobRecord,
-} from "./repositories/scheduler-ops.repository.ts";
+} from "./repositories/process/scheduler-ops.repository.ts";
 export { NoopSchedulerWakeService } from "./services/scheduler-wake.service.ts";
 export { SchedulerWakePort } from "./ports/scheduler-wake.port.ts";
 export {
@@ -112,14 +112,14 @@ export type {
   AggregateDiscoveryRow,
   EventExplorerRepository,
   RawEventRow,
-} from "./repositories/event-explorer.repository.ts";
+} from "./repositories/observe/event-explorer.repository.ts";
 export { MemoryProcessOpsRepository } from "./repositories/memory/memory.process-ops.repository.ts";
 export type {
   ProcessNameCounts,
   ProcessOpsRepository,
-} from "./repositories/process-ops.repository.ts";
+} from "./repositories/process/process-ops.repository.ts";
 export { MemoryReplayRepository } from "./repositories/memory/memory.replay.repository.ts";
-export type { ReplayRepository } from "./repositories/replay.repository.ts";
+export type { ReplayRepository } from "./repositories/process/replay.repository.ts";
 export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process-ops.repository.ts";
 export { ProcessAuditRepository } from "./repositories/prisma/prisma.process-audit.repository.ts";
 export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository.ts";
@@ -127,7 +127,7 @@ export { OpsExplainClickHouseRepository } from "./repositories/clickhouse/clickh
 export type {
   OpsExplainClientResolution,
   OpsExplainClients,
-} from "./repositories/ops-explain.repository.ts";
+} from "./repositories/observe/ops-explain.repository.ts";
 
 /** Public intake for the reports customers' coding agents file. */
 export {
@@ -183,7 +183,7 @@ export { PrismaProcessManagerPurgeRepository } from "./repositories/prisma/prism
 export type {
   ProcessManagerPurgeRepository,
   ProcessManagerPurgeTarget,
-} from "./repositories/process-manager-purge.repository.ts";
+} from "./repositories/process/process-manager-purge.repository.ts";
 
 // The transport declarations the process mounts. Each is inert: it names its
 // routes or procedures, the access each is reached behind, and the facts the

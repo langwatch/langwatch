@@ -1,5 +1,5 @@
 import type { Anomaly, AnomalyKind } from "@langwatch/ops-contract";
-import { AnomalyStateRepository } from "../anomaly.repository.ts";
+import { AnomalyStateRepository } from "../observe/anomaly.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
 /** The active anomalies in memory, keyed the way the stored hash keys them. */

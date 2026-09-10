@@ -3,7 +3,7 @@ import type { AdminOperationInput } from "@langwatch/ops-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
 import { describe, expect, it, vi } from "vitest";
-import { AdminBackofficeRepository } from "../admin-backoffice.repository.ts";
+import { AdminBackofficeRepository } from "../admin/admin-backoffice.repository.ts";
 import { AdminBackofficeService } from "../../services/admin-backoffice.service.ts";
 import { AdminAuditSink } from "../../services/impersonation.service.ts";
 

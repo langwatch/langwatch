@@ -13,7 +13,7 @@ import type {
   QueueInfo,
   RedisInfo,
 } from "@langwatch/ops-contract";
-import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
+import type { OpsMetricsRepository } from "../repositories/observe/ops-metrics.repository.ts";
 import { JOB_NAME_COUNTER_PREFIX, OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
 import { nowInstant } from "@langwatch/time";
 

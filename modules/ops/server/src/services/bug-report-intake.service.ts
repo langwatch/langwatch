@@ -7,7 +7,7 @@ import type {
   BugReportNotifier,
   BugReportRateLimiter,
 } from "../app/ops.app.ts";
-import type { BugReportRepository } from "../repositories/bug-report.repository.ts";
+import type { BugReportRepository } from "../repositories/admin/bug-report.repository.ts";
 
 const logger = createLogger("langwatch:bug-reports");
 

@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   ProcessManagerPurgeRepository,
   type ProcessManagerPurgeTarget,
-} from "../process-manager-purge.repository.ts";
+} from "../process/process-manager-purge.repository.ts";
 
 const logger = createLogger("langwatch:ops:process-manager-purge");
 

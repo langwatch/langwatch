@@ -20,16 +20,16 @@ import { type AdminAuditSink, ImpersonationService } from "../services/impersona
 import { OpsService } from "../services/ops.service.ts";
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store.repository.ts";
-import { NullBlobStoreRepository } from "../repositories/blob-store.repository.ts";
+import { NullBlobStoreRepository } from "../repositories/admin/blob-store.repository.ts";
 import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.admin-backoffice.repository.ts";
 import { AdminBackofficeService } from "../services/admin-backoffice.service.ts";
-import type { SchedulerOpsRepository } from "../repositories/scheduler-ops.repository.ts";
+import type { SchedulerOpsRepository } from "../repositories/process/scheduler-ops.repository.ts";
 import type { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
 import { QueueAuditAdapter } from "../adapters/audit-log.queue-audit.adapter.ts";
-import { NullQueueRepository } from "../repositories/queue.repository.ts";
+import { NullQueueRepository } from "../repositories/process/queue.repository.ts";
 import { QueueService } from "../services/queue.service.ts";
 import type { QueuePayloadDecoderPort } from "../ports/queue-payload-decoder.port.ts";
 import {

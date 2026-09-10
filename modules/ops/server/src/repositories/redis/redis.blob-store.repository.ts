@@ -22,8 +22,8 @@ import type {
   OpsBlobStoreStats,
   OpsBlobSummary,
 } from "@langwatch/ops-contract";
-import { BlobStoreRepository } from "../blob-store.repository.ts";
-import type { BlobDeleteResult } from "../blob-store.repository.ts";
+import { BlobStoreRepository } from "../admin/blob-store.repository.ts";
+import type { BlobDeleteResult } from "../admin/blob-store.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
 /** Dry-run eval, so the browser reports the same verdict the runner would act on. */

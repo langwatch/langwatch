@@ -427,10 +427,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|modules/ops/server/src/repositories",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|modules/ops/server/src/repositories/prisma",
       "measured": "2026-09-08"
     },

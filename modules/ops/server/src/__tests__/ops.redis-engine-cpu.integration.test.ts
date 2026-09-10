@@ -5,8 +5,8 @@
  * result. Spec: specs/ops/redis-pressure.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { OpsLatencyHistograms, OpsQueueTotals } from "../repositories/ops-metrics.repository.ts";
-import { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
+import type { OpsLatencyHistograms, OpsQueueTotals } from "../repositories/observe/ops-metrics.repository.ts";
+import { OpsMetricsRepository } from "../repositories/observe/ops-metrics.repository.ts";
 import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
 import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture.ts";
 

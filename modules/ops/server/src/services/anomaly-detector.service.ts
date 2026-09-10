@@ -5,7 +5,7 @@ import type { AnomalyHardTierAlertPort } from "../ports/anomaly-hard-tier-alert.
 import type {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,
-} from "../repositories/anomaly.repository.ts";
+} from "../repositories/observe/anomaly.repository.ts";
 import { percentile } from "../rules/ops-anomaly-percentile.rules.ts";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../rules/anomaly-constants.rules.ts";
 import { nowInstant } from "@langwatch/time";

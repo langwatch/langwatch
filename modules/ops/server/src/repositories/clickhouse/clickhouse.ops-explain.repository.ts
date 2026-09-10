@@ -5,7 +5,7 @@ import {
   type OpsExplainClientResolution,
   type OpsExplainClients,
   type OpsExplainQueryClient,
-} from "../ops-explain.repository.ts";
+} from "../observe/ops-explain.repository.ts";
 
 /**
  * Resolves and queries the ClickHouse client behind the operator-only

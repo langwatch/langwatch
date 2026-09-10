@@ -6,7 +6,7 @@ import { AnomalyHardTierAlertPort } from "../../ports/anomaly-hard-tier-alert.po
 import {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,
-} from "../../repositories/anomaly.repository.ts";
+} from "../../repositories/observe/anomaly.repository.ts";
 import {
   AnomalyDetectorService,
   HARD_TIER_SUSTAIN_MINUTES,

@@ -7,7 +7,7 @@ import { generate } from "@langwatch/ksuid";
 import type { BugReport, BugReportCreateInput } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { BugReportRepository } from "../bug-report.repository.ts";
+import type { BugReportRepository } from "../admin/bug-report.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
 const BUG_REPORT_KSUID_RESOURCE = "bugreport";

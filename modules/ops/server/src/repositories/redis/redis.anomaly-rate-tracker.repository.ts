@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { AnomalyRateTrackerRepository } from "../anomaly.repository.ts";
+import { AnomalyRateTrackerRepository } from "../observe/anomaly.repository.ts";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
 
 const logger = createLogger("langwatch:observability:tenantRateTracker");

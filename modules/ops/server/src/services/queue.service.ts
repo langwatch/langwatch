@@ -6,7 +6,7 @@ import type {
   DrainPreview,
   JobEntry,
   QueueRepository,
-} from "../repositories/queue.repository.ts";
+} from "../repositories/process/queue.repository.ts";
 import type {
   OpsParkedTenantsPage,
   OpsQueueReconcileResult,

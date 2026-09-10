@@ -3,7 +3,7 @@ import { EventExplorerService } from "../event-explorer.service.ts";
 import type {
   EventExplorerRepository,
   RawEventRow,
-} from "../../repositories/event-explorer.repository.ts";
+} from "../../repositories/observe/event-explorer.repository.ts";
 import {
   OpsEventingIntrospectionPort,
   type OpsDejaViewProjection,

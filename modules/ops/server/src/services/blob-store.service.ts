@@ -1,7 +1,7 @@
 import type { BlobSweepReport } from "@langwatch/ops-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { BlobStoreRepository } from "../repositories/blob-store.repository.ts";
+import type { BlobStoreRepository } from "../repositories/admin/blob-store.repository.ts";
 import type {
   OpsBlobPage,
   OpsBlobSort,

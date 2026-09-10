@@ -7,7 +7,7 @@ import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
-import { AdminBackofficeRepository } from "../../../repositories/admin-backoffice.repository.ts";
+import { AdminBackofficeRepository } from "../../../repositories/admin/admin-backoffice.repository.ts";
 import { AdminAuditSink } from "../../impersonation.service.ts";
 
 export const backofficeOperator: UserProfile = {

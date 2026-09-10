@@ -6,7 +6,7 @@ import type {
   ProcessInstanceDetail,
 } from "@langwatch/ops-contract";
 import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
-import type { ProcessAuditSink } from "../repositories/ops-audit.repository.ts";
+import type { ProcessAuditSink } from "../repositories/process/ops-audit.repository.ts";
 import type {
   DeadLetterCount,
   DeadOutboxMessageView,
@@ -15,7 +15,7 @@ import type {
   ProcessOutboxMessageView,
   ProcessWakeRow,
 } from "@langwatch/ops-contract";
-import type { ProcessOpsRepository } from "../repositories/process-ops.repository.ts";
+import type { ProcessOpsRepository } from "../repositories/process/process-ops.repository.ts";
 import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
 import { nowInstant } from "@langwatch/time";
 

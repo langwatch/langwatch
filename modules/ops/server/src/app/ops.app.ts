@@ -97,7 +97,7 @@ import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
-import type { OpsExplainClients } from "#repositories/ops-explain.repository";
+import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
 import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { timingSafeEqual } from "node:crypto";

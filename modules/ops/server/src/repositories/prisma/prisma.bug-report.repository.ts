@@ -10,7 +10,7 @@ import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { type Instant, fromDate } from "@langwatch/time";
 
-import type { BugReportRepository } from "../bug-report.repository.ts";
+import type { BugReportRepository } from "../admin/bug-report.repository.ts";
 
 /**
  * The id prefix every report carries.

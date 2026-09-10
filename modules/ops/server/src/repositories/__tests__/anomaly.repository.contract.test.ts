@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,
-} from "../anomaly.repository.ts";
+} from "../observe/anomaly.repository.ts";
 import { MemoryAnomalyRateTrackerRepository } from "../memory/memory.anomaly-rate-tracker.repository.ts";
 import { MemoryAnomalyStateRepository } from "../memory/memory.anomaly-state.repository.ts";
 import { MemoryOpsStore } from "../memory/memory.ops.store.ts";

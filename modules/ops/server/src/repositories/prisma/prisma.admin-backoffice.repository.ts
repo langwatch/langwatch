@@ -14,7 +14,7 @@ import {
   PROJECT_SAFE_SELECT,
 } from "./prisma.admin.repository.ts";
 import { PrismaAdminUserMapper, USER_BACKOFFICE_INCLUDE } from "./prisma.admin-user.mapper.ts";
-import { AdminBackofficeRepository } from "../admin-backoffice.repository.ts";
+import { AdminBackofficeRepository } from "../admin/admin-backoffice.repository.ts";
 import { type Instant, toDate } from "@langwatch/time";
 
 /**

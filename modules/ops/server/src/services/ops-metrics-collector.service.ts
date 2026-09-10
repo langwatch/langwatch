@@ -16,7 +16,7 @@ import type {
 } from "@langwatch/ops-contract";
 import { computeEngineCpuPercent } from "../rules/ops-redis-engine-cpu.rules.ts";
 import type { OpsQueueMetricsSourcePort } from "../ports/ops-queue-metrics-source.port.ts";
-import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
+import type { OpsMetricsRepository } from "../repositories/observe/ops-metrics.repository.ts";
 import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.rules.ts";
 import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
 import { OpsMetricsPublicationService } from "./ops-metrics-publication.service.ts";
