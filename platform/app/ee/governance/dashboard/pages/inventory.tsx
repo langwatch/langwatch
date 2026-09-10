@@ -2623,14 +2623,22 @@ export type ParserConfigMode = "create" | "edit";
 /**
  * The bucket widths Anthropic's usage report accepts, newest-grained first.
  *
- * Read by `validBucketWidth` alone now that the picker offers daily and nothing
- * else — the form no longer needs the list, but an edit form opening on a
- * source saved back when `1m` and `1h` were offered still has to build. The
- * adapter's own `anthropicAdminPullConfigSchema` declares the same domain
- * server-side and the unit test asserts the two still agree, which is what
- * keeps this a projection of the schema rather than a second source of truth.
+ * Two readers now: `validBucketWidth`, and the picker — which offers daily to
+ * everyone and additionally whichever of these a source is already being read
+ * at, so opening an old source to edit it does not silently move it to daily.
+ * The adapter's own `anthropicAdminPullConfigSchema` declares the same domain
+ * server-side and `anthropicFormControls.unit.test.ts` asserts the two still
+ * agree, which is what keeps this a projection of the schema rather than a
+ * second source of truth.
  */
-const ANTHROPIC_BUCKET_WIDTHS = ["1m", "1h", "1d"] as const;
+export const ANTHROPIC_BUCKET_WIDTHS = ["1m", "1h", "1d"] as const;
+
+/** What each width in `ANTHROPIC_BUCKET_WIDTHS` is called on the form. */
+const ANTHROPIC_BUCKET_WIDTH_LABELS: Record<string, string> = {
+  "1m": "1m — per minute",
+  "1h": "1h — hourly",
+  "1d": "1d — daily",
+};
 
 /**
  * The one bucket width either report is read at.
@@ -2651,17 +2659,36 @@ const ANTHROPIC_DAILY_BUCKET_OPTION: FieldOption = {
 };
 
 /**
- * The bucket widths offered, which is one width whatever the report.
+ * The bucket widths offered: daily, plus the one this source is already read at
+ * if that is something else.
  *
- * Still a function of the sibling values rather than a constant list, because
- * the field's contract is that its domain may depend on the report — and the
- * cost report's domain genuinely is narrower than what the adapter accepts.
- * Collapsing the signature would hide that.
+ * Daily alone would have been a silent migration rather than a narrowing.
+ * `reconcileParserValues` drops any held value the picker does not offer, so a
+ * usage source saved back when `1m` and `1h` were offered would have had its
+ * width cleared the next time anyone opened its drawer — for an unrelated
+ * change, with nothing on screen saying so. The finer widths are withdrawn from
+ * new sources; they are not taken away from the sources already using them.
+ *
+ * The retained entry is the held value verbatim, so choosing daily is still how
+ * you move off it. Nothing is retained on a cost source: the puller pins
+ * `COST_REPORT_BUCKET_WIDTH` and ignores the setting, so a width stored there
+ * was never in effect and `validBucketWidth` refuses it anyway. `1d` is not
+ * retained either — the daily entry already means daily, and two entries saying
+ * so is a choice between identical answers.
  */
 function anthropicBucketWidthOptions(
-  _values: Record<string, string>,
+  values: Record<string, string>,
 ): readonly FieldOption[] {
-  return [ANTHROPIC_DAILY_BUCKET_OPTION];
+  const held = (values.bucketWidth ?? "").trim();
+  const report = (values.report ?? "").trim().toLowerCase();
+  if (held === "" || held === "1d") return [ANTHROPIC_DAILY_BUCKET_OPTION];
+  if (validBucketWidth(held, report) === null) {
+    return [ANTHROPIC_DAILY_BUCKET_OPTION];
+  }
+  return [
+    ANTHROPIC_DAILY_BUCKET_OPTION,
+    { value: held, label: ANTHROPIC_BUCKET_WIDTH_LABELS[held] ?? held },
+  ];
 }
 
 /**
@@ -4052,7 +4079,7 @@ function ParserConfigField({
           color="red.500"
           data-testid={`parser-field-error-${field.key}`}
         >
-          Enter a value — this source cannot be created without it.
+          Enter a value — this source cannot be saved without it.
         </Text>
       )}
     </VStack>

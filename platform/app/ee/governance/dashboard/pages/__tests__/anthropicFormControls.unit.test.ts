@@ -25,6 +25,7 @@
 import { describe, expect, it } from "vitest";
 import { anthropicAdminPullConfigSchema } from "../../../services/pullers/anthropicAdmin.puller";
 import {
+  ANTHROPIC_BUCKET_WIDTHS,
   buildAnthropicAdminPullConfig,
   type ComposerState,
   dateInputValue,
@@ -102,6 +103,19 @@ describe("Anthropic composer controls", () => {
 
   describe("the bucket width field", () => {
     // @scenario "The bucket width is daily whichever report is chosen"
+    it("knows the same widths the adapter schema accepts, and no others", () => {
+      // `ANTHROPIC_BUCKET_WIDTHS` is what the form will hand back to an old
+      // source and what `validBucketWidth` measures a stored width against.
+      // Both readings are only correct while the list is a projection of the
+      // schema — let it drift and the form either refuses a width the adapter
+      // would have honoured, or keeps offering one the adapter has dropped.
+      expect([...ANTHROPIC_BUCKET_WIDTHS]).toEqual([
+        ...anthropicAdminPullConfigSchema.shape.bucketWidth.removeDefault()
+          .options,
+      ]);
+    });
+
+    // @scenario "The bucket width is daily whichever report is chosen"
     it("offers the daily entry alone on a usage source", () => {
       const options = selectOptionsFor("bucketWidth", { report: "usage" });
 
@@ -125,18 +139,88 @@ describe("Anthropic composer controls", () => {
       ).toBe("1d — daily");
     });
 
-    // @scenario "The bucket width is daily whichever report is chosen"
-    it("still refuses a finer width an older source was saved with", () => {
-      // The picker no longer offers `1h`, but an edit form opening on a source
-      // saved when it did still seeds one, and the builder is the checkpoint
-      // that decides what reaches the adapter. On a usage source it is a width
-      // the schema accepts, so it builds rather than blocking the admin out of
-      // their own source.
-      const built = buildAnthropicAdminPullConfig(
-        composerWith({ report: "usage", bucketWidth: "1h" }),
-      ) as Record<string, unknown>;
+    // @scenario "A source already reading hourly keeps reading hourly"
+    it("keeps offering the width an existing usage source is read at", () => {
+      // Through the whole edit path, not the builder alone. The builder was
+      // never the risk: `reconcileParserValues` drops any held value the
+      // picker does not offer, so a picker offering daily alone would have
+      // cleared this source's width before the builder ever saw it — a
+      // migration to daily performed by opening the drawer.
+      const seeded = seedComposerParserConfig({
+        sourceType: "anthropic_admin",
+        storedParserConfig: {
+          credentialsToken: "sk-ant-admin-test",
+          report: "usage",
+          bucketWidth: "1h",
+        },
+      });
+      const reconciled = reconcileParserValues({
+        sourceType: "anthropic_admin",
+        values: seeded,
+      });
 
-      expect(built.bucketWidth).toBe("1h");
+      expect(reconciled.bucketWidth).toBe("1h");
+      expect(
+        selectOptionsFor("bucketWidth", reconciled).map((o) => o.value),
+      ).toEqual(["", "1h"]);
+      // Built with the token supplied rather than with the seeded values as
+      // they stand: seeding deliberately returns a blank secret, so every edit
+      // of this source needs the token retyped whatever the width does (#7777).
+      // That is a separate problem and not what this test is measuring.
+      expect(
+        (
+          buildAnthropicAdminPullConfig(
+            composerWith({
+              ...reconciled,
+              credentialsToken: "sk-ant-admin-test",
+            }),
+          ) as Record<string, unknown>
+        ).bucketWidth,
+      ).toBe("1h");
+    });
+
+    // @scenario "A source already reading hourly keeps reading hourly"
+    it("offers daily beside it, so the admin can still move off the finer width", () => {
+      const options = selectOptionsFor("bucketWidth", {
+        report: "usage",
+        bucketWidth: "1h",
+      });
+
+      // The retention is not a lock-in. Daily stays first and still carries no
+      // value, so choosing it is how a source leaves the finer width behind.
+      expect(options[0]?.value).toBe("");
+      expect(options[0]?.label).toBe("1d — daily");
+      expect(options[1]?.label).toBe("1h — hourly");
+    });
+
+    // @scenario "A width the cost report would reject is not kept either"
+    it("keeps nothing on a cost source, whose width was never in effect", () => {
+      const options = selectOptionsFor("bucketWidth", {
+        report: "cost",
+        bucketWidth: "1h",
+      });
+
+      // The puller pins the cost report to daily and ignores the setting, so
+      // the stored `1h` was doing nothing. Offering it back would show the
+      // admin a control with no effect, and the builder refuses it anyway.
+      expect(options.map((o) => o.value)).toEqual([""]);
+      expect(
+        buildAnthropicAdminPullConfig(
+          composerWith({ report: "cost", bucketWidth: "1h" }),
+        ),
+      ).toBeNull();
+    });
+
+    // @scenario "The bucket width is daily whichever report is chosen"
+    it("refuses a width no version of the form ever offered", () => {
+      // Retention reaches only as far as the schema does. A `2h` that arrived
+      // from somewhere other than this form is neither offered back nor built.
+      expect(
+        selectOptionsFor("bucketWidth", {
+          report: "usage",
+          bucketWidth: "2h",
+        }).map((o) => o.value),
+      ).toEqual([""]);
       expect(
         buildAnthropicAdminPullConfig(
           composerWith({ report: "usage", bucketWidth: "2h" }),

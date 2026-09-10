@@ -30,6 +30,28 @@ Feature: Choose Anthropic adapter settings instead of typing them
       # out, so daily is written down once, in the adapter's schema.
 
     @unit
+    Scenario: A source already reading hourly keeps reading hourly
+      Given a usage source was saved with an hourly bucket width
+      When the admin opens that source to edit it
+      Then the hourly width is offered alongside the daily one
+      And the field still holds hourly
+      # The form drops any held value its picker does not offer, so
+      # offering daily alone would have moved this source to daily the
+      # next time anyone opened it for an unrelated change -- a settings
+      # change nobody asked for and nothing announced. The finer widths
+      # are withdrawn from new sources, not taken off the ones already
+      # reading at them; the admin can still move to daily by choosing it.
+
+    @unit
+    Scenario: A width the cost report would reject is not kept either
+      Given a cost source was somehow saved with an hourly bucket width
+      When the admin opens that source to edit it
+      Then the only entry offered is the daily one
+      # The puller ignores the width on a cost source, so the stored one
+      # was never in effect. Keeping it would show the admin a setting
+      # that does nothing, and the builder refuses it anyway.
+
+    @unit
     Scenario: The report opens on the one almost every organization wants
       When the admin opens the form without touching the report field
       Then the report field holds the cost report

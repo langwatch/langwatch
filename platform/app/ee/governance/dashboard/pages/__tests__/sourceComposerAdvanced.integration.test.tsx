@@ -451,7 +451,9 @@ describe("given a source type that explains what it needs granted", () => {
       // the assertion above is a real state rather than a string that never
       // matched anything.
       expect(
-        await screen.findByText(/Needs an app registration with a client secret/),
+        await screen.findByText(
+          /Needs an app registration with a client secret/,
+        ),
       ).toBeVisible();
     });
   });
