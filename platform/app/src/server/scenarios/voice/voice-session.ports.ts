@@ -19,6 +19,7 @@ import {
   parseVoiceAgentConfig,
   VOICE_TRANSPORT_PROVIDER,
   type VoiceTransport,
+  voiceAgentExternalId,
 } from "~/server/agents/voice/voice-agent.config";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
@@ -121,7 +122,7 @@ export function createVoiceSessionPortsFromServices({
       const agent = await agentService.getById({ id: agentRowId, projectId });
       if (agent?.type !== "voice") return null;
       const config = parseVoiceAgentConfig(agent.config);
-      return { id: agent.id, agentExternalId: config.agentId };
+      return { id: agent.id, agentExternalId: voiceAgentExternalId(config) };
     },
 
     /** Whether the project saved a voice agent for this vendor agent id: the

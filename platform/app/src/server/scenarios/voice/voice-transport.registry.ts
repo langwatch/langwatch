@@ -9,6 +9,7 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
 import type { CallRecord } from "./call-record";
 import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport";
+import { phoneTransport } from "./transports/phone.transport";
 
 /** The provider key and host a runner reads a conversation back with. Never
  *  reaches the browser — a runner keeps it and returns only the signed URL. */
@@ -25,6 +26,14 @@ export interface VoiceSessionConnect {
 }
 
 export interface VoiceTransportRunner {
+  /**
+   * Guard that runs before any credential lookup, so a transport that cannot
+   * run yet fails with its own typed error rather than the generic
+   * {@link VoiceTransportRunner.missingKeyMessage} key-missing error. Left
+   * unimplemented by transports that are ready; the phone stub throws here
+   * until the voice worker that dials it ships.
+   */
+  assertAvailable?(): void;
   /** Build the SDK agent adapter the pool child drives for this transport. */
   createAgentAdapter(input: {
     agentId: string;
@@ -68,4 +77,5 @@ export const voiceTransportRegistry: Record<
   VoiceTransportRunner
 > = {
   elevenlabs_convai: elevenLabsConvaiTransport,
+  phone: phoneTransport,
 };

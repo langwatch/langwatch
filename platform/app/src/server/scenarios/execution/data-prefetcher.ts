@@ -73,6 +73,7 @@ import {
   type CallerVoiceConfig,
   parseCallerVoiceConfig,
 } from "../voice/caller-voice.config";
+import { VoicePhoneTransportUnavailableError } from "../voice/transports/phone.transport";
 import { voiceCallMaxSeconds } from "../voice/voice-limits";
 import { resolveTraceWaitTimeoutMs } from "./ingest-lag.service";
 import {
@@ -1044,6 +1045,12 @@ async function fetchVoiceAgentData({
   if (agent?.type !== "voice") return null;
 
   const config = parseVoiceAgentConfig(agent.config);
+  // Slice 1: a phone target has no voice worker yet, so a scenario run of one
+  // fails with the transport's own typed error rather than reaching the vendor.
+  // Only the ElevenLabs branch below reads an agent id and a credential.
+  if (config.transport !== "elevenlabs_convai") {
+    throw new VoicePhoneTransportUnavailableError();
+  }
 
   const provider = await findElevenLabsProviderForProject({ projectId });
   const credential = provider
