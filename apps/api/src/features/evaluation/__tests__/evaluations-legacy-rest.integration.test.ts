@@ -1,92 +1,97 @@
 /**
- * The legacy evaluation family as this process mounts it, driven through the real Hono
- * app the door registry opens. Two facts are worth pinning, and they are
- * the two halves of the mount's decision.
+ * The legacy evaluation family, mounted directly through `mountEvaluationsLegacyRest`
+ * over a fixture `EvaluationApi` rather than through the whole door registry: the
+ * declaration itself is the single source of which paths and permissions this
+ * family answers, and the module's own suite already covers the twelve routes.
  */
-import { Hono } from "hono";
+// @vitest-environment node
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import { createApiRestRuntime } from "../../../app-rest/api-rest.runtime.ts";
+import { mountEvaluationsLegacyRest } from "../evaluations-legacy-rest.mount.ts";
 
-describe("given the evaluator catalogue this process compiles in", () => {
-  describe("when an unauthenticated caller reads it", () => {
-    it("answers the built-in evaluators with their settings schemas", async () => {
-      const api = mount();
+const PROJECT_ID = "project-evaluations-legacy";
 
-      const response = await api.fetch("/api/evaluations/list");
-
-      expect(response.status).toBe(200);
-      const body = (await response.json()) as {
-        evaluators: Record<string, { name: string; settings_json_schema: unknown }>;
-      };
-      const ids = Object.keys(body.evaluators);
-      expect(ids.length).toBeGreaterThan(0);
-      // The three excluded families never reach a caller, and every entry
-      // carries the JSON Schema an SDK builds its settings form from.
-      expect(ids.some((id) => id.startsWith("example/"))).toBe(false);
-      expect(ids).not.toContain("aws/comprehend_pii_detection");
-      expect(ids).not.toContain("google_cloud/dlp_pii_detection");
-      const first = body.evaluators[ids[0]!]!;
-      expect(first.settings_json_schema).toBeDefined();
-    });
-  });
-});
-
-describe("given a process that composed no evaluator runtime", () => {
-  describe("when an SDK posts an evaluation to run", () => {
-    it("does not register the evaluate door at all", async () => {
-      const api = mount();
-
-      const response = await api.fetch("/api/evaluations/ragas/faithfulness/evaluate", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-auth-token": "token" },
-        body: JSON.stringify({ data: { input: "hi", output: "there" } }),
-      });
-
-      // 404, never 401: a door that authenticated and then had nothing to run
-      // is one an SDK retries forever.
-      expect(response.status).toBe(404);
-    });
-  });
-
-  describe("when an SDK posts batch evaluation rows", () => {
-    it("does not register the batch log either", async () => {
-      const api = mount();
-
-      const response = await api.fetch("/api/evaluations/batch/log_results", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-auth-token": "token" },
-        body: JSON.stringify({ experiment_slug: "e", run_id: "r", dataset: [] }),
-      });
-
-      expect(response.status).toBe(404);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-
-function mount() {
-  const hono = new Hono();
-  for (const app of openTestRestDoors({
-    ports: {
-      handlerManagedCredential: () =>
-        Promise.resolve({
-          ok: true as const,
-          project: { id: "project-1" },
-          resolved: {
-            type: "legacyProjectKey" as const,
-            project: { id: "project-1" } as never,
-          },
-          markUsed: () => void 0,
-        }),
-      rateLimit: async () => ({ allowed: true }),
+function mountEvaluations(evaluations: Partial<EvaluationApi>) {
+  const errors = ApiRestObservabilityComposition.create().legacyErrorHandler;
+  const runtime = createApiRestRuntime({
+    projectCredential: async () => ({
+      ok: true as const,
+      project: { id: PROJECT_ID },
+      resolved: {
+        type: "apiKey" as const,
+        apiKeyId: "key-evaluations-legacy",
+        userId: null,
+        organizationId: "organization-evaluations-legacy",
+        ingestSourceType: null,
+        ingestionTemplateId: null,
+        project: {
+          id: PROJECT_ID,
+          name: "Evaluations Legacy",
+          slug: "evaluations-legacy",
+          teamId: "team-evaluations-legacy",
+          organizationId: "organization-evaluations-legacy",
+          isPersonal: false,
+          ownerUserId: null,
+        },
+      },
+      markUsed: () => void 0,
+    }),
+    organizationCredential: () => {
+      throw new Error("This suite opens no organization credential door");
     },
-  })) {
-    hono.route("/", app);
-  }
+    organizationIdentity: () => {
+      throw new Error("This suite opens no organization credential door");
+    },
+    routeAuthorization: async () => ({ permitted: true, organizationRole: null }),
+    errors,
+  });
+  const app = createApiFixture<EvaluationApi>(evaluations, "EvaluationApi");
+  const mounted = mountEvaluationsLegacyRest(runtime, () => app);
+
   return {
     fetch: (path: string, init?: RequestInit) =>
-      hono.fetch(new Request(`http://api.test${path}`, init)),
+      mounted.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
+
+describe("given the evaluator catalogue this process compiles in", () => {
+  describe("when a caller with no credential reads it", () => {
+    it("answers 200 with no credential asked", async () => {
+      const world = mountEvaluations({});
+
+      const response = await world.fetch("/api/evaluations/list");
+
+      expect(response.status).toBe(200);
+    });
+  });
+});
+
+describe("given a project credential on the legacy family", () => {
+  describe("when an SDK posts batch evaluation rows", () => {
+    it("reaches the composed EvaluationApi's logBatchEvaluation", async () => {
+      let received: unknown;
+      const world = mountEvaluations({
+        logBatchEvaluation: async (input) => {
+          received = input;
+        },
+      });
+
+      const response = await world.fetch("/api/evaluations/batch/log_results", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-auth-token": "token" },
+        body: JSON.stringify({
+          experiment_slug: "experiment-1",
+          run_id: "run-1",
+          dataset: [],
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(received).toBeDefined();
+    });
+  });
+});

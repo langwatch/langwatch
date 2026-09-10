@@ -1,24 +1,80 @@
 /**
- * The three URLs a synchronous studio run is started from, driven through the real Hono
- * app the API process mounts.
+ * The three URLs a synchronous studio run is started from, driven through the
+ * real Hono app this process's REST runtime mounts.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import {
   WorkflowNotFoundError,
   WorkflowNotPublishedError,
   WorkflowVersionNotFoundError,
 } from "@langwatch/workflow-contract";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import { createApiRestRuntime } from "../../../app-rest/api-rest.runtime.ts";
 import { mountWorkflowRunRest } from "../workflow-run-rest.mount.ts";
-import type { HandlerManagedCredential } from "../../../app/api-handler-managed-credential.ts";
+import type { ApiRestRuntimePorts } from "../../../app-rest/api-rest.runtime.ts";
+
+const PROJECT = {
+  id: "project-1",
+  slug: "acme",
+  teamId: "team-1",
+  organizationId: "organization-1",
+};
 
 const jsonInit = {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ question: "hello" }),
 };
+
+function testRuntime(options: { credentialOk: boolean }) {
+  const errors = ApiRestObservabilityComposition.create().legacyErrorHandler;
+  const projectCredential: ApiRestRuntimePorts["projectCredential"] = options.credentialOk
+    ? async () => ({
+        ok: true as const,
+        project: { ...PROJECT, isPersonal: false, ownerUserId: null },
+        resolved: {
+          type: "apiKey" as const,
+          apiKeyId: "key-1",
+          userId: null,
+          organizationId: PROJECT.organizationId,
+          ingestSourceType: null,
+          ingestionTemplateId: null,
+          project: { ...PROJECT, isPersonal: false, ownerUserId: null },
+        },
+        markUsed: () => void 0,
+      })
+    : async () => ({
+        ok: false as const,
+        status: 403 as const,
+        body: { error: "insufficient_permissions", permission: "workflows:manage" },
+      });
+
+  return createApiRestRuntime({
+    projectCredential,
+    organizationCredential: () => {
+      throw new Error("This suite opens no organization credential door");
+    },
+    organizationIdentity: () => {
+      throw new Error("This suite opens no organization credential door");
+    },
+    routeAuthorization: async () => ({ permitted: true, organizationRole: null }),
+    errors,
+  });
+}
+
+function mount(options: { run: (...args: never[]) => unknown; credentialOk?: boolean }) {
+  const runtime = testRuntime({ credentialOk: options.credentialOk ?? true });
+  const workflows = createApiFixture<WorkflowApi>({ run: options.run }, "Workflow API");
+  const mounted = mountWorkflowRunRest(runtime, { workflows: () => workflows });
+
+  return {
+    fetch: (path: string, init?: RequestInit) =>
+      mounted.fetch(new Request(`http://api.test${path}`, init)),
+  };
+}
 
 describe("given a synchronous workflow run", () => {
   describe("when a key that may manage workflows posts inputs", () => {
@@ -66,14 +122,7 @@ describe("given a synchronous workflow run", () => {
   describe("when the key lacks the permission", () => {
     it("answers the ceiling refusal as sent, before the body is even read", async () => {
       const run = vi.fn();
-      const api = mount({
-        run,
-        credential: {
-          ok: false,
-          status: 403,
-          body: { error: "insufficient_permissions", permission: "workflows:manage" },
-        },
-      });
+      const api = mount({ run, credentialOk: false });
 
       const response = await api.fetch("/api/workflows/workflow-1/run", jsonInit);
 
@@ -105,66 +154,3 @@ describe("given a synchronous workflow run", () => {
     });
   });
 });
-
-// ---------------------------------------------------------------------------
-
-function mount(options: {
-  run: (...args: never[]) => unknown;
-  credential?: HandlerManagedCredential;
-}) {
-  const credential: HandlerManagedCredential = options.credential ?? {
-    ok: true,
-    project: { id: "project-1", slug: "acme", teamId: "team-1" } as never,
-    resolved: { type: "project" } as never,
-    markUsed: () => {},
-  };
-
-  const hono = new Hono().route(
-    "/",
-    mountWorkflowRunRest({
-      security: passThroughSecurity(),
-      collaborators: {
-        credential: async () => credential,
-        workflows: () => ({ run: options.run }) as never,
-      },
-    }),
-  );
-
-  return {
-    fetch: (path: string, init?: RequestInit) =>
-      hono.fetch(new Request(`http://api.test${path}`, init)),
-  };
-}
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
-
-const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json({ error: handled.code ?? "error" }, handled.httpStatus as never);
-  }
-  return c.json({ error: String(error) }, 500);
-};
