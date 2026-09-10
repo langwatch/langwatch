@@ -108,6 +108,52 @@ describe("given a source's last agents listing", () => {
       ).toEqual({ outcome: "refused", cause: "unreachable" });
     });
 
+    /**
+     * The cause table is an object literal, and indexing one with a string
+     * reaches its prototype. `toString` and friends come back as inherited
+     * functions rather than `undefined`, so a `?? "unreachable"` fallback
+     * never fires and a Function lands where a cause belongs. `REFUSAL_VOICE`
+     * has no entry for it and reading a headline off `undefined` throws, so
+     * the screen crashes instead of drawing the refusal it was handed.
+     *
+     * That is strictly worse than the wrong-advice bug the fallback exists to
+     * prevent, and it shipped in this file once already.
+     *
+     * These names are tested one at a time rather than as a loop so a failure
+     * names the word that broke it.
+     */
+    it.each([
+      "toString",
+      "constructor",
+      "valueOf",
+      "hasOwnProperty",
+    ])("falls to asking again for %s, which is also a property name", (inherited) => {
+      expect(agentsListingOutcome(row("refused", inherited))).toEqual({
+        outcome: "refused",
+        cause: "unreachable",
+      });
+    });
+
+    /**
+     * The control, and the whole diagnosis of why the bug above survived a
+     * green suite.
+     *
+     * This assertion passes against the broken lookup, because an ordinary
+     * unknown word is genuinely absent from the table and `??` fires for it.
+     * So any test that reaches for a plausible-sounding unknown reason — which
+     * is what the test above this block does with `quota_exhausted_v2`, and
+     * what anybody writing this file would reach for first — is guaranteed to
+     * miss the inherited-name case entirely.
+     *
+     * Keep both. Deleting this one loses the record of why coverage that looks
+     * complete was not, and the next person writes the same passing test.
+     */
+    it("still falls to asking again for an ordinary unknown word (control)", () => {
+      expect(
+        agentsListingOutcome(row("refused", "some_future_reason")),
+      ).toEqual({ outcome: "refused", cause: "unreachable" });
+    });
+
     it("carries no count, so nothing downstream can read one", () => {
       const outcome = agentsListingOutcome(row("refused", "unauthorized"));
 
