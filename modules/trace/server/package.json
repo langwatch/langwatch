@@ -32,18 +32,6 @@
       "types": "./dist/adapters/trace-processing-producer.adapter.d.ts",
       "default": "./src/adapters/trace-processing-producer.adapter.ts"
     },
-    "./api-trpc/spans": {
-      "types": "./dist/transport/api-trpc/spans.api.d.ts",
-      "default": "./src/transport/api-trpc/spans.api.ts"
-    },
-    "./api-trpc/trace-edit-overlay": {
-      "types": "./dist/transport/api-trpc/trace-edit-overlay.api.d.ts",
-      "default": "./src/transport/api-trpc/trace-edit-overlay.api.ts"
-    },
-    "./api-trpc/traces": {
-      "types": "./dist/transport/api-trpc/traces.api.d.ts",
-      "default": "./src/transport/api-trpc/traces.api.ts"
-    },
     "./api-trpc/trace-read-mappers": {
       "types": "./dist/transport/api-trpc/trace-read-mappers.api.d.ts",
       "default": "./src/transport/api-trpc/trace-read-mappers.api.ts"

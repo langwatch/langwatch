@@ -16,9 +16,6 @@ import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
 import type { SharedTraceTrpcPorts } from "@langwatch/trace-server/api-trpc/shared-trace";
-import type { SpansTrpcPorts } from "@langwatch/trace-server/api-trpc/spans";
-import type { TraceEditOverlayTrpcPorts } from "@langwatch/trace-server/api-trpc/trace-edit-overlay";
-import type { TracesTrpcPorts } from "@langwatch/trace-server/api-trpc/traces";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import type { TrpcRequestLike } from "@langwatch/api/trpc";
 import { trpcClientAddress } from "../../app/api-client-address.ts";
@@ -142,22 +139,6 @@ export function composeTraceFeature(options: TraceFeatureOptions): ComposedTrace
       : Promise.reject(refuse("the caller's read-time redactions"));
 
   const ports: ApiTracePorts = {
-    traces: {
-      ...(traceReads?.legacyPorts() ??
-        refuseAll<
-          Omit<
-            TracesTrpcPorts<
-              TraceLegacyListInput,
-              unknown,
-              TraceLegacyFilterInput,
-              unknown,
-              unknown
-            >,
-            "getViewerProtections"
-          >
-        >(refuse, "the legacy trace grid")),
-      getViewerProtections: viewerProtections,
-    },
     tracesV2: {
       ...(traceReads?.readPorts() ??
         refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(refuse, "the trace read passes")),
@@ -165,15 +146,6 @@ export function composeTraceFeature(options: TraceFeatureOptions): ComposedTrace
         refuseAll<ReturnType<ApiTraceReadStackPort["explorerPorts"]>>(
           refuse,
           "the trace explorer",
-        )),
-      getViewerProtections: viewerProtections,
-    },
-    spans: { getViewerProtections: viewerProtections } satisfies SpansTrpcPorts,
-    traceEditOverlay: {
-      ...(traceReads?.editOverlayRedaction() ??
-        refuseAll<Omit<TraceEditOverlayTrpcPorts<Protections>, "getViewerProtections">>(
-          refuse,
-          "the reviewer-correction redaction",
         )),
       getViewerProtections: viewerProtections,
     },

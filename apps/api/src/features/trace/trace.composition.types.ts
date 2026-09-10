@@ -6,9 +6,6 @@ import type {
   TraceLegacyListInput,
 } from "@langwatch/trace-contract";
 import type { SharedTraceTrpcPorts } from "@langwatch/trace-server/api-trpc/shared-trace";
-import type { SpansTrpcPorts } from "@langwatch/trace-server/api-trpc/spans";
-import type { TraceEditOverlayTrpcPorts } from "@langwatch/trace-server/api-trpc/trace-edit-overlay";
-import type { TracesTrpcPorts } from "@langwatch/trace-server/api-trpc/traces";
 import type { TracesV2TrpcPorts } from "@langwatch/trace-server/api-trpc/traces-v2";
 import type { TraceApp } from "@langwatch/trace-server";
 import type { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
@@ -31,9 +28,6 @@ export type ComposedTraceFeature = Readonly<{
  * The thirteen tRPC ports {@link ApiTrpcCollaborators} mounts individually.
  */
 export type ApiTracePorts = Readonly<{
-  traces: TracesTrpcPorts<TraceLegacyListInput, unknown, TraceLegacyFilterInput, unknown, unknown>;
   tracesV2: Omit<TracesV2TrpcPorts<unknown, unknown>, "queryTranslation">;
-  spans: SpansTrpcPorts;
-  traceEditOverlay: TraceEditOverlayTrpcPorts<Protections>;
   sharedTrace: SharedTraceTrpcPorts;
 }>;

@@ -20,11 +20,6 @@ export {
 export { createStoredObjectTrpcRouter } from "../features/stored-object/stored-object-trpc.mount.ts";
 export { createSuiteTrpcRouter } from "../features/suite/suite-trpc.mount.ts";
 export {
-  createSpansTrpcRouter,
-  createTraceEditOverlayTrpcRouter,
-  createTracesTrpcRouter,
-} from "../features/trace/trace-trpc.mount.ts";
-export {
   createSharedTraceTrpcRouter,
   createTracesV2TrpcRouter,
 } from "../features/trace/traces-v2-trpc.mount.ts";

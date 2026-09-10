@@ -469,3 +469,7 @@ export {
   TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME,
 } from "./adapters/otel.trace-edge-media-telemetry.adapter.ts";
 export { traceServer, type TraceInfrastructure } from "./trace.server.ts";
+
+export { spansTrpcTransport } from "./transport/spans.trpc.ts";
+export { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
+export { tracesTrpcTransport } from "./transport/traces.trpc.ts";

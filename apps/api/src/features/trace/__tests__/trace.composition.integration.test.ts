@@ -8,7 +8,13 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
-import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
+import {
+  spansTrpcTransport,
+  traceEditOverlayTrpcTransport,
+  tracesTrpcTransport,
+  TraceApp,
+  type TraceAppDependencies,
+} from "@langwatch/trace-server";
 import { SHARE_MAX_FULL_SPANS, type Span, type TraceSummaryData } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -37,11 +43,6 @@ import {
   composeApiUsageStats,
 } from "../../../app/api-usage.composition.ts";
 import { installApiNotification } from "../../notification/notification.composition.ts";
-import {
-  createSpansTrpcRouter,
-  createTraceEditOverlayTrpcRouter,
-  createTracesTrpcRouter,
-} from "../trace-trpc.mount.ts";
 import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "../traces-v2-trpc.mount.ts";
 import { installApiEntitlement } from "../../entitlement/entitlement.composition.ts";
 import { UsageCounterPort, type UsageWarningPort } from "@langwatch/entitlement-server";
@@ -228,13 +229,10 @@ function testTraceGroupHalf(broadcast: PresenceEmitterPort): ComposedTraceFeatur
   const ports = testTraceGroupPorts();
   return {
     routers: (mount: ApiTrpcFeatureMount) => ({
-      traces: createTracesTrpcRouter({ ...mount, ports: ports.traces }),
+      traces: mount.runtime.mount(tracesTrpcTransport, (ctx) => ctx.app.traces),
       tracesV2: createTracesV2TrpcRouter({ ...mount, ports: ports.tracesV2 }),
-      spans: createSpansTrpcRouter({ ...mount, ports: ports.spans }),
-      traceEditOverlay: createTraceEditOverlayTrpcRouter({
-        ...mount,
-        ports: ports.traceEditOverlay,
-      }),
+      spans: mount.runtime.mount(spansTrpcTransport, (ctx) => ctx.app.traces),
+      traceEditOverlay: mount.runtime.mount(traceEditOverlayTrpcTransport, (ctx) => ctx.app.traces),
       sharedTrace: createSharedTraceTrpcRouter({
         ...mount,
         publicProcedure: mount.publicProcedure,
@@ -560,7 +558,7 @@ describe("given a process that composed no trace read stack", () => {
     const { group } = composeGroup();
 
     await expect(
-      group.ports.traces.getViewerProtections({}, { projectId: "project-1" }),
+      group.ports.tracesV2.getViewerProtections({}, { projectId: "project-1" }),
     ).rejects.toMatchObject({ code: "service_unavailable" });
   });
 
@@ -784,7 +782,7 @@ describe("given an API process that composed the real observability collaborator
       const clickHouse = testClickHouse([]);
       const group = composeRealGroup(clickHouse);
 
-      const protections = (await group.ports.traces.getViewerProtections(
+      const protections = (await group.ports.tracesV2.getViewerProtections(
         { tryActor: () => ({ id: "user-1" }) },
         { projectId: "project-1" },
       )) as {
@@ -793,7 +791,7 @@ describe("given an API process that composed the real observability collaborator
       };
       // No caller at all: the redactions are the anonymous reader's, which is
       // the fail-closed direction rather than the permissive one.
-      const anonymous = (await group.ports.traces.getViewerProtections(
+      const anonymous = (await group.ports.tracesV2.getViewerProtections(
         {},
         { projectId: "project-1" },
       )) as { canSeeCosts: boolean };
@@ -834,30 +832,6 @@ describe("given an API process that composed the real observability collaborator
     });
   });
 
-  describe("when the legacy grid's own ports are asked for", () => {
-    it("carries a real input parser and a real span digest", async () => {
-      const clickHouse = testClickHouse([]);
-      const group = composeRealGroup(clickHouse);
-
-      const parsed = group.ports.traces.listInputSchema.parse({
-        projectId: "project-1",
-        startDate: 1_700_000_000_000,
-        endDate: 1_700_000_600_000,
-      });
-      const digest = await group.ports.traces.formatSpansDigest([]);
-
-      expect(parsed).toMatchObject({ projectId: "project-1" });
-      expect(() =>
-        group.ports.traces.listInputSchema.parse({
-          projectId: "project-1",
-          startDate: 1_700_000_000_000,
-          endDate: 1_700_000_600_000,
-          pageOffset: 3,
-        }),
-      ).toThrow();
-      expect(typeof digest).toBe("string");
-    });
-  });
 
   describe("when the usage panel and the plan banner are read through the real handler", () => {
     it("answers a real reading taken against a real plan", async () => {
