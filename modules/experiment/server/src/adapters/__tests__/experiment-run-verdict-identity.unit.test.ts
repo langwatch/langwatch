@@ -14,7 +14,7 @@ import {
 import {
   RecordEvaluatorResultCommand,
   RecordTargetResultCommand,
-} from "../eventing.experiment-run-processing.adapter.ts";
+} from "../../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import type {
   EvaluatorResultEventData,
   TargetResultEventData,

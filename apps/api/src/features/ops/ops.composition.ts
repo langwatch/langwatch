@@ -21,7 +21,8 @@ import {
   PrismaProcessAuditRepository,
   OpsSnapshotRedisPort,
   ProcessOpsPrismaRepository,
-  RedisOpsSnapshotAdapter,
+  DefaultOpsSnapshotService,
+  RedisOpsSnapshotRepository,
   type OpsCapability,
   type OpsEventExplorer,
   type OpsExplainClients,
@@ -188,7 +189,9 @@ async function composeOps(
 ): Promise<OpsApp> {
   const resources = install.resources;
   const snapshots = options.redis
-    ? RedisOpsSnapshotAdapter.create({ redis: ApiOpsSnapshotRedis.create(options.redis) })
+    ? DefaultOpsSnapshotService.create(
+        RedisOpsSnapshotRepository.create(ApiOpsSnapshotRedis.create(options.redis)),
+      )
     : null;
   // Polling starts here rather than on first read: the dashboard, the badge and
   // the live stream all read the last artifact this process pulled, so a reader

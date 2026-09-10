@@ -31,7 +31,7 @@ import {
 import { z } from "zod";
 
 import type { LangyApp } from "#app/langy.app";
-import type { LocalControlRuntime } from "#adapters/langy-local-control-runtime.adapter";
+import type { LocalControlRuntime } from "#repositories/redis/redis.langy-local-control-runtime.repository";
 import { LangyKeyIdentityService } from "#services/langy-key-identity.service";
 import type { ControlSkipGate } from "#rules/langy-local-session-contract.rules";
 import { conversationTitle, conversationUrl } from "#rules/langy-local-session-text.rules";

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { ClickHouseCodingAgentProcessingAdapter } from "../clickhouse.coding-agent-processing.adapter.ts";
+import { RedisCodingAgentProcessingRepository } from "../../repositories/redis/redis.coding-agent-processing.repository.ts";
 import { ModelCatalogCostEstimatorAdapter } from "../model-catalog.cost-estimator.adapter.ts";
-import type { CodingAgentProcessingPipeline } from "../eventing.coding-agent-processing.adapter.ts";
+import type { CodingAgentProcessingPipeline } from "../../repositories/redis/redis.coding-agent-session-pipeline.repository.ts";
 import { type CodingAgentSessionState } from "../../projections/coding-agent-session.projection.ts";
 import { CodingAgentSessionStateProjection } from "../../projections/coding-agent-session-state.projection.ts";
 import { CodingAgentProjectActivityPort } from "../../ports/coding-agent-project-activity.port.ts";
@@ -96,7 +96,7 @@ function compose(
   const redis = { get: vi.fn(async () => null), set };
   const projectActivity = new RecordingProjectActivity();
 
-  const pipeline: CodingAgentProcessingPipeline = ClickHouseCodingAgentProcessingAdapter.create({
+  const pipeline: CodingAgentProcessingPipeline = RedisCodingAgentProcessingRepository.create({
     resolveClient: resolveClient as never,
     defaultRetentionDays: 49,
     redis: redis as never,

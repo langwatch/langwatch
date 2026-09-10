@@ -10,7 +10,7 @@ import {
 } from "@langwatch/experiment-contract";
 import type { Entry, Field, StudioWorkflow as WorkflowDSL } from "@langwatch/workflow-contract";
 import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port.ts";
-import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port.ts";
+import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port.ts";
 import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
 import type { ExperimentService } from "./experiment.service.ts";
@@ -78,7 +78,7 @@ export type WorkflowEvaluationDependencies = {
   /** The datasets, prompts, agents and evaluators the load reads through. */
   services: ExecutionDataServices;
   /** Where the run's progress is written so a poll on another process finds it. */
-  progress: ExperimentRunProgressPort;
+  progress: ExperimentRunProgressRepository;
   /** The deployment's public base URL, for the shareable results link. */
   baseUrl: string;
   defaultConcurrency: number;

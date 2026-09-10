@@ -24,14 +24,12 @@ export { BugReportInboxService } from "./services/bug-report-inbox.service.ts";
 export type { BugReportRepository } from "./repositories/admin/bug-report.repository.ts";
 export type { OpsRepositories } from "./repositories/ops.repositories.ts";
 export { OpsOperations, type OpsOperationsOptions } from "./app/ops-operations.ts";
+export { RedisOpsSnapshotRepository } from "./repositories/redis/redis.ops-snapshot.repository.ts";
+export { DefaultOpsSnapshotService } from "./services/ops-snapshot-reader.service.ts";
 export {
-  RedisOpsSnapshotAdapter,
-  type RedisOpsSnapshotAdapterOptions,
-} from "./adapters/redis.ops-snapshot.adapter.ts";
-export {
-  RedisSchedulerWakeAdapter,
+  RedisSchedulerWakeRepository as RedisSchedulerWakeAdapter,
   type SchedulerWakeRedis,
-} from "./adapters/redis.scheduler-wake.adapter.ts";
+} from "./repositories/redis/redis.scheduler-wake.repository.ts";
 export { OpsSnapshotRedisPort } from "./ports/ops-snapshot-redis.port.ts";
 export {
   ProcessAuditRepository,
@@ -55,7 +53,7 @@ export {
 export { AdminAuditSink } from "./services/impersonation.service.ts";
 export * from "./rules/ops-error-normalizer.rules.ts";
 export * from "./rules/ops-redis-engine-cpu.rules.ts";
-export { OpsWorkerAdapter, type OpsWorkerAdapterOptions } from "./adapters/ops-worker.adapter.ts";
+export { PrismaOpsWorkerRepository as OpsWorkerAdapter, type OpsWorkerAdapterOptions } from "./repositories/prisma/prisma.ops-worker.repository.ts";
 export { AnomalyHardTierAlertPort } from "./ports/anomaly-hard-tier-alert.port.ts";
 export { StorageStatsMetricsPort } from "./ports/storage-stats-metrics.port.ts";
 export { OtelStorageStatsMetricsAdapter } from "./adapters/otel.storage-stats-metrics.adapter.ts";
@@ -92,9 +90,9 @@ export {
 export { ReplayService } from "./services/replay.service.ts";
 export { LOCK_REFRESH_INTERVAL_MS } from "./services/replay-lock-heartbeat.service.ts";
 export { OpsMetricsCollectorService } from "./services/ops-metrics-collector.service.ts";
-export { OpsQueueMetricsSourcePort } from "./ports/ops-queue-metrics-source.port.ts";
+export { OpsQueueMetricsSourceRepository as OpsQueueMetricsSourcePort } from "./repositories/ops-queue-metrics-source.repository.ts";
 export { QueueOpsMetricsSourceAdapter } from "./adapters/queue.ops-queue-metrics-source.adapter.ts";
-export { IoredisOpsSnapshotRedisAdapter } from "./adapters/ioredis.ops-snapshot-redis.adapter.ts";
+export { RedisOpsSnapshotRedisRepository as IoredisOpsSnapshotRedisAdapter } from "./repositories/redis/redis.ops-snapshot-redis.repository.ts";
 export { QueueService } from "./services/queue.service.ts";
 export { QueueRedisRepository } from "./repositories/redis/queue.repository.ts";
 export { RedisOpsMetricsRepository } from "./repositories/redis/redis.ops-metrics.repository.ts";
@@ -188,7 +186,12 @@ export type {
 // The transport declarations the process mounts. Each is inert: it names its
 // routes or procedures, the access each is reached behind, and the facts the
 // mounting process must bind - and nothing about how this process runs.
-export { adminRest, adminActor, adminAuthSession } from "./transport/admin.rest.ts";
+export {
+  adminRest,
+  adminActor,
+  adminAuthSession,
+  type AdminRestPorts,
+} from "./transport/admin.rest.ts";
 export { opsBugReportRest, bugReportCredential } from "./transport/ops-bug-report.rest.ts";
 export { opsClickHouseExplainRest } from "./transport/ops-clickhouse-explain.rest.ts";
 export { opsOperatorFact } from "./transport/ops-operator.trpc.ts";

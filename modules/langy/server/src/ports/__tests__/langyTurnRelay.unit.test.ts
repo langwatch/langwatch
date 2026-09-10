@@ -9,8 +9,8 @@ import { mintRunToken, signFrame } from "@langwatch/langy-server/streaming/langy
 import {
   type LangyRelayBuffer,
   type LangyRelayConversations,
-  LangyTurnRelayAdapter,
-} from "../../adapters/langy-turn-relay.adapter.ts";
+  RedisLangyTurnRelayRepository,
+} from "../../repositories/redis/redis.langy-turn-relay.repository.ts";
 
 const RUN_TOKEN = mintRunToken();
 const IDENTITY = {
@@ -142,7 +142,7 @@ function makeRelay(
   const resourceLinks = over.resourceLinks ?? fakeResourceLinks();
   const reserveFrameNonce = vi.fn(async () => over.fresh ?? true);
   const refreshHandoffTtl = over.refreshHandoffTtl ?? vi.fn(async () => undefined);
-  const relay = LangyTurnRelayAdapter.create({
+  const relay = RedisLangyTurnRelayRepository.create({
     buffer,
     conversations,
     reserveFrameNonce,

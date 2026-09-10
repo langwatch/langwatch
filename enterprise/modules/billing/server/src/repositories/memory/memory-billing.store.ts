@@ -2,7 +2,7 @@
 
 import type { Instant } from "@langwatch/time";
 import type { BillingCheckpoint } from "../../ports/billing-checkpoint.port.ts";
-import type { BillingSubscriptionRecord } from "../../ports/subscription.port.ts";
+import type { BillingSubscriptionRecord } from "../subscription.repository.ts";
 import type { NurturingProfile } from "../nurturing-profile.repository.ts";
 
 /** An organization as every billing row in the memory tier sees it. */

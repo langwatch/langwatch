@@ -1,9 +1,24 @@
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  PostgresProjectAdapter,
-  type PostgresProjectAdapterOptions,
+  PrismaProjectRepository,
+  ProjectService,
+  type ProjectCredentialsPort,
+  type ProjectDiagnosticsPort,
+  type ProjectKeyMapPort,
+  type ProjectStoredObjectsPort,
+  type PrismaProjectDatabase,
 } from "@langwatch/project-server";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
+
+export interface PostgresProjectAdapterOptions {
+  database: PrismaProjectDatabase;
+  credentials: ProjectCredentialsPort;
+  organizations: OrganizationApi;
+  keyMap?: ProjectKeyMapPort;
+  storedObjects?: ProjectStoredObjectsPort;
+  diagnostics?: ProjectDiagnosticsPort;
+}
 
 /**
  * A `ProjectApi` over real rows, for the suites that seed a project and then
@@ -14,7 +29,14 @@ import { toDate } from "@langwatch/time";
  * because nothing composed here is behind them.
  */
 export function createPrismaProjectApi(options: PostgresProjectAdapterOptions): ProjectApi {
-  const directory = PostgresProjectAdapter.create(options).build();
+  const directory = ProjectService.create({
+    repository: PrismaProjectRepository.create({ prisma: options.database }),
+    credentials: options.credentials,
+    organizations: options.organizations,
+    keyMap: options.keyMap,
+    storedObjects: options.storedObjects,
+    diagnostics: options.diagnostics,
+  });
   const unimplemented = (operation: string): Promise<never> =>
     Promise.reject(new Error(`this suite composes no project application: ${operation}`));
 

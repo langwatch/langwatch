@@ -19,9 +19,9 @@ import {
 } from "../billing-webhook-subscription.repository.ts";
 import type {
   BillingSubscriptionRecord,
-  BillingSubscriptionPort,
+  SubscriptionRepository,
   BillingSubscriptionWithOrganization,
-} from "../../ports/subscription.port.ts";
+} from "../subscription.repository.ts";
 
 const logger = createLogger("langwatch:billing:webhook-subscription-adapter");
 
@@ -30,14 +30,14 @@ export type BillingWebhookTrialLicenseDatabase = Pick<PrismaClient, "organizatio
 
 export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSubscriptionPort {
   private constructor(
-    private readonly subscriptions: BillingSubscriptionPort,
+    private readonly subscriptions: SubscriptionRepository,
     private readonly database: BillingWebhookTrialLicenseDatabase,
   ) {
     super();
   }
 
   static create(options: {
-    subscriptions: BillingSubscriptionPort;
+    subscriptions: SubscriptionRepository;
     database: BillingWebhookTrialLicenseDatabase;
   }): PrismaBillingWebhookSubscriptionRepository {
     return new PrismaBillingWebhookSubscriptionRepository(options.subscriptions, options.database);

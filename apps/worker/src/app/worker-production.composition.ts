@@ -51,9 +51,10 @@ import {
   type ScimSyncPipelineDatabase,
 } from "@langwatch/identity-server";
 import {
-  type LangySessionKeyReapDatabase,
+  type PrismaLangySessionKeyReapDatabase,
+  LangySessionKeyReapService,
   OtelLangySessionKeyMetricsAdapter,
-  PostgresLangySessionKeyReapAdapter,
+  PrismaLangySessionKeyReapRepository,
 } from "@langwatch/langy-server";
 import {
   ClickHouseCodingAgentProcessingAdapter,
@@ -67,8 +68,8 @@ import {
 } from "@langwatch/metric-server";
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
 import {
+  BillableEventsMeterClickHouseRepository,
   BillableEventsQueryService,
-  ClickHouseBillableEventsMeterAdapter,
   ClickHouseBillingAdapter,
   EventingBillableEventsMeterAdapter,
   EventingBillingMeterDispatchAdapter,
@@ -86,12 +87,12 @@ import {
 } from "@langwatch/enterprise-billing-server";
 import type { PricingModel as EntitlementPricingModel } from "@langwatch/entitlement-contract";
 import { PlanNextStepService } from "@langwatch/entitlement-server";
-import { PostgresOrganizationLicenseAdapter } from "@langwatch/enterprise-licensing-server";
+import { PrismaOrganizationLicenseRepository } from "@langwatch/enterprise-licensing-server";
 import { ClickHouseExperimentRunProcessingAdapter } from "@langwatch/experiment-server";
 import {
   type CodingAgentActivityDatabase,
-  PostgresCodingAgentActivityAdapter,
-  PostgresGovernanceInternalProjectAdapter,
+  PrismaCodingAgentActivityRepository,
+  PrismaGovernanceInternalProjectRepository,
   ProjectOldestTeamPort,
 } from "@langwatch/project-server";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
@@ -325,7 +326,7 @@ export type WorkerDatabaseCompositionOptions = PrismaApiKeyDatabase &
   PrismaGithubPullRequestsDatabase &
   IdentityPipelineDatabase &
   JoinRequestPipelineDatabase &
-  LangySessionKeyReapDatabase &
+  PrismaLangySessionKeyReapDatabase &
   WorkerLangyConversationDatabase &
   ScimSyncPipelineDatabase &
   WorkerProjectStorageDatabase &
@@ -506,10 +507,10 @@ export class WorkerProductionComposition {
     // registry to lend it; it writes the same series name the App writes.
     const langyMaintenance = LangyMaintenanceWorkerFeatureInstaller.create({
       eventing,
-      sessionKeyReap: PostgresLangySessionKeyReapAdapter.create({
-        database: options.database,
+      sessionKeyReap: LangySessionKeyReapService.create({
+        repository: PrismaLangySessionKeyReapRepository.create(options.database),
         metrics: OtelLangySessionKeyMetricsAdapter.create(),
-      }).build(),
+      }),
     });
     // Unconditional, unlike the groups still owned by the legacy registry: the
     // sweep is composed from this package and the feature's own service, so
@@ -554,9 +555,9 @@ export class WorkerProductionComposition {
     // feature package over substrates this process already holds — the tenant-keyed ClickHouse
     // client the event store resolves through, the queue's own Redis, and the one Prisma client
     // this process opened. So there is no graph in which it is present but unbuildable.
-    const codingAgentActivity = PostgresCodingAgentActivityAdapter.create({
-      database: options.database,
-    }).build();
+    const codingAgentActivity = PrismaCodingAgentActivityRepository.create({
+      prisma: options.database,
+    });
     const projectActivity = WorkerProjectActivityAdapter.create(codingAgentActivity);
     const codingAgent = CodingAgentWorkerFeatureInstaller.create({
       eventing,
@@ -597,7 +598,7 @@ export class WorkerProductionComposition {
           // The licence row a self-hosted deployment's Enterprise tier lives
           // in, on the same guarded client. Without it this process refuses
           // the webhook batch a licensed customer's screen says is enabled.
-          licenses: PostgresOrganizationLicenseAdapter.create(options.connection.client).build(),
+          licenses: PrismaOrganizationLicenseRepository.create(options.connection.client),
           ...(options.config.deployment.licensePublicKey
             ? { licensePublicKey: options.config.deployment.licensePublicKey }
             : {}),
@@ -1497,7 +1498,7 @@ export class WorkerProductionComposition {
         config: options.config,
         database: options.database,
         resolveClickHouseClient: options.eventing.resolveClickHouseClient,
-        projects: PostgresGovernanceInternalProjectAdapter.create({
+        projects: PrismaGovernanceInternalProjectRepository.create({
           database: options.database as never,
           teams: PrismaGovernanceOldestTeamAdapter.create(options.database),
         }).build(),
@@ -2180,9 +2181,9 @@ export function saasBillableEventsMeter(options: {
   });
   const meter = EventingBillableEventsMeterAdapter.create({
     organizations,
-    meter: ClickHouseBillableEventsMeterAdapter.create({
+    meter: BillableEventsMeterClickHouseRepository.create({
       resolveClient: (organizationId) => options.resolveClickHouseClient(organizationId),
-    }).build(),
+    }),
   }).build();
   const dispatch = EventingBillingMeterDispatchAdapter.create({
     organizations,

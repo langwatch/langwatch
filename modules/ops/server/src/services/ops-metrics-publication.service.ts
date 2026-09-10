@@ -13,7 +13,7 @@ import type {
   OpsSnapshotService,
   QueueInfo,
 } from "@langwatch/ops-contract";
-import type { OpsQueueMetricsSourcePort } from "../ports/ops-queue-metrics-source.port.ts";
+import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
 import type { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
 import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
@@ -39,7 +39,7 @@ export class OpsMetricsPublicationService {
   private latestDetail: DetailSnapshot | null = null;
 
   private constructor(
-    private readonly ops: OpsQueueMetricsSourcePort,
+    private readonly ops: OpsQueueMetricsSourceRepository,
     private readonly sampling: OpsMetricsSamplingService,
     private readonly window: OpsMetricsWindowService,
     private readonly writerId: string,
@@ -49,7 +49,7 @@ export class OpsMetricsPublicationService {
   ) {}
 
   static create(params: {
-    ops: OpsQueueMetricsSourcePort;
+    ops: OpsQueueMetricsSourceRepository;
     sampling: OpsMetricsSamplingService;
     window: OpsMetricsWindowService;
     writerId: string;

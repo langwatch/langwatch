@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { PostgresModelCostCatalogAdapter } from "../postgres.model-cost-catalog.adapter.ts";
+import { PrismaModelCostCatalogRepository } from "../../repositories/prisma/prisma.model-cost-catalog.repository.ts";
 
 /**
  * Spec: modules/model-provider/specs/model-cost-catalog-seam.feature
@@ -54,7 +54,7 @@ function catalogue(options: { project?: unknown } = {}) {
   return {
     findMany,
     projects,
-    built: PostgresModelCostCatalogAdapter.create({
+    built: PrismaModelCostCatalogRepository.create({
       database: { customLLMModelCost: { findMany } } as unknown as PrismaClient,
       projects: projects as never,
     }).build(),

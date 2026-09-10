@@ -25,6 +25,7 @@ import {
   type AdminAuditRequest,
   type AdminResourceName,
   type OpsApi as OpsApiContract,
+  type OpsOperator,
 } from "@langwatch/ops-contract";
 import { z } from "zod";
 
@@ -234,4 +235,17 @@ function auditRequestFrom(request: Request): AdminAuditRequest {
   });
 
   return { headers };
+}
+
+/**
+ * What a process must reach to open `/api/admin/*`: the operator application
+ * itself, and the browser session read that resolves this door's two facts.
+ * Framework-free on purpose, so this door names no auth package.
+ */
+export interface AdminRestPorts {
+  ops(): OpsApiContract;
+  /** The impersonator-aware actor `adminActor` binds, or null when signed out. */
+  resolveActor(request: Request): Promise<OpsOperator | null>;
+  /** The raw auth session `adminAuthSession` binds, or null when expired. */
+  resolveAuthSession(request: Request): Promise<{ id: string } | null>;
 }

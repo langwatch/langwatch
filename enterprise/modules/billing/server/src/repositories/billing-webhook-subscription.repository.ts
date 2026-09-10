@@ -3,7 +3,7 @@
 import type {
   BillingOrganizationRecord,
   BillingSubscriptionRecord,
-} from "../ports/subscription.port.ts";
+} from "./subscription.repository.ts";
 
 export type SubscriptionWithOrg = BillingSubscriptionRecord & {
   /** The trial licence a paid subscription retires. */

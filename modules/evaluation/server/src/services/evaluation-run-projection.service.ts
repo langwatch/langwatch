@@ -6,7 +6,7 @@ import {
   type EvaluationRunLookup,
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
-import { EvaluationRunProjectionPort } from "../ports/evaluation-run-projection.port.ts";
+import { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
 import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
 
 /**
@@ -23,7 +23,7 @@ import type { EvaluationRunRepository } from "../repositories/evaluation.reposit
  * provably never calls, and a graph that names a collaborator it cannot use
  * is how a boot refusal turns into a runtime one.
  */
-export class EvaluationRunProjectionService extends EvaluationRunProjectionPort {
+export class EvaluationRunProjectionService extends EvaluationRunProjectionRepository {
   static create(options: { repository: EvaluationRunRepository }): EvaluationRunProjectionService {
     return new EvaluationRunProjectionService(options.repository);
   }

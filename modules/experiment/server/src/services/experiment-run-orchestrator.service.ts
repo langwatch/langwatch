@@ -15,7 +15,7 @@ import {
 import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port.ts";
-import type { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port.ts";
+import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
 import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
@@ -381,7 +381,7 @@ export class ExperimentRunOrchestratorService {
     abort,
     runId,
   }: {
-    abort: ExperimentRunAbortPort;
+    abort: ExperimentRunAbortRepository;
     runId: string;
   }): Promise<void> => {
     await abort.requestAbort(runId);

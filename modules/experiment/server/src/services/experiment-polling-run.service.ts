@@ -14,7 +14,7 @@ import {
 } from "@langwatch/experiment-contract";
 import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
 import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port.ts";
-import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port.ts";
+import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process.ts";
 import {
   ExperimentRunResultsWriterService,
@@ -32,7 +32,7 @@ export type StartPollingRunInput = Omit<OrchestratorInput, "runId" | "scope" | "
   /** The deployment's public base URL, for the shareable results link. */
   baseUrl: string;
   /** Where the run's progress is written so a poll on another process finds it. */
-  progress: ExperimentRunProgressPort;
+  progress: ExperimentRunProgressRepository;
   /**
    * Where an unexpected failure is reported beyond the log line. Optional: a
    * deployment that composes none loses nothing the customer can see.
@@ -75,7 +75,7 @@ const reportFailedRun = async ({
   runId: string;
   experimentSlug: string;
   projectId: string;
-  progress: ExperimentRunProgressPort;
+  progress: ExperimentRunProgressRepository;
   errorReporting?: ExperimentRunErrorReportingPort;
 }): Promise<void> => {
   const failure = mapThrownErrorEvent({ error });
@@ -114,7 +114,7 @@ const runExecution = async ({
   runUrl: string;
   experimentSlug: string;
   persistResults?: RunResultsPersistence;
-  progress: ExperimentRunProgressPort;
+  progress: ExperimentRunProgressRepository;
   errorReporting?: ExperimentRunErrorReportingPort;
 }): Promise<void> => {
   const draft = emptyRunResultsDraft();

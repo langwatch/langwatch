@@ -4,11 +4,11 @@ import type {
   OpsQueueReconcileResult,
   QueueInfo,
 } from "@langwatch/ops-contract";
-import { OpsQueueMetricsSourcePort } from "../ports/ops-queue-metrics-source.port.ts";
+import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import type { QueueService } from "../services/queue.service.ts";
 
 /** The writer's queue reads over the queue service alone, for a process with no Postgres. */
-export class QueueOpsMetricsSourceAdapter extends OpsQueueMetricsSourcePort {
+export class QueueOpsMetricsSourceAdapter extends OpsQueueMetricsSourceRepository {
   static create(queues: QueueService): QueueOpsMetricsSourceAdapter {
     return new QueueOpsMetricsSourceAdapter(queues);
   }

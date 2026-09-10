@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { BillableEventsPort } from "../ports/billable-events.port.ts";
+import type { BillableEventsRepository } from "../repositories/billable-events.repository.ts";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:billableEventsQuery");
@@ -8,9 +8,9 @@ const logger = createLogger("langwatch:billing:billableEventsQuery");
  * Queries ClickHouse for the count of distinct billable events for an org in a billing month.
  */
 export class BillableEventsQueryService {
-  private constructor(private readonly repository: BillableEventsPort | null) {}
+  private constructor(private readonly repository: BillableEventsRepository | null) {}
 
-  static create(repository: BillableEventsPort | null): BillableEventsQueryService {
+  static create(repository: BillableEventsRepository | null): BillableEventsQueryService {
     return new BillableEventsQueryService(repository);
   }
 

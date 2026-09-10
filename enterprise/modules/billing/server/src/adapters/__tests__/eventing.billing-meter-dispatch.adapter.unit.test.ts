@@ -6,7 +6,7 @@ import {
   BILLING_METER_DISPATCH_SUPPRESS_MS,
   EventingBillingMeterDispatchAdapter,
 } from "../eventing.billing-meter-dispatch.adapter.ts";
-import { RedisBillingTenantOrganizationCacheAdapter } from "../redis.tenant-organization-cache.adapter.ts";
+import { RedisTenantOrganizationCacheRepository } from "../../repositories/redis/redis.tenant-organization-cache.repository.ts";
 import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.billing.repositories.ts";
 import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 import { Temporal, type Instant } from "@langwatch/time";
@@ -26,7 +26,7 @@ function compose(
       organizations: PostgresBillingRepositories.create({
         prisma: { project: { findUnique } } as never,
       }).tenantOrganizations,
-      cache: RedisBillingTenantOrganizationCacheAdapter.create({
+      cache: RedisTenantOrganizationCacheRepository.create({
         redis: { get: vi.fn(async () => null), setex: vi.fn(async () => "OK") } as never,
       }),
     }),

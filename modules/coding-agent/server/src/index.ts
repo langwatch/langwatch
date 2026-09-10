@@ -17,14 +17,14 @@ export { CodingAgentPullRequestMappingPort } from "./ports/coding-agent-pull-req
 export { SystemCodingAgentClockAdapter } from "./adapters/coding-agent-clock.adapter.ts";
 export { ModelCatalogCostEstimatorAdapter } from "./adapters/model-catalog.cost-estimator.adapter.ts";
 export {
-  ClickHouseCodingAgentProcessingAdapter,
+  RedisCodingAgentProcessingRepository as ClickHouseCodingAgentProcessingAdapter,
   type ClickHouseCodingAgentProcessingAdapterOptions,
-} from "./adapters/clickhouse.coding-agent-processing.adapter.ts";
+} from "./repositories/redis/redis.coding-agent-processing.repository.ts";
 export {
   EventingCodingAgentProcessingAdapter,
   type CodingAgentProcessingPipeline,
   type CodingAgentProcessingPipelineDeps,
-} from "./adapters/eventing.coding-agent-processing.adapter.ts";
+} from "./repositories/redis/redis.coding-agent-session-pipeline.repository.ts";
 export { OtelCodingAgentCostMetricsAdapter } from "./adapters/otel.coding-agent-cost-metrics.adapter.ts";
 export { CodingAgentCostMetricsPort } from "./ports/coding-agent-cost-metrics.port.ts";
 export { CodingAgentTraceProcessingPort } from "./ports/coding-agent-trace-processing.port.ts";

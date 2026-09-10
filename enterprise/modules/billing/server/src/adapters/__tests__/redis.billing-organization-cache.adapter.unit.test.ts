@@ -2,9 +2,9 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
-  RedisBillingOrganizationCacheAdapter,
+  RedisBillingOrganizationCacheRepository,
   type BillingOrganizationCacheRedis,
-} from "../redis.billing-organization-cache.adapter.ts";
+} from "../../repositories/redis/redis.billing-organization-cache.repository.ts";
 import type { BillingReportOrganizationLookup } from "../../ports/billing-report-organization.port.ts";
 
 /** The whole verdict is what the cache stores, not just the organization. */
@@ -18,7 +18,7 @@ const ORGANIZATION: BillingReportOrganizationLookup = {
 };
 
 function cacheOver(redis: Partial<BillingOrganizationCacheRedis>) {
-  return RedisBillingOrganizationCacheAdapter.create({
+  return RedisBillingOrganizationCacheRepository.create({
     redis: redis as BillingOrganizationCacheRedis,
   });
 }

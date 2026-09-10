@@ -1,4 +1,4 @@
-import type { ExperimentWorkflowVersionPort } from "../../ports/experiment-workflow-version.port.ts";
+import type { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 import type {
   ExperimentRun,
   ExperimentRunAggregate,
@@ -34,7 +34,7 @@ type ExperimentClickHouseClient = {
 };
 
 type ClickHouseExperimentRunRepositoryOptions = {
-  workflowVersions: ExperimentWorkflowVersionPort;
+  workflowVersions: ExperimentWorkflowVersionRepository;
   resolveClient: (projectId: string) => Promise<ExperimentClickHouseClient | null>;
   tupleParam: (values: string[]) => unknown;
   telemetry: {

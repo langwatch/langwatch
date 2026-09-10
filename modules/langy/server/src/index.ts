@@ -38,9 +38,9 @@ export {
   LANGY_SESSION_KEYS_METRIC_NAME,
 } from "./adapters/otel.langy-session-key-metrics.adapter.ts";
 export {
-  PostgresLangySessionKeyReapAdapter,
-  type LangySessionKeyReapDatabase,
-} from "./adapters/postgres.langy-session-key-reap.adapter.ts";
+  PrismaLangySessionKeyReapRepository,
+  type PrismaLangySessionKeyReapDatabase,
+} from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
 export type { LangySessionKeyRevocation } from "./services/langy-session-key.service.ts";
 export { ADOPTABLE_CONVERSATION_ID } from "./services/langy.service.ts";
 export type {
@@ -141,9 +141,9 @@ export type { LangyConversationProcessingPipelineDeps } from "./adapters/eventin
 export {
   EventingLangyConversationAdapter,
   type EventingLangyConversationAdapterOptions,
-  type LangyConversationRuntimeCommands,
-} from "./adapters/eventing.langy-conversation-runtime.adapter.ts";
-export { LangyConversationProducerAdapter } from "./adapters/langy-conversation-producer.adapter.ts";
+  type RedisLangyConversationRuntimeRepository as LangyConversationRuntimeCommands,
+} from "./repositories/redis/redis.langy-conversation-runtime.repository.ts";
+export { RedisLangyConversationProducerRepository as LangyConversationProducerAdapter } from "./repositories/redis/redis.langy-conversation-producer.repository.ts";
 export {
   EventingLangyMaintenanceAdapter,
   type LangyMaintenancePipelineDeps,
@@ -182,9 +182,9 @@ export {
   type LangyTitleGeneratorDeps,
 } from "./services/langy-title-generator.service.ts";
 export {
-  LangyEffectPortsAdapter,
+  RedisLangyEffectRepository as LangyEffectPortsAdapter,
   type CreateLangyEffectPortsOptions,
-} from "./adapters/langy-effect.adapter.ts";
+} from "./repositories/redis/redis.langy-effect.repository.ts";
 export {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,
@@ -305,9 +305,9 @@ export {
 // for the developer. One runtime per process, two transports over it, and the
 // worker's REST door onto both.
 export {
-  LangyLocalControlRuntimeAdapter,
+  RedisLangyLocalControlRuntimeRepository as LangyLocalControlRuntimeAdapter,
   type LocalControlRuntime,
-} from "./adapters/langy-local-control-runtime.adapter.ts";
+} from "./repositories/redis/redis.langy-local-control-runtime.repository.ts";
 export {
   ControlRequestService,
   type ControlRequestKeyMinter,

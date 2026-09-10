@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId, type AppendStore, type FoldProjectionStore } from "@langwatch/eventing";
-import { ClickHouseExperimentRunProcessingAdapter } from "../clickhouse.experiment-run-processing.adapter.ts";
-import type { ExperimentRunProcessingPipeline } from "../eventing.experiment-run-processing.adapter.ts";
+import { RedisExperimentRunProcessingRepository } from "../../repositories/redis/redis.experiment-run-processing.repository.ts";
+import type { ExperimentRunProcessingPipeline } from "../../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import type { ClickHouseExperimentRunResultRecord } from "../../projections/experiment-run-result-storage.projection.ts";
 import type { ExperimentRunStateData } from "../../projections/experiment-run-state.projection.ts";
 
@@ -83,7 +83,7 @@ function compose(options: { foldCacheTtlSeconds?: number } = {}) {
   const set = vi.fn(async (..._args: unknown[]) => "OK");
   const redis = { get: vi.fn(async () => null), set };
 
-  const pipeline: ExperimentRunProcessingPipeline = ClickHouseExperimentRunProcessingAdapter.create(
+  const pipeline: ExperimentRunProcessingPipeline = RedisExperimentRunProcessingRepository.create(
     {
       resolveClient: resolveClient as never,
       defaultRetentionDays: 49,

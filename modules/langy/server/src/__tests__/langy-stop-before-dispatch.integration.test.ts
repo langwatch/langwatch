@@ -20,7 +20,7 @@ import {
   LangyTurnHandoffRedisRepository,
 } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
 import type { LangyTurnHandoff } from "../repositories/langy-live-turn.repository.ts";
-import { LangyEffectPortsAdapter } from "../adapters/langy-effect.adapter.ts";
+import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
 import { testRedisUrl } from "./support/test-redis-url.ts";
 
 /** Native Redis, the way every other datastore suite in this repo asks for one. */
@@ -99,7 +99,7 @@ function makeStopDeps() {
 
 function makeDispatchPorts() {
   const dispatch = vi.fn(async () => "accepted" as const);
-  const ports = LangyEffectPortsAdapter.create({
+  const ports = RedisLangyEffectRepository.create({
     handoffStore,
     worker: { dispatch },
     mintSessionKey: vi.fn(),
@@ -108,7 +108,7 @@ function makeDispatchPorts() {
     saveTitle: vi.fn(),
     failTurn: { failTurn: vi.fn() },
     markError: vi.fn(),
-  } as unknown as Parameters<typeof LangyEffectPortsAdapter.create>[0]);
+  } as unknown as Parameters<typeof RedisLangyEffectRepository.create>[0]);
   return { ports, dispatch };
 }
 

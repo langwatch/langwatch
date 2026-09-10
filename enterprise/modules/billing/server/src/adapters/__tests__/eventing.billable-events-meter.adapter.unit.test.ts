@@ -8,9 +8,9 @@ import {
 import {
   BILLING_TENANT_ORGANIZATION_CACHE_PREFIX,
   BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS,
-  RedisBillingTenantOrganizationCacheAdapter,
-} from "../redis.tenant-organization-cache.adapter.ts";
-import { ClickHouseBillableEventsMeterAdapter } from "../clickhouse.billable-events-meter.adapter.ts";
+  RedisTenantOrganizationCacheRepository,
+} from "../../repositories/redis/redis.tenant-organization-cache.repository.ts";
+import { BillableEventsMeterClickHouseRepository } from "../../repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
 import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.billing.repositories.ts";
 import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 
@@ -62,14 +62,14 @@ function compose(options: {
     organizations: PostgresBillingRepositories.create({
       prisma: { project: { findUnique } } as never,
     }).tenantOrganizations,
-    cache: RedisBillingTenantOrganizationCacheAdapter.create({ redis: redis as never }),
+    cache: RedisTenantOrganizationCacheRepository.create({ redis: redis as never }),
   });
 
   const projection = EventingBillableEventsMeterAdapter.create({
     organizations,
-    meter: ClickHouseBillableEventsMeterAdapter.create({
+    meter: BillableEventsMeterClickHouseRepository.create({
       resolveClient: resolveClient as never,
-    }).build(),
+    }),
   }).build();
 
   return { projection, findUnique, redis, insert, resolveClient };

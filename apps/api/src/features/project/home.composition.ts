@@ -3,7 +3,11 @@
  * one read: the entities this person last opened, across every vertical that records one.
  */
 import { HandledError } from "@langwatch/handled-error";
-import { PostgresRecentItemsAdapter, type ProjectHomeApi } from "@langwatch/project-server";
+import {
+  PrismaRecentItemsRepository,
+  RecentItemsService,
+  type ProjectHomeApi,
+} from "@langwatch/project-server";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createHomeTrpcRouter } from "./project-trpc.mount.ts";
@@ -14,9 +18,9 @@ import type { ComposedHomeFeature } from "./home.composition.types.ts";
 export function composeHomeFeature(options: {
   infrastructure: ApiTrpcInfrastructure;
 }): ComposedHomeFeature {
-  const recentItems = PostgresRecentItemsAdapter.create({
-    database: options.infrastructure.prisma,
-  }).build();
+  const recentItems = RecentItemsService.create({
+    repository: PrismaRecentItemsRepository.create({ prisma: options.infrastructure.prisma }),
+  });
 
   return {
     router: (mount) =>

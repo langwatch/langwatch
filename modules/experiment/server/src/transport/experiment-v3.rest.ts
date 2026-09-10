@@ -33,7 +33,7 @@ import {
 import { z } from "zod";
 
 import type { ExperimentApp } from "#app/experiment.app";
-import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port.ts";
+import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
 import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
 import type { StartPollingRunInput } from "../services/experiment-polling-run.service.ts";
@@ -62,7 +62,7 @@ export type ExperimentV3StartRunInput = Omit<
  */
 export type ExperimentV3RunLoop = Readonly<{
   ports: ExperimentRunPorts | null;
-  progress: ExperimentRunProgressPort | null;
+  progress: ExperimentRunProgressRepository | null;
   services: ExecutionDataServices;
   // `WorkflowService` is server-private to the workflow module; this transport
   // only forwards it into the orchestrator, so it is typed loosely rather than
@@ -208,7 +208,7 @@ const saveWorkbenchStateBodySchema = z.object({
 /** The run loop, or the refusal a process without one owes the caller. */
 export function runLoopOf(run: ExperimentV3RunLoop): {
   ports: ExperimentRunPorts;
-  progress: ExperimentRunProgressPort;
+  progress: ExperimentRunProgressRepository;
 } {
   if (!run.ports || !run.progress) {
     throw new ExperimentRunLoopUnavailableError("experiment run loop");

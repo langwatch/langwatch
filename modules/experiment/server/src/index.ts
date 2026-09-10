@@ -1,4 +1,3 @@
-export * from "./adapters/postgres.experiment.adapter.ts";
 /**
  * The persistence-and-orchestration service, folded out of the contract
  * package (ADR-133: no standalone contract-service class). Peer compositions
@@ -8,10 +7,21 @@ export * from "./adapters/postgres.experiment.adapter.ts";
 export { ExperimentService, type ExperimentServiceOptions } from "./services/experiment.service.ts";
 export { ExperimentDspyRetentionPort } from "./ports/experiment-dspy-retention.port.ts";
 export { ExperimentWorkbenchUpdatesPort } from "./ports/experiment-workbench-updates.port.ts";
+export { ExperimentExecutionPort } from "./ports/experiment-execution.port.ts";
 export {
-  ClickHouseExperimentRunProcessingAdapter,
+  PrismaExperimentRepository,
+  type ExperimentDatabase,
+} from "./repositories/prisma/prisma.experiment.repository.ts";
+export {
+  PrismaExperimentWorkflowVersionRepository,
+  type ExperimentWorkflowVersionDatabase,
+} from "./repositories/prisma/prisma.experiment-workflow-version.repository.ts";
+export { ClickHouseExperimentRunRepository } from "./repositories/clickhouse/clickhouse.experiment-run.repository.ts";
+export { ClickHouseExperimentDspyRepository } from "./repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
+export {
+  RedisExperimentRunProcessingRepository as ClickHouseExperimentRunProcessingAdapter,
   type ClickHouseExperimentRunProcessingAdapterOptions,
-} from "./adapters/clickhouse.experiment-run-processing.adapter.ts";
+} from "./repositories/redis/redis.experiment-run-processing.repository.ts";
 export {
   ExperimentEventingAdapter,
   type ExperimentRunProcessingPipeline,
@@ -19,8 +29,8 @@ export {
   type ExperimentRunEventingResultRecord,
   type ExperimentRunEventingState,
   type ExperimentRunEventingStateRepository,
-  type ExperimentRunProcessingPipelineDeps,
-} from "./adapters/eventing.experiment-run-processing.adapter.ts";
+  type ClickhouseExperimentRunProcessingRepository as ExperimentRunProcessingPipelineDeps,
+} from "./repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 export {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
@@ -66,7 +76,7 @@ export {
  * The run-state fold store, composed for a process. The repository behind it
  * stays internal — see the adapter's own note.
  */
-export { ExperimentRunStateStoreAdapter } from "./adapters/experiment-run-state-store.adapter.ts";
+export { ClickhouseExperimentRunStateStoreRepository as ExperimentRunStateStoreAdapter } from "./repositories/clickhouse/clickhouse.experiment-run-state-store.repository.ts";
 
 /**
  * The workbench run loop, moved WHOLE out of the retired application.
@@ -77,28 +87,28 @@ export {
   shouldStripScore,
 } from "./processes/experiment-evaluator-score-filter.process.ts";
 export { getRunUrl } from "./rules/experiment-run-url.rules.ts";
-export { ExperimentRunAbortPort } from "./ports/experiment-run-abort.port.ts";
+export { ExperimentRunAbortRepository as ExperimentRunAbortPort } from "./repositories/experiment-run-abort.repository.ts";
 export { ExperimentConnectedDispatchPort } from "./ports/experiment-connected-dispatch.port.ts";
 export {
   ExperimentConnectedAgentOwnershipPort,
   type ExperimentConnectedAgentSubject,
 } from "./ports/experiment-connected-agent-ownership.port.ts";
-export { RedisExperimentRunAbortAdapter } from "./adapters/redis.experiment-run-abort.adapter.ts";
+export { RedisExperimentRunAbortRepository as RedisExperimentRunAbortAdapter } from "./repositories/redis/redis.experiment-run-abort.repository.ts";
 
 export { ExperimentEvaluationReportingPort } from "./ports/experiment-evaluation-reporting.port.ts";
 export { ExperimentModelCostPort } from "./ports/experiment-model-cost.port.ts";
 export {
-  ExperimentRunProgressPort,
+  ExperimentRunProgressRepository as ExperimentRunProgressPort,
   type ExperimentRunProgressFailure,
   type ExperimentRunProgressState,
   type ExperimentRunProgressSummary,
-} from "./ports/experiment-run-progress.port.ts";
+} from "./repositories/experiment-run-progress.repository.ts";
 export { ExperimentRunErrorReportingPort } from "./ports/experiment-run-error-reporting.port.ts";
 export { ExperimentSandboxCredentialPort } from "./ports/experiment-sandbox-credential.port.ts";
 export { ExperimentStudioDispatchPort } from "./ports/experiment-studio-dispatch.port.ts";
 export { ExperimentTargetEntityNamesPort } from "./ports/experiment-target-entity-names.port.ts";
 export { ExperimentWorkflowDslPort } from "./ports/experiment-workflow-dsl.port.ts";
-export { RedisExperimentRunProgressAdapter } from "./adapters/redis.experiment-run-progress.adapter.ts";
+export { RedisExperimentRunProgressRepository as RedisExperimentRunProgressAdapter } from "./repositories/redis/redis.experiment-run-progress.repository.ts";
 
 export { ExperimentRunOrchestratorService } from "./services/experiment-run-orchestrator.service.ts";
 export type { ExperimentRunPorts, OrchestratorInput } from "./rules/experiment-run-input.rules.ts";

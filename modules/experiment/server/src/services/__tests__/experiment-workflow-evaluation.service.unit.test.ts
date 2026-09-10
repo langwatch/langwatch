@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ExperimentWorkflowDslPort } from "../../ports/experiment-workflow-dsl.port.ts";
-import type { ExperimentRunProgressPort } from "../../ports/experiment-run-progress.port.ts";
+import type { ExperimentRunProgressRepository } from "../../repositories/experiment-run-progress.repository.ts";
 import {
   WorkflowEvaluationService,
   type WorkflowEvaluationDependencies,
@@ -122,7 +122,7 @@ function buildDeps(
     overrides.findOrCreateForWorkflow ??
     vi.fn().mockResolvedValue({ id: "experiment_1", slug: "evaluate-me" });
 
-  const progress: ExperimentRunProgressPort = {
+  const progress: ExperimentRunProgressRepository = {
     createRun: vi.fn().mockResolvedValue(undefined),
     updateProgress: vi.fn(),
     addEvent: vi.fn(),
@@ -131,7 +131,7 @@ function buildDeps(
     stopRun: vi.fn(),
     findRunState: vi.fn(),
     deleteRun: vi.fn(),
-  } as unknown as ExperimentRunProgressPort;
+  } as unknown as ExperimentRunProgressRepository;
 
   const deps: WorkflowEvaluationDependencies = {
     experiments: { findOrCreateForWorkflow } as never,

@@ -29,9 +29,9 @@ import { LocalControlLongPoll } from "../../api-rest/langy-local-control-long-po
 import { presenceKey } from "../../../rules/langy-local-control-keys.rules.ts";
 import { LOCAL_CONTROL_PROTOCOL_VERSION } from "@langwatch/langy-contract";
 import {
-  LangyLocalControlRuntimeAdapter,
+  RedisLangyLocalControlRuntimeRepository,
   type LocalControlRuntime,
-} from "../../../adapters/langy-local-control-runtime.adapter.ts";
+} from "../../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { LocalControlSessionCoreService } from "../../../services/langy-local-session.service.ts";
 import { testRedisUrl } from "../../../__tests__/support/test-redis-url.ts";
 
@@ -147,7 +147,7 @@ function upgradeRouterFor(server: Server) {
 }
 
 function testPorts(store: SessionStateStore) {
-  const runtime = LangyLocalControlRuntimeAdapter.create({
+  const runtime = RedisLangyLocalControlRuntimeRepository.create({
     store,
     projects: { tryReadOrganizationId: async () => organizationId },
     mintSessionKey: async ({ userId: owner }) => {

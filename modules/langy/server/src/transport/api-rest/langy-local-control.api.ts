@@ -32,7 +32,7 @@ import {
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
-import type { LocalControlRuntime } from "#adapters/langy-local-control-runtime.adapter";
+import type { LocalControlRuntime } from "#repositories/redis/redis.langy-local-control-runtime.repository";
 import { ControlRequestService } from "#services/langy-local-control-request.service";
 import { conversationUrl } from "#rules/langy-local-session-text.rules";
 import type { LocalControlLongPoll } from "./langy-local-control-long-poll.api.ts";

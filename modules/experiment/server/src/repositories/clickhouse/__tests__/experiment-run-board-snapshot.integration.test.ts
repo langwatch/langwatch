@@ -24,7 +24,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   RecordEvaluatorResultCommand,
   RecordTargetResultCommand,
-} from "../../../adapters/eventing.experiment-run-processing.adapter.ts";
+} from "../clickhouse.experiment-run-processing.repository.ts";
 import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,

@@ -23,7 +23,7 @@ import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
 import type { ExperimentEvaluationReportingPort } from "../ports/experiment-evaluation-reporting.port.ts";
 import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port.ts";
-import type { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port.ts";
+import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ExperimentSandboxCredentialPort } from "../ports/experiment-sandbox-credential.port.ts";
 import type { ExperimentConnectedDispatchPort } from "../ports/experiment-connected-dispatch.port.ts";
 import type { ExperimentConnectedAgentOwnershipPort } from "../ports/experiment-connected-agent-ownership.port.ts";
@@ -41,7 +41,7 @@ export type ExperimentRunPorts = {
   /** The deployment's price table, for cells the engine reports untariffed. */
   cost: ExperimentModelCostPort;
   /** The stop signal and the owner record this run's abort is authorized against. */
-  abort: ExperimentRunAbortPort;
+  abort: ExperimentRunAbortRepository;
   /** The Eventing command surface a run's results are dispatched through. */
   experiments: ExperimentService;
   /** Where a cell's evaluator result is reported as an evaluation. */

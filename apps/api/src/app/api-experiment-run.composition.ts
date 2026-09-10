@@ -20,6 +20,7 @@ import {
   ExperimentConnectedDispatchPort,
   type ExperimentConnectedAgentSubject,
   ExperimentEvaluationReportingPort,
+  type ExperimentExecutionPort,
   ExperimentModelCostPort,
   type ExperimentService,
   ExperimentSandboxCredentialPort,
@@ -35,7 +36,6 @@ import {
   type ExperimentRunPorts,
   type ExperimentRunProcessingPipelineDeps,
   type ExperimentRunProgressPort,
-  type PostgresExperimentAdapterOptions,
   type StartPollingRunInput,
   type WorkflowEvaluationOutcome,
 } from "@langwatch/experiment-server";
@@ -68,7 +68,7 @@ import type { RunActor } from "@langwatch/scenario-contract";
  * The four dispatchers a run's HISTORY is written through, or `undefined` where this
  * process composed no command queue.
  */
-export type ApiExperimentRunCommands = NonNullable<PostgresExperimentAdapterOptions["execution"]>;
+export type ApiExperimentRunCommands = ExperimentExecutionPort;
 
 /**
  * Registers `experiment_run_processing` as a PRODUCER and hands back the four dispatchers

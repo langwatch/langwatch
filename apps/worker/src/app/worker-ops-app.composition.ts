@@ -35,7 +35,8 @@ import {
   PrismaProcessAuditRepository,
   ProcessOpsPrismaRepository,
   QueuePayloadDecoderPort,
-  RedisOpsSnapshotAdapter,
+  DefaultOpsSnapshotService,
+  RedisOpsSnapshotRepository,
   RedisSchedulerWakeAdapter,
   ReplayService,
   type ReplayRepository,
@@ -87,9 +88,9 @@ export function installWorkerOps<Infrastructure>(
 ): ApplicationBuilder<Infrastructure> {
   const database = options.connection.client;
   const introspection = EventingOpsIntrospectionAdapter.create(() => options.eventing.definitions);
-  const snapshots = RedisOpsSnapshotAdapter.create({
-    redis: IoredisOpsSnapshotRedisAdapter.create(options.redis),
-  });
+  const snapshots = DefaultOpsSnapshotService.create(
+    RedisOpsSnapshotRepository.create(IoredisOpsSnapshotRedisAdapter.create(options.redis)),
+  );
   return builder.withModule(opsServer, {
     infrastructure: {
       createCapability: (peers: OpsAppDependencies) => {

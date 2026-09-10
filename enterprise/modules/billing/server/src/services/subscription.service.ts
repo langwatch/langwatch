@@ -21,8 +21,8 @@ import type { BillingOrganizationPort } from "../ports/organization.port.ts";
 import type { BillingSubscriptionNotifierPort } from "../ports/subscription-notifier.port.ts";
 import type {
   BillingSubscriptionRecord,
-  BillingSubscriptionPort,
-} from "../ports/subscription.port.ts";
+  SubscriptionRepository,
+} from "../repositories/subscription.repository.ts";
 import { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 import {
   SubscriptionItemCalculatorService,
@@ -40,7 +40,7 @@ export const RECENT_INVOICES_LIMIT = 4;
  */
 export class BillingSubscriptionService {
   private constructor(
-    private readonly repository: BillingSubscriptionPort,
+    private readonly repository: SubscriptionRepository,
     private readonly organizationRepository: BillingOrganizationPort,
     private readonly stripe: Stripe,
     private readonly itemCalculator: SubscriptionItemCalculatorService,
@@ -50,7 +50,7 @@ export class BillingSubscriptionService {
   ) {}
 
   static create(options: {
-    repository: BillingSubscriptionPort;
+    repository: SubscriptionRepository;
     organizationRepository: BillingOrganizationPort;
     stripe: Stripe;
     itemCalculator: SubscriptionItemCalculatorService;

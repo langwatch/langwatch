@@ -5,7 +5,7 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationV3Event } from "@langwatch/experiment-contract";
-import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port.ts";
+import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 
 const logger = createLogger("langwatch:experiment:run-state-mirror");
 
@@ -32,7 +32,7 @@ export class ExperimentRunStateMirrorService implements RunStateMirror {
     private readonly projectId: string,
     private readonly experimentId: string | undefined,
     private readonly experimentSlug: string,
-    private readonly progress: ExperimentRunProgressPort,
+    private readonly progress: ExperimentRunProgressRepository,
   ) {}
 
   static create(options: {
@@ -40,7 +40,7 @@ export class ExperimentRunStateMirrorService implements RunStateMirror {
     experimentId?: string;
     experimentSlug: string;
     /** Where the frames are mirrored so a poll on another process finds them. */
-    progress: ExperimentRunProgressPort;
+    progress: ExperimentRunProgressRepository;
   }): ExperimentRunStateMirrorService {
     return new ExperimentRunStateMirrorService(
       options.projectId,

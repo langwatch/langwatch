@@ -7,7 +7,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import Redis from "ioredis";
-import { EventingCodingAgentProcessingAdapter } from "../../eventing.coding-agent-processing.adapter.ts";
+import { EventingCodingAgentProcessingAdapter } from "../../../repositories/redis/redis.coding-agent-session-pipeline.repository.ts";
 import { MemorySessionContextMemoRepository } from "../../../repositories/memory/memory.session-context-memo.repository.ts";
 import { CodingAgentCostMetricsPort } from "../../../ports/coding-agent-cost-metrics.port.ts";
 import { TestClock, TestProjectService } from "../../../__tests__/fixtures/coding-agent.fixture.ts";

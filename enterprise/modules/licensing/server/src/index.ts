@@ -19,7 +19,7 @@ export {
   type LicensePlanReader,
   type LicensingEntitlementSourceAdapterMode,
 } from "./adapters/licensing.entitlement-source.adapter.ts";
-export { PostgresOrganizationLicenseAdapter } from "./adapters/postgres.organization-license.adapter.ts";
+export { PrismaOrganizationLicenseRepository } from "./repositories/prisma/prisma.organization-license.repository.ts";
 export { LicenseCryptographyPort } from "./ports/license-cryptography.port.ts";
 export { OrganizationLicensePort } from "./ports/organization-license.port.ts";
 export { LicenseLoggerPort } from "./ports/license-logger.port.ts";

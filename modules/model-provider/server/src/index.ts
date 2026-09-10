@@ -1,16 +1,16 @@
 export {
   PostgresModelProviderAdapter,
   type PostgresModelProviderAdapterOptions,
-} from "./adapters/postgres.model-provider.adapter.ts";
+} from "./services/model-provider-service.composition.ts";
 export {
-  PostgresModelCostCatalogAdapter,
+  PrismaModelCostCatalogRepository as PostgresModelCostCatalogAdapter,
   type ModelCostCatalogDatabase,
-} from "./adapters/postgres.model-cost-catalog.adapter.ts";
+} from "./repositories/prisma/prisma.model-cost-catalog.repository.ts";
 export { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
 export {
   PostgresModelProviderEvidenceAdapter,
   type ModelProviderEvidenceDatabase,
-} from "./adapters/postgres.model-provider-evidence.adapter.ts";
+} from "./services/model-provider-evidence-service.composition.ts";
 export { ModelProviderEvidenceService } from "./services/model-provider-evidence.service.ts";
 export { ModelProviderProjectScopeService } from "./services/model-provider-project-scope.service.ts";
 export {

@@ -13,10 +13,14 @@ import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import {
+  ClickHouseExperimentDspyRepository,
+  ClickHouseExperimentRunRepository,
   ExperimentApp,
   ExperimentDspyRetentionPort,
+  ExperimentService,
   ExperimentWorkbenchUpdatesPort,
-  PostgresExperimentAdapter,
+  PrismaExperimentRepository,
+  PrismaExperimentWorkflowVersionRepository,
   workbenchStateSchema,
   type ExperimentBroadcast,
   type ExperimentTrpcPorts,
@@ -138,16 +142,27 @@ export function composeExperimentFeature(options: {
   // save on is the emitter the SSE subscription reads it from.
   const broadcast = options.broadcast ?? NO_BROADCAST;
 
-  const experiments = PostgresExperimentAdapter.create({
-    database: prisma,
-    // The adapter's own contract: `null` is a deployment without ClickHouse,
-    // and its repository answers the refusal rather than this composition
-    // guessing at one.
-    resolveClickHouseClient: async (projectId) =>
-      options.resolveClickHouseClient ? await options.resolveClickHouseClient(projectId) : null,
-    tupleParam: (values) => new TupleParam(values),
-    dspyRetention: FixedExperimentDspyRetention.create(DEFAULT_RETENTION_DAYS),
-    runHistoryTelemetry: LoggedExperimentRunHistoryTelemetry.create(logger),
+  // The adapter's own contract: `null` is a deployment without ClickHouse,
+  // and its repository answers the refusal rather than this composition
+  // guessing at one.
+  const resolveClickHouseClient = async (projectId: string) =>
+    options.resolveClickHouseClient ? await options.resolveClickHouseClient(projectId) : null;
+  const tupleParam = (values: string[]) => new TupleParam(values);
+  const runHistoryTelemetry = LoggedExperimentRunHistoryTelemetry.create(logger);
+
+  const experiments = ExperimentService.create({
+    repository: PrismaExperimentRepository.create(prisma),
+    runRepository: ClickHouseExperimentRunRepository.create({
+      workflowVersions: PrismaExperimentWorkflowVersionRepository.create(prisma),
+      resolveClient: resolveClickHouseClient,
+      tupleParam,
+      telemetry: runHistoryTelemetry,
+    }),
+    dspyRepository: ClickHouseExperimentDspyRepository.create({
+      resolveClient: resolveClickHouseClient,
+      retention: FixedExperimentDspyRetention.create(DEFAULT_RETENTION_DAYS),
+      telemetry: runHistoryTelemetry,
+    }),
     slugify: slugifyExperimentName,
     newId: () => nanoid(8),
     references: {

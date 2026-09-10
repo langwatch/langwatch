@@ -19,14 +19,14 @@ export {
 } from "./transport/subscription.trpc.ts";
 export { StripeErrorAdapter } from "./adapters/stripe-error.stripe-error.adapter.ts";
 export {
-  ClickHouseBillingAdapter,
+  ClickhouseClickHouseRepository as ClickHouseBillingAdapter,
   type BillingClickHouseClientResolver,
-} from "./adapters/clickhouse.clickhouse.adapter.ts";
+} from "./repositories/clickhouse/clickhouse.clickhouse.repository.ts";
 export type { BillableEventsClickHouseClient } from "./repositories/clickhouse/clickhouse.billable-events.repository.ts";
 export {
-  PostgresBillingAdapter,
+  PrismaPostgresRepository as PostgresBillingAdapter,
   type PostgresBillingPersistence,
-} from "./adapters/postgres.postgres.adapter.ts";
+} from "./repositories/prisma/prisma.postgres.repository.ts";
 export { StripeErrorTranslatorPort } from "./ports/stripe-error-translator.port.ts";
 export { BillingCheckpointPort, type BillingCheckpoint } from "./ports/billing-checkpoint.port.ts";
 export {
@@ -43,9 +43,9 @@ export {
 export type { BillingCheckpointDatabase } from "./repositories/prisma/prisma.billing-checkpoint.repository.ts";
 export type { BillingReportOrganizationDatabase } from "./repositories/prisma/prisma.billing-report-organization.repository.ts";
 export {
-  RedisBillingOrganizationCacheAdapter,
+  RedisBillingOrganizationCacheRepository as RedisBillingOrganizationCacheAdapter,
   type BillingOrganizationCacheRedis,
-} from "./adapters/redis.billing-organization-cache.adapter.ts";
+} from "./repositories/redis/redis.billing-organization-cache.repository.ts";
 export {
   StripeUsageReportingAdapter,
   StripeUsageReportingUnavailable,
@@ -58,16 +58,16 @@ export { NullBillingOrganizationAdapter } from "./adapters/null-organization.ada
 export { BillingSubscriptionNotifierPort } from "./ports/subscription-notifier.port.ts";
 export { NullBillingSubscriptionNotifierAdapter } from "./adapters/null-subscription-notifier.adapter.ts";
 export { NullUsageLimitEmailAdapter, UsageLimitEmailPort } from "./ports/usage-limit-email.port.ts";
-export { BillableEventsPort, type BillableEventsWindow } from "./ports/billable-events.port.ts";
+export { BillableEventsRepository as BillableEventsPort, type BillableEventsWindow } from "./repositories/billable-events.repository.ts";
 export {
   BillableEventsMeterPort,
   type BillableEventRecord,
 } from "./ports/billable-events-meter.port.ts";
 export {
-  ClickHouseBillableEventsMeterAdapter,
+  BillableEventsMeterClickHouseRepository,
   type BillableEventsMeterClickHouseClient,
   type BillableEventsMeterClickHouseClientResolver,
-} from "./adapters/clickhouse.billable-events-meter.adapter.ts";
+} from "./repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
 export {
   BILLABLE_EVENTS_METER_PROJECTION_NAME,
   EventingBillableEventsMeterAdapter,
@@ -85,13 +85,13 @@ export {
 export {
   BILLING_TENANT_ORGANIZATION_CACHE_PREFIX,
   BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS,
-  RedisBillingTenantOrganizationCacheAdapter,
+  RedisTenantOrganizationCacheRepository as RedisBillingTenantOrganizationCacheAdapter,
   type BillingTenantOrganizationCacheRedis,
-} from "./adapters/redis.tenant-organization-cache.adapter.ts";
+} from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
 export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
 export { PlanLimitsPlanCatalogueAdapter } from "./adapters/plan-limits.plan-catalogue.adapter.ts";
 export { OrganizationPricingPort } from "./ports/organization-pricing.port.ts";
-export { BillingSubscriptionPort } from "./ports/subscription.port.ts";
+export { SubscriptionRepository as BillingSubscriptionPort } from "./repositories/subscription.repository.ts";
 export {
   ANNUAL_EVENTS_BILLING_THRESHOLD,
   AnnualEventsBillingThresholdService,
@@ -188,7 +188,7 @@ export {
   type SubscriptionWithOrg,
 } from "./repositories/billing-webhook-subscription.repository.ts";
 export { NurturingSinkRegistryService } from "./services/nurturing-sink-registry.service.ts";
-export { PostgresNurturingProfileAdapter } from "./adapters/postgres.nurturing-profile.adapter.ts";
+export { PrismaNurturingProfileRepository } from "./repositories/prisma/prisma.nurturing-profile.repository.ts";
 export type {
   NurturingProfile,
   NurturingProfileRepository,

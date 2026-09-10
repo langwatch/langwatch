@@ -69,17 +69,21 @@ import {
   type ExperimentWorkbenchReferenceServices,
 } from "./experiment-workbench-references.service.ts";
 import { nowInstant, type Instant } from "@langwatch/time";
+import { UnavailableExperimentExecutionAdapter } from "../adapters/unavailable-experiment-execution.adapter.ts";
+import { NoopExperimentWorkbenchUpdatesAdapter } from "../adapters/noop-experiment-workbench-updates.adapter.ts";
 
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
   runRepository: ExperimentRunRepository;
   dspyRepository: ExperimentDspyRepository;
-  execution: ExperimentExecutionPort;
+  /** Refuses by name where the runtime composes no Eventing pipeline. */
+  execution?: ExperimentExecutionPort;
   slugify: (value: string) => string;
   newId: () => string;
   now?: () => Instant;
   references: ExperimentWorkbenchReferenceServices;
-  updates: ExperimentWorkbenchUpdatesPort;
+  /** Drops workbench update notices where no live update transport is composed. */
+  updates?: ExperimentWorkbenchUpdatesPort;
 };
 
 /**
@@ -102,8 +106,8 @@ export class ExperimentService {
   private readonly workbench: ExperimentWorkbenchService;
 
   private constructor(private readonly options: ExperimentServiceOptions) {
-    this.execution = options.execution;
-    this.updates = options.updates;
+    this.execution = options.execution ?? UnavailableExperimentExecutionAdapter.create();
+    this.updates = options.updates ?? NoopExperimentWorkbenchUpdatesAdapter.create();
     this.slugs = ExperimentSlugService.create({
       repository: options.repository,
       newId: options.newId,

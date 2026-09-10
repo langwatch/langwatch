@@ -27,7 +27,7 @@ import type {
   BillingWebhookSubscriptionPort,
   SubscriptionWithOrg,
 } from "../repositories/billing-webhook-subscription.repository.ts";
-import type { BillingSubscriptionRecord } from "../ports/subscription.port.ts";
+import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");

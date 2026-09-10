@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ExperimentClickHouseAdapter } from "../../../adapters/experiment-clickhouse.adapter.ts";
+import { ClickhouseExperimentClickHouseRepository } from "../clickhouse.experiment-clickhouse.repository.ts";
 import { ClickHouseExperimentIdLookupRepository } from "../clickhouse.experiment-id-lookup.repository.ts";
 
 describe("ClickHouseExperimentIdLookupRepository", () => {
@@ -18,7 +18,7 @@ describe("ClickHouseExperimentIdLookupRepository", () => {
           json: async () => [{ ExperimentId: "exp-1" }],
         });
         const repository = ClickHouseExperimentIdLookupRepository.create({
-          clickhouse: ExperimentClickHouseAdapter.create(resolveClient),
+          clickhouse: ClickhouseExperimentClickHouseRepository.create(resolveClient),
         });
 
         const result = await repository.findExperimentId({
@@ -44,7 +44,7 @@ describe("ClickHouseExperimentIdLookupRepository", () => {
       it("returns null", async () => {
         mockQuery.mockResolvedValue({ json: async () => [] });
         const repository = ClickHouseExperimentIdLookupRepository.create({
-          clickhouse: ExperimentClickHouseAdapter.create(resolveClient),
+          clickhouse: ClickhouseExperimentClickHouseRepository.create(resolveClient),
         });
 
         const result = await repository.findExperimentId({

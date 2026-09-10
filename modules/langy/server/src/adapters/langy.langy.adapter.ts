@@ -13,7 +13,7 @@ import {
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
 } from "../services/langy.service.ts";
-import { LangyTurnRelayAdapter, type LangyRelayRedis } from "./langy-turn-relay.adapter.ts";
+import { RedisLangyTurnRelayRepository, type LangyRelayRedis } from "../repositories/redis/redis.langy-turn-relay.repository.ts";
 import {
   LangyFeedbackPromptPolicy,
   type LangyFeedbackPromptRedisPort,
@@ -214,7 +214,7 @@ export class PostgresLangyAdapter {
       ...(relay
         ? {
             openRelay: (langyService) =>
-              LangyTurnRelayAdapter.create({
+              RedisLangyTurnRelayRepository.create({
                 conversations: langyService,
                 redis: relay.redis,
                 baseHost: relay.baseHost,

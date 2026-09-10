@@ -7,10 +7,10 @@ import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-con
 import { fromDate } from "@langwatch/time";
 import { NUMERIC_OVERRIDE_FIELDS } from "../../services/plan-provider.service.ts";
 import {
-  BillingSubscriptionPort,
+  SubscriptionRepository,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
-} from "../../ports/subscription.port.ts";
+} from "../subscription.repository.ts";
 
 type SubscriptionRow = {
   id: string;
@@ -58,7 +58,7 @@ export type BillingSubscriptionDatabase = Pick<
   "organization" | "subscription" | "$transaction"
 >;
 
-export class PrismaSubscriptionRepository extends BillingSubscriptionPort {
+export class PrismaSubscriptionRepository extends SubscriptionRepository {
   private constructor(private readonly prisma: BillingSubscriptionDatabase) {
     super();
   }

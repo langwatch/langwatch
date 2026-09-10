@@ -15,7 +15,7 @@ import type {
   RedisInfo,
 } from "@langwatch/ops-contract";
 import { computeEngineCpuPercent } from "../rules/ops-redis-engine-cpu.rules.ts";
-import type { OpsQueueMetricsSourcePort } from "../ports/ops-queue-metrics-source.port.ts";
+import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import type { OpsMetricsRepository } from "../repositories/observe/ops-metrics.repository.ts";
 import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.rules.ts";
 import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
@@ -53,7 +53,7 @@ export class OpsMetricsCollectorService {
    */
   private isCollecting = false;
 
-  private readonly ops: OpsQueueMetricsSourcePort;
+  private readonly ops: OpsQueueMetricsSourceRepository;
   private snapshots: OpsSnapshotService | null;
   /** Identity of this writer in the lease and in every artifact it stamps. */
   private readonly writerId: string;
@@ -76,7 +76,7 @@ export class OpsMetricsCollectorService {
 
   static create(params: {
     metrics: OpsMetricsRepository;
-    ops: OpsQueueMetricsSourcePort;
+    ops: OpsQueueMetricsSourceRepository;
     snapshots?: OpsSnapshotService | null;
     writerId?: string;
   }): OpsMetricsCollectorService {
@@ -86,7 +86,7 @@ export class OpsMetricsCollectorService {
   /** The process-wide collector, started on first call. */
   static getSingleton(params: {
     metrics: OpsMetricsRepository;
-    ops: OpsQueueMetricsSourcePort;
+    ops: OpsQueueMetricsSourceRepository;
     snapshots?: OpsSnapshotService | null;
   }): OpsMetricsCollectorService {
     if (!OpsMetricsCollectorService.singleton) {
@@ -114,7 +114,7 @@ export class OpsMetricsCollectorService {
 
   private constructor(params: {
     metrics: OpsMetricsRepository;
-    ops: OpsQueueMetricsSourcePort;
+    ops: OpsQueueMetricsSourceRepository;
     snapshots?: OpsSnapshotService | null;
     writerId?: string;
   }) {

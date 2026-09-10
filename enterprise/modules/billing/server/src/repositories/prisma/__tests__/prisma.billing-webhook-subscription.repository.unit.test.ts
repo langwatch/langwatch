@@ -6,10 +6,10 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { PrismaBillingWebhookSubscriptionRepository } from "../prisma.billing-webhook-subscription.repository.ts";
 import {
-  BillingSubscriptionPort,
+  SubscriptionRepository,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
-} from "../../../ports/subscription.port.ts";
+} from "../../subscription.repository.ts";
 import { Temporal } from "@langwatch/time";
 
 const SUBSCRIPTION: BillingSubscriptionRecord = {
@@ -38,7 +38,7 @@ function recordNotFound(): Error & { code: string } {
   return Object.assign(new Error("No Subscription found"), { code: "P2025" });
 }
 
-function repositoryDouble(overrides: Partial<BillingSubscriptionPort> = {}) {
+function repositoryDouble(overrides: Partial<SubscriptionRepository> = {}) {
   return {
     tryFindActive: vi.fn(),
     tryFindLastNonCancelled: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
@@ -54,12 +54,12 @@ function repositoryDouble(overrides: Partial<BillingSubscriptionPort> = {}) {
     migrateToSeatEvent: vi.fn(() => Promise.resolve([])),
     updateQuantities: vi.fn(() => Promise.resolve(WITH_ORGANIZATION)),
     ...overrides,
-  } as unknown as BillingSubscriptionPort;
+  } as unknown as SubscriptionRepository;
 }
 
 function compose(
   options: {
-    repository?: BillingSubscriptionPort;
+    repository?: SubscriptionRepository;
     license?: string | null;
   } = {},
 ) {
@@ -126,7 +126,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
       const { adapter } = compose({
         repository: repositoryDouble({
           activate: vi.fn(() => Promise.reject(recordNotFound())),
-        } as Partial<BillingSubscriptionPort>),
+        } as Partial<SubscriptionRepository>),
       });
 
       await expect(
@@ -141,7 +141,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
       const { adapter } = compose({
         repository: repositoryDouble({
           activate: vi.fn(() => Promise.reject(new Error("connection refused"))),
-        } as Partial<BillingSubscriptionPort>),
+        } as Partial<SubscriptionRepository>),
       });
 
       await expect(

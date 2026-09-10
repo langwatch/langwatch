@@ -6,10 +6,10 @@ import {
 } from "@langwatch/model-provider-server";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
-  PostgresProjectMetadataAdapter,
+  PrismaProjectRepository,
+  ProjectMetadataService,
   type ProjectDiagnosticsPort,
   type ProjectMetadataDatabase,
-  type ProjectMetadataService,
 } from "@langwatch/project-server";
 
 /**
@@ -80,10 +80,10 @@ export function createWorkerTraceCapabilityServices(options: {
    */
   monitors: MonitorApi;
 }): WorkerTraceCapabilityServices {
-  const projects = PostgresProjectMetadataAdapter.create({
-    database: options.database,
+  const projects = ProjectMetadataService.create({
+    repository: PrismaProjectRepository.create({ prisma: options.database }),
     ...(options.diagnostics ? { diagnostics: options.diagnostics } : {}),
-  }).build();
+  });
 
   return {
     projects,

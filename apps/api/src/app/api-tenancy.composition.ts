@@ -19,9 +19,10 @@ import {
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
-  PostgresProjectAdapter,
+  PrismaProjectRepository,
   ProjectCredentialsAdapter,
   ProjectDiagnosticsPort,
+  ProjectService,
   type ProjectKeyMapPort,
   type ProjectManagementDirectory,
 } from "@langwatch/project-server";
@@ -124,13 +125,13 @@ export class ApiTenancyComposition {
     // deleted here leaves the stored-object cleanup to the tier that owns it. `keyMap` is
     // not in that category — it is this process's own ClickHouse, and it is supplied
     // wherever one was opened.
-    const projectDirectory = PostgresProjectAdapter.create({
-      database,
+    const projectDirectory = ProjectService.create({
+      repository: PrismaProjectRepository.create({ prisma: database }),
       credentials: ProjectCredentialsAdapter.create(),
       organizations,
       ...(options.keyMap ? { keyMap: options.keyMap } : {}),
       diagnostics: LoggedApiProjectDiagnostics.create(),
-    }).build();
+    });
 
     // The credential store is installed rather than hand-built: its repositories
     // are chosen once, here. The SAME AuthZ service answers both the permission

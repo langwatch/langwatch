@@ -6,9 +6,9 @@ import {
   BillingWebhookSubscriptionPort,
 } from "../billing-webhook-subscription.repository.ts";
 import type {
-  BillingSubscriptionPort,
+  SubscriptionRepository,
   BillingSubscriptionRecord,
-} from "../../ports/subscription.port.ts";
+} from "../subscription.repository.ts";
 import type { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /**
@@ -17,14 +17,14 @@ import type { MemoryBillingStore } from "./memory-billing.store.ts";
  */
 export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSubscriptionPort {
   private constructor(
-    private readonly subscriptions: BillingSubscriptionPort,
+    private readonly subscriptions: SubscriptionRepository,
     private readonly store: MemoryBillingStore,
   ) {
     super();
   }
 
   static create(options: {
-    subscriptions: BillingSubscriptionPort;
+    subscriptions: SubscriptionRepository;
     store: MemoryBillingStore;
   }): MemoryBillingWebhookSubscriptionRepository {
     return new MemoryBillingWebhookSubscriptionRepository(options.subscriptions, options.store);

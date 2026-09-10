@@ -1,7 +1,7 @@
 export {
-  EvaluationAdapter,
+  ClickhouseEvaluationRepository as EvaluationAdapter,
   type EvaluationAdapterOptions,
-} from "./adapters/evaluation.clickhouse.adapter.ts";
+} from "./repositories/clickhouse/clickhouse.evaluation.repository.ts";
 export { EvaluationApp, type EvaluationInfrastructure } from "./app/evaluation.app.ts";
 export { evaluationServer } from "./evaluation.server.ts";
 /**
@@ -12,13 +12,13 @@ export { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evalua
 /**
  * The monitors page's seven-day trend, for a process that reads it and executes nothing.
  */
-export { MonitorPerformanceAdapter } from "./adapters/monitor-performance.clickhouse.adapter.ts";
+export { ClickhouseMonitorPerformanceRepository as MonitorPerformanceAdapter } from "./repositories/clickhouse/clickhouse.monitor-performance.repository.ts";
 export { MonitorPerformanceService } from "./services/monitor-performance.service.ts";
 export {
   EvaluationEventingAdapter,
   type EvaluationEventingStores,
 } from "./adapters/evaluation.eventing.adapter.ts";
-export { EvaluationRunProjectionPort } from "./ports/evaluation-run-projection.port.ts";
+export { EvaluationRunProjectionRepository as EvaluationRunProjectionPort } from "./repositories/evaluation-run-projection.repository.ts";
 export { EvaluationRunProjectionService } from "./services/evaluation-run-projection.service.ts";
 export {
   EvaluationExecutionPort,

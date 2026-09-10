@@ -5,7 +5,7 @@ import {
   type PlanTypes,
 } from "@langwatch/enterprise-billing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import type { BillingSubscriptionPort } from "../ports/subscription.port.ts";
+import type { SubscriptionRepository } from "../repositories/subscription.repository.ts";
 
 // Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
 type NumericOverrideField = "maxMembers" | "maxMembersLite" | "maxMessagesPerMonth";
@@ -35,7 +35,7 @@ const isAdmin = (adminEmails: ReadonlySet<string>, user?: { email?: string | nul
 
 export class SaaSPlanProviderService extends BillingService {
   private constructor(
-    private readonly subscriptions: BillingSubscriptionPort,
+    private readonly subscriptions: SubscriptionRepository,
     private readonly isSaas: boolean,
     private readonly adminEmails: ReadonlySet<string>,
   ) {
@@ -43,7 +43,7 @@ export class SaaSPlanProviderService extends BillingService {
   }
 
   static create(options: {
-    subscriptions: BillingSubscriptionPort;
+    subscriptions: SubscriptionRepository;
     isSaas: boolean;
     adminEmails?: string | readonly string[];
   }): SaaSPlanProviderService {
