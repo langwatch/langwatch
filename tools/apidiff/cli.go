@@ -234,7 +234,7 @@ func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bo
 	flags.SetOutput(out.stderr)
 	boot := BootConfig{}
 	probe := &probeFlags{excludePrefixes: stringSlice{"/api/gateway"}}
-	flags.StringVar(&boot.MainRef, "main-ref", "main", "git ref to boot as the base instance")
+	flags.StringVar(&boot.MainRef, "main-ref", "origin/main", "git ref to boot as the base instance; the remote ref by default, since a local main falls behind without anyone noticing")
 	flags.StringVar(&boot.BranchDir, "branch-dir", ".", "checkout to diff (haven path: its HEAD is checked out into its own worktree; the checkout itself is never booted)")
 	flags.StringVar(&boot.WorkRoot, "work-root", "", "worktree/log root (default <repo>/.apidiff/<timestamp>)")
 	flags.BoolVar(&boot.Keep, "keep", false, "keep infra, databases and worktree after the run")
