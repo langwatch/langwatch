@@ -1,32 +1,45 @@
 import type { AlertType, AutomationLimitNextStep, DatasetActionParams, GraphTriggerEvaluationReason, GraphTriggerEvaluationResult, GraphTriggerSweepCandidate, SlackActionParams, SlackPayload, TriggerMatchRecordedEventData, TriggerSummary, WebhookActionParams, WebhookDeliveryInput } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
+import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
+import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
+import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
+import type { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
+import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationDatasetMapper } from "../services/automation-dataset-mapper.service.ts";
+import type { AutomationDispatchError, AutomationHeartbeat, AutomationLogger } from "../services/automation-graph-runtime.service.ts";
+import type { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
+import type { AutomationSlackBotTokenDecryptor, AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
+import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
+import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 export interface AutomationInfrastructure {  automationClock: AutomationClock;
-  automationDatasetMapper: AutomationDatasetMapperPort;
-  automationDispatchError: AutomationDispatchErrorPort;
+  automationDatasetMapper: AutomationDatasetMapper;
+  automationDispatchError: AutomationDispatchError;
   automationEmailCapStore: AutomationEmailCapStore;
   automationEvaluationQueryClassification: AutomationEvaluationQueryClassification;
   automationEvaluationTraceSummary: AutomationEvaluationTraceSummary;
   automationEvaluationTriggerFilter: AutomationEvaluationTriggerFilter;
   automationGraphActivity: AutomationGraphActivity;
   automationGraphDelivery: AutomationGraphDelivery;
-  automationGraphNotifier: AutomationGraphNotifierPort;
-  automationHeartbeat: AutomationHeartbeatPort;
-  automationIntentRetention: AutomationIntentRetentionPort;
-  automationLogger: AutomationLoggerPort;
-  automationNotificationDelivery: AutomationNotificationDeliveryPort;
-  automationPersistActionWriter: AutomationPersistActionWriterPort;
+  automationGraphNotifier: AutomationGraphNotifier;
+  automationHeartbeat: AutomationHeartbeat;
+  automationIntentRetention: AutomationIntentRetention;
+  automationLogger: AutomationLogger;
+  automationNotificationDelivery: AutomationNotificationDelivery;
+  automationPersistActionWriter: AutomationPersistActionWriter;
   automationProjectIdentity: AutomationProjectIdentityPort;
   automationRunaway: AutomationRunawayPort;
-  automationScheduledIntent: AutomationScheduledIntentPort;
-  automationSlackBotTokenDecryptor: AutomationSlackBotTokenDecryptorPort;
-  automationSlackProvider: AutomationSlackProviderPort;
-  automationTestFire: AutomationTestFirePort;
-  automationTraceTriggerCatalogue: AutomationTraceTriggerCataloguePort;
+  automationScheduledIntent: AutomationScheduledIntent;
+  automationSlackBotTokenDecryptor: AutomationSlackBotTokenDecryptor;
+  automationSlackProvider: AutomationSlackProvider;
+  automationTestFire: AutomationTestFire;
+  automationTraceTriggerCatalogue: AutomationTraceTriggerCatalogue;
   automationTriggerMatchRecorder: AutomationTriggerMatchRecorder;
-  automationWebhookProvider: AutomationWebhookProviderPort;
+  automationWebhookProvider: AutomationWebhookProvider;
   scheduledJobStore: ScheduledJobStorePort;
-  schedulerWake: SchedulerWakePort;
-  unsubscribeTokenVerifier: UnsubscribeTokenVerifierPort;
+  schedulerWake: SchedulerWake;
+  unsubscribeTokenVerifier: UnsubscribeTokenVerifier;
 }
 
 
@@ -189,133 +202,27 @@ export type GraphAlertDispatchResult = {
 };
 
 /** Technical delivery boundary owned by the process composition root. */
-export interface AutomationGraphNotifierPort {
-  dispatch(input: GraphAlertDispatchInput): Promise<GraphAlertDispatchResult>;
-}
 
 /** Process logger used by graph evaluation and heartbeat isolation. */
-export interface AutomationLoggerPort {
-  error(fields: Record<string, unknown>, message: string): void;
-  debug(fields: Record<string, unknown>, message: string): void;
-  info(fields: Record<string, unknown>, message: string): void;
-  warn(fields: Record<string, unknown>, message: string): void;
-}
 
 /** Technical ClickHouse resolver used only by the heartbeat recency query. */
-export interface AutomationHeartbeatPort {
-  tryResolveClickHouseClient(projectId: string): Promise<ClickHouseClient | null>;
-}
 
 /** Host crypto boundary for stored Slack bot credentials. */
-export interface AutomationSlackBotTokenDecryptorPort {
-  tryDecrypt(params: SlackActionParams): string | null;
-}
 
 /** Host transport semantics for retryable and terminal delivery failures. */
-export interface AutomationDispatchErrorPort {
-  isTerminal(error: unknown): boolean;
-  createTerminal(message: string): unknown;
-}
 
 export type AutomationGraphNotifierInput = GraphAlertDispatchInput;
 
 export type AutomationGraphNotifierResult = GraphAlertDispatchResult;
 
 
-export interface AutomationIntentRetentionPort {
-  deleteDispatchedBefore(input: { processName: string; before: number }): Promise<number>;
-}
 
 /** Outbound provider calls. Automation owns when and what to send; the process
  * adapter owns SDKs, HTTP policy, mail rendering infrastructure, and secrets. */
-export interface AutomationNotificationDeliveryPort {
-  /** The established transactional-mail renderer remains a host delivery
-   * adapter; Automation decides when a legacy digest is sent. */
-  sendLegacyEmail(input: {
-    recipients: string[];
-    triggerData: Array<{
-      traceId: string;
-      input: string;
-      output: string;
-      projectId: string;
-      fullTrace: TraceRecord;
-    }>;
-    triggerName: string;
-    triggerId: string;
-    projectId: string;
-    projectSlug: string;
-    triggerType: AlertType | null;
-    triggerMessage: string;
-    isRecipientSent(recipientHash: string): Promise<boolean>;
-    recordRecipientSent(recipientHash: string): Promise<void>;
-  }): Promise<void>;
-
-  sendEmail(input: {
-    recipients: string[];
-    triggerId: string;
-    projectId: string;
-    subject: string;
-    html: string;
-    isRecipientSent(recipientHash: string): Promise<boolean>;
-    recordRecipientSent(recipientHash: string): Promise<void>;
-  }): Promise<void>;
-
-  sendSlackWebhook(input: {
-    webhook: string;
-    triggerName: string;
-    payload: SlackPayload;
-  }): Promise<void>;
-
-  sendLegacySlackWebhook(input: {
-    webhook: string;
-    triggerData: Array<{
-      traceId: string;
-      input: string;
-      output: string;
-      projectId: string;
-      fullTrace: TraceRecord;
-    }>;
-    triggerName: string;
-    projectSlug: string;
-    triggerType: AlertType | null;
-    triggerMessage: string;
-    baseHost: string;
-  }): Promise<void>;
-
-  sendSlackBot(input: {
-    token: string;
-    channel: string;
-    payload: SlackPayload;
-    triggerName: string;
-  }): Promise<void>;
-
-  sendWebhook(input: WebhookDeliveryRequest): Promise<WebhookSendResult>;
-}
 
 
-export interface AutomationDatasetMapperPort {
-  map(input: {
-    trace: TraceRecord;
-    mapping: DatasetActionParams["datasetMapping"]["mapping"];
-    expansions: readonly string[];
-  }): Array<Record<string, string | number>>;
-}
 
 
-export interface AutomationPersistActionWriterPort {
-  addToAnnotationQueue(input: {
-    traceIds: string[];
-    projectId: string;
-    annotators: string[];
-    userId: string;
-  }): Promise<void>;
-
-  addToDataset(input: {
-    datasetId: string;
-    projectId: string;
-    datasetRecords: DatasetRecordEntry[];
-  }): Promise<void>;
-}
 
 export type AutomationWebhookStoredParams = {
   url: string;
@@ -329,35 +236,8 @@ export type AutomationWebhookStoredParams = {
 };
 
 
-export interface AutomationSlackProviderPort {
-  tryDecrypt(params: { slackBotToken?: string }): string | null;
-}
 
 
-export interface AutomationWebhookProviderPort {
-  parseStored(value: unknown): AutomationWebhookStoredParams;
-
-  decryptHeaders(params: {
-    headersEncrypted?: string;
-    headers?: Record<string, string>;
-  }): Record<string, string>;
-
-  decryptSigningSecrets(
-    params: {
-      signingSecretEncrypted?: string;
-      previousSigningSecretEncrypted?: string;
-      previousSigningSecretExpiresAt?: number;
-    },
-    now?: Instant,
-  ): string[];
-
-  persist(input: {
-    incoming: WebhookActionParams;
-    existing?: AutomationWebhookStoredParams | null;
-  }): AutomationWebhookStoredParams;
-
-  redact(params: AutomationWebhookStoredParams): WebhookActionParams;
-}
 
 export type ClaimLease = { key: string; token: string };
 
@@ -396,19 +276,6 @@ export interface AutomationRunawayPort {
 }
 
 
-export interface AutomationScheduledIntentPort {
-  decideGraphTriggerHeartbeat(input: {
-    now: Instant;
-  }): Promise<GraphTriggerSweepCandidate[]>;
-
-  evaluateGraphTrigger(input: {
-    triggerId: string;
-    projectId: string;
-    reason: GraphTriggerEvaluationReason;
-  }): Promise<GraphTriggerEvaluationResult>;
-
-  pruneWebhookDeliveries(now?: Instant): Promise<number>;
-}
 
 export interface TestFireEmail {
   recipients: string[];
@@ -437,12 +304,6 @@ export interface TestFireWebhook {
 }
 
 
-export interface AutomationTestFirePort {
-  sendEmail(input: TestFireEmail): Promise<void>;
-  sendSlack(input: TestFireSlackWebhook): Promise<void>;
-  sendSlackBot(input: TestFireSlackBot): Promise<void>;
-  sendWebhook(input: TestFireWebhook): Promise<{ status: number }>;
-}
 
 /**
  * The one automation listing the trace-alert path reads.
@@ -458,9 +319,6 @@ export interface AutomationTestFirePort {
  * `AutomationService` satisfies this, so the application's own composition is
  * unchanged and both graphs answer from the same implementation.
  */
-export interface AutomationTraceTriggerCataloguePort {
-  getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]>;
-}
 
 
 export interface AutomationEmailCapStore {
@@ -506,9 +364,6 @@ export interface ScheduledJobStorePort {
 }
 
 
-export interface SchedulerWakePort {
-  publish(): void;
-}
 
 export type UnsubscribeTokenPayload = {
   projectId: string;
@@ -517,6 +372,3 @@ export type UnsubscribeTokenPayload = {
 };
 
 
-export interface UnsubscribeTokenVerifierPort {
-  tryVerify(token: string): UnsubscribeTokenPayload | null;
-}

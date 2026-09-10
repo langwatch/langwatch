@@ -3,9 +3,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
   AutomationClock,
-  AutomationDispatchErrorPort,
-  AutomationLoggerPort,
-  AutomationNotificationDeliveryPort,
+  AutomationDispatchError,
+  AutomationLogger,
+  AutomationNotificationDelivery,
   AutomationProjectIdentityPort,
 } from "../../app/automation.infrastructure.ts";
 import { PrismaCustomGraphRepository } from "./prisma.custom-graph.repository.ts";
@@ -47,13 +47,13 @@ export class PrismaAutomationGraphActivityRepository {
     projects: AutomationProjectIdentityPort;
     analytics: AnalyticsService;
     /** The process's outbound transports: mail, Slack, webhook. */
-    delivery: AutomationNotificationDeliveryPort;
+    delivery: AutomationNotificationDelivery;
     /** Reads the Slack bot tokens and webhook secrets this deployment wrote. */
     crypto: AutomationSecretCrypto;
     emailCaps: AutomationEmailCapService;
-    logger: AutomationLoggerPort;
+    logger: AutomationLogger;
     /** How the process's queue tells a permanent failure from a retryable one. */
-    dispatchErrors: AutomationDispatchErrorPort;
+    dispatchErrors: AutomationDispatchError;
     /** The deployment's own origin; every link in an alert is built from it. */
     baseHost: string;
     emailHourlyCap: number;

@@ -106,7 +106,7 @@ class TestFireDelivery extends AutomationTestFire {
   }
 }
 
-export function createAutomationTestFirePort(): AutomationTestFire {
+export function createAutomationTestFire(): AutomationTestFire {
   return new TestFireDelivery();
 }
 
