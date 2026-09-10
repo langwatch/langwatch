@@ -33,6 +33,7 @@ export { featureSourceFilenameRule } from "./rules/feature-source-filename.rule.
 export { featureSourceLayoutRule } from "./rules/feature-source-layout.rule.mjs";
 export { featureSourceSubjectRule } from "./rules/feature-source-subject.rule.mjs";
 export { bannedLegacyNamesRule } from "./rules/banned-legacy-names.rule.mjs";
+export { noPortVocabularyRule } from "./rules/no-port-vocabulary.rule.mjs";
 export { moduleAppOnlyAcrossPackagesRule } from "./rules/module-app-only-across-packages.rule.mjs";
 export { featureSideHoldsNoAppRule } from "./rules/feature-side-holds-no-app.rule.mjs";
 export { noAliasReexportRule } from "./rules/no-alias-reexport.rule.mjs";
@@ -55,6 +56,9 @@ export { planLiteralsRule } from "./rules/plan-literals.rule.mjs";
 export { prismaContainmentRule } from "./rules/prisma-containment.rule.mjs";
 export { schemaOutsideContractRule } from "./rules/schema-outside-contract.rule.mjs";
 export { secretsThroughSourceRule } from "./rules/secrets-through-source.rule.mjs";
+export { serviceDoesNotOpenAChannelRule } from "./rules/service-does-not-open-a-channel.rule.mjs";
+export { channelTakesOnlyItsClientRule } from "./rules/channel-takes-only-its-client.rule.mjs";
+export { repositoryTakesOnlyItsStoreRule } from "./rules/repository-takes-only-its-store.rule.mjs";
 export { serviceClassesRule } from "./rules/service-classes.rule.mjs";
 export { serviceDependenciesRule } from "./rules/service-dependencies.rule.mjs";
 export { serviceLoadsItsOwnConfigRule } from "./rules/service-loads-its-own-config.rule.mjs";
@@ -64,3 +68,13 @@ export { temporalOnlyRule } from "./rules/temporal-only.rule.mjs";
 export { typedPrismaSeamRule } from "./rules/typed-prisma-seam.rule.mjs";
 export { webImportsServerShapedValueRule } from "./rules/web-imports-server-shaped-value.rule.mjs";
 export { zodObjectCompositionRule } from "./rules/zod-object-composition.rule.mjs";
+export {
+  danglingBarrelExportRule,
+  resetDanglingResolutionCache,
+} from "./rules/dangling-barrel-export.rule.mjs";
+export { emptyCatchRule } from "./rules/empty-catch.rule.mjs";
+export { standInCastRule } from "./rules/stand-in-cast.rule.mjs";
+export { transportImportsARepositoryRule } from "./rules/transport-imports-a-repository.rule.mjs";
+export { testDescriptionIsAnActionRule } from "./rules/test-description-is-an-action.rule.mjs";
+export { bannedTestModelNamesRule } from "./rules/banned-test-model-names.rule.mjs";
+export { noInlineDynamicImportRule } from "./rules/no-inline-dynamic-import.rule.mjs";
