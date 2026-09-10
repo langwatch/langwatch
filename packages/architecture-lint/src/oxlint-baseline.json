@@ -6903,6 +6903,2022 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.authoring-families.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.cli-key-owner-ceiling.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.experiments-cicd-run.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.experiments-routing.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.experiments-workbench.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.langy-control.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.organizations-provisioning-family.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.packaged-families.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.product-families.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.prompt-tag-cascade.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.secured-family-rbac.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.slack-trigger-family.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.teams-family.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.unsubscribe-family.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.webhooks-idempotency.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/api-rest.workflow-run-refusals.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/support/gateway-platform-rest.harness.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/__tests__/support/organization-family.world.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/api-rest.doors.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/api-rest.packaged-services.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-rest/api-rest.services.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-trpc/__tests__/support/app-trpc-features.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-trpc/app-trpc.context.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-trpc/app-trpc.error-formatter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app-trpc/app-trpc.features.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-authz.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-automation.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-better-auth.identity-branch.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-coding-agent-caller-scope.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-elevenlabs-webhook.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-enterprise-application.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-evaluator-execution.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-experiment-run.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-gateway-idempotency.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-gateway-internal-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-gateway-spend-pipeline.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-gateway-spend-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-gateway-webhooks.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-mail.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-model-provider.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-packaged-rest.usage-guard.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-personal-virtual-key-scope-rbac.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-production.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-rest-model-defaults-orphan.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-studio-host.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-tenancy.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-trace-ingest.otlp.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-trace-spool.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-trpc-record.test-doubles.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-usage-mail.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-usage.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/api-virtual-key-scope-rbac.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/__tests__/support/prisma-project-api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-agent-pipelines.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-agents.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-auth.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-authoring-model.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-authoring-rest.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-authz.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-automation.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-better-auth.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-billing-webhook.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-connected-agents.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-enterprise-application.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-evaluation-read.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-evaluator-execution.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-experiment-run.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-gateway-internal-rest.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-gateway-spend-pipeline.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-gateway-spend-rest.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-gateway-webhooks.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-gateway.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-idempotency.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-identity-eventing.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-identity-pipelines.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-mail.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-model-provider.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-organization-invites.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-organization-settings-secret.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-otlp-credential-policy.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-packaged-rest.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-person-mail.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-production.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-scim.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-studio-host.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-tenancy.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-trace-ingest.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-trace-read-stack.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-trace-spool.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/api-usage.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/app/nlp-lambda-arn-cache.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/agent-cache/__tests__/agent-cache-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/agent-cache/__tests__/agent-cache-sandbox-key.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/agent/__tests__/http-proxy.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/agent/agent-platform-url.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/agent/agent-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/analytics/__tests__/analytics.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/analytics/__tests__/saved-workbench-charts-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/analytics/__tests__/saved-workbench-charts-trpc.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/analytics/analytics-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/analytics/analytics-trpc.routers.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/analytics/analytics.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/analytics/analytics.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/analytics/langwatch-ql-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/analytics/query-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/annotation/__tests__/annotation.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/api-key/api-key-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/auth/__tests__/auth-cli-device-flow-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/auth/__tests__/auth-cli-personal-guard.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/auth/__tests__/auth-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/auth/__tests__/support/test-auth-api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/auth/auth-cli-device-flow-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/auth/auth-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/auth/auth-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/auth/auth.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/automation/automation-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/automation/automation.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/automation/automation.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/automation/triggers-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/automation/unsubscribe-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/bug-report/bug-report-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/bug-report/bug-report-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/bug-report/bug-report.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/coding-agent/__tests__/coding-agent-v1-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/coding-agent/coding-agent-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/coding-agent/coding-agent.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/cron/cron.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/dashboard/dashboard.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/data-privacy/data-privacy.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/data-retention/data-retention.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/discovery/__tests__/spend-filter-parity.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/enterprise/__tests__/governance-cli-ingestion-key-project-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/enterprise/__tests__/governance-cli-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/enterprise/__tests__/governance-cli-virtual-key-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/enterprise/__tests__/governance-ingest-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/enterprise/__tests__/scim-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/enterprise/enterprise-webhook.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/enterprise/enterprise.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/enterprise/governance-cli-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/enterprise/governance-ingest-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/enterprise/licensing-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/entitlement/__tests__/entitlement.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/evaluation/evaluation.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/evaluator/__tests__/evaluator-create-model-resolution.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/evaluator/__tests__/evaluator.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/evaluator/evaluator.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/__tests__/experiment-execution-data.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/__tests__/experiment-init-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/__tests__/experiment-rest-mounts.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/__tests__/experiment-rest.fixture.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/__tests__/experiment-v3-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/experiment-dspy-steps-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/experiment-init-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/experiment-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/experiment-v3-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/experiment.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/experiment/experiment.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/export/scenario-run-export-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/export/trace-export-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/feature-flag/feature-flag.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/gateway/__tests__/anchored-budget-breach-once-per-period.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/gateway/__tests__/gateway-cached-call-cost-agreement.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/gateway/__tests__/gateway-spend-price-agreement.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/gateway/__tests__/gateway.boot.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/gateway/__tests__/gateway.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/gateway/gateway-model-provider-credentials.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/gateway/gateway-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/gateway/gateway-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/gateway/gateway.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/github/__tests__/github-install-backfill.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/github/__tests__/github-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/github/github-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/health/health-probe-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/identity/api-join-request-mail.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/identity/identity.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/langy/__tests__/langy-navigate-resource.adapter.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/langy/__tests__/langy-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/langy/__tests__/langy-workbench-actions.adapter.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/langy/__tests__/langy.composition.pr-quota.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/langy/langy-navigate-resource.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/langy/langy-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/langy/langy-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/langy/langy-workbench-actions.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/langy/langy.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/langy/langy.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/mcp/__tests__/hosted-mcp.mount.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/mcp/hosted-mcp.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/mcp/mcp-authorize-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/model-provider/__tests__/model-provider.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/model-provider/model-provider-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/model-provider/model-provider-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/model-provider/model-provider.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/model-provider/model-provider.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/model-provider/playground-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/model-provider/translate-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/monitor/__tests__/monitor-performance.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/monitor/__tests__/support/monitor-performance.fixtures.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/monitor/monitor.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/ops/admin-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/ops/ops-clickhouse-explain-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/ops/ops-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/ops/ops.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/ops/ops.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/organization/__tests__/organization.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/organization/__tests__/person-features.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/organization/organization-management-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/organization/organization-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/organization/organization.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/organization/organization.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/platform-health/platform-health-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/presence/presence.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/presence/presence.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/project/__tests__/integrations-checks.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/project/home.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/project/project-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/project/project-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/project/project.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/prompt/prompt-execute-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/prompt/prompt.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/prompt/prompt.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/role/__tests__/role.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/role/role.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/scenario/__tests__/scenario-server.boot.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/scenario/__tests__/scenario.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/scenario/scenario-generate-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/scenario/scenario-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/scenario/scenario-run-platform-url.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/scenario/scenario.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/scenario/scenario.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/secret/secret.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/stored-object/__tests__/product-storage.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/stored-object/stored-object-file-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/stored-object/stored-object.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/stored-object/stored-object.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/suite/suite-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/suite/suite.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/topic/__tests__/topic.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/topic/topic-api.feature.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/topic/topic.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/__tests__/trace-rest.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/__tests__/trace.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/__tests__/traces-rest.mount.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/__tests__/tracked-event-ports.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/__tests__/tracked-event-rest.mount.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/trace-legacy-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/trace-producer.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/trace-read-stack.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/trace.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/trace.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/traces-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/traces-v2-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/tracked-event-ports.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/trace/tracked-event-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/user/__tests__/user-credentials.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/user/__tests__/user-directory.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/user/me-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/user/user-avatar-objects.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/user/user-avatar-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/user/user-avatar-storage.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/user/user.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/webhook/__tests__/webhook.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/webhook/webhook.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/workflow/__tests__/execution-features.composition.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/workflow/workflow-run-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/workflow/workflow-studio-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/workflow/workflow-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/workflow/workflow.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/features/workflow/workflow.composition.types.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/platform/config/api.config.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/platform/infrastructure/api-secret-encryption.infrastructure.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/platform/infrastructure/api-trace-spool.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/tasks/openapi-document/openapi-document.generator.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/api/src/tasks/openapi-document/openapi-document.surface.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/tasks/src/platform/__tests__/system-migrations.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/tasks/src/platform/dataset-content-backfill.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/tasks/src/platform/infrastructure/tasks-stored-object-storage.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/tasks/src/platform/model-provider-credential-cipher.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/tasks/src/platform/object-storage-migrate.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/tasks/src/platform/stalled-runs-backfill.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/tasks/src/platform/system-migrations.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/tasks/src/tasks.catalogue.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/tasks/src/tasks/agent-audit-log-ids-backfill.task.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/__tests__/codex-coding-defaults.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/scenario-runner-egress-fence.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-agent.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-automation-graph.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-automation-settlement-reads.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-automation-settlement.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-dataset-normalization.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-evaluation-processing.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-langy-conversation.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-object-storage.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-plan-provider.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-production.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-production.infrastructure.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-scenario-processing.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-tenancy-ownership.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-tenancy.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-blob.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-broadcast.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-capability-services.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-content-drop.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-cost-enrichment.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-evaluation-trigger.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-narrow-ports.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-processing-mount.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-processing-pipeline.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-product-analytics.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/__tests__/worker-trace-token-estimation.composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-agent-apps.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-agent.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-analytics.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-automation-graph.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-automation-settlement-reads.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-automation-settlement.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-coding-agent-app.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-dataset-normalization.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-evaluation-app.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-evaluation-execution.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-evaluation-model-env.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-evaluation-processing.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-evaluation-server.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-evaluator.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-feature-flag-cache.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-foundation-apps.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-gateway-spend.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-governance-ingestion.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-governance-rollups.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-langy-conversation.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-langy-title-model.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-mail.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-model-provider.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-object-storage.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-observability-apps.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-ops-app.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-ops.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-plan-provider.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-production.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-project-activity.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-realtime-session.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-record-span.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-report-schedule.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-scenario-execution.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-scenario-processing.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-span-storage.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-standalone.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-telemetry-read.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-tenancy-infrastructure.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-tenancy.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-tenant-broadcast.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-topic-clustering.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-alert-trigger.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-app.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-blob-read.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-blob.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-broadcast.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-capability-services.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-content-drop.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-cost-enrichment.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-evaluation-trigger.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-narrow-ports.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-privacy.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-processing-pipeline.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-product-analytics.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-projection-stores.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-trace-token-estimation.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-tracked-event.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-user-app.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/app/worker-webhook-egress.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/__tests__/worker-feature-command-binding.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/api-key/__tests__/api-key-worker-feature.installer.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/api-key/api-key-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/authz/__tests__/authz-worker-feature.installer.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/authz/authz-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/automation/__tests__/automation-notification-delivery.adapter.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/automation/__tests__/automation-runaway.adapter.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/automation/automation-next-step.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/automation/automation-notification-delivery.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/automation/automation-runaway.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/automation/automation-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/automation/slack-web-api.transport.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/automation/webhook-delivery.transport.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/coding-agent/coding-agent-trace-processing.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/coding-agent/coding-agent-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/evaluation/evaluation-analytics-attribute-policy.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/experiment/experiment-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/gateway/gateway-realtime-session-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/gateway/gateway-spend-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/github/__tests__/github-worker-feature.installer.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/github/github-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/identity/__tests__/join-request-mail.adapter.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/identity/identity-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/identity/join-request-mail.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/identity/join-request-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/identity/scim-sync-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/langy/__tests__/langy-maintenance-worker-feature.installer.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/langy/langy-maintenance-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/log/log-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/metric/metric-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/ops/ops-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/scenario/__tests__/scenario-worker-feature.installer.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/scenario/scenario-execution-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/scenario/scenario-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/suite/suite-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/topic/topic-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/features/trace/trace-worker-feature.installer.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/platform/config/worker.config.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/platform/infrastructure/__tests__/worker-foundation.adapter.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/platform/infrastructure/__tests__/worker-pii-analysis.adapter.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/platform/infrastructure/worker-foundation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/platform/infrastructure/worker-pii-analysis.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/platform/infrastructure/worker-product-analytics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/platform/infrastructure/worker-stored-object-storage.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/platform/infrastructure/worker-token-counter.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/platform/infrastructure/worker-trace-spool.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/src/scenario-child.entrypoint.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|apps/worker/tests/e2e/code-agent/auth0-code-agent.scenario.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/modules/billing/server/src/adapters/plan-limits.plan-catalogue.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/modules/governance/server/src/__tests__/pulled-usage-ledger.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/modules/governance/server/src/services/__tests__/genie-trace-mapper.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/modules/scim/server/src/services/__tests__/scim-cost-center.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/__tests__/governance-webhook.adapter.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/admin-workspace-view-audit.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/cli-token-revocation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/gateway-debit.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/governance-eventing.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/governance-infrastructure.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/governance-kpis.clickhouse.repository.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/governance-ocsf-events.clickhouse.repository.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/governance-products.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/governance-signals.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/governance-subscriber.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/governance-webhook.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/ingestion-key.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/ingestion-pull-worker.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/ingestion-source-activity.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/ingestion-source.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/personal-usage.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/quarantine-fill-evaluator.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/runtime.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/governance/ssrf-safe-anomaly-alert-http.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/sso.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/trpc/enterprise-gateway-trpc.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/trpc/enterprise-governance-trpc.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/src/trpc/enterprise-trpc.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/tests/governance/department-spend.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/api/tests/governance/governance-signals.adapter.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/worker/src/governance/governance-ingestion-pull.host.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/worker/src/governance/spend-spike-anomaly.worker.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/worker/src/index.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|enterprise/packages/composition/worker/tests/worker-composition.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/coding-agent/server/src/projections/__tests__/coding-agent-session.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-cost-drift.subscriber.redelivery.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-log-facts-dispatch.subscriber.redelivery.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-metric-facts-dispatch.subscriber.redelivery.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-span-facts-dispatch.subscriber.redelivery.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/dashboard/server/src/services/__tests__/saved-workbench-chart-policy.service.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/dashboard/server/src/services/__tests__/saved-workbench-chart-run.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/dataset/server/src/services/dataset-normalization.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/evaluation/server/src/adapters/__tests__/workflow-evaluation.adapter.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/evaluation/server/src/adapters/workflow-evaluation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/evaluation/server/src/ports/__tests__/evaluation.service.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/evaluator/server/src/app/__tests__/evaluator.fixture.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/evaluator/server/src/app/evaluator.app.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/evaluator/server/src/services/__tests__/evaluator.service.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/evaluator/server/src/services/evaluator-code.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/evaluator/server/src/services/evaluator-execution.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/evaluator/server/src/services/evaluator.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/app/__tests__/experiment.app.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/app/experiment.app.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/repositories/__tests__/experiment-archive.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/repositories/__tests__/experiment.service.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/repositories/__tests__/workbench.persistence.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/rules/experiment-run-input.rules.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/__tests__/experiment-cell-execution.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/__tests__/experiment-connected-cell.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/__tests__/experiment-run-orchestrator.sandbox-credential.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/__tests__/experiment-workbench-references.service.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/__tests__/experiment-workflow-cell.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/experiment-cell-execution.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/experiment-connected-cell.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/experiment-run-orchestrator.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/experiment-workbench-references.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/experiment-workflow-cell.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/experiment/server/src/services/experiment-workflow-evaluation.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/gateway/server/src/app/gateway.infrastructure.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/hosted-mcp/server/src/transport/hosted-mcp.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/log/server/src/services/__tests__/log-request-collection.service.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/metric/server/src/services/metric-point.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/metric/server/src/services/metric-values.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/scenario/server/src/__tests__/codex-coding-defaults.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/scenario/server/src/__tests__/suite-run-version-stamp.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/scenario/server/src/__tests__/support/scenario-execution-prefetcher.fixture.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/scenario/server/src/repositories/clickhouse/__tests__/clickhouse.run-configurations.repository.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/scenario/server/src/repositories/clickhouse/__tests__/simulation-clickhouse-repository-run-parameters.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/scenario/server/src/services/__tests__/scenario-target-prefetch.service.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/scenario/server/src/services/agent-test.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/scenario/server/src/services/scenario-execution-prefetcher.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/scenario/server/src/services/scenario-target-prefetch.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/share/server/src/repositories/ledger/__tests__/ledger.share.repository.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/trace/server/src/ports/__tests__/record-span.command.content-drop.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|modules/webhook/server/src/services/webhook-destination-dispatch.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|packages/prisma-client/prisma/seed.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "module-app-only-across-packages|packages/test-harness/src/__tests__/nlpgo-staged-payload-roundtrip.integration.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "namespace-class|enterprise/modules/billing/server/src/services/nurturing-activity-tracking.service.ts",
       "measured": "2026-09-08"
     },

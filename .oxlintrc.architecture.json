@@ -54,7 +54,8 @@
     "langwatch/no-logger-spy": "error",
     "langwatch/no-raw-error-output": "error",
     "langwatch/no-boot-hook-outside-guard": "error",
-    "langwatch/banned-legacy-names": "error"
+    "langwatch/banned-legacy-names": "error",
+    "langwatch/module-app-only-across-packages": "error"
   },
   "overrides": [
     {

@@ -33,6 +33,7 @@ export { featureSourceFilenameRule } from "./rules/feature-source-filename.rule.
 export { featureSourceLayoutRule } from "./rules/feature-source-layout.rule.mjs";
 export { featureSourceSubjectRule } from "./rules/feature-source-subject.rule.mjs";
 export { bannedLegacyNamesRule } from "./rules/banned-legacy-names.rule.mjs";
+export { moduleAppOnlyAcrossPackagesRule } from "./rules/module-app-only-across-packages.rule.mjs";
 export { featureSideHoldsNoAppRule } from "./rules/feature-side-holds-no-app.rule.mjs";
 export { noAliasReexportRule } from "./rules/no-alias-reexport.rule.mjs";
 export { noBootHookOutsideGuardRule } from "./rules/no-boot-hook-outside-guard.rule.mjs";

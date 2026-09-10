@@ -261,7 +261,7 @@ function lintServer(snapshot: WorkspaceSnapshot, pkg: ClassifiedPackage): Archit
   return violations;
 }
 
-const PRIVATE_SERVER_EXPORT = /(?:^|\/)(?:projections|repositories|stores)(?:\/|$)/;
+const PRIVATE_SERVER_EXPORT = /(?:^|\/)(?:app|projections|repositories|rules|services|stores)(?:\/|$)/;
 /**
  * What `src/testing.ts` may still export past `PRIVATE_SERVER_EXPORT`: a
  * double, not a real repository, store, or projection (R6, burn-down §4).
@@ -626,9 +626,9 @@ function lintPrivateServerExportsForEntry(
       line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
       specifier,
       message:
-        "A feature server root cannot expose a repository, store, or projection implementation.",
+        "A feature server root cannot expose a service, repository, store, projection, app, or rule implementation.",
       allowed:
-        "Export the feature installer (<feature>Server) and its transport declarations; keep persistence and projection modules private to the feature server.",
+        "Export the feature installer (<feature>Server), its transport declarations, its Infrastructure type, and contract-facing types; keep everything else private to the feature server.",
     });
   };
 
@@ -679,7 +679,7 @@ function lintPrivateServerExportsForEntry(
         pkg,
         allowTestingDoubles,
       })) {
-        add(element);
+        add(element, exportName(element));
       }
     }
   }
