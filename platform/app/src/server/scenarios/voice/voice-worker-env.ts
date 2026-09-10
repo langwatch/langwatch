@@ -10,7 +10,7 @@
  *   - VOICE_WS_PORT         the TCP port the media listener binds (default 3300).
  *   - VOICE_PUBLIC_BASE_URL the public https origin Twilio dials back; the
  *                           worker derives wss://<host>/twilio/<nonce> from it.
- *                           Required when VOICE_WORKER_ONLY is on — the worker
+ *                           Required when VOICE_WORKER_ONLY is on - the worker
  *                           refuses to start without it, because a listener no
  *                           call can reach is a silent misconfiguration.
  *
@@ -54,8 +54,8 @@ const publicBaseUrlSchema = z
 
 /**
  * Parse and validate the voice worker env. Throws when VOICE_WORKER_ONLY is on
- * but VOICE_PUBLIC_BASE_URL is missing or malformed — the "refuses to start"
- * clause of the env contract — so the worker fails loud at boot rather than
+ * but VOICE_PUBLIC_BASE_URL is missing or malformed - the "refuses to start"
+ * clause of the env contract - so the worker fails loud at boot rather than
  * coming up with a listener Twilio can never reach.
  */
 export function readVoiceWorkerEnv(

@@ -31,7 +31,7 @@ interface RegisteredNonce {
 }
 
 /**
- * An in-memory map of live nonces. One instance per worker process — the
+ * An in-memory map of live nonces. One instance per worker process - the
  * listener and the phone jobs share it through {@link getVoiceNonceRegistry}.
  */
 export class VoiceNonceRegistry {

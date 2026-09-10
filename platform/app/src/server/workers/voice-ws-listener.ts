@@ -5,7 +5,7 @@
  * owns that public port in the parent worker process: it accepts the upgrade,
  * authenticates the nonce against {@link ../scenarios/voice/voice-nonce-registry},
  * and hands the raw socket to the scenario child that owns the call. It does
- * NOT complete the WebSocket handshake — a live `ws.WebSocket` cannot cross an
+ * NOT complete the WebSocket handshake - a live `ws.WebSocket` cannot cross an
  * IPC boundary, so the child completes the handshake against its own `ws` server
  * (slice 2, {@link ../scenarios/voice/voice-socket-handoff}).
  *
@@ -182,6 +182,11 @@ export async function bootVoiceWsListener(params: {
 		address,
 		close: () =>
 			new Promise<void>((resolve) => {
+				// Drop any connection still held by the parent (a rejected upgrade
+				// mid-write, or a socket not yet handed off) so shutdown never waits
+				// on one; a socket already handed to a child left this process and is
+				// unaffected.
+				server.closeAllConnections();
 				server.close(() => resolve());
 			}),
 	};
