@@ -1204,4 +1204,107 @@ describe("given a listing outcome that arrives after a later ask was accepted", 
       expect(second.LastPeopleDirectoryCount).toBe(900);
     });
   });
+  /**
+   * The same interleaving on the agents columns.
+   *
+   * The fence is written once per handler rather than once per projection, so
+   * "people is fenced" is not evidence that agents is. It is the same four
+   * lines four times, and four places is four chances for one of them to be
+   * dropped in a later edit with nothing going red.
+   */
+  describe("when the abandoned ask was an agents listing", () => {
+    const agentsListed = ({
+      state,
+      requestId,
+      requestedAt,
+      agentCount,
+      occurredAt,
+    }: {
+      state: IngestionPullRunStatusData;
+      requestId: string;
+      requestedAt: number;
+      agentCount: number;
+      occurredAt: number;
+    }) =>
+      projection.apply(
+        state,
+        event(
+          "lw.obs.ingestion_pull.agents_listed",
+          { sourceId: "source-1", requestId, requestedAt, agentCount },
+          occurredAt,
+        ),
+      );
+
+    it("leaves the accepted ask's agent count standing", () => {
+      const accepted = agentsListed({
+        state: projection.init(),
+        requestId: "req-b",
+        requestedAt: SECOND_ASKED_AT,
+        agentCount: 42,
+        occurredAt: SECOND_ASKED_AT + 30_000,
+      });
+      const superseded = agentsListed({
+        state: accepted,
+        requestId: "req-a",
+        requestedAt: FIRST_ASKED_AT,
+        agentCount: 3,
+        occurredAt: SECOND_ASKED_AT + 60_000,
+      });
+
+      expect(superseded.LastAgentsListingCount).toBe(42);
+      expect(superseded.LastAgentsListingAt).toBe(SECOND_ASKED_AT);
+    });
+
+    it("cannot bury it under a refusal either", () => {
+      const accepted = agentsListed({
+        state: projection.init(),
+        requestId: "req-b",
+        requestedAt: SECOND_ASKED_AT,
+        agentCount: 42,
+        occurredAt: SECOND_ASKED_AT + 30_000,
+      });
+      const superseded = projection.apply(
+        accepted,
+        event(
+          "lw.obs.ingestion_pull.agents_listing_refused",
+          {
+            sourceId: "source-1",
+            requestId: "req-a",
+            requestedAt: FIRST_ASKED_AT,
+            reason: "insufficient_scope",
+            status: 403,
+          },
+          SECOND_ASKED_AT + 60_000,
+        ),
+      );
+
+      // The refusal the agents page would draw as a broken credential, over a
+      // listing that had just answered with forty-two agents.
+      expect(superseded.LastAgentsListingOutcome).toBe("listed");
+      expect(superseded.LastAgentsListingCount).toBe(42);
+      expect(superseded.LastAgentsListingReason).toBeNull();
+      expect(superseded.LastAgentsListingStatus).toBeNull();
+    });
+
+    it("still replaces it when the later ask is the one answering", () => {
+      // The arm from the other side: a fence that dropped everything would
+      // pass both assertions above and break every ordinary second sync.
+      const first = agentsListed({
+        state: projection.init(),
+        requestId: "req-a",
+        requestedAt: FIRST_ASKED_AT,
+        agentCount: 3,
+        occurredAt: FIRST_ASKED_AT + 30_000,
+      });
+      const second = agentsListed({
+        state: first,
+        requestId: "req-b",
+        requestedAt: SECOND_ASKED_AT,
+        agentCount: 42,
+        occurredAt: SECOND_ASKED_AT + 30_000,
+      });
+
+      expect(second.LastAgentsListingCount).toBe(42);
+    });
+  });
 });
