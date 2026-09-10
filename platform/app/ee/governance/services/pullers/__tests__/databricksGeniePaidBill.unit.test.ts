@@ -33,8 +33,21 @@ const WORKSPACE_URL = "https://adb-1.azuredatabricks.net";
 const WAREHOUSE_ID = "095eb666b2ed2762";
 const PAID_SKU = "PREMIUM_GENIE_SERVERLESS_REAL_TIME_INFERENCE_EU_WEST";
 const FREE_SKU = "GENIE_FREE_USAGE";
-const DAY = "2026-09-08";
 const HOUR_MS = 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * HOUR_MS;
+/**
+ * The day the fixture bills on: two days back, from the clock. The read's
+ * first-run window is the last thirty days through tomorrow and the fixture
+ * only serves rows inside the window it was asked about, so a day pinned to
+ * the calendar would fall out of the window a month after it was written and
+ * every row-landing test would fail with nothing landed.
+ */
+const DAY = new Date(Date.now() - 2 * ONE_DAY_MS).toISOString().slice(0, 10);
+/** Where a first read with no configured start begins: thirty days back, day-aligned. */
+const FIRST_RUN_FLOOR_MS =
+  Math.floor((Date.now() - 30 * ONE_DAY_MS) / ONE_DAY_MS) * ONE_DAY_MS;
+/** The same limit the warehouse read holds for. */
+const MAX_HOLD_MS = 7 * ONE_DAY_MS;
 
 const reply = (body: unknown, status = 200) =>
   ({
@@ -195,7 +208,17 @@ function cursorOf(result: { cursor: string | null }) {
     sinceMs: number;
     costHeldSinceMs: number | null;
     paidBillReadThroughMs: number | null;
+    paidBillHeldSinceMs: number | null;
   };
+}
+
+/** The bound value of one named parameter on the first bill statement posted. */
+function firstBillParameter(name: string): string {
+  const asked = billStatements();
+  expect(asked.length).toBeGreaterThan(0);
+  return (asked[0]!.parameters as { name: string; value: string }[]).find(
+    (p) => p.name === name,
+  )!.value;
 }
 
 const paidRow = (
@@ -336,6 +359,40 @@ describe("given a Genie source with the paid bill read switched on", () => {
       // No zero anywhere on it: no price is not a price of nothing.
       expect(JSON.stringify(event)).not.toContain('"0"');
     });
+
+    const zeroPriced: { name: string; sku: string }[] = [
+      { name: "a free row priced at zero", sku: FREE_SKU },
+      { name: "a paid price line listed at zero", sku: PAID_SKU },
+    ];
+    for (const { name, sku } of zeroPriced) {
+      /** @scenario "A free Genie row lands with its usage count and no amount" */
+      it(`${name} still lands with no amount`, async () => {
+        // The day Databricks publishes a list price of zero, the statement's
+        // multiplication yields a well-formed decimal zero rather than null.
+        billPlan = {
+          kind: "rows",
+          rows: [
+            paidRow({
+              sku,
+              quantity: "40",
+              amount: "0.000000000000",
+              currency: "USD",
+            }),
+          ],
+        };
+
+        const result = await pull({ readPaidGenieBill: true });
+        const events = billEvents(result);
+
+        expect(events).toHaveLength(1);
+        const event = events[0]!;
+        expect(event.extra?.quantity).toBe("40");
+        expect(event.cost_usd).toBeUndefined();
+        expect(event.cost_amount).toBeUndefined();
+        expect(hintOf(event)).not.toHaveProperty("costUsd");
+        expect(JSON.stringify(event)).not.toContain("0.000000000000");
+      });
+    }
   });
 
   describe("when a person's day spans several surfaces and channels", () => {
@@ -417,8 +474,10 @@ describe("given a Genie source with the paid bill read switched on", () => {
         expect(billEvents(result)).toHaveLength(0);
         expect(result.errorCount).toBe(0);
         const cursor = cursorOf(result);
-        // Its own place: a fresh read that could not finish has none to move.
-        expect(cursor.paidBillReadThroughMs).toBeNull();
+        // Its own place: a fresh read that could not finish holds at the
+        // floor it started from, and writes that floor down.
+        expect(cursor.paidBillReadThroughMs).toBe(FIRST_RUN_FLOOR_MS);
+        expect(cursor.paidBillHeldSinceMs).not.toBeNull();
         // And the warehouse read's place is untouched by it: that read priced
         // its window whole, so the watermark moved and nothing is held.
         expect(cursor.sinceMs).toBeGreaterThan(Date.now() - HOUR_MS);
@@ -459,11 +518,7 @@ describe("given a Genie source with the paid bill read switched on", () => {
         cursor: first.cursor,
       });
 
-      const asked = billStatements();
-      expect(asked.length).toBeGreaterThan(0);
-      const from = (
-        asked[0]!.parameters as { name: string; value: string }[]
-      ).find((p) => p.name === "from_date")!.value;
+      const from = firstBillParameter("from_date");
       // Behind where it reached — a day's bill keeps landing after the day —
       // but not back at the start of history.
       expect(Date.parse(from)).toBeLessThanOrEqual(reachedMs);
@@ -471,6 +526,126 @@ describe("given a Genie source with the paid bill read switched on", () => {
       expect(cursorOf(second).paidBillReadThroughMs).toBeGreaterThanOrEqual(
         reachedMs,
       );
+    });
+  });
+
+  describe("when the bill is refused on every run", () => {
+    /** @scenario "A held paid Genie read keeps its floor across runs" */
+    it("keeps the floor it first held at instead of sliding it forward", async () => {
+      billPlan = { kind: "http", status: 403 };
+
+      const first = await pull({ readPaidGenieBill: true });
+      const firstCursor = cursorOf(first);
+      expect(firstCursor.paidBillReadThroughMs).toBe(FIRST_RUN_FLOOR_MS);
+      const heldSinceMs = firstCursor.paidBillHeldSinceMs!;
+      expect(heldSinceMs).not.toBeNull();
+
+      statementBodies = [];
+      const second = await pull({
+        readPaidGenieBill: true,
+        cursor: first.cursor,
+      });
+      const secondCursor = cursorOf(second);
+
+      // The same floor, and the same hold: neither the position nor the
+      // instant the hold began moved with the clock.
+      expect(secondCursor.paidBillReadThroughMs).toBe(FIRST_RUN_FLOOR_MS);
+      expect(secondCursor.paidBillHeldSinceMs).toBe(heldSinceMs);
+      // And the second run asked about the held period again, from at or
+      // before the floor — never from a floor that crept forward.
+      expect(Date.parse(firstBillParameter("from_date"))).toBeLessThanOrEqual(
+        FIRST_RUN_FLOOR_MS,
+      );
+      expect(billEvents(second)).toHaveLength(0);
+      expect(second.notices).toContain(PAID_GENIE_BILL_UNREADABLE);
+    });
+
+    /** @scenario "A held paid Genie read keeps its floor across runs" */
+    it("still reads a cursor written before the hold had a clock", async () => {
+      billPlan = { kind: "http", status: 403 };
+      const sinceMs = Date.now() - 3 * ONE_DAY_MS;
+      const cursor = JSON.stringify({
+        sinceMs,
+        spaceId: null,
+        conversationId: null,
+        sweepHadGap: false,
+        spaceSetFingerprint: null,
+        sweepOldestPendingMs: null,
+        sweepStartedAtMs: null,
+        costHeldSinceMs: null,
+        paidBillReadThroughMs: FIRST_RUN_FLOOR_MS,
+      });
+
+      const result = await pull({ readPaidGenieBill: true, cursor });
+      const next = cursorOf(result);
+
+      // Not restarted from the configured watermark: the old cursor parsed,
+      // the floor it carried is kept, and the hold starts its clock now.
+      expect(next.paidBillReadThroughMs).toBe(FIRST_RUN_FLOOR_MS);
+      expect(next.paidBillHeldSinceMs).toBeGreaterThan(Date.now() - HOUR_MS);
+      expect(next.sinceMs).toBeGreaterThanOrEqual(sinceMs);
+    });
+
+    /** @scenario "A paid Genie hold older than the limit moves on" */
+    it("moves past the window once the hold is older than the limit, recording nothing for it", async () => {
+      billPlan = { kind: "http", status: 403 };
+      const heldSinceMs = Date.now() - MAX_HOLD_MS - ONE_DAY_MS;
+      const held = await pull({ readPaidGenieBill: true });
+      const cursor = JSON.stringify({
+        ...cursorOf(held),
+        paidBillHeldSinceMs: heldSinceMs,
+      });
+
+      const result = await pull({ readPaidGenieBill: true, cursor });
+      const next = cursorOf(result);
+
+      // Moved on: the position is at the end of the window it asked about,
+      // and the hold is released so the next one ages from its own start.
+      const endOfTodayMs =
+        Math.floor(Date.now() / ONE_DAY_MS) * ONE_DAY_MS + ONE_DAY_MS;
+      expect(next.paidBillReadThroughMs).toBe(endOfTodayMs);
+      expect(next.paidBillHeldSinceMs).toBeNull();
+      // Nothing recorded for the span it gave up on — no row, so no zero.
+      expect(billEvents(result)).toHaveLength(0);
+      expect(JSON.stringify(result.events)).not.toContain("genie_bill");
+      // The refusal is still named in the run's result.
+      expect(result.notices).toContain(PAID_GENIE_BILL_UNREADABLE);
+      // And the warehouse read's hold is not the one that was aged.
+      expect(next.costHeldSinceMs).toBeNull();
+    });
+
+    /** @scenario "A paid Genie hold older than the limit moves on" */
+    it("keeps holding while the hold is younger than the limit", async () => {
+      billPlan = { kind: "http", status: 403 };
+      const heldSinceMs = Date.now() - MAX_HOLD_MS + ONE_DAY_MS;
+      const held = await pull({ readPaidGenieBill: true });
+      const cursor = JSON.stringify({
+        ...cursorOf(held),
+        paidBillHeldSinceMs: heldSinceMs,
+      });
+
+      const next = cursorOf(await pull({ readPaidGenieBill: true, cursor }));
+
+      expect(next.paidBillReadThroughMs).toBe(FIRST_RUN_FLOOR_MS);
+      expect(next.paidBillHeldSinceMs).toBe(heldSinceMs);
+    });
+
+    /** @scenario "A held paid Genie read keeps its floor across runs" */
+    it("releases the hold on the run the bill reads whole", async () => {
+      billPlan = { kind: "http", status: 403 };
+      const held = await pull({ readPaidGenieBill: true });
+      expect(cursorOf(held).paidBillHeldSinceMs).not.toBeNull();
+
+      billPlan = { kind: "rows", rows: [paidRow()] };
+      const result = await pull({
+        readPaidGenieBill: true,
+        cursor: held.cursor,
+      });
+      const next = cursorOf(result);
+
+      expect(billEvents(result)).toHaveLength(1);
+      expect(next.paidBillHeldSinceMs).toBeNull();
+      expect(next.paidBillReadThroughMs).toBeGreaterThan(FIRST_RUN_FLOOR_MS);
     });
   });
 
@@ -483,7 +658,10 @@ describe("given a Genie source with the paid bill read switched on", () => {
 
       expect(billStatements()).toHaveLength(0);
       expect(billEvents(result)).toHaveLength(0);
+      // No window was asked about, so there is no floor to write and no
+      // hold to age: the read starts fresh once a warehouse is named.
       expect(cursorOf(result).paidBillReadThroughMs).toBeNull();
+      expect(cursorOf(result).paidBillHeldSinceMs).toBeNull();
       expect(result.notices).toContain(PAID_GENIE_BILL_UNREADABLE);
     });
   });

@@ -417,8 +417,11 @@ Feature: Pulled provider usage becomes visible, attributed cost
     When the source runs
     Then the questions are still recorded, with no amount
     And the source keeps its place so the same period is asked about again
-    And the run reports that the bill could not be read
+    And the run's result names that the bill could not be read
     And no question is recorded at zero
+    # "Names" in its result, as data the run hands back: nothing downstream
+    # reads that code yet, so no screen and no person sees it. The log line
+    # beside it is where a reader finds out today.
     # Held the same way an answer cut short or timed out is held, and bounded
     # by the same hold: a bill refused for longer than the hold allows lets
     # the source move on, and the questions it leaves behind stay unpriced.
@@ -455,8 +458,12 @@ Feature: Pulled provider usage becomes visible, attributed cost
     When the source runs
     Then the row is recorded with its usage quantity
     And the row carries no amount
+    And a price line published at zero counts as no list price
     # Free usage has no price, and no price is not zero. Inventing one would
-    # put a figure on the screen the bill cannot back.
+    # put a figure on the screen the bill cannot back. The day the provider
+    # lists the free line at zero, the bill's arithmetic yields a well-formed
+    # zero rather than nothing; that zero is stripped on the way in, so a row
+    # nobody was billed for never lands as a measured zero dollars.
 
   @unit
   Scenario: A paid Genie read that stops short holds its place and lands nothing
@@ -469,6 +476,32 @@ Feature: Pulled provider usage becomes visible, attributed cost
     # Two reads, two positions. The warehouse allocation and the bill line
     # answer on different tables and fail independently, so one holding must
     # never pin or free the other.
+
+  @unit
+  Scenario: A held paid Genie read keeps its floor across runs
+    Given a Genie source with the paid bill read switched on and no configured start
+    And the bill is refused on its first run and again on the next
+    When the source runs twice
+    Then the paid bill read holds at the same floor both times
+    And the second run asks about the held period again from that floor
+    And the hold is released on the first run that reads the bill whole
+    # A first read with no configured start begins thirty days back, which is
+    # a different instant every run. A hold that wrote nothing down would
+    # begin a day later each day and quietly lose the day before it while
+    # claiming to hold. The floor is written on the held run so it stays put.
+
+  @unit
+  Scenario: A paid Genie hold older than the limit moves on
+    Given a Genie source whose paid bill has been refused for longer than the hold allows
+    When the source runs
+    Then the paid bill read moves past the window it was holding
+    And no row is recorded for that window, with no amount rather than zero
+    And the run's result still names that the bill could not be read
+    And the warehouse read's hold is not the one that was aged
+    # The same limit the warehouse read holds for. A workspace that refuses
+    # the billing tables every run would otherwise re-ask the same window
+    # forever; once the hold runs out the source moves on, the rows for that
+    # span stay unrecorded, and the next hold ages from its own start.
 
   @unit
   Scenario: Surface and channel are labels and do not split a person's day
