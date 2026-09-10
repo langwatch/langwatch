@@ -22,8 +22,7 @@
 
 import { HandledError } from "@langwatch/handled-error";
 import type { AgentAdapter } from "@langwatch/scenario";
-import * as ScenarioRunner from "@langwatch/scenario";
-import { AgentRole } from "@langwatch/scenario";
+import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
@@ -125,9 +124,7 @@ type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
  * everything else the SDK adapter carries.
  */
 const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
-  const sdk = ScenarioRunner.voice.twilioAgent(
-    options,
-  ) as unknown as SdkTwilioAdapter;
+  const sdk = scenarioVoice.twilioAgent(options) as unknown as SdkTwilioAdapter;
   const originalPlaceCall = sdk.placeCall.bind(sdk);
   const adapter = sdk as unknown as TwilioAdapterLike;
   // Translate our `shouldRecord` to the SDK's published `record` option; this

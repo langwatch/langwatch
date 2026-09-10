@@ -44,6 +44,15 @@ const TARGET = "+14155559999";
 /** The connect() a runner exposes on the SDK adapter it returns. */
 type Connectable = { connect: () => Promise<void> };
 
+/** The vendor SDK's own `placeCall` argument shape: `shouldRecord` swapped for
+ *  the SDK's published `record`, mirroring the (unexported) `SdkTwilioAdapter`
+ *  translation in phone.transport.ts. Derived from the exported
+ *  `TwilioAdapterLike` so it tracks that type instead of duplicating it. */
+type SdkPlaceCallArgs = Omit<
+  Parameters<TwilioAdapterLike["placeCall"]>[0],
+  "shouldRecord"
+> & { record?: boolean };
+
 interface FakeAdapter extends TwilioAdapterLike {
   readonly placeCallArgs: Array<Parameters<TwilioAdapterLike["placeCall"]>[0]>;
   readonly disconnectCount: () => number;
@@ -381,7 +390,7 @@ describe("phoneTransport", () => {
 
       /** @scenario "The default phone factory translates shouldRecord to the SDK's record option" */
       it("translates shouldRecord to the SDK's record option on placeCall, without leaking shouldRecord through", async () => {
-        const placeCall = vi.fn(async () => {});
+        const placeCall = vi.fn(async (_args: SdkPlaceCallArgs) => {});
         const sdkAdapter = {
           role: AgentRole.AGENT,
           connect: vi.fn(async () => {}),
@@ -399,7 +408,7 @@ describe("phoneTransport", () => {
         await (built as unknown as Connectable).connect();
 
         expect(placeCall).toHaveBeenCalledTimes(1);
-        const call = placeCall.mock.calls[0]?.[0] as Record<string, unknown>;
+        const call = placeCall.mock.calls[0]?.[0];
         expect(call).toMatchObject({
           to: TARGET,
           attachStream: "a-leg",

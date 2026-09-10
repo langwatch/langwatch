@@ -71,7 +71,7 @@ Feature: Voice agents: reach an agent by phone
 
   @unit
   Scenario: The default phone factory translates shouldRecord to the SDK's record option
-    Given a phone target configured with shouldRecord for the call
+    Given a phone runner that requests recording for the call
     When the runner places the call through the default Twilio agent factory
     Then the SDK receives a record option carrying that value
     And the SDK never receives a shouldRecord option
