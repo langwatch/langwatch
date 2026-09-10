@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
 import {
+  type PriorSessionRow,
   PriorSessionService,
   sessionTokenFromCookieValue,
 } from "../prior-session.service";
@@ -15,21 +15,29 @@ type SessionRow = {
 };
 
 /**
- * One row keyed by token, which is the only read the service makes. Returning
- * `undefined` for an unknown token is what Prisma's `findUnique` does, and the
- * service must treat it the same as a revoked one.
+ * One row keyed by token, which is the only read the service makes. Answering
+ * `null` for an unknown token is what the repository does for a token with no
+ * row, and the service must treat it the same as a revoked one.
+ *
+ * Rows are still declared in Prisma's nested shape, because that is what the
+ * repository reads; flattening them here is the repository's job and doing it
+ * in the fixture is what keeps the two in step.
  */
 function harness(rows: Record<string, SessionRow> = {}) {
   const asked: string[] = [];
-  const prisma = {
-    session: {
-      findUnique: async ({ where }: { where: { sessionToken: string } }) => {
-        asked.push(where.sessionToken);
-        return rows[where.sessionToken] ?? null;
-      },
+  const repository = {
+    findByToken: async ({
+      token,
+    }: {
+      token: string;
+    }): Promise<PriorSessionRow | null> => {
+      asked.push(token);
+      const row = rows[token];
+      if (!row) return null;
+      return { expires: row.expires, email: row.user?.email ?? null };
     },
-  } as unknown as PrismaClient;
-  const service = new PriorSessionService({ prisma, now: () => NOW });
+  };
+  const service = new PriorSessionService({ repository, now: () => NOW });
   return { service, asked };
 }
 

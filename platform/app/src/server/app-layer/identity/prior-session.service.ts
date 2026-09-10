@@ -38,7 +38,6 @@
  * that caller already holds. There is no address to pass in and therefore no
  * question to ask about somebody else's.
  */
-import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
  * What the sign-in screen is told.
@@ -73,8 +72,24 @@ export function sessionTokenFromCookieValue(
   return token && token.length > 0 ? token : null;
 }
 
+/**
+ * A session as this decision needs it: when it stopped being usable, and the
+ * address to greet. Flat rather than Prisma's nesting, so the rule below reads
+ * as a rule rather than as a shape.
+ */
+export interface PriorSessionRow {
+  expires: Date;
+  /** Null when the account went after the session did — nobody to greet. */
+  email: string | null;
+}
+
+/** The one read this makes. ADR-129 keeps the query itself one tier down. */
+export interface PriorSessionRepository {
+  findByToken(input: { token: string }): Promise<PriorSessionRow | null>;
+}
+
 export interface PriorSessionServiceDeps {
-  prisma: PrismaClient;
+  repository: PriorSessionRepository;
   /** Wall-clock, injected so a test can sit either side of `expires`. */
   now: () => Date;
 }
@@ -97,10 +112,7 @@ export class PriorSessionService {
     const token = sessionTokenFromCookieValue(sessionCookie);
     if (!token) return UNKNOWN;
 
-    const session = await this.deps.prisma.session.findUnique({
-      where: { sessionToken: token },
-      select: { expires: true, user: { select: { email: true } } },
-    });
+    const session = await this.deps.repository.findByToken({ token });
 
     // No row: either revoked, or a token we never issued. Both answer the same
     // thing, deliberately — see the class docblock. Nothing distinguishes them
@@ -114,7 +126,7 @@ export class PriorSessionService {
     if (session.expires > this.deps.now()) return UNKNOWN;
 
     // The account went after the session did. There is nobody to greet.
-    const email = session.user?.email;
+    const email = session.email;
     if (!email) return UNKNOWN;
 
     return { kind: "expired", email };

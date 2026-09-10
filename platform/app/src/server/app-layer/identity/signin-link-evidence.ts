@@ -6,7 +6,6 @@ import {
 import { linkRefusalFor } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
 
 const logger = createLogger("langwatch:identity:signin-link-evidence");
 
@@ -20,8 +19,23 @@ const assertedClaimsSchema = z.object({
   email_verified: z.boolean().optional(),
 });
 
+/**
+ * The account a provider wants to attach to, as the rule needs it: whether
+ * its own address was ever confirmed, and how many sign-in methods it already
+ * holds.
+ */
+export interface SignInLinkCandidate {
+  holdsVerifiedEmail: boolean;
+  attachedAccounts: number;
+}
+
+/** The reads this guard makes. ADR-129 keeps the queries one tier down. */
+export interface SignInLinkEvidenceRepository {
+  findCandidate(input: { userId: string }): Promise<SignInLinkCandidate | null>;
+}
+
 export interface SignInLinkEvidenceDeps {
-  prisma: PrismaClient;
+  repository: SignInLinkEvidenceRepository;
   /** The identity write surface, resolved per call like every ledger user. */
   proposeLink: (input: {
     tenantId: string;
@@ -96,15 +110,9 @@ export class SignInLinkEvidence {
     const asserted = assertedAddress(idToken);
     if (!asserted) return null;
 
-    const [user, existingAccounts] = await Promise.all([
-      this.deps.prisma.user.findUnique({
-        where: { id: userId },
-        select: { emailVerified: true },
-      }),
-      this.deps.prisma.account.count({ where: { userId } }),
-    ]);
+    const candidate = await this.deps.repository.findCandidate({ userId });
     // Nobody to link onto, or nothing already linked: see the header.
-    if (!user || existingAccounts === 0) return null;
+    if (!candidate || candidate.attachedAccounts === 0) return null;
 
     const reason = linkRefusalFor({
       assertion: {
@@ -118,7 +126,7 @@ export class SignInLinkEvidence {
       candidates: [
         {
           userId,
-          holdsVerifiedEmail: user.emailVerified,
+          holdsVerifiedEmail: candidate.holdsVerifiedEmail,
           identifierDomains: [],
         },
       ],

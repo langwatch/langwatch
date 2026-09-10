@@ -1,6 +1,5 @@
 /** @vitest-environment node */
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
 import { SignInLinkEvidence } from "../signin-link-evidence";
 
 /**
@@ -28,15 +27,17 @@ const evidenceOver = ({
   accountCount: number;
   proposeLink?: ReturnType<typeof vi.fn>;
 }) => {
-  const prisma = {
-    user: { findUnique: vi.fn().mockResolvedValue({ emailVerified }) },
-    account: { count: vi.fn().mockResolvedValue(accountCount) },
-  } as unknown as PrismaClient;
+  const repository = {
+    findCandidate: vi.fn().mockResolvedValue({
+      holdsVerifiedEmail: emailVerified,
+      attachedAccounts: accountCount,
+    }),
+  };
 
   return {
     proposeLink,
     evidence: new SignInLinkEvidence({
-      prisma,
+      repository,
       proposeLink: proposeLink as never,
       now: () => 1_700_000_000_000,
       newCommandId: () => "idcmd_test",

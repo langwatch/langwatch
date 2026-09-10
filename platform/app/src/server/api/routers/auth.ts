@@ -2,12 +2,10 @@ import { createHash } from "node:crypto";
 import { normalizeIdentifierValue } from "@langwatch/identity";
 import { getSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
-import {
-  type PriorSession,
-  PriorSessionService,
-} from "~/server/app-layer/identity/prior-session.service";
+import type { PriorSession } from "~/server/app-layer/identity/prior-session.service";
 import {
   localSignUpDecision,
+  priorSession,
   signInRouter,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
@@ -462,9 +460,8 @@ export const authRouter = createTRPCRouter({
         cookieHeader ? { cookie: String(cookieHeader) } : {},
       );
 
-      return await new PriorSessionService({
-        prisma: ctx.prisma,
-        now: () => new Date(),
-      }).explain({ sessionCookie: getSessionCookie(headers) });
+      return await priorSession().explain({
+        sessionCookie: getSessionCookie(headers),
+      });
     }),
 });
