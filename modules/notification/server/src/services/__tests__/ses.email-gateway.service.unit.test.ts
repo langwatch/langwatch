@@ -15,7 +15,7 @@ vi.mock("@aws-sdk/client-ses", () => ({
   },
 }));
 
-import { SesEmailGatewayAdapter } from "../ses.email-gateway.adapter.ts";
+import { SesEmailGatewayAdapter } from "../ses.email-gateway.service.ts";
 
 /**
  * Spec: modules/notification/specs/packaged-mail-delivery.feature

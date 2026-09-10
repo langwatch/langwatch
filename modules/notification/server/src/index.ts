@@ -1,12 +1,12 @@
-export { EmailDeliveryAdapter } from "./adapters/email-delivery.adapter.ts";
+export { EmailDeliveryAdapter } from "./services/email-delivery.service.ts";
 export { notificationServer } from "./notification.server.ts";
-export { ResendEmailGatewayAdapter } from "./adapters/resend.email-gateway.adapter.ts";
-export { SendgridEmailGatewayAdapter } from "./adapters/sendgrid.email-gateway.adapter.ts";
+export { ResendEmailGatewayAdapter } from "./services/resend.email-gateway.service.ts";
+export { SendgridEmailGatewayAdapter } from "./services/sendgrid.email-gateway.service.ts";
 export {
   SesEmailGatewayAdapter,
   type SesAwsClientConfiguration,
-} from "./adapters/ses.email-gateway.adapter.ts";
-export { SmtpEmailGatewayAdapter } from "./adapters/smtp.email-gateway.adapter.ts";
+} from "./services/ses.email-gateway.service.ts";
+export { SmtpEmailGatewayAdapter } from "./services/smtp.email-gateway.service.ts";
 export {
   EMAIL_PROVIDER_NAMES,
   EmailDeliveryPort,
@@ -17,7 +17,7 @@ export {
   type EmailOutboundProxyConfig,
   type EmailProviderName,
   type MailerConfiguration,
-} from "./ports/email-delivery.port.ts";
+} from "./services/email-gateway.service.ts";
 export { EmailMimeService } from "./services/email-mime.service.ts";
 export { EmailProviderService } from "./services/email-provider.service.ts";
 export { RedisTenantBroadcastRepository as RedisTenantBroadcastAdapter } from "./repositories/redis/redis.tenant-broadcast.repository.ts";
@@ -27,4 +27,4 @@ export {
   TenantBroadcastPublisherPort,
   type TenantBroadcastEventType,
   type TenantBroadcastMessage,
-} from "./ports/tenant-broadcast.port.ts";
+} from "./repositories/tenant-broadcast.repository.ts";

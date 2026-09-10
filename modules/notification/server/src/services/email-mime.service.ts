@@ -1,4 +1,4 @@
-import type { EmailAttachment } from "../ports/email-delivery.port.ts";
+import type { EmailAttachment } from "./email-gateway.service.ts";
 import { nowInstant } from "@langwatch/time";
 
 /** Maximum bytes one RFC 2047 encoded-word can carry.

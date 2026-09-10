@@ -8,8 +8,8 @@ const { close, createTransport, sendMail } = vi.hoisted(() => ({
 
 vi.mock("nodemailer", () => ({ default: { createTransport } }));
 
-import { EmailProviderConfigurationError } from "../../ports/email-delivery.port.ts";
-import { SmtpEmailGatewayAdapter } from "../smtp.email-gateway.adapter.ts";
+import { EmailProviderConfigurationError } from "../email-gateway.service.ts";
+import { SmtpEmailGatewayAdapter } from "../smtp.email-gateway.service.ts";
 
 /**
  * Spec: modules/notification/specs/packaged-mail-delivery.feature

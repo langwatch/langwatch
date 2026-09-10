@@ -7,7 +7,7 @@ const { EnvHttpProxyAgent, fetch } = vi.hoisted(() => ({
 
 vi.mock("undici", () => ({ EnvHttpProxyAgent, fetch }));
 
-import { ResendEmailGatewayAdapter } from "../resend.email-gateway.adapter.ts";
+import { ResendEmailGatewayAdapter } from "../resend.email-gateway.service.ts";
 
 /**
  * Spec: modules/notification/specs/packaged-mail-delivery.feature

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MailerConfiguration } from "../../ports/email-delivery.port.ts";
+import type { MailerConfiguration } from "../email-gateway.service.ts";
 import { EmailProviderService } from "../email-provider.service.ts";
 
 /**
