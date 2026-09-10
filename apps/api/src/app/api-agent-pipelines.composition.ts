@@ -12,7 +12,7 @@ import {
 } from "@langwatch/langy-server";
 import {
   SimulationProcessingProducerAdapter,
-  SimulationExecutionRepository,
+  SimulationExecutionPort,
 } from "@langwatch/scenario-server";
 import type {
   SimulationCancelRun,
@@ -85,7 +85,7 @@ export type ApiAgentPipelinesOptions = Readonly<{
 /** The agent-side write surfaces, as this process produces them. */
 export type ApiAgentPipelines = Readonly<{
   /** The eight simulation writes, as the scenario application dispatches them. */
-  simulations: SimulationExecutionRepository;
+  simulations: SimulationExecutionPort;
   /** The two writes a suite run is started and fanned out by. */
   suiteRuns: SuiteRunCommandsPort;
   /** All sixteen conversation writes. */
@@ -171,7 +171,7 @@ function commandLookup(input: {
 // ---------------------------------------------------------------------------
 
 /** The eight simulation writes, on this process's own registration. */
-class EventingApiSimulationExecution extends SimulationExecutionRepository {
+class EventingApiSimulationExecution extends SimulationExecutionPort {
   private readonly dispatch: Record<string, Dispatch>;
 
   constructor(command: (name: string) => Dispatch) {
@@ -232,7 +232,7 @@ const SIMULATION_COMMAND_NAMES = [
 ] as const;
 
 /** The nine simulation writes, refused by name where there is no queue. */
-class UnqueuedApiSimulationExecution extends SimulationExecutionRepository {
+class UnqueuedApiSimulationExecution extends SimulationExecutionPort {
   queueRun(): Promise<void> {
     return this.refuse();
   }
