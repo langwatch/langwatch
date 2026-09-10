@@ -17,7 +17,10 @@ import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwat
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { bindTenantDirectoryReader } from "@langwatch/organization-server";
+import {
+  bindTenantDirectoryReader,
+  verifyInstanceAdminKey,
+} from "@langwatch/organization-server";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { Hono } from "hono";
@@ -2333,6 +2336,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       routeAuthorization: (input) => handlerManagedCredentials.authorizeOrganizationRoute(input),
       errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
       ...(packaged.ports.dualAuth ? { dualCredential: packaged.ports.dualAuth } : {}),
+      // The instance administrator bearer the organizations door answers behind.
+      instanceAdminCredential: verifyInstanceAdminKey({
+        instanceAdminKey: packaged.ports.instanceAdminKey,
+        isSaas: packaged.ports.isSaas,
+      }),
       // The SAME application the three SCIM families answer from: the bearer a
       // door accepts and the tenant a route then provisions cannot be resolved
       // by two objects.
