@@ -103,6 +103,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",

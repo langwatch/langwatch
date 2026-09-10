@@ -46,10 +46,10 @@
       "types": "./dist/ui/sections/use-filter-params.d.ts",
       "default": "./src/ui/sections/use-filter-params.ts"
     },
-    "./screens/analytics": {
-      "langwatch-declaration-source": "./src/screens/analytics/index.ts",
-      "types": "./dist/screens/analytics/index.d.ts",
-      "default": "./src/screens/analytics/index.ts"
+    "./analytics": {
+      "langwatch-declaration-source": "./src/analytics.ts",
+      "types": "./dist/analytics.d.ts",
+      "default": "./src/analytics.ts"
     },
     "./surfaces/analytics-host": {
       "langwatch-declaration-source": "./src/model/analytics-host.ts",

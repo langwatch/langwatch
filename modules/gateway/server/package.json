@@ -80,18 +80,6 @@
       "types": "./dist/projections/gateway-spend.projection.d.ts",
       "default": "./src/projections/gateway-spend.projection.ts"
     },
-    "./api-trpc/gateway-budget": {
-      "types": "./dist/transport/api-trpc/gateway-budget.api.d.ts",
-      "default": "./src/transport/api-trpc/gateway-budget.api.ts"
-    },
-    "./api-trpc/gateway-cache-rule": {
-      "types": "./dist/transport/api-trpc/gateway-cache-rule.api.d.ts",
-      "default": "./src/transport/api-trpc/gateway-cache-rule.api.ts"
-    },
-    "./api-trpc/gateway-guardrail": {
-      "types": "./dist/transport/api-trpc/gateway-guardrail.api.d.ts",
-      "default": "./src/transport/api-trpc/gateway-guardrail.api.ts"
-    },
     "./api-trpc/gateway-spend-event": {
       "types": "./dist/transport/api-trpc/gateway-spend-event.api.d.ts",
       "default": "./src/transport/api-trpc/gateway-spend-event.api.ts"
