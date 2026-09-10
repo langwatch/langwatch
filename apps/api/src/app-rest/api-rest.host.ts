@@ -36,7 +36,6 @@ import type {
 import { canonicalErrorResponse } from "../app/api-canonical-error.ts";
 import { ApiRestCredentials } from "./api-rest.credentials.ts";
 import {
-  ApiRestCredentialRefusal,
   ApiRestDoorUnconfiguredError,
   ApiRestDoorUnverifiedError,
 } from "./api-rest.refusals.ts";
@@ -136,7 +135,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
       doors,
     }).mount(rest, {
       app,
-      onError: renderRefusal(familyErrors),
+      onError: familyErrors,
       facts: [
         ...(door === "project" ? [this.projectFacts()] : []),
         ...((options?.facts ?? []) as readonly RestTransportMiddlewareBinding[]),
@@ -210,15 +209,8 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   /** Every project-scoped family: the key is resolved once, and refused once. */
   private projectDoor(): RestIdentity {
     return {
-      authenticate: async ({ request, permission }): Promise<RestCaller> => {
-        const credential = await this.credentials.authenticate({ request, permission });
-        if (!credential.ok) {
-          throw new ApiRestCredentialRefusal(credential.status, credential.body);
-        }
-        this.projectCredentials.set(request, credential.resolved);
-
-        return this.projectCaller(request, credential);
-      },
+      authenticate: async ({ request, permission }): Promise<RestCaller> =>
+        this.projectCaller(request, await this.credentials.authenticate({ request, permission })),
       // A route that answers any authenticated caller asks the door for no
       // permission, so there is nothing to enforce as the key's ceiling.
       identify: async ({ request }): Promise<RestCaller> =>
@@ -227,20 +219,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   }
 
   /** What the project door answers with, and where its credential is kept. */
-  private projectCaller(
-    request: Request,
-    credential:
-      | Readonly<{
-          ok: true;
-          project: Readonly<{ id: string }>;
-          resolved: ResolvedApiKeyCredential;
-          markUsed: () => void;
-        }>
-      | Readonly<{ ok: false; status: number; body: object }>,
-  ): RestCaller {
-    if (!credential.ok) {
-      throw new ApiRestCredentialRefusal(credential.status as 401, credential.body);
-    }
+  private projectCaller(request: Request, credential: ApiProjectCredential): RestCaller {
     this.projectCredentials.set(request, credential.resolved);
 
     return {
@@ -378,15 +357,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
    * What the organization door answers with, and where the credential behind a
    * second permission question is kept.
    */
-  private organizationCaller(
-    credential:
-      | Readonly<{ ok: true; resolved: ResolvedOrganizationApiKeyToken; markUsed: () => void }>
-      | Readonly<{ ok: false; status: number; body: object }>,
-  ): RestCaller {
-    if (!credential.ok) {
-      throw new ApiRestCredentialRefusal(credential.status as 401, credential.body);
-    }
-
+  private organizationCaller(credential: ApiOrganizationCredential): RestCaller {
     const caller: RestCaller = {
       actor: credential.resolved.userId ? { type: "user", id: credential.resolved.userId } : null,
       scope: { tier: "organization", id: credential.resolved.organizationId },
@@ -398,13 +369,8 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   }
 }
 
-function refusalFor(door: string): ApiRestCredentialRefusal {
-  const error = new ApiRestDoorUnverifiedError(door);
-  return new ApiRestCredentialRefusal(401, {
-    error: error.code,
-    message: error.message,
-    ...error.meta,
-  });
+function refusalFor(door: string): ApiRestDoorUnverifiedError {
+  return new ApiRestDoorUnverifiedError(door);
 }
 
 /**
@@ -416,15 +382,6 @@ function doorOf(declaration: RestTransportDeclaration<unknown>): ApiRestDoor {
   return declaration.routes.every((route) => route.access?.kind === "public")
     ? "public"
     : declaration.credential;
-}
-
-/** The door's own refusal keeps its body; everything else is the family's. */
-function renderRefusal(boundary: RestErrorHandler): RestErrorHandler {
-  return (error, context) => {
-    if (error instanceof ApiRestCredentialRefusal) return context.json(error.body, error.status);
-
-    return boundary(error, context);
-  };
 }
 
 /** The envelope a family that names none of its own answers a refusal in. */

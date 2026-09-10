@@ -7,7 +7,6 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 /**
  * The sentence an unauthenticated caller of a project family receives. It
@@ -18,6 +17,30 @@ export const MISSING_PROJECT_CREDENTIAL_MESSAGE =
   "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";
 
 export const INVALID_PROJECT_CREDENTIAL_MESSAGE = "Invalid auth token.";
+
+/** No credential at all reached a project door. */
+export class ApiProjectMissingCredentialsError extends HandledError {
+  declare readonly code: "missing_credentials";
+
+  constructor() {
+    super("missing_credentials", MISSING_PROJECT_CREDENTIAL_MESSAGE, {
+      httpStatus: 401,
+      fault: "customer",
+    });
+  }
+}
+
+/** The token reached a project door and stands for nothing this deployment knows. */
+export class ApiProjectInvalidCredentialsError extends HandledError {
+  declare readonly code: "invalid_credentials";
+
+  constructor() {
+    super("invalid_credentials", INVALID_PROJECT_CREDENTIAL_MESSAGE, {
+      httpStatus: 401,
+      fault: "customer",
+    });
+  }
+}
 
 /** No credential at all reached an organization door. */
 export class ApiOrganizationMissingCredentialsError extends HandledError {
@@ -106,20 +129,6 @@ export class ApiRestDoorUnverifiedError extends HandledError {
   }
 }
 
-/**
- * A credential the door would not accept, carrying the status and the body the
- * credential chain itself wrote. ONE class for every family: the refusal is the
- * DOOR's answer, and a family rendering its own would be a copy of it.
- */
-export class ApiRestCredentialRefusal extends Error {
-  constructor(
-    readonly status: ContentfulStatusCode,
-    readonly body: object,
-  ) {
-    super("REST request refused at the door");
-    this.name = "ApiRestCredentialRefusal";
-  }
-}
 
 /**
  * A door whose secret this deployment did not configure. 404 rather than 401:

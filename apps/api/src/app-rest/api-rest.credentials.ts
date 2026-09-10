@@ -13,15 +13,14 @@ import {
   type ResolvedOrganizationApiKeyToken,
 } from "@langwatch/api-key-contract";
 import type { AuthzApi, AuthzPermission, PermissionDecision } from "@langwatch/authz-contract";
-import type { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { canonicalErrorFor } from "../app/api-canonical-error.ts";
 import { apiKeyCeilingRefusal } from "../app/api-key-ceiling-refusal.ts";
 import { extractApiKeyRequestCredentials } from "../app/api-key-request-credentials.ts";
 import {
+  ApiProjectInvalidCredentialsError,
+  ApiProjectMissingCredentialsError,
   ApiOrganizationAuthenticationUnavailableError,
   ApiOrganizationCredentialClassMismatchError,
   ApiOrganizationInvalidCredentialsError,
@@ -32,24 +31,25 @@ import {
   MISSING_PROJECT_CREDENTIAL_MESSAGE,
 } from "./api-rest.refusals.ts";
 
-/** What a resolved project credential gives a door, or what a refused one answers. */
-export type ApiProjectCredential =
-  | Readonly<{
-      ok: true;
-      project: ResolvedApiKeyCredential["project"];
-      resolved: ResolvedApiKeyCredential;
-      markUsed: () => void;
-    }>
-  | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
+/**
+ * What a resolved project credential gives a door.
+ *
+ * There is no refused shape: a door that will not accept a credential throws
+ * the `HandledError` naming why, and the REST boundary renders it. A result
+ * object here would carry a status and a body the boundary never sees, so the
+ * caller would receive a message with no `code` to branch on.
+ */
+export type ApiProjectCredential = Readonly<{
+  project: ResolvedApiKeyCredential["project"];
+  resolved: ResolvedApiKeyCredential;
+  markUsed: () => void;
+}>;
 
 /** The same, for the organization door, which names no project. */
-export type ApiOrganizationCredential =
-  | Readonly<{
-      ok: true;
-      resolved: ResolvedOrganizationApiKeyToken;
-      markUsed: () => void;
-    }>
-  | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
+export type ApiOrganizationCredential = Readonly<{
+  resolved: ResolvedOrganizationApiKeyToken;
+  markUsed: () => void;
+}>;
 
 /** The peer Apps the two credential chains read. */
 export type ApiRestCredentialPeers = Readonly<{
@@ -85,29 +85,17 @@ export class ApiRestCredentials {
     permission: AuthzPermission;
   }): Promise<ApiProjectCredential> {
     const credentials = extractApiKeyRequestCredentials(input.request);
-    if (!credentials) {
-      return { ok: false, status: 401, body: { message: MISSING_PROJECT_CREDENTIAL_MESSAGE } };
-    }
+    if (!credentials) throw new ApiProjectMissingCredentialsError();
 
     const resolved = await this.apiKeys.findResolvedToken(credentials);
-    if (!resolved) {
-      return { ok: false, status: 401, body: { message: INVALID_PROJECT_CREDENTIAL_MESSAGE } };
-    }
+    if (!resolved) throw new ApiProjectInvalidCredentialsError();
 
     if (resolved.type === "apiKey") {
       const allowed = await this.isWithinCeiling({ resolved, permission: input.permission });
-      if (!allowed) {
-        const refusal = apiKeyCeilingRefusal(resolved, input.permission, this.logger);
-        return {
-          ok: false,
-          status: refusal.httpStatus as ContentfulStatusCode,
-          body: canonicalErrorFor(refusal).body,
-        };
-      }
+      if (!allowed) throw apiKeyCeilingRefusal(resolved, input.permission, this.logger);
     }
 
     return {
-      ok: true,
       project: resolved.project,
       resolved,
       markUsed: () => {
@@ -123,17 +111,12 @@ export class ApiRestCredentials {
    */
   async identify(input: { request: Request }): Promise<ApiProjectCredential> {
     const credentials = extractApiKeyRequestCredentials(input.request);
-    if (!credentials) {
-      return { ok: false, status: 401, body: { message: MISSING_PROJECT_CREDENTIAL_MESSAGE } };
-    }
+    if (!credentials) throw new ApiProjectMissingCredentialsError();
 
     const resolved = await this.apiKeys.findResolvedToken(credentials);
-    if (!resolved) {
-      return { ok: false, status: 401, body: { message: INVALID_PROJECT_CREDENTIAL_MESSAGE } };
-    }
+    if (!resolved) throw new ApiProjectInvalidCredentialsError();
 
     return {
-      ok: true,
       project: resolved.project,
       resolved,
       markUsed: () => {
@@ -152,8 +135,6 @@ export class ApiRestCredentials {
     permission: AuthzPermission;
   }): Promise<ApiOrganizationCredential> {
     const identified = await this.identifyOrganization(input);
-    if (!identified.ok) return identified;
-
     const resolved = identified.resolved;
     const allowed = await this.authz.hasApiKeyPermission({
       apiKeyId: resolved.apiKeyId,
@@ -162,7 +143,7 @@ export class ApiRestCredentials {
       scope: { type: "org", id: resolved.organizationId },
       permission: input.permission,
     });
-    if (!allowed) return refusal(new ApiOrganizationPermissionError(input.permission));
+    if (!allowed) throw new ApiOrganizationPermissionError(input.permission);
 
     return identified;
   }
@@ -174,17 +155,12 @@ export class ApiRestCredentials {
    */
   async identifyOrganization(input: { request: Request }): Promise<ApiOrganizationCredential> {
     const credentials = extractApiKeyRequestCredentials(input.request);
-    if (!credentials) return refusal(new ApiOrganizationMissingCredentialsError());
+    if (!credentials) throw new ApiOrganizationMissingCredentialsError();
 
-    const resolution = await this.resolveOrganization(credentials.token);
-    if (!resolution.ok) return refusal(resolution.error);
-
-    const resolved = resolution.resolved;
-    const known = await this.organizationExists(resolved.organizationId);
-    if (!known.ok) return refusal(known.error);
+    const resolved = await this.resolveOrganization(credentials.token);
+    await this.assertOrganizationExists(resolved.organizationId);
 
     return {
-      ok: true,
       resolved,
       markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
     };
@@ -215,28 +191,19 @@ export class ApiRestCredentials {
   }
 
   /** The organization credential the token stands for, or the refusal it earns. */
-  private async resolveOrganization(
-    token: string,
-  ): Promise<
-    | Readonly<{ ok: true; resolved: ResolvedOrganizationApiKeyToken }>
-    | Readonly<{ ok: false; error: HandledError }>
-  > {
+  private async resolveOrganization(token: string): Promise<ResolvedOrganizationApiKeyToken> {
+    let resolution;
     try {
-      const resolution = await this.apiKeys.resolveOrganizationToken({ token });
-      if (resolution.ok) return { ok: true, resolved: resolution.resolved };
-
-      return {
-        ok: false,
-        error:
-          resolution.reason === "wrong_credential_class"
-            ? new ApiOrganizationCredentialClassMismatchError()
-            : new ApiOrganizationInvalidCredentialsError(),
-      };
+      resolution = await this.apiKeys.resolveOrganizationToken({ token });
     } catch (error) {
       this.logger.error({ error }, "Organization credential resolution failed");
-
-      return { ok: false, error: new ApiOrganizationAuthenticationUnavailableError() };
+      throw new ApiOrganizationAuthenticationUnavailableError();
     }
+
+    if (resolution.ok) return resolution.resolved;
+    throw resolution.reason === "wrong_credential_class"
+      ? new ApiOrganizationCredentialClassMismatchError()
+      : new ApiOrganizationInvalidCredentialsError();
   }
 
   /**
@@ -244,23 +211,18 @@ export class ApiRestCredentials {
    * failure is the lookup itself breaking, and the answer the caller receives
    * carries none of the cause, so it is logged here or lost.
    */
-  private async organizationExists(
-    organizationId: string,
-  ): Promise<Readonly<{ ok: true }> | Readonly<{ ok: false; error: HandledError }>> {
+  private async assertOrganizationExists(organizationId: string): Promise<void> {
     try {
       await this.organizations.getSettings({ organizationId });
-
-      return { ok: true };
     } catch (error) {
       if (error instanceof OrganizationNotFoundError) {
-        return { ok: false, error: new ApiOrganizationNotFoundForCredentialError() };
+        throw new ApiOrganizationNotFoundForCredentialError();
       }
       this.logger.error(
         { error, organizationId },
         "Organization lookup failed while authenticating an organization credential",
       );
-
-      return { ok: false, error: new ApiOrganizationAuthenticationUnavailableError() };
+      throw new ApiOrganizationAuthenticationUnavailableError();
     }
   }
 
@@ -279,11 +241,3 @@ export class ApiRestCredentials {
   }
 }
 
-/** One refused credential, in the canonical envelope this process writes. */
-function refusal(error: HandledError): ApiOrganizationCredential {
-  return {
-    ok: false,
-    status: error.httpStatus as ContentfulStatusCode,
-    body: canonicalErrorFor(error).body,
-  };
-}
