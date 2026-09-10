@@ -68,6 +68,8 @@ export {
 export {
   Auth0ApiError,
   Auth0PasswordService,
+  buildAuth0Config,
+  type Auth0Config,
   type Auth0ErrorCode,
   type Auth0ManagementCredentials,
 } from "./services/auth0-password.service.ts";

@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
 
 const logger = createLogger("langwatch:auth0:password");
 
@@ -44,38 +45,44 @@ export type Auth0ManagementCredentials = Readonly<{
   mgmtClientSecret: string | undefined;
 }>;
 
-/** The tenant, once every value it needs is present. */
-interface Auth0Config {
-  issuer: string;
-  mgmtClientId: string;
-  mgmtClientSecret: string;
-  audience: string;
-}
+const auth0ConfigSchema = z
+  .object({
+    issuer: z.string().min(1),
+    mgmtClientId: z.string().min(1),
+    mgmtClientSecret: z.string().min(1),
+  })
+  .transform(({ issuer, mgmtClientId, mgmtClientSecret }) => {
+    const trimmedIssuer = issuer.replace(/\/+$/, "");
+
+    return {
+      issuer: trimmedIssuer,
+      mgmtClientId,
+      mgmtClientSecret,
+      audience: `${trimmedIssuer}/api/v2/`,
+    };
+  });
+
+/** The tenant, once every value it needs is present. Built once by the composition root. */
+export type Auth0Config = z.infer<typeof auth0ConfigSchema>;
 
 /**
- * Validates the deployment's credentials, or refuses by name.
+ * Validates the deployment's credentials, or refuses by name. Called once where the
+ * credentials are read (composition root), not by the service on every call.
  */
-function loadConfig(credentials: Auth0ManagementCredentials): Auth0Config {
-  const { issuer, mgmtClientId, mgmtClientSecret } = credentials;
-  if (!issuer || !mgmtClientId || !mgmtClientSecret) {
+export function buildAuth0Config(credentials: Auth0ManagementCredentials): Auth0Config {
+  const parsed = auth0ConfigSchema.safeParse(credentials);
+  if (!parsed.success) {
     throw new Auth0ApiError({
       status: 500,
       code: "not_configured",
       message:
         "Auth0 environment variables are not set. Set AUTH0_ISSUER and either " +
-        "AUTH0_MGMT_CLIENT_ID/SECRET (preferred — a separate Machine-to-Machine app) " +
+        "AUTH0_MGMT_CLIENT_ID/SECRET (preferred - a separate Machine-to-Machine app) " +
         "or AUTH0_CLIENT_ID/SECRET.",
     });
   }
 
-  const trimmedIssuer = issuer.replace(/\/+$/, "");
-
-  return {
-    issuer: trimmedIssuer,
-    mgmtClientId,
-    mgmtClientSecret,
-    audience: `${trimmedIssuer}/api/v2/`,
-  };
+  return parsed.data;
 }
 
 async function parseJsonSafe(res: Response): Promise<unknown> {
@@ -172,9 +179,7 @@ export class Auth0PasswordService {
   /**
    * Get a Management API access token via client_credentials grant.
    */
-  static async getManagementApiToken(credentials: Auth0ManagementCredentials): Promise<string> {
-    const config = loadConfig(credentials);
-
+  static async getManagementApiToken(config: Auth0Config): Promise<string> {
     if (
       cachedToken &&
       cachedToken.clientId === config.mgmtClientId &&
@@ -236,13 +241,12 @@ export class Auth0PasswordService {
    * callers should surface a configuration error message to the operator.
    */
   static async updateUserPassword(args: {
-    credentials: Auth0ManagementCredentials;
+    config: Auth0Config;
     auth0UserId: string;
     newPassword: string;
     managementToken: string;
   }): Promise<void> {
-    const config = loadConfig(args.credentials);
-
+    const { config } = args;
     const url = `${config.issuer}/api/v2/users/${encodeURIComponent(args.auth0UserId)}`;
     const res = await fetchAuth0(url, {
       method: "PATCH",
@@ -322,12 +326,11 @@ export class Auth0PasswordService {
    * Management M2M client. Returns:
    */
   static async verifyCurrentPassword(args: {
-    credentials: Auth0ManagementCredentials;
+    config: Auth0Config;
     email: string;
     password: string;
   }): Promise<boolean> {
-    const config = loadConfig(args.credentials);
-
+    const { config } = args;
     const res = await fetchAuth0(`${config.issuer}/oauth/token`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -393,14 +396,14 @@ export class Auth0PasswordService {
    * Verify the user's current Auth0 password, then update it via the Management API.
    */
   static async changeAuth0Password(args: {
-    credentials: Auth0ManagementCredentials;
+    config: Auth0Config;
     email: string;
     auth0UserId: string;
     currentPassword: string;
     newPassword: string;
   }): Promise<{ ok: true } | { ok: false; reason: "wrong_password" }> {
     const verified = await Auth0PasswordService.verifyCurrentPassword({
-      credentials: args.credentials,
+      config: args.config,
       email: args.email,
       password: args.currentPassword,
     });
@@ -408,9 +411,9 @@ export class Auth0PasswordService {
       return { ok: false, reason: "wrong_password" };
     }
 
-    const token = await Auth0PasswordService.getManagementApiToken(args.credentials);
+    const token = await Auth0PasswordService.getManagementApiToken(args.config);
     await Auth0PasswordService.updateUserPassword({
-      credentials: args.credentials,
+      config: args.config,
       auth0UserId: args.auth0UserId,
       newPassword: args.newPassword,
       managementToken: token,
