@@ -209,6 +209,14 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   // written out because `Day` is a `Date`, not a DateTime, and the wrap is the
   // thing that makes the interval arithmetic legal — not because the default
   // would produce anything different.
+  //
+  // Migration 00095 stopped the 13-month hard delete on both of these tables,
+  // and its header says nothing else moves them. That is wrong about this
+  // file: the two entries below keep rendering the 49-day
+  // `MOVE ... TO VOLUME 'cold'` clause on any cluster with cold storage
+  // enabled and the tiered policy. The MOVE relocates parts and deletes
+  // nothing, so a row whose `_retention_days` is 0 still lives forever — it
+  // just lives on cheaper disk once it is 49 days old.
   {
     table: "governance_cost_rollup_1d",
     ttlColumn: "Day",

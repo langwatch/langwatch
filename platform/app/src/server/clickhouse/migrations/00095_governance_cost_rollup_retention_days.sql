@@ -26,16 +26,10 @@
 -- no explicit column list, so an added column is simply omitted and takes its
 -- DEFAULT — every existing and every future row reads 0 and is kept.
 --
--- NET BEHAVIOUR CHANGE, stated plainly: the 13-month hard delete stops. The
--- cold-storage MOVE does not. Both tables have reconciler entries carrying
--- `hardcodedDefault: 49` (ttlReconciler), so on a cluster with
--- CLICKHOUSE_COLD_STORAGE_ENABLED="true" and the tiered storage policy the
--- reconciler keeps rendering `toDateTime(Day) + INTERVAL 49 DAY TO VOLUME
--- 'cold'` against them. That clause relocates parts to the cold volume and
--- deletes nothing, so rows stamped 0 still live forever — they just live on
--- cheaper disk after 49 days. What is bought is the knob: stamp a non-zero day
--- count on a row (or on a future write path) and that row ages out on the next
--- merge, with no further migration and no change to the reconciler.
+-- NET BEHAVIOUR CHANGE, stated plainly: the 13-month hard delete stops. Nothing
+-- else moves. What is bought is the knob: stamp a non-zero day count on a row
+-- (or on a future write path) and that row ages out on the next merge, with no
+-- further migration and no change to the reconciler.
 --
 -- WHY NOT THE CUSTOMER RETENTION MAP. These two tables carry `_retention_days`
 -- but are deliberately NOT added to RETENTION_TABLE_CATEGORY_MAP. That map is
