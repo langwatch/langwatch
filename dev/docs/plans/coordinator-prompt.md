@@ -71,6 +71,30 @@ Start now: run the counters, say what is dirty, and spawn your first two
 lanes.
 ```
 
+## 1a. Sharing the checkout with another agent
+
+More than one agent works in this checkout: this session's lanes, a Codex
+session, and whoever is at the keyboard. They collide when two of them rewrite
+the same file, which is expensive to unpick and easy to prevent.
+
+The board is `.claims.tsv` at the repo root, git-ignored, driven by one script:
+
+```
+bash dev/scripts/claim.sh take <who> "<task>" <paths...>   # before editing
+bash dev/scripts/claim.sh check <paths...>                 # who holds these
+bash dev/scripts/claim.sh list                             # everything live
+bash dev/scripts/claim.sh done <who>                       # release
+```
+
+Every agent, whatever its make, does three things: `check` the paths before it
+starts, `take` them with its own name and its task, and `done` when it stops.
+A claim older than three hours lists as STALE rather than disappearing, so an
+agent that died still says where it died. The board is advisory, not a lock:
+it works because everyone reads it, and it costs one line each way.
+
+Put the claim line in every lane prompt you write, and read the board before
+choosing which tasks to spawn.
+
 ## 2. What the coordinator must not do itself
 
 Module conversion. The moment the coordinator starts editing a module it stops

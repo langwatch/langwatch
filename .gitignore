@@ -169,3 +169,5 @@ server.log
 
 # Prisma client output: prepare regenerates it (pnpm start:prepare:files), never commit it
 packages/prisma-client/src/generated/
+.claims.tsv
+.claims.tsv.lock/
