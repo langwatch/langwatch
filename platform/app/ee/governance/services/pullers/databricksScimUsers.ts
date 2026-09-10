@@ -172,6 +172,65 @@ function isCollectionExhausted(params: {
  * unproven for bulk use, so a workspace that will not serve it has to produce
  * a refusal an admin can read rather than an error an effect retries.
  */
+/**
+ * Appends the people this walk has not already recorded, and says how many.
+ *
+ * The count is the return value rather than the list length because it is what
+ * the caller decides on: a page that added nobody means the walk is not
+ * advancing, whatever the workspace claims its total to be.
+ */
+function appendUnseen({
+  people,
+  seenActorIds,
+  candidates,
+}: {
+  people: DiscoveredPersonRecord[];
+  seenActorIds: Set<string>;
+  candidates: DiscoveredPersonRecord[];
+}): number {
+  let added = 0;
+  for (const person of candidates) {
+    if (seenActorIds.has(person.rawActorId)) continue;
+    seenActorIds.add(person.rawActorId);
+    people.push(person);
+    added += 1;
+  }
+  return added;
+}
+
+/**
+ * Whether this walk has learned everything the workspace is going to tell it.
+ *
+ * Three ways to be done, and only the last is the one SCIM documents:
+ *
+ * A page that named NOBODY ends it whatever the total claims, because the next
+ * request asks from the same index and is answered the same way.
+ *
+ * A page that named only people already recorded ends it for the same reason,
+ * one step later. `startIndex` is a request and not a guarantee: a workspace
+ * that ignores it serves the same first users forever while reporting a total
+ * far larger, and the documented check below believes the total — it sees a
+ * full page and an index short of the end, so it asks again, to the end of the
+ * page budget. Deduplicating alone would keep the count honest and still spend
+ * every one of those requests learning nothing.
+ *
+ * Otherwise, the collection's own arithmetic.
+ */
+function walkIsFinished({
+  returned,
+  addedThisPage,
+  totalResults,
+  nextIndex,
+}: {
+  returned: number;
+  addedThisPage: number;
+  totalResults: number | null;
+  nextIndex: number;
+}): boolean {
+  if (returned === 0 || addedThisPage === 0) return true;
+  return isCollectionExhausted({ returned, totalResults, nextIndex });
+}
+
 export async function listDatabricksPeople(params: {
   workspaceUrl: string;
   token: string;
@@ -180,6 +239,16 @@ export async function listDatabricksPeople(params: {
   const { workspaceUrl, token, signal } = params;
 
   const people: DiscoveredPersonRecord[] = [];
+  // Every `rawActorId` already taken, because a page can repeat one.
+  //
+  // `startIndex` is a request, not a guarantee. A workspace that ignores it
+  // answers every page with the same first hundred users while reporting a
+  // total of a thousand, and the exhaustion check below believes the total: it
+  // sees a full page and an index short of the end, so it asks again. With a
+  // hundred-page budget that walk records the same hundred people up to a
+  // hundred times, and the count the screen shows is the count of the
+  // repetitions rather than of the workspace's staff.
+  const seenActorIds = new Set<string>();
   let startIndex = 1;
 
   try {
@@ -197,18 +266,18 @@ export async function listDatabricksPeople(params: {
       if (read.isMalformed) {
         return peopleRefused({ reason: "malformed_response", status: null });
       }
-      people.push(...scimUsersAsPeople(read.users));
-
-      // A page that named nobody ends the walk whatever it claims about the
-      // total, because the next request would ask from the same index and be
-      // answered the same way.
-      if (read.returned === 0) return peopleListed(people);
+      const addedThisPage = appendUnseen({
+        people,
+        seenActorIds,
+        candidates: scimUsersAsPeople(read.users),
+      });
 
       startIndex += read.returned;
 
       if (
-        isCollectionExhausted({
+        walkIsFinished({
           returned: read.returned,
+          addedThisPage,
           totalResults: read.totalResults,
           nextIndex: startIndex,
         })

@@ -266,6 +266,36 @@ describe("agent listing on the ingestion pull process manager", () => {
       expect(disabled.state.currentAgentsListing).toBeNull();
       expect(disabled.nextWakeAt).toBeNull();
     });
+
+    /**
+     * Asserted for agents as well as people even though one handler body
+     * serves both, because the slot is the half that differs: this one checks
+     * `currentAgentsListing` stays free, and its sibling checks the people
+     * slot. A gate that read the wrong slot would pass one of these.
+     */
+    it("asks nothing for a request that arrives after the disable", () => {
+      const booted = bootConfigured();
+      const disabled = evolve({
+        previousState: booted.state,
+        event: envelope({
+          eventType: INGESTION_PULL_EVENT_TYPES.DISABLED,
+          occurredAt: Date.parse("2026-09-09T10:04:00Z"),
+          payload: { sourceId: "source-1", cron: null, cursor: null },
+        }),
+        now: Date.parse("2026-09-09T10:04:00Z"),
+      });
+
+      const late = evolve({
+        previousState: disabled.state,
+        ...requested({
+          requestId: "req-late",
+          at: Date.parse("2026-09-09T10:05:00Z"),
+        }),
+      });
+
+      expect(late.intents).toEqual([]);
+      expect(late.state.currentAgentsListing).toBeNull();
+    });
   });
 
   describe("when a requested event was committed without a request id", () => {

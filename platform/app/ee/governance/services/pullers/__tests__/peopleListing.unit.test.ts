@@ -289,6 +289,72 @@ describe("the Anthropic and OpenAI admin lists", () => {
 
     expect(JSON.stringify(listing)).not.toContain("sk-live-secret");
   });
+
+  /**
+   * `startIndex` is a request, not a guarantee.
+   *
+   * A workspace that ignores it answers every page with the same first users
+   * while reporting a total far larger, and the exhaustion check believes the
+   * total: a full page and an index short of the end means ask again. With a
+   * hundred-page budget that walk recorded the same people up to a hundred
+   * times, and the number the screen showed was the count of the repetitions
+   * rather than of the workspace's staff.
+   *
+   * `mockResolvedValue`, not `mockResolvedValueOnce`: the point is that the
+   * same reply stays available for every request the walk chooses to make.
+   */
+  it("records each person once rather than once per repeated page", async () => {
+    fetchMock.mockResolvedValue(
+      reply({
+        body: {
+          Resources: [
+            { id: "u-1", userName: "ada@example.com" },
+            { id: "u-2", userName: "grace@example.com" },
+          ],
+          totalResults: 1000,
+          startIndex: 1,
+          itemsPerPage: 2,
+        },
+      }),
+    );
+
+    const listing = await listDatabricksPeople({
+      workspaceUrl: "https://dbc-1.cloud.databricks.com",
+      token: "token",
+    });
+
+    if (listing.outcome !== "listed") throw new Error("expected a listing");
+    expect(listing.items.map((person) => person.rawActorId)).toEqual([
+      "ada@example.com",
+      "grace@example.com",
+    ]);
+  });
+
+  /**
+   * Deduplicating alone would keep the count honest and still spend the whole
+   * page budget learning nothing, so the walk stops as soon as a page adds
+   * nobody new. Two requests rather than one: a first page cannot be known to
+   * be a repeat until a second one repeats it.
+   */
+  it("stops asking once a page adds nobody new", async () => {
+    fetchMock.mockResolvedValue(
+      reply({
+        body: {
+          Resources: [{ id: "u-1", userName: "ada@example.com" }],
+          totalResults: 1000,
+          startIndex: 1,
+          itemsPerPage: 1,
+        },
+      }),
+    );
+
+    await listDatabricksPeople({
+      workspaceUrl: "https://dbc-1.cloud.databricks.com",
+      token: "token",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("the Microsoft directory list", () => {

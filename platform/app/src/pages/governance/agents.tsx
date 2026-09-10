@@ -267,7 +267,18 @@ function useAgentsScreen() {
     // suppresses its own: reporting that the real read is still running, or
     // that it failed, beside a screen full of invented figures leaves the
     // reader unable to act on either half.
-    isLoading: !sample.active && !!orgId && agents.isLoading,
+    // `!orgId`, not `!!orgId`, and the inversion is the whole fix.
+    //
+    // The query is disabled until the organization resolves, and a disabled
+    // query reports `isLoading: false`. Requiring an org id here therefore
+    // said "not loading" for the one window in which nothing has been asked
+    // yet, and `agents.data` is undefined then, so the page fell through to
+    // "no agent has registered" — a claim about the organization, made before
+    // the organization was even known.
+    //
+    // A read still in flight has not earned an empty state, and neither has a
+    // read that has not started.
+    isLoading: !sample.active && (!orgId || agents.isLoading),
     error: sample.active ? null : agents.error,
   };
 }
@@ -332,7 +343,11 @@ function useAgentSync({
   const connected = sources.data ?? [];
   const status = governanceSyncStatus({
     canManage,
-    isLoadingSources: sources.isLoading,
+    // Same window as the agents read above: until the organization resolves
+    // this query is disabled and reports `isLoading: false`, so `connected`
+    // is empty and the control would say "no provider can list agents" about
+    // an organization it has not identified yet.
+    isLoadingSources: !orgId || sources.isLoading,
     sourceCount: connected.length,
     isAsking: mutation.isPending,
     hasAsked,
