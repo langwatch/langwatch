@@ -72,6 +72,17 @@ const s3PollingConfigSchema = z.object({
   parser: z.enum(["ndjson", "json-array", "csv"]),
   schedule: z.string().min(1),
   eventMapping: eventMappingSchema,
+  /**
+   * Whether each event keeps a verbatim copy of the line it was mapped from.
+   *
+   * On by default: the contract reserves `raw_payload` for a replay against a
+   * future mapping, and the audit row exports it for a SIEM to drill back to.
+   * A source turns it off when the line carries what the mapping was written
+   * to leave out. The OpenAI compliance export puts the person's email beside
+   * the id on every line; the mapping names the person by the id, and a kept
+   * copy would carry the address into the audit row by the back door.
+   */
+  retainRawPayload: z.boolean().default(true),
 });
 
 export type S3PollingConfig = z.infer<typeof s3PollingConfigSchema>;
@@ -513,7 +524,9 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       cost_usd: asDecimalString(get(config.eventMapping.cost_usd)),
       tokens_input: asInt(get(config.eventMapping.tokens_input)),
       tokens_output: asInt(get(config.eventMapping.tokens_output)),
-      raw_payload: JSON.stringify(rawEvent),
+      // Empty, not absent, when the copy is not kept: the contract types the
+      // field as a string, and an empty string carries nothing of the line.
+      raw_payload: config.retainRawPayload ? JSON.stringify(rawEvent) : "",
       ...(Object.keys(extras).length > 0 ? { extra: extras } : {}),
     };
   }
