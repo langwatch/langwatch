@@ -143,7 +143,10 @@ const createExternalize = (inlineAll) => ({
       // re-resolve from APP rather than the importer, mark the result to break
       // the recursion, and let the rules below inline the workspace copy (they
       // already do: the app declares langwatch as workspace:*).
-      if (!a.pluginData?.langwatchPinned && basePackage(a.path) === "langwatch") {
+      if (
+        !a.pluginData?.langwatchPinned &&
+        basePackage(a.path) === "langwatch"
+      ) {
         return b.resolve(a.path, {
           resolveDir: APP,
           kind: a.kind,
