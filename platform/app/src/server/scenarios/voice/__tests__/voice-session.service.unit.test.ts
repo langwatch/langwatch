@@ -1043,12 +1043,17 @@ describe("authorizeRecordingPlayback", () => {
       it("authorizes with the credential", async () => {
         const hasVoiceAgentForExternalId = vi.fn(async () => true);
         const fetchCallRecord = vi.fn(
-          async () =>
-            ({
-              agentExternalId: "agent_xyz",
-              turns: [],
-              source: "provider",
-            }) as CallRecord,
+          async (): Promise<CallRecord> => ({
+            conversationId: "conv_1",
+            transport: "elevenlabs_convai",
+            agentExternalId: "agent_xyz",
+            startedAt: 1000,
+            endedAt: 2000,
+            durationMs: 1000,
+            turns: [],
+            isCutAtLimit: false,
+            source: "provider",
+          }),
         );
         const ports = fakePorts({
           runner: fakeRunner({ fetchCallRecord }),
@@ -1075,12 +1080,17 @@ describe("authorizeRecordingPlayback", () => {
         const ports = fakePorts({
           runner: fakeRunner({
             fetchCallRecord: vi.fn(
-              async () =>
-                ({
-                  agentExternalId: "agent_other",
-                  turns: [],
-                  source: "provider",
-                }) as CallRecord,
+              async (): Promise<CallRecord> => ({
+                conversationId: "conv_1",
+                transport: "elevenlabs_convai",
+                agentExternalId: "agent_other",
+                startedAt: 1000,
+                endedAt: 2000,
+                durationMs: 1000,
+                turns: [],
+                isCutAtLimit: false,
+                source: "provider",
+              }),
             ),
           }),
           over: { hasVoiceAgentForExternalId: vi.fn(async () => false) },
