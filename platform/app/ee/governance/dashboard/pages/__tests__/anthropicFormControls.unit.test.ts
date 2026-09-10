@@ -28,6 +28,7 @@ import {
   buildAnthropicAdminPullConfig,
   type ComposerState,
   dateInputValue,
+  defaultParserValues,
   fieldControl,
   PARSER_FIELDS,
   reconcileParserValues,
@@ -73,29 +74,74 @@ describe("Anthropic composer controls", () => {
       ]);
     });
 
-    // @scenario "A required choice does not answer itself"
-    it("offers an unselected entry so a native select cannot preselect for the admin", () => {
+    // @scenario "The report opens on the one almost every organization wants"
+    it("opens on the cost report rather than on nothing", () => {
+      // Through the seeding path the drawer actually uses, not off the field
+      // definition: a default that only exists on the FieldDef and is never
+      // seeded shows an answer the builder is not handed.
+      expect(defaultParserValues("anthropic_admin").report).toBe("cost");
+
+      // And it has to be a report that is really offered, or the picker
+      // displays a value with no matching option and shows nothing at all.
+      expect(selectOptionsFor("report", {}).map((o) => o.value)).toContain(
+        "cost",
+      );
+    });
+
+    // @scenario "The report opens on the one almost every organization wants"
+    it("still offers an entry carrying no value, so the choice can be cleared", () => {
       const options = selectOptionsFor("report", {});
 
-      // A controlled <select> whose value is "" and whose option list has no
-      // "" entry displays its first option while the state stays empty: the
-      // admin is shown "cost" without ever having chosen it.
+      // The default answers the field; it does not lock it. Clearing the
+      // picker has to remain possible, and the form then refuses the save and
+      // marks the field rather than quietly reinstating cost.
       expect(options[0]?.value).toBe("");
       expect(fieldFor("report").required).toBe(true);
     });
   });
 
   describe("the bucket width field", () => {
-    // @scenario "The bucket widths offered are the ones the adapter declares"
-    it("offers the widths the adapter schema accepts, and no others", () => {
-      const offered = selectOptionsFor("bucketWidth", { report: "usage" })
-        .map((o) => o.value)
-        .filter((v) => v !== "");
+    // @scenario "The bucket width is daily whichever report is chosen"
+    it("offers the daily entry alone on a usage source", () => {
+      const options = selectOptionsFor("bucketWidth", { report: "usage" });
 
-      expect(offered).toEqual([
-        ...anthropicAdminPullConfigSchema.shape.bucketWidth.removeDefault()
-          .options,
-      ]);
+      expect(options.map((o) => o.value)).toEqual([""]);
+      expect(options[0]?.label).toContain("daily");
+    });
+
+    // @scenario "The bucket width is daily whichever report is chosen"
+    it("says daily because the adapter's own default is daily", () => {
+      // The entry carries no value, so what the source is actually read at is
+      // whatever the schema defaults to. If that default ever moves off `1d`,
+      // the form's label becomes a claim nothing backs — which is the drift
+      // this pins, and the reason the label is not just asserted against
+      // itself.
+      const bucketWidth =
+        anthropicAdminPullConfigSchema.shape.bucketWidth.parse(undefined);
+
+      expect(bucketWidth).toBe("1d");
+      expect(
+        selectOptionsFor("bucketWidth", { report: "usage" })[0]?.label,
+      ).toBe("1d — daily");
+    });
+
+    // @scenario "The bucket width is daily whichever report is chosen"
+    it("still refuses a finer width an older source was saved with", () => {
+      // The picker no longer offers `1h`, but an edit form opening on a source
+      // saved when it did still seeds one, and the builder is the checkpoint
+      // that decides what reaches the adapter. On a usage source it is a width
+      // the schema accepts, so it builds rather than blocking the admin out of
+      // their own source.
+      const built = buildAnthropicAdminPullConfig(
+        composerWith({ report: "usage", bucketWidth: "1h" }),
+      ) as Record<string, unknown>;
+
+      expect(built.bucketWidth).toBe("1h");
+      expect(
+        buildAnthropicAdminPullConfig(
+          composerWith({ report: "usage", bucketWidth: "2h" }),
+        ),
+      ).toBeNull();
     });
 
     // @scenario "The cost report offers no width to choose between"

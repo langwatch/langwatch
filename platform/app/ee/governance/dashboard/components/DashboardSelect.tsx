@@ -51,6 +51,7 @@ export function DashboardSelect({
   onChange,
   placeholder = "Select an option",
   disabled = false,
+  invalid = false,
 }: {
   ariaLabel: string;
   options: readonly DashboardSelectOption[];
@@ -58,6 +59,15 @@ export function DashboardSelect({
   onChange: (next: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  /**
+   * The form refused a save because this choice is unanswered.
+   *
+   * Passed to `Select.Root` rather than painted onto the trigger here, because
+   * the recipe already knows what an invalid select looks like and it also
+   * sets `aria-invalid` on the control — a red border a screen reader cannot
+   * see is not a rejection anyone was told about.
+   */
+  invalid?: boolean;
 }) {
   const collection = useMemo(
     () => createListCollection({ items: [...options] }),
@@ -69,6 +79,7 @@ export function DashboardSelect({
       size="sm"
       collection={collection}
       disabled={disabled}
+      invalid={invalid}
       // An empty string is "nothing chosen", not a value: passing [""] would
       // select an option that does not exist and show its label as current.
       value={value ? [value] : []}

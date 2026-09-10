@@ -81,6 +81,11 @@ const CONFIG = {
   // every queued-response count here without testing anything the seats suite
   // does not already. `copilotStudioDataverseSeats.unit.test.ts` owns that read.
   readSeats: false,
+  // Off for the same reason, and named for the same reason. The schema's
+  // default is on, and a directory read adds a Graph call to every
+  // queued-response count in this file.
+  // `copilotStudioDataverseDirectory.unit.test.ts` owns that read.
+  readDirectory: false,
 };
 
 const BOT_ID = "bbbbbbbb-0000-4000-8000-000000000002";
@@ -460,7 +465,7 @@ describe("given a response steering the next page somewhere else", () => {
 
 describe("given a run against an environment holding one conversation", () => {
   /** @scenario "The conversation read never reaches beyond the environment" */
-  it("reaches only the sign-in and the environment, never the directory", async () => {
+  it("reaches only the sign-in and the environment when the directory read is off", async () => {
     const adapter = await newAdapter();
     queueSignInAndBots();
     responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });

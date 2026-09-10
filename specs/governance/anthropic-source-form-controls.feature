@@ -17,17 +17,30 @@ Feature: Choose Anthropic adapter settings instead of typing them
       Then the choices are exactly the usage report and the cost report
 
     @unit
-    Scenario: The bucket widths offered are the ones the adapter declares
+    Scenario: The bucket width is daily whichever report is chosen
       Given the report is set to usage
       When the admin looks at the bucket width field
-      Then the widths offered are the ones the adapter's own schema accepts
-      And no width is offered that the adapter would reject
+      Then the only entry offered is the daily one
+      And it carries no value, so the adapter's own default decides
+      And that default is daily, so the entry does not name a width the
+        source will not be read at
+      # The finer widths multiply the rows a day costs and change no
+      # figure the pillar shows, because every screen that reads this data
+      # reads it by day. The entry stays empty rather than spelling "1d"
+      # out, so daily is written down once, in the adapter's schema.
 
     @unit
-    Scenario: A required choice does not answer itself
+    Scenario: The report opens on the one almost every organization wants
       When the admin opens the form without touching the report field
-      Then the report field offers an unselected entry carrying no value
+      Then the report field holds the cost report
       And the form still marks the report as required
+      And an unselected entry carrying no value is still offered
+      # Cost is the provider's own figure for what was spent, which is
+      # what this source is added for; usage is the specialist choice made
+      # by someone who wants our pricing applied to raw token counts. The
+      # empty entry remains so clearing the field is possible — the form
+      # then refuses the save and marks the field rather than quietly
+      # putting the default back.
 
   Rule: A setting the cost report would reject is not offered on a cost source
 

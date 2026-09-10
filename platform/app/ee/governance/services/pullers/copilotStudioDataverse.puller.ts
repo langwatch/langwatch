@@ -211,15 +211,24 @@ export const copilotStudioDataversePullConfigSchema = z.object({
   /**
    * Whether to read the tenant's user directory beside the conversations.
    *
-   * Off unless switched on — the opposite default from `readSeats`, because
-   * the consent is heavier: `/users` needs `User.Read.All`, which hands this
-   * source every name, address, and department in the tenant rather than a
-   * list of licence pools. That is exactly what the identity screens need
-   * (a transcript knows people only as directory ids, and the directory is
-   * what knows their names and departments) — and exactly what an admin
-   * should turn on deliberately rather than discover was on.
+   * On unless switched off, the same default as `readSeats`, and for the same
+   * reason: a transcript knows people only as directory ids, so a source that
+   * reads conversations and not the directory can say an agent was used four
+   * hundred times and cannot say by whom. Every screen in the pillar that
+   * names a person, a department or an agent's owner is downstream of this
+   * read, and off by default meant they were empty for every source the
+   * product created — with no page anywhere saying why.
+   *
+   * The consent is heavier than the seat read's and is the reason this stays
+   * a setting rather than becoming a constant: `/users` needs `User.Read.All`,
+   * which hands this source every name, address and department in the tenant
+   * rather than a list of licence pools. An admin who does not want that turns
+   * the switch off on the setup form, where it is offered on the way in. A
+   * tenant that never granted the permission refuses the call, and the refusal
+   * costs nothing — `readMicrosoftDirectory` holds the day rather than failing
+   * the run, exactly as the seat read does.
    */
-  readDirectory: z.boolean().default(false),
+  readDirectory: z.boolean().default(true),
 });
 
 export type CopilotStudioDataverseConfig = z.infer<

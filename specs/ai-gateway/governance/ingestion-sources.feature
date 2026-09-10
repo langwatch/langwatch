@@ -684,6 +684,49 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And historical events stay readable (TenantId-scoped) until manual purge
     And new events from the upstream operator's old config are rejected with 401
 
+  Rule: A refused save says which field it is refusing
+
+    @unit
+    Scenario: An empty required field is named rather than described
+      Given the composer is open on a source type with required fields
+      And one required field is empty
+      When the admin presses the create button
+      Then that field is marked as the one holding up the save
+      And the field says what to do about it
+      And no source is created
+      # The toast said some of the values were not valid and named none of
+      # them, which leaves an admin auditing a form of a dozen fields
+      # against one sentence. Anything the form can point at, it points at.
+
+    @unit
+    Scenario: A complaint about a hidden field is not left hidden
+      Given a required field that only appears once a switch is turned off
+      And that field is empty
+      When the admin presses the create button
+      Then the group holding it opens
+      # Marking a control nobody can see is telling the admin the form is
+      # wrong and then showing them a form on which everything is filled in.
+
+    @unit
+    Scenario: Answering a field clears the complaint about it
+      Given the create button was pressed with a required field empty
+      When the admin types a value into that field
+      Then the field is no longer marked
+      # A field that stays red after it has been answered reads as a
+      # second, different rejection.
+
+  Rule: What a source needs granted is read once, not on every visit
+
+    @unit
+    Scenario: The setup prose sits behind the heading, not above the fields
+      When the admin opens the composer on any source type
+      Then the body of the form starts with the fields
+      And what the source reads and what it needs granted is behind an
+        information control beside the drawer's heading
+      # It is three or four sentences of prerequisites. Printed in the body
+      # it pushed the fields it describes below the fold, and everyone who
+      # had already read it scrolled past it every time after.
+
   Rule: One provider account is read by one connection
 
     Two connections reading the same report from the same provider account
