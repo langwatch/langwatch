@@ -308,6 +308,16 @@ export interface WorkflowApi {
     isEvaluator?: boolean;
   }): Promise<void>;
   listPublishedComponents(input: { projectId: string }): Promise<unknown>;
+
+  // -- the deployment's own housekeeping ------------------------------------
+
+  /**
+   * Deletes the studio's quiet per-project NLP Lambda functions and their log
+   * groups. It belongs here rather than to a process: the Lambdas are the
+   * studio's own engines and the policy deciding which are quiet is this
+   * module's service. The deployment's cron bearer is what invokes it.
+   */
+  cleanupOldLambdas(): Promise<void>;
 }
 
 export const WorkflowApi = moduleApi<WorkflowApi>("workflow");

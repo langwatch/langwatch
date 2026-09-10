@@ -11,6 +11,10 @@ import {
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import {
   workflowRunAnswerSchema,
+  workflowRunRestBodySchema,
+  workflowRunRestParamsSchema,
+  workflowRunRestRefusalSchema,
+  workflowRunRestVersionedParamsSchema,
   WorkflowApi,
   WorkflowNotFoundError,
   WorkflowNotPublishedError,
@@ -27,25 +31,6 @@ export const workflowRunContentType = defineRestMiddleware(
   "workflowRunContentType",
   z.string().nullable(),
 );
-
-/** The refusal this door answers in its own words: an SDK parses `{ message }`. */
-const workflowRunRefusalSchema = z.object({ message: z.string() });
-
-/**
- * A workflow run takes the workflow's own entry fields as its body, so there
- * is no fixed set of properties to name: open the object and say where the
- * names come from.
- */
-const workflowRunBodySchema = z
-  .looseObject({})
-  .describe("The workflow's input fields, named as the workflow's entry node names them");
-
-const versionedParamsSchema = z.object({
-  workflowId: z.string().min(1),
-  versionId: z.string().min(1),
-});
-
-const workflowParamsSchema = z.object({ workflowId: z.string().min(1) });
 
 /** One run, whichever of the three addresses asked for it. */
 async function runWorkflow({
@@ -120,13 +105,14 @@ function namedRefusalFor({ error, workflowId }: { error: unknown; workflowId: st
 export const workflowRunRest = defineRestRouter(WorkflowApi)
   .withNamespace("workflow-run")
   .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("project")
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/optimization/:workflowId/:versionId", "runOptimizationWorkflowVersion")
-  .withParams(versionedParamsSchema)
+  .withParams(workflowRunRestVersionedParamsSchema)
   .withRawBody("text", { mediaType: "application/json" })
   .withPermission("workflows:manage")
-  .responds({ 200: workflowRunAnswerSchema, 400: workflowRunRefusalSchema })
+  .responds({ 200: workflowRunAnswerSchema, 400: workflowRunRestRefusalSchema })
   .withDocs({
     summary: "Run a workflow version (legacy path)",
     description:
@@ -135,7 +121,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       "integrations; this one stays for callers written against it. The body is the workflow's " +
       "own input fields, named as its entry node names them.",
     tags: ["Workflows"],
-    requestBody: { schema: workflowRunBodySchema },
+    requestBody: { schema: workflowRunRestBodySchema },
   })
   .withMiddleware(workflowRunContentType)
   .handle(({ app, input, scope, raw }, contentType) =>
@@ -150,10 +136,10 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
   )
 
   .post("/api/workflows/:workflowId/run", "runWorkflow")
-  .withParams(workflowParamsSchema)
+  .withParams(workflowRunRestParamsSchema)
   .withRawBody("text", { mediaType: "application/json" })
   .withPermission("workflows:manage")
-  .responds({ 200: workflowRunAnswerSchema, 400: workflowRunRefusalSchema })
+  .responds({ 200: workflowRunAnswerSchema, 400: workflowRunRestRefusalSchema })
   .withDocs({
     summary: "Run a workflow",
     description:
@@ -161,7 +147,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       "workflow's published version; address a specific version with the `{versionId}` form of " +
       "this path. The body is the workflow's own input fields, named as its entry node names them.",
     tags: ["Workflows"],
-    requestBody: { schema: workflowRunBodySchema },
+    requestBody: { schema: workflowRunRestBodySchema },
   })
   .withMiddleware(workflowRunContentType)
   .handle(({ app, input, scope, raw }, contentType) =>
@@ -175,10 +161,10 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
   )
 
   .post("/api/workflows/:workflowId/:versionId/run", "runWorkflowVersion")
-  .withParams(versionedParamsSchema)
+  .withParams(workflowRunRestVersionedParamsSchema)
   .withRawBody("text", { mediaType: "application/json" })
   .withPermission("workflows:manage")
-  .responds({ 200: workflowRunAnswerSchema, 400: workflowRunRefusalSchema })
+  .responds({ 200: workflowRunAnswerSchema, 400: workflowRunRestRefusalSchema })
   .withDocs({
     summary: "Run a specific workflow version",
     description:
@@ -186,7 +172,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       "output. Use this when a caller must keep hitting the same version as the workflow is " +
       "edited. The body is the workflow's own input fields, named as its entry node names them.",
     tags: ["Workflows"],
-    requestBody: { schema: workflowRunBodySchema },
+    requestBody: { schema: workflowRunRestBodySchema },
   })
   .withMiddleware(workflowRunContentType)
   .handle(({ app, input, scope, raw }, contentType) =>

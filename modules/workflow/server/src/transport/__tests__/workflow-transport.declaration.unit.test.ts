@@ -121,7 +121,7 @@ describe("the workflow module's transport declarations", () => {
     });
   });
 
-  describe("given the three REST families the module declares", () => {
+  describe("given the REST families the module declares", () => {
     it("keeps the /api/workflows management addresses", () => {
       expect(routesOf(createWorkflowRest(platformUrl))).toEqual([
         ["GET", "/", "listWorkflows", "workflows:view"],
@@ -157,7 +157,7 @@ describe("the workflow module's transport declarations", () => {
         ["POST", "/api/workflows/code-completion", "completeWorkflowCode", "public"],
         ["POST", "/api/workflows/post_event", "postWorkflowStudioEvent", "public"],
       ]);
-      expect(workflowStudioRest.router().credential).toBe("session");
+      expect(workflowStudioRest.router().credential).toBe("browser");
     });
   });
 });

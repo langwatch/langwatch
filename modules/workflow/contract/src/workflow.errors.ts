@@ -69,3 +69,18 @@ export class LlmModelNotSetError extends Error {
   }
 }
 import { HandledError } from "@langwatch/handled-error";
+
+/**
+ * The deployment asked for the studio's Lambda sweep and composed no fleet for
+ * it to run against. Named rather than answered as an empty report: "nothing
+ * was quiet" and "nothing was looked at" read identically to a scheduler, and
+ * only one of them is a healthy deployment.
+ */
+export class NlpLambdaFleetNotComposedError extends Error {
+  readonly code = "nlp_lambda_fleet_not_composed" as const;
+
+  constructor() {
+    super("This deployment composed no NLP Lambda fleet, so there is nothing to sweep.");
+    this.name = "NlpLambdaFleetNotComposedError";
+  }
+}

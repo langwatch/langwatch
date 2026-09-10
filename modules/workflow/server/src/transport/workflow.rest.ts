@@ -16,8 +16,17 @@ import { createLogger } from "@langwatch/observability";
 import {
   WorkflowApi,
   WorkflowNotFoundError,
+  workflowRestArchivedSchema,
+  workflowRestDetailSchema,
+  workflowRestEvaluateSchema,
+  workflowRestEvaluationStartedSchema,
+  workflowRestParamsSchema,
+  workflowRestRefusalSchema,
+  workflowRestUpdateSchema,
   type Workflow,
   type WorkflowEvaluationRequest,
+  type WorkflowRestDetail,
+  type WorkflowRestUpdate,
 } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
@@ -32,70 +41,6 @@ export const workflowEvaluationRunCeiling = defineRestMiddleware(
   "workflowEvaluationRunCeiling",
   z.boolean(),
 );
-
-const workflowResponseSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  icon: z.string().nullable(),
-  description: z.string().nullable(),
-  isEvaluator: z.boolean(),
-  isComponent: z.boolean(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-
-const workflowResponseWithPlatformUrlSchema = z.object({
-  ...workflowResponseSchema.shape,
-  platformUrl: z.string().url(),
-});
-
-/** The bare `{ error }` body this family's refusals have always carried. */
-const workflowRefusalSchema = z.object({ error: z.string() });
-
-const idParamsSchema = z.object({ id: z.string().min(1) });
-
-const updateWorkflowSchema = z.object({
-  name: z.string().min(1).optional(),
-  icon: z.string().optional(),
-  description: z.string().optional(),
-});
-
-const archivedWorkflowSchema = z.object({ id: z.string(), archived: z.boolean() });
-
-const evaluationStartedSchema = z.object({
-  run_id: z.string(),
-  run_url: z.string(),
-  workflow_version_id: z.string(),
-  version: z.string(),
-});
-
-const evaluateBodySchema = z
-  .object({
-    version_id: z
-      .string()
-      .optional()
-      .describe("Committed version to evaluate; defaults to the latest commit"),
-    data: z
-      .array(z.record(z.string(), z.unknown()))
-      .optional()
-      .describe("Inline rows to evaluate instead of the workflow's attached dataset"),
-    dataset_id: z
-      .string()
-      .optional()
-      .describe("Platform dataset id to evaluate; mutually exclusive with data"),
-    parameters: z
-      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
-      .optional()
-      .describe("Constant entry inputs applied to every row, e.g. a feature flag or PR number"),
-    row_indices: z
-      .array(z.number().int().nonnegative())
-      .optional()
-      .describe("Subset of dataset row indices to evaluate"),
-  })
-  .refine((body) => !(body.data && body.dataset_id), {
-    message: "Pass either data or a dataset_id, not both",
-    path: ["data"],
-  });
 
 function toWorkflowResponse(workflow: Workflow) {
   return {
@@ -128,9 +73,6 @@ function evaluationRefusalOf(
   return null;
 }
 
-/** One workflow as the wire publishes it, with its studio address. */
-type WorkflowWire = z.infer<typeof workflowResponseWithPlatformUrlSchema>;
-
 /** How a route reaches the studio address of one workflow. */
 type StudioUrl = (projectSlug: string, workflowId: string) => string;
 
@@ -141,7 +83,7 @@ async function readWorkflow(params: {
   projectId: string;
   projectSlug: string;
   studioUrl: StudioUrl;
-}): Promise<Readonly<{ status: 200; body: WorkflowWire }> | typeof NOT_FOUND> {
+}): Promise<Readonly<{ status: 200; body: WorkflowRestDetail }> | typeof NOT_FOUND> {
   try {
     const workflow = await params.app.getById({ id: params.id, projectId: params.projectId });
 
@@ -158,8 +100,8 @@ async function writeWorkflow(params: {
   projectId: string;
   projectSlug: string;
   studioUrl: StudioUrl;
-  changes: z.infer<typeof updateWorkflowSchema>;
-}): Promise<Readonly<{ status: 200; body: WorkflowWire }> | typeof NOT_FOUND> {
+  changes: WorkflowRestUpdate;
+}): Promise<Readonly<{ status: 200; body: WorkflowRestDetail }> | typeof NOT_FOUND> {
   const { app, id, projectId } = params;
 
   try {
@@ -195,7 +137,7 @@ async function startEvaluation(params: {
   app: WorkflowApi;
   request: WorkflowEvaluationRequest;
 }): Promise<
-  | Readonly<{ status: 200; body: z.infer<typeof evaluationStartedSchema> }>
+  | Readonly<{ status: 200; body: z.infer<typeof workflowRestEvaluationStartedSchema> }>
   | Readonly<{ status: 400 | 404; body: { error: string } }>
 > {
   try {
@@ -230,7 +172,7 @@ function wireOf(params: {
   workflow: Workflow;
   projectSlug: string;
   studioUrl: StudioUrl;
-}): WorkflowWire {
+}): WorkflowRestDetail {
   return {
     ...toWorkflowResponse(params.workflow),
     platformUrl: params.studioUrl(params.projectSlug, params.workflow.id),
@@ -252,10 +194,11 @@ export function createWorkflowRest(platformUrl: PlatformUrlBuilder): WorkflowRes
     defineRestRouter(WorkflowApi)
       .withNamespace("workflows")
       .withVersion(MANAGEMENT_API_VERSION)
+      .withCredential("project")
 
       .get("/", "listWorkflows")
       .withPermission("workflows:view")
-      .withOutput(z.array(workflowResponseWithPlatformUrlSchema))
+      .withOutput(z.array(workflowRestDetailSchema))
       .withDocs({ description: "List all non-archived workflows for the project" })
       .withMiddleware(projectRestFacts)
       .handle(async ({ app, scope }, project) => {
@@ -269,9 +212,9 @@ export function createWorkflowRest(platformUrl: PlatformUrlBuilder): WorkflowRes
       })
 
       .get("/:id", "getWorkflow")
-      .withParams(idParamsSchema)
+      .withParams(workflowRestParamsSchema)
       .withPermission("workflows:view")
-      .responds({ 200: workflowResponseWithPlatformUrlSchema, 404: workflowRefusalSchema })
+      .responds({ 200: workflowRestDetailSchema, 404: workflowRestRefusalSchema })
       .withDocs({ description: "Get a workflow by its ID" })
       .withMiddleware(projectRestFacts)
       .handle(({ app, input, scope }, project) => {
@@ -289,10 +232,10 @@ export function createWorkflowRest(platformUrl: PlatformUrlBuilder): WorkflowRes
       // Editing metadata on a workflow that already exists is an `:update`.
       // `:manage` still implies it, so no existing caller changes.
       .patch("/:id", "updateWorkflow")
-      .withParams(idParamsSchema)
-      .withInput(updateWorkflowSchema)
+      .withParams(workflowRestParamsSchema)
+      .withInput(workflowRestUpdateSchema)
       .withPermission("workflows:update")
-      .responds({ 200: workflowResponseWithPlatformUrlSchema, 404: workflowRefusalSchema })
+      .responds({ 200: workflowRestDetailSchema, 404: workflowRestRefusalSchema })
       .withDocs({ description: "Update a workflow's metadata (name, icon, description)" })
       .withMiddleware(projectRestFacts)
       .handle(({ app, input, scope }, project) => {
@@ -311,9 +254,9 @@ export function createWorkflowRest(platformUrl: PlatformUrlBuilder): WorkflowRes
 
       // Archiving deliberately stays at `:manage`.
       .delete("/:id", "archiveWorkflow")
-      .withParams(idParamsSchema)
+      .withParams(workflowRestParamsSchema)
       .withPermission("workflows:manage")
-      .responds({ 200: archivedWorkflowSchema, 404: workflowRefusalSchema })
+      .responds({ 200: workflowRestArchivedSchema, 404: workflowRestRefusalSchema })
       .withDocs({ description: "Archive (soft-delete) a workflow" })
       .handle(({ app, input, scope }) => {
         logger.info({ projectId: scope.id, workflowId: input.id }, "Archiving workflow");
@@ -327,14 +270,14 @@ export function createWorkflowRest(platformUrl: PlatformUrlBuilder): WorkflowRes
       // second gate is the ceiling fact above: the caller must also be able to
       // READ the run it starts.
       .post("/:id/evaluate", "evaluateWorkflow")
-      .withParams(idParamsSchema)
-      .withInput(evaluateBodySchema)
+      .withParams(workflowRestParamsSchema)
+      .withInput(workflowRestEvaluateSchema)
       .withPermission("workflows:create")
       .responds({
-        200: evaluationStartedSchema,
-        400: workflowRefusalSchema,
-        403: workflowRefusalSchema,
-        404: workflowRefusalSchema,
+        200: workflowRestEvaluationStartedSchema,
+        400: workflowRestRefusalSchema,
+        403: workflowRestRefusalSchema,
+        404: workflowRestRefusalSchema,
       })
       .withDocs({
         description:

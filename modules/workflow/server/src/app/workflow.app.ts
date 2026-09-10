@@ -9,6 +9,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
+  NlpLambdaFleetNotComposedError,
   WorkflowApi,
   WorkflowExecutionFailedError,
   type ArchiveWorkflowCommand,
@@ -44,6 +45,7 @@ import {
   type WorkflowVersionHistoryMode,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
+import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
 import type { WorkflowService } from "../services/workflow.service.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
@@ -253,6 +255,13 @@ export interface WorkflowInfrastructure {
   studioRuns: WorkflowStudioRuns;
   signals: WorkflowSignals;
   nlpLambdaArnResolver: NlpLambdaArnResolver;
+  /**
+   * The account the studio's engines are deployed into, for the sweep the
+   * deployment's cron bearer invokes. Absent where the deployment fronts the
+   * engine with no Lambdas at all, and the sweep then refuses by name rather
+   * than reporting a clean run over nothing.
+   */
+  nlpLambdaFleet?: NlpLambdaFleet;
   nlpLambdaFunction: NlpLambdaFunctionPort;
   nlpLambdaInvoke: NlpLambdaInvoke;
   nlpLambdaStreamInvoke: NlpLambdaStreamInvoke;
@@ -748,6 +757,22 @@ export class WorkflowApp implements WorkflowApi {
 
   listPublishedComponents(input: { projectId: string }): Promise<unknown> {
     return this.#infrastructure.publications.listPublishedComponents(input);
+  }
+
+  // -- the deployment's own housekeeping ------------------------------------
+
+  /**
+   * Sweeps the studio's quiet per-project NLP Lambda functions and their log
+   * groups. It refuses rather than reporting an empty sweep when the
+   * deployment composed no fleet: "nothing to delete" and "nothing was looked
+   * at" read identically to a scheduler, and only one of them is healthy.
+   */
+  async cleanupOldLambdas(): Promise<void> {
+    const fleet = this.#infrastructure.nlpLambdaFleet;
+
+    if (!fleet) throw new NlpLambdaFleetNotComposedError();
+
+    await NlpLambdaCleanupService.create({ fleet }).sweep();
   }
 
   /**

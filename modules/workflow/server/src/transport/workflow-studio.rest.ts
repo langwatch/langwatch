@@ -14,7 +14,7 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
   LlmModelNotSetError,
-  studioClientEventSchema,
+  workflowStudioRestEventSchema,
   WorkflowApi,
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
@@ -32,11 +32,6 @@ export const workflowStudioSession = defineRestMiddleware(
 const SESSION_RESOLVED_IN_HANDLER =
   "the studio editor's browser session is resolved by the family itself, which answers its own " +
   "401 and 403 in the sentences the editor renders; no API credential opens this door";
-
-const postEventBodySchema = z.object({
-  projectId: z.string(),
-  event: studioClientEventSchema,
-});
 
 /**
  * The event types the engine accepts. Stated as a set rather than a `switch`
@@ -149,11 +144,11 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withAccess(publicRoute({ reason: SESSION_RESOLVED_IN_HANDLER }))
   .withRawResponse({ produces: ["text/event-stream", "application/json"] })
-  .withDocs({ requestBody: { schema: postEventBodySchema } })
+  .withDocs({ requestBody: { schema: workflowStudioRestEventSchema } })
   .withMiddleware(workflowStudioSession)
   .handle(async ({ app, raw }, session): Promise<RestRawResult> => {
     const posted = postedJson(raw);
-    const validated = posted ? postEventBodySchema.safeParse(posted) : null;
+    const validated = posted ? workflowStudioRestEventSchema.safeParse(posted) : null;
 
     if (!posted || !validated?.success) return jsonAnswer({ error: "Invalid body" }, 400);
 

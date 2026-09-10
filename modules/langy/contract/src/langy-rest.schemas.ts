@@ -45,6 +45,20 @@ export const langyTurnResultSchema = z.object({
   errorCode: z.string().optional(),
 });
 
+/** The turn one durable ingest names in its path. */
+export const langyInternalTurnParamsSchema = z.object({ turnId: z.string().min(1) });
+
+/** What a durable turn result answers once it is recorded. */
+export const langyInternalAcceptedSchema = z.object({ status: z.literal("accepted") });
+
+/** What a revoke answers: the state the key is now in, however it got there. */
+export const langyInternalRevokedSchema = z.object({
+  outcome: z.enum(["revoked", "already_revoked", "not_found"]),
+});
+
+/** The bare `{ error }` body this control plane's refusals have always carried. */
+export const langyInternalRefusalSchema = z.object({ error: z.string() });
+
 export const langyRevokeCredentialsSchema = z.object({
   apiKeyId: z.string().min(1).max(128),
   // The tenant the key belongs to. Required so the revoke is scoped to one

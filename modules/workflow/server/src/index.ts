@@ -96,7 +96,8 @@ export {
 } from "./app/workflow.app.ts";
 export { workflowServer } from "./workflow.server.ts";
 
-/** The four declarations the installer carries, and the fifth the process builds. */
+/** The five declarations the installer carries, and the sixth the process builds. */
+export { cronRest } from "./transport/cron.rest.ts";
 export { workflowTrpcTransport } from "./transport/workflow.trpc.ts";
 export { workflowOptimizationTrpcTransport } from "./transport/workflow-optimization.trpc.ts";
 export { workflowRunContentType, workflowRunRest } from "./transport/workflow-run.rest.ts";
