@@ -3,16 +3,57 @@
  * Lifts only the shared decisions — one `assertEntitled` gate, one optional
  * events log — and reaches the rest through {@link endpoints}/{@link health}.
  */
+import { randomUUID } from "node:crypto";
+
 import {
   WebhookApi,
   type WebhookApi as WebhookApiContract,
 } from "@langwatch/webhook-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type { WebhookEndpointRuntime } from "../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
 import type { WebhookDispatchResult } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 import type { WebhookEventsService } from "../services/webhook-events.service.ts";
 import type { WebhookHealthService } from "../services/webhook-health.service.ts";
+
+/** The single-envelope batch a test fire sends. */
+function testFireBody(now: Instant): string {
+  return JSON.stringify({
+    batch: [
+      {
+        id: `evt_test_${randomUUID()}`,
+        type: "test.ping",
+        created: now.toString({ fractionalSecondDigits: 3 }),
+        schema_version: "1",
+        data: { message: "LangWatch webhook test delivery" },
+      },
+    ],
+  });
+}
+
+/** Records a test fire's outcome. The test itself ran, so a delivery-log
+ *  write failure must never turn the documented answer into a throw. */
+async function recordTestFire(
+  endpoints: WebhookEndpointRuntime,
+  attempt: {
+    organizationId: string;
+    endpointId: string;
+    dispatchId: string;
+    outcome: "success" | "terminal";
+    responseStatus?: number;
+    error?: string;
+  },
+): Promise<void> {
+  try {
+    await endpoints.recordDeliveryAttempt({ ...attempt, attempt: 1, eventCount: 1 });
+  } catch (error) {
+    logger.warn({ error }, "test-fire delivery log write failed");
+  }
+}
+
+const logger = createLogger("langwatch:webhook:app");
 
 /** One endpoint's last hop, as the delivery worker performs it. */
 export type WebhookTestDispatch = (input: {
@@ -84,6 +125,67 @@ export class WebhookApp implements WebhookApiContract {
   getDeliveries: WebhookApiContract["getDeliveries"] = (input) =>
     this.#dependencies.endpoints.getDeliveries(input);
   getHealth: WebhookApiContract["getHealth"] = (input) => this.#dependencies.health.health(input);
+  testFire: WebhookApiContract["testFire"] = async ({ organizationId, endpointId }) => {
+    const { endpoints, dispatch } = this.#dependencies;
+    const [secrets, destination] = await Promise.all([
+      endpoints.getSigningSecrets({ organizationId, endpointId }),
+      endpoints.getDestinationConfig({ organizationId, endpointId }),
+    ]);
+    const dispatchId = `test:${randomUUID()}`;
+
+    try {
+      // Reaches exactly what real delivery reaches, including the transport:
+      // a queue endpoint's test must land on the queue, not on a URL it has none of.
+      const result = await dispatch({
+        destination,
+        organizationId,
+        endpointId,
+        body: testFireBody(nowInstant()),
+        batchId: dispatchId,
+        attempt: 1,
+        signingSecrets: secrets,
+        isTestFire: true,
+      });
+      const delivered = result.verdict === "success";
+      await recordTestFire(endpoints, {
+        organizationId,
+        endpointId,
+        dispatchId,
+        outcome: delivered ? "success" : "terminal",
+        ...(result.status !== null ? { responseStatus: result.status } : {}),
+      });
+
+      return delivered
+        ? {
+            delivered: true,
+            responseStatus: result.status,
+            responseBody: String(result.body ?? "").slice(0, 500),
+          }
+        : {
+            delivered: false,
+            responseStatus: result.status,
+            error: String(result.error ?? "").slice(0, 500),
+          };
+    } catch (error) {
+      // The full message goes to the delivery log for the operator; the
+      // answer carries a sanitised summary so internal dispatch wording and
+      // transport details never reach the caller verbatim.
+      await recordTestFire(endpoints, {
+        organizationId,
+        endpointId,
+        dispatchId,
+        outcome: "terminal",
+        error: error instanceof Error ? error.message.slice(0, 500) : String(error),
+      });
+
+      return {
+        delivered: false,
+        responseStatus: null,
+        error:
+          "The test delivery could not reach the receiver; see the endpoint's delivery log for details.",
+      };
+    }
+  };
   assertEndpointsEntitled: WebhookApiContract["assertEndpointsEntitled"] = (organizationId) =>
     this.#dependencies.assertEndpointsEntitled(organizationId);
   getEmittedEvents: WebhookApiContract["getEmittedEvents"] = (input) =>

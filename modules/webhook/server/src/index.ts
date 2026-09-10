@@ -123,7 +123,7 @@ export { webhookEndpointTrpcTransport } from "./transport/webhook-endpoint.trpc.
 /**
  * The organization-key REST family this feature owns, `/api/webhooks/v1`.
  */
-export { createWebhookRestApp } from "./transport/api-rest/webhook.api.ts";
+export { webhookRest } from "./transport/webhook.rest.ts";
 
 // --------------------------------------------------------------------------- An endpoint's
 // LAST HOP Everything above the destination interface is one machinery no matter where an

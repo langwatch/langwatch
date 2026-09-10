@@ -140,3 +140,12 @@ export type WebhookDeliveryLog = {
   deliveries: WebhookDeliveryAttemptRecord[];
   nextCursor: WebhookDeliveryPosition | null;
 };
+
+/**
+ * A test fire's outcome, over the same last hop a real delivery dispatches
+ * through. `responseBody`/`error` are truncated summaries: the full detail
+ * lands in the delivery log, never in this answer.
+ */
+export type WebhookTestFireResult =
+  | { delivered: true; responseStatus: number | null; responseBody: string }
+  | { delivered: false; responseStatus: number | null; error: string };

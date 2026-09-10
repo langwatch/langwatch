@@ -10,6 +10,7 @@ import type {
   WebhookEndpointHealth,
   WebhookEndpointView,
   WebhookEnvelope,
+  WebhookTestFireResult,
 } from "./webhook.ts";
 
 /**
@@ -45,6 +46,9 @@ export interface WebhookApi {
     cursor?: WebhookDeliveryPosition;
   }): Promise<WebhookDeliveryLog>;
   getHealth(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointHealth>;
+  /** Sends a signed test event through the exact hop a real delivery dispatches
+   *  through, and records the attempt in the endpoint's delivery log. */
+  testFire(input: { organizationId: string; endpointId: string }): Promise<WebhookTestFireResult>;
   getEmittedEvents(input: ListWebhookEventsQuery): Promise<ListWebhookEventsResult>;
   findEmittedEventById(input: {
     organizationId: string;
