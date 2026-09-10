@@ -8,6 +8,7 @@ import { organizationManagementRest } from "./transport/organization-management.
 import { organizationTrpcTransport } from "./transport/organization.trpc.ts";
 import { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
 import { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-workspace-features.trpc.ts";
+import { createTeamRest } from "./transport/team.rest.ts";
 import { teamTrpcTransport } from "./transport/team.trpc.ts";
 
 export const organizationServer = defineModule("organization")

@@ -11,7 +11,7 @@ export {
   OrganizationSessionRevocationPort,
   type OrganizationPlanUser,
   type OrganizationSeatDecision,
-} from "./ports/organization-membership.port.ts";
+} from "./app/organization.infrastructure.ts";
 export { OrganizationMembershipService } from "./services/organization-membership.service.ts";
 export { OrganizationGroupScopeService } from "./services/organization-group-scope.service.ts";
 export {
@@ -69,7 +69,7 @@ export {
   OrganizationSettingsSecretPort,
   GroupIdentityPort,
   TeamIdentityPort,
-} from "./ports/organization.port.ts";
+} from "./app/organization.infrastructure.ts";
 export {
   OrganizationRepository,
   type StoredOrganizationSettings,
@@ -112,7 +112,8 @@ export type {
   OrganizationPlanGate,
   OrganizationSignals,
 } from "./app/organization.infrastructure.ts";
-export { createGroupRestApp } from "./transport/api-rest/group.api.ts";
+export { groupsRest, groupsRestEnterpriseGate } from "./transport/group.rest.ts";
+export { createTeamRest } from "./transport/team.rest.ts";
 export { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
 // See the NOTE above `createOrganizationRestApp`: the legacy provisioning
 // family stays exported for the same four out-of-path consumers.
@@ -123,7 +124,6 @@ export {
   verifyInstanceAdminKey,
 } from "./transport/api-rest/organization-provisioning.api.ts";
 export { ORGANIZATIONS_SPEC_OPTIONS } from "./rules/organization-provisioning-openapi.rules.ts";
-export { createTeamsRestApp } from "./transport/api-rest/team.api.ts";
 export { buildInviteAcceptUrl, buildMembersSettingsUrl } from "./rules/invite-link.rules.ts";
 export {
   resolveInviteDisplayStatus,
