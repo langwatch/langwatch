@@ -1,7 +1,9 @@
 export {
-  PostgresAutomationAdapter,
+  PostgresAutomationRepositories,
   type AutomationDatabase,
-} from "./adapters/postgres.automation.adapter.ts";
+} from "./repositories/prisma/prisma.automation.repositories.ts";
+export { automationRepositories } from "./repositories/automation-repositories.registry.ts";
+export type { AutomationRepositories } from "./repositories/automation.repositories.ts";
 export { automationServer } from "./automation.server.ts";
 export { PostgresAutomationGraphDeliveryAdapter } from "./adapters/postgres.automation-graph-delivery.adapter.ts";
 export { SlackWebhookDeliveryAdapter } from "./adapters/slack-webhook.delivery.adapter.ts";

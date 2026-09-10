@@ -52,10 +52,11 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 
+import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
 import {
-  PostgresAutomationAdapter,
+  PostgresAutomationRepositories,
   type AutomationDatabase,
-} from "../adapters/postgres.automation.adapter.ts";
+} from "../repositories/prisma/prisma.automation.repositories.ts";
 import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
 import type {
   AutomationDispatchErrorPort,
@@ -71,6 +72,10 @@ import type { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
 import type { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
 import type { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port.ts";
 import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
+import { AutomationService } from "../services/automation.service.ts";
+import { AutomationTemplateService } from "../services/automation-template.service.ts";
+import { ReportScheduleService } from "../services/report-schedule.service.ts";
+import { AutomationGraphService } from "../services/trigger-graph.service.ts";
 import {
   AutomationRulesService,
   type AutomationProjectIdentity,
@@ -207,7 +212,8 @@ type AutomationSetup = FeatureSetup<
   AutomationDependencies,
   AutomationInfrastructure,
   AutomationServerConfig
->;
+> &
+  Readonly<{ repositories?: AutomationRepositories }>;
 
 /** What the application is composed from, once the process has supplied it. */
 interface AutomationAppCollaborators {
@@ -217,6 +223,17 @@ interface AutomationAppCollaborators {
   authoring: AutomationAuthoringService;
   audit: AutomationAuditSink;
   limits: AutomationCallCounter;
+}
+
+/**
+ * The rows a process that still passes its own client gets, until its
+ * composition hands `repositories` over instead of `database`.
+ */
+function postgresRepositoriesFor(setup: AutomationSetup): AutomationRepositories {
+  return PostgresAutomationRepositories.create({
+    prisma: setup.infrastructure.database,
+    clock: setup.infrastructure.clock,
+  });
 }
 
 export class AutomationApp implements AutomationApi {
@@ -242,24 +259,44 @@ export class AutomationApp implements AutomationApi {
       },
       redis: setup.infrastructure.redis,
     });
-    const automation = PostgresAutomationAdapter.create({
-      database: setup.infrastructure.database,
-      verifier: setup.infrastructure.verifier,
-      jobs: setup.infrastructure.jobs,
-      clock: setup.infrastructure.clock,
-      wake: setup.infrastructure.wake,
+    const repositories = setup.repositories ?? postgresRepositoriesFor(setup);
+    const graph = AutomationGraphService.create({
+      triggers: repositories.triggers,
+      customGraphs: repositories.customGraphs,
       projects: setup.dependencies.projects,
       analytics: setup.dependencies.analytics,
       notifier: setup.infrastructure.notifier,
-      baseHost: setup.config.baseHost,
+      triggerSent: repositories.graphTriggerSent,
       logger: setup.infrastructure.logger,
       slackTokens: setup.infrastructure.slackTokens,
       dispatchErrors: setup.infrastructure.dispatchErrors,
       heartbeat: setup.infrastructure.heartbeat,
       runaway: setup.infrastructure.runaway,
-      testFire: setup.infrastructure.testFire,
+      clock: setup.infrastructure.clock,
+      baseHost: setup.config.baseHost,
+    });
+    const automation = AutomationService.create({
+      triggers: repositories.triggers,
+      history: repositories.history,
+      suppressions: repositories.suppressions,
+      names: repositories.names,
+      customGraphs: repositories.customGraphs,
+      webhookDeliveries: repositories.webhookDeliveries,
+      verifier: setup.infrastructure.verifier,
+      reportSchedules: ReportScheduleService.create({
+        jobs: setup.infrastructure.jobs,
+        clock: setup.infrastructure.clock,
+        wake: setup.infrastructure.wake,
+        triggers: repositories.triggers,
+      }),
+      clock: setup.infrastructure.clock,
+      graph,
+      templates: AutomationTemplateService.create({
+        baseHost: setup.config.baseHost,
+        delivery: setup.infrastructure.testFire,
+      }),
       persistCaps,
-    }).build();
+    });
     const rules = AutomationRulesService.create({
       automation,
       projects: setup.dependencies.projects,

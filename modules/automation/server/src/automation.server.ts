@@ -1,6 +1,7 @@
 import { defineModule } from "@langwatch/runtime-composition";
 
 import { AutomationApp } from "./app/automation.app.ts";
+import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
 import { automationTrpcTransport } from "./transport/automation.trpc.ts";
 import { emailSuppressionTrpcTransport } from "./transport/email-suppression.trpc.ts";
 import { slackAutomationRest } from "./transport/slack-trigger.rest.ts";
@@ -14,6 +15,7 @@ export type { AutomationInfrastructure } from "./app/automation.app.ts";
  * `createAutomationRest(platformUrl)` and mounted beside these.
  */
 export const automationServer = defineModule("automation")
+  .withRepositories(automationRepositories)
   .withApp(AutomationApp)
   .withTransports(
     automationTrpcTransport,

@@ -59,19 +59,11 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "automation|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "automation|refusing-composition",
       "measured": "2026-09-08"
     },
     {
       "key": "automation|testing-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "automation|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {
