@@ -3,25 +3,23 @@ import { SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 import { ScenarioRepository } from "../scenario.repository.ts";
 import { ScenarioService } from "../../services/scenario.service.ts";
-import { ScenarioClockPort } from "../../ports/scenario-clock.port.ts";
-import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../../ports/scenario-id.port.ts";
-import { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port.ts";
+import { ScenarioClock } from "../../app/scenario.app.ts";
+import { ScenarioTestSuiteId, ScenarioId } from "../../app/scenario.app.ts";
+import { ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
 
 const simulations = Object.create(SimulationService.prototype) as SimulationService;
 
-class TestScenarioId extends ScenarioIdPort {
+class TestScenarioId implements ScenarioId {
   constructor(private readonly value: string) {
-    super();
   }
   next(): string {
     return this.value;
   }
 }
 
-class TestScenarioTestSuiteId extends ScenarioTestSuiteIdPort {
+class TestScenarioTestSuiteId implements ScenarioTestSuiteId {
   constructor(private readonly value: string) {
-    super();
   }
 
   next(): string {
@@ -29,16 +27,15 @@ class TestScenarioTestSuiteId extends ScenarioTestSuiteIdPort {
   }
 }
 
-class TestScenarioClock extends ScenarioClockPort {
+class TestScenarioClock implements ScenarioClock {
   constructor(private readonly value: Date = new Date(0)) {
-    super();
   }
   now(): Date {
     return this.value;
   }
 }
 
-class TestScenarioSecretCipher extends ScenarioSecretCipherPort {
+class TestScenarioSecretCipher implements ScenarioSecretCipher {
   encrypt(value: string): string {
     return `encrypted:${value}`;
   }
@@ -242,7 +239,7 @@ describe("ScenarioService", () => {
   });
 
   describe("given a deployment with no stored-secret encryption key", () => {
-    class RefusingScenarioSecretCipher extends ScenarioSecretCipherPort {
+    class RefusingScenarioSecretCipher implements ScenarioSecretCipher {
       encrypt(): string {
         throw Object.assign(
           new Error(

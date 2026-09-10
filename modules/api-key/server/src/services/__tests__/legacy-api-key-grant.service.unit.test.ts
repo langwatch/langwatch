@@ -1,7 +1,7 @@
 import type { ApiKey } from "@langwatch/api-key-contract";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiKeyDiagnosticsPort } from "../../ports/api-key-diagnostics.port.ts";
+import { ApiKeyDiagnostics } from "../../app/api-key.app.ts";
 import { LegacyApiKeyGrantService } from "../legacy-api-key-grant.service.ts";
 import { fromDate } from "@langwatch/time";
 
@@ -32,7 +32,7 @@ function apiKey(overrides: Partial<ApiKey> = {}): ApiKey {
   };
 }
 
-class RecordingDiagnostics extends ApiKeyDiagnosticsPort {
+class RecordingDiagnostics implements ApiKeyDiagnostics {
   readonly warnings: Array<{
     context: Record<string, unknown>;
     message: string;

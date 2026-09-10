@@ -14,7 +14,7 @@ import { createJudgeModelFromParams, createModelFromParams } from "./litellm-mod
 import { selectRoleModelParams } from "./scenario-role-model.adapter.ts";
 import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.adapter.ts";
 import type { ChildProcessJobData } from "@langwatch/scenario-contract";
-import type { ScenarioHttpPort } from "../ports/scenario-http.port.ts";
+import type { ScenarioHttp } from "../app/scenario.app.ts";
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface
@@ -31,7 +31,7 @@ export interface ScenarioChildRuntime {
   langwatchEndpoint: string;
   langwatchApiKey: string;
   verbose: boolean;
-  httpPort: ScenarioHttpPort;
+  httpPort: ScenarioHttp;
   logger: Logger;
   /** The operator's nlpgo deadlines, read by the process that started this. */
   nlpTimeouts?: NlpFetchTimeouts;

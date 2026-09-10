@@ -40,7 +40,7 @@ function track(project: string, tabKey: string): string {
 let connection: RedisConnection | null = null;
 let scenarioTabRegistry: ScenarioTabRegistryService;
 
-class SystemClock extends ScenarioClockPort {
+class SystemClock implements ScenarioClockPort {
   now(): Date {
     return new Date();
   }

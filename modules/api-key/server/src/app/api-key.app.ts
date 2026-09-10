@@ -37,8 +37,8 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 import { ApiKeyTokenAdapter } from "../adapters/api-key-token.api-key-token.adapter.ts";
-import type { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port.ts";
-import type { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port.ts";
+import type { ApiKeyBindingId } from "./api-key.app.ts";
+import type { ApiKeyDiagnostics } from "./api-key.app.ts";
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import {
@@ -55,9 +55,9 @@ export interface ApiKeyCaller {
 export interface ApiKeyInfrastructure {
   /** The HMAC key a stored secret is derived under. */
   readonly pepper: string;
-  readonly bindingIds: ApiKeyBindingIdPort;
+  readonly bindingIds: ApiKeyBindingId;
   readonly deriveBindingId: AuthzBindingIdDeriver;
-  readonly diagnostics: ApiKeyDiagnosticsPort;
+  readonly diagnostics: ApiKeyDiagnostics;
 }
 type ApiKeyDependencies = Readonly<{
   authorization: typeof AuthzApi;
@@ -521,4 +521,14 @@ export class ApiKeyApp implements ApiKeyApi {
   #isOrganizationAdmin(organizationId: string, by: ApiKeyCaller): Promise<boolean> {
     return this.#service.isOrgAdmin({ userId: by.id, organizationId });
   }
+}
+
+/** Generates opaque AuthZ binding identifiers for API-key grants. */
+export interface ApiKeyBindingId {
+  generateBindingId(): string;
+}
+
+
+export interface ApiKeyDiagnostics {
+  warn(context: Record<string, unknown>, message: string): void;
 }

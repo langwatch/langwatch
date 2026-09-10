@@ -45,9 +45,9 @@ import { resolveRunParameters } from "@langwatch/scenario-contract";
 import { createLogger } from "@langwatch/observability";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
-import type { ScenarioClockPort } from "../ports/scenario-clock.port.ts";
-import type { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../ports/scenario-id.port.ts";
-import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port.ts";
+import type { ScenarioClock } from "../app/scenario.app.ts";
+import type { ScenarioTestSuiteId, ScenarioId } from "../app/scenario.app.ts";
+import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
 import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 
 const logger = createLogger("langwatch:scenarios");
@@ -63,10 +63,10 @@ function actorFor(lastUpdatedById: string | null | undefined): ScenarioActor {
 export type ScenarioServiceOptions = {
   repository: ScenarioRepository;
   simulations: SimulationService;
-  ids: ScenarioIdPort;
-  testSuiteIds: ScenarioTestSuiteIdPort;
-  clock: ScenarioClockPort;
-  secretCipher: ScenarioSecretCipherPort;
+  ids: ScenarioId;
+  testSuiteIds: ScenarioTestSuiteId;
+  clock: ScenarioClock;
+  secretCipher: ScenarioSecretCipher;
 };
 
 /**

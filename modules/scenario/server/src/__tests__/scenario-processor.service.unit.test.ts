@@ -27,7 +27,7 @@ const job = (id: string): ExecutionJobData => ({
   target: { type: "http", referenceId: "agent-1" },
 });
 
-class TestCancellationSubscriber extends CancellationSubscriberPort {
+class TestCancellationSubscriber implements CancellationSubscriberPort {
   private onCancellation: ((message: CancellationMessage) => void) | undefined = void 0;
 
   subscribe(onCancellation: (message: CancellationMessage) => void): Promise<() => Promise<void>> {
@@ -46,18 +46,17 @@ class TestCancellationSubscriber extends CancellationSubscriberPort {
   }
 }
 
-class TestMetrics extends ScenarioProcessorServiceMetricsPort {
+class TestMetrics implements ScenarioProcessorServiceMetricsPort {
   started(): void {}
   completed(): void {}
   failed(): void {}
 }
 
-class HoldingExecutionRunner extends ScenarioExecutionRunnerPort {
+class HoldingExecutionRunner implements ScenarioExecutionRunnerPort {
   constructor(
     private readonly pool: ScenarioExecutionPoolService,
     private readonly child: ChildProcess,
   ) {
-    super();
   }
 
   execute(jobData: ExecutionJobData): Promise<void> {
@@ -96,7 +95,7 @@ function processorFixture() {
   };
 }
 
-class TestChildSession extends ScenarioChildExecutionSession {
+class TestChildSession implements ScenarioChildExecutionSession {
   readonly execute = vi.fn().mockResolvedValue({ success: true });
   readonly abort = vi.fn().mockResolvedValue(undefined);
 }

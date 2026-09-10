@@ -39,7 +39,7 @@ import {
 import type { SecretApi } from "@langwatch/secret-contract";
 
 
-import type { AgentAdapterFactoryPort } from "../ports/agent-adapter-factory.port.ts";
+import type { AgentAdapterFactory } from "../app/scenario.app.ts";
 import { z } from "zod";
 import {
   AgentTestPrefetchService,
@@ -61,7 +61,7 @@ export type AgentTestServiceOptions = {
   simulations: SimulationService;
   config: ScenarioExecutionPrefetchConfig;
   /** Builds the adapter that speaks to the agent under test. */
-  agentAdapters: AgentAdapterFactoryPort;
+  agentAdapters: AgentAdapterFactory;
   /** The platform's call-budget ceiling every kind of agent answers inside. */
   maxCallTimeoutMs: number;
 };

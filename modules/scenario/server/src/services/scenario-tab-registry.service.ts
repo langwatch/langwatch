@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { ScenarioTabRegistry, type ScenarioTabRegistration } from "@langwatch/scenario-contract";
-import type { ScenarioClockPort } from "../ports/scenario-clock.port.ts";
-import type { ScenarioTabStorePort } from "../ports/scenario-tab-store.port.ts";
+import type { ScenarioClock } from "../app/scenario.app.ts";
+import type { ScenarioTabStore } from "../app/scenario.app.ts";
 
 const logger = createLogger("langwatch:scenario-tab-registry");
 const KEY_PREFIX = "scenario_tab:v1";
@@ -17,16 +17,16 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
   private readonly memoryPending = new Map<string, PendingNavigate>();
 
   static create(options: {
-    store: ScenarioTabStorePort | null;
-    clock: ScenarioClockPort;
+    store: ScenarioTabStore | null;
+    clock: ScenarioClock;
   }): ScenarioTabRegistryService {
     return new ScenarioTabRegistryService(options);
   }
 
   private constructor(
     private readonly options: {
-      store: ScenarioTabStorePort | null;
-      clock: ScenarioClockPort;
+      store: ScenarioTabStore | null;
+      clock: ScenarioClock;
     },
   ) {
     super();

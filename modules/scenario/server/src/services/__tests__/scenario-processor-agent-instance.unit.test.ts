@@ -6,9 +6,9 @@
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CancellationSubscriberPort } from "../../ports/cancellation-channel.port.ts";
-import { ScenarioChildBootstrapPort } from "../../ports/scenario-child-bootstrap.port.ts";
-import { ScenarioProcessorServiceMetricsPort } from "../../ports/scenario-processor-metrics.port.ts";
+import { CancellationSubscriber } from "../../app/scenario.app.ts";
+import { ScenarioChildBootstrap } from "../../app/scenario.app.ts";
+import { ScenarioProcessorServiceMetrics } from "../../app/scenario.app.ts";
 import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
 import type { ExecutionJobData } from "../scenario-execution-pool.service.ts";
 import { ScenarioProcessorService } from "../scenario-processor.service.ts";
@@ -22,13 +22,13 @@ const JOB: ExecutionJobData = {
   target: { type: "connected", referenceId: "agent_123" },
 };
 
-class SilentCancellations extends CancellationSubscriberPort {
+class SilentCancellations implements CancellationSubscriber {
   subscribe(): Promise<() => Promise<void>> {
     return Promise.resolve(async () => {});
   }
 }
 
-class SilentMetrics extends ScenarioProcessorServiceMetricsPort {
+class SilentMetrics implements ScenarioProcessorServiceMetrics {
   started(): void {}
   completed(): void {}
   failed(): void {}
@@ -50,9 +50,7 @@ describe("ScenarioProcessorService.handleSucceeded", () => {
       execution,
       pool: ScenarioExecutionPoolService.create({ concurrency: 1 }),
       cancellations: new SilentCancellations(),
-      childProcesses: Object.create(
-        ScenarioChildBootstrapPort.prototype,
-      ) as ScenarioChildBootstrapPort,
+      childProcesses: {} as ScenarioChildBootstrap,
       metrics: new SilentMetrics(),
     });
   });

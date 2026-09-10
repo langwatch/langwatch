@@ -14,11 +14,11 @@ import { SimulationService } from "@langwatch/scenario-contract";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { ScenarioRepository } from "../../repositories/scenario.repository.ts";
 import { ScenarioService } from "../../services/scenario.service.ts";
-import { ScenarioClockPort } from "../scenario-clock.port.ts";
-import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../scenario-id.port.ts";
-import { ScenarioSecretCipherPort } from "../scenario-secret-cipher.port.ts";
+import { ScenarioClock } from "../../app/scenario.app.ts";
+import { ScenarioTestSuiteId, ScenarioId } from "../../app/scenario.app.ts";
+import { ScenarioSecretCipher } from "../../app/scenario.app.ts";
 
-class CancellationTestSecretCipher extends ScenarioSecretCipherPort {
+class CancellationTestSecretCipher implements ScenarioSecretCipher {
   encrypt(value: string): string {
     return value;
   }
@@ -28,19 +28,19 @@ class CancellationTestSecretCipher extends ScenarioSecretCipherPort {
   }
 }
 
-class CancellationTestId extends ScenarioIdPort {
+class CancellationTestId implements ScenarioId {
   next(): string {
     return "unused";
   }
 }
 
-class CancellationTestTestSuiteId extends ScenarioTestSuiteIdPort {
+class CancellationTestTestSuiteId implements ScenarioTestSuiteId {
   next(): string {
     return "test_suite_unused";
   }
 }
 
-class CancellationTestClock extends ScenarioClockPort {
+class CancellationTestClock implements ScenarioClock {
   now(): Date {
     return new Date(0);
   }

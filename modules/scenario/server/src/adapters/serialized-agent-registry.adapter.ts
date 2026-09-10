@@ -5,10 +5,7 @@
  */
 
 import type { AgentAdapter } from "@langwatch/scenario";
-import {
-  AgentAdapterFactoryPort,
-  type AgentAdapterBuildInput,
-} from "../ports/agent-adapter-factory.port.ts";
+import { AgentAdapterFactory, type AgentAdapterBuildInput } from "../app/scenario.app.ts";
 import type { NlpFetchTimeouts } from "./nlp-fetch.adapter.ts";
 import { SerializedCodeAgentAdapter } from "./serialized-code-agent.adapter.ts";
 import { SerializedHttpAgentAdapter } from "./serialized-http-agent.adapter.ts";
@@ -21,7 +18,7 @@ import { SerializedWorkflowAgentAdapter } from "./serialized-workflow-agent.adap
  * registered, or if the resolved factory is missing the credential it needs (modelParams for
  * prompt, projectApiKey for workflow/code).
  */
-export class SerializedAgentRegistryAdapter extends AgentAdapterFactoryPort {
+export class SerializedAgentRegistryAdapter implements AgentAdapterFactory {
   /**
    * `nlpTimeouts` are the operator's nlpgo deadlines, read by the process that
    * composed this registry — an unset one falls back to the same default the
@@ -34,7 +31,6 @@ export class SerializedAgentRegistryAdapter extends AgentAdapterFactoryPort {
   }
 
   private constructor(private readonly nlpTimeouts: NlpFetchTimeouts) {
-    super();
   }
 
   build(input: AgentAdapterBuildInput): AgentAdapter {

@@ -7,8 +7,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { ChildProcess } from "child_process";
 import type { ScenarioExecutionJob } from "@langwatch/scenario-contract";
-import type { ScenarioExecutionRunnerPort } from "../ports/scenario-execution-runner.port.ts";
-import { ScenarioExecutionPoolPort } from "../ports/scenario-execution-pool.port.ts";
+import type { ScenarioExecutionRunner } from "../app/scenario.app.ts";
+import { ScenarioExecutionPool } from "../app/scenario.app.ts";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");
 
@@ -19,7 +19,7 @@ type ActiveExecution = {
   child?: ChildProcess;
 };
 
-export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
+export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
   /**
    * In-flight job data keyed by scenarioRunId, tracked from the moment a job starts (before the
    * child is registered) so the spawn window — where the child exists but is not registered yet —
@@ -29,18 +29,17 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
   private readonly _pending: ExecutionJobData[] = [];
   private readonly _cancelled = new Set<string>();
   private readonly _concurrency: number;
-  private runner: ScenarioExecutionRunnerPort | undefined = void 0;
+  private runner: ScenarioExecutionRunner | undefined = void 0;
 
   static create(options: { concurrency: number }): ScenarioExecutionPoolService {
     return new ScenarioExecutionPoolService(options);
   }
 
   private constructor({ concurrency }: { concurrency: number }) {
-    super();
     this._concurrency = concurrency;
   }
 
-  connect(runner: ScenarioExecutionRunnerPort): void {
+  connect(runner: ScenarioExecutionRunner): void {
     this.runner = runner;
   }
 
@@ -49,7 +48,7 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
    * `ScenarioProcessorService.create` calls it during worker boot, so a job submitted before that
    * lands on an unconnected pool.
    */
-  private requireRunner(scenarioRunId: string): ScenarioExecutionRunnerPort {
+  private requireRunner(scenarioRunId: string): ScenarioExecutionRunner {
     if (!this.runner) {
       throw new Error(
         `Scenario execution pool is not connected for scenarioRunId=${scenarioRunId}`,
@@ -241,13 +240,12 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
 }
 
 /** Explicit non-worker capability; throwing lets the durable intent retry. */
-export class UnavailableScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
+export class UnavailableScenarioExecutionPoolService implements ScenarioExecutionPool {
   static create(): UnavailableScenarioExecutionPoolService {
     return new UnavailableScenarioExecutionPoolService();
   }
 
   private constructor() {
-    super();
   }
 
   submit(input: ScenarioExecutionJob): void {

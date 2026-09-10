@@ -16,16 +16,15 @@ import {
   type StoredApiKey,
 } from "../api-key.repository.ts";
 import { ApiKeyTokenAdapter } from "../../adapters/api-key-token.api-key-token.adapter.ts";
-import { ApiKeyBindingIdPort } from "../../ports/api-key-binding-id.port.ts";
+import { ApiKeyBindingId } from "../../app/api-key.app.ts";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
-class TestApiKeyBindingIdPort extends ApiKeyBindingIdPort {
+class TestApiKeyBindingIdPort implements ApiKeyBindingId {
   static create(): TestApiKeyBindingIdPort {
     return new TestApiKeyBindingIdPort();
   }
 
   private constructor() {
-    super();
   }
 
   generateBindingId(): string {

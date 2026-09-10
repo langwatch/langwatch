@@ -22,7 +22,7 @@ import {
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port.ts";
+import type { ApiKeyBindingId } from "../app/api-key.app.ts";
 import type { ApiKeyTokenRepository } from "../repositories/api-key-token.repository.ts";
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
@@ -40,7 +40,7 @@ export type ApiKeyDependencies = {
   grants: AuthzApi;
   organizations: OrganizationApi;
   projects: ProjectApi;
-  bindingIds: ApiKeyBindingIdPort;
+  bindingIds: ApiKeyBindingId;
   legacyGrants: LegacyApiKeyGrantService;
   tokens: ApiKeyTokenRepository;
 };

@@ -131,7 +131,7 @@ export interface ScenarioPrefetchFixture {
   modelProviders?: ModelProviderApi;
 }
 
-class TestScenarioSecretCipher extends ScenarioSecretCipherPort {
+class TestScenarioSecretCipher implements ScenarioSecretCipherPort {
   encrypt(plaintext: string): string {
     return `test:v1:${Buffer.from(plaintext, "utf8").toString("base64url")}`;
   }

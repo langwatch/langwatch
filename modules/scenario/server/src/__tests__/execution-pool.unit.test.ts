@@ -29,11 +29,10 @@ function makeFakeChild(): { child: ChildProcess; kill: ReturnType<typeof vi.fn> 
   return { child, kill };
 }
 
-class TestScenarioExecutionRunner extends ScenarioExecutionRunnerPort {
+class TestScenarioExecutionRunner implements ScenarioExecutionRunnerPort {
   readonly skipped: ExecutionJobData[] = [];
 
   constructor(private readonly executeJob: (jobData: ExecutionJobData) => Promise<void>) {
-    super();
   }
 
   execute(jobData: ExecutionJobData): Promise<void> {

@@ -19,9 +19,9 @@ import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { ScenarioRepository } from "../../repositories/scenario.repository.ts";
-import type { ScenarioIdPort, ScenarioTestSuiteIdPort } from "../../ports/scenario-id.port.ts";
-import type { ScenarioClockPort } from "../../ports/scenario-clock.port.ts";
-import type { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port.ts";
+import type { ScenarioId, ScenarioTestSuiteId } from "../scenario.app.ts";
+import type { ScenarioClock } from "../scenario.app.ts";
+import type { ScenarioSecretCipher } from "../scenario.app.ts";
 import { ScenarioApp } from "../scenario.app.ts";
 
 function harness() {
@@ -49,10 +49,10 @@ function harness() {
       scenarioTabs: {} as ScenarioTabRegistry,
       resultAtoms: {} as ResultAtomsService,
       runConfigurations: {} as RunConfigurationsService,
-      ids: {} as ScenarioIdPort,
-      testSuiteIds: {} as ScenarioTestSuiteIdPort,
-      clock: {} as ScenarioClockPort,
-      secretCipher: {} as ScenarioSecretCipherPort,
+      ids: {} as ScenarioId,
+      testSuiteIds: {} as ScenarioTestSuiteId,
+      clock: {} as ScenarioClock,
+      secretCipher: {} as ScenarioSecretCipher,
       broadcast: {
         getTenantEmitter: () => {
           throw new Error("the queue path subscribes to nothing");

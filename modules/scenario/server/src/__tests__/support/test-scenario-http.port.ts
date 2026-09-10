@@ -14,13 +14,13 @@ export const mockScenarioHttpFetch = vi.fn(
   },
 );
 
-class TestScenarioHttpPort extends ScenarioHttpPort {
+class TestScenarioHttpPort implements ScenarioHttpPort {
   fetch(input: ScenarioHttpRequest): Promise<ScenarioHttpResponse> {
     return mockScenarioHttpFetch(input.url, input.init);
   }
 }
 
-class NativeScenarioHttpPort extends ScenarioHttpPort {
+class NativeScenarioHttpPort implements ScenarioHttpPort {
   fetch(input: ScenarioHttpRequest): Promise<ScenarioHttpResponse> {
     return fetch(input.url, input.init);
   }

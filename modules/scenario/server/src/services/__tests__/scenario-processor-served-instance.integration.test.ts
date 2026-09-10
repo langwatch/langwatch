@@ -22,8 +22,8 @@ vi.mock("../../adapters/child-process-spawn.adapter.ts", () => ({
 }));
 
 import { NodeScenarioChildProcessAdapter } from "../../adapters/node-scenario-child-process.adapter.ts";
-import { CancellationSubscriberPort } from "../../ports/cancellation-channel.port.ts";
-import { ScenarioProcessorServiceMetricsPort } from "../../ports/scenario-processor-metrics.port.ts";
+import { CancellationSubscriber } from "../../app/scenario.app.ts";
+import { ScenarioProcessorServiceMetrics } from "../../app/scenario.app.ts";
 import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
 import type { ExecutionJobData } from "../scenario-execution-pool.service.ts";
 import { ScenarioProcessorService } from "../scenario-processor.service.ts";
@@ -37,13 +37,13 @@ const JOB: ExecutionJobData = {
   target: { type: "connected", referenceId: "agent_served" },
 };
 
-class SilentCancellations extends CancellationSubscriberPort {
+class SilentCancellations implements CancellationSubscriber {
   subscribe(): Promise<() => Promise<void>> {
     return Promise.resolve(async () => {});
   }
 }
 
-class SilentMetrics extends ScenarioProcessorServiceMetricsPort {
+class SilentMetrics implements ScenarioProcessorServiceMetrics {
   started(): void {}
   completed(): void {}
   failed(): void {}

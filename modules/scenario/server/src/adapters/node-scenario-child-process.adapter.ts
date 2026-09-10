@@ -19,10 +19,10 @@ import { resolveChildProcessSpawn } from "./child-process-spawn.adapter.ts";
 import { resolveChildTlsEnv } from "./child-tls-env.adapter.ts";
 import type { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
 import {
-  ScenarioChildBootstrapPort,
+  ScenarioChildBootstrap,
   ScenarioChildExecutionSession,
   type ScenarioChildEnvironment,
-} from "../ports/scenario-child-bootstrap.port.ts";
+} from "../app/scenario.app.ts";
 
 const logger = createLogger("langwatch:scenarios:child-process");
 
@@ -66,7 +66,7 @@ export type ScenarioChildProcessResult = {
   agentInstance?: { hostname: string; label: string | null };
 };
 
-export class NodeScenarioChildProcessAdapter extends ScenarioChildBootstrapPort {
+export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
   static readonly parseResult = parseChildProcessResultValue;
   static readonly buildEnvironment = buildChildEnvironmentValue;
   static readonly buildOtelResourceAttributes = buildOtelResourceAttributesValue;
@@ -84,7 +84,6 @@ export class NodeScenarioChildProcessAdapter extends ScenarioChildBootstrapPort 
       pool: ScenarioExecutionPoolService;
     },
   ) {
-    super();
   }
 
   start(input: {
@@ -226,7 +225,7 @@ export class NodeScenarioChildProcessAdapter extends ScenarioChildBootstrapPort 
   }
 }
 
-class NodeScenarioChildExecutionSession extends ScenarioChildExecutionSession {
+class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession {
   static create(options: {
     child: ChildProcess;
     completion: Promise<ScenarioExecutionResult>;
@@ -252,7 +251,6 @@ class NodeScenarioChildExecutionSession extends ScenarioChildExecutionSession {
       ) => void;
     },
   ) {
-    super();
   }
 
   execute(data: ChildProcessJobData): Promise<ScenarioExecutionResult> {

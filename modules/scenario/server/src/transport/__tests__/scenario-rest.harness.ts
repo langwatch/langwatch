@@ -3,9 +3,9 @@ import { EventEmitter } from "node:events";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
-import { ScenarioClockPort } from "../../ports/scenario-clock.port.ts";
-import { ScenarioIdPort, ScenarioTestSuiteIdPort } from "../../ports/scenario-id.port.ts";
-import { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port.ts";
+import { ScenarioClock } from "../../app/scenario.app.ts";
+import { ScenarioId, ScenarioTestSuiteId } from "../../app/scenario.app.ts";
+import { ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioApp } from "../../app/scenario.app.ts";
 import {
@@ -29,7 +29,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 export const PROJECT_ID = "project_scenario_rest";
 export const PROJECT_SLUG = "scenario-rest-project";
 
-class SequentialScenarioId extends ScenarioIdPort {
+class SequentialScenarioId implements ScenarioId {
   #nextId = 0;
 
   next(): string {
@@ -38,7 +38,7 @@ class SequentialScenarioId extends ScenarioIdPort {
   }
 }
 
-class SequentialTestSuiteId extends ScenarioTestSuiteIdPort {
+class SequentialTestSuiteId implements ScenarioTestSuiteId {
   #nextId = 0;
 
   next(): string {
@@ -47,13 +47,13 @@ class SequentialTestSuiteId extends ScenarioTestSuiteIdPort {
   }
 }
 
-class FixedScenarioClock extends ScenarioClockPort {
+class FixedScenarioClock implements ScenarioClock {
   now(): Date {
     return new Date("2026-09-10T00:00:00.000Z");
   }
 }
 
-class PlainScenarioCipher extends ScenarioSecretCipherPort {
+class PlainScenarioCipher implements ScenarioSecretCipher {
   encrypt(plaintext: string): string {
     return plaintext;
   }

@@ -5,13 +5,10 @@ import type {
 } from "@langwatch/scenario-contract";
 import { createContextFromJobData, runWithContext } from "@langwatch/observability/context";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { CancellationSubscriberPort } from "../ports/cancellation-channel.port.ts";
-import { ScenarioExecutionRunnerPort } from "../ports/scenario-execution-runner.port.ts";
-import type { ScenarioProcessorServiceMetricsPort } from "../ports/scenario-processor-metrics.port.ts";
-import type {
-  ScenarioChildBootstrapPort,
-  ScenarioChildExecutionSession,
-} from "../ports/scenario-child-bootstrap.port.ts";
+import type { CancellationSubscriber } from "../app/scenario.app.ts";
+import { ScenarioExecutionRunner } from "../app/scenario.app.ts";
+import type { ScenarioProcessorServiceMetrics } from "../app/scenario.app.ts";
+import type { ScenarioChildBootstrap, ScenarioChildExecutionSession } from "../app/scenario.app.ts";
 import { isCustomerActionablePrefetchFailure } from "../rules/scenario-prefetch-failure.rules.ts";
 import type {
   ExecutionJobData,
@@ -20,13 +17,13 @@ import type {
 
 const logger = createLogger("langwatch:scenarios:processor");
 
-export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
+export class ScenarioProcessorService implements ScenarioExecutionRunner {
   static create(options: {
     execution: ScenarioExecutionService;
     pool: ScenarioExecutionPoolService;
-    cancellations: CancellationSubscriberPort;
-    childProcesses: ScenarioChildBootstrapPort;
-    metrics: ScenarioProcessorServiceMetricsPort;
+    cancellations: CancellationSubscriber;
+    childProcesses: ScenarioChildBootstrap;
+    metrics: ScenarioProcessorServiceMetrics;
   }): ScenarioProcessorService {
     return new ScenarioProcessorService(options);
   }
@@ -35,12 +32,11 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
     private readonly options: {
       execution: ScenarioExecutionService;
       pool: ScenarioExecutionPoolService;
-      cancellations: CancellationSubscriberPort;
-      childProcesses: ScenarioChildBootstrapPort;
-      metrics: ScenarioProcessorServiceMetricsPort;
+      cancellations: CancellationSubscriber;
+      childProcesses: ScenarioChildBootstrap;
+      metrics: ScenarioProcessorServiceMetrics;
     },
   ) {
-    super();
   }
 
   /**

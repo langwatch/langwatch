@@ -53,17 +53,27 @@ export {
     type ScenarioAppInfrastructure,
     type ScenarioBroadcast
 } from "./app/scenario.app.ts";
-export * from "./ports/cancellation-channel.port.ts";
+// CancellationPublisher/CancellationSubscriber are not re-exported here: the
+// redis adapter above already exports its own same-named types (a different
+// shape, the raw client boundary), so the folded interfaces stay reachable
+// only through ScenarioAppInfrastructure to avoid a duplicate barrel export.
+export type { CancellationMessage } from "./app/scenario.app.ts";
 export * from "./ports/scenario-activity.port.ts";
-export * from "./ports/scenario-child-bootstrap.port.ts";
-export * from "./ports/scenario-clock.port.ts";
-export * from "./ports/scenario-execution-pool.port.ts";
-export * from "./ports/scenario-execution-runner.port.ts";
-export * from "./ports/scenario-http.port.ts";
-export * from "./ports/scenario-id.port.ts";
-export * from "./ports/scenario-processor-metrics.port.ts";
-export * from "./ports/scenario-secret-cipher.port.ts";
-export * from "./ports/scenario-tab-store.port.ts";
+export type {
+  ScenarioChildEnvironment,
+  ScenarioChildExecutionSession,
+  ScenarioChildBootstrap,
+  ScenarioClock,
+  ScenarioExecutionPool,
+  ScenarioExecutionRunner,
+  ScenarioHttpResponse,
+  ScenarioHttp,
+  ScenarioId,
+  ScenarioTestSuiteId,
+  ScenarioProcessorServiceMetrics,
+  ScenarioSecretCipher,
+  ScenarioTabStore,
+} from "./app/scenario.app.ts";
 export { STALL_THRESHOLD_MS } from "./processes/simulation-run-execution-evolution.process.ts";
 export * from "./processes/simulation-run-execution.process.ts";
 export { SIMULATION_RUN_EXECUTION_PROCESS_NAME, simulationRunExecutionPM } from "./processes/simulation-run-execution.process.ts";

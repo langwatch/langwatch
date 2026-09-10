@@ -1,4 +1,4 @@
-import { ScenarioTabStorePort } from "../ports/scenario-tab-store.port.ts";
+import { ScenarioTabStore } from "../app/scenario.app.ts";
 
 export interface ScenarioTabRedisMulti {
   zadd(key: string, score: number, member: string): ScenarioTabRedisMulti;
@@ -23,13 +23,12 @@ export interface ScenarioTabRedisConnection {
   del(key: string): Promise<unknown>;
 }
 
-export class RedisScenarioTabStoreAdapter extends ScenarioTabStorePort {
+export class RedisScenarioTabStoreAdapter implements ScenarioTabStore {
   static create(connection: ScenarioTabRedisConnection): RedisScenarioTabStoreAdapter {
     return new RedisScenarioTabStoreAdapter(connection);
   }
 
   private constructor(private readonly connection: ScenarioTabRedisConnection) {
-    super();
   }
 
   async refresh(input: {

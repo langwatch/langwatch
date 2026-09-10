@@ -12,9 +12,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { ScenarioClockPort } from "../scenario-clock.port.ts";
-import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../scenario-id.port.ts";
-import { ScenarioSecretCipherPort } from "../scenario-secret-cipher.port.ts";
+import { ScenarioClock } from "../../app/scenario.app.ts";
+import { ScenarioTestSuiteId, ScenarioId } from "../../app/scenario.app.ts";
+import { ScenarioSecretCipher } from "../../app/scenario.app.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -22,21 +22,20 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-class ScenarioIds extends ScenarioIdPort {
+class ScenarioIds implements ScenarioId {
   next(): string {
     return `scenario_${randomUUID()}`;
   }
 }
 
-class TestSuiteIds extends ScenarioTestSuiteIdPort {
+class TestSuiteIds implements ScenarioTestSuiteId {
   next(): string {
     return `test_suite_${randomUUID()}`;
   }
 }
 
-class TestClock extends ScenarioClockPort {
+class TestClock implements ScenarioClock {
   constructor(private readonly value?: Date) {
-    super();
   }
 
   now(): Date {
@@ -44,7 +43,7 @@ class TestClock extends ScenarioClockPort {
   }
 }
 
-class TestSecretCipher extends ScenarioSecretCipherPort {
+class TestSecretCipher implements ScenarioSecretCipher {
   encrypt(plaintext: string): string {
     return plaintext;
   }

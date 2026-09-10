@@ -23,7 +23,7 @@ import {
   type ScenarioPrefetchLookups,
 } from "./scenario-prefetch-completion.service.ts";
 import { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
-import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port.ts";
+import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
 import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 
@@ -42,7 +42,7 @@ export interface ScenarioExecutionPrefetchConfig {
 }
 
 type ScenarioExecutionPrefetcherServiceOptions = {
-  secretCipher: ScenarioSecretCipherPort;
+  secretCipher: ScenarioSecretCipher;
   config: ScenarioExecutionPrefetchConfig;
   scenarios: ScenarioService;
   suites: SuiteApi;

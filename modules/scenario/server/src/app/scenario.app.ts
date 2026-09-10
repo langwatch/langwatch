@@ -65,7 +65,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import type { EventEmitter } from "node:events";
-import type { TestAgentRunInput, TestAgentTurnInput } from "@langwatch/scenario-contract";
+import type { ChildProcessJobData, ScenarioExecutionJob, ScenarioExecutionResult, TestAgentRunInput, TestAgentTurnInput } from "@langwatch/scenario-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { AgentTestService } from "../services/agent-test.service.ts";
 import type {
@@ -75,9 +75,11 @@ import type {
 import type { ResultAtomsService } from "../services/result-atoms.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
-import type { ScenarioIdPort, ScenarioTestSuiteIdPort } from "../ports/scenario-id.port.ts";
-import type { ScenarioClockPort } from "../ports/scenario-clock.port.ts";
-import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port.ts";
+import type { ScenarioId, ScenarioTestSuiteId } from "./scenario.app.ts";
+import type { ScenarioClock } from "./scenario.app.ts";
+import type { ScenarioSecretCipher } from "./scenario.app.ts";
+import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
+import type { Logger } from "@langwatch/observability";
 import {
   SilentScenarioActivity,
   type ScenarioActivityPort,
@@ -127,15 +129,25 @@ export interface ScenarioAppInfrastructure {
   broadcast: ScenarioBroadcast;
   resultAtoms: ResultAtomsService;
   runConfigurations: RunConfigurationsService;
-  ids: ScenarioIdPort;
-  testSuiteIds: ScenarioTestSuiteIdPort;
-  clock: ScenarioClockPort;
-  secretCipher: ScenarioSecretCipherPort;
+  ids: ScenarioId;
+  testSuiteIds: ScenarioTestSuiteId;
+  clock: ScenarioClock;
+  secretCipher: ScenarioSecretCipher;
   /**
    * Where a created scenario is reported to, for a process that composed
    * product analytics and the lifecycle sender. Absent reports nothing.
    */
   activity?: ScenarioActivityPort;
+  agentAdapterFactory: AgentAdapterFactory;
+  cancellationPublisher: CancellationPublisher;
+  cancellationSubscriber: CancellationSubscriber;
+  scenarioChildBootstrap: ScenarioChildBootstrap;
+  scenarioChildExecutionSession: ScenarioChildExecutionSession;
+  scenarioExecutionPool: ScenarioExecutionPool;
+  scenarioExecutionRunner: ScenarioExecutionRunner;
+  scenarioHttp: ScenarioHttp;
+  scenarioProcessorServiceMetrics: ScenarioProcessorServiceMetrics;
+  scenarioTabStore: ScenarioTabStore;
 }
 
 /** The one peer API this feature reads directly. */
@@ -651,4 +663,147 @@ export class ScenarioApp implements ScenarioApi {
   }): Promise<RunConfigurationEntry[]> {
     return this.#dependencies.runConfigurations.getEntries(input);
   }
+}
+
+/** The serialized description one agent adapter is built from. */
+export type AgentAdapterBuildInput = {
+  adapterData: TargetAdapterData;
+  modelParams?: LiteLLMParams;
+  nlpServiceUrl: string;
+  projectApiKey?: string;
+  parameters?: RunParameterValues;
+  httpPort?: ScenarioHttp;
+  logger?: Logger;
+};
+
+/**
+ * Builds the adapter that speaks to one agent. A port rather than a direct import of the
+ * serialized-adapter registry: a service may not reach into its package's concrete adapters, so the
+ * process that holds both supplies the registry.
+ */
+export interface AgentAdapterFactory {
+  build(input: AgentAdapterBuildInput): AgentAdapter;
+}
+
+/** Payload broadcast when a queued or running scenario must be cancelled. */
+export type CancellationMessage = {
+  projectId: string;
+  scenarioRunId: string;
+  batchRunId?: string;
+};
+
+/** Publishes a cancellation signal to the worker fleet. */
+export interface CancellationPublisher {
+  publish(message: CancellationMessage): Promise<void>;
+}
+
+/** Receives cancellation signals sent to the worker fleet. */
+export interface CancellationSubscriber {
+  subscribe(
+    onCancellation: (message: CancellationMessage) => void,
+  ): Promise<() => Promise<void>>;
+}
+
+export interface ScenarioChildEnvironment {
+  labels: string[];
+  telemetry: { endpoint: string; apiKey: string };
+}
+
+
+export interface ScenarioChildExecutionSession {
+  execute(data: ChildProcessJobData): Promise<ScenarioExecutionResult>;
+  abort(): Promise<void>;
+}
+
+
+export interface ScenarioChildBootstrap {
+  start(input: {
+    jobData: ExecutionJobData;
+    environment: ScenarioChildEnvironment;
+  }): ScenarioChildExecutionSession;
+}
+
+
+export interface ScenarioClock {
+  now(): Date;
+}
+
+/** Complete submission capability used by the Scenario execution service. */
+export interface ScenarioExecutionPool {
+  submit(input: ScenarioExecutionJob): void;
+}
+
+
+export interface ScenarioExecutionRunner {
+  execute(jobData: ExecutionJobData): Promise<void>;
+
+  skipCancelled(jobData: ExecutionJobData): void;
+}
+
+/** Response boundary required by serialized HTTP scenario targets. */
+export interface ScenarioHttpResponse {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  headers: { get(name: string): string | null };
+  json(): Promise<unknown>;
+  text(): Promise<string>;
+}
+
+/**
+ * Named egress boundary for an HTTP scenario target.
+ *
+ * The application composition supplies the SSRF-safe implementation; the
+ * scenario server never imports an application fetch helper or weakens its
+ * policy with a native-fetch fallback.
+ */
+export interface ScenarioHttp {
+  fetch(input: {
+    url: string;
+    init: { method: string; headers: Record<string, string>; body?: string };
+  }): Promise<ScenarioHttpResponse>;
+}
+
+
+export interface ScenarioId {
+  next(): string;
+}
+
+
+export interface ScenarioTestSuiteId {
+  next(): string;
+}
+
+
+export interface ScenarioProcessorServiceMetrics {
+  started(): void;
+
+  completed(durationMs: number): void;
+
+  failed(): void;
+}
+
+/** Encrypts the opaque secret values that travel with a queued scenario run. */
+export interface ScenarioSecretCipher {
+  encrypt(plaintext: string): string;
+
+  decrypt(ciphertext: string): string;
+}
+
+
+export interface ScenarioTabStore {
+  refresh(input: {
+    key: string;
+    member: string;
+    score: number;
+    ttlSeconds: number;
+  }): Promise<void>;
+
+  retire(input: { key: string; member: string; score: number }): Promise<void>;
+
+  countAfter(input: { key: string; cutoff: number }): Promise<number>;
+
+  setPending(input: { key: string; url: string; ttlSeconds: number }): Promise<void>;
+
+  tryTakePending(key: string): Promise<string | null>;
 }

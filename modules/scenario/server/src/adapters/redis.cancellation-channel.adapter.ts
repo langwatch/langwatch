@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import {
-  CancellationPublisherPort,
-  CancellationSubscriberPort,
+  CancellationPublisher as CancellationPublisherPort,
+  CancellationSubscriber as CancellationSubscriberPort,
   type CancellationMessage,
-} from "../ports/cancellation-channel.port.ts";
+} from "../app/scenario.app.ts";
 
 export const CANCELLATION_CHANNEL = "scenario:cancel";
 
@@ -19,13 +19,12 @@ export type CancellationSubscriber = {
 
 const logger = createLogger("langwatch:scenarios:cancellation-channel");
 
-export class RedisCancellationPublisherAdapter extends CancellationPublisherPort {
+export class RedisCancellationPublisherAdapter implements CancellationPublisherPort {
   static create(publisher: CancellationPublisher): RedisCancellationPublisherAdapter {
     return new RedisCancellationPublisherAdapter(publisher);
   }
 
   private constructor(private readonly publisher: CancellationPublisher) {
-    super();
   }
 
   async publish(message: CancellationMessage): Promise<void> {
@@ -37,13 +36,12 @@ export class RedisCancellationPublisherAdapter extends CancellationPublisherPort
   }
 }
 
-export class UnavailableCancellationPublisherAdapter extends CancellationPublisherPort {
+export class UnavailableCancellationPublisherAdapter implements CancellationPublisherPort {
   static create(): UnavailableCancellationPublisherAdapter {
     return new UnavailableCancellationPublisherAdapter();
   }
 
   private constructor() {
-    super();
   }
 
   publish(message: CancellationMessage): Promise<void> {
@@ -53,13 +51,12 @@ export class UnavailableCancellationPublisherAdapter extends CancellationPublish
   }
 }
 
-export class RedisCancellationSubscriberAdapter extends CancellationSubscriberPort {
+export class RedisCancellationSubscriberAdapter implements CancellationSubscriberPort {
   static create(subscriber: CancellationSubscriber): RedisCancellationSubscriberAdapter {
     return new RedisCancellationSubscriberAdapter(subscriber);
   }
 
   private constructor(private readonly subscriber: CancellationSubscriber) {
-    super();
   }
 
   async subscribe(

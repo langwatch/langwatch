@@ -5,7 +5,7 @@ import {
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
 
-import { ScenarioProcessorServiceMetricsPort } from "../ports/scenario-processor-metrics.port.ts";
+import { ScenarioProcessorServiceMetrics } from "../app/scenario.app.ts";
 
 const JOB_TYPE = "scenario";
 
@@ -13,7 +13,7 @@ const JOB_TYPE = "scenario";
  * The processor's own counts, on the two instruments every other job in the fleet already reports
  * to.
  */
-export class OtelScenarioProcessorMetricsAdapter extends ScenarioProcessorServiceMetricsPort {
+export class OtelScenarioProcessorMetricsAdapter implements ScenarioProcessorServiceMetrics {
   static create(): OtelScenarioProcessorMetricsAdapter {
     return new OtelScenarioProcessorMetricsAdapter();
   }
@@ -29,7 +29,6 @@ export class OtelScenarioProcessorMetricsAdapter extends ScenarioProcessorServic
   });
 
   private constructor() {
-    super();
   }
 
   started(): void {

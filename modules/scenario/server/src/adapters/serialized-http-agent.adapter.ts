@@ -19,7 +19,7 @@ import { JSONPath } from "jsonpath-plus";
 import { applyAuthentication } from "./http-auth.adapter.ts";
 import type { HttpAgentData, RunParameterValues } from "@langwatch/scenario-contract";
 import { ScenarioSecretReferenceAdapter } from "./scenario-secret-reference.adapter.ts";
-import type { ScenarioHttpPort } from "../ports/scenario-http.port.ts";
+import type { ScenarioHttp } from "../app/scenario.app.ts";
 import { SerializedAgentPort } from "../ports/serialized-agent.port.ts";
 
 /**
@@ -136,7 +136,7 @@ export class SerializedHttpAgentAdapter extends SerializedAgentPort {
     config: HttpAgentData;
     logger?: Logger;
     parameters?: RunParameterValues;
-    httpPort?: ScenarioHttpPort;
+    httpPort?: ScenarioHttp;
   }): SerializedHttpAgentAdapter {
     return new SerializedHttpAgentAdapter(options);
   }
@@ -146,7 +146,7 @@ export class SerializedHttpAgentAdapter extends SerializedAgentPort {
   private readonly config: HttpAgentData;
   private readonly logger: Logger;
   private readonly parameters: RunParameterValues;
-  private readonly httpPort: ScenarioHttpPort | undefined;
+  private readonly httpPort: ScenarioHttp | undefined;
 
   constructor({
     config,
@@ -158,7 +158,7 @@ export class SerializedHttpAgentAdapter extends SerializedAgentPort {
     logger?: Logger;
     /** The run's resolved values, read from url and body as `params.NAME`. */
     parameters?: RunParameterValues;
-    httpPort?: ScenarioHttpPort;
+    httpPort?: ScenarioHttp;
   }) {
     super();
     this.name = "SerializedHttpAgentAdapter";
@@ -293,7 +293,7 @@ export class SerializedHttpAgentAdapter extends SerializedAgentPort {
     durationMs,
     redactedHeaders,
   }: {
-    response: Awaited<ReturnType<ScenarioHttpPort["fetch"]>>;
+    response: Awaited<ReturnType<ScenarioHttp["fetch"]>>;
     loggedUrl: string;
     method: string;
     durationMs: number;

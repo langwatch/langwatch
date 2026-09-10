@@ -25,9 +25,8 @@ const job: ScenarioExecutionJob = {
   target: { type: "prompt", referenceId: "prompt-1" },
 };
 
-class TestRunner extends ScenarioExecutionRunnerPort {
+class TestRunner implements ScenarioExecutionRunnerPort {
   constructor(private readonly executeJob: (input: ScenarioExecutionJob) => void) {
-    super();
   }
 
   execute(input: ScenarioExecutionJob): Promise<void> {
@@ -38,7 +37,7 @@ class TestRunner extends ScenarioExecutionRunnerPort {
   skipCancelled(): void {}
 }
 
-class TestCancellationPublisher extends CancellationPublisherPort {
+class TestCancellationPublisher implements CancellationPublisherPort {
   readonly publish = vi.fn().mockResolvedValue(undefined);
 }
 

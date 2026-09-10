@@ -35,7 +35,7 @@ import type { ExecutionJobData } from "../services/scenario-execution-pool.servi
 
 /** A runner that never actually executes — the pool only needs the job
  * marked active so `registerChild` below finds it. */
-class NoopRunner extends ScenarioExecutionRunnerPort {
+class NoopRunner implements ScenarioExecutionRunnerPort {
   async execute(): Promise<void> {}
   skipCancelled(): void {}
 }

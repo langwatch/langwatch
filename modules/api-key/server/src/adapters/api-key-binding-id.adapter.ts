@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port.ts";
+import { ApiKeyBindingId } from "../app/api-key.app.ts";
 
 /**
  * The AuthZ binding identifier an API-key grant is written under.
@@ -12,13 +12,12 @@ import { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port.ts";
  */
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
-export class ApiKeyBindingIdAdapter extends ApiKeyBindingIdPort {
+export class ApiKeyBindingIdAdapter implements ApiKeyBindingId {
   static create(): ApiKeyBindingIdAdapter {
     return new ApiKeyBindingIdAdapter();
   }
 
   private constructor() {
-    super();
   }
 
   generateBindingId(): string {
