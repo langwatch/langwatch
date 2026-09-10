@@ -4,9 +4,10 @@ Feature: Voice agents: reach an agent by phone
   So that a scenario run can call it once the voice worker ships
 
   # @see https://github.com/langwatch/langwatch/issues/8014
-  # Slice 1 is additive and inert: the phone member is selectable behind a flag,
-  # but every run over phone fails with a clear message until the voice worker
-  # that dials it exists.
+  # The phone member is selectable behind a flag. Slice 2 adds the real Twilio
+  # runner (a-leg outbound dial, deny-by-default allowlist, duration cap,
+  # recording read), but it is inert by default: without the Twilio operator
+  # environment every run path fails closed, and no worker dials it yet.
 
   # ---------------------------------------------------------------------------
   # Config schema
@@ -25,7 +26,7 @@ Feature: Voice agents: reach an agent by phone
     Then it is rejected
 
   # ---------------------------------------------------------------------------
-  # Runner (stub until the voice worker ships)
+  # Runner (Twilio, inert until the voice worker dials it)
   # ---------------------------------------------------------------------------
 
   @integration
@@ -35,10 +36,34 @@ Feature: Voice agents: reach an agent by phone
     Then it fails because phone targets have no browser call
 
   @unit
-  Scenario: Running a phone target before the voice worker exists fails with a clear message
-    Given the phone transport runner
-    When any of its call methods is invoked
-    Then it fails with a message that points at issue 8014
+  Scenario: A phone run fails closed when Twilio is not configured
+    Given the phone transport runner and no Twilio environment
+    When the agent adapter is built
+    Then it fails with the phone-unavailable message
+
+  @unit
+  Scenario: A phone target is dialled with an a-leg outbound call
+    Given the phone transport runner, a Twilio environment and an allowlisted number
+    When the agent adapter connects
+    Then Twilio places an a-leg outbound call to that number
+
+  @unit
+  Scenario: A phone target refuses a callee that is not allowlisted
+    Given the phone transport runner and a Twilio environment
+    When the agent adapter connects to a number not in the project allowlist
+    Then the call is refused before Twilio is reached
+
+  @unit
+  Scenario: A phone call's duration is capped
+    Given the phone transport runner and a project cap above the ceiling
+    When the agent adapter connects
+    Then the a-leg call is placed with a duration clamped to the ceiling
+
+  @unit
+  Scenario: A finished phone recording is not ready until Twilio completes it
+    Given a phone call whose Twilio recording is still processing
+    When the finished call record is fetched
+    Then no record is returned yet and the live transcript is kept
 
   # ---------------------------------------------------------------------------
   # Drawer option gating

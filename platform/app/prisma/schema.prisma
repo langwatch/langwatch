@@ -1020,6 +1020,15 @@ model Project {
   /// per-request credentials envelope. See specs/langy/langy-egress-enforcement.feature.
   langyEgressAllowlist Json?
 
+  /// Per-project guardrails for phone (Twilio) voice targets: the deny-by-default
+  /// list of E.164 numbers a phone target may dial, and an optional per-call
+  /// duration cap (seconds, clamped to VOICE_PHONE_MAX_CALL_DURATION_SECONDS).
+  /// null/absent ⇒ no destination is dialable (deny-by-default) and the default
+  /// cap applies. Resolved by resolveVoicePhoneConfig; the Twilio account
+  /// credentials themselves live in the environment, never here. No UI yet
+  /// (langwatch/langwatch#8014). See specs/features/agents/voice-phone.feature.
+  voicePhoneConfig Json?
+
   /// When a coding-agent session was last folded for this project, and when a
   /// pull request was last mapped for a branch one of those sessions ran on.
   /// Both are instrumentation signals, not counters: the project sidebar shows

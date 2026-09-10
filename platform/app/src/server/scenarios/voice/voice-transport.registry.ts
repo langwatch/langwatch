@@ -39,6 +39,16 @@ export interface VoiceTransportRunner {
     agentId: string;
     credential: VoiceTransportCredential;
     maxCallSeconds: number;
+    /**
+     * Phone-only guardrails resolved from the project's `voicePhoneConfig`: the
+     * deny-by-default callee allowlist and the per-call duration cap. Optional
+     * so transports that do not dial (ElevenLabs) ignore it; the phone runner
+     * treats an absent config as deny-by-default and refuses to dial.
+     */
+    phoneConfig?: {
+      allowedCallees: readonly string[];
+      maxCallDurationSeconds: number;
+    };
   }): AgentAdapter;
   /**
    * Ask the provider for a short-lived signed URL the browser opens the call

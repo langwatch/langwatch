@@ -35381,8 +35381,10 @@ description: "Test an ElevenLabs Conversational AI agent from the LangWatch app:
 ---
 
 <Note>
-  Testing another transport (Pipecat, OpenAI Realtime, Gemini Live, Twilio) from code? See [Voice Agent Testing](/agent-testing/voice-agents).
+  Testing another transport (Pipecat, OpenAI Realtime, Gemini Live) from code? See [Voice Agent Testing](/agent-testing/voice-agents).
 </Note>
+
+**Phone (Twilio) targets are in preview.** Behind the phone-targets feature flag you can register a phone number as a Voice target so a scenario run dials it over Twilio. It is inert until an operator configures Twilio on the deployment (`VOICE_PUBLIC_BASE_URL` and the `TWILIO_*` credentials) and allowlists the destination number per project; a phone target has no in-browser "Talk to it" call.
 
 ## What it is
 

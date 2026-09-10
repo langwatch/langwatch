@@ -236,8 +236,8 @@ describe("mintVoiceSession", () => {
       });
     });
 
-    describe("when the transport cannot run yet (the phone stub)", () => {
-      /** @scenario "Running a phone target before the voice worker exists fails with a clear message" */
+    describe("when a phone target is minted for a browser call", () => {
+      /** @scenario "A phone target has no browser call" */
       it("rejects with the unavailable error before any credential lookup", async () => {
         const runner = fakeRunner();
         const resolveCredential = vi.fn(async () => CREDENTIAL);
