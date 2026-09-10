@@ -215,8 +215,8 @@ export class GithubApp implements GithubApiContract {
   getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]> {
     return this.#service.getAllForOrganization(organizationId);
   }
-  tryGetByInstallationId(installationId: string): Promise<GithubInstallation | null> {
-    return this.#service.tryGetByInstallationId(installationId);
+  findByInstallationId(installationId: string): Promise<GithubInstallation | null> {
+    return this.#service.findByInstallationId(installationId);
   }
   isOrganizationMember(input: { userId: string; organizationId: string }): Promise<boolean> {
     return this.#service.isOrganizationMember(input);
@@ -294,13 +294,13 @@ export class GithubApp implements GithubApiContract {
   }): Promise<readonly GithubPullRequest[]> {
     return this.#service.findAllByBranches(input);
   }
-  tryFindByNumber(input: {
+  findByNumber(input: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;
     prNumber: number;
   }): Promise<GithubPullRequest | null> {
-    return this.#service.tryFindByNumber(input);
+    return this.#service.findByNumber(input);
   }
   recheckDueBranches(): Promise<number> {
     return this.#service.recheckDueBranches();

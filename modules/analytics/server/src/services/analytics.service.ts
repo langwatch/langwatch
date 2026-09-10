@@ -247,7 +247,7 @@ export class AnalyticsService extends AnalyticsServiceContract {
     );
   }
 
-  tryGetEvaluationAnalytics(
+  findEvaluationAnalytics(
     input: AnalyticsEvaluationReadInput,
   ): Promise<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] } | null> {
     return this.evaluationRepository.tryFind(analyticsEvaluationReadInputSchema.parse(input));

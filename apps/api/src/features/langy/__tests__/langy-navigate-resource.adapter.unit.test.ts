@@ -37,7 +37,7 @@ function directories(): {
       monitors: { tryGetMonitorById: record("monitor", { id: "monitor_1" }) },
       evaluators: { tryGetById: record("evaluator", { id: "evaluator_1" }) },
       agents: { getById: record("agent", { id: "agent_1", type: "http" }) },
-      simulations: { tryGetScenarioRunData: record("scenarioRun", { scenarioRunId: "run_1" }) },
+      simulations: { findScenarioRunData: record("scenarioRun", { scenarioRunId: "run_1" }) },
     } as unknown as ApiLangyNavigateResources,
   };
 }

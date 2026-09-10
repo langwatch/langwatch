@@ -109,7 +109,7 @@ export interface AuthzApi {
     args: Binding.AuthzAccessBreakdownInput,
   ): Promise<Binding.AuthzAccessBreakdownOutput>;
   isOnEngine(args: Queries.AuthzListOrganizationBindingsInput): Promise<boolean>;
-  tryGetEngineCutoverAt(args: Queries.AuthzListOrganizationBindingsInput): Promise<Instant | null>;
+  findEngineCutoverAt(args: Queries.AuthzListOrganizationBindingsInput): Promise<Instant | null>;
   attach(args: Commands.AuthzAttachGrantInput): Promise<Commands.AuthzBindingOutput>;
   update(args: Commands.AuthzUpdateGrantInput): Promise<void>;
   revoke(args: Commands.AuthzRevokeGrantInput): Promise<void>;

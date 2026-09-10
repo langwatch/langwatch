@@ -200,7 +200,7 @@ export class AutomationService {
     return trigger;
   }
 
-  tryGetByCustomGraphId(input: {
+  findByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null> {

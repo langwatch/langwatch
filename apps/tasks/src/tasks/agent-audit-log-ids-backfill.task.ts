@@ -3,7 +3,7 @@ import type { Redis, Cluster } from "ioredis";
 import { Task } from "@langwatch/task";
 import { createLogger } from "@langwatch/observability";
 import { createAgentAuditLogIdsMigration } from "@langwatch/enterprise-audit-log-server";
-import { PostgresSystemMigrationsAdapter } from "@langwatch/ops-server";
+import { OpsSystemMigrations } from "@langwatch/ops-server";
 
 const logger = createLogger("langwatch:task:agent-audit-log-ids-backfill");
 
@@ -41,7 +41,7 @@ export class AgentAuditLogIdsBackfillTask extends Task {
     }
     if (!this.#redis) throw new Error("Redis is required to lease the audit-log migration.");
 
-    const runner = PostgresSystemMigrationsAdapter.create({
+    const runner = OpsSystemMigrations.create({
       database,
       redis: this.#redis,
       isSaaS: () => false,

@@ -22,17 +22,17 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const deps = {
     conversations: {
       ensureConversation: vi.fn(async () => ({ id: "conv-1", isNew: false })),
-      tryFindByIdVisible: vi.fn(async () => null),
-      tryGetPendingHandoff: vi.fn(async () => null),
-      tryGetRunToken: vi.fn(async () => "run-token"),
+      findByIdVisible: vi.fn(async () => null),
+      findPendingHandoff: vi.fn(async () => null),
+      findRunToken: vi.fn(async () => "run-token"),
       acceptTurn: vi.fn(async () => undefined),
       finalizeTurn: vi.fn(async () => undefined),
     },
     credentials: {
       getOrProvision: vi.fn(async () => ({ organizationId: "org-1" })),
-      tryGetEgressAllowlist: vi.fn(async () => null),
+      findEgressAllowlist: vi.fn(async () => null),
       resolveMirrorTier: vi.fn(async () => "content" as const),
-      tryGetModelsAllowed: vi.fn(async () => null),
+      findModelsAllowed: vi.fn(async () => null),
     },
     models: { resolve: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })) },
     worker: {
@@ -250,9 +250,9 @@ describe("LangyTurnService.startConversationTurn conversation memory", () => {
     const { deps, mocks } = makeDeps({
       conversations: {
         ensureConversation: vi.fn(async () => ({ id: "conv-1", isNew: true })),
-        tryFindByIdVisible: vi.fn(async () => null),
-        tryGetPendingHandoff: vi.fn(async () => null),
-        tryGetRunToken: vi.fn(async () => "run-token"),
+        findByIdVisible: vi.fn(async () => null),
+        findPendingHandoff: vi.fn(async () => null),
+        findRunToken: vi.fn(async () => "run-token"),
         acceptTurn: vi.fn(async () => undefined),
         finalizeTurn: vi.fn(async () => undefined),
       } as unknown as LangyTurnServiceDeps["conversations"],

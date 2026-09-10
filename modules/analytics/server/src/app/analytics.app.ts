@@ -245,10 +245,10 @@ export class AnalyticsApp implements AnalyticsApiContract {
     return this.#dependencies.analytics.upsertEvaluationAnalyticsBatch(input);
   }
 
-  tryGetEvaluationAnalytics(
-    input: Parameters<AnalyticsService["tryGetEvaluationAnalytics"]>[0],
-  ): ReturnType<AnalyticsService["tryGetEvaluationAnalytics"]> {
-    return this.#dependencies.analytics.tryGetEvaluationAnalytics(input);
+  findEvaluationAnalytics(
+    input: Parameters<AnalyticsService["findEvaluationAnalytics"]>[0],
+  ): ReturnType<AnalyticsService["findEvaluationAnalytics"]> {
+    return this.#dependencies.analytics.findEvaluationAnalytics(input);
   }
 
   appendEvaluationAnalyticsRollup(

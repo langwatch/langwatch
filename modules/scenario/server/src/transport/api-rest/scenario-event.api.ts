@@ -441,11 +441,11 @@ export async function archiveScenarioRun({
   projectId,
   scenarioRunId,
 }: {
-  simulations: Pick<SimulationService, "tryGetScenarioRunData" | "deleteRun">;
+  simulations: Pick<SimulationService, "findScenarioRunData" | "deleteRun">;
   projectId: string;
   scenarioRunId: string;
 }): Promise<{ archived: number; failed: number; scenarioRunId: string } | null> {
-  const run = await simulations.tryGetScenarioRunData({ projectId, scenarioRunId });
+  const run = await simulations.findScenarioRunData({ projectId, scenarioRunId });
   if (!run) return null;
 
   await simulations.deleteRun({

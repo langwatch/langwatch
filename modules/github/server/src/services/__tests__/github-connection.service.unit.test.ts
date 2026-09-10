@@ -40,7 +40,7 @@ function service({
   webBase = "https://github.com",
 } = {}) {
   const getAllForOrganization = vi.fn(async () => installations);
-  const tryGetByInstallationId = vi.fn(async () => byId);
+  const findByInstallationId = vi.fn(async () => byId);
   const appConfig: GithubAppConfig = {
     appSlug: "langwatch-langy",
     webhookSecret: "whsecret",
@@ -49,9 +49,9 @@ function service({
 
   return {
     getAllForOrganization,
-    tryGetByInstallationId,
+    findByInstallationId,
     connection: GithubConnectionService.create({
-      installations: { getAllForOrganization, tryGetByInstallationId },
+      installations: { getAllForOrganization, findByInstallationId },
       getAppConfig: () => appConfig,
       getWebBase: () => webBase,
     }),

@@ -304,7 +304,7 @@ describe.skipIf(!DB_URL)(
 
       /** @scenario A row's unrelated project scope does not inflate its specificity */
       it("ranks the shared row by the scope that grants THIS project access", async () => {
-        const row = await query.tryFindRowServingModel({
+        const row = await query.findRowServingModel({
           projectId: fixture.projectId,
           provider: "gemini",
           model: "gemini-pro-x",

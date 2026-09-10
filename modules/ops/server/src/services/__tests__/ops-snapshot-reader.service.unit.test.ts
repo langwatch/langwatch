@@ -154,7 +154,7 @@ async function readDashboard(input: {
   const repository = new SnapshotRepositoryStub(input.live, input.detail);
   const service = DefaultOpsSnapshotService.create(repository);
   await service.start();
-  const dashboard = service.tryGetDashboardData();
+  const dashboard = service.findDashboardData();
   service.stop();
   return dashboard;
 }

@@ -93,7 +93,7 @@ const navigateFrames = (
 
 function fakeConversations(runToken: string | null = RUN_TOKEN) {
   return {
-    tryGetRunToken: vi.fn(async () => runToken),
+    findRunToken: vi.fn(async () => runToken),
     recordToolCallStarted: vi.fn(async () => {}),
     recordToolCallCompleted: vi.fn(async () => {}),
     ingestAgentTurnResult: vi.fn(async () => {}),
@@ -1063,7 +1063,7 @@ describe("LangyTurnRelayAdapter", () => {
       await relay.handle(frame({ type: "delta", text: "a" }));
       await relay.handle(frame({ type: "delta", text: "b" }));
       await relay.handle(frame({ type: "final", text: "done" }));
-      expect(conversations.tryGetRunToken).toHaveBeenCalledTimes(1);
+      expect(conversations.findRunToken).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1092,7 +1092,7 @@ describe("LangyTurnRelayAdapter", () => {
           turnId: "turn-1",
         });
         // The lagging projection is never consulted once the handoff has it.
-        expect(conversations.tryGetRunToken).not.toHaveBeenCalled();
+        expect(conversations.findRunToken).not.toHaveBeenCalled();
       });
     });
 
@@ -1113,7 +1113,7 @@ describe("LangyTurnRelayAdapter", () => {
         // falling through to the projection is the point of the two-stage lookup.
         expect(out).toEqual({ status: "applied" });
         expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
-        expect(conversations.tryGetRunToken).toHaveBeenCalledTimes(1);
+        expect(conversations.findRunToken).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -1121,7 +1121,7 @@ describe("LangyTurnRelayAdapter", () => {
       it("re-reads the token instead of reusing the cached miss", async () => {
         // No handoff wired; the projection is null on the first read, then lands.
         const conversations = fakeConversations();
-        conversations.tryGetRunToken.mockResolvedValueOnce(null);
+        conversations.findRunToken.mockResolvedValueOnce(null);
         const { relay, buffer } = makeRelay({ conversations });
 
         const first = await relay.handle(frame({ type: "delta", text: "one" }));
@@ -1131,7 +1131,7 @@ describe("LangyTurnRelayAdapter", () => {
         expect(second).toEqual({ status: "applied" });
         expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
         // Re-queried because the first null was NOT cached (the bug this fixes).
-        expect(conversations.tryGetRunToken).toHaveBeenCalledTimes(2);
+        expect(conversations.findRunToken).toHaveBeenCalledTimes(2);
       });
     });
   });

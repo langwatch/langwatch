@@ -126,7 +126,7 @@ describe.each(backends)("given the $name GitHub repositories", ({ create }) => {
       await repositories.pullRequests.upsertPullRequests({
         pullRequests: [pullRequest({ state: "open", prUpdatedAt: at("2026-01-01T10:30:00Z") })],
       });
-      const afterOlder = await repositories.pullRequests.tryFindByNumber({
+      const afterOlder = await repositories.pullRequests.findByNumber({
         organizationId: ORGANIZATION,
         repositoryHost: HOST,
         repositoryFullName: REPOSITORY,
@@ -138,7 +138,7 @@ describe.each(backends)("given the $name GitHub repositories", ({ create }) => {
       await repositories.pullRequests.upsertPullRequests({
         pullRequests: [pullRequest({ state: "open", prUpdatedAt: at("2026-01-01T11:00:00Z") })],
       });
-      const afterEqual = await repositories.pullRequests.tryFindByNumber({
+      const afterEqual = await repositories.pullRequests.findByNumber({
         organizationId: ORGANIZATION,
         repositoryHost: HOST,
         repositoryFullName: REPOSITORY,
@@ -260,7 +260,7 @@ describe.each(backends)("given the $name GitHub repositories", ({ create }) => {
       expect(deleted).toEqual({ branchChecks: 1 });
       expect(await repositories.pullRequests.tryFindBranchCheck(branchKey())).toBeNull();
       expect(
-        await repositories.pullRequests.tryFindByNumber({
+        await repositories.pullRequests.findByNumber({
           organizationId: ORGANIZATION,
           repositoryHost: HOST,
           repositoryFullName: REPOSITORY,

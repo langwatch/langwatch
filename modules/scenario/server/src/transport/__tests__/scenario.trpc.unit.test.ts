@@ -269,7 +269,7 @@ describe("the scenarios tRPC transport", () => {
 
   describe("given a run state that names nothing", () => {
     it("answers not found rather than an empty run", async () => {
-      const { caller } = harness({ tryGetScenarioRunData: async () => null });
+      const { caller } = harness({ findScenarioRunData: async () => null });
 
       await expect(
         caller.getRunState({ projectId: PROJECT_ID, scenarioRunId: "scenariorun_1" }),

@@ -151,7 +151,7 @@ function ingestWorld(options: { sourceType?: string } = {}) {
   const ports: GovernanceIngestRestPorts = {
     governance: () =>
       ({
-        tryFindIngestionSourceByIngestSecret: (secret: string) =>
+        findIngestionSourceByIngestSecret: (secret: string) =>
           Promise.resolve(secret === INGEST_SECRET ? source : null),
         ingestionSourceRecordEventReceived: (id: string) => {
           recordedEvents.push(id);

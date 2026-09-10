@@ -98,24 +98,24 @@ export class LangyTurnPreparationService {
     return Promise.allSettled([
       conversation.isNew
         ? Promise.resolve(null)
-        : this.deps.conversations.tryFindByIdVisible({
+        : this.deps.conversations.findByIdVisible({
             id: conversation.id,
             projectId,
             userId,
           }),
       conversation.isNew
         ? Promise.resolve(null)
-        : this.deps.conversations.tryGetPendingHandoff({
+        : this.deps.conversations.findPendingHandoff({
             projectId,
             conversationId: conversation.id,
           }),
       mintedRunToken
         ? Promise.resolve(mintedRunToken)
-        : this.deps.conversations.tryGetRunToken({
+        : this.deps.conversations.findRunToken({
             projectId,
             conversationId: conversation.id,
           }),
-      this.deps.credentials.tryGetModelsAllowed({
+      this.deps.credentials.findModelsAllowed({
         projectId,
         organizationId: credentials.organizationId,
       }),

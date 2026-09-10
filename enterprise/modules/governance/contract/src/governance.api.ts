@@ -119,7 +119,7 @@ import type {
  */
 export interface GovernanceApi {
   anomalyRuleList(organizationId: string): Promise<AnomalyRule[]>;
-  tryFindAnomalyRuleById(input: { id: string; organizationId: string }): Promise<AnomalyRule | null>;
+  findAnomalyRuleById(input: { id: string; organizationId: string }): Promise<AnomalyRule | null>;
   anomalyRuleGetById(input: { id: string; organizationId: string }): Promise<AnomalyRule>;
   anomalyRuleCreate(input: CreateAnomalyRuleInput): Promise<AnomalyRule>;
   anomalyRuleUpdate(input: UpdateAnomalyRuleInput): Promise<AnomalyRule>;
@@ -221,7 +221,7 @@ export interface GovernanceApi {
   }): Promise<PersonalIngestionKeyState | null>;
 
   ingestionSourceList(organizationId: string): Promise<GovernanceIngestionSource[]>;
-  tryFindIngestionSourceById(input: {
+  findIngestionSourceById(input: {
     id: string;
     organizationId: string;
   }): Promise<GovernanceIngestionSource | null>;
@@ -240,7 +240,7 @@ export interface GovernanceApi {
     sources: ReadonlyArray<{ traceProjectId?: string | null }>,
     organizationId: string,
   ): Promise<Set<string>>;
-  tryFindIngestionSourceByIngestSecret(rawSecret: string): Promise<GovernanceIngestionSource | null>;
+  findIngestionSourceByIngestSecret(rawSecret: string): Promise<GovernanceIngestionSource | null>;
   ingestionSourceCreate(
     input: CreateGovernanceIngestionSourceCommand,
   ): Promise<CreatedGovernanceIngestionSource>;
@@ -259,7 +259,7 @@ export interface GovernanceApi {
 
   templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
-  tryFindTemplateByIdForOrg(input: {
+  findTemplateByIdForOrg(input: {
     id: string;
     organizationId: string;
   }): Promise<IngestionTemplate | null>;
@@ -283,7 +283,7 @@ export interface GovernanceApi {
     input: GovernanceBudgetOverviewInput,
   ): Promise<GovernanceBudgetOverviewForUser>;
   routingPolicyList(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
-  tryFindRoutingPolicyById(input: FindRoutingPolicyInput): Promise<RoutingPolicy | null>;
+  findRoutingPolicyById(input: FindRoutingPolicyInput): Promise<RoutingPolicy | null>;
   routingPolicyGetById(input: FindRoutingPolicyInput): Promise<RoutingPolicy>;
   routingPolicyCreate(input: CreateRoutingPolicyInput): Promise<RoutingPolicy>;
   routingPolicyUpdate(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy>;
@@ -303,7 +303,7 @@ export interface GovernanceApi {
 
   aiToolListForUser(input: AiToolMemberInput): Promise<AiToolEntry[]>;
   aiToolListForAdmin(input: AiToolOrganizationInput): Promise<AiToolEntry[]>;
-  tryFindAiToolById(input: FindAiToolEntryInput): Promise<AiToolEntry | null>;
+  findAiToolById(input: FindAiToolEntryInput): Promise<AiToolEntry | null>;
   aiToolGetById(input: FindAiToolEntryInput): Promise<AiToolEntry>;
   aiToolCreate(input: CreateAiToolEntryInput): Promise<AiToolEntry>;
   aiToolUpdate(input: UpdateAiToolEntryInput): Promise<AiToolEntry>;

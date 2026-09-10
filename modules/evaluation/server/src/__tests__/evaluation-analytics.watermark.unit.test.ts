@@ -51,7 +51,7 @@ class RecordingAnalytics extends AnalyticsService {
   async upsertEvaluationAnalyticsBatch(entries: Written[]): Promise<void> {
     this.written.push(...entries);
   }
-  async tryGetEvaluationAnalytics(): Promise<null> {
+  async findEvaluationAnalytics(): Promise<null> {
     return null;
   }
   async appendEvaluationAnalyticsRollup(): Promise<void> {}

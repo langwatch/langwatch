@@ -195,7 +195,7 @@ export function registerGovernanceMcpTools(server: McpServerLike, ctx: Governanc
       const r = await resolve();
       const denied = await requireRead(r, "aiTools:view");
       if (denied) return text(denied);
-      const row = await ctx.governance.tryFindTemplateByIdForOrg({
+      const row = await ctx.governance.findTemplateByIdForOrg({
         id,
         organizationId: r.organizationId,
       });

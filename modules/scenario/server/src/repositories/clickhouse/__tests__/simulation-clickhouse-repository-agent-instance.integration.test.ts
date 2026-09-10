@@ -140,7 +140,7 @@ integration("given a run that was queued, finished and had its instance recorded
         { tenantId: createTenantId(tenantId) },
       );
 
-      const run = await runs.tryGetScenarioRunData({
+      const run = await runs.findScenarioRunData({
         projectId: tenantId,
         scenarioRunId,
       });

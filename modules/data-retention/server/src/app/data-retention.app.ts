@@ -226,8 +226,8 @@ export class DataRetentionApp implements DataRetentionApiContract {
     return this.#retention.isPinned(input);
   }
 
-  tryGetPin(input: UnpinTraceInput): Promise<PinnedTrace | null> {
-    return this.#retention.tryGetPin(input);
+  findPin(input: UnpinTraceInput): Promise<PinnedTrace | null> {
+    return this.#retention.findPin(input);
   }
 
   listByProject(input: { projectId: string }): Promise<PinnedTrace[]> {

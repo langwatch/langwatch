@@ -38,8 +38,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly anomalyRuleList: GovernanceApi["anomalyRuleList"] = (...args) =>
     this.rules.anomalyRuleList(...args);
 
-  readonly tryFindAnomalyRuleById: GovernanceApi["tryFindAnomalyRuleById"] = (...args) =>
-    this.rules.tryFindAnomalyRuleById(...args);
+  readonly findAnomalyRuleById: GovernanceApi["findAnomalyRuleById"] = (...args) =>
+    this.rules.findAnomalyRuleById(...args);
 
   readonly anomalyRuleGetById: GovernanceApi["anomalyRuleGetById"] = (...args) =>
     this.rules.anomalyRuleGetById(...args);
@@ -99,8 +99,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly aiToolListForAdmin: GovernanceApi["aiToolListForAdmin"] = (...args) =>
     this.rules.aiToolListForAdmin(...args);
 
-  readonly tryFindAiToolById: GovernanceApi["tryFindAiToolById"] = (...args) =>
-    this.rules.tryFindAiToolById(...args);
+  readonly findAiToolById: GovernanceApi["findAiToolById"] = (...args) =>
+    this.rules.findAiToolById(...args);
 
   readonly aiToolGetById: GovernanceApi["aiToolGetById"] = (...args) =>
     this.rules.aiToolGetById(...args);
@@ -191,9 +191,9 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly ingestionSourceList: GovernanceApi["ingestionSourceList"] = (...args) =>
     this.ingestion.ingestionSourceList(...args);
 
-  readonly tryFindIngestionSourceById: GovernanceApi["tryFindIngestionSourceById"] = (
+  readonly findIngestionSourceById: GovernanceApi["findIngestionSourceById"] = (
     ...args
-  ) => this.ingestion.tryFindIngestionSourceById(...args);
+  ) => this.ingestion.findIngestionSourceById(...args);
 
   readonly ingestionSourceLiveTraceProjectIds: GovernanceApi["ingestionSourceLiveTraceProjectIds"] =
     (...args) => this.ingestion.ingestionSourceLiveTraceProjectIds(...args);
@@ -201,8 +201,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly ingestionSourceGetById: GovernanceApi["ingestionSourceGetById"] = (...args) =>
     this.ingestion.ingestionSourceGetById(...args);
 
-  readonly tryFindIngestionSourceByIngestSecret: GovernanceApi["tryFindIngestionSourceByIngestSecret"] =
-    (...args) => this.ingestion.tryFindIngestionSourceByIngestSecret(...args);
+  readonly findIngestionSourceByIngestSecret: GovernanceApi["findIngestionSourceByIngestSecret"] =
+    (...args) => this.ingestion.findIngestionSourceByIngestSecret(...args);
 
   readonly ingestionSourceCreate: GovernanceApi["ingestionSourceCreate"] = (...args) =>
     this.ingestion.ingestionSourceCreate(...args);
@@ -226,8 +226,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly templateListForOrgAdmin: GovernanceApi["templateListForOrgAdmin"] = (...args) =>
     this.ingestion.templateListForOrgAdmin(...args);
 
-  readonly tryFindTemplateByIdForOrg: GovernanceApi["tryFindTemplateByIdForOrg"] = (...args) =>
-    this.ingestion.tryFindTemplateByIdForOrg(...args);
+  readonly findTemplateByIdForOrg: GovernanceApi["findTemplateByIdForOrg"] = (...args) =>
+    this.ingestion.findTemplateByIdForOrg(...args);
 
   readonly templateGetByIdForOrg: GovernanceApi["templateGetByIdForOrg"] = (...args) =>
     this.ingestion.templateGetByIdForOrg(...args);
@@ -302,8 +302,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly routingPolicyList: GovernanceApi["routingPolicyList"] = (...args) =>
     this.lifecycle.routingPolicyList(...args);
 
-  readonly tryFindRoutingPolicyById: GovernanceApi["tryFindRoutingPolicyById"] = (...args) =>
-    this.lifecycle.tryFindRoutingPolicyById(...args);
+  readonly findRoutingPolicyById: GovernanceApi["findRoutingPolicyById"] = (...args) =>
+    this.lifecycle.findRoutingPolicyById(...args);
 
   readonly routingPolicyGetById: GovernanceApi["routingPolicyGetById"] = (...args) =>
     this.lifecycle.routingPolicyGetById(...args);

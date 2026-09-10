@@ -216,13 +216,13 @@ describe("LangyConversationService", () => {
         );
       });
 
-      it("tryFindByIdVisible returns null for the same case", async () => {
+      it("findByIdVisible returns null for the same case", async () => {
         const repo = makeRepo({
           tryFindVisibleById: vi.fn().mockResolvedValue(null),
         });
         const svc = LangyConversationService.create(makeCommands(), repo);
         expect(
-          await svc.tryFindByIdVisible({
+          await svc.findByIdVisible({
             id: "c1",
             projectId: "p1",
             userId: "alice",
@@ -635,7 +635,7 @@ describe("LangyConversationService", () => {
           makeRepo({ tryFindPendingHandoff }),
         );
 
-        const pending = await svc.tryGetPendingHandoff({
+        const pending = await svc.findPendingHandoff({
           projectId: "p1",
           conversationId: "c1",
         });
@@ -660,7 +660,7 @@ describe("LangyConversationService", () => {
     describe("when there is no pending handoff", () => {
       it("returns null so the next turn cold-starts", async () => {
         const svc = LangyConversationService.create(makeCommands(), makeRepo());
-        const pending = await svc.tryGetPendingHandoff({
+        const pending = await svc.findPendingHandoff({
           projectId: "p1",
           conversationId: "c1",
         });

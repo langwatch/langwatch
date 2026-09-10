@@ -278,7 +278,7 @@ describe("EvaluationService", () => {
       }),
     ).resolves.toEqual({});
     await expect(
-      service(repository).tryGetInputs({
+      service(repository).findInputs({
         tenantId: "project_1",
         evaluationId: "evaluation_1",
       }),
@@ -300,7 +300,7 @@ describe("EvaluationService", () => {
     });
 
     await expect(
-      evaluation.tryGetInputs({
+      evaluation.findInputs({
         tenantId: "project_1",
         evaluationId: "evaluation_1",
       }),

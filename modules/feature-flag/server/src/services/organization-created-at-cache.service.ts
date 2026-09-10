@@ -37,7 +37,7 @@ export class OrganizationCreatedAtCacheService {
     }
 
     try {
-      const summary = await this.organizations.tryGetProvisioningSummary(organizationId);
+      const summary = await this.organizations.findProvisioningSummary(organizationId);
       const createdAt = summary?.createdAt ?? null;
       this.rememberOrganizationCreatedAt({ organizationId, createdAt, now });
 

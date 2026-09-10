@@ -124,7 +124,7 @@ export async function mountGatewayPlatformRest(): Promise<GatewayRestHarness> {
 
   const idempotency = composeApiIdempotency({ database: prisma, encryption });
 
-  const gateway = composeApiGateway({
+  const gateway = await composeApiGateway({
     prisma,
     authz: authzBuild.authz,
     projects: tenancy.projects,

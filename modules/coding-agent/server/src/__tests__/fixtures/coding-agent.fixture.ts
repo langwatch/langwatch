@@ -544,7 +544,7 @@ export class TestGithubService implements GithubApi {
     throw new Error("not used by Coding Agent tests");
   }
 
-  async tryGetByInstallationId(): Promise<never> {
+  async findByInstallationId(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }
 
@@ -623,7 +623,7 @@ export class TestGithubService implements GithubApi {
     return this.pullRequests;
   }
 
-  async tryFindByNumber(input: { prNumber: number }): Promise<GithubPullRequest | null> {
+  async findByNumber(input: { prNumber: number }): Promise<GithubPullRequest | null> {
     return this.pullRequests.find((pr) => pr.prNumber === input.prNumber) ?? null;
   }
 

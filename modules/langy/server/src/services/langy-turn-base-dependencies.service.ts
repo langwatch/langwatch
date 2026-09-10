@@ -50,7 +50,7 @@ export class LangyTurnBaseDependenciesService {
       }),
       modelOverride ? Promise.resolve(null) : deps.models.resolve({ projectId }),
       deps.credentials.getOrProvision({ projectId, session, mintSessionKey: false }),
-      deps.credentials.tryGetEgressAllowlist({ projectId }),
+      deps.credentials.findEgressAllowlist({ projectId }),
       deps.credentials.resolveMirrorTier({ projectId }),
     ]);
   }

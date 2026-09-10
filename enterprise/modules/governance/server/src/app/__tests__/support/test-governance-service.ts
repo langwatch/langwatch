@@ -119,13 +119,13 @@ export class TestGovernanceService implements GovernanceApi {
   templateListForUser = unsupported<GovernanceApi["templateListForUser"]>();
   templateSyncPlatformCatalog = unsupported<GovernanceApi["templateSyncPlatformCatalog"]>();
   templateUpdateOttlRules = unsupported<GovernanceApi["templateUpdateOttlRules"]>();
-  tryFindAiToolById = unsupported<GovernanceApi["tryFindAiToolById"]>();
-  tryFindAnomalyRuleById = unsupported<GovernanceApi["tryFindAnomalyRuleById"]>();
-  tryFindIngestionSourceById = unsupported<GovernanceApi["tryFindIngestionSourceById"]>();
-  tryFindIngestionSourceByIngestSecret =
-    unsupported<GovernanceApi["tryFindIngestionSourceByIngestSecret"]>();
-  tryFindRoutingPolicyById = unsupported<GovernanceApi["tryFindRoutingPolicyById"]>();
-  tryFindTemplateByIdForOrg = unsupported<GovernanceApi["tryFindTemplateByIdForOrg"]>();
+  findAiToolById = unsupported<GovernanceApi["findAiToolById"]>();
+  findAnomalyRuleById = unsupported<GovernanceApi["findAnomalyRuleById"]>();
+  findIngestionSourceById = unsupported<GovernanceApi["findIngestionSourceById"]>();
+  findIngestionSourceByIngestSecret =
+    unsupported<GovernanceApi["findIngestionSourceByIngestSecret"]>();
+  findRoutingPolicyById = unsupported<GovernanceApi["findRoutingPolicyById"]>();
+  findTemplateByIdForOrg = unsupported<GovernanceApi["findTemplateByIdForOrg"]>();
   tryResolveDefaultRoutingPolicyForUser =
     unsupported<GovernanceApi["tryResolveDefaultRoutingPolicyForUser"]>();
   usageRecord = unsupported<GovernanceApi["usageRecord"]>();

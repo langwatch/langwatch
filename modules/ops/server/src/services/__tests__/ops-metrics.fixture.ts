@@ -71,7 +71,7 @@ export class OpsMetricsTestAdapter {
     return this.unavailable();
   }
 
-  tryGetBlob(): never {
+  findBlob(): never {
     return this.unavailable();
   }
 
@@ -123,7 +123,7 @@ export class OpsMetricsTestAdapter {
     return this.unavailable();
   }
 
-  tryGetQueueGroup(): never {
+  findQueueGroup(): never {
     return this.unavailable();
   }
 

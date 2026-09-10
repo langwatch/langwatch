@@ -71,7 +71,7 @@ const makeOps = () => {
 const makeSnapshots = (isHeld: boolean): OpsSnapshotService => ({
   start: vi.fn().mockResolvedValue(void 0),
   stop: vi.fn(),
-  tryGetDashboardData: vi.fn().mockReturnValue(null),
+  findDashboardData: vi.fn().mockReturnValue(null),
   getBadgeCounts: vi.fn().mockReturnValue({
     blockedCount: 0,
     dlqCount: 0,

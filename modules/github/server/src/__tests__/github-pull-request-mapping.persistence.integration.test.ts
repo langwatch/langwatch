@@ -416,7 +416,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
 
     expect(http.listingUrls).toHaveLength(0);
     await expect(
-      github.tryFindByNumber({
+      github.findByNumber({
         organizationId,
         repositoryHost: "github.com",
         repositoryFullName,
@@ -463,7 +463,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
 
     await vi.waitFor(async () => {
       await expect(
-        github.tryFindByNumber({
+        github.findByNumber({
           organizationId,
           repositoryHost: "github.com",
           repositoryFullName,
@@ -509,7 +509,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
 
     await vi.waitFor(async () => {
       await expect(
-        github.tryFindByNumber({
+        github.findByNumber({
           organizationId,
           repositoryHost: "github.com",
           repositoryFullName,
@@ -892,7 +892,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     await listing;
 
     await expect(
-      github.tryFindByNumber({
+      github.findByNumber({
         organizationId,
         repositoryHost: "github.com",
         repositoryFullName,
@@ -913,7 +913,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
       updatedAt: "2026-08-20T15:00:00.000Z",
     });
     await github.applyPullRequestEvent(initial);
-    const initialMapping = await github.tryFindByNumber({
+    const initialMapping = await github.findByNumber({
       organizationId,
       repositoryHost: "github.com",
       repositoryFullName,
@@ -940,7 +940,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     );
 
     await expect(
-      github.tryFindByNumber({
+      github.findByNumber({
         organizationId,
         repositoryHost: "github.com",
         repositoryFullName,

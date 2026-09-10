@@ -378,12 +378,12 @@ function disabledProvider(provider: string): ModelProvider {
 function modelProviderService(deps: ScenarioPrefetchFixture): ModelProviderApi {
   if (deps.modelProviders) return deps.modelProviders;
   return fakeService<ModelProviderApi>({
-    tryGetResolvedDefault: async (input) => ({
+    findResolvedDefault: async (input) => ({
       model: await deps.modelResolver.resolve(input.featureKey, input.projectId),
       source: "feature_override",
       scope: "project",
     }),
-    tryGetProviderForProject: async (input) =>
+    findProviderForProject: async (input) =>
       deps.disabledProviders?.has(input.provider) ? disabledProvider(input.provider) : null,
     prepareExecution: async (input) => {
       const result = await deps.modelParamsProvider.prepare(input.projectId, input.model);

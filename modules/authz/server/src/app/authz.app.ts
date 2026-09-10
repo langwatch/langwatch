@@ -104,8 +104,8 @@ export class AuthzApp implements AuthzApi {
   getAccessBreakdown: AuthzApi["getAccessBreakdown"] = (a) =>
     this.#permissions.getAccessBreakdown(a);
   isOnEngine: AuthzApi["isOnEngine"] = (a) => this.#permissions.isOnEngine(a);
-  tryGetEngineCutoverAt: AuthzApi["tryGetEngineCutoverAt"] = (a) =>
-    this.#permissions.tryGetEngineCutoverAt(a);
+  findEngineCutoverAt: AuthzApi["findEngineCutoverAt"] = (a) =>
+    this.#permissions.findEngineCutoverAt(a);
   hasProjectPermission(a: { userId: string; projectId: string; permission: AuthzPermission }) {
     return this.#permissions.hasPermission(a);
   }

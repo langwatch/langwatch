@@ -125,7 +125,7 @@ export class ManagerExplorerService {
     return this.fleet.findUpcomingWakes(params);
   }
 
-  async tryGetInstanceDetail(params: { ref: ProcessRef }): Promise<ProcessInstanceDetail | null> {
+  async findInstanceDetail(params: { ref: ProcessRef }): Promise<ProcessInstanceDetail | null> {
     const instance = await this.store.findByRef({ ref: params.ref });
     if (!instance) {
       return null;

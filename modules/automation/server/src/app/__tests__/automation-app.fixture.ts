@@ -121,7 +121,7 @@ export function createCanonicalAutomationApp(): {
     getTopUsedDocuments: vi.fn(),
     upsertEvaluationAnalytics: vi.fn(),
     upsertEvaluationAnalyticsBatch: vi.fn(),
-    tryGetEvaluationAnalytics: vi.fn(),
+    findEvaluationAnalytics: vi.fn(),
     appendEvaluationAnalyticsRollup: vi.fn(),
     appendEvaluationAnalyticsRollupBatch: vi.fn(),
     filterOptions: vi.fn(),

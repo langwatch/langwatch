@@ -93,7 +93,7 @@ function fakePromptService(): PromptApi {
  * test-suite/scenario references are real, not re-implemented. */
 function fakeScenarioService(): ScenarioApi {
   return {
-    tryGetTestSuite: async ({
+    findTestSuite: async ({
       testSuiteId,
       projectId: pid,
     }: {

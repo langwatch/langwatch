@@ -123,7 +123,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return row.role;
   }
 
-  async tryGetUserOrgRoleByTeamId(params: {
+  async findUserOrgRoleByTeamId(params: {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null> {
@@ -276,7 +276,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .map((organization) => this.fullyLoadedOrganization(organization, params.userId));
   }
 
-  async tryGetOrganizationWithMembers(params: {
+  async findOrganizationWithMembers(params: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
@@ -301,7 +301,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return { ...toOrganization(organization), members };
   }
 
-  async tryGetMemberById(params: {
+  async findMemberById(params: {
     organizationId: string;
     userId: string;
     currentUserId: string;

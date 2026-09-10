@@ -348,7 +348,7 @@ export const modelProviders = {
   },
 } satisfies Record<string, ModelProviderDefinition>;
 
-export function tryGetModelProviderDefinition(provider: string): ModelProviderDefinition | null {
+export function findModelProviderDefinition(provider: string): ModelProviderDefinition | null {
   const registry: Record<string, ModelProviderDefinition> = modelProviders;
   return registry[provider] ?? null;
 }

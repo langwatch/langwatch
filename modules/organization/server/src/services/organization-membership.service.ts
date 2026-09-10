@@ -149,18 +149,18 @@ export class OrganizationMembershipService {
     return this.repo.tryGetUserOrgRole(params);
   }
 
-  async tryGetUserOrgRoleByTeamId(params: {
+  async findUserOrgRoleByTeamId(params: {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null> {
-    return this.repo.tryGetUserOrgRoleByTeamId(params);
+    return this.repo.findUserOrgRoleByTeamId(params);
   }
 
   /**
    * The org's declared primary intent (ADR-038); null = intent unset
    * (legacy org). Consumed by the home resolver to pin the "/" landing.
    */
-  async tryGetPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
+  async findPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
     return this.repo.tryFindPrimaryIntentById(organizationId);
   }
 
@@ -276,7 +276,7 @@ export class OrganizationMembershipService {
   }
 
   /** One organization's provisioning summary, or null when the id is unknown. */
-  async tryGetProvisioningSummary(
+  async findProvisioningSummary(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null> {
     return this.repo.tryFindProvisioningSummaryById(organizationId);
@@ -299,12 +299,12 @@ export class OrganizationMembershipService {
    * Returns an organization with its members and their team memberships.
    * Returns null when the user is not a member of the organization.
    */
-  async tryGetOrganizationWithMembers(params: {
+  async findOrganizationWithMembers(params: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
   }): Promise<OrganizationWithMembersAndTheirTeams | null> {
-    return this.repo.tryGetOrganizationWithMembers(params);
+    return this.repo.findOrganizationWithMembers(params);
   }
 
   /**
@@ -312,12 +312,12 @@ export class OrganizationMembershipService {
    * Returns null when the current user is not a member (not found) or the target member
    * does not exist.
    */
-  async tryGetMemberById(params: {
+  async findMemberById(params: {
     organizationId: string;
     userId: string;
     currentUserId: string;
   }): Promise<OrganizationMemberWithUser | null> {
-    return this.repo.tryGetMemberById(params);
+    return this.repo.findMemberById(params);
   }
 
   /**

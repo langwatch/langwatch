@@ -187,19 +187,19 @@ export class ModelProviderService {
     return this.query.getForProject(input);
   }
 
-  tryGetProviderForProject(input: {
+  findProviderForProject(input: {
     projectId: string;
     provider: string;
   }): Promise<ModelProvider | null> {
-    return this.query.tryGetProviderForProject(input);
+    return this.query.findProviderForProject(input);
   }
 
-  tryFindRowServingModel(input: {
+  findRowServingModel(input: {
     projectId: string;
     provider: string;
     model: string;
   }): Promise<ModelProvider | null> {
-    return this.query.tryFindRowServingModel(input);
+    return this.query.findRowServingModel(input);
   }
 
   getExecutionProviders(input: {
@@ -258,7 +258,7 @@ export class ModelProviderService {
     return this.defaults.getInheritedValues(input);
   }
 
-  tryGetResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null> {
+  findResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null> {
     return this.defaults.tryGetResolved(input);
   }
 
@@ -286,7 +286,7 @@ export class ModelProviderService {
     return this.writeAuthorization.assertApiKeyCanWriteDefault(input.apiKey, input.scopes);
   }
 
-  tryGetDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null> {
+  findDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null> {
     return this.defaultWrites.tryGet(input);
   }
 

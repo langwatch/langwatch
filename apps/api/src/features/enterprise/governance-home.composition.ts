@@ -86,7 +86,7 @@ function governanceHomePorts(infrastructure: ApiTrpcInfrastructure): GovernanceH
         } as never,
       ),
 
-    tryGetPrimaryIntent: async ({ organizationId }) => {
+    findPrimaryIntent: async ({ organizationId }) => {
       const organization = await prisma.organization.findUnique({
         where: { id: organizationId },
         select: { primaryIntent: true },

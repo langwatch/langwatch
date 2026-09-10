@@ -213,7 +213,7 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
       updatedAt: expect.any(Date),
     });
     await expect(
-      testSuites.tryGetTestSuite({ projectId, testSuiteId: created.id }),
+      testSuites.findTestSuite({ projectId, testSuiteId: created.id }),
     ).resolves.toEqual(created);
     await expect(testSuites.listTestSuites({ projectId })).resolves.toEqual([created]);
   });
@@ -230,7 +230,7 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
       testSuites.renameTestSuite({ projectId, testSuiteId: foreign.id, name: "Taken over" }),
     ).rejects.toMatchObject({ code: "scenario_test_suite_not_found" });
     await expect(
-      testSuites.tryGetTestSuite({ projectId: otherProjectId, testSuiteId: foreign.id }),
+      testSuites.findTestSuite({ projectId: otherProjectId, testSuiteId: foreign.id }),
     ).resolves.toMatchObject({ name: "Foreign" });
   });
 

@@ -10,7 +10,7 @@ import {
 import type { CodingAgentSessionReads } from "@langwatch/coding-agent-server";
 import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
 import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
-import { GithubService, type GithubAppConfig } from "@langwatch/github-contract";
+import { type GithubApi, type GithubAppConfig } from "@langwatch/github-contract";
 import {
   GithubBranchDemandService,
   GithubHostPort,
@@ -226,12 +226,10 @@ class TestGithubHost extends GithubHostPort {
  * The GitHub App as this world stands it in: the install flow's own seam, plus
  * the branch mapping the backfill drives.
  */
-class TestGithubService extends GithubService {
+class TestGithubService implements GithubApi {
   readonly configured = true;
 
-  constructor(private readonly onBranchMapping: (request: BranchMappingRequest) => Promise<void>) {
-    super();
-  }
+  constructor(private readonly onBranchMapping: (request: BranchMappingRequest) => Promise<void>) {}
 
   getAppConfig(): GithubAppConfig {
     return { configured: true, appSlug: "test-app", webhookSecret: "webhook-secret" };
@@ -305,7 +303,7 @@ class TestGithubService extends GithubService {
     return this.unread();
   }
 
-  tryGetByInstallationId(): Promise<never> {
+  findByInstallationId(): Promise<never> {
     return this.unread();
   }
 
@@ -349,7 +347,7 @@ class TestGithubService extends GithubService {
     return this.unread();
   }
 
-  tryFindByNumber(): Promise<never> {
+  findByNumber(): Promise<never> {
     return this.unread();
   }
 

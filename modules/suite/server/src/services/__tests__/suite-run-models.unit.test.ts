@@ -25,7 +25,7 @@ function buildScenarios(
 
 function buildModelProviders(defaults: Record<string, string>) {
   return {
-    tryGetResolvedDefault: vi.fn(async ({ featureKey }: { featureKey: string }) => {
+    findResolvedDefault: vi.fn(async ({ featureKey }: { featureKey: string }) => {
       const model = defaults[featureKey];
       return model ? { model, source: "role_default", scope: "project" } : null;
     }),

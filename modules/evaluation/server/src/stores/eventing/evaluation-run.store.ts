@@ -49,7 +49,7 @@ export class EvaluationRunStore implements FoldProjectionStore<EvaluationRunData
   }
 
   tryGet(aggregateId: string, context: ProjectionStoreContext): Promise<EvaluationRunData | null> {
-    return this.service.tryGetRunByEvaluationId({
+    return this.service.findRunByEvaluationId({
       tenantId: String(context.tenantId),
       evaluationId: aggregateId,
     });

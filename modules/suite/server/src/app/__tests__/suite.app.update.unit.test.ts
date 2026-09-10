@@ -77,7 +77,7 @@ const promptApi = createApiFixture<PromptApi>({
   renameTag: mockMethod(),
   tryDeleteTagByName: mockMethod(),
   listForProject: mockMethod(),
-  tryGetByIdOrHandle: mockMethod(),
+  findByIdOrHandle: mockMethod(),
   getByIdOrHandle: mockMethod(),
   listVersions: mockMethod(),
   create: mockMethod(),
@@ -129,7 +129,7 @@ function buildApp(overrides: { scenarios?: Partial<ScenarioApi> } = {}) {
     resolveRunParameters: mockMethod(),
     resolveRunParametersForScenarios: mockMethod(),
     getNamesByIds: mockMethod(),
-    tryGetTestSuite: vi.fn<ScenarioApi["tryGetTestSuite"]>().mockResolvedValue(testSuite()),
+    findTestSuite: vi.fn<ScenarioApi["findTestSuite"]>().mockResolvedValue(testSuite()),
     createTestSuite: mockMethod(),
     updateTestSuite,
     getTestSuiteRunDefinition: mockMethod(),
@@ -257,10 +257,10 @@ describe("SuiteApp.update", () => {
 
 describe("SuiteApp.listByIds", () => {
   it("keeps matching test suites, omits missing associations and looks up duplicate IDs once", async () => {
-    const lookup = vi.fn<ScenarioApi["tryGetTestSuite"]>(async ({ testSuiteId, projectId }) =>
+    const lookup = vi.fn<ScenarioApi["findTestSuite"]>(async ({ testSuiteId, projectId }) =>
       testSuiteId === "test_suite_1" && projectId === "project_1" ? testSuite() : null,
     );
-    const { app } = buildApp({ scenarios: { tryGetTestSuite: lookup } });
+    const { app } = buildApp({ scenarios: { findTestSuite: lookup } });
 
     const suites = await app.listByIds({
       projectId: "project_1",

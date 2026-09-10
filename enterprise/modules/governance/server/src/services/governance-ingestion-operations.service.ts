@@ -85,7 +85,7 @@ export class GovernanceIngestionOperationsService {
   readonly ingestionSourceList: GovernanceApi["ingestionSourceList"] = (...args) =>
     this.ingestionSources.list(...args);
 
-  readonly tryFindIngestionSourceById: GovernanceApi["tryFindIngestionSourceById"] = (
+  readonly findIngestionSourceById: GovernanceApi["findIngestionSourceById"] = (
     ...args
   ) => this.ingestionSources.tryFindById(...args);
 
@@ -95,7 +95,7 @@ export class GovernanceIngestionOperationsService {
   readonly ingestionSourceLiveTraceProjectIds: GovernanceApi["ingestionSourceLiveTraceProjectIds"] =
     (...args) => this.ingestionSources.liveTraceProjectIds(...args);
 
-  readonly tryFindIngestionSourceByIngestSecret: GovernanceApi["tryFindIngestionSourceByIngestSecret"] =
+  readonly findIngestionSourceByIngestSecret: GovernanceApi["findIngestionSourceByIngestSecret"] =
     (...args) => this.ingestionSources.tryFindByIngestSecret(...args);
 
   readonly ingestionSourceCreate: GovernanceApi["ingestionSourceCreate"] = (...args) =>
@@ -120,7 +120,7 @@ export class GovernanceIngestionOperationsService {
   readonly templateListForOrgAdmin: GovernanceApi["templateListForOrgAdmin"] = (...args) =>
     this.templates.listForOrgAdmin(...args);
 
-  readonly tryFindTemplateByIdForOrg: GovernanceApi["tryFindTemplateByIdForOrg"] = (...args) =>
+  readonly findTemplateByIdForOrg: GovernanceApi["findTemplateByIdForOrg"] = (...args) =>
     this.templates.tryFindByIdForOrg(...args);
 
   readonly templateGetByIdForOrg: GovernanceApi["templateGetByIdForOrg"] = (...args) =>

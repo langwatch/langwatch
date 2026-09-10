@@ -76,10 +76,10 @@ export class SimulationService extends SimulationServiceContract {
     return simulationSetDataSchema.array().parse(await this.repository.getScenarioSetsData(input));
   }
 
-  async tryGetScenarioRunData(
+  async findScenarioRunData(
     input: SimulationScenarioRunInput,
   ): Promise<SimulationRunData | null> {
-    const run = await this.repository.tryGetScenarioRunData(input);
+    const run = await this.repository.findScenarioRunData(input);
 
     return run === null ? null : simulationRunDataSchema.parse(run);
   }
@@ -92,10 +92,10 @@ export class SimulationService extends SimulationServiceContract {
     );
   }
 
-  async tryGetBatchSummary(
+  async findBatchSummary(
     input: SimulationBatchSummaryInput,
   ): Promise<SimulationBatchSummary | null> {
-    const summary = await this.repository.tryGetBatchSummary(input);
+    const summary = await this.repository.findBatchSummary(input);
 
     return summary === null ? null : simulationBatchSummarySchema.parse(summary);
   }

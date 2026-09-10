@@ -6,7 +6,7 @@ export type ProviderOnboardingDefaultPlan = {
   EMBEDDINGS?: string;
 };
 
-function tryGetLatestEmbedding(provider: string): string | undefined {
+function findLatestEmbedding(provider: string): string | undefined {
   const embeddings = getModelsForProvider(provider)
     .filter((model) => model.mode === "embedding")
     .map((model) => model.id)
@@ -27,7 +27,7 @@ export function buildProviderOnboardingDefaultPlan(
     return {
       DEFAULT: "openai/latest",
       FAST: "openai/latest-mini",
-      EMBEDDINGS: tryGetLatestEmbedding("openai"),
+      EMBEDDINGS: findLatestEmbedding("openai"),
     };
   }
   if (provider === "anthropic") {
@@ -37,11 +37,11 @@ export function buildProviderOnboardingDefaultPlan(
     return {
       DEFAULT: "gemini/latest",
       FAST: "gemini/latest-mini",
-      EMBEDDINGS: tryGetLatestEmbedding("gemini"),
+      EMBEDDINGS: findLatestEmbedding("gemini"),
     };
   }
   if (provider === "voyage") {
-    return { EMBEDDINGS: tryGetLatestEmbedding("voyage") };
+    return { EMBEDDINGS: findLatestEmbedding("voyage") };
   }
 
   return {};

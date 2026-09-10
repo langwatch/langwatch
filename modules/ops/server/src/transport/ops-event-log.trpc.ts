@@ -105,7 +105,7 @@ export const opsEventLogTrpcTransport = defineTrpcRouter(OpsApi, opsEventLogTrpc
   .handle(({ app, input }, operator) => {
     app.admitOperator(operator, "ops:view");
 
-    return app.tryFindHistoryEntry({ runId: input.runId });
+    return app.findHistoryEntry({ runId: input.runId });
   })
 
   .procedure("startReplay")

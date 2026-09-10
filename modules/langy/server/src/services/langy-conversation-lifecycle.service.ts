@@ -47,7 +47,7 @@ type LangyConversationLifecycleOptions = {
     projectId: string;
     userId: string;
   }) => Promise<ConversationDetail>;
-  tryFindByIdVisible: (input: {
+  findByIdVisible: (input: {
     id: string;
     projectId: string;
     userId: string;
@@ -232,7 +232,7 @@ export class LangyConversationLifecycleService {
    * none exists. READ ONLY server-side — the worker-provisioning path injects
    * it and the relay verifies stream frames with it, same posture as the handoff token.
    */
-  async tryGetRunToken({
+  async findRunToken({
     projectId,
     conversationId,
   }: {
@@ -251,7 +251,7 @@ export class LangyConversationLifecycleService {
     projectId: string;
     userId: string;
   }): Promise<boolean> {
-    const conv = await this.deps.tryFindByIdVisible({ id, projectId, userId });
+    const conv = await this.deps.findByIdVisible({ id, projectId, userId });
     // Only the owner may archive — a shared conversation is visible, not deletable.
     if (!conv?.isOwn) {
       return false;
@@ -279,7 +279,7 @@ export class LangyConversationLifecycleService {
     title?: string | null;
     isShared?: boolean;
   }): Promise<ConversationDetail> {
-    const conv = await this.deps.tryFindByIdVisible({ id, projectId, userId });
+    const conv = await this.deps.findByIdVisible({ id, projectId, userId });
     if (!conv?.isOwn) {
       // A shared conversation is visible but not editable by a non-owner; we do
       // not leak that distinction — both read as "not found" to the caller.

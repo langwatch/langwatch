@@ -122,7 +122,7 @@ describe("SimulationClickHouseRepository", () => {
     ]);
 
     await expect(
-      repository.tryGetScenarioRunData({
+      repository.findScenarioRunData({
         projectId: "project-1",
         scenarioRunId: "run-1",
       }),
@@ -140,7 +140,7 @@ describe("SimulationClickHouseRepository", () => {
     const { repository } = makeRepository([[]]);
 
     await expect(
-      repository.tryGetScenarioRunData({
+      repository.findScenarioRunData({
         projectId: "project-1",
         scenarioRunId: "missing-run",
       }),
@@ -155,7 +155,7 @@ describe("SimulationClickHouseRepository", () => {
     };
     const { repository } = makeRepository([[runRow({ Metadata: JSON.stringify(metadata) })]]);
 
-    const run = await repository.tryGetScenarioRunData({
+    const run = await repository.findScenarioRunData({
       projectId: "project-1",
       scenarioRunId: "run-1",
     });

@@ -101,7 +101,7 @@ export class LegacyApiKeyGrantService {
   }
 
   private async persist(apiKey: ApiKey, binding: AuthzLedgerBindingAttach): Promise<void> {
-    const cutoverAt = await this.options.authz.tryGetEngineCutoverAt({
+    const cutoverAt = await this.options.authz.findEngineCutoverAt({
       organizationId: apiKey.organizationId,
     });
     if (cutoverAt === null) {

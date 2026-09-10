@@ -165,7 +165,7 @@ integration("who started a batch", () => {
         makeRunRow({ scenarioSetId, batchRunId, metadata: startedBy("user_omar", "cli") }),
       ]);
 
-      const summary = await repo.tryGetBatchSummary({
+      const summary = await repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -192,7 +192,7 @@ integration("who started a batch", () => {
         scenarioSetId,
         limit: 10,
       });
-      const summary = await repo.tryGetBatchSummary({
+      const summary = await repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -213,7 +213,7 @@ integration("who started a batch", () => {
         scenarioSetId,
         limit: 10,
       });
-      const summary = await repo.tryGetBatchSummary({
+      const summary = await repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });

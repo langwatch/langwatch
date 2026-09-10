@@ -23,16 +23,16 @@ import { archiveScenarioRun } from "../scenario-event.api.ts";
 describe("archiveScenarioRun()", () => {
   let mockTryGetScenarioRunData: Mock;
   let mockDeleteRun: Mock;
-  let simulations: Pick<SimulationService, "tryGetScenarioRunData" | "deleteRun">;
+  let simulations: Pick<SimulationService, "findScenarioRunData" | "deleteRun">;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockTryGetScenarioRunData = vi.fn().mockResolvedValue(null);
     mockDeleteRun = vi.fn().mockResolvedValue(undefined);
     simulations = {
-      tryGetScenarioRunData: mockTryGetScenarioRunData,
+      findScenarioRunData: mockTryGetScenarioRunData,
       deleteRun: mockDeleteRun,
-    } as unknown as Pick<SimulationService, "tryGetScenarioRunData" | "deleteRun">;
+    } as unknown as Pick<SimulationService, "findScenarioRunData" | "deleteRun">;
   });
 
   describe("when the run belongs to the project", () => {

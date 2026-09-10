@@ -191,7 +191,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
         // Unreferenced with a long backstop: the sweep would shorten it.
         await redis.set(blobKey, "body", "EX", 4 * 24 * 3600);
 
-        const summary = await ops.tryGetBlob({
+        const summary = await ops.findBlob({
           queueName: QUEUE,
           projectId: PROJECT,
           hash: HASH,

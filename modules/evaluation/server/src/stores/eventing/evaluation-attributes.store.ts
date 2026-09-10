@@ -151,7 +151,7 @@ export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationA
     appliedEventIds: string[];
     miss?: "absent" | "undecodable";
   }> {
-    const found = await this.analytics.tryGetEvaluationAnalytics({
+    const found = await this.analytics.findEvaluationAnalytics({
       tenantId: String(context.tenantId),
       evaluationId: aggregateId,
       window: context.readWindow,

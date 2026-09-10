@@ -86,7 +86,7 @@ export class GithubBranchMappingService {
       return false;
     }
 
-    const installation = await this.deps.installations.tryGetByInstallationId(event.installationId);
+    const installation = await this.deps.installations.findByInstallationId(event.installationId);
     if (!installation) {
       logger.info(
         { installationId: event.installationId, action: event.action },

@@ -27,15 +27,15 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve({});
   }
 
-  tryGetProviderForProject(): Promise<null> {
+  findProviderForProject(): Promise<null> {
     return Promise.resolve(null);
   }
 
-  tryFindRowServingModel(): Promise<null> {
+  findRowServingModel(): Promise<null> {
     return Promise.resolve(null);
   }
 
-  tryGetResolvedDefault(): Promise<null> {
+  findResolvedDefault(): Promise<null> {
     return Promise.resolve(null);
   }
 
@@ -47,7 +47,7 @@ export class TestModelProviderService implements ModelProviderApi {
     throw new Error("Not used by Workflow tests.");
   }
 
-  tryGetDefaultConfig(): Promise<null> {
+  findDefaultConfig(): Promise<null> {
     return Promise.resolve(null);
   }
 

@@ -276,7 +276,7 @@ export class LangyConversationReadService {
    * genuinely tolerate "no fold yet" (the chat route's busy-guard). Every
    * other caller should use `getById` and let the domain error travel.
    */
-  async tryFindByIdVisible({
+  async findByIdVisible({
     id,
     projectId,
     userId,

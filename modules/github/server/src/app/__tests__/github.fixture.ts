@@ -87,7 +87,7 @@ export class TestGithubService implements GithubApi {
     return [];
   }
 
-  async tryGetByInstallationId(): Promise<GithubInstallation | null> {
+  async findByInstallationId(): Promise<GithubInstallation | null> {
     return null;
   }
 
@@ -142,7 +142,7 @@ export class TestGithubService implements GithubApi {
     return [];
   }
 
-  async tryFindByNumber(): Promise<GithubPullRequest | null> {
+  async findByNumber(): Promise<GithubPullRequest | null> {
     return null;
   }
 

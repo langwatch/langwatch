@@ -263,7 +263,7 @@ function memoryScenarioApi(world: SuiteWorld): ScenarioApi {
   };
 
   return createApiFixture<ScenarioApi>({
-    tryGetTestSuite: async (input) => {
+    findTestSuite: async (input) => {
       const found = world.testSuites.get(input.testSuiteId);
 
       return found && found.projectId === input.projectId ? found : null;

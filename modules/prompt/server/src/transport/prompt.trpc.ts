@@ -57,7 +57,7 @@ export const promptTrpcTransport = defineTrpcRouter(PromptApi, promptTrpc)
   // `prompt_tag_invalid`, both handled errors the client reads its copy off.
   .procedure("getByIdOrHandle")
   .withPermission("prompts:view")
-  .handle(({ app, input }) => app.tryGetByIdOrHandle(input))
+  .handle(({ app, input }) => app.findByIdOrHandle(input))
 
   .procedure("checkHandleUniqueness")
   .withPermission("prompts:view")

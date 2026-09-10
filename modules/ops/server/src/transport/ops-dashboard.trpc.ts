@@ -22,7 +22,7 @@ export const opsDashboardTrpcTransport = defineTrpcRouter(OpsApi, opsDashboardTr
   .handle(({ app }, operator) => {
     app.admitOperator(operator, "ops:view");
 
-    return app.tryGetDashboardData();
+    return app.findDashboardData();
   })
 
   .procedure("getBadgeCounts")

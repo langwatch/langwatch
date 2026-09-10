@@ -165,7 +165,7 @@ integration("the note of a batch", () => {
         }),
       ]);
 
-      const summary = await repo.tryGetBatchSummary({
+      const summary = await repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -203,7 +203,7 @@ integration("the note of a batch", () => {
       const batchRunId = `batch-no-note-summary-${nanoid()}`;
       await insertRows([makeRunRow({ scenarioSetId, batchRunId, metadata: null })]);
 
-      const summary = await repo.tryGetBatchSummary({
+      const summary = await repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -247,7 +247,7 @@ integration("the note of a batch", () => {
         }),
       ]);
 
-      const summary = await repo.tryGetBatchSummary({
+      const summary = await repo.findBatchSummary({
         projectId: tenantId,
         batchRunId,
       });
@@ -320,7 +320,7 @@ integration("a batch produced by an SDK or CI run", () => {
       });
       await insertRows([row]);
 
-      const run = await repo.tryGetScenarioRunData({
+      const run = await repo.findScenarioRunData({
         projectId: tenantId,
         scenarioRunId: row.ScenarioRunId,
       });

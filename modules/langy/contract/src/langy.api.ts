@@ -15,7 +15,7 @@ import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
 /** The portable, callable Langy capability shared by process transports. */
 export interface LangyApi {
   stopTurn(input: LangyStopTurnInput & { userId: string }): Promise<void>;
-  tryGetEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null>;
+  findEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null>;
   trySetEgressAllowlist(input: {
     projectId: string;
     allowlist: LangyEgressAllowlist;
@@ -48,7 +48,7 @@ export interface LangyApi {
     conversationId: string;
     userId: string;
   }): Promise<LangyLocalRecord>;
-  tryFindByIdVisible(input: {
+  findByIdVisible(input: {
     id: string;
     projectId: string;
     userId: string;
@@ -86,7 +86,7 @@ export interface LangyApi {
     requestedConversationId: string | null;
     modelOverride?: string;
   }): Promise<{ conversationId: string | null; warmed: boolean }>;
-  tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null>;
+  findModelsAllowedForProject(projectId: string): Promise<string[] | null>;
   revokeWorkerSessionKey(input: {
     apiKeyId: string;
     projectId: string;
@@ -103,7 +103,7 @@ export interface LangyApi {
     turnId: string;
   }): Promise<boolean>;
   ingestAgentTurnResult(input: LangyTurnResultInput): Promise<void>;
-  tryGetRunToken(input: { projectId: string; conversationId: string }): Promise<string | null>;
+  findRunToken(input: { projectId: string; conversationId: string }): Promise<string | null>;
   recordToolCallStarted(input: {
     projectId: string;
     conversationId: string;

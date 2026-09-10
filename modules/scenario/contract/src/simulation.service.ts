@@ -116,13 +116,13 @@ export abstract class SimulationService {
   abstract getScenarioSetsData(
     input: SimulationProjectDateRangeInput,
   ): Promise<SimulationSetData[]>;
-  abstract tryGetScenarioRunData(
+  abstract findScenarioRunData(
     input: SimulationScenarioRunInput,
   ): Promise<SimulationRunData | null>;
   abstract getBatchHistoryForScenarioSet(
     input: SimulationBatchHistoryInput,
   ): Promise<SimulationBatchHistory>;
-  abstract tryGetBatchSummary(
+  abstract findBatchSummary(
     input: SimulationBatchSummaryInput,
   ): Promise<SimulationBatchSummary | null>;
   abstract getRunDataForBatchRun(input: SimulationBatchRunInput): Promise<SimulationBatchRunData>;

@@ -98,7 +98,7 @@ export class SuiteService {
       return suite;
     }
 
-    const testSuite = await this.options.scenarios.tryGetTestSuite({
+    const testSuite = await this.options.scenarios.findTestSuite({
       testSuiteId: parsed.id,
       projectId: parsed.projectId,
     });

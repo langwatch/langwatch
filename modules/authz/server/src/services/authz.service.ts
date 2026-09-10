@@ -106,7 +106,7 @@ export type AuthzServiceOptions = {
    */
   isOnEngine: (organizationId: string) => Promise<boolean>;
   /** Finalized cutover time used by compatibility fact minting. */
-  tryGetEngineCutoverAt?: (organizationId: string) => Promise<Instant | null>;
+  findEngineCutoverAt?: (organizationId: string) => Promise<Instant | null>;
 };
 
 export class AuthzService extends AuthzServiceContract {
@@ -200,12 +200,12 @@ export class AuthzService extends AuthzServiceContract {
     return await this.options.isOnEngine(organizationId);
   }
 
-  async tryGetEngineCutoverAt({
+  async findEngineCutoverAt({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<Instant | null> {
-    return this.options.tryGetEngineCutoverAt?.(organizationId) ?? null;
+    return this.options.findEngineCutoverAt?.(organizationId) ?? null;
   }
 
   async authorize<Tier extends BindingScopeTier, Permission extends AuthzPermission>({

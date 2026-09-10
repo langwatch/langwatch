@@ -38,10 +38,10 @@ export interface OrganizationVisibilityReader {
       demoProjectId: string;
     }>,
   ): Promise<FullyLoadedOrganization[]>;
-  tryGetOrganizationWithMembers(
+  findOrganizationWithMembers(
     input: Readonly<{ organizationId: string; includeDeactivated: boolean; userId: string }>,
   ): Promise<OrganizationWithMembersAndTheirTeams | null>;
-  tryGetMemberById(
+  findMemberById(
     input: Readonly<{ organizationId: string; userId: string; currentUserId: string }>,
   ): Promise<OrganizationWithMembersAndTheirTeams["members"][number] | null>;
 }
@@ -121,7 +121,7 @@ export class OrganizationVisibilityService {
     input: Readonly<{ organizationId: string; includeDeactivated: boolean }>,
     by: OrganizationCaller,
   ): Promise<OrganizationWithMembersAndTheirTeams> {
-    const organization = await this.deps.reader.tryGetOrganizationWithMembers({
+    const organization = await this.deps.reader.findOrganizationWithMembers({
       ...input,
       userId: by.id,
     });
@@ -155,7 +155,7 @@ export class OrganizationVisibilityService {
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller,
   ): Promise<OrganizationWithMembersAndTheirTeams["members"][number]> {
-    const member = await this.deps.reader.tryGetMemberById({ ...input, currentUserId: by.id });
+    const member = await this.deps.reader.findMemberById({ ...input, currentUserId: by.id });
 
     if (!member) throw new MemberNotFoundError(input.userId);
 

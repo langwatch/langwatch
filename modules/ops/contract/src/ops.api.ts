@@ -92,7 +92,7 @@ export interface OpsApi {
   listBlobQueues(): Promise<string[]>;
   getBlobStoreStats(): Promise<OpsBlobStoreStats>;
   listBlobs(input: ListBlobsInput): Promise<OpsBlobPage>;
-  tryGetBlob(input: GetBlobInput): Promise<OpsBlobSummary | null>;
+  findBlob(input: GetBlobInput): Promise<OpsBlobSummary | null>;
   runBlobCleanup(input: RunBlobCleanupInput): Promise<BlobSweepReport>;
   deleteBlob(input: DeleteBlobInput): Promise<DeleteBlobResult>;
   listAnomalies(): Promise<Anomaly[]>;
@@ -111,7 +111,7 @@ export interface OpsApi {
     page: number;
     pageSize: number;
   }): Promise<OpsQueueGroupsPage>;
-  tryGetQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo | null>;
+  findQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo | null>;
   listQueueGroupJobs(input: {
     queueName: string;
     groupId: string;
@@ -302,7 +302,7 @@ export interface OpsApi {
     apiToken?: string | undefined;
     projectIdHint?: string | null;
   }): Promise<{ id: string }>;
-  tryGetDashboardData(): DashboardData | null;
+  findDashboardData(): DashboardData | null;
   badgeCounts(): { blockedCount: number; dlqCount: number; computedAt: Date | null };
   streamDashboard(input: { signal?: { readonly aborted: boolean } }): AsyncIterable<DashboardData>;
   getQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo>;
@@ -375,7 +375,7 @@ export interface OpsApi {
     search?: string;
   }): Promise<{ instances: ProcessInstanceRow[]; total: number }>;
   getUpcomingWakes(input: { limit: number }): Promise<ProcessWakeRow[]>;
-  tryGetInstanceDetail(input: {
+  findInstanceDetail(input: {
     ref: { processName: string; projectId: string; processKey: string };
   }): Promise<ProcessInstanceDetail | null>;
   getOutbox(input: {
@@ -417,7 +417,7 @@ export interface OpsApi {
     actorUserId: string;
   }): Promise<{ released: boolean }>;
   getHistory(): Promise<ReplayHistoryEntry[]>;
-  tryFindHistoryEntry(input: { runId: string }): Promise<ReplayHistoryEntry | null>;
+  findHistoryEntry(input: { runId: string }): Promise<ReplayHistoryEntry | null>;
   startReplay(input: {
     projectionNames: string[];
     since: string;

@@ -14,7 +14,7 @@ import {
   normalizeRoutingHandle,
   providerDeprecation,
   routingHandleProblem,
-  tryGetModelProviderDefinition,
+  findModelProviderDefinition,
   type ModelCostRate,
   type ModelDefaultScope,
   type ModelProviderApiKeyValidation,
@@ -78,7 +78,7 @@ export abstract class ModelProviderConnectionRateLimiter {
 /** Registry/SDK boundary. Provider SDKs and environment configuration stay behind this port. */
 export abstract class ModelProviderCatalog {
   exists(provider: string): boolean {
-    return tryGetModelProviderDefinition(provider) !== null;
+    return findModelProviderDefinition(provider) !== null;
   }
   abstract systemProviders(input: {
     projectId?: string;
@@ -108,7 +108,7 @@ export abstract class ModelProviderCatalog {
     embeddingsModels: string[];
     disabledByDefault?: boolean;
   } {
-    const definition = tryGetModelProviderDefinition(provider);
+    const definition = findModelProviderDefinition(provider);
 
     return {
       models: getProviderModelOptions(provider, "chat").map((model) => model.value),
@@ -222,7 +222,7 @@ export abstract class ModelProviderCatalog {
   tryGetExecutionDefinition(input: {
     provider: string;
   }): { apiKey: string; endpointKey: string | null } | null {
-    const definition = tryGetModelProviderDefinition(input.provider);
+    const definition = findModelProviderDefinition(input.provider);
     return definition
       ? {
           apiKey: definition.apiKey,
@@ -347,7 +347,7 @@ export abstract class ModelProviderCredentialProbePort {
     projectId: string;
     provider: string;
     customBaseUrl: string | undefined;
-    modelProviders: Pick<ModelProviderApi, "tryGetProviderForProject">;
+    modelProviders: Pick<ModelProviderApi, "findProviderForProject">;
   }): Promise<ModelProviderCredentialVerdict>;
 }
 

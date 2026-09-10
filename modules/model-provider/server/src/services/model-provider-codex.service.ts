@@ -32,7 +32,7 @@ export class ModelProviderCodexService {
 
   async getStatus(input: ModelProviderCodexStatusInput): Promise<ModelProviderCodexStatus> {
     const parsed = modelProviderCodexStatusInputSchema.parse(input);
-    const provider = await this.options.query.tryGetProviderForProject({
+    const provider = await this.options.query.findProviderForProject({
       provider: "openai_codex",
       projectId: parsed.projectId,
     });

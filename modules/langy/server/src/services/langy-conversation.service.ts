@@ -150,7 +150,7 @@ export class LangyConversationService {
       messages,
       runtime,
       getById: (input) => this.getById(input),
-      tryFindByIdVisible: (input) => this.tryFindByIdVisible(input),
+      findByIdVisible: (input) => this.findByIdVisible(input),
     });
   }
 
@@ -178,10 +178,10 @@ export class LangyConversationService {
     return this.reads.getLocalRecord(input);
   }
 
-  tryFindByIdVisible(
-    input: Parameters<LangyConversationReadService["tryFindByIdVisible"]>[0],
-  ): ReturnType<LangyConversationReadService["tryFindByIdVisible"]> {
-    return this.reads.tryFindByIdVisible(input);
+  findByIdVisible(
+    input: Parameters<LangyConversationReadService["findByIdVisible"]>[0],
+  ): ReturnType<LangyConversationReadService["findByIdVisible"]> {
+    return this.reads.findByIdVisible(input);
   }
 
   getAll(
@@ -214,10 +214,10 @@ export class LangyConversationService {
     return this.lifecycle.forkById(input);
   }
 
-  tryGetRunToken(
-    input: Parameters<LangyConversationLifecycleService["tryGetRunToken"]>[0],
-  ): ReturnType<LangyConversationLifecycleService["tryGetRunToken"]> {
-    return this.lifecycle.tryGetRunToken(input);
+  findRunToken(
+    input: Parameters<LangyConversationLifecycleService["findRunToken"]>[0],
+  ): ReturnType<LangyConversationLifecycleService["findRunToken"]> {
+    return this.lifecycle.findRunToken(input);
   }
 
   recordUserMessage(
@@ -268,10 +268,10 @@ export class LangyConversationService {
     return this.turns.ingestAgentTurnResult(input);
   }
 
-  tryGetPendingHandoff(
-    input: Parameters<LangyConversationTurnService["tryGetPendingHandoff"]>[0],
-  ): ReturnType<LangyConversationTurnService["tryGetPendingHandoff"]> {
-    return this.turns.tryGetPendingHandoff(input);
+  findPendingHandoff(
+    input: Parameters<LangyConversationTurnService["findPendingHandoff"]>[0],
+  ): ReturnType<LangyConversationTurnService["findPendingHandoff"]> {
+    return this.turns.findPendingHandoff(input);
   }
 
   recordTurnHandoff(

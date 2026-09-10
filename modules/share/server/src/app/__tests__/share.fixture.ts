@@ -36,7 +36,7 @@ export function createShareTestDataRetention(): DataRetentionApi {
     ),
     autoUnpin: vi.fn(async () => void 0),
     unpin: vi.fn(async () => void 0),
-    tryGetPin: vi.fn(async () => null),
+    findPin: vi.fn(async () => null),
     listByProject: vi.fn(async () => []),
   });
 }

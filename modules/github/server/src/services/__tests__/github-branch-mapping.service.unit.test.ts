@@ -50,7 +50,7 @@ class FakeHost extends GithubHostPort {
 
 class FakeInstallations extends GithubBranchInstallationsPort {
   installation: { organizationId: string } | null = null;
-  tryGetByInstallationId(): Promise<{ organizationId: string } | null> {
+  findByInstallationId(): Promise<{ organizationId: string } | null> {
     return Promise.resolve(this.installation);
   }
   tryResolveInstallationForRepository(): Promise<{
@@ -84,7 +84,7 @@ class FakeRepository extends GithubPullRequestsRepository {
   findAllByBranchKeys(): Promise<never[]> {
     return Promise.resolve([]);
   }
-  tryFindByNumber(): Promise<null> {
+  findByNumber(): Promise<null> {
     return Promise.resolve(null);
   }
   refreshSnapshot(): Promise<void> {

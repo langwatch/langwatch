@@ -14,7 +14,7 @@ function executionWith(providers: Record<string, unknown>, rowById?: unknown) {
     query: {
       getExecutionProviders: async () => providers,
       tryGetByIdForProject: async () => rowById ?? null,
-      tryFindRowServingModel: async () => null,
+      findRowServingModel: async () => null,
     },
     catalog: {
       prepareExecution: async ({ parameters }: { parameters: Record<string, unknown> }) =>

@@ -161,7 +161,7 @@ export async function setupModelEnv(
     // failure falls through to the config error rather than an infra one.
     let servingRow = null;
     try {
-      servingRow = await modelProvidersService.tryFindRowServingModel({
+      servingRow = await modelProvidersService.findRowServingModel({
         projectId,
         provider,
         model: modelName,

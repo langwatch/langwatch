@@ -204,7 +204,7 @@ describe("EvaluationAnalyticsStore read-back version gate", () => {
 
     async upsertEvaluationAnalyticsBatch(): Promise<void> {}
 
-    async tryGetEvaluationAnalytics(): Promise<{
+    async findEvaluationAnalytics(): Promise<{
       row: EvaluationAnalyticsRow;
       appliedEventIds: string[];
     }> {

@@ -101,7 +101,7 @@ export interface PromptApi {
     organizationId?: string;
     version?: "latest" | "all";
   }): Promise<VersionedPrompt[]>;
-  tryGetByIdOrHandle(
+  findByIdOrHandle(
     input: PromptReference & { organizationId?: string },
   ): Promise<VersionedPrompt | null>;
   getByIdOrHandle(input: PromptReference & { organizationId?: string }): Promise<VersionedPrompt>;

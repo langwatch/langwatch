@@ -12,17 +12,17 @@ function makeFixture() {
   const deps = {
     conversations: {
       ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
-      tryFindByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
-      tryGetPendingHandoff: vi.fn(async () => null),
-      tryGetRunToken: vi.fn(async () => "run-token"),
+      findByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+      findPendingHandoff: vi.fn(async () => null),
+      findRunToken: vi.fn(async () => "run-token"),
       acceptTurn,
       finalizeTurn: vi.fn(async () => undefined),
     },
     credentials: {
       getOrProvision: vi.fn(async () => ({ organizationId: "organization-1" })),
-      tryGetEgressAllowlist: vi.fn(async () => null),
+      findEgressAllowlist: vi.fn(async () => null),
       resolveMirrorTier: vi.fn(async () => "content" as const),
-      tryGetModelsAllowed: vi.fn(async () => null),
+      findModelsAllowed: vi.fn(async () => null),
     },
     models: { resolve: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })) },
     worker: {

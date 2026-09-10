@@ -296,7 +296,7 @@ export function createSimulationRunsRestApp(options: {
       "Getting simulation run",
     );
 
-    const run = await simulations().tryGetScenarioRunData({
+    const run = await simulations().findScenarioRunData({
       projectId: project.id,
       scenarioRunId: input.scenarioRunId,
     });
@@ -340,7 +340,7 @@ export function createSimulationRunsRestApp(options: {
       "Getting batch summary",
     );
 
-    const batch = await simulations().tryGetBatchSummary({
+    const batch = await simulations().findBatchSummary({
       projectId: project.id,
       batchRunId: input.batchRunId,
     });

@@ -90,7 +90,7 @@ export const opsProcessTrpcTransport = defineTrpcRouter(OpsApi, opsProcessTrpc)
   .handle(({ app, input }, operator) => {
     app.admitOperator(operator, "ops:view");
 
-    return app.tryGetInstanceDetail({ ref: input });
+    return app.findInstanceDetail({ ref: input });
   })
 
   .procedure("listProcessOutbox")

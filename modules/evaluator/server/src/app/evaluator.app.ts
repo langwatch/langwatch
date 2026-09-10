@@ -4,6 +4,7 @@
  * rule either door used to hold is a method here, and a caller arrives as
  * `actorId`, never read from a session or a request.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import {
@@ -35,11 +36,11 @@ import {
 } from "@langwatch/evaluator-contract";
 import {
   ModelNotConfiguredError,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
 import {
@@ -107,7 +108,7 @@ export interface EvaluatorAppInfrastructure {
    * creates an evaluator without naming them, but the rule for what happens
    * then belongs to the module, not to that door.
    */
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   /** The models a deployment falls back to when a project configured none. */
   fallbackModels?: Readonly<{ defaultModel: string; embeddingsModel: string }> | undefined;
   /** Mints the ephemeral studio ids a code evaluator's run is traced under. */
@@ -124,7 +125,7 @@ type EvaluatorSetup = FeatureSetup<
 /** What the app is built from, once the setup has assembled it. */
 type EvaluatorAppParts = Readonly<{
   evaluators: EvaluatorRuntimeService;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
 }>;

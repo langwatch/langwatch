@@ -274,7 +274,7 @@ class Authorization extends AuthzService {
     return this.notUsed();
   }
 
-  tryGetEngineCutoverAt(): Promise<never> {
+  findEngineCutoverAt(): Promise<never> {
     return this.notUsed();
   }
 
@@ -1639,7 +1639,7 @@ describe("ModelProviderApi", () => {
     ];
 
     await expect(
-      service(providers).tryFindRowServingModel({
+      service(providers).findRowServingModel({
         projectId: "project_1",
         provider: "openai",
         model: "deployment",
@@ -1665,7 +1665,7 @@ describe("ModelProviderApi", () => {
     ];
 
     await expect(
-      service(providers).tryFindRowServingModel({
+      service(providers).findRowServingModel({
         projectId: "project_1",
         provider: "openai",
         model: "deployment",
@@ -2164,7 +2164,7 @@ describe("ModelProviderApi", () => {
     ];
 
     await expect(
-      service(providers).tryFindRowServingModel({
+      service(providers).findRowServingModel({
         projectId: "project_1",
         provider: "openai",
         model: "deployment",
@@ -2188,7 +2188,7 @@ describe("ModelProviderApi", () => {
     ];
 
     await expect(
-      service(providers).tryFindRowServingModel({
+      service(providers).findRowServingModel({
         projectId: "project_1",
         provider: "openai",
         model: "text-embedding-3-small",

@@ -82,7 +82,7 @@ export class ModelProviderQueryService {
     return Object.fromEntries(selected.map((provider) => [provider.provider, provider]));
   }
 
-  async tryGetProviderForProject(input: {
+  async findProviderForProject(input: {
     projectId: string;
     provider: string;
   }): Promise<ModelProvider | null> {
@@ -115,7 +115,7 @@ export class ModelProviderQueryService {
     });
   }
 
-  async tryFindRowServingModel(input: {
+  async findRowServingModel(input: {
     projectId: string;
     provider: string;
     model: string;

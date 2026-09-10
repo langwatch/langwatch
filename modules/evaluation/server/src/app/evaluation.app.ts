@@ -223,16 +223,16 @@ export class EvaluationApp implements EvaluationApiContract {
   upsertRuns: EvaluationApiContract["upsertRuns"] = (input) => this.#service.upsertRuns(input);
   getRunByEvaluationId: EvaluationApiContract["getRunByEvaluationId"] = (input) =>
     this.#service.getRunByEvaluationId(input);
-  tryGetRunByEvaluationId: EvaluationApiContract["tryGetRunByEvaluationId"] = (input) =>
-    this.#service.tryGetRunByEvaluationId(input);
+  findRunByEvaluationId: EvaluationApiContract["findRunByEvaluationId"] = (input) =>
+    this.#service.findRunByEvaluationId(input);
   findRunsByTraceId: EvaluationApiContract["findRunsByTraceId"] = (input) =>
     this.#service.findRunsByTraceId(input);
   findSummariesByTraceIds: EvaluationApiContract["findSummariesByTraceIds"] = (input) =>
     this.#service.findSummariesByTraceIds(input);
   findTraceEvaluations: EvaluationApiContract["findTraceEvaluations"] = (input) =>
     this.#service.findTraceEvaluations(input);
-  tryGetInputs: EvaluationApiContract["tryGetInputs"] = (input) =>
-    this.#service.tryGetInputs(input);
+  findInputs: EvaluationApiContract["findInputs"] = (input) =>
+    this.#service.findInputs(input);
   getMonitorPerformance: EvaluationApiContract["getMonitorPerformance"] = (input) =>
     this.#service.getMonitorPerformance(input);
 

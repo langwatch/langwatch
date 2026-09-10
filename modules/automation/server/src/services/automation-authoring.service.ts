@@ -673,7 +673,7 @@ export class AutomationAuthoringService {
     // no path to recover since the soft-deleted row is hidden.
     const existingForGraph =
       isGraphAlert && input.customGraphId
-        ? await this.collaborators.automation.tryGetByCustomGraphId({
+        ? await this.collaborators.automation.findByCustomGraphId({
             projectId: input.projectId,
             customGraphId: input.customGraphId,
           })

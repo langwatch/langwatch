@@ -8,16 +8,17 @@
  * keeps private. Everything the case does not name refuses by name rather
  * than answering undefined.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   ModelProviderResolution,
-  ModelProviderService,
+  ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import { vi } from "vitest";
 
 import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
@@ -62,21 +63,21 @@ export function testEvaluatorPermissions(permits: (projectId: string) => boolean
 export function createEvaluatorTestApp(
   input: Readonly<{
     repository?: MemoryEvaluatorRepository;
-    modelProviders?: Partial<ModelProviderService>;
+    modelProviders?: Partial<ModelProviderApi>;
     permissions?: AuthzApi;
     graph?: EvaluatorGraph;
   }> = {},
 ): Readonly<{
   app: EvaluatorApp;
   repository: MemoryEvaluatorRepository;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
 }> {
   const graph = input.graph ?? testEvaluatorGraph();
   const permissions = input.permissions ?? testEvaluatorPermissions(() => true);
   const repository = input.repository ?? MemoryEvaluatorRepository.create();
-  const modelProviders = createApiFixture<ModelProviderService>({
+  const modelProviders = createApiFixture<ModelProviderApi>({
     resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) =>
       testModelResolution(
         featureKey,

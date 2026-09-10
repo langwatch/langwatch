@@ -365,7 +365,7 @@ describe("AnalyticsService", () => {
     });
 
     await expect(
-      service.tryGetEvaluationAnalytics({
+      service.findEvaluationAnalytics({
         tenantId: evaluationRow.tenantId,
         evaluationId: evaluationRow.evaluationId,
       }),

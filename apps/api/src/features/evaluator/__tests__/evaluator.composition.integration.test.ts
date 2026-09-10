@@ -11,12 +11,12 @@ import { AuditLogApi as AuditLogApiToken } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { newEvaluatorId } from "@langwatch/evaluator-contract";
 import { evaluatorServer, type EvaluatorGraph } from "@langwatch/evaluator-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApp } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { WorkflowApp, WorkflowNlpRuntimePort } from "@langwatch/workflow-server";
+
+import type { WorkflowApp, WorkflowNlpRuntimePort, WorkflowService,} from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthzService } from "@langwatch/authz-contract";
@@ -89,7 +89,7 @@ async function bootEvaluator(overrides: { graph?: EvaluatorGraph } = {}) {
         nlp: createApiFixture<{
           dispatch: () => Promise<never>;
         }>(),
-        modelProviders: createApiFixture<ModelProviderService>({
+        modelProviders: createApiFixture<ModelProviderApi>({
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) =>
             resolution(
               featureKey,
@@ -247,7 +247,7 @@ describe("given a workflow evaluator whose graph has never been saved", () => {
         workflows: createApiFixture<WorkflowService>(),
         nlpRuntime: createApiFixture<WorkflowNlpRuntimePort>(),
         workflowApp: () => createApiFixture<WorkflowApp>(),
-        modelProviders: createApiFixture<ModelProviderService>(),
+        modelProviders: createApiFixture<ModelProviderApi>(),
         permissions: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
         users: createApiFixture<UserApi>(),
       },

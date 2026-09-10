@@ -185,7 +185,7 @@ export interface OrganizationApi {
     team: { id: string; slug: string; name: string };
   }>;
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
-  tryGetProvisioningSummary(
+  findProvisioningSummary(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
@@ -196,19 +196,19 @@ export interface OrganizationApi {
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;
   getOldestTeamId(input: GetOldestTeamInput): Promise<string>;
   tryGetOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string | null>;
-  tryGetOrganizationWithMembers(
+  findOrganizationWithMembers(
     input: Readonly<{ organizationId: string; includeDeactivated: boolean }>,
     by: OrganizationCaller,
   ): Promise<OrganizationWithMembersAndTheirTeams | null>;
-  tryGetMemberById(
+  findMemberById(
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller,
   ): Promise<OrganizationMemberWithUser | null>;
   getAllMembers(input: Readonly<{ organizationId: string }>): Promise<User[]>;
-  tryGetUserOrgRoleByTeamId(
+  findUserOrgRoleByTeamId(
     input: Readonly<{ userId: string; teamId: string }>,
   ): Promise<OrganizationUserRole | null>;
-  tryGetPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null>;
+  findPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null>;
   ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace>;
   ensurePersonalWorkspace(
     input: Omit<PersonalWorkspaceInput, "userId">,
@@ -324,7 +324,7 @@ export interface OrganizationApi {
     input: Omit<PersonalWorkspaceFeaturesInput, "callerUserId">,
     by: OrganizationCaller,
   ): Promise<PersonalFeatures>;
-  tryGetProject(id: string): Promise<Project | null>;
+  findProject(id: string): Promise<Project | null>;
   listProjectsByOrganization(
     input: Readonly<{ organizationId: string; page: number; limit: number; projectIds?: string[] }>,
   ): Promise<PaginatedProjects>;

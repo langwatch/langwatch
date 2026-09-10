@@ -93,10 +93,10 @@ export class LangyService {
     await this.turns.stopTurn(input);
   }
 
-  tryGetEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null> {
+  findEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null> {
     const projectId = langyEgressProjectInputSchema.parse(input).projectId;
 
-    return this.credentials.tryGetEgressAllowlist({ projectId });
+    return this.credentials.findEgressAllowlist({ projectId });
   }
 
   trySetEgressAllowlist(input: {
@@ -143,12 +143,12 @@ export class LangyService {
     return this.conversations.getLocalRecord(input);
   }
 
-  tryFindByIdVisible(input: {
+  findByIdVisible(input: {
     id: string;
     projectId: string;
     userId: string;
   }): Promise<ContractConversationDetail | null> {
-    return this.conversations.tryFindByIdVisible(input);
+    return this.conversations.findByIdVisible(input);
   }
 
   getById(input: {
@@ -204,8 +204,8 @@ export class LangyService {
     return this.turns.warmConversationWorker(input);
   }
 
-  tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null> {
-    return this.credentials.tryGetModelsAllowedForProject(projectId);
+  findModelsAllowedForProject(projectId: string): Promise<string[] | null> {
+    return this.credentials.findModelsAllowedForProject(projectId);
   }
 
   revokeWorkerSessionKey(input: {
@@ -239,8 +239,8 @@ export class LangyService {
     return this.conversations.ingestAgentTurnResult(input);
   }
 
-  tryGetRunToken(input: { projectId: string; conversationId: string }): Promise<string | null> {
-    return this.conversations.tryGetRunToken(input);
+  findRunToken(input: { projectId: string; conversationId: string }): Promise<string | null> {
+    return this.conversations.findRunToken(input);
   }
 
   recordToolCallStarted(input: {

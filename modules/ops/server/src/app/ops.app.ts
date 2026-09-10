@@ -205,7 +205,7 @@ export type OpsProcessExplorer = {
     search?: string;
   }): Promise<{ instances: ProcessInstanceRow[]; total: number }>;
   getUpcomingWakes(input: { limit: number }): Promise<ProcessWakeRow[]>;
-  tryGetInstanceDetail(input: { ref: OpsProcessRef }): Promise<ProcessInstanceDetail | null>;
+  findInstanceDetail(input: { ref: OpsProcessRef }): Promise<ProcessInstanceDetail | null>;
   getOutbox(input: {
     ref: OpsProcessRef;
     page: number;
@@ -253,7 +253,7 @@ export type OpsProcessExplorer = {
  */
 export type OpsReplayRunner = {
   getHistory(): Promise<ReplayHistoryEntry[]>;
-  tryFindHistoryEntry(input: { runId: string }): Promise<ReplayHistoryEntry | null>;
+  findHistoryEntry(input: { runId: string }): Promise<ReplayHistoryEntry | null>;
   startReplay(input: {
     projectionNames: string[];
     since: string;
@@ -632,8 +632,8 @@ export class OpsApp implements OpsApi {
   }
 
   /** The collected dashboard, or null when no snapshot collector is running. */
-  tryGetDashboardData(): DashboardData | null {
-    return this.#dependencies.ops.snapshots?.tryGetDashboardData() ?? null;
+  findDashboardData(): DashboardData | null {
+    return this.#dependencies.ops.snapshots?.findDashboardData() ?? null;
   }
 
   /**
@@ -662,7 +662,7 @@ export class OpsApp implements OpsApi {
 
   /** One queue group, raising a not-found rather than answering null. */
   async getQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo> {
-    const group = await this.#dependencies.ops.tryGetQueueGroup(input);
+    const group = await this.#dependencies.ops.findQueueGroup(input);
     if (!group) {
       throw new NotFoundError("not_found", "Queue group", input.groupId, {
         meta: { queueName: input.queueName },
@@ -804,8 +804,8 @@ export class OpsApp implements OpsApi {
   getUpcomingWakes(input: Parameters<OpsProcessExplorer["getUpcomingWakes"]>[0]) {
     return this.#dependencies.ops.managerExplorer.getUpcomingWakes(input);
   }
-  tryGetInstanceDetail(input: Parameters<OpsProcessExplorer["tryGetInstanceDetail"]>[0]) {
-    return this.#dependencies.ops.managerExplorer.tryGetInstanceDetail(input);
+  findInstanceDetail(input: Parameters<OpsProcessExplorer["findInstanceDetail"]>[0]) {
+    return this.#dependencies.ops.managerExplorer.findInstanceDetail(input);
   }
   getOutbox(input: Parameters<OpsProcessExplorer["getOutbox"]>[0]) {
     return this.#dependencies.ops.managerExplorer.getOutbox(input);
@@ -840,8 +840,8 @@ export class OpsApp implements OpsApi {
   getHistory() {
     return this.#dependencies.ops.replay.getHistory();
   }
-  tryFindHistoryEntry(input: Parameters<OpsReplayRunner["tryFindHistoryEntry"]>[0]) {
-    return this.#dependencies.ops.replay.tryFindHistoryEntry(input);
+  findHistoryEntry(input: Parameters<OpsReplayRunner["findHistoryEntry"]>[0]) {
+    return this.#dependencies.ops.replay.findHistoryEntry(input);
   }
   startReplay(input: Parameters<OpsReplayRunner["startReplay"]>[0]) {
     return this.#dependencies.ops.replay.startReplay(input);
@@ -871,8 +871,8 @@ export class OpsApp implements OpsApi {
   listBlobs(input: Parameters<OpsService["listBlobs"]>[0]) {
     return this.#dependencies.ops.listBlobs(input);
   }
-  tryGetBlob(input: Parameters<OpsService["tryGetBlob"]>[0]) {
-    return this.#dependencies.ops.tryGetBlob(input);
+  findBlob(input: Parameters<OpsService["findBlob"]>[0]) {
+    return this.#dependencies.ops.findBlob(input);
   }
   runBlobCleanup(input: Parameters<OpsService["runBlobCleanup"]>[0]) {
     return this.#dependencies.ops.runBlobCleanup(input);
@@ -940,8 +940,8 @@ export class OpsApp implements OpsApi {
   listQueueGroups(input: Parameters<OpsService["listQueueGroups"]>[0]) {
     return this.#dependencies.ops.listQueueGroups(input);
   }
-  tryGetQueueGroup(input: Parameters<OpsService["tryGetQueueGroup"]>[0]) {
-    return this.#dependencies.ops.tryGetQueueGroup(input);
+  findQueueGroup(input: Parameters<OpsService["findQueueGroup"]>[0]) {
+    return this.#dependencies.ops.findQueueGroup(input);
   }
   listQueueGroupJobs(input: Parameters<OpsService["listQueueGroupJobs"]>[0]) {
     return this.#dependencies.ops.listQueueGroupJobs(input);

@@ -42,7 +42,7 @@ export interface AnalyticsApi {
   }): Promise<AnalyticsFilterOption[]>;
   upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void>;
   upsertEvaluationAnalyticsBatch(input: AnalyticsEvaluationUpsertInput[]): Promise<void>;
-  tryGetEvaluationAnalytics(input: AnalyticsEvaluationReadInput): Promise<{
+  findEvaluationAnalytics(input: AnalyticsEvaluationReadInput): Promise<{
     row: AnalyticsEvaluationRow;
     appliedEventIds: string[];
   } | null>;

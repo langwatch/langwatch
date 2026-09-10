@@ -96,7 +96,7 @@ export const opsPlatformTrpcTransport = defineTrpcRouter(OpsApi, opsPlatformTrpc
   .handle(({ app, input }, operator) => {
     app.admitOperator(operator, "ops:view");
 
-    return app.tryGetBlob(input);
+    return app.findBlob(input);
   })
 
   // A dry run destroys nothing, so it does not ask for the confirmation.

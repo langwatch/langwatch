@@ -180,7 +180,7 @@ export class DataRetentionService {
     return pin !== null;
   }
 
-  async tryGetPin(input: UnpinTraceInput): Promise<PinnedTrace | null> {
+  async findPin(input: UnpinTraceInput): Promise<PinnedTrace | null> {
     return this.options.pins.findByProjectAndTrace(unpinTraceInputSchema.parse(input));
   }
 

@@ -48,7 +48,7 @@ export class GovernanceLifecycleOperationsService {
   readonly routingPolicyList: GovernanceApi["routingPolicyList"] = (...args) =>
     this.routingPolicies.list(...args);
 
-  readonly tryFindRoutingPolicyById: GovernanceApi["tryFindRoutingPolicyById"] = (...args) =>
+  readonly findRoutingPolicyById: GovernanceApi["findRoutingPolicyById"] = (...args) =>
     this.routingPolicies.tryFindById(...args);
 
   readonly routingPolicyGetById: GovernanceApi["routingPolicyGetById"] = (...args) =>

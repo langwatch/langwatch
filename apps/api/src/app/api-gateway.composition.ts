@@ -5,6 +5,7 @@
  */
 import type { ApiKeyPermissionScope, AuthzService } from "@langwatch/authz-contract";
 import {
+  gatewayServer,
   GatewayApp,
   GatewayApplicableBudgetsService,
   GatewayBudgetLedgerAdapter,
@@ -28,10 +29,10 @@ import {
   type GatewayVirtualKeySpendPort,
   type MembershipSet,
   type VirtualKeyActor,
-  virtualKeyBudgetInputSchema,
   GatewayScopeResolutionService,
   type GatewayAppDependencies,
 } from "@langwatch/gateway-server";
+import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
 import { PrismaGatewayAuditRepository } from "@langwatch/gateway-server/composition/gateway-audit";
 import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
 import { PrismaGatewayVirtualKeyRepository } from "@langwatch/gateway-server/composition/gateway-virtual-keys";
@@ -48,7 +49,7 @@ import { PrismaVirtualKeyAuthorizationRepository } from "@langwatch/gateway-serv
 import { PrismaVirtualKeyDirectBudgetRepository } from "@langwatch/gateway-server/composition/gateway-virtual-key-direct-budgets";
 import { PrismaGatewayScopeResolutionRepository } from "@langwatch/gateway-server/composition/gateway-scope-resolution";
 import { PrismaGatewayTransactionAdapter } from "@langwatch/gateway-server/composition/gateway-transactions";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { createApp } from "@langwatch/runtime-composition";
 
 const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
 /** A capability this deployment did not compose, refused by name. */
@@ -183,7 +184,9 @@ export type ApiGatewayComposition = Readonly<{
  * either a capability built over persistence the feature package cannot reach, or a
  * decision made against role bindings and memberships it cannot see.
  */
-export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGatewayComposition {
+export async function composeApiGateway(
+  options: ApiGatewayCompositionOptions,
+): Promise<ApiGatewayComposition> {
   const { prisma, authz, projects, clickhouse } = options;
   const permissions = ApiGatewayScopePermissions.create(authz);
   const virtualKeyAuthorization = VirtualKeyAuthorizationService.create({
@@ -446,12 +449,13 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
       }),
   };
 
-  const app = GatewayApp.create({
-    dependencies: {},
-    infrastructure,
-    config: undefined,
-    resources: new ResourceScope(),
-  });
+  // The module builds its own application, so the five declared namespaces
+  // mount on the same instance every REST family and `ctx.app` already read.
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withInfrastructure({})
+    .withModule(gatewayServer, { infrastructure })
+    .boot({ role: "api" });
+  const app = runtime.module(gatewayServer).provided;
 
   return { app, virtualKeys, budgetSpend, virtualKeySpend, spendEvents, budgetDecisions };
 }

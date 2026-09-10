@@ -8,12 +8,12 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import { EvaluatorWorkflowVersionRequiredError } from "@langwatch/evaluator-contract";
 import { evaluatorServer, type EvaluatorGraph } from "@langwatch/evaluator-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApp } from "@langwatch/runtime-composition";
 import { nowInstant, toDate } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { WorkflowApp, WorkflowNlpRuntimePort } from "@langwatch/workflow-server";
+
+import type { WorkflowApp, WorkflowNlpRuntimePort, WorkflowService,} from "@langwatch/workflow-server";
 import { nanoid } from "nanoid";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
@@ -42,7 +42,7 @@ export type EvaluatorPeers = Readonly<{
    * The model gateway. It resolves a project's default and embeddings models
    * when an evaluator is created without naming them.
    */
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   /** Answers whether a caller may act in a project other than the request's. */
   permissions: AuthzApiContract;
   /** Names the person behind each row of one evaluator's change history. */

@@ -295,7 +295,7 @@ async function resolveExpectedInstallationTarget(input: {
 
   if (!input.installationId) return target;
 
-  const owned = await input.service.tryGetByInstallationId(input.installationId);
+  const owned = await input.service.findByInstallationId(input.installationId);
 
   if (owned && owned.organizationId === input.organizationId) {
     target.expectedInstallationId = owned.installationId;

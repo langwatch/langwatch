@@ -263,7 +263,7 @@ export abstract class OrganizationMembershipRepository {
     userId: string;
     organizationId: string;
   }): Promise<OrganizationUserRole | null>;
-  abstract tryGetUserOrgRoleByTeamId(params: {
+  abstract findUserOrgRoleByTeamId(params: {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null>;
@@ -301,13 +301,13 @@ export abstract class OrganizationMembershipRepository {
     demoProjectId: string;
   }): Promise<FullyLoadedOrganization[]>;
 
-  abstract tryGetOrganizationWithMembers(params: {
+  abstract findOrganizationWithMembers(params: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
   }): Promise<OrganizationWithMembersAndTheirTeams | null>;
 
-  abstract tryGetMemberById(params: {
+  abstract findMemberById(params: {
     organizationId: string;
     userId: string;
     currentUserId: string;
@@ -317,7 +317,7 @@ export abstract class OrganizationMembershipRepository {
 
   /**
    * A single membership row with its user, disabled or not. Unlike
-   * `tryGetMemberById` there is no caller pre-check: the management surface
+   * `findMemberById` there is no caller pre-check: the management surface
    * authenticates through the organization credential, not a session user.
    */
   abstract tryFindMembership(params: {

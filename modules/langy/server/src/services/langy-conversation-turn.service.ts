@@ -373,7 +373,7 @@ export class LangyConversationTurnService {
    * The pending shutdown-handoff for a conversation, or null (ADR-048). Read
    * from the fold; the token is opaque to the control plane.
    */
-  async tryGetPendingHandoff({
+  async findPendingHandoff({
     projectId,
     conversationId,
   }: {

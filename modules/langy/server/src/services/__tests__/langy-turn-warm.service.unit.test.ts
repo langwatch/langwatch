@@ -48,9 +48,9 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   } as unknown as LangyTurnServiceDeps["conversations"];
   const credentials = {
     getOrProvision,
-    tryGetEgressAllowlist: vi.fn(async () => null),
+    findEgressAllowlist: vi.fn(async () => null),
     resolveMirrorTier: vi.fn(async () => "content" as const),
-    tryGetModelsAllowed: getModelsAllowed,
+    findModelsAllowed: getModelsAllowed,
   } as unknown as LangyTurnServiceDeps["credentials"];
 
   const deps = {

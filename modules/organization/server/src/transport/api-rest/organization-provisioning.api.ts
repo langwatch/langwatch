@@ -41,7 +41,7 @@ export interface OrganizationProvisioningPort {
     slug?: string;
   }): Promise<{ organization: { id: string; name: string }; team: unknown }>;
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
-  tryGetProvisioningSummary(
+  findProvisioningSummary(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
@@ -212,7 +212,7 @@ export function createOrganizationsRestApp(options: {
         ],
       });
 
-      summary = await service_.tryGetProvisioningSummary(created.organization.id);
+      summary = await service_.findProvisioningSummary(created.organization.id);
       if (!summary) {
         // The slug is the natural key an infrastructure-as-code caller stores;
         // answering 201 with a blank one moves the failure far from its cause.
@@ -264,7 +264,7 @@ export function createOrganizationsRestApp(options: {
   });
 
   const getHandler = async (_c: Context, input: z.infer<typeof organizationParamsSchema>) => {
-    const organization = await organizations().tryGetProvisioningSummary(input.id);
+    const organization = await organizations().findProvisioningSummary(input.id);
     if (!organization) {
       throw new NotFoundError("not_found", "Organization", input.id);
     }

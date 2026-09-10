@@ -217,7 +217,7 @@ export const modelProviderTrpcTransport = defineTrpcRouter(ModelProviderApi, mod
   .procedure("getResolvedDefault")
   .withPermission("project:view")
   .handle(({ app, input }) =>
-    app.tryGetResolvedDefault({ projectId: input.projectId, featureKey: input.featureKey }),
+    app.findResolvedDefault({ projectId: input.projectId, featureKey: input.featureKey }),
   )
 
   .procedure("getDefaultModelsForProject")

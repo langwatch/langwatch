@@ -21,7 +21,7 @@ import {
   ModelProviderCustomModelsMigrateTask,
   ModelRegistrySyncTask,
 } from "@langwatch/model-provider-server";
-import { PostgresProcessManagerPurgeAdapter, ProcessManagerPurgeTask } from "@langwatch/ops-server";
+import { PrismaProcessManagerPurgeRepository, ProcessManagerPurgeTask } from "@langwatch/ops-server";
 import type { Task } from "@langwatch/task";
 import { GdprUserDataEraseRepository, UserDataEraseTask } from "@langwatch/user-server";
 import { buildDatasetContentBackfillTask } from "./platform/dataset-content-backfill.composition.ts";
@@ -66,7 +66,7 @@ export function buildTasksCatalogue({
     buildSystemMigrationsPassTask({ host, eventing }),
     ProcessManagerPurgeTask.create({
       repository: () =>
-        PostgresProcessManagerPurgeAdapter.create({ database: host.requirePrisma() }),
+        PrismaProcessManagerPurgeRepository.create({ database: host.requirePrisma() }),
     }),
     AgentAuditLogIdsBackfillTask.create({
       database: () => host.requirePrisma(),

@@ -292,7 +292,7 @@ export class ScenarioService {
     });
   }
 
-  tryGetTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
+  findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
     return this.options.repository.tryFindTestSuite(scenarioTestSuiteIdInputSchema.parse(input));
   }
 

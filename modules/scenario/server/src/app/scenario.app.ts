@@ -235,8 +235,8 @@ export class ScenarioApp implements ScenarioApi {
     return this.#dependencies.scenarios.getNamesByIds(input);
   }
 
-  tryGetTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
-    return this.#dependencies.scenarios.tryGetTestSuite(input);
+  findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
+    return this.#dependencies.scenarios.findTestSuite(input);
   }
 
   createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
@@ -553,8 +553,8 @@ export class ScenarioApp implements ScenarioApi {
   }
 
   /** One run by its id. No date window, so old runs stay reachable. */
-  tryGetScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null> {
-    return this.#dependencies.simulations.tryGetScenarioRunData(input);
+  findScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null> {
+    return this.#dependencies.simulations.findScenarioRunData(input);
   }
 
   /** How many batch runs one suite has, for its pagination. */

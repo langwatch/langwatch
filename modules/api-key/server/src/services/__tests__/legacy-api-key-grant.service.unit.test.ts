@@ -50,20 +50,20 @@ function harness(
     attachBindings?: ReturnType<typeof vi.fn>;
   } = {},
 ) {
-  const tryGetEngineCutoverAt = vi
+  const findEngineCutoverAt = vi
     .fn()
     .mockResolvedValue(options.cutoverAt === undefined ? CUTOVER_INSTANT : options.cutoverAt);
   const attachBindings =
     options.attachBindings ?? vi.fn().mockResolvedValue({ attached: [], duplicates: [] });
   const diagnostics = new RecordingDiagnostics();
   const service = LegacyApiKeyGrantService.create({
-    authz: { tryGetEngineCutoverAt } as unknown as AuthzService,
+    authz: { findEngineCutoverAt } as unknown as AuthzService,
     grants: { attachBindings } as unknown as AuthzGrantsService,
     deriveBindingId: () => "grant-derived",
     diagnostics,
     ...(options.now ? { now: options.now } : {}),
   });
-  return { service, tryGetEngineCutoverAt, attachBindings, diagnostics };
+  return { service, findEngineCutoverAt, attachBindings, diagnostics };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -115,7 +115,7 @@ describe("LegacyApiKeyGrantService", () => {
 
   // @scenario A key born during a parked genesis import still mints once the organization migrates
   it("retries after the organization reaches finalized cutover", async () => {
-    const { service, tryGetEngineCutoverAt, attachBindings } = harness({
+    const { service, findEngineCutoverAt, attachBindings } = harness({
       cutoverAt: null,
     });
 
@@ -123,7 +123,7 @@ describe("LegacyApiKeyGrantService", () => {
     await settle();
     expect(attachBindings).not.toHaveBeenCalled();
 
-    tryGetEngineCutoverAt.mockResolvedValue(CUTOVER_INSTANT);
+    findEngineCutoverAt.mockResolvedValue(CUTOVER_INSTANT);
     service.mint(apiKey());
     await settle();
     expect(attachBindings).toHaveBeenCalledTimes(1);

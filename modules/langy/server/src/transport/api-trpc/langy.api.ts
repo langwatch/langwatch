@@ -465,7 +465,7 @@ export class LangyTrpcApi {
           .handle(async ({ input, ctx }) => {
             // A freshness poll of the OPEN conversation — which may be the one the
             // user JUST started, whose fold has not been projected yet. So this is a
-            // caller for which absence is a real answer: `tryFindByIdVisible`, not
+            // caller for which absence is a real answer: `findByIdVisible`, not
             // `getById`. Using the throwing form here would 500 the poll on every
             // first turn.
             const detail = await ctx.app.langy.tryFindVisible({
@@ -857,7 +857,7 @@ export class LangyTrpcApi {
           .withOutput(langyModelsAllowedSchema)
           .withPermission("langy:view")
           .handle(async ({ input, ctx }) => {
-            const modelsAllowed = await ctx.app.langy.tryGetModelsAllowed(input.projectId);
+            const modelsAllowed = await ctx.app.langy.findModelsAllowed(input.projectId);
             return { modelsAllowed };
           }),
       )

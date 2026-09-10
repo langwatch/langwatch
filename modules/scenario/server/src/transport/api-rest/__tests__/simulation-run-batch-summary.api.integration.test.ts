@@ -72,15 +72,15 @@ function makeSummary(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function mount(tryGetBatchSummary: ReturnType<typeof vi.fn>) {
+function mount(findBatchSummary: ReturnType<typeof vi.fn>) {
   const app = createSimulationRunsRestApp({
     security: testSecurity(),
-    simulations: () => ({ tryGetBatchSummary }) as unknown as SimulationService,
+    simulations: () => ({ findBatchSummary }) as unknown as SimulationService,
     scenarioRunPlatformUrl: () => "https://app.test/run",
   });
 
   return {
-    tryGetBatchSummary,
+    findBatchSummary,
     fetch: (path: string) => app.fetch(new Request(`http://api.test${path}`)),
   };
 }
@@ -101,7 +101,7 @@ describe("given the simulation runs REST family", () => {
         runningCount: 1,
         isComplete: false,
       });
-      expect(api.tryGetBatchSummary).toHaveBeenCalledWith({
+      expect(api.findBatchSummary).toHaveBeenCalledWith({
         projectId: project.id,
         batchRunId: "batch_1",
       });

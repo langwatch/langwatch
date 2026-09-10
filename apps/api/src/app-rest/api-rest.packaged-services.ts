@@ -23,7 +23,7 @@ import type { EnterpriseFeature } from "@langwatch/enterprise-plan-gate";
 import type { EvaluatorApp } from "@langwatch/evaluator-server";
 import type { ExperimentApp } from "@langwatch/experiment-server";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type {
   OrganizationLedgerActor,
   OrganizationService,
@@ -41,8 +41,8 @@ import type {
 } from "@langwatch/stored-object-server";
 import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
 import type { UserApi } from "@langwatch/user-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { WorkflowEvaluationTrigger } from "@langwatch/workflow-server";
+
+import type { WorkflowEvaluationTrigger, WorkflowService,} from "@langwatch/workflow-server";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ApiErrorBody } from "@langwatch/api/rest";
@@ -83,7 +83,7 @@ export type ApiPackagedRestServices = Readonly<{
   evaluators?: (() => EvaluatorApp) | undefined;
   experiments?: (() => ExperimentApp) | undefined;
   governance?: (() => GovernanceApp) | undefined;
-  modelProviders?: (() => ModelProviderService) | undefined;
+  modelProviders?: (() => ModelProviderApi) | undefined;
   monitors?: (() => MonitorApi) | undefined;
   /** The organization directory `/api/groups`, `/api/teams` and `/api/me` read. */
   organizations?: (() => OrganizationService) | undefined;

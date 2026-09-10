@@ -83,7 +83,7 @@ class TestPullRequestRepository extends NullGithubPullRequestsRepository {
     super();
   }
 
-  tryFindByNumber(input: {
+  findByNumber(input: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;

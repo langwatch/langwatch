@@ -12,7 +12,7 @@ import {
 } from "@langwatch/identity-server";
 import { parseRoutingTable } from "@langwatch/clickhouse-client";
 import {
-  PostgresSystemMigrationsAdapter,
+  OpsSystemMigrations,
   RoutingTableOrganizationDataplaneAdapter,
   SystemMigrationsPassTask,
 } from "@langwatch/ops-server";
@@ -52,7 +52,7 @@ export function buildSystemMigrationsPassTask({
       const database = host.requirePrisma();
       organizationMigrations ??= registeredMigrations({ host, eventing });
       const userMigrations = registeredUserMigrations({ database, eventing: identityEventing() });
-      const runner = PostgresSystemMigrationsAdapter.create({
+      const runner = OpsSystemMigrations.create({
         database,
         redis: host.redis ?? null,
         isSaaS: () => host.config.isSaaS,

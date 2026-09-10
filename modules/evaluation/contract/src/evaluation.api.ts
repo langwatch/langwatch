@@ -63,7 +63,7 @@ export interface EvaluationApi {
   upsertRun(input: UpsertEvaluationRunCommand): Promise<void>;
   upsertRuns(input: UpsertEvaluationRunCommand[]): Promise<void>;
   getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData>;
-  tryGetRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
+  findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
   findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
   findSummariesByTraceIds(
     input: EvaluationSummariesByTraceIdsQuery,
@@ -71,7 +71,7 @@ export interface EvaluationApi {
   findTraceEvaluations(
     input: TraceEvaluationsQuery,
   ): Promise<Record<string, TraceEvaluationData[]>>;
-  tryGetInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
+  findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
   getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]>;
 
   // The public evaluation doors: the SDK's batch result log and the four

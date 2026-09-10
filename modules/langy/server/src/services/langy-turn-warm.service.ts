@@ -77,7 +77,7 @@ export class LangyTurnWarmService {
       return { conversationId, warmed: false };
     }
 
-    const modelsAllowed = await this.deps.credentials.tryGetModelsAllowed({
+    const modelsAllowed = await this.deps.credentials.findModelsAllowed({
       projectId,
       organizationId: credentials.organizationId,
     });

@@ -103,7 +103,7 @@ export class OpsService {
     return this.blobStore.getBlobs(input);
   }
 
-  tryGetBlob(input: GetBlobInput): Promise<OpsBlobSummary | null> {
+  findBlob(input: GetBlobInput): Promise<OpsBlobSummary | null> {
     return this.blobStore.tryGetBlobById(input);
   }
 
@@ -182,7 +182,7 @@ export class OpsService {
     return this.queues.getGroups(input);
   }
 
-  tryGetQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo | null> {
+  findQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo | null> {
     return this.queues.tryGetGroupDetail(input);
   }
 

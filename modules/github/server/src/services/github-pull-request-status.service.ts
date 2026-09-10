@@ -117,7 +117,7 @@ export class GithubPullRequestStatusService {
     organizationId: string;
     ref: GithubPullRequestRef;
   }): Promise<GithubPullRequestLiveStatus | null> {
-    const stored = await this.deps.repository.tryFindByNumber({
+    const stored = await this.deps.repository.findByNumber({
       organizationId,
       ...ref,
     });

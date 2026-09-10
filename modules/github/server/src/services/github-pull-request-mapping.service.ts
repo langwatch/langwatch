@@ -73,13 +73,13 @@ export class GithubPullRequestMappingService {
     return rows.map(toContractPullRequest);
   }
 
-  async tryFindByNumber(input: {
+  async findByNumber(input: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;
     prNumber: number;
   }): Promise<GithubPullRequest | null> {
-    const row = await this.repository.tryFindByNumber(input);
+    const row = await this.repository.findByNumber(input);
 
     return row ? toContractPullRequest(row) : null;
   }

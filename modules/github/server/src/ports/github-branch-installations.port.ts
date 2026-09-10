@@ -18,7 +18,7 @@ export abstract class GithubBranchInstallationsPort {
    * Attribution of a verified delivery, so it stays valid with no App
    * credentials configured at all.
    */
-  abstract tryGetByInstallationId(
+  abstract findByInstallationId(
     installationId: string,
   ): Promise<{ organizationId: string } | null>;
 

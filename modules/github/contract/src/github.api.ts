@@ -28,7 +28,7 @@ export interface GithubApi {
   popupErrorHtml(message: string): string;
   tryParsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null;
   getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]>;
-  tryGetByInstallationId(installationId: string): Promise<GithubInstallation | null>;
+  findByInstallationId(installationId: string): Promise<GithubInstallation | null>;
   isOrganizationMember(input: { userId: string; organizationId: string }): Promise<boolean>;
   getConnectionStatus(input: { organizationId: string }): Promise<GithubConnectionStatus>;
   disconnect(input: {
@@ -76,7 +76,7 @@ export interface GithubApi {
     repositoryFullName: string;
     headBranches: readonly string[];
   }): Promise<readonly GithubPullRequest[]>;
-  tryFindByNumber(input: {
+  findByNumber(input: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;

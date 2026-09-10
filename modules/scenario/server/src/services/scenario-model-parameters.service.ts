@@ -37,7 +37,7 @@ export class ScenarioModelParametersService {
       };
     }
 
-    const provider = await this.modelProviders.tryGetProviderForProject({
+    const provider = await this.modelProviders.findProviderForProject({
       projectId,
       provider: providerKey,
     });

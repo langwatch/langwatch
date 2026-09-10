@@ -69,10 +69,21 @@ check once at the end. Every tool output is filtered (`tail`, `grep`, vitest
 
 ## Budget
 
-The cap is 90 minutes or 250 tool calls, whichever comes first. A lane does not
+The cap is 90 minutes or 120 tool calls, whichever comes first. A lane does not
 stop before that because a module is large; it lands each step green and
 continues. At 45 minutes it writes a one-paragraph status. Whole-file python
 rewrites of the same file are a smell: use targeted edits.
+
+The cost of a lane is the sum of its context over every turn, and the context
+grows by every tool result and every line the lane writes, so the total is
+quadratic in the number of turns. Measured on 10 lanes: 70k tokens on the first
+turn, 350k to 410k by turn 280, 15M to 83M cached input tokens per lane, with
+cache misses at zero or one. Fewer turns is the lever, not the cache window:
+one Bash call runs several commands joined with `&&`; a file is read once and
+edited with targeted `Edit` calls; a check runs once at the end, not after every
+edit. A lane that reaches the cap writes its state to the report and stops; the
+coordinator starts a fresh lane from that report rather than resuming, because
+a resumed lane pays its full context again on every further turn.
 
 ## Report
 

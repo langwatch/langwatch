@@ -260,7 +260,7 @@ export class PromptApp implements PromptApi {
   }
 
   /** One prompt, or null when the project has none by that id or handle. */
-  async tryGetByIdOrHandle(
+  async findByIdOrHandle(
     input: PromptReference & { organizationId?: string },
   ): Promise<VersionedPrompt | null> {
     try {
@@ -276,7 +276,7 @@ export class PromptApp implements PromptApi {
   async getByIdOrHandle(
     input: PromptReference & { organizationId?: string },
   ): Promise<VersionedPrompt> {
-    const prompt = await this.tryGetByIdOrHandle(input);
+    const prompt = await this.findByIdOrHandle(input);
     if (!prompt) throw new PromptNotFoundError();
     return prompt;
   }

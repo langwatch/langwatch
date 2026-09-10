@@ -232,7 +232,7 @@ describe.skipIf(!databaseUrl)("the Default test suite on the write path", () => 
     expect(moved.testSuiteId).toBe(defaultSuite!.id);
     expect(defaultSuite!.scenarioIds).toEqual([scenario.id]);
     await expect(
-      suites.tryGetTestSuite({ projectId, testSuiteId: refunds.id }),
+      suites.findTestSuite({ projectId, testSuiteId: refunds.id }),
     ).resolves.toMatchObject({ scenarioIds: [] });
   });
 });

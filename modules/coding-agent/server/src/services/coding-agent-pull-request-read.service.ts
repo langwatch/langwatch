@@ -233,7 +233,7 @@ export class CodingAgentPullRequestReadService {
     rows: CodingAgentUsageRow[];
     modelBreakdown: CodingAgentModelUsage[];
   }> {
-    const target = await this.dependencies.github.tryFindByNumber({
+    const target = await this.dependencies.github.findByNumber({
       organizationId: query.organizationId,
       repositoryHost: query.repositoryHost,
       repositoryFullName: query.repositoryFullName,

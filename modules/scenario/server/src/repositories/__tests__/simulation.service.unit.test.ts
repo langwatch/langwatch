@@ -37,7 +37,7 @@ describe("SimulationService", () => {
     );
 
     await expect(
-      service.tryGetScenarioRunData({ projectId: "project_1", scenarioRunId: "run_1" }),
+      service.findScenarioRunData({ projectId: "project_1", scenarioRunId: "run_1" }),
     ).resolves.toBeNull();
     await expect(
       service.getRunIdsForSet({ projectId: "project_1", scenarioSetId: "set_1" }),

@@ -196,7 +196,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     return records.map((record) => PrismaGithubPullRequestsRepository.toPullRequestRow(record));
   }
 
-  async tryFindByNumber({
+  async findByNumber({
     organizationId,
     repositoryHost,
     repositoryFullName,

@@ -689,7 +689,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       // have a default model configured.
       const resolveDefaultModel = async (): Promise<string> =>
         (
-          await this.modelProvider?.tryGetResolvedDefault({
+          await this.modelProvider?.findResolvedDefault({
             projectId: configData.projectId,
             featureKey: "DEFAULT",
           })

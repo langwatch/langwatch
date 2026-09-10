@@ -155,7 +155,7 @@ describe("given the API process composes the operator back office", () => {
         dlqCount: 0,
         computedAt: null,
       });
-      expect(feature.app.tryGetDashboardData()).toBeNull();
+      expect(feature.app.findDashboardData()).toBeNull();
     });
   });
 });

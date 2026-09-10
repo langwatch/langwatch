@@ -293,8 +293,8 @@ export class ServerOrganizationApp implements OrganizationApi {
     application.#visibility = OrganizationVisibilityService.create({
       reader: {
         getAllForUser: (input) => membership.getAllForUser(input),
-        tryGetOrganizationWithMembers: (input) => membership.tryGetOrganizationWithMembers(input),
-        tryGetMemberById: (input) => membership.tryGetMemberById(input),
+        findOrganizationWithMembers: (input) => membership.findOrganizationWithMembers(input),
+        findMemberById: (input) => membership.findMemberById(input),
       },
       permissions: setup.dependencies.permissions,
       secrets: setup.infrastructure.settingsSecrets,
@@ -370,9 +370,9 @@ export class ServerOrganizationApp implements OrganizationApi {
     application.#visibility = OrganizationVisibilityService.create({
       reader: {
         getAllForUser: (input) => dependencies.membership.getAllForUser(input),
-        tryGetOrganizationWithMembers: (input) =>
-          dependencies.membership.tryGetOrganizationWithMembers(input),
-        tryGetMemberById: (input) => dependencies.membership.tryGetMemberById(input),
+        findOrganizationWithMembers: (input) =>
+          dependencies.membership.findOrganizationWithMembers(input),
+        findMemberById: (input) => dependencies.membership.findMemberById(input),
       },
       permissions: dependencies.permissions,
       secrets: infrastructure.settingsSecrets,
@@ -520,9 +520,9 @@ export class ServerOrganizationApp implements OrganizationApi {
       .then((summaries) => summaries.map(organizationProvisioningSummaryFromDate));
   }
 
-  tryGetProvisioningSummary(organizationId: string) {
+  findProvisioningSummary(organizationId: string) {
     return this.#dependencies.membership
-      .tryGetProvisioningSummary(organizationId)
+      .findProvisioningSummary(organizationId)
       .then((summary) =>
         summary === null ? null : organizationProvisioningSummaryFromDate(summary),
       );
@@ -559,25 +559,25 @@ export class ServerOrganizationApp implements OrganizationApi {
   }
 
   /** One organization with its members and each member's teams. */
-  tryGetOrganizationWithMembers(
+  findOrganizationWithMembers(
     input: Omit<
-      Parameters<OrganizationMembershipPort["tryGetOrganizationWithMembers"]>[0],
+      Parameters<OrganizationMembershipPort["findOrganizationWithMembers"]>[0],
       "userId"
     >,
     by: OrganizationCaller,
   ): Promise<OrganizationWithMembersAndTheirTeams | null> {
-    return this.#dependencies.membership.tryGetOrganizationWithMembers({
+    return this.#dependencies.membership.findOrganizationWithMembers({
       ...input,
       userId: by.id,
     });
   }
 
   /** One member, redacted to what the calling member may see. */
-  tryGetMemberById(
-    input: Omit<Parameters<OrganizationMembershipPort["tryGetMemberById"]>[0], "currentUserId">,
+  findMemberById(
+    input: Omit<Parameters<OrganizationMembershipPort["findMemberById"]>[0], "currentUserId">,
     by: OrganizationCaller,
   ): Promise<OrganizationMemberWithUser | null> {
-    return this.#dependencies.membership.tryGetMemberById({ ...input, currentUserId: by.id });
+    return this.#dependencies.membership.findMemberById({ ...input, currentUserId: by.id });
   }
 
   /** Every member of one organization, for the member pickers. */
@@ -587,11 +587,11 @@ export class ServerOrganizationApp implements OrganizationApi {
 
   /** The role a user holds in the organization owning one team — read by the project-protections
    * resolver, since a user with no team binding may still reach a project via an org-wide role. */
-  tryGetUserOrgRoleByTeamId(input: {
+  findUserOrgRoleByTeamId(input: {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null> {
-    return this.#dependencies.membership.tryGetUserOrgRoleByTeamId(input);
+    return this.#dependencies.membership.findUserOrgRoleByTeamId(input);
   }
 
   /**
@@ -599,8 +599,8 @@ export class ServerOrganizationApp implements OrganizationApi {
    * never set. The governance setup screen reads it to decide which checklist
    * the organization is being walked through.
    */
-  tryGetPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
-    return this.#dependencies.membership.tryGetPrimaryIntent(organizationId);
+  findPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
+    return this.#dependencies.membership.findPrimaryIntent(organizationId);
   }
 
   /** Makes the caller's personal workspace in this organization exist. */
@@ -922,7 +922,7 @@ export class ServerOrganizationApp implements OrganizationApi {
   // -- the projects an organization's teams hold -----------------------------
 
   /** One project, or null when it does not exist. */
-  tryGetProject(id: string): Promise<Project | null> {
+  findProject(id: string): Promise<Project | null> {
     return this.#dependencies.projects.tryGetById(id);
   }
 
@@ -1340,7 +1340,7 @@ export class ServerOrganizationApp implements OrganizationApi {
     input: Readonly<{ teamId: string; userId: string; role: string }>;
   }): Promise<void> {
     const { organizationId, input } = params;
-    const organizationRole = await this.#dependencies.membership.tryGetUserOrgRoleByTeamId({
+    const organizationRole = await this.#dependencies.membership.findUserOrgRoleByTeamId({
       userId: input.userId,
       teamId: input.teamId,
     });

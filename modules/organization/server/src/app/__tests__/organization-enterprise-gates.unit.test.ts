@@ -60,7 +60,7 @@ function application(options: { enterprise: boolean }) {
   const membership = {
     updateTeamMemberRole: writes.updateTeamMemberRole,
     getAuditLogs: writes.getAuditLogs,
-    tryGetUserOrgRoleByTeamId: vi.fn(async () => "MEMBER"),
+    findUserOrgRoleByTeamId: vi.fn(async () => "MEMBER"),
   };
 
   const app = ServerOrganizationApp.createForTesting({

@@ -95,7 +95,7 @@ export class ModelProviderExecutionService {
     }
 
     return (
-      (await this.options.query.tryFindRowServingModel({
+      (await this.options.query.findRowServingModel({
         projectId: input.projectId,
         provider: selected.provider,
         model: reference.model,

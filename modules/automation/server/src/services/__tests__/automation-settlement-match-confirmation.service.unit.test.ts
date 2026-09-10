@@ -32,7 +32,7 @@ class TestEvaluations {
   getRunByEvaluationId(): never {
     return unavailable();
   }
-  tryGetRunByEvaluationId(): never {
+  findRunByEvaluationId(): never {
     return unavailable();
   }
   findRunsByTraceId(input: { tenantId: string; traceId: string }): Promise<EvaluationRunData[]> {
@@ -45,7 +45,7 @@ class TestEvaluations {
   findTraceEvaluations(): never {
     return unavailable();
   }
-  tryGetInputs(): never {
+  findInputs(): never {
     return unavailable();
   }
   getMonitorPerformance(): never {

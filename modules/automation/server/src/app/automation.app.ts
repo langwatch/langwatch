@@ -333,11 +333,11 @@ export class AutomationApp implements AutomationApi {
   }
 
   /** One automation by the custom graph it watches, or null. */
-  tryGetByCustomGraphId(input: {
+  findByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null> {
-    return this.#automation.tryGetByCustomGraphId(input);
+    return this.#automation.findByCustomGraphId(input);
   }
 
   getByCustomGraphIds(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]> {

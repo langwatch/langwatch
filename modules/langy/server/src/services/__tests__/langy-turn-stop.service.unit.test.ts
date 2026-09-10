@@ -26,7 +26,7 @@ function makeStopDeps(
   } = {},
 ) {
   const finalizeTurn = vi.fn(async (_args: Record<string, unknown>) => ({ messageId: "a1" }));
-  const tryFindByIdVisible = vi.fn(async () => ({
+  const findByIdVisible = vi.fn(async () => ({
     isOwn: over.isOwn ?? true,
     currentTurnId: over.currentTurnId === undefined ? "turn-1" : over.currentTurnId,
   }));
@@ -44,7 +44,7 @@ function makeStopDeps(
   }));
 
   const deps = {
-    conversations: { finalizeTurn, tryFindByIdVisible } as unknown,
+    conversations: { finalizeTurn, findByIdVisible } as unknown,
     credentials: {} as unknown,
     worker: { cancel } as unknown,
     tokenBuffer: over.noBuffer ? null : ({ readTail, markEnd } as unknown),
@@ -56,7 +56,7 @@ function makeStopDeps(
 
   return {
     deps,
-    mocks: { finalizeTurn, tryFindByIdVisible, isTurnActor, markEnd, cancel, readTail },
+    mocks: { finalizeTurn, findByIdVisible, isTurnActor, markEnd, cancel, readTail },
   };
 }
 
@@ -89,7 +89,7 @@ describe("LangyTurnStopService.stopTurn", () => {
         expect.objectContaining({ conversationId: "conv-1", turnId: "turn-1" }),
       );
       // The actor short-circuits the ownership read.
-      expect(mocks.tryFindByIdVisible).not.toHaveBeenCalled();
+      expect(mocks.findByIdVisible).not.toHaveBeenCalled();
     });
   });
 
@@ -157,7 +157,7 @@ describe("LangyTurnStopService.stopTurn", () => {
 
       await LangyTurnStopService.create(deps).stopTurn(stopArgs);
 
-      expect(mocks.tryFindByIdVisible).not.toHaveBeenCalled();
+      expect(mocks.findByIdVisible).not.toHaveBeenCalled();
       expect(mocks.finalizeTurn).toHaveBeenCalledTimes(1);
     });
   });

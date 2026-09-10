@@ -43,23 +43,17 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   matchModelCost,
   type ModelCostRate,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type {
-  StudioClientEvent,
-  StudioServerEvent,
-  WorkflowRunOrigin,
-  WorkflowService,
-} from "@langwatch/workflow-contract";
+import type { StudioClientEvent, StudioServerEvent, WorkflowRunOrigin } from "@langwatch/workflow-contract";
 import {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
-  WorkflowStudioDispatchService,
-} from "@langwatch/workflow-server";
+  WorkflowStudioDispatchService, type WorkflowService,} from "@langwatch/workflow-server";
 import { ConnectedTargetService } from "@langwatch/suite-server";
 import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
@@ -187,7 +181,7 @@ export type ApiExperimentRunOptions = Readonly<{
   /** Names this process in a refusal. */
   processName: string;
   /** The gateway the dispatch's sampling-parameter strip and the price table read. */
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   /** Where the NLP engine answers; absent means every cell refuses at the dispatch. */
   nlpServiceUrl: string | undefined;
   /** This deployment's public origin, for the shareable results link. */
@@ -443,7 +437,7 @@ class ApiExperimentConnectedAgentOwnershipAdapter extends ExperimentConnectedAge
  */
 class ApiExperimentStudioDispatchAdapter extends ExperimentStudioDispatchPort {
   static create(options: {
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
     nlpServiceUrl: string | undefined;
   }): ApiExperimentStudioDispatchAdapter {
     return new ApiExperimentStudioDispatchAdapter(
@@ -475,11 +469,11 @@ class ApiExperimentStudioDispatchAdapter extends ExperimentStudioDispatchPort {
  * What a cell's tokens cost, in this deployment's own rate table.
  */
 class ApiExperimentModelCostAdapter extends ExperimentModelCostPort {
-  static create(options: { modelProviders: ModelProviderService }): ApiExperimentModelCostAdapter {
+  static create(options: { modelProviders: ModelProviderApi }): ApiExperimentModelCostAdapter {
     return new ApiExperimentModelCostAdapter(options.modelProviders);
   }
 
-  private constructor(private readonly modelProviders: ModelProviderService) {
+  private constructor(private readonly modelProviders: ModelProviderApi) {
     super();
   }
 

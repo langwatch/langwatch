@@ -101,7 +101,7 @@ export type GovernanceHomeTrpcPorts = Readonly<{
    * pin. Fail-safe: a transient error means "no intent" and takes the legacy
    * path.
    */
-  tryGetPrimaryIntent(input: { organizationId: string }): Promise<string | null>;
+  findPrimaryIntent(input: { organizationId: string }): Promise<string | null>;
 }>;
 
 const organizationScopeSchema = z.object({ organizationId: z.string() });
@@ -144,7 +144,7 @@ export function createGovernanceHomeTrpcRouter<
         ports.canManageOrganization({ organizationId, userId }),
         ports.tryGetPinnedHomePath({ userId }),
         ports.governanceUiEnabled({ organizationId, userId }).catch(() => false),
-        ports.tryGetPrimaryIntent({ organizationId }).catch(() => null),
+        ports.findPrimaryIntent({ organizationId }).catch(() => null),
       ]);
 
       const firstProjectSlug =

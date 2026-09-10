@@ -24,7 +24,7 @@ export interface OpsSnapshotAbortSignal {
 export abstract class OpsSnapshotService {
   abstract start(): Promise<void>;
   abstract stop(): void;
-  abstract tryGetDashboardData(): DashboardData | null;
+  abstract findDashboardData(): DashboardData | null;
   abstract getBadgeCounts(): OpsBadgeCounts;
   abstract streamDashboard(input: {
     signal?: OpsSnapshotAbortSignal;

@@ -153,8 +153,8 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy;
   }
 
-  tryGetEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null> {
-    return this.dependencies.langy.tryGetEgressAllowlist(input);
+  findEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null> {
+    return this.dependencies.langy.findEgressAllowlist(input);
   }
 
   trySetEgressAllowlist(input: {
@@ -176,8 +176,8 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.getEventsAfter(input);
   }
 
-  tryFindByIdVisible(input: Parameters<LangyApiContract["tryFindByIdVisible"]>[0]) {
-    return this.dependencies.langy.tryFindByIdVisible(input);
+  findByIdVisible(input: Parameters<LangyApiContract["findByIdVisible"]>[0]) {
+    return this.dependencies.langy.findByIdVisible(input);
   }
 
   getAllByConversation(input: Parameters<LangyApiContract["getAllByConversation"]>[0]) {
@@ -204,8 +204,8 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.warmConversationWorker(input);
   }
 
-  tryGetModelsAllowedForProject(projectId: string) {
-    return this.dependencies.langy.tryGetModelsAllowedForProject(projectId);
+  findModelsAllowedForProject(projectId: string) {
+    return this.dependencies.langy.findModelsAllowedForProject(projectId);
   }
 
   revokeWorkerSessionKey(input: Parameters<LangyApiContract["revokeWorkerSessionKey"]>[0]) {
@@ -220,8 +220,8 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.ingestAgentTurnResult(input);
   }
 
-  tryGetRunToken(input: Parameters<LangyApiContract["tryGetRunToken"]>[0]) {
-    return this.dependencies.langy.tryGetRunToken(input);
+  findRunToken(input: Parameters<LangyApiContract["findRunToken"]>[0]) {
+    return this.dependencies.langy.findRunToken(input);
   }
 
   recordToolCallStarted(input: Parameters<LangyApiContract["recordToolCallStarted"]>[0]) {
@@ -273,7 +273,7 @@ export class LangyApp implements LangyApiContract {
     projectId: string;
     userId: string;
   }): Promise<LangyConversationDetail | null> {
-    return this.dependencies.langy.tryFindByIdVisible(input);
+    return this.dependencies.langy.findByIdVisible(input);
   }
 
   /**
@@ -309,7 +309,7 @@ export class LangyApp implements LangyApiContract {
     projectId: string;
     userId: string;
   }): Promise<boolean> {
-    return (await this.dependencies.langy.tryFindByIdVisible(input)) !== null;
+    return (await this.dependencies.langy.findByIdVisible(input)) !== null;
   }
 
   /** The conversation spine, raising the feature's not-found when it is not visible. */
@@ -345,8 +345,8 @@ export class LangyApp implements LangyApiContract {
   }
 
   /** The model allow-list the composer narrows to, or null when every model is allowed. */
-  tryGetModelsAllowed(projectId: string): Promise<string[] | null> {
-    return this.dependencies.langy.tryGetModelsAllowedForProject(projectId);
+  findModelsAllowed(projectId: string): Promise<string[] | null> {
+    return this.dependencies.langy.findModelsAllowedForProject(projectId);
   }
 
   // -- conversation writes ---------------------------------------------------
@@ -443,7 +443,7 @@ export class LangyApp implements LangyApiContract {
    * themselves, which is one rule written twice about a network policy.
    */
   async egressAllowlist(input: { projectId: string }): Promise<LangyEgressState> {
-    return toEgressState(await this.dependencies.langy.tryGetEgressAllowlist(input));
+    return toEgressState(await this.dependencies.langy.findEgressAllowlist(input));
   }
 
   /** Replaces the allow-list. An empty list clears it back to monitor-only. */
@@ -483,7 +483,7 @@ export class LangyApp implements LangyApiContract {
         return true;
       }
     }
-    const conversation = await langy.tryFindByIdVisible({
+    const conversation = await langy.findByIdVisible({
       id: conversationId,
       projectId,
       userId,

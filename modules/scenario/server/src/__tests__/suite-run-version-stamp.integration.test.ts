@@ -121,7 +121,7 @@ function scenarioApiOver(service: ScenarioService): ScenarioApi {
   return createApiFixture<ScenarioApi>({
     list: (input) => service.list(input),
     listTestSuites: (input) => service.listTestSuites(input),
-    tryGetTestSuite: (input) => service.tryGetTestSuite(input),
+    findTestSuite: (input) => service.findTestSuite(input),
     createTestSuite: (input) => service.createTestSuite(input),
     updateTestSuite: (input) => service.updateTestSuite(input),
     renameTestSuite: (input) => service.renameTestSuite(input),

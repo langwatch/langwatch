@@ -106,7 +106,7 @@ export class ApiLangyNavigateResourceAdapter extends LangyNavigateResourcePort {
         return agent ? agentDrawerPath({ agentId: agent.id, agentType: agent.type }) : null;
       }
       case "scenarioRun": {
-        const run = await services.simulations?.tryGetScenarioRunData({
+        const run = await services.simulations?.findScenarioRunData({
           projectId,
           scenarioRunId: resourceId,
         });

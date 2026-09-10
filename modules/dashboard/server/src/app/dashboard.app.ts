@@ -257,7 +257,7 @@ export class DashboardApp implements DashboardApi {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | undefined> {
-    const trigger = await this.#automation.tryGetByCustomGraphId(input);
+    const trigger = await this.#automation.findByCustomGraphId(input);
     if (trigger === null || !trigger.active || trigger.deleted) return undefined;
 
     return this.#redacted(trigger);

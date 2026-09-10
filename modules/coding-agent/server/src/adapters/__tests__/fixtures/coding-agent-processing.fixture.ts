@@ -97,11 +97,11 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve({});
   }
 
-  tryGetProviderForProject(): Promise<null> {
+  findProviderForProject(): Promise<null> {
     return Promise.resolve(null);
   }
 
-  tryFindRowServingModel(): Promise<null> {
+  findRowServingModel(): Promise<null> {
     return Promise.resolve(null);
   }
 
@@ -153,7 +153,7 @@ export class TestModelProviderService implements ModelProviderApi {
     throw new Error("Not used by Coding Agent tests.");
   }
 
-  tryGetResolvedDefault(): Promise<null> {
+  findResolvedDefault(): Promise<null> {
     return Promise.resolve(null);
   }
 
@@ -177,7 +177,7 @@ export class TestModelProviderService implements ModelProviderApi {
     throw new Error("Not used by Coding Agent tests.");
   }
 
-  tryGetDefaultConfig(): Promise<null> {
+  findDefaultConfig(): Promise<null> {
     return Promise.resolve(null);
   }
 

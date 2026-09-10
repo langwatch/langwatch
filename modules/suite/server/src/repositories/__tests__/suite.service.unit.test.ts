@@ -107,7 +107,7 @@ function serviceOptions(
 ): SuiteServiceOptions {
   return {
     repository: repo,
-    scenarios: mockScenarioService({ tryGetTestSuite: vi.fn().mockResolvedValue(null) }),
+    scenarios: mockScenarioService({ findTestSuite: vi.fn().mockResolvedValue(null) }),
     agents: createApiFixture<AgentApi>(),
     prompts: createApiFixture<PromptApi>(),
     execution: new UnusedExecutionPort(),
@@ -925,17 +925,17 @@ describe("SuiteService", () => {
 
   it("loads a test suite through ScenarioService when no custom suite exists", async () => {
     const testSuite = suite({ id: "test_suite_1", kind: "test_suite", scenarioIds: [] });
-    const tryGetTestSuite = vi.fn().mockResolvedValue(testSuite);
+    const findTestSuite = vi.fn().mockResolvedValue(testSuite);
     const service = SuiteService.create(
       serviceOptions(repository({ findById: vi.fn().mockResolvedValue(null) }), {
-        scenarios: mockScenarioService({ tryGetTestSuite }),
+        scenarios: mockScenarioService({ findTestSuite }),
       }),
     );
 
     await expect(
       service.get({ id: testSuite.id, projectId: testSuite.projectId }),
     ).resolves.toEqual(testSuite);
-    expect(tryGetTestSuite).toHaveBeenCalledWith({
+    expect(findTestSuite).toHaveBeenCalledWith({
       testSuiteId: testSuite.id,
       projectId: testSuite.projectId,
     });
@@ -946,7 +946,7 @@ describe("SuiteService", () => {
     const testSuite = suite({ id: "test_suite_1", kind: "test_suite", scenarioIds: [] });
     const updateTestSuite = vi.fn().mockResolvedValue(testSuite);
     const scenarios = mockScenarioService({
-      tryGetTestSuite: vi.fn().mockResolvedValue(testSuite),
+      findTestSuite: vi.fn().mockResolvedValue(testSuite),
       updateTestSuite,
     });
     const service = SuiteService.create(
@@ -973,7 +973,7 @@ describe("SuiteService", () => {
     const missingService = SuiteService.create(
       serviceOptions(repository({ findById: vi.fn().mockResolvedValue(testSuite) }), {
         scenarios: mockScenarioService({
-          tryGetTestSuite: vi.fn().mockResolvedValue(testSuite),
+          findTestSuite: vi.fn().mockResolvedValue(testSuite),
           updateTestSuite: vi.fn().mockRejectedValue(new ScenarioTestSuiteNotFoundError()),
         }),
       }),
@@ -988,7 +988,7 @@ describe("SuiteService", () => {
     const service = SuiteService.create({
       ...serviceOptions(repository({ findById: vi.fn().mockResolvedValue(testSuite) })),
       scenarios: mockScenarioService({
-        tryGetTestSuite: vi.fn().mockResolvedValue(testSuite),
+        findTestSuite: vi.fn().mockResolvedValue(testSuite),
         getTestSuiteRunDefinition: vi.fn().mockRejectedValue(new ScenarioTestSuiteNotFoundError()),
         getReferenceStates: vi.fn(),
       }),

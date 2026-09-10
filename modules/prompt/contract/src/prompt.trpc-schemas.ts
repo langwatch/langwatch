@@ -224,7 +224,7 @@ export type PromptAssignTagTrpcInput = z.infer<typeof promptAssignTagTrpcInputSc
  * Prisma row.
  *
  * `getByIdOrHandle` answers `null` rather than refusing: the transport calls
- * the application's `tryGetByIdOrHandle`, and the drawer renders an empty form
+ * the application's `findByIdOrHandle`, and the drawer renders an empty form
  * for a prompt that is not there yet.
  */
 export type PromptGetAllForProjectTrpcOutput = VersionedPrompt[];

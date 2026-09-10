@@ -15,7 +15,7 @@ import {
   type EvaluationClickHouseResolver,
 } from "@langwatch/evaluation-server";
 import { EvaluationApp } from "@langwatch/evaluation-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import {
@@ -28,9 +28,8 @@ import {
   WorkflowLlmParametersPort,
   type WorkflowEnvironmentDecryptor,
   type WorkflowLlmParameterResolution,
-  type WorkflowNlpRuntimePort,
-} from "@langwatch/workflow-server";
-import type { LLMConfig, WorkflowApi, WorkflowService } from "@langwatch/workflow-contract";
+  type WorkflowNlpRuntimePort, type WorkflowService,} from "@langwatch/workflow-server";
+import type { LLMConfig, WorkflowApi } from "@langwatch/workflow-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import { mintStoredObjectUri, ObjectNotFoundError } from "@langwatch/stored-object-contract";
@@ -45,7 +44,7 @@ export type WorkerEvaluationWorkflowCompositionInput = Readonly<{
   database: PrismaClient;
   /** The ONE dataset application this process installed, read by the studio. */
   datasets: DatasetApi;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   secretDecryptor: WorkflowEnvironmentDecryptor;
   nlpServiceUrl: string | undefined;
   payloadStaging: NlpPayloadStagingPort;
@@ -253,14 +252,14 @@ class WorkerEvaluationInputStorage extends EvaluationInputStoragePort {
 
 class WorkerEvaluationWorkflowLlmParameters extends WorkflowLlmParametersPort {
   static create(input: {
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
   }): WorkerEvaluationWorkflowLlmParameters {
     return new WorkerEvaluationWorkflowLlmParameters(input.modelProviders);
   }
 
-  #modelProviders: ModelProviderService;
+  #modelProviders: ModelProviderApi;
 
-  private constructor(modelProviders: ModelProviderService) {
+  private constructor(modelProviders: ModelProviderApi) {
     super();
     this.#modelProviders = modelProviders;
   }

@@ -31,7 +31,7 @@ export class GovernanceRulesOperationsService {
   readonly anomalyRuleList: GovernanceApi["anomalyRuleList"] = (...args) =>
     this.anomalyRules.list(...args);
 
-  readonly tryFindAnomalyRuleById: GovernanceApi["tryFindAnomalyRuleById"] = (...args) =>
+  readonly findAnomalyRuleById: GovernanceApi["findAnomalyRuleById"] = (...args) =>
     this.anomalyRules.tryFindById(...args);
 
   readonly anomalyRuleGetById: GovernanceApi["anomalyRuleGetById"] = (...args) =>
@@ -92,7 +92,7 @@ export class GovernanceRulesOperationsService {
   readonly aiToolListForAdmin: GovernanceApi["aiToolListForAdmin"] = (...args) =>
     this.aiTools.listForAdmin(...args);
 
-  readonly tryFindAiToolById: GovernanceApi["tryFindAiToolById"] = (...args) =>
+  readonly findAiToolById: GovernanceApi["findAiToolById"] = (...args) =>
     this.aiTools.tryFindById(...args);
 
   readonly aiToolGetById: GovernanceApi["aiToolGetById"] = (...args) =>

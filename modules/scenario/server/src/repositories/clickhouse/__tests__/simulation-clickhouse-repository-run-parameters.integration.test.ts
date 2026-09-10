@@ -185,7 +185,7 @@ integration("given a run queued against a target carrying an override", () => {
       const command = await queueRunAgainstTarget();
       await storeRun(command);
 
-      const run = await repository.tryGetScenarioRunData({
+      const run = await repository.findScenarioRunData({
         projectId: tenantId,
         scenarioRunId: command.scenarioRunId,
       });

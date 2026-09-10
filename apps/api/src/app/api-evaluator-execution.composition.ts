@@ -2,6 +2,7 @@
  * The evaluator RUNTIME, composed from this process's own graph. Three doors on
  * `apps/api` need one thing: an evaluator, run.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { TraceReadableSpanService } from "@langwatch/trace-server";
 import {
   AZURE_SAFETY_PROVIDER_KEY,
@@ -26,7 +27,7 @@ import type {
   EvaluatorTypes,
   SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import { clampMaxTokens, type ModelProviderService } from "@langwatch/model-provider-contract";
+import { clampMaxTokens, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   getProjectModelProviders,
   prepareEnvKeys,
@@ -36,7 +37,7 @@ import {
 import type { Logger } from "@langwatch/observability";
 import { mappingStateSchema } from "@langwatch/dataset-contract";
 import type { Span } from "@langwatch/trace-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 
 /**
  * The data an evaluator is handed, as this process's doors build it.
@@ -88,7 +89,7 @@ export type ApiEvaluatorExecutionOptions = Readonly<{
   /** The studio a custom (workflow) evaluator runs on. */
   workflows: WorkflowService;
   /** The ONE model gateway on this process. */
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   /** Where the evaluator service answers; absent composes no runtime. */
   langevalsEndpoint: string | undefined;
   /** The process environment an evaluator's own `envVars` are read from. */
@@ -310,11 +311,11 @@ class ApiEvaluationWorkflowExecutor extends EvaluationWorkflowExecutorPort {
  * provider row.
  */
 export class ApiEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCredentialsPort {
-  static create(modelProviders: ModelProviderService): ApiEvaluationAzureSafetyCredentials {
+  static create(modelProviders: ModelProviderApi): ApiEvaluationAzureSafetyCredentials {
     return new ApiEvaluationAzureSafetyCredentials(modelProviders);
   }
 
-  private constructor(private readonly modelProviders: ModelProviderService) {
+  private constructor(private readonly modelProviders: ModelProviderApi) {
     super();
   }
 
@@ -341,7 +342,7 @@ export class ApiEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCr
  */
 class ApiEvaluationModelEnv extends EvaluationModelEnvPort {
   static create(deps: {
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
     azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
     environment: Readonly<Record<string, string | undefined>>;
   }): ApiEvaluationModelEnv {
@@ -350,7 +351,7 @@ class ApiEvaluationModelEnv extends EvaluationModelEnvPort {
 
   private constructor(
     private readonly deps: {
-      modelProviders: ModelProviderService;
+      modelProviders: ModelProviderApi;
       azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
       environment: Readonly<Record<string, string | undefined>>;
     },
@@ -456,7 +457,7 @@ class ApiEvaluationModelEnv extends EvaluationModelEnvPort {
       // as no rescue rather than masking the config error behind an infrastructure one.
       let servingRow;
       try {
-        servingRow = await this.deps.modelProviders.tryFindRowServingModel({
+        servingRow = await this.deps.modelProviders.findRowServingModel({
           projectId,
           provider,
           model: modelName,

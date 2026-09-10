@@ -164,7 +164,7 @@ export interface LangyRelayBuffer {
 
 /** The slice of the conversation service the relay dispatches durable events through. */
 export interface LangyRelayConversations {
-  tryGetRunToken(a: { projectId: string; conversationId: string }): Promise<string | null>;
+  findRunToken(a: { projectId: string; conversationId: string }): Promise<string | null>;
   recordToolCallStarted(a: {
     projectId: string;
     conversationId: string;
@@ -475,7 +475,7 @@ export class LangyTurnRelayAdapter {
     // Fallback: the durable RunToken projection. Covers a handoff that aged out
     // past its TTL on a very long turn, and keeps working when no handoff dep is
     // wired (unit tests).
-    const fromProjection = await this.deps.conversations.tryGetRunToken({
+    const fromProjection = await this.deps.conversations.findRunToken({
       projectId,
       conversationId,
     });

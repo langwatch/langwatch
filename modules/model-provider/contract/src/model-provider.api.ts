@@ -150,11 +150,11 @@ export interface ModelProviderApi {
   getForProject(
     input: ModelProviderListProjectInput & { provider?: string },
   ): Promise<Record<string, ModelProviderSummary>>;
-  tryGetProviderForProject(input: {
+  findProviderForProject(input: {
     projectId: string;
     provider: string;
   }): Promise<ModelProvider | null>;
-  tryFindRowServingModel(input: {
+  findRowServingModel(input: {
     projectId: string;
     provider: string;
     model: string;
@@ -216,7 +216,7 @@ export interface ModelProviderApi {
     scopes: ModelDefaultScope[];
     excludeConfigId?: string;
   }): Promise<ModelDefaultInheritedValues>;
-  tryGetResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null>;
+  findResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null>;
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution>;
   findAlternateModel(input: {
     projectId: string;
@@ -229,7 +229,7 @@ export interface ModelProviderApi {
     by: ModelProviderCaller,
   ): Promise<ModelDefaultConfig>;
   assertApiKeyMayWriteDefaultScopes(input: ModelDefaultApiKeyScopeCheck): Promise<void>;
-  tryGetDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null>;
+  findDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null>;
   deleteDefaultConfig(input: ModelDefaultDeleteRequest, by: ModelProviderCaller): Promise<void>;
   listCosts(input: ModelCostListInput): Promise<ModelCost[]>;
   /** The registry's context-window and output ceilings, or null when it names no such model. */

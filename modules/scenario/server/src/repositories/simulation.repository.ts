@@ -42,13 +42,13 @@ export abstract class SimulationRepository {
   abstract getScenarioSetsData(
     input: SimulationProjectDateRangeInput,
   ): Promise<SimulationSetData[]>;
-  abstract tryGetScenarioRunData(
+  abstract findScenarioRunData(
     input: SimulationScenarioRunInput,
   ): Promise<SimulationRunData | null>;
   abstract getBatchHistoryForScenarioSet(
     input: SimulationBatchHistoryInput,
   ): Promise<SimulationBatchHistory>;
-  abstract tryGetBatchSummary(
+  abstract findBatchSummary(
     input: SimulationBatchSummaryInput,
   ): Promise<SimulationBatchSummary | null>;
   abstract getRunDataForBatchRun(input: SimulationBatchRunInput): Promise<SimulationBatchRunData>;
@@ -87,13 +87,13 @@ export class NullSimulationRepository extends SimulationRepository {
   async getScenarioSetsData(): Promise<SimulationSetData[]> {
     return [];
   }
-  async tryGetScenarioRunData(): Promise<SimulationRunData | null> {
+  async findScenarioRunData(): Promise<SimulationRunData | null> {
     return null;
   }
   async getBatchHistoryForScenarioSet(): Promise<SimulationBatchHistory> {
     return { batches: [], hasMore: false, lastUpdatedAt: 0, totalCount: 0 };
   }
-  async tryGetBatchSummary(): Promise<SimulationBatchSummary | null> {
+  async findBatchSummary(): Promise<SimulationBatchSummary | null> {
     return null;
   }
   async getRunDataForBatchRun(): Promise<SimulationBatchRunData> {

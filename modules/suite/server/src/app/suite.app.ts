@@ -193,7 +193,7 @@ export class SuiteApp implements SuiteApi {
       if (!(error instanceof SuiteNotFoundError)) throw error;
     }
 
-    const testSuite = await this.#dependencies.scenarios.tryGetTestSuite({
+    const testSuite = await this.#dependencies.scenarios.findTestSuite({
       testSuiteId: input.id,
       projectId: input.projectId,
     });
@@ -232,7 +232,7 @@ export class SuiteApp implements SuiteApi {
    * Updates one suite, whichever kind it turns out to be.
    */
   async update(input: UpdateSuiteCommand): Promise<SuiteOrTestSuite> {
-    const testSuite = await this.#dependencies.scenarios.tryGetTestSuite({
+    const testSuite = await this.#dependencies.scenarios.findTestSuite({
       testSuiteId: input.id,
       projectId: input.projectId,
     });

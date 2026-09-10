@@ -2,7 +2,7 @@ import { HandledError, type SerializedHandledError } from "@langwatch/handled-er
 import { createLogger } from "@langwatch/observability";
 import {
   MASKED_KEY_PLACEHOLDER,
-  tryGetModelProviderDefinition,
+  findModelProviderDefinition,
   type ModelProviderCredentialVerdict,
   type ModelProviderApi,
   type ModelProviderUncheckedReason,
@@ -899,7 +899,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     projectId: string;
     provider: string;
     customBaseUrl: string | undefined;
-    modelProviders: Pick<ModelProviderApi, "tryGetProviderForProject">;
+    modelProviders: Pick<ModelProviderApi, "findProviderForProject">;
     /**
      * The process environment the fallback key is read from, passed in rather
      * than read here: a package has no environment of its own, and the caller
@@ -908,7 +908,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     environment: Readonly<Record<string, string | undefined>>;
     egress: ModelProviderEgressPort;
   }): Promise<ModelProviderCredentialVerdict> {
-    const providerDef = tryGetModelProviderDefinition(provider);
+    const providerDef = findModelProviderDefinition(provider);
     if (!providerDef) {
       return unchecked("unknown_provider");
     }
@@ -921,7 +921,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     const endpointField = providerDef.endpointKey;
 
     // Try to get stored API key from DB (decrypted by repository)
-    const storedProvider = await service.tryGetProviderForProject({
+    const storedProvider = await service.findProviderForProject({
       projectId,
       provider,
     });
@@ -974,7 +974,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     egress: ModelProviderEgressPort,
   ): Promise<ModelProviderCredentialVerdict> {
     // Get provider definition from registry
-    const providerDef = tryGetModelProviderDefinition(provider);
+    const providerDef = findModelProviderDefinition(provider);
     if (!providerDef) {
       return unchecked("unknown_provider");
     }
@@ -1061,7 +1061,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     projectId: string;
     provider: string;
     customBaseUrl: string | undefined;
-    modelProviders: Pick<ModelProviderApi, "tryGetProviderForProject">;
+    modelProviders: Pick<ModelProviderApi, "findProviderForProject">;
   }): Promise<ModelProviderCredentialVerdict> {
     return HttpModelProviderCredentialProbeAdapter.validateKeyWithCustomUrl({
       ...input,
@@ -1090,7 +1090,7 @@ export class UnavailableModelProviderCredentialProbeAdapter extends ModelProvide
     projectId: string;
     provider: string;
     customBaseUrl: string | undefined;
-    modelProviders: Pick<ModelProviderApi, "tryGetProviderForProject">;
+    modelProviders: Pick<ModelProviderApi, "findProviderForProject">;
   }): Promise<ModelProviderCredentialVerdict> {
     return this.unchecked();
   }

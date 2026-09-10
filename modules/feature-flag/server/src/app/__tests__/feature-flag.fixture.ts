@@ -71,7 +71,7 @@ export class TestOrganizations {
 
   api(overrides: Partial<OrganizationApi> = {}): OrganizationApi {
     return createApiFixture<OrganizationApi>({
-      tryGetProvisioningSummary: async (organizationId: string) => {
+      findProvisioningSummary: async (organizationId: string) => {
         this.organizationReads += 1;
         if (this.failNextRead) {
           this.failNextRead = false;

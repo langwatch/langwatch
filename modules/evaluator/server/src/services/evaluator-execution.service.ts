@@ -1,3 +1,4 @@
+import type { WorkflowService } from "@langwatch/workflow-server";
 import {
   CODE_EVALUATOR_CHECK_PREFIX,
   codeEvaluatorConfigSchema,
@@ -9,12 +10,7 @@ import {
   type EvaluatorIdOrSlugInput,
   type ResolvedEvaluatorExecution,
 } from "@langwatch/evaluator-contract";
-import {
-  getWorkflowEntryOutputs,
-  parseStudioWorkflow,
-  WorkflowNotFoundError,
-  type WorkflowService,
-} from "@langwatch/workflow-contract";
+import { getWorkflowEntryOutputs, parseStudioWorkflow, WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import type { EvaluatorRepository } from "../repositories/evaluator.repository.ts";
 
 export class EvaluatorExecutionService {

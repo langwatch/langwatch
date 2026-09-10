@@ -171,7 +171,7 @@ export interface ScenarioApi {
     ids: string[];
     projectId: string;
   }): Promise<{ id: string; name: string }[]>;
-  tryGetTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
+  findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
   createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
   getTestSuiteRunDefinition(
@@ -246,7 +246,7 @@ export interface ScenarioApi {
   getRunDataForScenarioSet(
     input: SimulationScenarioSetRunsInput,
   ): Promise<{ runs: SimulationRunData[]; nextCursor: string | null }>;
-  tryGetScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null>;
+  findScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null>;
   getBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number>;
   getBatchHistoryForScenarioSet(
     input: SimulationBatchHistoryInput,

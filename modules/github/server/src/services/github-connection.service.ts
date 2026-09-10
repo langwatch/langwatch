@@ -15,7 +15,7 @@ import { GithubNotConnectedError } from "@langwatch/github-contract";
 type GithubConnectionDependencies = {
   installations: {
     getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]>;
-    tryGetByInstallationId(installationId: string): Promise<GithubInstallation | null>;
+    findByInstallationId(installationId: string): Promise<GithubInstallation | null>;
   };
   getAppConfig(): GithubAppConfig;
   getWebBase(): string;
@@ -56,7 +56,7 @@ export class GithubConnectionService {
     organizationId: string;
     installationId: string;
   }): Promise<GithubDisconnectResult> {
-    const installation = await this.dependencies.installations.tryGetByInstallationId(
+    const installation = await this.dependencies.installations.findByInstallationId(
       input.installationId,
     );
     // Cross-tenant guard: the installation must belong to this organization.

@@ -340,7 +340,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return orgUser.role;
   }
 
-  async tryGetUserOrgRoleByTeamId({
+  async findUserOrgRoleByTeamId({
     userId,
     teamId,
   }: {
@@ -596,7 +596,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     }) as Promise<FullyLoadedOrganization[]>;
   }
 
-  async tryGetOrganizationWithMembers(params: {
+  async findOrganizationWithMembers(params: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
@@ -638,7 +638,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     }) as Promise<OrganizationWithMembersAndTheirTeams | null>;
   }
 
-  async tryGetMemberById(params: {
+  async findMemberById(params: {
     organizationId: string;
     userId: string;
     currentUserId: string;

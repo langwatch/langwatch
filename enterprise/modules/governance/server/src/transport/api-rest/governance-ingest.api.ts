@@ -143,7 +143,7 @@ export type GovernanceIngestRestPorts = Readonly<{
   /** The SAME governance service the console reads sources and templates from. */
   governance: () => Pick<
     GovernanceApi,
-    | "tryFindIngestionSourceByIngestSecret"
+    | "findIngestionSourceByIngestSecret"
     | "ingestionSourceRecordEventReceived"
     | "extractCanonicalCostEvents"
     | "ottlTransform"
@@ -427,7 +427,7 @@ export function createGovernanceIngestRestApp(options: {
     if (!header) return null;
     const match = /^Bearer\s+(lw_is_[A-Za-z0-9_-]+)$/.exec(header.trim());
     if (!match) return null;
-    return await ports.governance().tryFindIngestionSourceByIngestSecret(match[1]!);
+    return await ports.governance().findIngestionSourceByIngestSecret(match[1]!);
   };
 
   /**

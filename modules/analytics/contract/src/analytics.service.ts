@@ -48,7 +48,7 @@ export abstract class AnalyticsService {
 
   abstract upsertEvaluationAnalyticsBatch(input: AnalyticsEvaluationUpsertInput[]): Promise<void>;
 
-  abstract tryGetEvaluationAnalytics(input: AnalyticsEvaluationReadInput): Promise<{
+  abstract findEvaluationAnalytics(input: AnalyticsEvaluationReadInput): Promise<{
     row: AnalyticsEvaluationRow;
     appliedEventIds: string[];
   } | null>;

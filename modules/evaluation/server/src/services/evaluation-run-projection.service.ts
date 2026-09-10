@@ -52,7 +52,7 @@ export class EvaluationRunProjectionService extends EvaluationRunProjectionPort 
     );
   }
 
-  tryGetRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
+  findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
     return this.repository.tryFindByEvaluationId(evaluationRunLookupSchema.parse(input));
   }
 }

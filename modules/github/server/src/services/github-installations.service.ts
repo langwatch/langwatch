@@ -61,8 +61,8 @@ export class GithubInstallationsService {
   // This read attributes a verified webhook and remains valid without
   // credentials. It goes through the access service because branch mapping
   // reads it there too, and one row should have one reader.
-  async tryGetByInstallationId(installationId: string): Promise<GithubInstallation | null> {
-    const row = await this.access.tryGetByInstallationId(installationId);
+  async findByInstallationId(installationId: string): Promise<GithubInstallation | null> {
+    const row = await this.access.findByInstallationId(installationId);
 
     return row ? toContractInstallation(row) : null;
   }

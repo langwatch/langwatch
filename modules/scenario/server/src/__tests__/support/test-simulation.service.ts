@@ -40,7 +40,7 @@ export class TestSimulationService extends SimulationService {
     return [];
   }
 
-  async tryGetScenarioRunData(): Promise<SimulationRunData | null> {
+  async findScenarioRunData(): Promise<SimulationRunData | null> {
     return this.options.run ?? null;
   }
 
@@ -48,7 +48,7 @@ export class TestSimulationService extends SimulationService {
     return { batches: [], hasMore: false, lastUpdatedAt: 0, totalCount: 0 };
   }
 
-  async tryGetBatchSummary(): Promise<SimulationBatchSummary | null> {
+  async findBatchSummary(): Promise<SimulationBatchSummary | null> {
     return null;
   }
 

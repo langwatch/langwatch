@@ -96,7 +96,7 @@ export class EvaluationService {
     return result;
   }
 
-  tryGetRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
+  findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
     return this.options.repository.tryFindByEvaluationId(evaluationRunLookupSchema.parse(input));
   }
 
@@ -121,7 +121,7 @@ export class EvaluationService {
     return this.options.repository.findTraceEvaluations(traceEvaluationsQuerySchema.parse(input));
   }
 
-  async tryGetInputs(input: {
+  async findInputs(input: {
     tenantId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {

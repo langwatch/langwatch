@@ -317,7 +317,7 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   .handle(async ({ app, input }) => {
     // A point lookup by unique run id, with no window, so runs older than any
     // default range stay reachable.
-    const data = await app.tryGetScenarioRunData({
+    const data = await app.findScenarioRunData({
       projectId: input.projectId,
       scenarioRunId: input.scenarioRunId,
     });

@@ -210,13 +210,13 @@ export class LangyCredentialService {
     }
   }
 
-  async tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null> {
+  async findModelsAllowedForProject(projectId: string): Promise<string[] | null> {
     const project = await this.deps.repository.tryFindProject(projectId);
     if (!project) {
       return null;
     }
 
-    return this.tryGetModelsAllowed({
+    return this.findModelsAllowed({
       projectId,
       organizationId: project.organizationId,
     });
@@ -229,7 +229,7 @@ export class LangyCredentialService {
     return this.deps.sessionKeys.revokeManaged(input);
   }
 
-  async tryGetModelsAllowed(input: {
+  async findModelsAllowed(input: {
     projectId: string;
     organizationId: string;
   }): Promise<string[] | null> {
@@ -250,7 +250,7 @@ export class LangyCredentialService {
     );
   }
 
-  async tryGetEgressAllowlist({ projectId }: { projectId: string }): Promise<string[] | null> {
+  async findEgressAllowlist({ projectId }: { projectId: string }): Promise<string[] | null> {
     const value = await this.deps.repository.tryFindEgressAllowlist(projectId);
     if (value == null) {
       return null;

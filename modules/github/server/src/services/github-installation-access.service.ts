@@ -44,7 +44,7 @@ export class GithubInstallationAccessService {
   // This read attributes a verified webhook and remains valid without
   // credentials: the pull-request event carries the installation id, and the
   // row it names is what says which organization the delivery belongs to.
-  tryGetByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
+  findByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
     return this.repository.tryFindByInstallationId(installationId);
   }
 

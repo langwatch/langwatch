@@ -61,7 +61,7 @@ export class SuiteRunModelsService {
       const resolveFeatureModel = (featureKey: string) => {
         const pending =
           defaults.get(featureKey) ??
-          modelProviders.tryGetResolvedDefault({ projectId, featureKey }).then((resolution) => {
+          modelProviders.findResolvedDefault({ projectId, featureKey }).then((resolution) => {
             if (!resolution) {
               throw new Error(`No model configured for "${featureKey}" (project: ${projectId}).`);
             }

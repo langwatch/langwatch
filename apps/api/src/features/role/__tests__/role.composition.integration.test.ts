@@ -19,9 +19,9 @@ import { EventEmitter } from "node:events";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { WorkflowApp, WorkflowNlpRuntimePort } from "@langwatch/workflow-server";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+
+import type { WorkflowApp, WorkflowNlpRuntimePort, WorkflowService,} from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
@@ -217,7 +217,7 @@ async function composeApplication(options: { planType?: string } = {}) {
       workflows: createApiFixture<WorkflowService>(),
       nlpRuntime: createApiFixture<WorkflowNlpRuntimePort>(),
       workflowApp: () => createApiFixture<WorkflowApp>(),
-      modelProviders: createApiFixture<ModelProviderService>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
       permissions: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
       users: createApiFixture<UserApi>(),
     },

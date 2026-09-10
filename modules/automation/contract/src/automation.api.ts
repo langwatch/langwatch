@@ -51,7 +51,7 @@ export interface AutomationApi {
   findRedactedById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
   tryGetLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
   requireById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
-  tryGetByCustomGraphId(input: {
+  findByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null>;

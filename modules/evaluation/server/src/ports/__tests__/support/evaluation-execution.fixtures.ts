@@ -196,7 +196,7 @@ export class TestEvaluationService {
     throw new Error("unused evaluation capability");
   }
 
-  async tryGetRunByEvaluationId(_input: never): Promise<EvaluationRunData | null> {
+  async findRunByEvaluationId(_input: never): Promise<EvaluationRunData | null> {
     return null;
   }
 
@@ -212,7 +212,7 @@ export class TestEvaluationService {
     return {};
   }
 
-  async tryGetInputs(_input: never): Promise<Record<string, unknown> | null> {
+  async findInputs(_input: never): Promise<Record<string, unknown> | null> {
     return null;
   }
 

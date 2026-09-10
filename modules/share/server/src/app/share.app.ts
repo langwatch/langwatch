@@ -109,7 +109,7 @@ export class ShareApp implements ShareApiContract {
   }
 
   findTracePin(input: TracePinInput): Promise<PinnedTrace | null> {
-    return this.#retention.tryGetPin(input);
+    return this.#retention.findPin(input);
   }
 
   listTracePins(input: ShareProjectScope): Promise<PinnedTrace[]> {

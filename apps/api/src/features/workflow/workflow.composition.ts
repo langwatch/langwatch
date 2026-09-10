@@ -1,4 +1,3 @@
-import type { WorkflowStudioDispatchService } from "@langwatch/workflow-server";
 /**
  * The studio's own vertical, composed as its own feature. Two namespaces, one feature.
  * `workflow.*` is the lifecycle — versions, copies, publication, the archive cascade.
@@ -10,7 +9,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import { pMapLimited } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { AiCallFailureService, getProjectModelProviders } from "@langwatch/model-provider-server";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -34,9 +33,11 @@ import {
   type WorkflowAiCallFeature,
   type WorkflowLlmParameterResolution,
   type WorkflowNlpRuntimePort,
+  type WorkflowService,
+  type WorkflowStudioDispatchService,
   type WorkflowTrpcPorts,
 } from "@langwatch/workflow-server";
-import type { LLMConfig, WorkflowService } from "@langwatch/workflow-contract";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -104,7 +105,7 @@ export function composeWorkflowRuntime(options: {
     /** The dataset service a studio node reads its rows through. */
     datasets: DatasetService;
     /** The gateway a node's model is resolved through. */
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
   }>;
   /** Where the NLP engine answers; absent means nothing executes. */
   nlpServiceUrl: string | undefined;
@@ -150,7 +151,7 @@ export type WorkflowPeers = Readonly<{
   /** The evaluators a workflow is published as. */
   evaluators: EvaluatorApi;
   /** The gateway a node's model is resolved through. */
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
 }>;
 
 import type { ComposedWorkflowFeature } from "./workflow.composition.types.ts";
@@ -162,7 +163,7 @@ import type { ComposedWorkflowFeature } from "./workflow.composition.types.ts";
  * than autogenerating nothing.
  */
 export function composeWorkflowCommitMessages(options: {
-  modelProviders: ModelProviderService | undefined;
+  modelProviders: ModelProviderApi | undefined;
   projects: ProjectApi | undefined;
   nlpServiceUrl: string | undefined;
 }): WorkflowCommitMessageService | undefined {
@@ -364,11 +365,11 @@ const actorId = (ctx: unknown): string => (ctx as ApiTrpcPortsContext).actor().i
  * The LiteLLM parameters one Studio run executes each of its models with.
  */
 class ApiWorkflowLlmParametersAdapter extends WorkflowLlmParametersPort {
-  static create(input: { modelProviders: ModelProviderService }): ApiWorkflowLlmParametersAdapter {
+  static create(input: { modelProviders: ModelProviderApi }): ApiWorkflowLlmParametersAdapter {
     return new ApiWorkflowLlmParametersAdapter(input.modelProviders);
   }
 
-  private constructor(private readonly modelProviders: ModelProviderService) {
+  private constructor(private readonly modelProviders: ModelProviderApi) {
     super();
   }
 

@@ -238,7 +238,7 @@ export class PostgresAuthzAdapter {
       bindings: bindingRepository,
       epoch,
       isOnEngine: selectHead,
-      tryGetEngineCutoverAt: async (organizationId) => {
+      findEngineCutoverAt: async (organizationId) => {
         const finalizedAt = await cutover.tryGetFinalizedAt({ organizationId });
 
         return finalizedAt === null ? null : fromDate(finalizedAt);

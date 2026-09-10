@@ -40,7 +40,7 @@ export class LangyTurnStopService {
         })
       : false;
     if (!isActor) {
-      const conversation = await conversations.tryFindByIdVisible({
+      const conversation = await conversations.findByIdVisible({
         id: conversationId,
         projectId,
         userId,

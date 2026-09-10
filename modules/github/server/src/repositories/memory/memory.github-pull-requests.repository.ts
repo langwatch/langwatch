@@ -121,7 +121,7 @@ export class MemoryGithubPullRequestsRepository extends GithubPullRequestsReposi
       );
   }
 
-  async tryFindByNumber(params: {
+  async findByNumber(params: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;

@@ -23,7 +23,7 @@ function process() {
     .withInfrastructure({})
     .withProvided(
       ScenarioApi,
-      createApiFixture<ScenarioApiContract>({ tryGetTestSuite: async () => null }),
+      createApiFixture<ScenarioApiContract>({ findTestSuite: async () => null }),
     )
     .withProvided(AgentApiToken, createApiFixture<AgentApi>({}))
     .withProvided(PromptApiToken, createApiFixture<PromptApi>({}))

@@ -50,7 +50,7 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
     super();
   }
 
-  tryGetDashboardData(): DashboardData | null {
+  findDashboardData(): DashboardData | null {
     return this.latest;
   }
 

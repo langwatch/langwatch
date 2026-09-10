@@ -38,7 +38,7 @@ export interface DataRetentionApi {
   autoPin(input: UnpinTraceInput): Promise<PinnedTrace>;
   autoUnpin(input: UnpinTraceInput): Promise<void>;
   isPinned(input: UnpinTraceInput): Promise<boolean>;
-  tryGetPin(input: UnpinTraceInput): Promise<PinnedTrace | null>;
+  findPin(input: UnpinTraceInput): Promise<PinnedTrace | null>;
   listByProject(input: { projectId: string }): Promise<PinnedTrace[]>;
   getPinnedTraceIds(input: { projectId: string }): Promise<string[]>;
   getRetroactiveMutationProgress(

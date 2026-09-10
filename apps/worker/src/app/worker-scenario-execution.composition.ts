@@ -12,7 +12,7 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import { generate } from "@langwatch/ksuid";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -54,9 +54,8 @@ import {
   PrismaWorkflowProjectEnvironmentAdapter,
   WorkflowLlmParametersPort,
   type WorkflowNlpRuntimePort,
-  type WorkflowLlmParameterResolution,
-} from "@langwatch/workflow-server";
-import type { LLMConfig, WorkflowService } from "@langwatch/workflow-contract";
+  type WorkflowLlmParameterResolution, type WorkflowService,} from "@langwatch/workflow-server";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
@@ -87,7 +86,7 @@ const SCENARIO_KSUID_RESOURCE = "scenario";
 export type WorkerScenarioExecutionCompositionInput = Readonly<{
   config: WorkerConfig;
   connection: PrismaConnection | undefined;
-  modelProviders: ModelProviderService | undefined;
+  modelProviders: ModelProviderApi | undefined;
   projects: ProjectApi | undefined;
   redis: RedisConnection | null | undefined;
   resolveClickHouseClient: EventingClickHouseClientResolver | undefined;
@@ -101,7 +100,7 @@ export type WorkerScenarioExecutionCompositionInput = Readonly<{
 export type WorkerScenarioExecutionPrerequisites = Readonly<{
   config: WorkerConfig;
   connection: PrismaConnection;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   projects: ProjectApi;
   redis: RedisConnection;
   resolveClickHouseClient: EventingClickHouseClientResolver;
@@ -418,11 +417,11 @@ class WorkerSuiteStartRefusal extends SuiteExecutionPort {
  * configured and switched off, and one that is on and hands back prepared credentials.
  */
 class WorkerWorkflowLlmParameters extends WorkflowLlmParametersPort {
-  static create(input: { modelProviders: ModelProviderService }): WorkerWorkflowLlmParameters {
+  static create(input: { modelProviders: ModelProviderApi }): WorkerWorkflowLlmParameters {
     return new WorkerWorkflowLlmParameters(input.modelProviders);
   }
 
-  private constructor(private readonly modelProviders: ModelProviderService) {
+  private constructor(private readonly modelProviders: ModelProviderApi) {
     super();
   }
 

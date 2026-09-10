@@ -139,7 +139,7 @@ integration("the completion of a batch", () => {
       it("counts the queued run as running and the finished one as settled", async () => {
         const { batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
 
-        const summary = await repo.tryGetBatchSummary({ projectId: tenantId, batchRunId });
+        const summary = await repo.findBatchSummary({ projectId: tenantId, batchRunId });
 
         expect(summary?.totalCount).toBe(2);
         expect(summary?.runningCount).toBe(1);
@@ -150,7 +150,7 @@ integration("the completion of a batch", () => {
       it("leaves allCompletedAt null while the queued run waits", async () => {
         const { batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
 
-        const summary = await repo.tryGetBatchSummary({ projectId: tenantId, batchRunId });
+        const summary = await repo.findBatchSummary({ projectId: tenantId, batchRunId });
 
         expect(summary?.allCompletedAt).toBeNull();
       });
@@ -163,7 +163,7 @@ integration("the completion of a batch", () => {
       it("settles every run and carries a completion timestamp", async () => {
         const { batchRunId } = await seedBatch(["SUCCESS", "FAILURE"]);
 
-        const summary = await repo.tryGetBatchSummary({ projectId: tenantId, batchRunId });
+        const summary = await repo.findBatchSummary({ projectId: tenantId, batchRunId });
 
         expect(summary?.runningCount).toBe(0);
         expect(summary?.settledCount).toBe(summary?.totalCount);

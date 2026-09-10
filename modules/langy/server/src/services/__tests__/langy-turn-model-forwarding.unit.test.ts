@@ -13,22 +13,22 @@ import {
 function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const dispatch = vi.fn(async () => "accepted" as const);
   const resolve = vi.fn(async () => ({ modelId: "openai/gpt-5-mini" }));
-  const tryGetModelsAllowed = vi.fn(async (): Promise<string[] | null> => null);
+  const findModelsAllowed = vi.fn(async (): Promise<string[] | null> => null);
 
   const deps = {
     conversations: {
       ensureConversation: vi.fn(async () => ({ id: "conv-1", isNew: false })),
-      tryFindByIdVisible: vi.fn(async () => null),
-      tryGetPendingHandoff: vi.fn(async () => null),
-      tryGetRunToken: vi.fn(async () => "run-token"),
+      findByIdVisible: vi.fn(async () => null),
+      findPendingHandoff: vi.fn(async () => null),
+      findRunToken: vi.fn(async () => "run-token"),
       acceptTurn: vi.fn(async () => undefined),
       finalizeTurn: vi.fn(async () => undefined),
     },
     credentials: {
       getOrProvision: vi.fn(async () => ({ organizationId: "org-1" })),
-      tryGetEgressAllowlist: vi.fn(async () => null),
+      findEgressAllowlist: vi.fn(async () => null),
       resolveMirrorTier: vi.fn(async () => "content" as const),
-      tryGetModelsAllowed,
+      findModelsAllowed,
     },
     models: { resolve },
     worker: {
@@ -71,7 +71,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     ...over,
   } as unknown as LangyTurnServiceDeps;
 
-  return { deps, mocks: { dispatch, resolve, tryGetModelsAllowed } };
+  return { deps, mocks: { dispatch, resolve, findModelsAllowed } };
 }
 
 const input = (over: Partial<StartConversationTurnInput> = {}): StartConversationTurnInput => ({
@@ -96,7 +96,7 @@ describe("LangyTurnService.startConversationTurn model forwarding", () => {
     "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0",
   ])("accepts and forwards the allowed model %s verbatim", async (model) => {
     const { deps, mocks } = makeDeps();
-    mocks.tryGetModelsAllowed.mockResolvedValue([model]);
+    mocks.findModelsAllowed.mockResolvedValue([model]);
 
     await LangyTurnService.create(deps).startConversationTurn(input({ modelOverride: model }));
 
@@ -106,7 +106,7 @@ describe("LangyTurnService.startConversationTurn model forwarding", () => {
   /** @scenario A per-send override still wins over the configured Langy model */
   it("does not resolve an unused default model when an override is allowed", async () => {
     const { deps, mocks } = makeDeps();
-    mocks.tryGetModelsAllowed.mockResolvedValue(["openai/gpt-5-mini"]);
+    mocks.findModelsAllowed.mockResolvedValue(["openai/gpt-5-mini"]);
 
     await LangyTurnService.create(deps).startConversationTurn(
       input({ modelOverride: "openai/gpt-5-mini" }),

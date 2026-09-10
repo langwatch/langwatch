@@ -93,7 +93,7 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
 export function createDashboardTestAutomation(triggers: Trigger[] = []): AutomationApi {
   return createApiFixture<AutomationApi>({
     getByCustomGraphIds: vi.fn(async () => triggers),
-    tryGetByCustomGraphId: vi.fn(async () => triggers[0] ?? null),
+    findByCustomGraphId: vi.fn(async () => triggers[0] ?? null),
   });
 }
 

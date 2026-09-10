@@ -21,5 +21,5 @@ export abstract class EvaluationRunProjectionPort {
 
   abstract upsertRuns(input: UpsertEvaluationRunCommand[]): Promise<void>;
 
-  abstract tryGetRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
+  abstract findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
 }

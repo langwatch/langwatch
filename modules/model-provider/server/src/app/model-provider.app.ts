@@ -250,19 +250,19 @@ export class ModelProviderApp implements ModelProviderApi {
     return this.#modelProviders.getForProject(input);
   }
 
-  tryGetProviderForProject(input: {
+  findProviderForProject(input: {
     projectId: string;
     provider: string;
   }): Promise<ModelProvider | null> {
-    return this.#modelProviders.tryGetProviderForProject(input);
+    return this.#modelProviders.findProviderForProject(input);
   }
 
-  tryFindRowServingModel(input: {
+  findRowServingModel(input: {
     projectId: string;
     provider: string;
     model: string;
   }): Promise<ModelProvider | null> {
-    return this.#modelProviders.tryFindRowServingModel(input);
+    return this.#modelProviders.findRowServingModel(input);
   }
 
   getExecutionProviders(
@@ -401,8 +401,8 @@ export class ModelProviderApp implements ModelProviderApi {
   // ── default models ─────────────────────────────────────────────────────────
 
   /** What the cascade resolves for one feature key, or null when nothing is set. */
-  tryGetResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null> {
-    return this.#modelProviders.tryGetResolvedDefault(input);
+  findResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null> {
+    return this.#modelProviders.findResolvedDefault(input);
   }
 
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution> {
@@ -468,8 +468,8 @@ export class ModelProviderApp implements ModelProviderApi {
     return this.#modelProviders.assertApiKeyMayWriteDefaultScopes(input);
   }
 
-  tryGetDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null> {
-    return this.#modelProviders.tryGetDefaultConfig(input);
+  findDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null> {
+    return this.#modelProviders.findDefaultConfig(input);
   }
 
   /** What the cascade would hand back for these scopes if they held nothing. */

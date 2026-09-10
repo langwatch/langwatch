@@ -103,7 +103,7 @@ const NO_GRAPH_ALERTS: DashboardGraphAlertLookup = {
   async getByCustomGraphIds() {
     return [];
   },
-  async tryGetByCustomGraphId() {
+  async findByCustomGraphId() {
     return null;
   },
 };

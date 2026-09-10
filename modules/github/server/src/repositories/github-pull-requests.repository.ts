@@ -156,7 +156,7 @@ export abstract class GithubPullRequestsRepository {
   }): Promise<GithubPullRequestRow[]>;
 
   /** One pull request by its number within a repository, or null. */
-  abstract tryFindByNumber(params: {
+  abstract findByNumber(params: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;
@@ -313,7 +313,7 @@ export class NullGithubPullRequestsRepository extends GithubPullRequestsReposito
   async findAllByBranchKeys(): Promise<GithubPullRequestRow[]> {
     return [];
   }
-  async tryFindByNumber(_params: {
+  async findByNumber(_params: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;

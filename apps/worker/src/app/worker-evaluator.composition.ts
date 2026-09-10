@@ -6,6 +6,7 @@
  * graph writes and the change history refuse by name rather than answering
  * from rows this process composed nothing to read.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -13,11 +14,11 @@ import {
   type EvaluatorGraph,
   type EvaluatorNlpDispatcher,
 } from "@langwatch/evaluator-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import { nanoid } from "nanoid";
 
 /** The evaluator application this process reads and runs evaluators through. */
@@ -35,7 +36,7 @@ export async function installWorkerEvaluator(options: {
   /** Where a code evaluator's one-node Studio graph runs. */
   nlpRuntime: EvaluatorNlpDispatcher;
   /** Resolves a project's default and embeddings models. */
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   resources: ResourceOwnership;
   /** Names this install in the worker's own resource ledger. */
   name: string;

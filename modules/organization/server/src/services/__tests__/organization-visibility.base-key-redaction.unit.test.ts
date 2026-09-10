@@ -68,8 +68,8 @@ function visibility(canUpdateProject: boolean) {
   return OrganizationVisibilityService.create({
     reader: {
       getAllForUser: vi.fn(async () => organizationPayload()),
-      tryGetOrganizationWithMembers: vi.fn(async () => null),
-      tryGetMemberById: vi.fn(async () => null),
+      findOrganizationWithMembers: vi.fn(async () => null),
+      findMemberById: vi.fn(async () => null),
     },
     permissions: testPermissions(canUpdateProject),
     secrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },

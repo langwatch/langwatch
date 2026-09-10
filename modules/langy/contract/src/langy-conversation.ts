@@ -88,16 +88,16 @@ export type LangyConversationTurnCapability = {
     conversationId?: string | null;
     adoptUnknownId?: boolean;
   }): Promise<{ id: string; isNew: boolean }>;
-  tryFindByIdVisible(input: {
+  findByIdVisible(input: {
     id: string;
     projectId: string;
     userId: string;
   }): Promise<{ isOwn: boolean; currentTurnId: string | null; status: string } | null>;
-  tryGetPendingHandoff(input: {
+  findPendingHandoff(input: {
     projectId: string;
     conversationId: string;
   }): Promise<{ token: string; turnId: string } | null>;
-  tryGetRunToken(input: { projectId: string; conversationId: string }): Promise<string | null>;
+  findRunToken(input: { projectId: string; conversationId: string }): Promise<string | null>;
   acceptTurn(input: {
     projectId: string;
     conversationId: string;
@@ -124,9 +124,9 @@ export type LangyCredentialTurnCapability = {
     session: LangyCredentialSession;
     mintSessionKey?: boolean;
   }): Promise<LangyCredentials>;
-  tryGetEgressAllowlist(input: { projectId: string }): Promise<string[] | null>;
+  findEgressAllowlist(input: { projectId: string }): Promise<string[] | null>;
   resolveMirrorTier(input: { projectId: string }): Promise<LangyMirrorTier>;
-  tryGetModelsAllowed(input: {
+  findModelsAllowed(input: {
     projectId: string;
     organizationId: string;
   }): Promise<string[] | null>;

@@ -141,7 +141,7 @@ export class ScenarioExecutionLookupService {
     featureKey: string;
     projectId: string;
   }): Promise<string> {
-    const resolved = await this.options.modelProviders.tryGetResolvedDefault({
+    const resolved = await this.options.modelProviders.findResolvedDefault({
       projectId,
       featureKey,
     });

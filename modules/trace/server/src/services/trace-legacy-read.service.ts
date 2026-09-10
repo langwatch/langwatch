@@ -335,7 +335,7 @@ export class TraceService {
         },
       },
       async () => {
-        return this.evaluationService.tryGetInputs({
+        return this.evaluationService.findInputs({
           tenantId: projectId,
           evaluationId,
         });

@@ -380,7 +380,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     }));
   }
 
-  async tryGetScenarioRunData({
+  async findScenarioRunData({
     projectId,
     scenarioRunId,
   }: {
@@ -611,7 +611,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
    * tenant, so this skips the scenario set and preview items the history page
    * fetches. Returns null when the tenant holds no run for that batch.
    */
-  async tryGetBatchSummary({
+  async findBatchSummary({
     projectId,
     batchRunId,
   }: {

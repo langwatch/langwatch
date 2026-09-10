@@ -472,8 +472,8 @@ async function composeMembershipHalf(options: {
         ...summary,
         createdAt: toDate(summary.createdAt),
       })),
-    tryGetProvisioningSummary: async (organizationId) => {
-      const summary = await app.tryGetProvisioningSummary(organizationId);
+    findProvisioningSummary: async (organizationId) => {
+      const summary = await app.findProvisioningSummary(organizationId);
       return summary === null ? null : { ...summary, createdAt: toDate(summary.createdAt) };
     },
   };

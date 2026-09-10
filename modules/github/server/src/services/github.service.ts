@@ -96,8 +96,8 @@ export class GithubFeatureService implements GithubApi {
     return this.getAppConfig().configured;
   }
 
-  tryGetByInstallationId(installationId: string): Promise<GithubInstallation | null> {
-    return this.installations.tryGetByInstallationId(installationId);
+  findByInstallationId(installationId: string): Promise<GithubInstallation | null> {
+    return this.installations.findByInstallationId(installationId);
   }
 
   isOrganizationMember(input: { userId: string; organizationId: string }): Promise<boolean> {
@@ -232,13 +232,13 @@ export class GithubFeatureService implements GithubApi {
     return this.mapping.findAllByBranches(input);
   }
 
-  tryFindByNumber(input: {
+  findByNumber(input: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;
     prNumber: number;
   }): Promise<GithubPullRequest | null> {
-    return this.mapping.tryFindByNumber(input);
+    return this.mapping.findByNumber(input);
   }
 
   recheckDueBranches(): Promise<number> {
