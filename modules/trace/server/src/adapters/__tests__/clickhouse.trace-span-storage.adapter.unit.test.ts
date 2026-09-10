@@ -4,7 +4,7 @@ import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
 } from "../../ports/clickhouse.port.ts";
-import { TraceSpanStoragePort } from "../../ports/trace-span-storage.port.ts";
+import { TraceSpanStoragePort } from "../../repositories/span-storage-write.repository.ts";
 import { TraceSpanStorageClickHouseRepository } from "../../repositories/clickhouse/trace-span-storage.repository.ts";
 
 /**

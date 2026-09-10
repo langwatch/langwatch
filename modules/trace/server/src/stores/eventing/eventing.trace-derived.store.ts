@@ -5,7 +5,7 @@ import {
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "../../projections/trace-derived.projection.ts";
-import { TraceAnalyticsProjectionPort } from "../../ports/trace-analytics-projection.port.ts";
+import { TraceAnalyticsProjectionPort } from "../../repositories/projection/trace-analytics-projection.repository.ts";
 
 /**
  * The projection stamps `getWithApplied` will decode: the current shape, and the pre-split

@@ -1,5 +1,5 @@
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import type { TraceDerivationSpanReaderPort } from "../../ports/trace-derivation-span-reader.port.ts";
+import type { TraceDerivationSpanReaderPort } from "../../repositories/read/trace-derivation-span-reader.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**

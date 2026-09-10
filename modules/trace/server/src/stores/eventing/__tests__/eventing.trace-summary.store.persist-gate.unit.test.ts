@@ -11,7 +11,7 @@
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { TraceSummaryProjectionPort } from "../../../ports/trace-summary-projection.port.ts";
+import type { TraceSummaryProjectionPort } from "../../../repositories/projection/trace-summary-projection.repository.ts";
 import { TraceSummaryStore } from "../eventing.trace-summary.store.ts";
 
 const context = {

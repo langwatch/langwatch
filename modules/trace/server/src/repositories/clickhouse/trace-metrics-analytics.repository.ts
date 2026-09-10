@@ -9,7 +9,7 @@ import {
 import {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionRead,
-} from "../../ports/trace-analytics-projection.port.ts";
+} from "../projection/trace-analytics-projection.repository.ts";
 import { queryWindowed } from "./windowed-read.mapper.ts";
 
 const TABLE_NAME = "trace_analytics" as const;

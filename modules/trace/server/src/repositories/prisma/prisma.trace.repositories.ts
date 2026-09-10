@@ -12,6 +12,9 @@ import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repo
 import { TraceDerivationSpanClickHouseRepository } from "../clickhouse/trace-derivation-span.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
 import { PrismaTraceEditOverlayRepository } from "./prisma.trace-edit-overlay.repository.ts";
+import { SessionGroupsClickHouseRepository } from "../clickhouse/session-groups.repository.ts";
+import { TraceListClickHouseRepository } from "../clickhouse/trace-list.repository.ts";
+import { ClickHouseTraceEventPayloadRepository } from "../clickhouse/trace-event-payload.repository.ts";
 
 /**
  * The "postgres" tier. The tier is named for the store every row the module
@@ -48,6 +51,11 @@ export class PostgresTraceRepositories {
       }),
       summary: TraceSummaryClickHouseRepository.create(storage),
       logRecords: LogRecordStorageClickHouseRepository.create(infrastructure.clickhouse),
+      list: TraceListClickHouseRepository.create(infrastructure.clickhouse),
+      sessionGroups: SessionGroupsClickHouseRepository.create(infrastructure.clickhouse),
+      eventPayloads: ClickHouseTraceEventPayloadRepository.createResolved({
+        resolveClient: infrastructure.clickhouse,
+      }),
     };
   }
 }

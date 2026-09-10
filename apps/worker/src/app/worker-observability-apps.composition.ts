@@ -98,7 +98,6 @@ export async function createWorkerObservabilityApps(
     resources: options.resources,
   });
   const traces = createWorkerTraceInfrastructure({
-    connection: options.connection,
     resolveClickHouseClient: options.resolveClickHouseClient,
     defaultRetentionDays: options.config.retention.defaultDays,
     canonicalisation: options.canonicalisation,

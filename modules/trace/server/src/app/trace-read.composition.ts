@@ -16,9 +16,7 @@ import {
 } from "@langwatch/trace-contract";
 import { TraceTreeComposition } from "./trace-tree.composition.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
-import { ClickHouseTraceEventPayloadRepository } from "../repositories/clickhouse/trace-event-payload.repository.ts";
 import { LogRecordStorageService } from "../services/log/trace-log-record-read.service.ts";
-import { SessionGroupsClickHouseRepository } from "../repositories/clickhouse/session-groups.repository.ts";
 import { SessionGroupsService } from "../services/session/trace-session-groups.service.ts";
 import { SpanStorageService } from "../services/offload/trace-span-storage-read.service.ts";
 import { TraceEditOverlayService } from "../services/edit-overlay/trace-edit-overlay.service.ts";
@@ -26,13 +24,12 @@ import { TraceEventDerivationService } from "../services/ingestion/trace-event-d
 import { TraceFullIoPort } from "../ports/trace-full-io.port.ts";
 import { TraceIOExtractionService } from "../services/content/trace-io-extraction.service.ts";
 import { TraceService as TraceLegacyReadService } from "../services/read/trace-legacy-read.service.ts";
-import { TraceListClickHouseRepository } from "../repositories/clickhouse/trace-list.repository.ts";
 import { TraceListService } from "../services/read/trace-list-read.service.ts";
 import { TraceQueryClassificationAdapter } from "../adapters/trace-query-classification.adapter.ts";
 import {
   TraceQueryFieldValuesPort,
   type TraceQueryFieldValuesInput,
-} from "../ports/query-field-values.port.ts";
+} from "../repositories/read/query-field-values.repository.ts";
 import { TraceSummaryService } from "../services/read/trace-summary-read.service.ts";
 import {
   TraceViewerProtectionService,
@@ -96,7 +93,7 @@ export function composeTraceAppDependencies(
     evaluationService: options.evaluations,
   });
   const list = TraceListService.create({
-    repository: TraceListClickHouseRepository.create(resolve),
+    repository: options.repositories.list,
     evaluations: options.evaluations,
     topicService: options.topics,
   });
@@ -135,7 +132,7 @@ export function composeTraceAppDependencies(
     eventDerivation: TraceEventDerivationService.create({
       spans: options.repositories.derivationSpans,
     }),
-    payloads: ClickHouseTraceEventPayloadRepository.createResolved({ resolveClient: resolve }),
+    payloads: options.repositories.eventPayloads,
     fullIo: TraceReadFullIo.create(ioExtractionService),
   }).build();
 
@@ -145,7 +142,7 @@ export function composeTraceAppDependencies(
       read,
       list,
       sessionGroups: SessionGroupsService.create({
-        repository: new SessionGroupsClickHouseRepository(resolve),
+        repository: options.repositories.sessionGroups,
         codingAgentSessions: options.codingAgents,
         resolveOrganizationId: (projectId) => options.projects.getOrganizationId(projectId),
       }),

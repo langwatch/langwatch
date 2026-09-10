@@ -1,4 +1,4 @@
-import { TraceExistencePort } from "../../../ports/trace-existence.port.ts";
+import { TraceExistencePort } from "../../read/trace-existence.repository.ts";
 import type { MemoryTraceSpanStore } from "./memory-trace-span.store.ts";
 
 /**

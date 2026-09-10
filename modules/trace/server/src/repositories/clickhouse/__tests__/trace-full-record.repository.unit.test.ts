@@ -6,7 +6,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { TraceClickHousePort, type TraceClickHouseClient } from "../../../ports/clickhouse.port.ts";
-import { TracePayloadReaderPort } from "../../../ports/trace-payload-reader.port.ts";
+import { TracePayloadReaderPort } from "../../read/trace-payload-reader.repository.ts";
 import { TraceFullIoPort } from "../../../ports/trace-full-io.port.ts";
 import { ClickHouseTraceFullRecordRepository } from "../trace-full-record.repository.ts";
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionEntry,
-} from "../../ports/trace-analytics-projection.port.ts";
+} from "../../repositories/projection/trace-analytics-projection.repository.ts";
 import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store.ts";
 import { TraceAnalyticsFoldProjection, type TraceAnalyticsData } from "../trace-derived.projection.ts";

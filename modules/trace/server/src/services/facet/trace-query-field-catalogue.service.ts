@@ -5,7 +5,7 @@ import {
   type TraceQueryFieldCatalogueInput,
 } from "@langwatch/trace-contract";
 
-import type { TraceQueryFieldValuesPort } from "../../ports/query-field-values.port.ts";
+import type { TraceQueryFieldValuesPort } from "../../repositories/read/query-field-values.repository.ts";
 
 const DYNAMIC_VALUES_LIMIT = 20;
 const SAMPLES_SHOWN = 8;

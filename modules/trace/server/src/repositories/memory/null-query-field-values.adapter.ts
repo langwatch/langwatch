@@ -1,7 +1,7 @@
 import {
   TraceQueryFieldValuesPort,
   type TraceQueryFieldValuesResult,
-} from "../../ports/query-field-values.port.ts";
+} from "../read/query-field-values.repository.ts";
 
 export class NullQueryFieldValuesAdapter extends TraceQueryFieldValuesPort {
   private constructor() {

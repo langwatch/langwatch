@@ -13,7 +13,7 @@ import {
   type TraceAnalyticsRow,
 } from "../trace-derived.projection.ts";
 import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store.ts";
-import { TraceAnalyticsProjectionPort } from "../../ports/trace-analytics-projection.port.ts";
+import { TraceAnalyticsProjectionPort } from "../../repositories/projection/trace-analytics-projection.repository.ts";
 import {
   createSpanReceivedEvent,
   createTestRuntime,

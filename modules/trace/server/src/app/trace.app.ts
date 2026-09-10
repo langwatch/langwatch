@@ -69,7 +69,7 @@ import type {
   TraceSummaryLookupInput,
 } from "@langwatch/trace-contract";
 import type { TraceLegacyReadPort } from "../ports/trace-legacy-read.port.ts";
-import type { TraceExistencePort } from "../ports/trace-existence.port.ts";
+import type { TraceExistencePort } from "../repositories/read/trace-existence.repository.ts";
 import type { TraceViewerProtectionService } from "../services/viewer/trace-viewer-protection.service.ts";
 import { TraceContentReadServiceImpl } from "../services/content/trace-content-read.service.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/canonicalisers/coding-agent/claude-code-log-enrichment.service.ts";

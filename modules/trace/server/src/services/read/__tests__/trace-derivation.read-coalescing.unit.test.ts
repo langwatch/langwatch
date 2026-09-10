@@ -1,6 +1,6 @@
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceDerivationSpanReaderPort } from "../../../ports/trace-derivation-span-reader.port.ts";
+import { TraceDerivationSpanReaderPort } from "../../../repositories/read/trace-derivation-span-reader.repository.ts";
 import { TraceModelCostPort } from "../../../ports/trace-model-cost.port.ts";
 import { ScenarioRoleMetricsDerivationService } from "../../support/scenario-role-metrics-derivation.service.ts";
 import { SpanCostService } from "../../span/span-cost.service.ts";

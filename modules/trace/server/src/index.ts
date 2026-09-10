@@ -88,12 +88,12 @@ export {
   TraceWindowedReadMetricsPort,
   type TraceWindowedReadOutcome,
 } from "./ports/trace-windowed-read-metrics.port.ts";
-export { TraceRecordPort } from "./ports/trace-record.port.ts";
+export { TraceRecordPort } from "./repositories/read/trace-record.repository.ts";
 
-export { TracePayloadReaderPort } from "./ports/trace-payload-reader.port.ts";
+export { TracePayloadReaderPort } from "./repositories/read/trace-payload-reader.repository.ts";
 export { TraceFullIoPort } from "./ports/trace-full-io.port.ts";
 export { TraceEventDerivationPort } from "./ports/trace-event-derivation.port.ts";
-export { TraceQueryFieldValuesPort } from "./ports/query-field-values.port.ts";
+export { TraceQueryFieldValuesPort } from "./repositories/read/query-field-values.repository.ts";
 
 export { TraceQueryClassificationAdapter } from "./adapters/trace-query-classification.adapter.ts";
 export { TraceQueryClickHouseAdapter } from "./repositories/clickhouse/trace-query.clickhouse.adapter.ts";
@@ -108,12 +108,12 @@ export {
 export { ClickHouseSpanAttributeKeysFacetAdapter } from "./repositories/clickhouse/trace-facet-span-attribute-keys.clickhouse.adapter.ts";
 export { TraceQueryEvaluationAdapter } from "./adapters/trace-query-evaluation.adapter.ts";
 export type { FieldDef } from "@langwatch/trace-contract";
-export { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port.ts";
+export { TraceSummaryReaderPort } from "./repositories/read/trace-summary-reader.repository.ts";
 export {
   TraceSummaryProjectionPort,
   type TraceSummaryProjectionEntry,
   type TraceSummaryReadWindow,
-} from "./ports/trace-summary-projection.port.ts";
+} from "./repositories/projection/trace-summary-projection.repository.ts";
 export {
   TraceSpanContentDropPort,
   type TraceSpanContentDropResult,
@@ -123,10 +123,10 @@ export {
 } from "./ports/trace-span-preparation.port.ts";
 export { TraceSpanSpoolPort, type TraceSpanSpoolIdentity } from "./ports/trace-span-spool.port.ts";
 export { TraceSpanNormalizationPort } from "./ports/trace-span-normalization.port.ts";
-export { TraceSpanStoragePort } from "./ports/trace-span-storage.port.ts";
+export { TraceSpanStoragePort } from "./repositories/span-storage-write.repository.ts";
 export { TraceSpanStorageClickHouseRepository } from "./repositories/clickhouse/trace-span-storage.repository.ts";
-export { TraceStoredSpanReaderPort } from "./ports/trace-stored-span-reader.port.ts";
-export { TraceDerivationSpanReaderPort } from "./ports/trace-derivation-span-reader.port.ts";
+export { TraceStoredSpanReaderPort } from "./repositories/read/trace-stored-span-reader.repository.ts";
+export { TraceDerivationSpanReaderPort } from "./repositories/read/trace-derivation-span-reader.repository.ts";
 export { TraceDerivationSpanClickHouseRepository } from "./repositories/clickhouse/trace-derivation-span.repository.ts";
 export { TraceEventDerivationService } from "./services/ingestion/trace-event-derivation.service.ts";
 export {
@@ -143,8 +143,8 @@ export {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionEntry,
   type TraceAnalyticsProjectionRead,
-} from "./ports/trace-analytics-projection.port.ts";
-export { TraceAnalyticsRollupPort } from "./ports/trace-analytics-rollup.port.ts";
+} from "./repositories/projection/trace-analytics-projection.repository.ts";
+export { TraceAnalyticsRollupPort } from "./repositories/projection/trace-analytics-rollup.repository.ts";
 export {
   RECORD_SPAN_DEDUPLICATION,
   EventingRecordSpanAdapter as RecordSpanCommand,
@@ -157,7 +157,7 @@ export { EventingTraceMetricCorrelationAdapter as RecordMetricCorrelationCommand
 export type {
   TraceQueryFieldValuesInput,
   TraceQueryFieldValuesResult,
-} from "./ports/query-field-values.port.ts";
+} from "./repositories/read/query-field-values.repository.ts";
 export {
   MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
@@ -300,7 +300,7 @@ export {
   detectCausalityLoop,
   type EvaluationTriggerSubscriberDeps,
 } from "./subscribers/evaluation-trigger.subscriber.ts";
-export { TraceExistencePort } from "./ports/trace-existence.port.ts";
+export { TraceExistencePort } from "./repositories/read/trace-existence.repository.ts";
 export { ClickHouseTraceExistenceRepository } from "./repositories/clickhouse/trace-existence.repository.ts";
 export {
   TraceEditOverlayService,

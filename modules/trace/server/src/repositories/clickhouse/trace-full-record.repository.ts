@@ -9,9 +9,9 @@ import {
 import { EventUtils } from "@langwatch/eventing";
 
 import type { TraceClickHouseClient, TraceClickHousePort } from "../../ports/clickhouse.port.ts";
-import { TraceFullRecordPort } from "../../ports/trace-full-record.port.ts";
+import { TraceFullRecordPort } from "../read/trace-full-record.repository.ts";
 import type { TraceFullIoPort } from "../../ports/trace-full-io.port.ts";
-import type { TracePayloadReaderPort } from "../../ports/trace-payload-reader.port.ts";
+import type { TracePayloadReaderPort } from "../read/trace-payload-reader.repository.ts";
 import {
   internalTraceFullReadProtections,
   TraceFullProtectionMapper,

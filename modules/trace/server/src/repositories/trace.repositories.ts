@@ -1,12 +1,15 @@
-import type { TraceAnalyticsProjectionPort } from "../ports/trace-analytics-projection.port.ts";
-import type { TraceDerivationSpanReaderPort } from "../ports/trace-derivation-span-reader.port.ts";
-import type { TraceExistencePort } from "../ports/trace-existence.port.ts";
+import type { TraceAnalyticsProjectionPort } from "./projection/trace-analytics-projection.repository.ts";
+import type { TraceDerivationSpanReaderPort } from "./read/trace-derivation-span-reader.repository.ts";
+import type { TraceExistencePort } from "./read/trace-existence.repository.ts";
 import type { LogRecordStorageRepository } from "./log-record-storage.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
-import type { TraceAnalyticsRollupPort } from "../ports/trace-analytics-rollup.port.ts";
-import type { TraceSummaryProjectionPort } from "../ports/trace-summary-projection.port.ts";
+import type { TraceAnalyticsRollupPort } from "./projection/trace-analytics-rollup.repository.ts";
+import type { TraceSummaryProjectionPort } from "./projection/trace-summary-projection.repository.ts";
 import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
+import type { SessionGroupsRepository } from "./session-groups.repository.ts";
+import type { TraceListRepository } from "@langwatch/trace-contract";
+import type { TracePayloadReaderPort } from "./read/trace-payload-reader.repository.ts";
 
 /**
  * The rows the trace module owns, chosen once at boot. One tier spans two
@@ -25,4 +28,8 @@ export interface TraceRepositories {
   readonly derivationSpans: TraceDerivationSpanReaderPort;
   readonly summary: TraceSummaryRepository;
   readonly logRecords: LogRecordStorageRepository;
+  readonly list: TraceListRepository;
+  readonly sessionGroups: SessionGroupsRepository;
+  /** Claim-check reads for fields the fold offloaded out of the summary. */
+  readonly eventPayloads: TracePayloadReaderPort;
 }

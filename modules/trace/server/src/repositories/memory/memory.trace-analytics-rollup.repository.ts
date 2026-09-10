@@ -1,4 +1,4 @@
-import { TraceAnalyticsRollupPort } from "../../ports/trace-analytics-rollup.port.ts";
+import { TraceAnalyticsRollupPort } from "../projection/trace-analytics-rollup.repository.ts";
 import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.projection.ts";
 
 /**

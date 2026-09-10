@@ -9,6 +9,9 @@ import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics.reposit
 import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
 import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.repository.ts";
 import { MemoryTraceSummaryProjectionRepository } from "./memory.trace-summary-projection.repository.ts";
+import { MemoryTracePayloadReaderRepository } from "./read/memory.trace-payload-reader.repository.ts";
+import { NullSessionGroupsRepository } from "../session-groups.repository.ts";
+import { NullTraceListAdapter } from "./null-trace-list.adapter.ts";
 
 /** The "memory" tier: every trace repository the app is tested without a database. */
 export class MemoryTraceRepositories {
@@ -33,6 +36,12 @@ export class MemoryTraceRepositories {
       // process there is nothing to read back, so the memory tier answers
       // empty rather than pretending to hold logs.
       logRecords: new NullLogRecordStorageRepository(),
+      // The list and the session rollup are ClickHouse aggregations over the
+      // summary projection, which this tier does not fold: they answer empty
+      // pages rather than a half-built rollup over the spans it does hold.
+      list: NullTraceListAdapter.create(),
+      sessionGroups: new NullSessionGroupsRepository(),
+      eventPayloads: MemoryTracePayloadReaderRepository.create(),
     };
   }
 }

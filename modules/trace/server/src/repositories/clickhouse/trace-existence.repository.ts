@@ -3,7 +3,7 @@
  */
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { TraceClickHouseResolver } from "../../ports/clickhouse.port.ts";
-import { TraceExistencePort } from "../../ports/trace-existence.port.ts";
+import { TraceExistencePort } from "../read/trace-existence.repository.ts";
 
 export class ClickHouseTraceExistenceRepository extends TraceExistencePort {
   static create(options: {

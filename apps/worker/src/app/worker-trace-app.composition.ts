@@ -2,7 +2,6 @@ import { analyticsFilterValueSchema } from "@langwatch/analytics-contract";
 import { generateClickHouseFilterConditions } from "@langwatch/analytics-server";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { FoldProjectionStore } from "@langwatch/eventing";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 import type { TraceInfrastructure, TraceProcessingCommands } from "@langwatch/trace-server";
 import { z } from "zod";
@@ -13,7 +12,6 @@ const legacyFiltersSchema = z.record(z.string(), analyticsFilterValueSchema);
 
 /** Storage/config for the canonical Trace declaration in the worker's shared feature runtime. */
 export function createWorkerTraceInfrastructure(options: {
-  connection: PrismaConnection;
   resolveClickHouseClient: (tenantId: string) => Promise<ClickHouseClient>;
   defaultRetentionDays: number;
   canonicalisation: TraceCanonicalisationService;
@@ -26,7 +24,6 @@ export function createWorkerTraceInfrastructure(options: {
 }): TraceInfrastructure {
   return {
     trace: {
-      connection: options.connection,
       resolveClickHouseClient: options.resolveClickHouseClient,
       defaultRetentionDays: options.defaultRetentionDays,
       canonicalisation: options.canonicalisation,

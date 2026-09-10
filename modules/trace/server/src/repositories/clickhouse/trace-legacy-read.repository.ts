@@ -327,6 +327,11 @@ export interface ClickHouseTraceLegacyReadOptions {
   blobResolutionDeps?: BlobResolutionDeps;
   retentionResolver?: DataRetentionApi;
   annotationService?: AnnotationApi;
+  /** The same peer as `annotationService`, under the name the class field uses. */
+  annotations?: AnnotationApi;
+  /** Supplied directly instead of `blobResolutionDeps`, which builds these. */
+  resolveTraceSpans?: ResolveTraceSpansFn;
+  resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
 }
 
 export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadRepository {
@@ -395,10 +400,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     return new TraceLegacyReadClickHouseRepository({
       resolveClickHouseClient: options.resolveClickHouseClient,
       filterConditions: options.filterConditions,
-      resolveTraceSpans: offloadedSpanResolver?.toResolverFn(),
-      resolveTraceSpansBatch: offloadedSpanResolver?.toBatchResolverFn(),
+      resolveTraceSpans: options.resolveTraceSpans ?? offloadedSpanResolver?.toResolverFn(),
+      resolveTraceSpansBatch:
+        options.resolveTraceSpansBatch ?? offloadedSpanResolver?.toBatchResolverFn(),
       retentionResolver: options.retentionResolver,
-      annotations: options.annotationService,
+      annotations: options.annotations ?? options.annotationService,
       traceCanonicalisation: options.traceCanonicalisation,
     });
   }
@@ -433,39 +439,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     return resolve(projectId);
   }
 
-  /**
-   * Static factory method for creating TraceLegacyReadClickHouseRepository with explicit
-   * canonicalisation and retention dependencies.
-   */
-  static create({
-    resolveClickHouseClient,
-    filterConditions,
-    resolveTraceSpans,
-    resolveTraceSpansBatch,
-    retentionResolver,
-    annotations,
-    traceCanonicalisation,
-  }: {
-    /** The process's tenant-keyed connection, or none where it composed one. */
-    resolveClickHouseClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
-    /** The analytics filter translator; absent, a filtered list refuses. */
-    filterConditions?: TraceLegacyFilterConditions | undefined;
-    resolveTraceSpans?: ResolveTraceSpansFn;
-    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
-    retentionResolver?: DataRetentionApi;
-    annotations?: AnnotationApi;
-    traceCanonicalisation: TraceCanonicalisationService;
-  }): TraceLegacyReadClickHouseRepository {
-    return new TraceLegacyReadClickHouseRepository({
-      resolveClickHouseClient,
-      filterConditions,
-      resolveTraceSpans,
-      resolveTraceSpansBatch,
-      retentionResolver,
-      annotations,
-      traceCanonicalisation,
-    });
-  }
 
   /**
    * @param occurredAt approximate time range bounding the partition scan.

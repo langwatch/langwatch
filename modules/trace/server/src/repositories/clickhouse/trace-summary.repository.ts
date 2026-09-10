@@ -13,7 +13,7 @@ import {
   TraceSummaryProjectionPort,
   type TraceSummaryProjectionEntry,
   type TraceSummaryReadWindow,
-} from "../../ports/trace-summary-projection.port.ts";
+} from "../projection/trace-summary-projection.repository.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read.mapper.ts";
 

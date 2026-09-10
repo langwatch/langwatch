@@ -5,11 +5,11 @@ import {
   TraceQueryFieldValuesPort,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
-} from "../query-field-values.port.ts";
+} from "../../repositories/read/query-field-values.repository.ts";
 import { TracePort, type TraceSpanSummaryRecord, type TraceSpanPage } from "../trace.port.ts";
-import { TraceSummaryReaderPort } from "../trace-summary-reader.port.ts";
+import { TraceSummaryReaderPort } from "../../repositories/read/trace-summary-reader.repository.ts";
 import { TraceService } from "../../services/support/trace.service.ts";
-import { TraceFullRecordPort } from "../trace-full-record.port.ts";
+import { TraceFullRecordPort } from "../../repositories/read/trace-full-record.repository.ts";
 import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
 import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";
 import { traceReadPorts } from "./support/trace-read-ports.fake.ts";

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TraceQueryFieldValuesPort } from "../query-field-values.port.ts";
-import { TraceSummaryReaderPort } from "../trace-summary-reader.port.ts";
+import { TraceQueryFieldValuesPort } from "../../repositories/read/query-field-values.repository.ts";
+import { TraceSummaryReaderPort } from "../../repositories/read/trace-summary-reader.repository.ts";
 import {
   TracePort,
   type TraceIngestLagSample,

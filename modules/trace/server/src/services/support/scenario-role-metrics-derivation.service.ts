@@ -1,4 +1,4 @@
-import type { TraceDerivationSpanReaderPort } from "../../ports/trace-derivation-span-reader.port.ts";
+import type { TraceDerivationSpanReaderPort } from "../../repositories/read/trace-derivation-span-reader.repository.ts";
 import { deriveScenarioRoleMetricsFromSpans } from "../../rules/scenario-role-metrics.rules.ts";
 import type { ScenarioRoleMetrics } from "../../rules/scenario-role-metrics.rules.ts";
 import { SpanCostService } from "../span/span-cost.service.ts";

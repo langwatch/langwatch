@@ -1,6 +1,6 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { TraceSummaryProjectionPort } from "../../ports/trace-summary-projection.port.ts";
+import { TraceSummaryProjectionPort } from "../../repositories/projection/trace-summary-projection.repository.ts";
 
 /**
  * Thin FoldProjectionStore adapter for trace summaries. Delegates directly to

@@ -12,7 +12,6 @@ import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { FoldProjectionStore } from "@langwatch/eventing";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 import type { TraceBlobStoreService } from "../services/offload/trace-blob-store.service.ts";
 import type { TraceLegacyFilterConditions } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
@@ -36,13 +35,6 @@ export const traceDependencies = {
 
 export type TraceInfrastructure = Readonly<{
   trace: Readonly<{
-    /**
-     * Still passed by the worker's own infrastructure factory and read by
-     * nothing here: the reviewer correction now comes from the repository
-     * registry. Removing it is a one-line change in
-     * apps/worker/src/app/worker-trace-app.composition.ts.
-     */
-    connection: PrismaConnection;
     resolveClickHouseClient: (tenantId: string) => Promise<ClickHouseClient>;
     defaultRetentionDays: number;
     canonicalisation: TraceCanonicalisationService;

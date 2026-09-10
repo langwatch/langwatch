@@ -7,12 +7,12 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import { TraceClickHousePort, type TraceClickHouseResolver } from "../ports/clickhouse.port.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
-import { TraceQueryFieldValuesPort } from "../ports/query-field-values.port.ts";
+import { TraceQueryFieldValuesPort } from "../repositories/read/query-field-values.repository.ts";
 import { TraceQueryClassificationPort } from "../ports/trace-query-classification.port.ts";
-import { TraceSummaryReaderPort } from "../ports/trace-summary-reader.port.ts";
-import { TraceRecordPort } from "../ports/trace-record.port.ts";
+import { TraceSummaryReaderPort } from "../repositories/read/trace-summary-reader.repository.ts";
+import { TraceRecordPort } from "../repositories/read/trace-record.repository.ts";
 import { TraceEventDerivationPort } from "../ports/trace-event-derivation.port.ts";
-import { TracePayloadReaderPort } from "../ports/trace-payload-reader.port.ts";
+import { TracePayloadReaderPort } from "../repositories/read/trace-payload-reader.repository.ts";
 import { TraceFullIoPort } from "../ports/trace-full-io.port.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
 import { TraceService } from "../services/support/trace.service.ts";

@@ -41,12 +41,12 @@ import {
 } from "@langwatch/trace-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import type { TraceQueryFieldValuesPort } from "../../ports/query-field-values.port.ts";
+import type { TraceQueryFieldValuesPort } from "../../repositories/read/query-field-values.repository.ts";
 import type { TraceQueryClassificationPort } from "../../ports/trace-query-classification.port.ts";
-import type { TraceSummaryReaderPort } from "../../ports/trace-summary-reader.port.ts";
-import type { TraceRecordPort } from "../../ports/trace-record.port.ts";
+import type { TraceSummaryReaderPort } from "../../repositories/read/trace-summary-reader.repository.ts";
+import type { TraceRecordPort } from "../../repositories/read/trace-record.repository.ts";
 import type { TraceEventDerivationPort } from "../../ports/trace-event-derivation.port.ts";
-import type { TraceFullRecordPort } from "../../ports/trace-full-record.port.ts";
+import type { TraceFullRecordPort } from "../../repositories/read/trace-full-record.repository.ts";
 import { TracePort, type TraceSpanSummaryRecord } from "../../ports/trace.port.ts";
 import { TraceQueryFieldCatalogueService } from "../facet/trace-query-field-catalogue.service.ts";
 import { nowInstant } from "@langwatch/time";
