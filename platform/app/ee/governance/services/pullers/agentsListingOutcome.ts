@@ -124,8 +124,31 @@ export function agentsListingOutcome(
   // knowable about a word we cannot read. The cost of being wrong here is one
   // wasted press, which is the cheapest of the three.
   const reason = row?.LastAgentsListingReason ?? "";
-  return {
-    outcome: "refused",
-    cause: REFUSAL_CAUSE[reason as ListingRefusalReason] ?? "unreachable",
-  };
+  return { outcome: "refused", cause: refusalCause(reason) };
+}
+
+/**
+ * The cause for a reason string, which is a free-form database column and not
+ * a member of the union it is cast to.
+ *
+ * `Object.hasOwn` before indexing, and not the bare lookup with `??`. Indexing
+ * an object literal reaches its prototype, so `toString`, `constructor`,
+ * `valueOf` and `hasOwnProperty` come back as inherited functions — truthy, so
+ * `??` never fires, and a Function reaches the screen where a cause belongs.
+ * `REFUSAL_VOICE` has no entry for it, and reading a headline off `undefined`
+ * throws where a refusal message was supposed to render.
+ *
+ * That is a crash and not a wrong sentence, which makes it worse than the bug
+ * this fallback exists to prevent. The set-membership check this replaced was
+ * immune; the table is the improvement and the bare lookup was the mistake.
+ *
+ * Nothing writes those words today. The guard is not about today: this column
+ * is untrusted on purpose, because the log outlives the vocabulary and a later
+ * release may write a reason this build has never heard of. Code that
+ * anticipates an unknown word owes it the same answer for every unknown word,
+ * not just the ones that are not also property names.
+ */
+function refusalCause(reason: string): AgentsListingRefusalCause {
+  if (!Object.hasOwn(REFUSAL_CAUSE, reason)) return "unreachable";
+  return REFUSAL_CAUSE[reason as ListingRefusalReason];
 }
