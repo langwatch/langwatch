@@ -59,7 +59,6 @@ function isCallerTurn(turn: CallTurn): boolean {
   return turn.role === "caller";
 }
 
-/** Open a fresh exchange at the next index and register it. */
 function openExchange(exchanges: VoiceExchange[]): VoiceExchange {
   const exchange: VoiceExchange = {
     index: exchanges.length,
@@ -84,8 +83,6 @@ function applyTurnContent(exchange: VoiceExchange, turn: CallTurn): void {
       : `${exchange.agentText}\n${turn.text}`;
 }
 
-/** Widen the exchange window to cover a turn's reported offsets, when it has
- *  any. */
 function applyTurnTiming(exchange: VoiceExchange, turn: CallTurn): void {
   if (turn.startMs !== undefined) {
     exchange.startMs = Math.min(exchange.startMs ?? turn.startMs, turn.startMs);
@@ -139,7 +136,6 @@ type OtlpAttribute = {
   value: { stringValue?: string; intValue?: number };
 };
 
-/** The span attributes for one exchange (decision 4). */
 function exchangeAttributes({
   exchange,
   record,
@@ -243,6 +239,102 @@ function exchangeWindowMs({
   return { startMs, endMs: startMs + slice };
 }
 
+type RecordSpanInput = Parameters<
+  ReturnType<typeof getApp>["traces"]["recordSpan"]
+>[0];
+
+/** The raw-OTLP `recordSpan` payload for one exchange's root span. */
+function buildExchangeSpanInput({
+  projectId,
+  record,
+  scenario,
+  scenarioRunId,
+  exchange,
+  traceId,
+  spanId,
+  startMs,
+  endMs,
+}: {
+  projectId: string;
+  record: CallRecord;
+  scenario?: VoiceTraceScenario;
+  scenarioRunId: string;
+  exchange: VoiceExchange;
+  traceId: string;
+  spanId: string;
+  startMs: number;
+  endMs: number;
+}): RecordSpanInput {
+  return {
+    tenantId: projectId,
+    span: {
+      traceId,
+      spanId,
+      traceState: null,
+      parentSpanId: null,
+      name: "Voice Call Turn",
+      kind: 1,
+      startTimeUnixNano: String(Math.round(startMs) * 1_000_000),
+      endTimeUnixNano: String(Math.round(endMs) * 1_000_000),
+      attributes: exchangeAttributes({
+        exchange,
+        record,
+        scenario,
+        scenarioRunId,
+      }),
+      events: [],
+      links: [],
+      status: { code: 1 },
+      droppedAttributesCount: 0,
+      droppedEventsCount: 0,
+      droppedLinksCount: 0,
+    },
+    resource: {
+      attributes: [
+        {
+          key: "langwatch.origin.source",
+          value: { stringValue: "platform" },
+        },
+        { key: "service.name", value: { stringValue: "langwatch-voice" } },
+      ],
+    },
+    instrumentationScope: { name: "langwatch.voice", version: null },
+    piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+    occurredAt: record.endedAt,
+  };
+}
+
+/** Record one exchange's root span; a failure is logged and swallowed
+ *  (decision 7) so the caller can always attach the derived ids. */
+async function recordExchangeSpan({
+  projectId,
+  scenarioRunId,
+  exchange,
+  traceId,
+  input,
+}: {
+  projectId: string;
+  scenarioRunId: string;
+  exchange: VoiceExchange;
+  traceId: string;
+  input: RecordSpanInput;
+}): Promise<void> {
+  try {
+    await getApp().traces.recordSpan(input);
+  } catch (err) {
+    logger.error(
+      {
+        err,
+        projectId,
+        scenarioRunId,
+        traceId,
+        exchangeIndex: exchange.index,
+      },
+      "Failed to record voice call trace",
+    );
+  }
+}
+
 /**
  * Emit one root span per exchange and return the per-turn trace ids (one entry
  * per `record.turns[i]`, in order). Failures are logged and swallowed; the ids
@@ -277,56 +369,24 @@ export async function recordVoiceCallTraces({
       record,
       useMeasuredOffsets,
     });
-    try {
-      await getApp().traces.recordSpan({
-        tenantId: projectId,
-        span: {
-          traceId,
-          spanId,
-          traceState: null,
-          parentSpanId: null,
-          name: "Voice Call Turn",
-          kind: 1,
-          startTimeUnixNano: String(Math.round(startMs) * 1_000_000),
-          endTimeUnixNano: String(Math.round(endMs) * 1_000_000),
-          attributes: exchangeAttributes({
-            exchange,
-            record,
-            scenario,
-            scenarioRunId,
-          }),
-          events: [],
-          links: [],
-          status: { code: 1 },
-          droppedAttributesCount: 0,
-          droppedEventsCount: 0,
-          droppedLinksCount: 0,
-        },
-        resource: {
-          attributes: [
-            {
-              key: "langwatch.origin.source",
-              value: { stringValue: "platform" },
-            },
-            { key: "service.name", value: { stringValue: "langwatch-voice" } },
-          ],
-        },
-        instrumentationScope: { name: "langwatch.voice", version: null },
-        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-        occurredAt: record.endedAt,
-      });
-    } catch (err) {
-      logger.error(
-        {
-          err,
-          projectId,
-          scenarioRunId,
-          traceId,
-          exchangeIndex: exchange.index,
-        },
-        "Failed to record voice call trace",
-      );
-    }
+    const input = buildExchangeSpanInput({
+      projectId,
+      record,
+      scenario,
+      scenarioRunId,
+      exchange,
+      traceId,
+      spanId,
+      startMs,
+      endMs,
+    });
+    await recordExchangeSpan({
+      projectId,
+      scenarioRunId,
+      exchange,
+      traceId,
+      input,
+    });
   }
 
   return { turnTraceIds };

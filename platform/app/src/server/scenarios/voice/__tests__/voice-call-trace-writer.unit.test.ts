@@ -40,7 +40,6 @@ function fakeRecord(over: Partial<CallRecord> = {}): CallRecord {
   };
 }
 
-/** The single recorded span, as an attribute-key lookup. */
 function attrsOf(call: number): Record<string, unknown> {
   const arg = mockRecordSpan.mock.calls[call]?.[0] as {
     span: { attributes: { key: string; value: Record<string, unknown> }[] };
