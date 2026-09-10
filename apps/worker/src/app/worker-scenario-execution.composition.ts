@@ -20,9 +20,7 @@ import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
-import { ScenarioService
-  type ScenarioAppInfrastructure,
-} from "@langwatch/scenario-server";
+import { ScenarioService, type ScenarioAppInfrastructure } from "@langwatch/scenario-server";
 import { PromptApi } from "@langwatch/prompt-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
