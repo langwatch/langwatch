@@ -1,12 +1,12 @@
 import {
-  ClickHouseLangyAnalyticsEventAdapter,
+  LangyAnalyticsEventClickHouseRepository,
   LangyWorkerHttpAdapter,
   EventingLangyConversationAdapter,
   LangyAnalyticsEventStorageAdapter,
   PostgresLangyAdapter,
-  LangyTokenBufferAdapter,
+  LangyTokenBufferRedisRepository,
   LangyTitleGeneratorService,
-  LangyTurnHandoffAdapter,
+  LangyTurnHandoffRedisRepository,
   OtelLangyWorkerMetricsAdapter,
   UnavailableLangyWorkerAdapter,
   type LangyAnalyticsClickHouseClientResolver,
@@ -75,13 +75,13 @@ export function createWorkerLangyConversation(
     langyConversationTurnProjectionStore: persistence.langyConversationTurnState,
     langyMessageProjectionStore: persistence.langyMessageStorage,
     langyAnalyticsEventProjectionStore: LangyAnalyticsEventStorageAdapter.create({
-      sink: ClickHouseLangyAnalyticsEventAdapter.create(options.resolveClickHouseClient),
+      sink: LangyAnalyticsEventClickHouseRepository.create(options.resolveClickHouseClient),
       defaultRetentionDays: options.defaultRetentionDays,
     }),
     broadcast: new WorkerLangyTenantBroadcastAdapter(options.broadcast),
     admissions: persistence.langyTurnAdmission,
-    buffer: LangyTokenBufferAdapter.create({ redis: options.redis }),
-    handoffStore: LangyTurnHandoffAdapter.create({ redis: options.redis }),
+    buffer: LangyTokenBufferRedisRepository.create({ redis: options.redis }),
+    handoffStore: LangyTurnHandoffRedisRepository.create({ redis: options.redis }),
     worker: options.config.langy
       ? LangyWorkerHttpAdapter.create({
           agentUrl: options.config.langy.agentUrl,

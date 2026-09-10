@@ -230,8 +230,6 @@ export {
 export {
   EmailJoinRequestNotifierAdapter,
   JoinRequestLifecycleDispatcherAdapter,
-  PrismaJoinMembershipAdapter,
-  PrismaJoinSettingsAdapter,
 } from "./adapters/postgres.join-request.adapter.ts";
 export { JoinRequestNotificationMailPort } from "./ports/join-request-notification-mail.port.ts";
 export { InProcessBreakGlassLimiterAdapter } from "./adapters/in-process-break-glass-limiter.adapter.ts";

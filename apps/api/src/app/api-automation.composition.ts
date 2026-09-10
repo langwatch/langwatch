@@ -49,6 +49,7 @@ import {
   AutomationSlackBotTokenDecryptorPort,
   AutomationTestFirePort,
   HmacUnsubscribeTokenAdapter,
+  PostgresAutomationRepositories,
   SchedulerWakePort,
   type ClaimLease,
 } from "@langwatch/automation-server";
@@ -109,6 +110,9 @@ export function composeApiAutomationApp(options: ApiAutomationCompositionOptions
   const config = { ...automationServerConfigSchema.parse({}), baseHost: options.baseHost };
 
   return AutomationApp.create({
+    // The rows this process reads and writes, over the same postgres tier the
+    // module's repository registry composes.
+    repositories: PostgresAutomationRepositories.create({ prisma: options.prisma, clock }),
     dependencies: {
       analytics: unevaluatedGraphAnalytics(),
       monitors: options.monitors,
@@ -117,7 +121,6 @@ export function composeApiAutomationApp(options: ApiAutomationCompositionOptions
       projects: options.projects,
     },
     infrastructure: {
-      database: options.prisma,
       verifier: HmacUnsubscribeTokenAdapter.create({ secret: options.unsubscribeSecret }),
       // The report calendar, on the SAME `ScheduledJob` store the worker's loop
       // claims a due row through — Eventing's own, not a second narrowing of it,

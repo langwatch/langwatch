@@ -9,6 +9,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
 import { AutomationApp, type AutomationInfrastructure } from "../automation.app.ts";
+import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
 import type { AutomationClockPort } from "../../ports/automation-clock.port.ts";
 import type {
   AutomationGraphNotifierPort,
@@ -163,7 +164,6 @@ export function createCanonicalAutomationApp(): {
     clearStoredFlag: vi.fn(),
   };
   const infrastructure: AutomationInfrastructure = {
-    database,
     verifier,
     jobs,
     clock,
@@ -193,6 +193,7 @@ export function createCanonicalAutomationApp(): {
   resources.own("automation-test-database", () => database.$disconnect());
   return {
     app: AutomationApp.create({
+      repositories: PostgresAutomationRepositories.create({ prisma: database, clock }),
       dependencies: {
         analytics,
         monitors,

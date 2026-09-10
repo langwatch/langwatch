@@ -167,11 +167,6 @@ export { MemoryLangyRepositories } from "./repositories/memory/memory.langy.repo
 export { PostgresLangyRepositories } from "./repositories/prisma/prisma.langy.repositories.ts";
 export type { LangyRepositories } from "./repositories/langy-repositories.registry.ts";
 export {
-  ClickHouseLangyAnalyticsEventAdapter,
-  LangyTokenBufferAdapter,
-  LangyTurnHandoffAdapter,
-} from "./adapters/langy-composition-handover.adapter.ts";
-export {
   LangyAnalyticsEventClickHouseRepository,
   type LangyAnalyticsClickHouseClientResolver,
   type LangyAnalyticsClickHouseWriteClient,

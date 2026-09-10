@@ -28,10 +28,10 @@ import {
   JoinRequestsService,
   PostgresIdentityEmailAdapter,
   PrismaJoinCandidateRepository,
-  PrismaJoinMembershipAdapter,
+  PrismaJoinMembershipRepository,
   PrismaJoinRequestProjectionRepository,
   PrismaJoinRequestReadRepository,
-  PrismaJoinSettingsAdapter,
+  PrismaJoinSettingRepository,
 } from "@langwatch/identity-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { createApp } from "@langwatch/runtime-composition";
@@ -342,7 +342,7 @@ async function composeMembershipHalf(options: {
     ),
     reads: new PrismaJoinRequestReadRepository(prisma),
     candidates: new PrismaJoinCandidateRepository(prisma),
-    membership: PrismaJoinMembershipAdapter.create(prisma, grants),
+    membership: PrismaJoinMembershipRepository.create(prisma, grants),
     notifier: mail
       ? EmailJoinRequestNotifierAdapter.create({
           prisma,
@@ -362,7 +362,7 @@ async function composeMembershipHalf(options: {
           requestExpired: async () => notifyNothing("a join request expired"),
           joinedAutomatically: async () => notifyNothing("somebody joined automatically"),
         },
-    settings: PrismaJoinSettingsAdapter.create(prisma),
+    settings: PrismaJoinSettingRepository.create(prisma),
     // The licence asymmetry, stated once: the gate that has always held single
     // sign-on holds AUTOMATIC joining, because that is federation. This process
     // holds no licence gate, so automatic joining is denied and ASKING is not —

@@ -1,45 +1,14 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { DEFAULT_DOMAIN_JOIN_SETTING, type DomainJoinSetting } from "@langwatch/identity-contract";
 import { newJoinRequestCommandId } from "../rules/join-request-id.rules.ts";
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/authz-contract";
+import { OrganizationUserRole } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process.ts";
 import type { JoinRequestNotificationMailPort } from "../ports/join-request-notification-mail.port.ts";
-import type {
-  JoinMembershipPort,
-  JoinRequestNotifier,
-  JoinSettingPort,
-} from "../rules/join-requests-contract.rules.ts";
-import { PrismaJoinMembershipRepository } from "../repositories/prisma/prisma.join-membership.repository.ts";
-import { PrismaJoinSettingRepository } from "../repositories/prisma/prisma.join-setting.repository.ts";
+import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 import type { JoinRequestService } from "../services/join-request.service.ts";
 
 const logger = createLogger("langwatch:identity:join-request-adapters");
-
-
-/**
- * The transitional seams: both classes now live under repositories/prisma.
- * Each stays here as a one-line factory until every composition outside this
- * package names the repository directly.
- */
-export class PrismaJoinMembershipAdapter {
-  static create(prisma: PrismaClient, writer: AuthzGrantsService): JoinMembershipPort {
-    return PrismaJoinMembershipRepository.create(prisma, writer);
-  }
-}
-
-export class PrismaJoinSettingsAdapter {
-  static create(prisma: PrismaClient): JoinSettingPort {
-    return PrismaJoinSettingRepository.create(prisma);
-  }
-}
 
 
 /** The organization's plan, read only for the fields the seat census needs. */

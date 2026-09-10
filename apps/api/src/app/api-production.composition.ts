@@ -327,7 +327,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   SkipPermissionsService,
   LangyLocalControlRuntimeAdapter,
-  LangyTokenBufferAdapter,
+  LangyTokenBufferRedisRepository,
   type LangyConversationCommands,
   LocalControlGateway,
   LocalControlLongPoll,
@@ -2051,8 +2051,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       authoringSession && experimentService
         ? {
             session: authoringSession,
-            credential: (input: { request: Request; permission: AuthzPermission }) =>
-              handlerManagedCredentials.authenticate(input),
             experiments: () => this.composedExperiment.app,
             run: experimentRun,
           }
@@ -2883,7 +2881,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       mintSessionKey: () => Promise.reject(new ApiLangySessionKeyUnavailableError()),
       events: commands,
       buffer: redis
-        ? LangyTokenBufferAdapter.create({ redis })
+        ? LangyTokenBufferRedisRepository.create({ redis })
         : LangyLocalControlRuntimeAdapter.nullBuffer(),
     });
     return this.composedLangyLocalRuntime;
@@ -3893,7 +3891,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         recordUserMessage: (args) => langy.recordUserMessage(args),
       },
       events: commands,
-      buffer: LangyTokenBufferAdapter.create({
+      buffer: LangyTokenBufferRedisRepository.create({
         redis: this.composedQueueRedis as NonNullable<typeof this.composedQueueRedis>,
       }),
       turns: LocalControlSessionCoreService.turnStarter({

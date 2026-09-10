@@ -53,10 +53,6 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
-import {
-  PostgresAutomationRepositories,
-  type AutomationDatabase,
-} from "../repositories/prisma/prisma.automation.repositories.ts";
 import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
 import type {
   AutomationDispatchErrorPort,
@@ -174,7 +170,6 @@ export interface AutomationAuditSink {
 }
 
 export type AutomationInfrastructure = Readonly<{
-  database: AutomationDatabase;
   verifier: UnsubscribeTokenVerifierPort;
   jobs: ScheduledJobStorePort;
   clock: AutomationClockPort;
@@ -213,7 +208,7 @@ type AutomationSetup = FeatureSetup<
   AutomationInfrastructure,
   AutomationServerConfig
 > &
-  Readonly<{ repositories?: AutomationRepositories }>;
+  Readonly<{ repositories: AutomationRepositories }>;
 
 /** What the application is composed from, once the process has supplied it. */
 interface AutomationAppCollaborators {
@@ -223,17 +218,6 @@ interface AutomationAppCollaborators {
   authoring: AutomationAuthoringService;
   audit: AutomationAuditSink;
   limits: AutomationCallCounter;
-}
-
-/**
- * The rows a process that still passes its own client gets, until its
- * composition hands `repositories` over instead of `database`.
- */
-function postgresRepositoriesFor(setup: AutomationSetup): AutomationRepositories {
-  return PostgresAutomationRepositories.create({
-    prisma: setup.infrastructure.database,
-    clock: setup.infrastructure.clock,
-  });
 }
 
 export class AutomationApp implements AutomationApi {
@@ -259,7 +243,7 @@ export class AutomationApp implements AutomationApi {
       },
       redis: setup.infrastructure.redis,
     });
-    const repositories = setup.repositories ?? postgresRepositoriesFor(setup);
+    const repositories = setup.repositories;
     const graph = AutomationGraphService.create({
       triggers: repositories.triggers,
       customGraphs: repositories.customGraphs,
