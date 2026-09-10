@@ -2,8 +2,8 @@ import Redis from "ioredis";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RedisTenantRateTrackerAdapter } from "../redis.tenant-rate-tracker.adapter.ts";
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
+import { RedisAnomalyRateTrackerRepository } from "../redis.anomaly-rate-tracker.repository.ts";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../../rules/anomaly-constants.rules.ts";
 
 function redisFake() {
   const redis = new Redis({ lazyConnect: true, enableOfflineQueue: false });
@@ -64,7 +64,7 @@ function redisFake() {
   return { redis, hashes };
 }
 
-describe("RedisTenantRateTrackerAdapter", () => {
+describe("RedisAnomalyRateTrackerRepository", () => {
   let now: number;
 
   beforeEach(() => {
@@ -77,7 +77,7 @@ describe("RedisTenantRateTrackerAdapter", () => {
 
   it("records minute buckets and indexes active tenants", async () => {
     const { redis } = redisFake();
-    const tracker = RedisTenantRateTrackerAdapter.create({
+    const tracker = RedisAnomalyRateTrackerRepository.create({
       redis,
       now: () => now,
     });
@@ -92,7 +92,7 @@ describe("RedisTenantRateTrackerAdapter", () => {
 
   it("zero-pads the requested series and trims orphaned minute fields", async () => {
     const { redis, hashes } = redisFake();
-    const tracker = RedisTenantRateTrackerAdapter.create({
+    const tracker = RedisAnomalyRateTrackerRepository.create({
       redis,
       now: () => now,
     });
@@ -111,7 +111,7 @@ describe("RedisTenantRateTrackerAdapter", () => {
       const { redis } = redisFake();
       const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>();
       const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "rate tracker flags");
-      const tracker = RedisTenantRateTrackerAdapter.create({
+      const tracker = RedisAnomalyRateTrackerRepository.create({
         redis,
         now: () => now,
         featureFlags: flags,
@@ -135,7 +135,7 @@ describe("RedisTenantRateTrackerAdapter", () => {
       const { redis } = redisFake();
       const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>();
       const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "rate tracker flags");
-      const tracker = RedisTenantRateTrackerAdapter.create({
+      const tracker = RedisAnomalyRateTrackerRepository.create({
         redis,
         now: () => now,
         featureFlags: flags,
@@ -150,13 +150,13 @@ describe("RedisTenantRateTrackerAdapter", () => {
 
   it("keeps cache read failures non-fatal and forwards a custom TTL", async () => {
     const { redis } = redisFake();
-    const tracker = RedisTenantRateTrackerAdapter.create({
+    const tracker = RedisAnomalyRateTrackerRepository.create({
       redis,
       now: () => now,
     });
     vi.spyOn(redis, "get").mockRejectedValueOnce(new Error("down"));
 
-    expect(await tracker.tryGetCachedBaseline("proj_acme")).toBeNull();
+    expect(await tracker.findCachedBaseline("proj_acme")).toBeNull();
     await tracker.setCachedBaseline({
       tenantId: "proj_acme",
       baseline: 0,

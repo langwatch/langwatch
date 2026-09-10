@@ -7,14 +7,14 @@ import {
 } from "@langwatch/ops-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { AnomalyStatePort } from "../../ports/anomaly-state.port.ts";
+import { AnomalyStateRepository } from "../anomaly.repository.ts";
 
 const logger = createLogger("langwatch:observability:anomalyState");
 
 export type { Anomaly, AnomalyKind, AnomalyTier };
 
 /** Redis persistence for active tenant anomalies shown to operators. */
-export class RedisAnomalyStateRepository extends AnomalyStatePort {
+export class RedisAnomalyStateRepository extends AnomalyStateRepository {
   private static readonly hashKey = "obs:anomalies";
 
   private constructor(private readonly redis: IORedis | Cluster) {
@@ -57,7 +57,7 @@ export class RedisAnomalyStateRepository extends AnomalyStatePort {
     return anomalies;
   }
 
-  async tryGet(tenantId: string, kind: AnomalyKind): Promise<Anomaly | null> {
+  async findByKind(tenantId: string, kind: AnomalyKind): Promise<Anomaly | null> {
     const raw = await this.redis.hget(RedisAnomalyStateRepository.hashKey, `${kind}:${tenantId}`);
     if (!raw) {
       return null;

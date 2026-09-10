@@ -3,8 +3,10 @@ import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { AnomalyHardTierAlertPort } from "../../ports/anomaly-hard-tier-alert.port.ts";
-import { AnomalyRateTrackerPort } from "../../ports/anomaly-rate-tracker.port.ts";
-import { AnomalyStatePort } from "../../ports/anomaly-state.port.ts";
+import {
+  AnomalyRateTrackerRepository,
+  AnomalyStateRepository,
+} from "../../repositories/anomaly.repository.ts";
 import {
   AnomalyDetectorService,
   HARD_TIER_SUSTAIN_MINUTES,
@@ -19,7 +21,7 @@ function projectIdOf(target: FeatureFlagTarget): string | undefined {
   return target.kind === "project" ? target.projectId : void 0;
 }
 
-class RateTrackerFake extends AnomalyRateTrackerPort {
+class RateTrackerFake extends AnomalyRateTrackerRepository {
   readonly baselines = new Map<string, number>();
   readonly listActiveTenants = vi.fn<() => Promise<string[]>>(async () => []);
   readonly currentWindowCount = vi.fn<(tenantId: string, seconds: number) => Promise<number>>(
@@ -28,7 +30,7 @@ class RateTrackerFake extends AnomalyRateTrackerPort {
   readonly perMinuteSeries = vi.fn<(tenantId: string, seconds: number) => Promise<number[]>>(
     async () => [],
   );
-  readonly tryGetCachedBaseline = vi.fn<(tenantId: string) => Promise<number | null>>(
+  readonly findCachedBaseline = vi.fn<(tenantId: string) => Promise<number | null>>(
     async (tenantId) => this.baselines.get(tenantId) ?? null,
   );
   readonly setCachedBaseline = vi.fn<
@@ -42,7 +44,7 @@ class RateTrackerFake extends AnomalyRateTrackerPort {
   });
 }
 
-class AnomalyStateFake extends AnomalyStatePort {
+class AnomalyStateFake extends AnomalyStateRepository {
   readonly anomalies = new Map<string, Anomaly>();
   readonly upsert = vi.fn<(anomaly: Anomaly) => Promise<void>>(async (anomaly) => {
     this.anomalies.set(`${anomaly.kind}:${anomaly.tenantId}`, anomaly);
@@ -52,7 +54,7 @@ class AnomalyStateFake extends AnomalyStatePort {
       this.anomalies.delete(`${kind}:${tenantId}`);
     },
   );
-  readonly tryGet = vi.fn<(tenantId: string, kind: Anomaly["kind"]) => Promise<Anomaly | null>>(
+  readonly findByKind = vi.fn<(tenantId: string, kind: Anomaly["kind"]) => Promise<Anomaly | null>>(
     async (tenantId, kind) => this.anomalies.get(`${kind}:${tenantId}`) ?? null,
   );
   readonly list = vi.fn<() => Promise<Anomaly[]>>(async () => [...this.anomalies.values()]);

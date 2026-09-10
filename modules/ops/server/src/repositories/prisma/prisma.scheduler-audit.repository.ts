@@ -1,6 +1,6 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
-import { SchedulerAuditSinkPort } from "../../ports/scheduler-audit-sink.port.ts";
+import { SchedulerAuditSink } from "../ops-audit.repository.ts";
 
 /** The rows the scheduler history reads back, and the people it names. */
 export type SchedulerAuditDatabase = {
@@ -36,7 +36,7 @@ export type SchedulerAuditDatabase = {
   };
 };
 
-export class PrismaSchedulerAuditRepository extends SchedulerAuditSinkPort {
+export class PrismaSchedulerAuditRepository extends SchedulerAuditSink {
   private constructor(
     private readonly database: SchedulerAuditDatabase,
     private readonly auditLog: AuditLogApi,

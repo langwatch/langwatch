@@ -1,8 +1,9 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import { ManagerExplorerService } from "../manager-explorer.service.ts";
-import { NullProcessAuditSink } from "../../ports/process-audit-sink.port.ts";
-import { NullProcessOpsAdapter } from "../../adapters/null.process-ops.adapter.ts";
+import { MemoryProcessAuditRepository } from "../../repositories/memory/memory.process-audit.repository.ts";
+import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
+import { MemoryProcessOpsRepository } from "../../repositories/memory/memory.process-ops.repository.ts";
 import type { ProcessNameCounts } from "../../repositories/process-ops.repository.ts";
 import {
   OpsEventingIntrospectionPort,
@@ -36,7 +37,7 @@ function counts(
 }
 
 function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = []) {
-  const fleet = new NullProcessOpsAdapter();
+  const fleet = MemoryProcessOpsRepository.create({ store: MemoryOpsStore.create() });
   fleet.countByProcessName = async () => rows;
 
   const registry: OpsProcessManagerMetadata[] = registryNames.map((processName) => ({
@@ -71,7 +72,7 @@ function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = 
   return ManagerExplorerService.create({
     store: fakeStore(),
     fleet,
-    audit: NullProcessAuditSink.create(),
+    audit: MemoryProcessAuditRepository.create({ store: MemoryOpsStore.create() }),
     introspection: new FakeIntrospection(),
   });
 }

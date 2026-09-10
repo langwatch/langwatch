@@ -3,8 +3,8 @@ import {
   LEASE_TTL_SECONDS,
   SNAPSHOT_LEASE_KEY,
   RedisOpsSnapshotRepository,
-} from "../../repositories/redis/redis.ops-snapshot.repository.ts";
-import { OpsSnapshotRedisPort } from "../ops-snapshot-redis.port.ts";
+} from "../redis.ops-snapshot.repository.ts";
+import { OpsSnapshotRedisPort } from "../../../ports/ops-snapshot-redis.port.ts";
 import {
   type LiveSnapshot,
   tryParseDetailSnapshot,

@@ -13,7 +13,7 @@ import {
   ScheduleSlotNotStaleError,
 } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { SchedulerAuditSinkPort } from "../ports/scheduler-audit-sink.port.ts";
+import { SchedulerAuditSink } from "../repositories/ops-audit.repository.ts";
 import type {
   SchedulerOpsRepository,
   ScheduledJobRecord,
@@ -26,14 +26,14 @@ const logger = createLogger("langwatch:ops:scheduler");
 export class SchedulerOpsService {
   private constructor(
     private readonly repository: SchedulerOpsRepository,
-    private readonly audit: SchedulerAuditSinkPort,
+    private readonly audit: SchedulerAuditSink,
     private readonly wake: SchedulerWakePort,
     private readonly projects: ProjectApi,
   ) {}
 
   static create(input: {
     repository: SchedulerOpsRepository;
-    audit: SchedulerAuditSinkPort;
+    audit: SchedulerAuditSink;
     wake: SchedulerWakePort;
     projects: ProjectApi;
   }): SchedulerOpsService {

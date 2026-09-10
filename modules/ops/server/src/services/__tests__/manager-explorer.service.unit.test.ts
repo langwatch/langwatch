@@ -2,8 +2,9 @@ import type { ProcessStore } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ManagerExplorerService } from "../manager-explorer.service.ts";
-import { NullProcessAuditSink } from "../../ports/process-audit-sink.port.ts";
-import { NullProcessOpsAdapter } from "../../adapters/null.process-ops.adapter.ts";
+import { MemoryProcessAuditRepository } from "../../repositories/memory/memory.process-audit.repository.ts";
+import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
+import { MemoryProcessOpsRepository } from "../../repositories/memory/memory.process-ops.repository.ts";
 import {
   OpsEventingIntrospectionPort,
   type OpsProcessManagerMetadata,
@@ -32,8 +33,8 @@ class FakeIntrospection extends OpsEventingIntrospectionPort {
 const makeService = (store: ProcessStore) =>
   ManagerExplorerService.create({
     store,
-    fleet: new NullProcessOpsAdapter(),
-    audit: NullProcessAuditSink.create(),
+    fleet: MemoryProcessOpsRepository.create({ store: MemoryOpsStore.create() }),
+    audit: MemoryProcessAuditRepository.create({ store: MemoryOpsStore.create() }),
     introspection: new FakeIntrospection(),
   });
 

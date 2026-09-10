@@ -40,7 +40,7 @@ import type { AdminBackofficeService } from "./admin-backoffice.service.ts";
 import type { ImpersonationService } from "./impersonation.service.ts";
 import type { BlobStoreService } from "./blob-store.service.ts";
 import type { SchedulerOpsService } from "./scheduler-ops.service.ts";
-import type { AnomalyStatePort } from "../ports/anomaly-state.port.ts";
+import type { AnomalyStateRepository } from "../repositories/anomaly.repository.ts";
 import type { QueueService } from "./queue.service.ts";
 
 /** The operations half of `OpsApi`, over the repositories and services this process composed. */
@@ -51,7 +51,7 @@ export class OpsService {
     private readonly adminBackoffice: AdminBackofficeService,
     private readonly blobStore: BlobStoreService,
     private readonly scheduler: SchedulerOpsService,
-    private readonly anomalyState: AnomalyStatePort | null,
+    private readonly anomalyState: AnomalyStateRepository | null,
     private readonly queues: QueueService,
   ) {}
 
@@ -61,7 +61,7 @@ export class OpsService {
     adminBackoffice: AdminBackofficeService;
     blobStore: BlobStoreService;
     scheduler: SchedulerOpsService;
-    anomalyState: AnomalyStatePort | null;
+    anomalyState: AnomalyStateRepository | null;
     queues: QueueService;
   }): OpsService {
     return new OpsService(

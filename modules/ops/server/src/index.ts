@@ -34,9 +34,13 @@ export {
 } from "./adapters/redis.scheduler-wake.adapter.ts";
 export { OpsSnapshotRedisPort } from "./ports/ops-snapshot-redis.port.ts";
 export {
-  NoopSchedulerAuditSink,
-  SchedulerAuditSinkPort,
-} from "./ports/scheduler-audit-sink.port.ts";
+  ProcessAuditSink,
+  SchedulerAuditSink,
+  type ProcessControlAction,
+} from "./repositories/ops-audit.repository.ts";
+export { MemoryProcessAuditRepository } from "./repositories/memory/memory.process-audit.repository.ts";
+export { MemorySchedulerAuditRepository } from "./repositories/memory/memory.scheduler-audit.repository.ts";
+export { MemoryOpsStore } from "./repositories/memory/memory.ops.store.ts";
 export type {
   SchedulerOpsRepository,
   ScheduledJobRecord,
@@ -103,18 +107,18 @@ export {
 } from "./ports/eventing-introspection.port.ts";
 export { EventingOpsIntrospectionAdapter } from "./adapters/eventing.ops-introspection.adapter.ts";
 export { OpsReplayRuntimePort, type OpsReplayRuntime } from "./ports/replay-runtime.port.ts";
-export { NullEventExplorerAdapter } from "./adapters/null.event-explorer.adapter.ts";
+export { MemoryEventExplorerRepository } from "./repositories/memory/memory.event-explorer.repository.ts";
 export type {
   AggregateDiscoveryRow,
   EventExplorerRepository,
   RawEventRow,
 } from "./repositories/event-explorer.repository.ts";
-export { NullProcessOpsAdapter } from "./adapters/null.process-ops.adapter.ts";
+export { MemoryProcessOpsRepository } from "./repositories/memory/memory.process-ops.repository.ts";
 export type {
   ProcessNameCounts,
   ProcessOpsRepository,
 } from "./repositories/process-ops.repository.ts";
-export { NullReplayAdapter } from "./adapters/null.replay.adapter.ts";
+export { MemoryReplayRepository } from "./repositories/memory/memory.replay.repository.ts";
 export type { ReplayRepository } from "./repositories/replay.repository.ts";
 export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process-ops.repository.ts";
 export { ProcessAuditRepository } from "./repositories/prisma/prisma.process-audit.repository.ts";

@@ -3,10 +3,7 @@ import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
-import {
-  ProcessAuditSinkPort,
-  type ProcessControlAction,
-} from "../../ports/process-audit-sink.port.ts";
+import { ProcessAuditSink, type ProcessControlAction } from "../ops-audit.repository.ts";
 
 const TARGET_KIND = "process_instance";
 
@@ -20,7 +17,7 @@ const FLEET_TARGET_ID = "fleet";
  * of band, so "why did this deliver at 03:14" must be answerable without anyone's memory.
  * contract the scheduler controls follow (ADR-091): a redriven intent is a
  */
-export class ProcessAuditRepository extends ProcessAuditSinkPort {
+export class ProcessAuditRepository extends ProcessAuditSink {
   static create({
     prisma,
     auditLog,

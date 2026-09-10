@@ -16,6 +16,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { BugReportRepository } from "../bug-report.repository.ts";
 import { MemoryBugReportRepository } from "../memory/memory.bug-report.repository.ts";
+import { MemoryOpsStore } from "../memory/memory.ops.store.ts";
 import { PrismaBugReportRepository } from "../prisma/prisma.bug-report.repository.ts";
 
 function report(overrides: Partial<BugReportCreateInput> = {}): BugReportCreateInput {
@@ -104,7 +105,7 @@ describe("given the memory support inbox", () => {
   let repository: BugReportRepository;
 
   beforeEach(() => {
-    repository = MemoryBugReportRepository.create();
+    repository = MemoryBugReportRepository.create({ store: MemoryOpsStore.create() });
   });
 
   contractCases({ repository: () => repository });

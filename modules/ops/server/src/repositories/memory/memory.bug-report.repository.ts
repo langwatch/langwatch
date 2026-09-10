@@ -8,6 +8,7 @@ import type { BugReport, BugReportCreateInput } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { BugReportRepository } from "../bug-report.repository.ts";
+import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
 const BUG_REPORT_KSUID_RESOURCE = "bugreport";
 
@@ -21,12 +22,10 @@ const SEARCHED_COLUMNS = [
 ] as const satisfies readonly (keyof BugReport)[];
 
 export class MemoryBugReportRepository implements BugReportRepository {
-  #rows: BugReport[] = [];
+  private constructor(private readonly store: MemoryOpsStore) {}
 
-  private constructor() {}
-
-  static create(): MemoryBugReportRepository {
-    return new MemoryBugReportRepository();
+  static create({ store }: { store: MemoryOpsStore }): MemoryBugReportRepository {
+    return new MemoryBugReportRepository(store);
   }
 
   async create({ data }: { data: BugReportCreateInput }): Promise<BugReport> {
@@ -46,7 +45,7 @@ export class MemoryBugReportRepository implements BugReportRepository {
       metadata: data.metadata ?? null,
     };
 
-    this.#rows.push(report);
+    this.store.bugReports.push(report);
 
     return report;
   }
@@ -66,7 +65,7 @@ export class MemoryBugReportRepository implements BugReportRepository {
   }
 
   async findById({ id }: { id: string }): Promise<BugReport | null> {
-    return this.#rows.find((row) => row.id === id) ?? null;
+    return this.store.bugReports.find((row) => row.id === id) ?? null;
   }
 
   async count({ search }: { search?: string | undefined } = {}): Promise<number> {
@@ -76,7 +75,7 @@ export class MemoryBugReportRepository implements BugReportRepository {
   /** Every row the term selects, newest first. A blank term selects them all. */
   #matching(search: string | undefined): BugReport[] {
     const term = search?.trim().toLowerCase();
-    const rows = [...this.#rows].sort(
+    const rows = [...this.store.bugReports].sort(
       (left, right) => right.createdAt.epochMilliseconds - left.createdAt.epochMilliseconds,
     );
 

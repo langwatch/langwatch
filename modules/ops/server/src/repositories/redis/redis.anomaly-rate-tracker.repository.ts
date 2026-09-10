@@ -2,17 +2,17 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { AnomalyRateTrackerPort } from "../ports/anomaly-rate-tracker.port.ts";
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../rules/anomaly-constants.rules.ts";
+import { AnomalyRateTrackerRepository } from "../anomaly.repository.ts";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
 
 const logger = createLogger("langwatch:observability:tenantRateTracker");
 
-export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
+export class RedisAnomalyRateTrackerRepository extends AnomalyRateTrackerRepository {
   private static readonly keyPrefix = "obs:tenant_rate:";
   private static readonly activeSet = "obs:tenant_rate:active";
   private static readonly baselinePrefix = "obs:tenant_rate:baseline:";
   private static readonly ttlSeconds = 8 * 24 * 3600;
-  private static readonly retentionMinutes = RedisTenantRateTrackerAdapter.ttlSeconds / 60;
+  private static readonly retentionMinutes = RedisAnomalyRateTrackerRepository.ttlSeconds / 60;
   private static readonly trimBatch = 500;
   static readonly baselineTtlSeconds = 60 * 60;
 
@@ -28,8 +28,8 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
     redis: IORedis | Cluster;
     now?: (() => number) | undefined;
     featureFlags?: FeatureFlagApi | undefined;
-  }): RedisTenantRateTrackerAdapter {
-    return new RedisTenantRateTrackerAdapter(
+  }): RedisAnomalyRateTrackerRepository {
+    return new RedisAnomalyRateTrackerRepository(
       options.redis,
       options.now ?? Date.now,
       options.featureFlags,
@@ -46,17 +46,17 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
     }
 
     const minute = Math.floor(this.now() / 60_000);
-    const key = `${RedisTenantRateTrackerAdapter.keyPrefix}${tenantId}`;
+    const key = `${RedisAnomalyRateTrackerRepository.keyPrefix}${tenantId}`;
 
     try {
       const pipe = this.redis.pipeline();
       pipe.hincrby(key, String(minute), count);
-      pipe.hdel(key, String(minute - RedisTenantRateTrackerAdapter.retentionMinutes));
-      pipe.expire(key, RedisTenantRateTrackerAdapter.ttlSeconds);
-      pipe.sadd(RedisTenantRateTrackerAdapter.activeSet, tenantId);
+      pipe.hdel(key, String(minute - RedisAnomalyRateTrackerRepository.retentionMinutes));
+      pipe.expire(key, RedisAnomalyRateTrackerRepository.ttlSeconds);
+      pipe.sadd(RedisAnomalyRateTrackerRepository.activeSet, tenantId);
       pipe.expire(
-        RedisTenantRateTrackerAdapter.activeSet,
-        RedisTenantRateTrackerAdapter.ttlSeconds,
+        RedisAnomalyRateTrackerRepository.activeSet,
+        RedisAnomalyRateTrackerRepository.ttlSeconds,
       );
       await pipe.exec();
     } catch (err) {
@@ -72,7 +72,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
     const minutesBack = Math.max(1, Math.ceil(windowSeconds / 60));
     const fields = Array.from({ length: minutesBack }, (_, index) => String(minuteNow - index));
     const values = await this.redis.hmget(
-      `${RedisTenantRateTrackerAdapter.keyPrefix}${tenantId}`,
+      `${RedisAnomalyRateTrackerRepository.keyPrefix}${tenantId}`,
       ...fields,
     );
 
@@ -95,8 +95,8 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
     const minuteNow = Math.floor(this.now() / 60_000);
     const minutesBack = Math.max(1, Math.ceil(lookbackSeconds / 60));
     const oldestMinute = minuteNow - (minutesBack - 1);
-    const retentionCutoff = minuteNow - RedisTenantRateTrackerAdapter.retentionMinutes;
-    const key = `${RedisTenantRateTrackerAdapter.keyPrefix}${tenantId}`;
+    const retentionCutoff = minuteNow - RedisAnomalyRateTrackerRepository.retentionMinutes;
+    const key = `${RedisAnomalyRateTrackerRepository.keyPrefix}${tenantId}`;
     const entries = await this.redis.hgetall(key);
     const series = Array.from({ length: minutesBack }, () => 0);
     const staleFields: string[] = [];
@@ -126,13 +126,13 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
   }
 
   async listActiveTenants(): Promise<string[]> {
-    return await this.redis.smembers(RedisTenantRateTrackerAdapter.activeSet);
+    return await this.redis.smembers(RedisAnomalyRateTrackerRepository.activeSet);
   }
 
-  async tryGetCachedBaseline(tenantId: string): Promise<number | null> {
+  async findCachedBaseline(tenantId: string): Promise<number | null> {
     try {
       const raw = await this.redis.get(
-        `${RedisTenantRateTrackerAdapter.baselinePrefix}${tenantId}`,
+        `${RedisAnomalyRateTrackerRepository.baselinePrefix}${tenantId}`,
       );
       if (!raw) {
         return null;
@@ -144,7 +144,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
     } catch (err) {
       logger.debug(
         { tenantId, err: err instanceof Error ? err.message : String(err) },
-        "TenantRateTracker.tryGetCachedBaseline failed (non-fatal)",
+        "TenantRateTracker.findCachedBaseline failed (non-fatal)",
       );
       return null;
     }
@@ -157,10 +157,10 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
   }): Promise<void> {
     try {
       await this.redis.set(
-        `${RedisTenantRateTrackerAdapter.baselinePrefix}${input.tenantId}`,
+        `${RedisAnomalyRateTrackerRepository.baselinePrefix}${input.tenantId}`,
         input.baseline.toString(),
         "EX",
-        input.ttlSeconds ?? RedisTenantRateTrackerAdapter.baselineTtlSeconds,
+        input.ttlSeconds ?? RedisAnomalyRateTrackerRepository.baselineTtlSeconds,
       );
     } catch (err) {
       logger.debug(
@@ -199,10 +199,10 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
     }
 
     try {
-      for (let index = 0; index < fields.length; index += RedisTenantRateTrackerAdapter.trimBatch) {
+      for (let index = 0; index < fields.length; index += RedisAnomalyRateTrackerRepository.trimBatch) {
         await this.redis.hdel(
           key,
-          ...fields.slice(index, index + RedisTenantRateTrackerAdapter.trimBatch),
+          ...fields.slice(index, index + RedisAnomalyRateTrackerRepository.trimBatch),
         );
       }
     } catch (err) {

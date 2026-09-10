@@ -2,8 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Anomaly } from "@langwatch/ops-contract";
 import type { AnomalyHardTierAlertPort } from "../ports/anomaly-hard-tier-alert.port.ts";
-import type { AnomalyRateTrackerPort } from "../ports/anomaly-rate-tracker.port.ts";
-import type { AnomalyStatePort } from "../ports/anomaly-state.port.ts";
+import type {
+  AnomalyRateTrackerRepository,
+  AnomalyStateRepository,
+} from "../repositories/anomaly.repository.ts";
 import { percentile } from "../rules/ops-anomaly-percentile.rules.ts";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../rules/anomaly-constants.rules.ts";
 import { nowInstant } from "@langwatch/time";
@@ -20,15 +22,15 @@ export const INSUFFICIENT_DATA_RECHECK_SECONDS = 10 * 60;
 
 export class AnomalyDetectorService {
   private constructor(
-    private readonly rateTracker: AnomalyRateTrackerPort,
-    private readonly anomalyState: AnomalyStatePort,
+    private readonly rateTracker: AnomalyRateTrackerRepository,
+    private readonly anomalyState: AnomalyStateRepository,
     private readonly featureFlags: FeatureFlagApi | undefined,
     private readonly hardTierAlerts: AnomalyHardTierAlertPort | undefined,
   ) {}
 
   static create(options: {
-    rateTracker: AnomalyRateTrackerPort;
-    anomalyState: AnomalyStatePort;
+    rateTracker: AnomalyRateTrackerRepository;
+    anomalyState: AnomalyStateRepository;
     featureFlags?: FeatureFlagApi | undefined;
     hardTierAlerts?: AnomalyHardTierAlertPort | undefined;
   }): AnomalyDetectorService {
@@ -97,7 +99,7 @@ export class AnomalyDetectorService {
       HARD_TIER_SUSTAIN_MINUTES * 60,
     );
     const hardPerMin = recentHard / HARD_TIER_SUSTAIN_MINUTES;
-    const existing = await this.anomalyState.tryGet(tenantId, "rate_breaker");
+    const existing = await this.anomalyState.findByKind(tenantId, "rate_breaker");
 
     if (hardPerMin >= baseline * HARD_TIER_MULTIPLIER) {
       const anomaly = this.anomaly({
@@ -193,7 +195,7 @@ export class AnomalyDetectorService {
   }
 
   private async resolveBaseline(tenantId: string): Promise<number | null> {
-    const cached = await this.rateTracker.tryGetCachedBaseline(tenantId);
+    const cached = await this.rateTracker.findCachedBaseline(tenantId);
     if (cached !== null) {
       return cached < MIN_BASELINE_RATE ? null : cached;
     }

@@ -24,7 +24,7 @@ import {
   AnomalyWorkerContributionAdapter,
   UsageStatsWorkerContributionAdapter,
 } from "./ops-worker-contribution.adapter.ts";
-import { RedisTenantRateTrackerAdapter } from "./redis.tenant-rate-tracker.adapter.ts";
+import { RedisAnomalyRateTrackerRepository } from "../repositories/redis/redis.anomaly-rate-tracker.repository.ts";
 import { IoredisOpsSnapshotRedisAdapter } from "./ioredis.ops-snapshot-redis.adapter.ts";
 import { QueueOpsMetricsSourceAdapter } from "./queue.ops-queue-metrics-source.adapter.ts";
 import { RedisOpsSnapshotAdapter } from "./redis.ops-snapshot.adapter.ts";
@@ -74,7 +74,7 @@ export class OpsWorkerAdapter extends OpsWorkerPort {
     }
 
     const detector = AnomalyDetectorService.create({
-      rateTracker: RedisTenantRateTrackerAdapter.create({
+      rateTracker: RedisAnomalyRateTrackerRepository.create({
         redis,
         featureFlags: this.options.anomaly.featureFlags,
       }),

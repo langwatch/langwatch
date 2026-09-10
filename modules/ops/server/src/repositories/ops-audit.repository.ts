@@ -1,4 +1,10 @@
-import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
+// The durable operator trails this module owns. One definition of what an
+// operator act is, shared by the stored rows and by the memory twins.
+import type {
+  ProcessAuditEntryView,
+  SchedulerAuditEntryView,
+  SchedulerControlAction,
+} from "@langwatch/ops-contract";
 
 export type ProcessControlAction =
   | "process_wake_now"
@@ -13,7 +19,7 @@ export type ProcessControlAction =
   | "process_release_lapsed_lease";
 
 /** Durable audit trail for Ops process-manager controls. */
-export abstract class ProcessAuditSinkPort {
+export abstract class ProcessAuditSink {
   abstract append(entry: {
     actorUserId: string;
     action: ProcessControlAction;
@@ -29,19 +35,15 @@ export abstract class ProcessAuditSinkPort {
   abstract listRecent(params: { limit: number }): Promise<ProcessAuditEntryView[]>;
 }
 
-/** For app presets that run without Postgres. */
-export class NullProcessAuditSink extends ProcessAuditSinkPort {
-  static create(): NullProcessAuditSink {
-    return new NullProcessAuditSink();
-  }
+/** Durable audit trail for Ops scheduler controls. */
+export abstract class SchedulerAuditSink {
+  abstract append(entry: {
+    actorUserId: string;
+    action: SchedulerControlAction;
+    scheduleId: string;
+    projectId: string;
+    slot: Date | null;
+  }): Promise<void>;
 
-  private constructor() {
-    super();
-  }
-
-  async append(): Promise<void> {}
-
-  async listRecent(): Promise<ProcessAuditEntryView[]> {
-    return [];
-  }
+  abstract listRecent(params: { limit: number }): Promise<SchedulerAuditEntryView[]>;
 }
