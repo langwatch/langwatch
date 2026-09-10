@@ -8,7 +8,7 @@ import {
   traceApi,
   TraceHostProvider,
   type TraceHostPort,
-} from "@langwatch/trace-web/screens/traces";
+} from "@langwatch/trace-web/traces";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

@@ -121,9 +121,13 @@
       "default": "./src/ui/sections/optimization_studio/execution-state-error.ts"
     },
     "./screens/workflows": {
-      "langwatch-declaration-source": "./src/screens/workflows/index.ts",
-      "types": "./dist/screens/workflows/index.d.ts",
-      "default": "./src/screens/workflows/index.ts"
+      "langwatch-declaration-source": "./src/workflows.ts",
+      "types": "./dist/workflows.d.ts",
+      "default": "./src/workflows.ts"
+    },
+    "./workflows": {
+      "types": "./dist/workflows.d.ts",
+      "default": "./src/workflows.ts"
     },
     "./surfaces/handled-error-views": {
       "langwatch-declaration-source": "./src/ui/elements/studio-host/errors.tsx",
@@ -171,34 +175,34 @@
       "default": "./src/model/sse/fetch-sse.ts"
     },
     "./surfaces/workflow-icons": {
-      "langwatch-declaration-source": "./src/surfaces/workflow-icons/index.ts",
-      "types": "./dist/surfaces/workflow-icons/index.d.ts",
-      "default": "./src/surfaces/workflow-icons/index.ts"
+      "langwatch-declaration-source": "./src/workflow-icons.ts",
+      "types": "./dist/workflow-icons.d.ts",
+      "default": "./src/workflow-icons.ts"
     },
     "./surfaces/workflow-card": {
-      "langwatch-declaration-source": "./src/surfaces/workflow-card/index.ts",
-      "types": "./dist/surfaces/workflow-card/index.d.ts",
-      "default": "./src/surfaces/workflow-card/index.ts"
+      "langwatch-declaration-source": "./src/workflow-card.ts",
+      "types": "./dist/workflow-card.d.ts",
+      "default": "./src/workflow-card.ts"
     },
     "./surfaces/code-agent": {
-      "langwatch-declaration-source": "./src/surfaces/code-agent/index.ts",
-      "types": "./dist/surfaces/code-agent/index.d.ts",
-      "default": "./src/surfaces/code-agent/index.ts"
+      "langwatch-declaration-source": "./src/code-agent.ts",
+      "types": "./dist/code-agent.d.ts",
+      "default": "./src/code-agent.ts"
     },
     "./surfaces/workflow-templates": {
-      "langwatch-declaration-source": "./src/surfaces/workflow-templates/index.ts",
-      "types": "./dist/surfaces/workflow-templates/index.d.ts",
-      "default": "./src/surfaces/workflow-templates/index.ts"
+      "langwatch-declaration-source": "./src/workflow-templates.ts",
+      "types": "./dist/workflow-templates.d.ts",
+      "default": "./src/workflow-templates.ts"
     },
     "./surfaces/studio-dataset-columns": {
-      "langwatch-declaration-source": "./src/surfaces/studio-dataset-columns/index.ts",
-      "types": "./dist/surfaces/studio-dataset-columns/index.d.ts",
-      "default": "./src/surfaces/studio-dataset-columns/index.ts"
+      "langwatch-declaration-source": "./src/studio-dataset-columns.ts",
+      "types": "./dist/studio-dataset-columns.d.ts",
+      "default": "./src/studio-dataset-columns.ts"
     },
     "./surfaces/studio-drawer-footer": {
-      "langwatch-declaration-source": "./src/surfaces/studio-drawer-footer/index.ts",
-      "types": "./dist/surfaces/studio-drawer-footer/index.d.ts",
-      "default": "./src/surfaces/studio-drawer-footer/index.ts"
+      "langwatch-declaration-source": "./src/studio-drawer-footer.ts",
+      "types": "./dist/studio-drawer-footer.d.ts",
+      "default": "./src/studio-drawer-footer.ts"
     },
     "./surfaces/evaluate-api-snippet": {
       "langwatch-declaration-source": "./src/model/evaluate-api-snippet.ts",

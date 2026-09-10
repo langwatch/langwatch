@@ -390,7 +390,7 @@
       "id": "traces",
       "root": "traces",
       "uses": {
-        "screens": ["@langwatch/trace-web/screens/traces"],
+        "screens": ["@langwatch/trace-web/traces"],
         "surfaces": [
           "@langwatch/annotation-web/annotation-card",
           "@langwatch/annotation-web/annotation-chips",
@@ -402,7 +402,7 @@
       "id": "workflows",
       "root": "workflows",
       "uses": {
-        "screens": ["@langwatch/workflow-web/screens/workflows"],
+        "screens": ["@langwatch/workflow-web/workflows"],
         "surfaces": [
           "@langwatch/dataset-web/surfaces/dataset-drawer",
           "@langwatch/dataset-web/surfaces/upload-csv-drawer",

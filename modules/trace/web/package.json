@@ -21,9 +21,37 @@
       "default": "./src/behavior/drawer.store.ts"
     },
     "./surfaces/trace-view-state": {
-      "langwatch-declaration-source": "./src/surfaces/trace-view-state/index.ts",
-      "types": "./dist/surfaces/trace-view-state/index.d.ts",
-      "default": "./src/surfaces/trace-view-state/index.ts"
+      "langwatch-declaration-source": "./src/trace-view-state.ts",
+      "types": "./dist/trace-view-state.d.ts",
+      "default": "./src/trace-view-state.ts"
+    },
+    "./surfaces/annotation-queue-session": {
+      "langwatch-declaration-source": "./src/annotation-queue-session.ts",
+      "types": "./dist/annotation-queue-session.d.ts",
+      "default": "./src/annotation-queue-session.ts"
+    },
+    "./surfaces/trace-filters": {
+      "langwatch-declaration-source": "./src/trace-filters.ts",
+      "types": "./dist/trace-filters.d.ts",
+      "default": "./src/trace-filters.ts"
+    },
+    "./surfaces/trace-origins": {
+      "langwatch-declaration-source": "./src/trace-origins.ts",
+      "types": "./dist/trace-origins.d.ts",
+      "default": "./src/trace-origins.ts"
+    },
+    "./surfaces/trace-selection": {
+      "langwatch-declaration-source": "./src/trace-selection.ts",
+      "types": "./dist/trace-selection.d.ts",
+      "default": "./src/trace-selection.ts"
+    },
+    "./traces": {
+      "types": "./dist/traces.d.ts",
+      "default": "./src/traces.ts"
+    },
+    "./screens/traces": {
+      "types": "./dist/traces.d.ts",
+      "default": "./src/traces.ts"
     },
     ".": {
       "langwatch-declaration-source": "./src/index.ts",

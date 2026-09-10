@@ -1,0 +1,104 @@
+import { Button } from "@chakra-ui/react";
+import { SearchX } from "lucide-react";
+import { useEffect } from "react";
+import { Link } from "@langwatch/ui-host/link";
+import { HandledErrorState } from "../../elements/studio-host/errors.tsx";
+import { useOrganizationTeamProject } from "../../behavior/studio-host/use-organization-team-project.ts";
+import OptimizationStudio from "../optimization_studio/optimization-studio.tsx";
+import { useLoadWorkflow } from "../../behavior/optimization_studio/use-load-workflow.ts";
+import { _useWorkflowStore, useWorkflowStore } from "../../behavior/use-workflow-store.ts";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { api } from "../../model/workflow-api-client.ts";
+import { useStudioHostBinding } from "../studio-host/binding.ts";
+
+export default function Studio() {
+  useStudioHostBinding();
+  const { workflow } = useLoadWorkflow();
+  const { project } = useOrganizationTeamProject();
+
+  const {
+    reset,
+    setWorkflow,
+    setAutosavedWorkflow,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+  } = useWorkflowStore(
+    ({
+      reset,
+      setWorkflow,
+      setAutosavedWorkflow,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+    }) => ({
+      reset,
+      setWorkflow,
+      setAutosavedWorkflow,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+    }),
+  );
+  const { clear } = _useWorkflowStore.temporal.getState();
+
+  const queryClient = api.useUtils();
+  useEffect(() => {
+    // Invalidate the workflow once navigating away to make sure when comming back
+    // that is doesn't accidentaly renders the previous version of the workflow
+    return () => {
+      void queryClient.workflow.getById.invalidate();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const dsl = workflow.data?.currentVersion?.dsl as unknown as StudioWorkflow | undefined;
+    if (dsl) {
+      // Prevent autosave from triggering after load
+      setAutosavedWorkflow(undefined);
+      setWorkflow({
+        ...dsl,
+        workflow_id: workflow.data?.id,
+        nodes: (dsl.nodes ?? []).map((node: any) => ({
+          ...node,
+          selected: false,
+        })),
+      });
+      setLastCommittedWorkflow(dsl);
+      // Snapshot the normalized store state as autosave baseline so
+      // hasPendingChanges() does not falsely detect dirty state after load
+      const loadedWorkflow = _useWorkflowStore.getState().getWorkflow();
+      setAutosavedWorkflow(loadedWorkflow);
+      setCurrentVersionId(workflow.data?.currentVersion?.id);
+    } else {
+      reset();
+      clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!workflow.data]);
+
+  // A missing workflow is a thing we can name, and the person looking at it needs a way out
+  // - this was a bare full-screen "404 / An error occurred" with no navigation, while the
+  // query underneath held `workflow_not_found`. Inside `DashboardLayout` for the same reason
+  // the experiments page does it: the sidebar is the way back.
+  if (workflow.isError) {
+    return (
+      // `DashboardLayout` DID NOT TRAVEL: chrome belongs to the route tree, and
+      // this address is served without a layout route above it - which is why
+      // the studio draws its own full-viewport header. The dead end therefore
+      // owns the viewport itself, and the way back is the button rather than a
+      // sidebar that is not there.
+      <HandledErrorState
+        error={workflow.error}
+        fallbackTitle="Couldn't open this workflow"
+        icon={<SearchX size={44} strokeWidth={1.5} />}
+      >
+        {project && (
+          <Link href={`/${project.slug}/workflows`}>
+            <Button colorPalette="orange">Back to workflows</Button>
+          </Link>
+        )}
+      </HandledErrorState>
+    );
+  }
+
+  return <OptimizationStudio />;
+}

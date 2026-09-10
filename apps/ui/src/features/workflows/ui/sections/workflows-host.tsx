@@ -8,7 +8,7 @@ import {
   workflowApi,
   WorkflowHostProvider,
   type WorkflowHostPort,
-} from "@langwatch/workflow-web/screens/workflows";
+} from "@langwatch/workflow-web/workflows";
 import { useMemo, type ComponentType, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

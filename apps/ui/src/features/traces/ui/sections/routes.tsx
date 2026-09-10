@@ -4,7 +4,7 @@
  * design: a share link must work for a reader with no account.
  */
 
-import { traceScreens } from "@langwatch/trace-web/screens/traces";
+import { traceScreens } from "@langwatch/trace-web/traces";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

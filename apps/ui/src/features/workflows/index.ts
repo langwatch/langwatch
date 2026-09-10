@@ -1,6 +1,6 @@
 /** Workflows: two screens, their dialogs and the chat panel, all in `@langwatch/workflow-web`. */
 
-import { workflowApi } from "@langwatch/workflow-web/screens/workflows";
+import { workflowApi } from "@langwatch/workflow-web/workflows";
 import { lazyDrawer } from "@langwatch/ui-drawer";
 import { uiFeature } from "../../behavior/ui-feature";
 import { workflowPageLoaders } from "./ui/sections/workflows-routes";

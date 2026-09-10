@@ -4,7 +4,7 @@
  * `?drawer.open=` (see `ui-family-move-manifests.md`). Lazy-loaded.
  */
 
-import { traceDrawerMount } from "@langwatch/trace-web/screens/traces";
+import { traceDrawerMount } from "@langwatch/trace-web/traces";
 import { lazy, Suspense } from "react";
 
 import { withHost } from "../../../../ui/sections/ui-page";
