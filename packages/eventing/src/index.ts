@@ -64,6 +64,15 @@ export type { EventSourcingOptions } from "./eventSourcing.ts";
 export { EventSourcing } from "./eventSourcing.ts";
 // Pipeline (static definitions)
 export { definePipeline, type PipelineBuilder } from "./pipeline/staticBuilder.ts";
+// The seam into a module: one declaration `.withEventing(...)` takes.
+export {
+  defineEventingModule,
+  type EventingCommandSender,
+  type EventingCommands,
+  type EventingConnection,
+  type EventingModule,
+  type EventingSetup,
+} from "./pipeline/eventingModule.ts";
 export type { ProcessManagerApplier } from "./pipeline/processBuilder.ts";
 export type { SubscriberSpec, TriggerContext } from "./pipeline/processManagerDefinition.ts";
 export type {

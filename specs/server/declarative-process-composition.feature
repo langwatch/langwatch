@@ -79,7 +79,22 @@ Feature: Composing a process declaratively
     When the route throws a handled error
     Then the runtime writes one audit row carrying the error code
 
-  @unimplemented
+  @unit
+  Scenario: A module declares its event sourcing beside its transports
+    Given a module that declares a pipeline with defineEventingModule
+    When the process boots with an eventing runtime on its pool
+    Then the pipeline is built over the module's own repositories and app
+    And it is built against the process store of the graph that installs it
+    And the senders registration answers with reach the module
+
+  @unit
+  Scenario: A role that runs no event sourcing ignores the declaration
+    Given a module that declares a pipeline with defineEventingModule
+    When the process boots with no eventing runtime on its pool
+    Then the module's app is created
+    And no pipeline is built or registered
+
+  @unit
   Scenario: The module list is generated from the catalogue
     Given the catalogue lists a core module and an enterprise module
     When the open-source build generates the module list

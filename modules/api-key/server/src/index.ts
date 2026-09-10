@@ -37,7 +37,6 @@ export {
   type CreateApiKeyRequest,
   type UpdateApiKeyRequest,
 } from "./app/api-key.app.ts";
-export { apiKeyEventing } from "./eventing/api-key.pipeline.ts";
 export { apiKeyServer } from "./api-key.server.ts";
 export { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
 export { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";

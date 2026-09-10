@@ -6,6 +6,7 @@ import type {
   TokenIdentity,
   TokenMap,
 } from "./dependency-token.ts";
+import type { FeatureEventing } from "./module-eventing.ts";
 import type { ModuleName, PublicNamespace } from "./module-namespace.ts";
 import type { NeedsResult } from "./infrastructure-needs.ts";
 import { publicNamespace, publicNamespaceFromUnknown } from "./module-namespace.ts";
@@ -90,6 +91,12 @@ export interface FeatureSetupArguments<Config, Infrastructure, Dependencies> {
   readonly infrastructure: Infrastructure;
   readonly dependencies: Dependencies;
   readonly persistence?: FeatureInstallArguments<Infrastructure>["persistence"];
+  /**
+   * What the module's registry answered on the selected backend, instantiated
+   * once per install so the app and its eventing declaration read the same
+   * objects rather than two graphs over the same rows.
+   */
+  readonly repositories?: unknown;
 }
 
 /** What the one transport assembly is handed, in a role that serves doors. */
@@ -144,6 +151,8 @@ export interface FeatureProvider<Provided> {
 /** What one installed feature holds, with its own types erased. */
 export interface InstalledFeatureState {
   readonly provided: unknown;
+  /** The instantiated repositories, for a module that declared a registry. */
+  readonly repositories?: unknown;
   /** Bound contribution readers; absent where the feature declared none. */
   readonly rest: (() => unknown) | undefined;
   readonly trpc: (() => unknown) | undefined;
@@ -161,6 +170,8 @@ export interface FeatureInstallArguments<Infrastructure> {
     infrastructure: Readonly<Record<string, unknown>>;
   }>;
   readonly role: ServerRole;
+  /** Instantiated once by the repository-aware declaration that wraps this. */
+  readonly repositories?: unknown;
   /** The instance the graph resolved for one token. */
   resolve(token: TokenIdentity): unknown;
 }
@@ -190,6 +201,13 @@ export interface InstallableServerFeature<Infrastructure> {
   readonly workers?: readonly unknown[];
   /** One-shot work the tasks role exposes, declared with `withTasks`. */
   readonly tasks?: readonly unknown[];
+  /**
+   * The event sourcing this module declared with `withEventing`. A role whose
+   * pool holds no eventing runtime ignores it; a role that runs one builds the
+   * pipeline over this module's own repositories and app, registers it, and
+   * hands the senders back through `connect`.
+   */
+  readonly eventing?: FeatureEventing;
   /**
    * The pool members this module named with `needs`. Types erase, so this is
    * what boot reads to refuse a process whose pool supplies one as undefined.
@@ -586,6 +604,7 @@ export class ServerFeatureAssembly<
           dependencies,
           resources: args.resources,
           persistence: args.persistence,
+          repositories: args.repositories,
         };
         const provided = state.setup(setupArguments);
         const { worker, close } = state;
@@ -840,23 +859,39 @@ class RepositoryAppBuilder<
   ): ModuleContributions<
     ReturnType<
       RepositoryAppBuilder<Name, Definitions, Dependencies, Infrastructure, Config, App>["build"]
-    > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> }
+    > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> },
+    RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+    App
   > {
-    return withContributions(
-      { ...this.build(), transports, namespace: publicNamespace(this.name) },
-      [],
-      [],
-    );
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<Name, Definitions, Dependencies, Infrastructure, Config, App>["build"]
+      > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> },
+      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+      App
+    >({ ...this.build(), transports, namespace: publicNamespace(this.name) }, [], []);
   }
 
   /** Background work this module contributes to the worker role. */
   withWorkers(...workers: readonly unknown[]) {
-    return withContributions(this.build(), workers, []);
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<Name, Definitions, Dependencies, Infrastructure, Config, App>["build"]
+      >,
+      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+      App
+    >(this.build(), workers, []);
   }
 
   /** One-shot work this module contributes to the tasks role. */
   withTasks(...tasks: readonly unknown[]) {
-    return withContributions(this.build(), [], tasks);
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<Name, Definitions, Dependencies, Infrastructure, Config, App>["build"]
+      >,
+      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+      App
+    >(this.build(), [], tasks);
   }
 
   build(): ServerFeatureDeclaration<
@@ -872,24 +907,69 @@ class RepositoryAppBuilder<
   > {
     const app = this.app;
     const registry = this.repositories;
-    const setup = serverFeature<Infrastructure>(this.name)
+    const name = this.name;
+    const setup = serverFeature<Infrastructure>(name)
       .withConfig(app.configSchema)
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, infrastructure, config, resources, persistence }) => {
-        if (!persistence) {
-          throw new Error(`Feature "${this.name}" requires process persistence.`);
-        }
-        const repositories = instantiateRepositories(registry, persistence);
-        return app.create({ dependencies, infrastructure, config, resources, repositories });
+      .withSetup(({ dependencies, infrastructure, config, resources, repositories }) => {
+        return app.create({
+          dependencies,
+          infrastructure,
+          config,
+          resources,
+          repositories: repositories as RepositoriesFor<
+            RepositoryRegistry<Definitions>,
+            keyof Definitions
+          >,
+        });
       })
       .provides(app.contract)
       .build();
     return {
       ...setup,
+      // The registry is read ONCE per install, here, and the instances are
+      // handed to the app and to this module's eventing declaration alike. A
+      // second read would give the two halves separate objects over the same
+      // rows, and a memory backend two separate databases.
+      install: (args) => {
+        if (!args.persistence) {
+          throw new Error(`Feature "${name}" requires process persistence.`);
+        }
+        const repositories = instantiateRepositories(registry, args.persistence);
+        return { ...setup.install({ ...args, repositories }), repositories };
+      },
       requiredInfrastructure: this.needs,
       repositoryRegistry: registry,
       ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
     };
+  }
+
+  /**
+   * This module's event sourcing, declared with `defineEventingModule`. It is
+   * built over the repositories and app above, so a declaration written for
+   * another module is not assignable here.
+   */
+  withEventing<Definition>(
+    eventing: FeatureEventing<
+      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+      App,
+      unknown,
+      Definition
+    >,
+  ): ModuleContributions<
+    ReturnType<
+      RepositoryAppBuilder<Name, Definitions, Dependencies, Infrastructure, Config, App>["build"]
+    >,
+    RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+    App
+  > {
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<Name, Definitions, Dependencies, Infrastructure, Config, App>["build"]
+      >,
+      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+      App
+    >(this.build(), [], [], eventing as FeatureEventing);
   }
 }
 
@@ -972,6 +1052,11 @@ class ConfiguredAppBuilder<
     return withContributions(this.build(), [], tasks);
   }
 
+  /** This module's event sourcing, built over the app above. */
+  withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
+    return withContributions(this.build(), [], [], eventing as FeatureEventing);
+  }
+
   build(): ServerFeatureDeclaration<
     Config,
     Infrastructure,
@@ -1034,6 +1119,11 @@ class UnconfiguredAppBuilder<
     return withContributions(this.build(), [], tasks);
   }
 
+  /** This module's event sourcing, built over the app above. */
+  withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
+    return withContributions(this.build(), [], [], eventing as FeatureEventing);
+  }
+
   build(): ServerFeatureDeclaration<
     undefined,
     Infrastructure,
@@ -1093,6 +1183,11 @@ class ConfiguredAppWithTransportsBuilder<
     return withContributions(this.build(), [], tasks);
   }
 
+  /** This module's event sourcing, built over the app above. */
+  withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
+    return withContributions(this.build(), [], [], eventing as FeatureEventing);
+  }
+
   build(): ServerFeatureDeclaration<
     Config,
     Infrastructure,
@@ -1137,6 +1232,11 @@ class UnconfiguredAppWithTransportsBuilder<
     return withContributions(this.build(), [], tasks);
   }
 
+  /** This module's event sourcing, built over the app above. */
+  withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
+    return withContributions(this.build(), [], [], eventing as FeatureEventing);
+  }
+
   build(): ServerFeatureDeclaration<
     undefined,
     Infrastructure,
@@ -1162,30 +1262,43 @@ class UnconfiguredAppWithTransportsBuilder<
  * other than the api owns. Every call answers a declaration, so a module can
  * never be left half-declared (ADR-144 s1).
  */
-export type ModuleContributions<Declaration> = Declaration &
+export type ModuleContributions<Declaration, Repositories = unknown, App = unknown> = Declaration &
   Readonly<{
     readonly workers: readonly unknown[];
     readonly tasks: readonly unknown[];
-    withWorkers(...workers: readonly unknown[]): ModuleContributions<Declaration>;
-    withTasks(...tasks: readonly unknown[]): ModuleContributions<Declaration>;
-    build(): Declaration & Readonly<{ workers: readonly unknown[]; tasks: readonly unknown[] }>;
+    readonly eventing: FeatureEventing | undefined;
+    withWorkers(
+      ...workers: readonly unknown[]
+    ): ModuleContributions<Declaration, Repositories, App>;
+    withTasks(...tasks: readonly unknown[]): ModuleContributions<Declaration, Repositories, App>;
+    withEventing<Definition>(
+      eventing: FeatureEventing<Repositories, App, unknown, Definition>,
+    ): ModuleContributions<Declaration, Repositories, App>;
+    build(): Declaration &
+      Readonly<{
+        workers: readonly unknown[];
+        tasks: readonly unknown[];
+        eventing: FeatureEventing | undefined;
+      }>;
   }>;
 
-/** Adds the worker and task halves to a built declaration. */
-function withContributions<Declaration extends object>(
+/** Adds the worker, task and eventing halves to a built declaration. */
+function withContributions<Declaration extends object, Repositories = unknown, App = unknown>(
   declaration: Declaration,
   workers: readonly unknown[],
   tasks: readonly unknown[],
-): ModuleContributions<Declaration> {
-  const contributed = { ...declaration, workers, tasks };
+  eventing?: FeatureEventing,
+): ModuleContributions<Declaration, Repositories, App> {
+  const contributed = { ...declaration, workers, tasks, eventing };
   return {
     ...contributed,
     withWorkers: (...next: readonly unknown[]) =>
-      withContributions(declaration, [...workers, ...next], tasks),
+      withContributions(declaration, [...workers, ...next], tasks, eventing),
     withTasks: (...next: readonly unknown[]) =>
-      withContributions(declaration, workers, [...tasks, ...next]),
+      withContributions(declaration, workers, [...tasks, ...next], eventing),
+    withEventing: (next: FeatureEventing) => withContributions(declaration, workers, tasks, next),
     build: () => contributed,
-  } as ModuleContributions<Declaration>;
+  } as ModuleContributions<Declaration, Repositories, App>;
 }
 
 function parseFeatureConfig<Config>(

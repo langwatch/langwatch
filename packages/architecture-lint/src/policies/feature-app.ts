@@ -1472,16 +1472,29 @@ function validDefinedApp(
   );
 }
 
+/**
+ * What a module may state after its app, each at most once: the doors it
+ * opens, the background work it contributes, the one-shot work it exposes and
+ * its event sourcing. Every one of them answers a declaration that is already
+ * installable, so the order between them carries no meaning.
+ */
+const DECLARED_MODULE_STAGES = new Set([
+  "withTransports",
+  "withWorkers",
+  "withTasks",
+  "withEventing",
+]);
+
 function validDefinedStages(stages: string[]): boolean {
   const hasRepositories = stages[0] === "withRepositories";
   const appIndex = hasRepositories ? 1 : 0;
-  const hasApp = stages[appIndex] === "withApp";
-  const hasBuild = stages.at(-1) === "build";
-  const hasOptionalTransports =
-    stages.length === appIndex + 2 ||
-    (stages.length === appIndex + 3 && stages[appIndex + 1] === "withTransports");
-
-  return hasApp && hasBuild && hasOptionalTransports;
+  if (stages[appIndex] !== "withApp") return false;
+  // `build` is optional: every stage answers a declaration that is already
+  // installable, so a module that states its last half is finished.
+  const tail =
+    stages.at(-1) === "build" ? stages.slice(appIndex + 1, -1) : stages.slice(appIndex + 1);
+  if (tail.some((stage) => !DECLARED_MODULE_STAGES.has(stage))) return false;
+  return new Set(tail).size === tail.length;
 }
 
 export function lintFeatureAppContracts(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {

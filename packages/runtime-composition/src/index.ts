@@ -41,6 +41,15 @@ export {
   type MissingNeeds,
   type NeedsResult,
 } from "./infrastructure-needs.ts";
+export {
+  commandsOf,
+  eventingHostFrom,
+  type EventingHost,
+  type EventingParticipation,
+  type FeatureEventing,
+  type FeatureEventingRegistration,
+  type FeatureEventingSetup,
+} from "./module-eventing.ts";
 export { moduleApi, ModuleApiToken } from "./module-api-token.ts";
 export { LocalFeatureApis } from "./local-feature-api.ts";
 export {

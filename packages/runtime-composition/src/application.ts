@@ -33,6 +33,12 @@ import {
   type MountedTransports,
 } from "./transport-mounting.ts";
 import { assertInfrastructure } from "./infrastructure-needs.ts";
+import {
+  commandsOf,
+  eventingHostFrom,
+  type EventingHost,
+  type FeatureEventing,
+} from "./module-eventing.ts";
 import { ResourceScope } from "./resource-scope.ts";
 import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
 import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
@@ -145,6 +151,8 @@ export class BootedRuntime<Infrastructure, Rest = never, Trpc = never> {
 /** One feature declared on an application, before boot looks at it. */
 interface DeclaredFeature {
   readonly name: string;
+  /** The event sourcing this module declared, installed where a runtime exists. */
+  readonly eventing: FeatureEventing | undefined;
   /** The background work this module declared, started by the worker role. */
   readonly workers: readonly unknown[];
   /** The one-shot work this module declared, exposed by the tasks role. */
@@ -238,6 +246,7 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
       requiredInfrastructure: declaration.requiredInfrastructure ?? [],
       workers: declaration.workers ?? [],
       tasks: declaration.tasks ?? [],
+      eventing: declaration.eventing,
       install: (args) => declaration.install({ ...args, infrastructure }),
     });
     return this;
@@ -284,6 +293,7 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
     this.assertEveryDependencyProvided(declarations, providerOf, role);
     const order = orderByDependency(declarations, providerOf, role);
 
+    const eventing = eventingHostFrom(this.infrastructure);
     const scope = new ResourceScope();
     const featureServices: RuntimeService[] = [];
     const installed = new Map<string, InstalledFeatureState>();
@@ -311,6 +321,7 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
           ? { ...state, provided: apis.reference(declaration.apiContract) }
           : state;
         installed.set(declaration.name, installedState);
+        installModuleEventing(declaration, state, eventing);
         declared.push(...declaredTransportsOf(declaration, installedState));
       }
       apis.ready();
@@ -448,6 +459,29 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
  */
 export function createApp<Pool>(options: ApplicationOptions<Pool>): ApplicationBuilder<Pool> {
   return new ApplicationBuilder<Pool>(options);
+}
+
+/**
+ * Installs one module's event sourcing, where this process runs any. The
+ * pipeline is built after the module's app, over the app and the same
+ * repository instances it was given. A pool with no eventing runtime installs
+ * nothing, so a role that runs none ignores the declaration.
+ */
+function installModuleEventing(
+  declaration: DeclaredFeature,
+  state: InstalledFeatureState,
+  eventing: EventingHost | undefined,
+): void {
+  const module = declaration.eventing;
+  if (!module || !eventing) return;
+  const definition = module.build({
+    participation: eventing.participation,
+    repositories: state.repositories,
+    app: state.provided,
+    processStore: eventing.processStore,
+  });
+  const registration = eventing.register(definition);
+  module.connect?.({ app: state.provided, commands: commandsOf(registration) });
 }
 
 /** What this role starts: declared workers on a worker, declared tasks on tasks. */
