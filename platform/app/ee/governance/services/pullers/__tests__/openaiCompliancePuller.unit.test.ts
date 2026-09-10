@@ -79,8 +79,13 @@ async function pullOneLine() {
     { cursor: null, credentials: {} },
     config,
   );
-  expect(result.errorCount).toBe(0);
-  expect(result.events).toHaveLength(1);
+  // A precondition of every test below, not an assertion of any of them: a
+  // line that failed to parse would make each test fail on a missing event.
+  if (result.errorCount !== 0 || result.events.length !== 1) {
+    throw new Error(
+      `expected one clean event, got ${result.events.length} with ${result.errorCount} error(s)`,
+    );
+  }
   return result.events[0]!;
 }
 

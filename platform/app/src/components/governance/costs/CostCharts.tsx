@@ -597,6 +597,42 @@ function ChartLegend({
 }
 
 /**
+ * The days a stacked chart has to mark, kept beside the rows rather than
+ * widened into them: a row is a bag of series values and a flag in it would be
+ * one more key for recharts to try to draw as a series.
+ *
+ * `emptyDays` is the subset with nothing in it at all: no series holds a
+ * figure, so there is no bar for the dash to sit on, and a mark stands in for
+ * one.
+ */
+function withheldDaysOf(buckets: StackedBucket[]): {
+  withheldDays: Set<string>;
+  emptyDays: Set<string>;
+} {
+  const withheld = buckets.filter((b) => b.withheld);
+  return {
+    withheldDays: new Set(withheld.map((b) => b.day)),
+    emptyDays: new Set(
+      withheld
+        .filter((b) => b.points.every((p) => p.value === 0))
+        .map((b) => b.day),
+    ),
+  };
+}
+
+/**
+ * A series' bar shape, only when some period is short: a custom shape makes
+ * recharts hand over zero-height bars it would otherwise skip, and a chart
+ * with nothing to mark has no use for them.
+ */
+function withheldShapeFor(
+  marks: WithheldMarks,
+): ((props: WithheldBarShapeProps) => ReactElement | null) | undefined {
+  if (marks.withheldDays.size === 0) return undefined;
+  return (props) => withheldBarShape(props, marks);
+}
+
+/**
  * Stacked bars over the time axis — the shape the cost-evolution panels want.
  *
  * `grouped` puts the series side by side instead of on top of one another, for
@@ -661,22 +697,8 @@ export function CostStackedBars({
     () => widenBuckets(buckets ?? [], keys),
     [buckets, keys],
   );
-  // Kept beside the rows rather than widened into them: a row is a bag of
-  // series values and a flag in it would be one more key for recharts to try
-  // to draw as a series.
-  const withheldDays = useMemo(
-    () => new Set((buckets ?? []).filter((b) => b.withheld).map((b) => b.day)),
-    [buckets],
-  );
-  // A withheld period with nothing in it at all: no series holds a figure,
-  // so there is no bar for the dash to sit on, and a mark stands in for one.
-  const emptyDays = useMemo(
-    () =>
-      new Set(
-        (buckets ?? [])
-          .filter((b) => b.withheld && b.points.every((p) => p.value === 0))
-          .map((b) => b.day),
-      ),
+  const { withheldDays, emptyDays } = useMemo(
+    () => withheldDaysOf(buckets ?? []),
     [buckets],
   );
 
@@ -730,19 +752,11 @@ export function CostStackedBars({
               stackId={grouped ? undefined : "cost"}
               fill={colorFor?.(k.key) ?? getHexColorForString(k.label)}
               isAnimationActive={false}
-              // Only when some period is short: a custom shape makes recharts
-              // hand over zero-height bars it would otherwise skip, and a
-              // chart with nothing to mark has no use for them.
-              shape={
-                withheldDays.size > 0
-                  ? (shapeProps: WithheldBarShapeProps) =>
-                      withheldBarShape(shapeProps, {
-                        withheldDays,
-                        emptyDays,
-                        drawsEmptyMark: index === 0,
-                      })
-                  : undefined
-              }
+              shape={withheldShapeFor({
+                withheldDays,
+                emptyDays,
+                drawsEmptyMark: index === 0,
+              })}
               cursor={onSelectSeries ? "pointer" : undefined}
               onClick={
                 onSelectSeries

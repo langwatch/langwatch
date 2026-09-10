@@ -1217,6 +1217,15 @@ type PaidGenieBillOutcome = {
 };
 
 /**
+ * Where a bill walk stopped short: the chunk or piece it could not read, and
+ * whether that was a refusal rather than a period too large or too slow.
+ */
+type PaidGenieBillStop = {
+  heldAt: { fromMs: number; toMs: number };
+  unreadable: boolean;
+};
+
+/**
  * Turn one bill reply into rows, or refuse the whole reply. Refusing whole is
  * the same rule the warehouse read follows: a partial answer lands some of a
  * period's rows and leaves the rest absent, and absent is indistinguishable
@@ -2356,55 +2365,22 @@ export class DatabricksGeniePuller
     const toMs = startOfDayMs(Date.now()) + ONE_DAY_MS;
 
     const rows: PaidGenieBillRow[] = [];
-    const read = (chunk: { fromMs: number; toMs: number }) =>
-      this.paidGenieBillChunk({
+    for (const chunk of warehouseCostChunks({ fromMs, toMs })) {
+      const stop = await this.walkPaidGenieBillChunk({
         config,
         token,
         options,
         budget,
         warehouseId,
         chunk,
+        rows,
       });
-    const held = ({
-      heldAt,
-      unreadable,
-    }: {
-      heldAt: { fromMs: number; toMs: number };
-      unreadable: boolean;
-    }) =>
-      this.paidGenieBillHeld({ rows, heldAt, windowEndMs: toMs, unreadable });
-
-    for (const chunk of warehouseCostChunks({ fromMs, toMs })) {
-      if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
-        return held({ heldAt: chunk, unreadable: false });
-      }
-      const answer = await read(chunk);
-      if (answer.outcome === "priced") {
-        rows.push(...answer.rows);
-        continue;
-      }
-      if (answer.outcome === "failed") {
-        return held({ heldAt: chunk, unreadable: true });
-      }
-
-      // Cut short or timed out: ask about less before holding, exactly as the
-      // warehouse read does, so the days that answer on their own still land.
-      const pieces = warehouseCostPieces(chunk);
-      if (pieces.length === 0) {
-        return held({ heldAt: chunk, unreadable: false });
-      }
-      for (const piece of pieces) {
-        if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
-          return held({ heldAt: piece, unreadable: false });
-        }
-        const pieceAnswer = await read(piece);
-        if (pieceAnswer.outcome === "priced") {
-          rows.push(...pieceAnswer.rows);
-          continue;
-        }
-        return held({
-          heldAt: piece,
-          unreadable: pieceAnswer.outcome === "failed",
+      if (stop !== null) {
+        return this.paidGenieBillHeld({
+          rows,
+          heldAt: stop.heldAt,
+          windowEndMs: toMs,
+          unreadable: stop.unreadable,
         });
       }
     }
@@ -2414,6 +2390,108 @@ export class DatabricksGeniePuller
       window: { readThroughMs: toMs, endMs: toMs, held: false },
       unreadable: false,
     };
+  }
+
+  /**
+   * One chunk of the bill window: whether the run still has room for it, the
+   * answer, and — when the answer is not whole — the pieces. Rows land on
+   * `rows` as they answer. Returns where the walk stopped, or null once the
+   * whole chunk has landed, the same split `priceWarehouseCostChunk` makes.
+   */
+  private async walkPaidGenieBillChunk({
+    config,
+    token,
+    options,
+    budget,
+    warehouseId,
+    chunk,
+    rows,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    warehouseId: string;
+    chunk: { fromMs: number; toMs: number };
+    rows: PaidGenieBillRow[];
+  }): Promise<PaidGenieBillStop | null> {
+    if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
+      return { heldAt: chunk, unreadable: false };
+    }
+    const answer = await this.paidGenieBillChunk({
+      config,
+      token,
+      options,
+      budget,
+      warehouseId,
+      chunk,
+    });
+    if (answer.outcome === "priced") {
+      rows.push(...answer.rows);
+      return null;
+    }
+    if (answer.outcome === "failed") {
+      return { heldAt: chunk, unreadable: true };
+    }
+
+    // Cut short or timed out: ask about less before holding, exactly as the
+    // warehouse read does, so the days that answer on their own still land.
+    const pieces = warehouseCostPieces(chunk);
+    if (pieces.length === 0) {
+      return { heldAt: chunk, unreadable: false };
+    }
+    return await this.walkPaidGenieBillPieces({
+      config,
+      token,
+      options,
+      budget,
+      warehouseId,
+      pieces,
+      rows,
+    });
+  }
+
+  /**
+   * The pieces of a chunk that would not answer whole, in order. Every piece
+   * that answers lands its rows; the first that does not stops the walk there,
+   * so the days before it are never re-asked.
+   */
+  private async walkPaidGenieBillPieces({
+    config,
+    token,
+    options,
+    budget,
+    warehouseId,
+    pieces,
+    rows,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    warehouseId: string;
+    pieces: { fromMs: number; toMs: number }[];
+    rows: PaidGenieBillRow[];
+  }): Promise<PaidGenieBillStop | null> {
+    for (const piece of pieces) {
+      if (budget.exhaustedWithin(WAREHOUSE_COST_TIMEOUT_MS)) {
+        return { heldAt: piece, unreadable: false };
+      }
+      const answer = await this.paidGenieBillChunk({
+        config,
+        token,
+        options,
+        budget,
+        warehouseId,
+        chunk: piece,
+      });
+      if (answer.outcome === "priced") {
+        rows.push(...answer.rows);
+        continue;
+      }
+      return { heldAt: piece, unreadable: answer.outcome === "failed" };
+    }
+    return null;
   }
 
   /**
@@ -4070,26 +4148,6 @@ function nextCursor({
     costHeldSinceMs !== null &&
     nowMs - costHeldSinceMs > WAREHOUSE_COST_MAX_HOLD_MS;
 
-  // The bill read's hold, aged the same way on its own stamp. A run that asked
-  // about no window — the read is off, or on with no warehouse — clears it:
-  // the source is not waiting on a bill, and a stamp left running against a
-  // misconfiguration would expire the hold the moment the source was fixed.
-  // Once expired, the position moves to the end of the window this run asked
-  // about — the rows in it stay unrecorded, with no amount — and the stamp is
-  // cleared so the next hold ages from its own start.
-  const paidBillHeldSinceMs = paidBillWindow?.held
-    ? (previous.paidBillHeldSinceMs ?? nowMs)
-    : null;
-  const paidBillHoldExpired =
-    paidBillHeldSinceMs !== null &&
-    nowMs - paidBillHeldSinceMs > WAREHOUSE_COST_MAX_HOLD_MS;
-  const paidBillReadThroughMs =
-    paidBillWindow === null
-      ? null
-      : paidBillHoldExpired
-        ? paidBillWindow.endMs
-        : paidBillWindow.readThroughMs;
-
   return {
     // A sweep that walked past something it never read is not whole, no matter
     // how tidily it finished. Holding the window costs a re-read of the same
@@ -4123,15 +4181,56 @@ function nextCursor({
     // moved past the period, so leaving the stamp would expire every subsequent
     // hold on arrival and the retry would never work again.
     costHeldSinceMs: holdExpired ? null : costHeldSinceMs,
-    // Never backwards, and never touched by anything above: a run that asked
-    // about no window leaves the position exactly where the last run that did
-    // put it. A held read writes its floor too — that is the whole point of
-    // the hold — and the max keeps the settling look-back from walking the
-    // floor backwards a run at a time.
-    paidBillReadThroughMs:
-      paidBillReadThroughMs === null
-        ? previous.paidBillReadThroughMs
-        : Math.max(previous.paidBillReadThroughMs ?? 0, paidBillReadThroughMs),
-    paidBillHeldSinceMs: paidBillHoldExpired ? null : paidBillHeldSinceMs,
+    // The bill read's own position and hold, folded here and nowhere near
+    // `sinceMs` or the cost hold above.
+    ...nextPaidBillPosition({ previous, paidBillWindow, nowMs }),
+  };
+}
+
+/**
+ * The paid bill read's position and hold for the next run.
+ *
+ * The hold is aged the same way as the cost hold, on its own stamp. A run that
+ * asked about no window — the read is off, or on with no warehouse — clears
+ * it: the source is not waiting on a bill, and a stamp left running against a
+ * misconfiguration would expire the hold the moment the source was fixed.
+ * Once expired, the position moves to the end of the window this run asked
+ * about — the rows in it stay unrecorded, with no amount — and the stamp is
+ * cleared so the next hold ages from its own start.
+ *
+ * The position never moves backwards: a run that asked about no window leaves
+ * it exactly where the last run that did put it. A held read writes its floor
+ * too — that is the whole point of the hold — and the max keeps the settling
+ * look-back from walking the floor backwards a run at a time.
+ */
+function nextPaidBillPosition({
+  previous,
+  paidBillWindow,
+  nowMs,
+}: {
+  previous: GenieCursor;
+  paidBillWindow: PaidGenieBillOutcome["window"];
+  nowMs: number;
+}): Pick<GenieCursor, "paidBillReadThroughMs" | "paidBillHeldSinceMs"> {
+  if (paidBillWindow === null) {
+    return {
+      paidBillReadThroughMs: previous.paidBillReadThroughMs,
+      paidBillHeldSinceMs: null,
+    };
+  }
+  const heldSinceMs = paidBillWindow.held
+    ? (previous.paidBillHeldSinceMs ?? nowMs)
+    : null;
+  const expired =
+    heldSinceMs !== null && nowMs - heldSinceMs > WAREHOUSE_COST_MAX_HOLD_MS;
+  const readThroughMs = expired
+    ? paidBillWindow.endMs
+    : paidBillWindow.readThroughMs;
+  return {
+    paidBillReadThroughMs: Math.max(
+      previous.paidBillReadThroughMs ?? 0,
+      readThroughMs,
+    ),
+    paidBillHeldSinceMs: expired ? null : heldSinceMs,
   };
 }

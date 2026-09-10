@@ -4,7 +4,10 @@ import type {
   IntentContext,
   IntentExecutor,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import {
+  type DispatchError,
+  isDispatchError,
+} from "~/server/event-sourcing/queues/dispatchError";
 import {
   incrementIngestionPullTotal,
   observeIngestionPullDuration,
@@ -293,80 +296,13 @@ export function createIngestionPullRunHandler(
         cursor: payload.cursor,
       });
     } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      if (isDispatchError(error) && error.retryable === false) {
-        // The provider refused the source outright (a key it no longer
-        // accepts, for one). Another attempt gets the same answer, and the
-        // outbox retires a non-retryable error before the retry ladder
-        // reaches the branch below that writes run_failed — so a refusal
-        // that is rethrown is never recorded. Record it now, on this
-        // attempt, and end the run. The source keeps its schedule: the next
-        // wake starts a fresh run, which is what an admin who has since
-        // replaced the key needs.
-        incrementIngestionPullTotal({ outcome: "failed_final" });
-        logger.warn(
-          {
-            sourceId: payload.sourceId,
-            attempt: intentContext.attempt,
-            error: detail,
-          },
-          "Ingestion pull refused by the provider; not retrying this run",
-        );
-        // The source page shows the refused code's text as written, so that
-        // code is only ever paired with a sentence we wrote ourselves. An
-        // adapter that refuses without one gets the generic failed code, and
-        // the page falls back to its fixed sentence; the diagnostic detail
-        // still lands in the event for the log, never on the screen.
-        const refusal =
-          error.customerMessage === undefined
-            ? { error: detail, errorCode: PULL_FAILED_ERROR_CODE }
-            : {
-                error: error.customerMessage,
-                errorCode: PULL_REFUSED_ERROR_CODE,
-              };
-        await commands.recordRunFailed({
-          tenantId: intentContext.projectId,
-          occurredAt: clock(),
-          sourceId: payload.sourceId,
-          runId: payload.runId,
-          scheduledFor: payload.scheduledFor,
-          ...refusal,
-          retryable: false,
-          retryAfterMs: providerRetryAfterMs(error),
-        });
-        return;
-      }
-      if (intentContext.attempt < maxAttempts) {
-        incrementIngestionPullTotal({ outcome: "failed_retryable" });
-        logger.warn(
-          {
-            sourceId: payload.sourceId,
-            attempt: intentContext.attempt,
-            error: detail,
-          },
-          "Ingestion pull failed; retrying from durable cursor",
-        );
-        throw error;
-      }
-      // The alertable outcome (ADR-054): retries exhausted, run_failed
-      // recorded. failed_retryable above is expected provider noise.
-      incrementIngestionPullTotal({ outcome: "failed_final" });
-      await commands.recordRunFailed({
-        tenantId: intentContext.projectId,
-        occurredAt: clock(),
-        sourceId: payload.sourceId,
-        runId: payload.runId,
-        scheduledFor: payload.scheduledFor,
-        error: detail,
-        errorCode: PULL_FAILED_ERROR_CODE,
-        // Retries are exhausted — nothing will retry THIS run. The next
-        // scheduled wake starts a fresh run from the durable cursor.
-        retryable: false,
-        // The wait leaves with the run rather than dying with it. Every
-        // attempt of this run has now been refused, so the next wake is the
-        // thing that must not walk back into the window the provider closed,
-        // and it reads this off the connection.
-        retryAfterMs: providerRetryAfterMs(error),
+      await settleFailedPull({
+        commands,
+        payload,
+        intentContext,
+        error,
+        maxAttempts,
+        clock,
       });
       return;
     }
@@ -384,6 +320,154 @@ export function createIngestionPullRunHandler(
       ...result,
     });
   };
+}
+
+/**
+ * What a failed pull leaves behind: a refusal is recorded at once, a failure
+ * with attempts left is rethrown so the outbox retries it from the durable
+ * cursor, and a failure with none left is recorded as final.
+ */
+async function settleFailedPull({
+  commands,
+  payload,
+  intentContext,
+  error,
+  maxAttempts,
+  clock,
+}: {
+  commands: IngestionPullOutcomeCommands;
+  payload: IngestionPullRunIntent;
+  intentContext: IntentContext;
+  error: unknown;
+  maxAttempts: number;
+  clock: () => number;
+}): Promise<void> {
+  const detail = error instanceof Error ? error.message : String(error);
+  if (isDispatchError(error) && error.retryable === false) {
+    await recordRefusedRun({
+      commands,
+      payload,
+      intentContext,
+      error,
+      detail,
+      clock,
+    });
+    return;
+  }
+  if (intentContext.attempt < maxAttempts) {
+    incrementIngestionPullTotal({ outcome: "failed_retryable" });
+    logger.warn(
+      {
+        sourceId: payload.sourceId,
+        attempt: intentContext.attempt,
+        error: detail,
+      },
+      "Ingestion pull failed; retrying from durable cursor",
+    );
+    throw error;
+  }
+  await recordExhaustedRun({
+    commands,
+    payload,
+    intentContext,
+    error,
+    detail,
+    clock,
+  });
+}
+
+/**
+ * The provider refused the source outright (a key it no longer accepts, for
+ * one). Another attempt gets the same answer, and the outbox retires a
+ * non-retryable error before the retry ladder reaches the branch that writes
+ * run_failed — so a refusal that is rethrown is never recorded. Record it now,
+ * on this attempt, and end the run. The source keeps its schedule: the next
+ * wake starts a fresh run, which is what an admin who has since replaced the
+ * key needs.
+ */
+async function recordRefusedRun({
+  commands,
+  payload,
+  intentContext,
+  error,
+  detail,
+  clock,
+}: {
+  commands: IngestionPullOutcomeCommands;
+  payload: IngestionPullRunIntent;
+  intentContext: IntentContext;
+  error: DispatchError;
+  detail: string;
+  clock: () => number;
+}): Promise<void> {
+  incrementIngestionPullTotal({ outcome: "failed_final" });
+  logger.warn(
+    {
+      sourceId: payload.sourceId,
+      attempt: intentContext.attempt,
+      error: detail,
+    },
+    "Ingestion pull refused by the provider; not retrying this run",
+  );
+  // The source page shows the refused code's text as written, so that code is
+  // only ever paired with a sentence we wrote ourselves. An adapter that
+  // refuses without one gets the generic failed code, and the page falls back
+  // to its fixed sentence; the diagnostic detail still lands in the event for
+  // the log, never on the screen.
+  const refusal =
+    error.customerMessage === undefined
+      ? { error: detail, errorCode: PULL_FAILED_ERROR_CODE }
+      : { error: error.customerMessage, errorCode: PULL_REFUSED_ERROR_CODE };
+  await commands.recordRunFailed({
+    tenantId: intentContext.projectId,
+    occurredAt: clock(),
+    sourceId: payload.sourceId,
+    runId: payload.runId,
+    scheduledFor: payload.scheduledFor,
+    ...refusal,
+    retryable: false,
+    retryAfterMs: providerRetryAfterMs(error),
+  });
+}
+
+/**
+ * The alertable outcome (ADR-054): retries exhausted, run_failed recorded.
+ * `failed_retryable` on the attempts before this one is expected provider
+ * noise.
+ */
+async function recordExhaustedRun({
+  commands,
+  payload,
+  intentContext,
+  error,
+  detail,
+  clock,
+}: {
+  commands: IngestionPullOutcomeCommands;
+  payload: IngestionPullRunIntent;
+  intentContext: IntentContext;
+  error: unknown;
+  detail: string;
+  clock: () => number;
+}): Promise<void> {
+  incrementIngestionPullTotal({ outcome: "failed_final" });
+  await commands.recordRunFailed({
+    tenantId: intentContext.projectId,
+    occurredAt: clock(),
+    sourceId: payload.sourceId,
+    runId: payload.runId,
+    scheduledFor: payload.scheduledFor,
+    error: detail,
+    errorCode: PULL_FAILED_ERROR_CODE,
+    // Retries are exhausted — nothing will retry THIS run. The next scheduled
+    // wake starts a fresh run from the durable cursor.
+    retryable: false,
+    // The wait leaves with the run rather than dying with it. Every attempt of
+    // this run has now been refused, so the next wake is the thing that must
+    // not walk back into the window the provider closed, and it reads this
+    // off the connection.
+    retryAfterMs: providerRetryAfterMs(error),
+  });
 }
 
 /**

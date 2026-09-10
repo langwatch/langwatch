@@ -217,8 +217,11 @@ function cursorOf(result: { cursor: string | null }) {
 /** The bound value of one named parameter on the first bill statement posted. */
 function firstBillParameter(name: string): string {
   const asked = billStatements();
-  expect(asked.length).toBeGreaterThan(0);
-  return (asked[0]!.parameters as { name: string; value: string }[]).find(
+  const first = asked[0];
+  if (first === undefined) {
+    throw new Error("no bill statement was posted");
+  }
+  return (first.parameters as { name: string; value: string }[]).find(
     (p) => p.name === name,
   )!.value;
 }
