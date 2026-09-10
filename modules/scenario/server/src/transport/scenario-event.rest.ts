@@ -15,6 +15,9 @@ import {
   responseSchemas,
   SCENARIO_TAB_NAVIGATE_EVENT,
   scenarioEventSchema,
+  scenarioEventBrowserTabBodySchema,
+  scenarioEventArchiveOutputSchema,
+  scenarioEventArchiveQuerySchema,
   ScenarioApi,
   ScenarioEventType,
   type ScenarioEvent,
@@ -63,37 +66,6 @@ export const scenarioEventErrorHandler =
     }
     return boundary(error, c);
   };
-
-const browserTabBodySchema = z.object({
-  tabKey: z.string().min(1).max(200),
-  batchRunId: z.string().min(1).max(200),
-  scenarioSetId: z.string().min(1).max(200).optional(),
-});
-
-/**
- * The archive response, as one object schema `.withOutput()` can publish: a
- * set-scoped archive reports the set id and whether more runs remain, a
- * run-scoped one reports the single run id. The union the contract answers
- * with (`archiveResponseSchema`) is the wire type; this is only how the
- * declaration documents it, since `.withOutput()` takes no plain union.
- */
-const archiveEventOutputSchema = z.object({
-  archived: z.number().int().nonnegative(),
-  failed: z.number().int().nonnegative(),
-  scenarioSetId: z.string().optional(),
-  hasMore: z.boolean().optional(),
-  scenarioRunId: z.string().optional(),
-});
-
-const archiveQuerySchema = z
-  .object({
-    scenarioSetId: z.string().min(1).optional(),
-    scenarioRunId: z.string().min(1).optional(),
-  })
-  .refine(
-    (query) => (query.scenarioSetId === undefined) !== (query.scenarioRunId === undefined),
-    { message: "Pass exactly one of scenarioSetId or scenarioRunId as a query parameter" },
-  );
 
 /**
  * REST for the events an SDK reports while a scenario runs.
@@ -203,7 +175,7 @@ export function createScenarioEventsRest(options: {
     // broadcasts there and the SDK skips opening a browser; otherwise it
     // falls back to opening one.
     .post("/browser-tab", "offerScenarioBrowserTab")
-    .withInput(browserTabBodySchema)
+    .withInput(scenarioEventBrowserTabBodySchema)
     .withPermission("scenarios:create")
     .withOutput(responseSchemas.browserTabHandoff)
     .withDocs({
@@ -255,9 +227,9 @@ export function createScenarioEventsRest(options: {
     // can never archive every run in the project. Stays at `:manage`: it is
     // destruction, and only the administration grain should carry it.
     .delete("/", "archiveScenarioEvents")
-    .withQuery(archiveQuerySchema)
+    .withQuery(scenarioEventArchiveQuerySchema)
     .withPermission("scenarios:manage")
-    .withOutput(archiveEventOutputSchema)
+    .withOutput(scenarioEventArchiveOutputSchema)
     .withDocs({
       description:
         "Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run).",

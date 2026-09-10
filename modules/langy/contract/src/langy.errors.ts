@@ -22,6 +22,23 @@ export class LangyNotEnabledError extends HandledError {
   }
 }
 
+/**
+ * No credential session behind an otherwise authenticated caller. A turn mints this user's
+ * worker credentials from the session, so refusing is the only safe answer: a session
+ * synthesized from the actor id alone would provision credentials under an incomplete user.
+ */
+export class LangySessionRequiredError extends HandledError {
+  declare readonly code: "unauthorized";
+
+  constructor() {
+    super("unauthorized", "No active session for this Langy request.", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "LangySessionRequiredError";
+  }
+}
+
 /** The requested conversation does not exist, or has been archived (HTTP 404). */
 export class LangyConversationNotFoundError extends NotFoundError {
   declare readonly code: "langy_conversation_not_found";

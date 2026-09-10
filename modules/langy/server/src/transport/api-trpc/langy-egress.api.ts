@@ -5,14 +5,13 @@
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { langyEgressAllowlistSchema } from "@langwatch/langy-contract";
+import {
+  langyEgressStateSchema,
+  langyEgressGetInputSchema,
+  langyEgressSetInputSchema,
+} from "@langwatch/langy-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { z } from "zod";
 import type { LangyApp } from "#app/langy.app";
-
-const langyEgressStateSchema = z
-  .object({ allowlist: langyEgressAllowlistSchema, enforcing: z.boolean() })
-  .strict();
 
 /**
  * The process supplies authentication; authorization arrives as `policy`.
@@ -70,13 +69,6 @@ export type LangyEgressTrpcPorts = Readonly<{
   ): Promise<void>;
 }>;
 
-const egressProjectSchema = z.object({ projectId: z.string() });
-
-const egressSetSchema = z.object({
-  projectId: z.string(),
-  allowlist: langyEgressAllowlistSchema,
-});
-
 /** Installs the complete `langyEgress.*` tRPC surface on a process-owned root. */
 export class LangyEgressTrpcApi {
   static create<
@@ -95,7 +87,7 @@ export class LangyEgressTrpcApi {
     })
       .query("get", (p) =>
         p
-          .withInput(egressProjectSchema)
+          .withInput(langyEgressGetInputSchema)
           .withOutput(langyEgressStateSchema)
           .withPermission("langy:view")
           // Monitor-only is decided on the application, not here: the editor
@@ -108,7 +100,7 @@ export class LangyEgressTrpcApi {
       )
       .mutation("set", (p) =>
         p
-          .withInput(egressSetSchema)
+          .withInput(langyEgressSetInputSchema)
           .withOutput(langyEgressStateSchema)
           .withPermission("langy:manage")
           .handle(async ({ ctx, input }) => {

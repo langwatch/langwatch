@@ -32,8 +32,11 @@ import {
   langyLocalRecordSchema,
   langyLocalWorkspaceStatusSchema,
   LangyRateLimitedError,
+  LangySessionRequiredError,
   LangyWaitExpiredError,
   langyTurnContextSchema,
+  langyTurnMessageSchema,
+  langyModelOverrideSchema,
   type LangyConversationDetail as ConversationDetail,
   type LangyConversationDetailDto,
   type LangyConversationListItem as ConversationListItem,
@@ -49,7 +52,7 @@ import { ADOPTABLE_CONVERSATION_ID } from "../../services/langy-conversation.ser
 import type { LangyChatMessageInput } from "../../services/langy-turn-shared.service.ts";
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
 import type { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter.ts";
-import { LangySessionRequiredError, type LangyApp } from "#app/langy.app";
+import type { LangyApp } from "#app/langy.app";
 import type { LocalControlRuntime } from "../../adapters/langy-local-control-runtime.adapter.ts";
 import { workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts";
 import { reconcileSkipPolicy } from "../../rules/langy-local-skip-policy.rules.ts";
@@ -183,24 +186,6 @@ export type LangyLocalTrpcPorts = Readonly<{
     write(input: { userId: string; preference: "github" | null }): Promise<void>;
   }>;
 }>;
-
-/** One chat message on the wire — role + opaque parts (bounded downstream). */
-const langyTurnMessageSchema = z.object({
-  role: z.enum(["user", "assistant", "system"]),
-  parts: z.array(z.record(z.string(), z.unknown())).default([]),
-});
-
-/**
- * Per-send model override from the sidebar picker. Shape-validated here; the value is checked
- * against the project's Langy VK allowlist in the service.
- */
-const langyModelOverrideSchema = z
-  .string()
-  .regex(
-    /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9._:-]+)+$/,
-    "modelOverride must be in 'provider/model' shape",
-  )
-  .max(200);
 
 /**
  * A caller-chosen conversation id the create path may ADOPT, the same shape

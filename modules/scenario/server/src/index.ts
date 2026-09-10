@@ -169,7 +169,6 @@ export {
   scenarioEventErrorHandler,
   type InlineMediaExtraction,
 } from "./transport/scenario-event.rest.ts";
-export { ScenarioRunRejectedError } from "./rules/scenario-run-request.rules.ts";
 export { filterRunsByTimestamp } from "./rules/simulation-run-timestamp-filter.rules.ts";
 
 // --------------------------------------------------------------------------- The run-history

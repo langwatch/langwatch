@@ -52,7 +52,6 @@ export type {
 export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
 export {
   LangyApp,
-  LangySessionRequiredError,
   type LangyBroadcast,
   type LangyEgressState,
   type LangyRedis,

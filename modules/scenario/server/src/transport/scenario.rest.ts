@@ -11,14 +11,23 @@
  * the process's boundary handler.
  */
 import { createLogger } from "@langwatch/observability";
-import { modelOverrideSchema } from "@langwatch/model-provider-contract";
 import {
   parseScenarioParameterDefinitions,
-  scenarioParameterDefinitionSchema,
-  scenarioParameterDefinitionsSchema,
   ScenarioApi,
   ScenarioNotFoundError,
   type Scenario,
+  scenarioLegacyErrorBodySchema,
+  scenarioRestResponseSchema,
+  scenarioRestResponseWithPlatformUrlSchema,
+  scenarioRestVersionSummarySchema,
+  scenarioRestVersionListResponseSchema,
+  scenarioRestVersionDetailResponseSchema,
+  scenarioRestListVersionsQuerySchema,
+  scenarioRestCreateSchema,
+  scenarioRestUpdateSchema,
+  scenarioRestIdParamsSchema,
+  scenarioRestIdVersionParamsSchema,
+  scenarioRestArchivedSchema,
 } from "@langwatch/scenario-contract";
 import type { ErrorHandler } from "hono";
 import { z } from "zod";
@@ -66,174 +75,17 @@ export const scenarioRestErrorHandler =
     return boundary(error, c);
   };
 
-const scenarioResponseSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  situation: z.string(),
-  criteria: z.array(z.string()),
-  labels: z.array(z.string()),
-  parameters: z.array(scenarioParameterDefinitionSchema),
-  /**
-   * The five fields below are optional in the document, not in the answer:
-   * every server sends them. They arrived after clients were generated from
-   * this family, and a client that reads one as required fails against a
-   * server that predates it.
-   *
-   * @see specs/api-reference/legacy-response-fields-optional.feature
-   */
-  simulatorModel: z
-    .string()
-    .nullable()
-    .optional()
-    .describe(
-      "The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family.",
-    ),
-  judgeModel: z
-    .string()
-    .nullable()
-    .optional()
-    .describe(
-      "The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family.",
-    ),
-  maxTurns: z
-    .number()
-    .int()
-    .nullable()
-    .optional()
-    .describe(
-      "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family.",
-    ),
-  minTurns: z
-    .number()
-    .int()
-    .nullable()
-    .optional()
-    .describe(
-      "The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family.",
-    ),
-  testSuiteId: z
-    .string()
-    .nullable()
-    .optional()
-    .describe(
-      "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.",
-    ),
-});
-
-const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
-  platformUrl: z.string().url(),
-});
-
-const scenarioVersionSummarySchema = z.object({
-  version: z.number().int().describe("The version number, counting from 1."),
-  authorLabel: z
-    .string()
-    .nullable()
-    .describe(
-      "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded.",
-    ),
-  authorId: z
-    .string()
-    .nullable()
-    .describe("The user who saved the version. Null when the save came from an API key."),
-  changeDescription: z.string().nullable(),
-  changedFields: z.array(z.string()).describe("The fields whose value this save changed."),
-  createdAt: z.string().describe("When the version was written, in ISO 8601."),
-  isSynthesized: z
-    .boolean()
-    .describe(
-      "True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back.",
-    ),
-});
-
-const scenarioVersionListResponseSchema = z.object({
-  versions: z.array(scenarioVersionSummarySchema),
-  nextCursor: z
-    .number()
-    .int()
-    .nullable()
-    .describe("Pass as cursor to read the page below this one. Null on the last page."),
-});
-
-const scenarioVersionDetailResponseSchema = scenarioVersionSummarySchema.extend({
-  schemaVersion: z.number().int().describe("The shape the snapshot was written in."),
-  snapshot: z
-    .object({
-      name: z.string(),
-      situation: z.string(),
-      criteria: z.array(z.string()),
-      labels: z.array(z.string()),
-      parameters: z.array(scenarioParameterDefinitionSchema),
-      simulatorModel: z.string().nullable(),
-      judgeModel: z.string().nullable(),
-      maxTurns: z.number().nullable(),
-      minTurns: z.number().nullable(),
-    })
-    .describe("The editable content of the case as this version saved it."),
-});
-
-const listScenarioVersionsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).optional(),
-  cursor: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .optional()
-    .describe("Read the page below this version number."),
-});
-
-const parametersDescription =
-  "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.";
-
-const testSuiteIdDescription =
-  "The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite.";
-
-const simulatorModelDescription =
-  "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.";
-const judgeModelDescription =
-  "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.";
-const maxTurnsDescription =
-  "Maximum conversation turns for a run of this scenario. Null uses the default.";
-const minTurnsDescription =
-  "Minimum conversation turns before the judge may end the run. Null uses the default.";
-
-const createScenarioSchema = z.object({
-  name: z.string().min(1, "name is required"),
-  situation: z.string(),
-  criteria: z.array(z.string()).optional().default([]),
-  labels: z.array(z.string()).optional().default([]),
-  parameters: scenarioParameterDefinitionsSchema.optional().describe(parametersDescription),
-  simulatorModel: modelOverrideSchema.nullish().describe(simulatorModelDescription),
-  judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
-  maxTurns: z.number().int().min(1).max(100).nullish().describe(maxTurnsDescription),
-  minTurns: z.number().int().min(0).max(100).nullish().describe(minTurnsDescription),
-  testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
-});
-
-const updateScenarioSchema = z.object({
-  name: z.string().min(1).optional(),
-  situation: z.string().optional(),
-  criteria: z.array(z.string()).optional(),
-  labels: z.array(z.string()).optional(),
-  parameters: scenarioParameterDefinitionsSchema.optional().describe(parametersDescription),
-  simulatorModel: modelOverrideSchema.nullish().describe(simulatorModelDescription),
-  judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
-  maxTurns: z.number().int().min(1).max(100).nullish().describe(maxTurnsDescription),
-  minTurns: z.number().int().min(0).max(100).nullish().describe(minTurnsDescription),
-  testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
-});
-
 /**
  * The fields the caller named. The schema marks every field optional, and a
  * field the body omits stays out of the update, so a PATCH never overwrites a
  * value the caller did not send. A null is a value: it clears the field.
  */
 function scenarioUpdateData(
-  body: z.infer<typeof updateScenarioSchema>,
-): Partial<z.infer<typeof updateScenarioSchema>> {
+  body: z.infer<typeof scenarioRestUpdateSchema>,
+): Partial<z.infer<typeof scenarioRestUpdateSchema>> {
   return Object.fromEntries(
     Object.entries(body).filter(([, value]) => value !== undefined),
-  ) as Partial<z.infer<typeof updateScenarioSchema>>;
+  ) as Partial<z.infer<typeof scenarioRestUpdateSchema>>;
 }
 
 function toScenarioResponse(scenario: Scenario) {
@@ -257,18 +109,10 @@ function scenarioEditorPath(scenarioId: string): string {
   return `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenarioId}`;
 }
 
-const idParamsSchema = z.object({ id: z.string().min(1) });
-const idVersionParamsSchema = idParamsSchema.extend({
-  version: z.coerce.number().int().min(1),
-});
-const archivedScenarioSchema = z.object({ id: z.string(), archived: z.boolean() });
-
-const legacyErrorBodySchema = z.object({ error: z.string() });
-
 const scenarioNotFoundResponse = {
   404: {
     description: "Scenario not found",
-    content: { "application/json": { schema: resolver(legacyErrorBodySchema) } },
+    content: { "application/json": { schema: resolver(scenarioLegacyErrorBodySchema) } },
   },
 };
 
@@ -291,7 +135,7 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
     /** List every scenario in the project. */
     .get("/", "listScenarios")
     .withPermission("scenarios:view")
-    .withOutput(z.array(scenarioResponseWithPlatformUrlSchema))
+    .withOutput(z.array(scenarioRestResponseWithPlatformUrlSchema))
     .withDocs({ description: "Get all scenarios for a project" })
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, scope }, project) => {
@@ -302,9 +146,9 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
 
     /** Read one scenario by id. */
     .get("/:id", "getScenario")
-    .withParams(idParamsSchema)
+    .withParams(scenarioRestIdParamsSchema)
     .withPermission("scenarios:view")
-    .withOutput(scenarioResponseWithPlatformUrlSchema)
+    .withOutput(scenarioRestResponseWithPlatformUrlSchema)
     .withDocs({
       description: "Get a specific scenario by ID",
       responses: scenarioNotFoundResponse,
@@ -322,9 +166,9 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
     // could create a scenario yesterday still can. What changes is that access
     // granted at the CREATE grain now works.
     .post("/", "createScenario")
-    .withInput(createScenarioSchema)
+    .withInput(scenarioRestCreateSchema)
     .withPermission("scenarios:create")
-    .withOutput(scenarioResponseWithPlatformUrlSchema)
+    .withOutput(scenarioRestResponseWithPlatformUrlSchema)
     .withStatus(201)
     .withDocs({ description: "Create a new scenario" })
     .withMiddleware(projectRestFacts, scenarioRestSurface)
@@ -355,10 +199,10 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
      * same behavior instead of a 404 on one of them.
      */
     .put("/:id", "updateScenario")
-    .withParams(idParamsSchema)
-    .withInput(updateScenarioSchema)
+    .withParams(scenarioRestIdParamsSchema)
+    .withInput(scenarioRestUpdateSchema)
     .withPermission("scenarios:update")
-    .withOutput(scenarioResponseWithPlatformUrlSchema)
+    .withOutput(scenarioRestResponseWithPlatformUrlSchema)
     .withDocs({ description: "Update an existing scenario", responses: scenarioNotFoundResponse })
     .withMiddleware(projectRestFacts, scenarioRestSurface)
     .handle(async ({ app, input, scope }, project, surface) => {
@@ -376,10 +220,10 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
     })
 
     .patch("/:id", "patchScenario")
-    .withParams(idParamsSchema)
-    .withInput(updateScenarioSchema)
+    .withParams(scenarioRestIdParamsSchema)
+    .withInput(scenarioRestUpdateSchema)
     .withPermission("scenarios:update")
-    .withOutput(scenarioResponseWithPlatformUrlSchema)
+    .withOutput(scenarioRestResponseWithPlatformUrlSchema)
     .withDocs({ description: "Update an existing scenario", responses: scenarioNotFoundResponse })
     .withMiddleware(projectRestFacts, scenarioRestSurface)
     .handle(async ({ app, input, scope }, project, surface) => {
@@ -400,9 +244,9 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
     // refined because access issued at that grain was being refused; nothing
     // is asking to destroy scenarios at a finer grain.
     .delete("/:id", "archiveScenario")
-    .withParams(idParamsSchema)
+    .withParams(scenarioRestIdParamsSchema)
     .withPermission("scenarios:manage")
-    .withOutput(archivedScenarioSchema)
+    .withOutput(scenarioRestArchivedSchema)
     .withDocs({
       description: "Archive (soft-delete) a scenario",
       responses: scenarioNotFoundResponse,
@@ -423,10 +267,10 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
 
     /** The version history of a scenario, newest first. */
     .get("/:id/versions", "listScenarioVersions")
-    .withParams(idParamsSchema)
-    .withQuery(listScenarioVersionsQuerySchema)
+    .withParams(scenarioRestIdParamsSchema)
+    .withQuery(scenarioRestListVersionsQuerySchema)
     .withPermission("scenarios:view")
-    .withOutput(scenarioVersionListResponseSchema)
+    .withOutput(scenarioRestVersionListResponseSchema)
     .withDocs({
       description:
         "List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.",
@@ -470,16 +314,16 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
      * also answers: it has no stored snapshot to serve.
      */
     .get("/:id/versions/:version", "getScenarioVersion")
-    .withParams(idVersionParamsSchema)
+    .withParams(scenarioRestIdVersionParamsSchema)
     .withPermission("scenarios:view")
-    .withOutput(scenarioVersionDetailResponseSchema)
+    .withOutput(scenarioRestVersionDetailResponseSchema)
     .withDocs({
       description:
         "Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.",
       responses: {
         404: {
           description: "Scenario or version not found",
-          content: { "application/json": { schema: resolver(legacyErrorBodySchema) } },
+          content: { "application/json": { schema: resolver(scenarioLegacyErrorBodySchema) } },
         },
       },
     })

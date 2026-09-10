@@ -10,7 +10,10 @@ import {
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
 } from "@langwatch/api/rest";
-import { LangyApiRequestInvalidError, langyMessagePartSchema } from "@langwatch/langy-contract";
+import {
+  LangyApiRequestInvalidError,
+  langyRestTurnBodySchema,
+} from "@langwatch/langy-contract";
 import type { Context } from "hono";
 import { z } from "zod";
 
@@ -59,33 +62,6 @@ export type LangyTurnsRestPorts = LangyRestCredentialPorts &
   }>;
 
 /**
- * One user turn on the wire. Parts stay opaque; the app layer bounds them. `content` is the
- * plain-text shorthand a generic HTTP client (a script, a scenario HTTP agent's body template)
- * can produce without restructuring its own message shape; it normalizes to a single text part.
- */
-const messageSchema = z
-  .object({
-    role: z.enum(["user", "assistant", "system"]),
-    parts: z.array(langyMessagePartSchema).optional(),
-    content: z.string().optional(),
-  })
-  .transform(({ role, parts, content }) => ({
-    role,
-    parts: parts ?? (content === undefined ? [] : [{ type: "text", text: content }]),
-  }));
-
-const turnBodySchema = z.object({
-  messages: z.array(messageSchema).min(1),
-  idempotencyKey: z.string().min(1),
-  modelOverride: z.string().min(1).optional(),
-  /**
-   * Adopt the path's conversation id as a NEW conversation when it does not exist yet, instead
-   * of minting a fresh one.
-   */
-  adoptConversationId: z.boolean().optional(),
-});
-
-/**
  * `Prefer: wait=<seconds>` (RFC 7240) opts a caller into synchronous delivery: the request is
  * held until the turn settles and the assistant's reply comes back in the body.
  */
@@ -104,7 +80,7 @@ function requestedWaitSeconds(c: Context): number | null {
  * Parse and validate a turn request body.
  */
 async function parseTurnBody(c: Context, conversationId: string | null) {
-  const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
+  const parsed = langyRestTurnBodySchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) throw new LangyApiRequestInvalidError(parsed.error.issues);
   if (parsed.data.adoptConversationId && !conversationId) {
     throw new LangyApiRequestInvalidError([

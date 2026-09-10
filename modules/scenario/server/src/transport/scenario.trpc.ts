@@ -19,13 +19,13 @@ import {
   ScenarioApi,
   ScenarioNotFoundError,
   ScenarioReservedSetIdError,
+  ScenarioRunRejectedError,
   scenarioTrpc,
   type RunActor,
 } from "@langwatch/scenario-contract";
 import { on } from "node:events";
 
 import { filterRunsByTimestamp } from "../rules/simulation-run-timestamp-filter.rules.ts";
-import { ScenarioRunRejectedError } from "../rules/scenario-run-request.rules.ts";
 
 const logger = createLogger("langwatch:scenario:trpc");
 

@@ -8,7 +8,11 @@
  */
 import { deferredScope } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import { ScenarioApi } from "@langwatch/scenario-contract";
+import {
+  ScenarioApi,
+  scenarioGenerateResultSchema,
+  scenarioGenerateRequestSchema,
+} from "@langwatch/scenario-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateObject, type LanguageModel } from "ai";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -51,30 +55,6 @@ export interface ScenarioGenerateRestPorts<TSession extends ScenarioGenerateRest
 export const SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS = 30_000;
 
 const SCENARIO_GENERATE_MAX_RETRIES = 1;
-
-const scenarioSchema = z.object({
-  name: z.string().describe("A short, descriptive name for the scenario (3-6 words)"),
-  situation: z
-    .string()
-    .describe(
-      "The context and setup: user persona, emotional state, background, and what they're trying to accomplish",
-    ),
-  criteria: z
-    .array(z.string())
-    .describe("3-6 specific, observable success criteria that can be judged from the conversation"),
-});
-
-const requestSchema = z.object({
-  prompt: z.string().min(1, "Prompt is required"),
-  currentScenario: z
-    .object({
-      name: z.string(),
-      situation: z.string(),
-      criteria: z.array(z.string()),
-    })
-    .nullable(),
-  projectId: z.string().min(1, "Project ID is required"),
-});
 
 const SYSTEM_PROMPT = `You are a scenario generation assistant for LangWatch. Your job is to help users create behavioral test scenarios for their AI agents. You will respond with a JSON object containing the scenario details.
 
@@ -134,9 +114,9 @@ export function createScenarioGenerateRest<TSession extends ScenarioGenerateRest
         return answer(401, { error: "You must be logged in to access this endpoint." });
       }
 
-      let body: z.infer<typeof requestSchema>;
+      let body: z.infer<typeof scenarioGenerateRequestSchema>;
       try {
-        body = requestSchema.parse(JSON.parse(raw));
+        body = scenarioGenerateRequestSchema.parse(JSON.parse(raw));
       } catch (error) {
         logger.error({ error }, "Invalid request body");
         return answer(400, { error: "Invalid request body" });
@@ -160,7 +140,7 @@ export function createScenarioGenerateRest<TSession extends ScenarioGenerateRest
 
         const result = await generateObject({
           model,
-          schema: scenarioSchema,
+          schema: scenarioGenerateResultSchema,
           system: SYSTEM_PROMPT,
           prompt: userPrompt,
           maxRetries: SCENARIO_GENERATE_MAX_RETRIES,

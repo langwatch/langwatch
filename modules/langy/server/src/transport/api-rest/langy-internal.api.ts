@@ -9,7 +9,10 @@ import {
   type MountableRestApp,
 } from "@langwatch/api/rest";
 import { ValidationError } from "@langwatch/handled-error";
-import { type CliToolResult, cliToolResultSchema } from "@langwatch/langy-contract";
+import {
+  langyRevokeCredentialsSchema,
+  langyTurnResultSchema,
+} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Context, MiddlewareHandler, Next } from "hono";
 import { z } from "zod";
@@ -70,50 +73,6 @@ export const langyInternalPolicy = () =>
 
 // ── turn result ingest ────────────────────────────────────────────────────
 
-/**
- * A tool call the agent ran, as posted with a completed turn. `output` doubles
- * as the error text when `isError` (a single wire field).
- */
-const finalToolCallSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  input: z.unknown().optional(),
-  output: z.string().optional(),
-  isError: z.boolean().optional(),
-  /** Canonical typed result; optional only for older workers during rollout. */
-  // Keep the CLI result's own validator as the single source of truth and
-  // preserve this route's existing error path at the value boundary.
-  result: z
-    .custom<CliToolResult>(
-      (value) => cliToolResultSchema.safeParse(value).success,
-      "Invalid CLI tool result",
-    )
-    .optional(),
-});
-
-const turnResultSchema = z.object({
-  projectId: z.string().min(1),
-  conversationId: z.string().min(1),
-  status: z.enum(["completed", "failed"]),
-  /** The final assistant prose. Present (possibly empty) on `completed`. */
-  text: z.string().optional(),
-  toolCalls: z.array(finalToolCallSchema).optional(),
-  /**
-   * A terminal error code the agent emits on its error frames (e.g.
-   * `at-capacity`, `session-not-found`, `worker_spawn_failed`). Mapped to a
-   * vetted domain error server-side; never raw prose. Present on `failed`.
-   */
-  errorCode: z.string().optional(),
-});
-
-const revokeCredentialsSchema = z.object({
-  apiKeyId: z.string().min(1).max(128),
-  // The tenant the key belongs to. Required so the revoke is scoped to one
-  // project — without it a bearer-secret holder could revoke any tenant's live
-  // session key by id alone.
-  projectId: z.string().min(1).max(128),
-});
-
 /** Builds the `/api/internal/langy` family over one process's ports. */
 export function createLangyInternalRestApp(options: {
   security: AppRestSecurity;
@@ -146,7 +105,7 @@ export function createLangyInternalRestApp(options: {
       });
     }
 
-    const parsed = turnResultSchema.safeParse(await c.req.json().catch(() => null));
+    const parsed = langyTurnResultSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) {
       throw ValidationError.fromZodError(parsed.error);
     }
@@ -209,7 +168,7 @@ export function createLangyInternalRestApp(options: {
    * `revokeWorkerSessionKey` refuses any key that is not a Langy session key.
    */
   const revokeHandler = async (c: Context) => {
-    const parsed = revokeCredentialsSchema.safeParse(await c.req.json().catch(() => null));
+    const parsed = langyRevokeCredentialsSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) {
       throw ValidationError.fromZodError(parsed.error);
     }

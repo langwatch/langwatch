@@ -42,3 +42,7 @@ export * from "./run-models.ts";
 export * from "./simulation-target.ts";
 export * from "./scenario-run-export.errors.ts";
 export * from "./scenario.responses.ts";
+export * from "./scenario-event.schemas.ts";
+export * from "./scenario-generate.schemas.ts";
+export * from "./scenario-rest.schemas.ts";
+export * from "./simulation-run.schemas.ts";

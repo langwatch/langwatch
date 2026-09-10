@@ -13,6 +13,16 @@ import {
   ScenarioApi,
   type BatchSummary,
   type ScenarioRunData,
+  scenarioLegacyErrorBodySchema,
+  scenarioRunRestResponseSchema,
+  scenarioRunRestResponseWithPlatformUrlSchema,
+  simulationBatchSummaryRestSchema,
+  simulationRunListQuerySchema,
+  simulationBatchQuerySchema,
+  scenarioRunIdParamsSchema,
+  batchRunIdParamsSchema,
+  simulationRunListResponseSchema,
+  simulationBatchListResponseSchema,
 } from "@langwatch/scenario-contract";
 import type { ErrorHandler } from "hono";
 import { z } from "zod";
@@ -39,78 +49,6 @@ export type ScenarioRunPlatformUrlBuilder = (args: {
   projectSlug: string;
   scenarioRunId: string;
 }) => string;
-
-const scenarioRunResponseSchema = z.object({
-  scenarioId: z.string(),
-  batchRunId: z.string(),
-  scenarioRunId: z.string(),
-  name: z.string().nullable(),
-  description: z.string().nullable(),
-  status: z.string(),
-  results: z
-    .object({
-      verdict: z.string().nullable().optional(),
-      reasoning: z.string().nullable().optional(),
-      metCriteria: z.array(z.string()).optional(),
-      unmetCriteria: z.array(z.string()).optional(),
-      error: z.string().nullable().optional(),
-    })
-    .nullable(),
-  messages: z.array(
-    z.object({
-      role: z.string(),
-      content: z.string(),
-    }),
-  ),
-  timestamp: z.number(),
-  updatedAt: z.number(),
-  durationInMs: z.number(),
-  totalCost: z.number().optional(),
-  note: z
-    .string()
-    .nullable()
-    .describe(
-      "One short line saying why the run was started, as given when it was queued. Null on a run started without one.",
-    ),
-  scenarioVersion: z
-    .number()
-    .int()
-    .nullable()
-    .describe(
-      "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed.",
-    ),
-});
-
-const scenarioRunResponseWithPlatformUrlSchema = scenarioRunResponseSchema.extend({
-  platformUrl: z.string().url(),
-});
-
-const batchSummarySchema = z.object({
-  batchRunId: z.string(),
-  totalCount: z.number(),
-  passCount: z.number(),
-  failCount: z.number(),
-  runningCount: z.number(),
-  settledCount: z.number(),
-  stalledCount: z.number(),
-  lastRunAt: z.number(),
-  lastUpdatedAt: z.number(),
-  firstCompletedAt: z.number().nullable(),
-  allCompletedAt: z
-    .number()
-    .nullable()
-    .describe(
-      "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.",
-    )
-    .meta({ deprecated: true }),
-  isComplete: z.boolean().describe("True when every run of the batch reached a terminal status."),
-  note: z
-    .string()
-    .nullable()
-    .describe(
-      "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one.",
-    ),
-});
 
 /**
  * Adds the completion flag the API exposes on top of the stored counts.
@@ -156,19 +94,6 @@ function toRunResponse(run: ScenarioRunData) {
   };
 }
 
-const listQuerySchema = z.object({
-  scenarioSetId: z.string().optional(),
-  batchRunId: z.string().optional(),
-  limit: z.coerce.number().int().positive().max(100).optional().default(20),
-  cursor: z.string().optional(),
-});
-
-const batchQuerySchema = z.object({
-  scenarioSetId: z.string(),
-  limit: z.coerce.number().int().positive().max(50).optional().default(10),
-  cursor: z.string().optional(),
-});
-
 /**
  * A run or a batch this project does not hold. The family answers it in the
  * bare `{ error }` body it has always had, so the miss is raised as the
@@ -186,26 +111,10 @@ export const simulationRunErrorHandler =
     return boundary(error, c);
   };
 
-const scenarioRunIdParamsSchema = z.object({ scenarioRunId: z.string().min(1) });
-const batchRunIdParamsSchema = z.object({ batchRunId: z.string().min(1) });
-
-const runListResponseSchema = z.object({
-  runs: z.array(scenarioRunResponseWithPlatformUrlSchema),
-  hasMore: z.boolean().optional(),
-  nextCursor: z.string().optional(),
-});
-
-const batchListResponseSchema = z.object({
-  batches: z.array(batchSummarySchema),
-  hasMore: z.boolean().optional(),
-  nextCursor: z.string().optional(),
-});
-
-const legacyErrorBodySchema = z.object({ error: z.string() });
 const notFoundResponse = {
   404: {
     description: "Not found",
-    content: { "application/json": { schema: resolver(legacyErrorBodySchema) } },
+    content: { "application/json": { schema: resolver(scenarioLegacyErrorBodySchema) } },
   },
 };
 
@@ -232,9 +141,9 @@ export function createSimulationRunsRest(options: {
     .withVersion(MANAGEMENT_API_VERSION)
 
     .get("/", "listSimulationRuns")
-    .withQuery(listQuerySchema)
+    .withQuery(simulationRunListQuerySchema)
     .withPermission("scenarios:view")
-    .withOutput(runListResponseSchema)
+    .withOutput(simulationRunListResponseSchema)
     .withDocs({
       description: "List simulation runs, optionally filtered by scenarioSetId or batchRunId",
     })
@@ -287,7 +196,7 @@ export function createSimulationRunsRest(options: {
     .get("/:scenarioRunId", "getSimulationRun")
     .withParams(scenarioRunIdParamsSchema)
     .withPermission("scenarios:view")
-    .withOutput(scenarioRunResponseWithPlatformUrlSchema)
+    .withOutput(scenarioRunRestResponseWithPlatformUrlSchema)
     .withDocs({
       description: "Get a single simulation run by its ID",
       responses: notFoundResponse,
@@ -307,9 +216,9 @@ export function createSimulationRunsRest(options: {
     })
 
     .get("/batches/list", "listSimulationRunBatches")
-    .withQuery(batchQuerySchema)
+    .withQuery(simulationBatchQuerySchema)
     .withPermission("scenarios:view")
-    .withOutput(batchListResponseSchema)
+    .withOutput(simulationBatchListResponseSchema)
     .withDocs({
       description: "List batch summaries for a scenario set (pass/fail counts per batch)",
     })
@@ -335,7 +244,7 @@ export function createSimulationRunsRest(options: {
     .get("/batches/:batchRunId", "getSimulationRunBatch")
     .withParams(batchRunIdParamsSchema)
     .withPermission("scenarios:view")
-    .withOutput(batchSummarySchema)
+    .withOutput(simulationBatchSummaryRestSchema)
     .withDocs({
       description: "Get the summary of a single batch run, including its completion flag",
       responses: notFoundResponse,

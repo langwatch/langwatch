@@ -16,6 +16,7 @@ import {
   LangyApiRequestInvalidError,
   LangyConversationNotFoundError,
   LangyUiActionUnknownError,
+  langyUiActionDispatchBodySchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -80,18 +81,6 @@ export type LangyUiActionsRestPorts = LangyRestCredentialPorts &
     backendRunner?: UiActionBackendRunner | undefined;
   }>;
 
-const dispatchBodySchema = z.object({
-  conversationId: z.string().min(1),
-  kind: z.string().min(1),
-  payload: z.unknown().optional(),
-  /**
-   * Which experiment a backend fallback applies the action to. The browser
-   * path ignores it (the open page IS the experiment); without it a fallback
-   * for a workbench action refuses with `langy_ui_experiment_required`.
-   */
-  experimentSlug: z.string().min(1).optional(),
-});
-
 /** Builds the `/api/langy/ui/actions` family over one process's ports. */
 export function createLangyUiActionsRestApp(options: {
   security: AppRestSecurity;
@@ -132,7 +121,7 @@ export function createLangyUiActionsRestApp(options: {
     });
     if (caller.dark) return c.notFound();
 
-    const parsed = dispatchBodySchema.safeParse(await c.req.json().catch(() => null));
+    const parsed = langyUiActionDispatchBodySchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) {
       throw new LangyApiRequestInvalidError(parsed.error.issues);
     }

@@ -2,7 +2,7 @@
  * The Langy feature's application: what its doors call. It holds every service and process
  * capability the feature's api files reach, and it is the one typed thing a transport is given.
  */
-import { HandledError, ValidationError } from "@langwatch/handled-error";
+import { ValidationError } from "@langwatch/handled-error";
 import {
   LangyConversationNotFoundError,
   type LangyConversationDetail,
@@ -63,23 +63,6 @@ export type LangyBroadcast = Readonly<{
   getTenantEmitter(tenantId: string): NodeJS.EventEmitter;
   cleanupTenantEmitter(tenantId: string): void;
 }>;
-
-/**
- * No credential session behind an otherwise authenticated caller. A turn mints this user's
- * worker credentials from the session, so refusing is the only safe answer: a session
- * synthesized from the actor id alone would provision credentials under an incomplete user.
- */
-export class LangySessionRequiredError extends HandledError {
-  declare readonly code: "unauthorized";
-
-  constructor() {
-    super("unauthorized", "No active session for this Langy request.", {
-      httpStatus: 401,
-      fault: "customer",
-    });
-    this.name = "LangySessionRequiredError";
-  }
-}
 
 /** What the process composes this feature's application from. */
 type LangyAppDependencies = {

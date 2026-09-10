@@ -18,14 +18,17 @@ import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import {
   approveControlRequestBodySchema,
   approveControlRequestResponseSchema,
-  cliFrameSchema,
   LangyLocalRequestInvalidError,
   listControlRequestsResponseSchema,
   LOCAL_CONTROL_PROTOCOL_VERSION,
-  platformFrameSchema,
-  refusedFrameSchema,
-  registeredFrameSchema,
   registerFrameSchema,
+  langyControlIdParamsSchema,
+  langyControlCancelResultSchema,
+  langyControlRegisterAnswerSchema,
+  langyControlPollAnswerSchema,
+  langyControlFramesBodySchema,
+  langyControlFramesAnswerSchema,
+  langyControlPollQuerySchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -43,50 +46,6 @@ export type LangyLocalControlRestPorts = Readonly<{
   /** This deployment's own origin, for the endpoint and the follow-along link. */
   baseHost: string | undefined;
 }>;
-
-const idParamsSchema = z.object({
-  id: z.string().min(1).describe("The control request id."),
-});
-
-const cancelResultSchema = z.object({
-  id: z.string().describe("The request that was cancelled."),
-  cancelled: z.literal(true).describe("Always true once the request is gone."),
-});
-
-const registerAnswerSchema = z.object({
-  frame: z
-    .union([registeredFrameSchema, refusedFrameSchema])
-    .describe("The registered frame, or the refused frame with its reason."),
-  instanceToken: z
-    .string()
-    .optional()
-    .describe(
-      "The token the poll and frames endpoints are addressed with, in the " +
-        "X-Agent-Instance-Token header. Present when the register was accepted.",
-    ),
-});
-
-const pollAnswerSchema = z.object({
-  frames: z
-    .array(platformFrameSchema)
-    .describe("The frames waiting for the folder; empty once the poll wait passes with none."),
-});
-
-const framesBodySchema = z.object({
-  frames: z
-    .array(cliFrameSchema)
-    .min(1)
-    .max(100)
-    .describe("Ack, result, permission_required and deregister frames, in order."),
-});
-
-const framesAnswerSchema = z.object({
-  accepted: z.number().int().describe("How many frames were taken."),
-});
-
-const pollQuerySchema = z.object({
-  inFlight: z.string().optional().describe("Comma-separated call ids this folder still holds."),
-});
 
 /**
  * The access declaration of the connect endpoints. The handler authenticates
@@ -211,7 +170,7 @@ export function createLangyLocalControlRestApp(options: {
   };
 
   const framesHandler = async (c: ControlContext) => {
-    const body = framesBodySchema.safeParse(await c.req.json().catch(() => null));
+    const body = langyControlFramesBodySchema.safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ accepted: 0 }, 422);
     const answer = await ports.longPoll().frames({
       token: c.req.header(INSTANCE_TOKEN_HEADER) ?? "",
@@ -233,7 +192,7 @@ export function createLangyLocalControlRestApp(options: {
     )
     .registerRoute("get", "/connect/poll", MANAGEMENT_API_VERSION, pollHandler, (b) =>
       connectDoor(b)
-        .withQuery(pollQuerySchema)
+        .withQuery(langyControlPollQuerySchema)
         .withRawResponse(
           "the frames waiting for the folder, or 410 when the instance token is not known",
         ),
@@ -258,7 +217,7 @@ export function createLangyLocalControlRestApp(options: {
     )
     .registerRoute("post", "/requests/:id/approve", MANAGEMENT_API_VERSION, approveHandler, (b) =>
       policy(requires("langy:create"))(b)
-        .withParams(idParamsSchema)
+        .withParams(langyControlIdParamsSchema)
         .withInput(approveControlRequestBodySchema)
         .withOutput(approveControlRequestResponseSchema)
         .withDocs({
@@ -273,8 +232,8 @@ export function createLangyLocalControlRestApp(options: {
     )
     .registerRoute("post", "/requests/:id/cancel", MANAGEMENT_API_VERSION, cancelHandler, (b) =>
       policy(requires("langy:create"))(b)
-        .withParams(idParamsSchema)
-        .withOutput(cancelResultSchema)
+        .withParams(langyControlIdParamsSchema)
+        .withOutput(langyControlCancelResultSchema)
         .withDocs({
           summary: "Cancel a Langy control request",
           description:
@@ -288,7 +247,7 @@ export function createLangyLocalControlRestApp(options: {
 }
 
 export type { RegisterAnswer };
-type RegisterAnswer = z.infer<typeof registerAnswerSchema>;
-type PollAnswer = z.infer<typeof pollAnswerSchema>;
-type FramesAnswer = z.infer<typeof framesAnswerSchema>;
+type RegisterAnswer = z.infer<typeof langyControlRegisterAnswerSchema>;
+type PollAnswer = z.infer<typeof langyControlPollAnswerSchema>;
+type FramesAnswer = z.infer<typeof langyControlFramesAnswerSchema>;
 export type { PollAnswer, FramesAnswer };

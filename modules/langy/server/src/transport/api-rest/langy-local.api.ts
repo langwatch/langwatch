@@ -23,9 +23,10 @@ import {
   LangyApiRequestInvalidError,
   LangyConversationNotFoundError,
   SHARE_CONTROL_COMMAND,
-  startCallBodySchema,
-  startWaitBodySchema,
   workspaceStatusSchema,
+  langyLocalCallIdParamsSchema,
+  langyLocalStartCallRequestSchema,
+  langyLocalStartWaitRequestSchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -110,19 +111,6 @@ export type LangyLocalRestPorts = LangyRestCredentialPorts &
     /** Whether the conversation's model may skip permission cards. */
     skipGate: ControlSkipGate;
   }>;
-
-const conversationBodySchema = z.object({
-  conversationId: z.string().min(1),
-  turnId: z.string().min(1),
-  /** The worker's own tool call, so the card renders where the work is. */
-  toolCallId: z.string().min(1).optional(),
-});
-
-/** The call or wait a poll and a cancel name in the path. */
-const callIdParamsSchema = z.object({ id: z.string().min(1) });
-
-const startCallRequestSchema = conversationBodySchema.and(startCallBodySchema);
-const startWaitRequestSchema = conversationBodySchema.and(startWaitBodySchema);
 
 export function createLangyLocalRestApp(options: {
   security: AppRestSecurity;
@@ -277,7 +265,7 @@ export function createLangyLocalRestApp(options: {
 
   const startCallHandler = async (c: ServiceContext<EndpointVariables>) => {
     const auth = await authorize(c);
-    const body = await parseBody(c, startCallRequestSchema);
+    const body = await parseBody(c, langyLocalStartCallRequestSchema);
     const conversation = await requireConversation({
       ...auth,
       conversationId: body.conversationId,
@@ -351,7 +339,7 @@ export function createLangyLocalRestApp(options: {
 
   const startWaitHandler = async (c: ServiceContext<EndpointVariables>) => {
     const auth = await authorize(c);
-    const body = await parseBody(c, startWaitRequestSchema);
+    const body = await parseBody(c, langyLocalStartWaitRequestSchema);
     await requireConversation({ ...auth, conversationId: body.conversationId });
 
     const wait = await ports.runtime().waits.startQuestion({
@@ -398,7 +386,7 @@ export function createLangyLocalRestApp(options: {
     )
     .registerRoute("get", "/local/calls/:id", MANAGEMENT_API_VERSION, readCallHandler, (b) =>
       localDoor(b)
-        .withParams(callIdParamsSchema)
+        .withParams(langyLocalCallIdParamsSchema)
         .withRawResponse("the call's answer, or Hono's own 404 while it is still running"),
     )
     .registerRoute(
@@ -407,7 +395,7 @@ export function createLangyLocalRestApp(options: {
       MANAGEMENT_API_VERSION,
       cancelCallHandler,
       (b) =>
-        localDoor(b).withParams(callIdParamsSchema).withRawResponse("the cancelled call's own id"),
+        localDoor(b).withParams(langyLocalCallIdParamsSchema).withRawResponse("the cancelled call's own id"),
     )
     .registerRoute("post", "/waits", MANAGEMENT_API_VERSION, startWaitHandler, (b) =>
       localDoor(b)
@@ -416,7 +404,7 @@ export function createLangyLocalRestApp(options: {
     )
     .registerRoute("get", "/waits/:id", MANAGEMENT_API_VERSION, readWaitHandler, (b) =>
       localDoor(b)
-        .withParams(callIdParamsSchema)
+        .withParams(langyLocalCallIdParamsSchema)
         .withRawResponse("the answered question, or Hono's own 404 while it is still waiting"),
     )
     .build();

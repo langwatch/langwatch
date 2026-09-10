@@ -16,6 +16,8 @@ export * from "./inline-channel/preview.ts";
 export * from "./inline-channel/choices.ts";
 export * from "./inline-channel/parts.ts";
 export * from "./langy.ts";
+export * from "./langy-trpc.schemas.ts";
+export * from "./langy-rest.schemas.ts";
 export * from "./langy.deep-link.ts";
 export * from "./langy.github-pr-url.ts";
 export * from "./langy.local-control-budgets.ts";
