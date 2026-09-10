@@ -14,8 +14,11 @@ export type ComposedGatewayFeature = Readonly<{
    * the Go data plane materialises a key's warm-cache bundle against the decision store.
    */
   composition: ApiGatewayComposition | undefined;
+  /** REST families exist only when their required infrastructure was composed. */
+  restServices: Readonly<{
+    agentCache?: (() => ApiTrpcFeatureApplication["gateway"]) | undefined;
+    elevenLabsWebhook?: (() => ApiTrpcFeatureApplication["gateway"]) | undefined;
+  }>;
   /** The six converted namespaces, mounted on this process's runtime. */
-  routers(
-    mount: ApiTrpcFeatureMount,
-  ): ReturnType<typeof createGatewayTrpcRouters<ApiTrpcContext>>;
+  routers(mount: ApiTrpcFeatureMount): ReturnType<typeof createGatewayTrpcRouters<ApiTrpcContext>>;
 }>;

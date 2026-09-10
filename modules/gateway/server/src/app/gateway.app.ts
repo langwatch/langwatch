@@ -15,7 +15,9 @@ import {
   type CreateGatewayCacheRuleInput,
   type CreateGatewayGuardrailInput,
   type GatewayApplicableBudget,
+  type GatewayAgentCacheWriteInput,
   type GatewayBudgetResolutionTarget,
+  type GatewayElevenLabsWebhookAnswer,
   type GatewayVirtualKeyDirectBudget,
   type GuardrailAttachment,
   type VirtualKeyConfig,
@@ -38,7 +40,16 @@ import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.
 import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port.ts";
 
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
+import {
+  GatewayAgentCacheService,
+  type GatewayAgentCacheEncryption,
+} from "../services/gateway-agent-cache.service.ts";
 import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
+import type { GatewayAgentCacheEntryStore } from "../stores/gateway-agent-cache/gateway-agent-cache.store.ts";
+import {
+  GatewayElevenLabsWebhookService,
+  type ElevenLabsWebhookCollaborators,
+} from "../services/gateway-elevenlabs-webhook.service.ts";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped API key or legacy project key, and what any of those IS belongs to the process's authentication, not this feature — the doors hand one straight to the checks below and never read it.
@@ -196,7 +207,19 @@ export type GatewayApplicableBudgetTarget = Readonly<{
 /**
  * What the process composes this application from: capabilities built over persistence this package cannot reach, or decisions made against role bindings/memberships it cannot see. Everything that is NOT such a decision (wire casing, cursors, money formatting, DTO projections) lives in this package directly instead.
  */
-export interface GatewayAppDependencies {
+export type GatewayRestInfrastructure = Readonly<{
+  /** Absent only where this process has no encryption and mounts no agent-cache family. */
+  agentCache?:
+    | Readonly<{
+        store: GatewayAgentCacheEntryStore;
+        encryption: GatewayAgentCacheEncryption;
+      }>
+    | undefined;
+  /** Absent where this process mounts no ElevenLabs callback family. */
+  elevenLabsWebhook?: ElevenLabsWebhookCollaborators | undefined;
+}>;
+
+export interface GatewayAppDependencies extends GatewayRestInfrastructure {
   // ── The feature's own services and stores ────────────────────────────────
 
   /** The virtual-key read and write capability. */
@@ -400,7 +423,7 @@ export interface GatewayAppDependencies {
   }): Promise<Map<string, { spentUsd: string; requests: number }>>;
 }
 
-export type GatewayInfrastructure = GatewayAppDependencies;
+export type GatewayInfrastructure = GatewayAppDependencies | GatewayRestInfrastructure;
 type GatewaySetup = FeatureSetup<Record<never, never>, GatewayInfrastructure, undefined>;
 
 export class GatewayApp implements GatewayApi {
@@ -411,10 +434,59 @@ export class GatewayApp implements GatewayApi {
     return new GatewayApp(setup.infrastructure);
   }
 
-  #dependencies: GatewayAppDependencies;
+  #coreDependencies: GatewayAppDependencies | undefined;
+  #agentCache: GatewayAgentCacheService | undefined;
+  #elevenLabsWebhook: GatewayElevenLabsWebhookService | undefined;
 
-  private constructor(dependencies: GatewayAppDependencies) {
-    this.#dependencies = dependencies;
+  private constructor(infrastructure: GatewayInfrastructure) {
+    this.#coreDependencies = "virtualKeys" in infrastructure ? infrastructure : void 0;
+    this.#agentCache = infrastructure.agentCache
+      ? GatewayAgentCacheService.create(infrastructure.agentCache)
+      : void 0;
+    this.#elevenLabsWebhook = infrastructure.elevenLabsWebhook
+      ? GatewayElevenLabsWebhookService.create(infrastructure.elevenLabsWebhook)
+      : void 0;
+  }
+
+  getAgentCacheEntry(input: { projectId: string; name: string }) {
+    return this.#agentCacheService().get(input);
+  }
+
+  putAgentCacheEntry(input: GatewayAgentCacheWriteInput) {
+    return this.#agentCacheService().put(input);
+  }
+
+  claimAgentCacheEntry(input: GatewayAgentCacheWriteInput) {
+    return this.#agentCacheService().claim(input);
+  }
+
+  deleteAgentCacheEntry(input: { projectId: string; name: string }) {
+    return this.#agentCacheService().delete(input);
+  }
+
+  receiveElevenLabsWebhook(input: {
+    modelProviderId: string;
+    rawBody: string;
+    signature: string | undefined;
+  }): Promise<GatewayElevenLabsWebhookAnswer> {
+    const service = this.#elevenLabsWebhook;
+    if (!service) throw new Error("The ElevenLabs family was mounted without its infrastructure");
+
+    return service.receive(input);
+  }
+
+  #agentCacheService(): GatewayAgentCacheService {
+    const service = this.#agentCache;
+    if (!service) throw new Error("The agent-cache family was mounted without its infrastructure");
+
+    return service;
+  }
+
+  get #dependencies(): GatewayAppDependencies {
+    const dependencies = this.#coreDependencies;
+    if (!dependencies) throw new Error("The gateway control plane was not installed");
+
+    return dependencies;
   }
 
   listBudgetsWithHealth(organizationId: string) {

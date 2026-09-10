@@ -20,6 +20,7 @@ import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApp, DatasetDirectUploadAuthorizer } from "@langwatch/dataset-server";
 import type { GovernanceApp, ScimApi, WebhookApp } from "@langwatch/enterprise-api";
 import type { EnterpriseFeature } from "@langwatch/enterprise-plan-gate";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApp } from "@langwatch/evaluator-server";
 import type { ExperimentApp } from "@langwatch/experiment-server";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -54,14 +55,10 @@ import type { ApiErrorBody } from "@langwatch/api/rest";
 
 import type { ApiHandlerManagedCredentialPort } from "./api-rest.runtime.ts";
 
-import type { AgentCacheStore } from "../features/agent-cache/agent-cache-rest.ts";
-
 /**
  * The product services this process may or may not have composed.
  */
 export type ApiPackagedRestServices = Readonly<{
-  /** The per-project expiring entry store the agent cache reads and writes. */
-  agentCache?: (() => AgentCacheStore) | undefined;
   /** The deprecated `/api/agents` family's read/write capability. */
   agents?: (() => AgentApi) | undefined;
   /**
@@ -86,6 +83,8 @@ export type ApiPackagedRestServices = Readonly<{
   dashboard?: (() => DashboardApi) | undefined;
   datasets?: (() => DatasetApp) | undefined;
   evaluators?: (() => EvaluatorApp) | undefined;
+  /** The legacy `/api/evaluations` doors an already-released SDK calls. */
+  evaluations?: (() => EvaluationApi) | undefined;
   experiments?: (() => ExperimentApp) | undefined;
   governance?: (() => GovernanceApp) | undefined;
   modelProviders?: (() => ModelProviderApi) | undefined;

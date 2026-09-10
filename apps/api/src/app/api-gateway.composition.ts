@@ -154,6 +154,8 @@ export type ApiGatewayCompositionOptions = Readonly<{
   virtualKeyPepper: string | undefined;
   /** The receipt ledger the keyed REST creates run through, where one exists. */
   idempotency?: ApiGatewayIdempotencyPort | undefined;
+  agentCache?: GatewayAppDependencies["agentCache"];
+  elevenLabsWebhook?: GatewayAppDependencies["elevenLabsWebhook"];
   /**
    * Where a virtual key's lifecycle is announced, where the deployment composed a ledger
    * for it.
@@ -259,6 +261,8 @@ export async function composeApiGateway(
   // `GatewayVirtualKeyDirectBudget`), so the application declares them itself
   // instead of taking them as parameters a router could not propagate.
   const infrastructure: GatewayAppDependencies = {
+    ...(options.agentCache ? { agentCache: options.agentCache } : {}),
+    ...(options.elevenLabsWebhook ? { elevenLabsWebhook: options.elevenLabsWebhook } : {}),
     virtualKeys,
     budgetDecisions,
     budgetSpend,

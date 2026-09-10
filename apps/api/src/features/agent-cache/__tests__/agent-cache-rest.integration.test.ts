@@ -1,145 +1,140 @@
 /**
- * The `/api/agent-cache` REST family, driven through the real Hono app
- * `createAgentCacheRestApp` builds — mounted over a real `AgentCacheService` on the
+ * The agent-cache family through the Gateway installer, process runtime, and
+ * production mount.
  * @see specs/agent-cache/agent-cache.feature
  */
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
-  createAppRestSecurity,
-  type AppRestSecurity,
-  type RestApiServicePorts,
-} from "@langwatch/api/rest";
+  MAX_AGENT_CACHE_NAME_LENGTH,
+  MAX_AGENT_CACHE_TTL_SECONDS,
+  MAX_AGENT_CACHE_VALUE_BYTES,
+  MIN_AGENT_CACHE_TTL_SECONDS,
+} from "@langwatch/gateway-contract/gateway-agent-cache-schemas";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import type { MiddlewareHandler } from "hono";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  createAgentCacheRestApp,
-  MAX_NAME_LENGTH,
-  MAX_TTL_SECONDS,
-  MAX_VALUE_BYTES,
-  MIN_TTL_SECONDS,
-  type AgentCacheStore,
-} from "../agent-cache-rest.ts";
-import { MemoryAgentCacheEntryStore } from "../agent-cache.store.ts";
-import { AgentCacheService } from "../agent-cache.service.ts";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import { createApiRestRuntime } from "../../../app-rest/api-rest.runtime.ts";
+import { composeGatewayAgentCache, installApiGateway } from "../../gateway/gateway.composition.ts";
+import { mountGatewayAgentCacheRest } from "../../gateway/gateway-rest.mount.ts";
 
-const PROJECT_ID = "project_cache";
+const PROJECT = {
+  id: "project-cache",
+  slug: "cache-project",
+  teamId: "team-cache",
+  organizationId: "organization-cache",
+  isPersonal: false,
+  ownerUserId: null,
+};
 
-const fakeEncryption: SecretEncryptionPort = {
+const encryption: SecretEncryptionPort = {
   encrypt: (value: string) => `sealed:${value}`,
   decrypt: (value: string) => {
     if (!value.startsWith("sealed:")) {
       throw new Error("this envelope does not open with the current key");
     }
+
     return value.slice("sealed:".length);
   },
 };
 
 type Caller = "authenticated" | "unauthenticated" | "no-grain";
 
-function testSecurity(caller: Caller): AppRestSecurity {
-  const pass: MiddlewareHandler = async (_c, next) => next();
-  const authenticateProject: MiddlewareHandler = async (c, next) => {
-    if (caller === "unauthenticated") {
-      return c.json({ error: "unauthenticated" }, 401);
-    }
-    c.set("project", {
-      id: PROJECT_ID,
-      name: "Cache Project",
-      slug: "cache-project",
-      teamId: "team_1",
-      organizationId: "org_1",
-      isPersonal: false,
-      ownerUserId: null,
-    });
-    await next();
-    return undefined;
-  };
-  const authorizeProjectPermission: MiddlewareHandler = async (c, next) => {
-    if (caller === "no-grain") return c.json({ error: "forbidden" }, 403);
-    await next();
-    return undefined;
-  };
-  const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: (error, c) => {
-      const handled = error as { httpStatus?: number; message?: string };
-      return c.json(
-        { error: handled.message ?? String(error) },
-        (handled.httpStatus ?? 500) as never,
-      );
-    },
-    canonicalErrorHandler: (error, c) => {
-      const handled = error as { httpStatus?: number; code?: string; message?: string };
-      return c.json(
-        { code: handled.code ?? "error", message: handled.message ?? String(error) },
-        (handled.httpStatus ?? 500) as never,
-      );
-    },
-    authenticateProject: () => authenticateProject,
-    authorizeProjectPermission: () => authorizeProjectPermission,
-    authorizeApiKeyCeiling: () => pass,
-    authenticateOrganization: () => pass,
-    authorizeOrganizationPermission: () => pass,
-    authorizeRouteTeamPermission: () => pass,
-    authorizeRouteProjectPermission: () => pass,
-    authenticateOrganizationThrowing: pass,
-    authorizeOrganizationPermissionThrowing: () => pass,
-  };
-  return createAppRestSecurity(ports);
-}
+async function buildApi(caller: Caller = "authenticated") {
+  const askedPermissions: AuthzPermission[] = [];
+  const errors = ApiRestObservabilityComposition.create().canonicalErrorHandler;
+  const runtime = createApiRestRuntime({
+    projectCredential: async ({ permission }) => {
+      askedPermissions.push(permission);
 
-function buildApi(caller: Caller = "authenticated") {
-  const store = MemoryAgentCacheEntryStore.create();
-  const service = new AgentCacheService(store, fakeEncryption);
-  const agentCache: AgentCacheStore = {
-    getByName: (input) => service.getByName(input),
-    put: (input) => service.put(input),
-    claim: (input) => service.claim(input),
-    delete: (input) => service.delete(input),
-  };
-  const app = createAgentCacheRestApp({
-    security: testSecurity(caller),
-    agentCache: () => agentCache,
+      if (caller === "unauthenticated") {
+        return { ok: false as const, status: 401 as const, body: { error: "Unauthorized" } };
+      }
+      if (caller === "no-grain") {
+        return { ok: false as const, status: 403 as const, body: { error: "Forbidden" } };
+      }
+
+      return {
+        ok: true as const,
+        project: PROJECT,
+        resolved: {
+          type: "apiKey" as const,
+          apiKeyId: "key-cache",
+          userId: null,
+          organizationId: PROJECT.organizationId,
+          ingestSourceType: null,
+          ingestionTemplateId: null,
+          project: PROJECT,
+        },
+        markUsed: () => void 0,
+      };
+    },
+    organizationCredential: () => {
+      throw new Error("This suite opens no organization credential door");
+    },
+    organizationIdentity: () => {
+      throw new Error("This suite opens no organization credential door");
+    },
+    routeAuthorization: async () => ({ permitted: true, organizationRole: null }),
+    errors,
   });
+  const agentCache = composeGatewayAgentCache({ encryption, redis: void 0 });
+  const gateway = await installApiGateway({
+    infrastructure: void 0,
+    peers: void 0,
+    clickhouse: null,
+    virtualKeyPepper: void 0,
+    agentCache,
+  });
+  const service = gateway.restServices.agentCache;
+  if (!service) throw new Error("The cache infrastructure did not install its REST service");
 
+  const app = mountGatewayAgentCacheRest(runtime, service);
   return {
-    get: (name: string) => app.hono.request(`/api/agent-cache/${name}`),
+    askedPermissions,
+    get: (name: string, prefix = "/api/agent-cache") => app.request(`${prefix}/${name}`),
     put: (name: string, body: Record<string, unknown>) =>
-      app.hono.request(`/api/agent-cache/${name}`, {
+      app.request(`/api/agent-cache/${name}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       }),
     claim: (name: string, body: Record<string, unknown>) =>
-      app.hono.request(`/api/agent-cache/${name}/claim`, {
+      app.request(`/api/agent-cache/${name}/claim`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       }),
-    del: (name: string) => app.hono.request(`/api/agent-cache/${name}`, { method: "DELETE" }),
+    remove: (name: string) => app.request(`/api/agent-cache/${name}`, { method: "DELETE" }),
   };
 }
 
-describe("given a project with an API key that can manage the agent cache", () => {
-  let api: ReturnType<typeof buildApi>;
+describe("given a project credential that can manage the agent cache", () => {
+  let api: Awaited<ReturnType<typeof buildApi>>;
 
-  beforeEach(() => {
-    api = buildApi("authenticated");
+  beforeEach(async () => {
+    api = await buildApi();
   });
 
-  describe("an entry is written by name and read back by name", () => {
+  describe("when an entry is written by name", () => {
     /** @scenario "A stored entry is read back by its name" */
-    it("answers the value the caller stored", async () => {
+    it("answers the value from both published base paths", async () => {
       await api.put("ACME_SESSION", { value: "session-1" });
 
-      const response = await api.get("ACME_SESSION");
-      const body = (await response.json()) as { name: string; value: string };
+      const canonical = await api.get("ACME_SESSION");
+      const versioned = await api.get("ACME_SESSION", "/api/v1/agent-cache");
 
-      expect(response.status).toBe(200);
-      expect(body).toEqual({ name: "ACME_SESSION", value: "session-1" });
+      expect(canonical.status).toBe(200);
+      await expect(canonical.json()).resolves.toEqual({
+        name: "ACME_SESSION",
+        value: "session-1",
+      });
+      expect(versioned.status).toBe(200);
+      expect(api.askedPermissions).toEqual([
+        "agentCache:manage",
+        "agentCache:manage",
+        "agentCache:manage",
+      ]);
     });
 
     /** @scenario "A second write replaces the entry" */
@@ -147,23 +142,24 @@ describe("given a project with an API key that can manage the agent cache", () =
       await api.put("ACME_SESSION", { value: "session-1" });
       await api.put("ACME_SESSION", { value: "session-2" });
 
-      const response = await api.get("ACME_SESSION");
-      const body = (await response.json()) as { value: string };
-
-      expect(body.value).toBe("session-2");
+      await expect((await api.get("ACME_SESSION")).json()).resolves.toMatchObject({
+        value: "session-2",
+      });
     });
 
     /** @scenario "An entry stops answering once its lifetime passes" */
     it("is refused as not found once its lifetime passes", async () => {
-      await api.put("ACME_SESSION", { value: "session-1", ttl_seconds: MIN_TTL_SECONDS });
-
-      await new Promise((resolve) => setTimeout(resolve, (MIN_TTL_SECONDS + 1) * 1000));
+      await api.put("ACME_SESSION", {
+        value: "session-1",
+        ttl_seconds: MIN_AGENT_CACHE_TTL_SECONDS,
+      });
+      await new Promise((resolve) => setTimeout(resolve, (MIN_AGENT_CACHE_TTL_SECONDS + 1) * 1000));
 
       const response = await api.get("ACME_SESSION");
-      const body = (await response.json()) as { code?: string };
-
       expect(response.status).toBe(404);
-      expect(body.code ?? "cache_entry_not_found").toBe("cache_entry_not_found");
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "cache_entry_not_found" },
+      });
     }, 10_000);
 
     /** @scenario "A name the project does not hold is refused as not found" */
@@ -171,141 +167,130 @@ describe("given a project with an API key that can manage the agent cache", () =
       const response = await api.get("ACME_ABSENT");
 
       expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "cache_entry_not_found" },
+      });
     });
 
     /** @scenario "Removing an entry the project does not hold succeeds" */
     it("succeeds when the entry it removes was never stored", async () => {
-      const response = await api.del("ACME_ABSENT");
+      const response = await api.remove("ACME_ABSENT");
 
       expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ name: "ACME_ABSENT", deleted: true });
     });
   });
 
-  describe("the accepted bounds are stated at the route", () => {
+  describe("when input is outside the published bounds", () => {
     /** @scenario "A value past the size limit is refused" */
-    it("refuses a value larger than the size limit", async () => {
-      const response = await api.put("ACME_SESSION", { value: "x".repeat(MAX_VALUE_BYTES + 1) });
+    it("counts UTF-8 bytes when refusing an oversized value", async () => {
+      const response = await api.put("ACME_SESSION", {
+        value: "é".repeat(MAX_AGENT_CACHE_VALUE_BYTES / 2 + 1),
+      });
 
       expect(response.status).toBe(422);
     });
 
     /** @scenario "A name outside the accepted shape is refused" */
-    it("refuses a name that is not UPPER_SNAKE_CASE", async () => {
-      const response = await api.get("not-upper-snake-case");
+    it("refuses names outside upper snake case or over the limit", async () => {
+      const wrongShape = await api.get("not-upper-snake-case");
+      const tooLong = await api.get("A".repeat(MAX_AGENT_CACHE_NAME_LENGTH + 1));
 
-      expect(response.status).toBe(422);
+      expect(wrongShape.status).toBe(422);
+      expect(tooLong.status).toBe(422);
     });
 
     /** @scenario "A lifetime outside the accepted range is refused" */
-    it("refuses a lifetime under the minimum", async () => {
-      const response = await api.put("ACME_SESSION", {
+    it("refuses lifetimes below and above the accepted range", async () => {
+      const tooShort = await api.put("ACME_SESSION", {
         value: "session-1",
-        ttl_seconds: MIN_TTL_SECONDS - 1,
+        ttl_seconds: MIN_AGENT_CACHE_TTL_SECONDS - 1,
+      });
+      const tooLong = await api.put("ACME_SESSION", {
+        value: "session-1",
+        ttl_seconds: MAX_AGENT_CACHE_TTL_SECONDS + 1,
       });
 
-      expect(response.status).toBe(422);
-    });
-
-    it("refuses a name longer than the accepted length", async () => {
-      const response = await api.get("A".repeat(MAX_NAME_LENGTH + 1));
-
-      expect(response.status).toBe(422);
-    });
-
-    it("refuses a lifetime over the maximum", async () => {
-      const response = await api.put("ACME_SESSION", {
-        value: "session-1",
-        ttl_seconds: MAX_TTL_SECONDS + 1,
-      });
-
-      expect(response.status).toBe(422);
+      expect(tooShort.status).toBe(422);
+      expect(tooLong.status).toBe(422);
     });
   });
 
-  describe("a caller can take a name only if the project does not hold it", () => {
+  describe("when callers claim the same name", () => {
     /** @scenario "A claim on a free name is taken" */
-    it("takes a free name and a read answers the claimed value", async () => {
+    it("takes a free name and reads back its claimed value", async () => {
       const response = await api.claim("ACME_SESSION", { value: "claimed-value" });
-      const body = (await response.json()) as { claimed: boolean };
 
-      expect(body.claimed).toBe(true);
-
-      const read = await api.get("ACME_SESSION");
-      expect(await read.json()).toMatchObject({ value: "claimed-value" });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ claimed: true });
+      await expect((await api.get("ACME_SESSION")).json()).resolves.toMatchObject({
+        value: "claimed-value",
+      });
     });
 
     /** @scenario "A claim on a held name leaves the held value alone" */
-    it("leaves the held value alone when the name is already taken", async () => {
+    it("leaves the held value alone when another claim loses", async () => {
       await api.claim("ACME_SESSION", { value: "first-value" });
 
       const response = await api.claim("ACME_SESSION", { value: "second-value" });
-      const body = (await response.json()) as { claimed: boolean };
-
-      expect(body.claimed).toBe(false);
-
-      const read = await api.get("ACME_SESSION");
-      expect(await read.json()).toMatchObject({ value: "first-value" });
+      await expect(response.json()).resolves.toMatchObject({ claimed: false });
+      await expect((await api.get("ACME_SESSION")).json()).resolves.toMatchObject({
+        value: "first-value",
+      });
     });
 
     /** @scenario "A name is free again once its lifetime passes" */
-    it("is free again once the claim's lifetime passes", async () => {
-      await api.claim("ACME_SESSION", { value: "first-value", ttl_seconds: MIN_TTL_SECONDS });
-
-      await new Promise((resolve) => setTimeout(resolve, (MIN_TTL_SECONDS + 1) * 1000));
+    it("takes the name again once the first claim expires", async () => {
+      await api.claim("ACME_SESSION", {
+        value: "first-value",
+        ttl_seconds: MIN_AGENT_CACHE_TTL_SECONDS,
+      });
+      await new Promise((resolve) => setTimeout(resolve, (MIN_AGENT_CACHE_TTL_SECONDS + 1) * 1000));
 
       const response = await api.claim("ACME_SESSION", { value: "second-value" });
-      const body = (await response.json()) as { claimed: boolean };
 
-      expect(body.claimed).toBe(true);
+      await expect(response.json()).resolves.toMatchObject({ claimed: true });
     }, 10_000);
 
     /** @scenario "Only one of several claims sent at once takes the name" */
-    it("lets exactly one of several simultaneous claims take the name", async () => {
+    it("lets exactly one simultaneous claim take the name", async () => {
       const responses = await Promise.all(
         ["one", "two", "three", "four"].map((value) => api.claim("ACME_SESSION", { value })),
       );
-      const bodies = (await Promise.all(responses.map((r) => r.json()))) as {
-        claimed: boolean;
-      }[];
+      const bodies = await Promise.all(responses.map((response) => response.json()));
 
-      expect(bodies.filter((b) => b.claimed)).toHaveLength(1);
+      expect(bodies.filter((body) => body.claimed === true)).toHaveLength(1);
     });
   });
 });
 
-describe("only a caller that can manage the cache reaches it", () => {
+describe("given a caller that cannot manage the cache", () => {
   /** @scenario "A caller without the manage grain is refused" */
-  it("refuses a caller that holds neither agentCache grain", async () => {
-    const api = buildApi("no-grain");
+  it("refuses both reads and writes with HTTP 403", async () => {
+    const api = await buildApi("no-grain");
 
-    const read = await api.get("ACME_SESSION");
-    const write = await api.put("ACME_SESSION", { value: "session-1" });
-
-    expect(read.status).toBe(403);
-    expect(write.status).toBe(403);
+    expect((await api.get("ACME_SESSION")).status).toBe(403);
+    expect((await api.put("ACME_SESSION", { value: "session-1" })).status).toBe(403);
+    expect(api.askedPermissions).toEqual(["agentCache:manage", "agentCache:manage"]);
   });
 
   /** @scenario "A request without an API key is refused" */
   it("refuses a request that carries no API key", async () => {
-    const api = buildApi("unauthenticated");
+    const api = await buildApi("unauthenticated");
 
-    const response = await api.get("ACME_SESSION");
-
-    expect(response.status).toBe(401);
+    expect((await api.get("ACME_SESSION")).status).toBe(401);
   });
+});
 
+describe("given a legacy project key", () => {
   /** @scenario "A legacy project key reaches the agent cache" */
-  it("lets a legacy project key store an entry and read it back", async () => {
-    // A legacy project key already holds full project access; the security
-    // spine's ceiling grants it every permission rather than the family
-    // checking for it specifically, so it reaches this route the same way
-    // any other authenticated, fully-permissioned caller does.
-    const api = buildApi("authenticated");
+  it("stores an entry and reads it back", async () => {
+    const api = await buildApi();
 
     await api.put("ACME_SESSION", { value: "session-1" });
     const response = await api.get("ACME_SESSION");
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ value: "session-1" });
+    await expect(response.json()).resolves.toMatchObject({ value: "session-1" });
   });
 });

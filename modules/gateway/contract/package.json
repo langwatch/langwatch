@@ -13,6 +13,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./gateway-agent-cache-schemas": {
+      "types": "./dist/gateway-agent-cache.schemas.d.ts",
+      "default": "./src/gateway-agent-cache.schemas.ts"
+    },
+    "./gateway-elevenlabs-webhook-schemas": {
+      "types": "./dist/gateway-elevenlabs-webhook.schemas.d.ts",
+      "default": "./src/gateway-elevenlabs-webhook.schemas.ts"
     }
   },
   "scripts": {
@@ -22,9 +30,9 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

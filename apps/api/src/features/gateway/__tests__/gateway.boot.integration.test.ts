@@ -1,14 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The gateway installed the way the API process installs it: the module boots
- * at `role: "api"`, and what comes back is the module's own application, so a
- * door reaching `ctx.app.gateway` and a door reaching the mounted namespaces
- * hold the same instance.
- *
- * Backed by an in-memory stand-in for the two tables the assertions touch,
- * because a boot proves wiring, not persistence: the repositories' own
- * contract tests are where a backend is proven.
+ * Boots the gateway at `role: "api"` over focused persistence doubles.
+ * Full control-plane doors share one app; REST-only installs keep their own gates.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthzService } from "@langwatch/authz-contract";
@@ -16,12 +9,21 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { GatewaySpendConfirmationPort } from "@langwatch/gateway-server";
 import { describe, expect, it, vi } from "vitest";
 
-import { installApiGateway } from "../gateway.composition.ts";
+import {
+  composeGatewayAgentCache,
+  composeGatewayElevenLabsWebhook,
+  installApiGateway,
+} from "../gateway.composition.ts";
 import type { ApiTrpcInfrastructure } from "../../../platform/infrastructure/api-trpc.infrastructure.ts";
 
 const ORGANIZATION_ID = "organization_boot";
+const cacheEncryption = {
+  encrypt: (value: string) => `encrypted:${value}`,
+  decrypt: (value: string) => value.replace(/^encrypted:/, ""),
+};
 
 /** The two tables this boot reads, and nothing else. */
 function memoryDatabase() {
@@ -85,6 +87,86 @@ describe("installing the gateway on the API process", () => {
 
       expect(gateway.composition).toBeUndefined();
       expect(() => gateway.app.listCacheRules(ORGANIZATION_ID)).toThrow(/This deployment has no/);
+    });
+
+    it("keeps agent cache available without the unrelated gateway peers", async () => {
+      const agentCache = composeGatewayAgentCache({
+        encryption: cacheEncryption,
+        redis: void 0,
+      });
+      const gateway = await installApiGateway({
+        infrastructure: void 0,
+        peers: void 0,
+        clickhouse: null,
+        virtualKeyPepper: void 0,
+        agentCache,
+      });
+      const cache = gateway.restServices.agentCache;
+      if (!cache) throw new Error("the agent-cache family was not installed");
+
+      await cache().putAgentCacheEntry({
+        projectId: "project_cache",
+        name: "SESSION",
+        value: "value",
+      });
+
+      await expect(
+        cache().getAgentCacheEntry({ projectId: "project_cache", name: "SESSION" }),
+      ).resolves.toEqual({ name: "SESSION", value: "value" });
+      expect(gateway.restServices.elevenLabsWebhook).toBeUndefined();
+      expect(gateway.composition).toBeUndefined();
+      expect(() => gateway.app.listCacheRules(ORGANIZATION_ID)).toThrow(/This deployment has no/);
+    });
+
+    it("keeps ElevenLabs available without the unrelated gateway peers", async () => {
+      const elevenLabsWebhook = composeGatewayElevenLabsWebhook({
+        prisma: memoryDatabase(),
+        encryption: cacheEncryption,
+        spendConfirmation: createApiFixture<GatewaySpendConfirmationPort>(),
+      });
+      const gateway = await installApiGateway({
+        infrastructure: void 0,
+        peers: void 0,
+        clickhouse: null,
+        virtualKeyPepper: void 0,
+        elevenLabsWebhook,
+      });
+
+      expect(gateway.restServices.elevenLabsWebhook).toBeTypeOf("function");
+      expect(gateway.restServices.agentCache).toBeUndefined();
+      expect(gateway.composition).toBeUndefined();
+      expect(() => gateway.app.listCacheRules(ORGANIZATION_ID)).toThrow(/This deployment has no/);
+    });
+
+    it("keeps agent cache unavailable without encryption", () => {
+      expect(composeGatewayAgentCache({ encryption: void 0, redis: void 0 })).toBeUndefined();
+    });
+
+    it("keeps ElevenLabs unavailable until all existing collaborators are present", () => {
+      const prisma = memoryDatabase();
+      const confirmation = createApiFixture<GatewaySpendConfirmationPort>();
+
+      expect(
+        composeGatewayElevenLabsWebhook({
+          prisma,
+          encryption: void 0,
+          spendConfirmation: confirmation,
+        }),
+      ).toBeUndefined();
+      expect(
+        composeGatewayElevenLabsWebhook({
+          prisma,
+          encryption: cacheEncryption,
+          spendConfirmation: void 0,
+        }),
+      ).toBeUndefined();
+      expect(
+        composeGatewayElevenLabsWebhook({
+          prisma: void 0,
+          encryption: cacheEncryption,
+          spendConfirmation: confirmation,
+        }),
+      ).toBeUndefined();
     });
   });
 });

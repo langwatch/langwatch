@@ -25,10 +25,7 @@ import type {
   GatewayCacheRuleResource,
   UpdateGatewayCacheRuleInput,
 } from "./gateway-cache-rule.ts";
-import type {
-  GatewayVirtualKeyRecord,
-  GatewayVirtualKeyScope,
-} from "./gateway.rows.ts";
+import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "./gateway.rows.ts";
 import type { VirtualKeyBudgetInput } from "./virtual-key.schemas.ts";
 import type { VirtualKeyConfig } from "./virtual-key-config.ts";
 import type {
@@ -38,10 +35,7 @@ import type {
   VirtualKeyCamelDtoResponse,
 } from "./gateway.responses.ts";
 import type { SpendFilters } from "./gateway-spend.schemas.ts";
-import type {
-  GatewayApplicableBudget,
-  GatewayVirtualKeyDirectBudget,
-} from "./gateway.budget.ts";
+import type { GatewayApplicableBudget, GatewayVirtualKeyDirectBudget } from "./gateway.budget.ts";
 import type {
   ArchiveGatewayGuardrailInput,
   CreateGatewayGuardrailInput,
@@ -124,8 +118,37 @@ export type GatewayMintedVirtualKey = Readonly<{
 /** One group a per-member allowance can be pointed at. */
 export type GatewayGroupTarget = Readonly<{ id: string; name: string; memberCount: number }>;
 
+export type GatewayAgentCacheWriteInput = Readonly<{
+  projectId: string;
+  name: string;
+  value: string;
+  ttlSeconds?: number;
+}>;
+
+export type GatewayElevenLabsWebhookAnswer = Readonly<{
+  status: 200 | 400 | 401 | 404;
+  body: Readonly<{ received: true }> | Readonly<{ error: string }>;
+}>;
+
 /** Callable gateway capability shared by API, worker, and task processes. */
 export interface GatewayApi {
+  getAgentCacheEntry(input: {
+    projectId: string;
+    name: string;
+  }): Promise<{ name: string; value: string }>;
+  putAgentCacheEntry(
+    input: GatewayAgentCacheWriteInput,
+  ): Promise<{ name: string; ttl_seconds: number }>;
+  claimAgentCacheEntry(
+    input: GatewayAgentCacheWriteInput,
+  ): Promise<{ name: string; claimed: boolean; ttl_seconds: number }>;
+  deleteAgentCacheEntry(input: { projectId: string; name: string }): Promise<void>;
+  receiveElevenLabsWebhook(input: {
+    modelProviderId: string;
+    rawBody: string;
+    signature: string | undefined;
+  }): Promise<GatewayElevenLabsWebhookAnswer>;
+
   /** Refuses an organization id that names no organization. */
   assertOrganizationExists(organizationId: string): Promise<void>;
   /** The organization a project belongs to, or null when the project is unknown. */
@@ -151,9 +174,7 @@ export interface GatewayApi {
   ): Promise<Map<string, string>>;
   listGroupTargets(organizationId: string): Promise<ReadonlyArray<GatewayGroupTarget>>;
   /** The budgets one debit lands on, as the spend graph resolves them. */
-  resolveApplicableBudgets(
-    input: GatewayBudgetResolutionTarget,
-  ): Promise<GatewayResolvedBudget[]>;
+  resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]>;
 
   listCacheRules(organizationId: string): Promise<GatewayCacheRuleResource[]>;
   findCacheRule(input: {
@@ -165,10 +186,7 @@ export interface GatewayApi {
   archiveCacheRule(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
 
   listGuardrails(projectId: string): Promise<GatewayGuardrailResource[]>;
-  findGuardrail(input: {
-    id: string;
-    projectId: string;
-  }): Promise<GatewayGuardrailResource | null>;
+  findGuardrail(input: { id: string; projectId: string }): Promise<GatewayGuardrailResource | null>;
   createGuardrail(input: CreateGatewayGuardrailInput): Promise<GatewayGuardrailResource>;
   updateGuardrail(input: UpdateGatewayGuardrailInput): Promise<GatewayGuardrailResource>;
   archiveGuardrail(input: ArchiveGatewayGuardrailInput): Promise<void>;

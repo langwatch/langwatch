@@ -43,6 +43,7 @@ import type { ComposedAutomationFeature } from "../features/automation/automatio
 import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding-agent.composition.types.ts";
 import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition.types.ts";
 import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition.types.ts";
+import type { ComposedEvaluationFeature } from "../features/evaluation/evaluation.composition.types.ts";
 import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition.types.ts";
 import type { ComposedDashboardFeature } from "../features/dashboard/dashboard.composition.types.ts";
 import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition.types.ts";
@@ -54,11 +55,6 @@ import { createApiTrackedEventPorts } from "../features/trace/tracked-event-port
 import { createAgentPlatformUrlBuilder } from "../features/agent/agent-platform-url.ts";
 import { createDatasetDirectUploadAuthorizer } from "../features/dataset/dataset-direct-upload-auth.ts";
 import { createScenarioRunPlatformUrlBuilder } from "../features/scenario/scenario-run-platform-url.ts";
-import {
-  MemoryAgentCacheEntryStore,
-  RedisAgentCacheEntryStore,
-} from "../features/agent-cache/agent-cache.store.ts";
-import { AgentCacheService } from "../features/agent-cache/agent-cache.service.ts";
 import { canonicalErrorFor } from "./api-canonical-error.ts";
 import { composeApiWebhookApplication } from "../features/enterprise/enterprise-webhook.composition.ts";
 import { orgRequestLedgerActor } from "./api-ledger-actor.ts";
@@ -110,6 +106,8 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   dataset: ComposedDatasetFeature | undefined;
   /** A project's evaluators, where this process composed the feature. */
   evaluator: ComposedEvaluatorFeature | undefined;
+  /** The legacy `/api/evaluations` doors, where this process installed the feature. */
+  evaluations: ComposedEvaluationFeature | undefined;
   /** The monitors a project runs, where this process installed the feature. */
   monitor: ComposedMonitorFeature | undefined;
   /** A project's dashboards and the graphs on them, where one was installed. */
@@ -169,7 +167,6 @@ export function composeApiPackagedRest(
     webhooks: options.enterpriseGovernance.webhooks,
     plans: options.plans,
   });
-  const agentCache = composeAgentCache(options);
   const scim = options.scim;
   const storedObjectBytes = options.storedObject.bytes;
   const projectDirectory = options.projectDirectory;
@@ -183,7 +180,6 @@ export function composeApiPackagedRest(
 
   return {
     services: {
-      ...(agentCache ? { agentCache: () => agentCache } : {}),
       ...(options.agents ? { agents: () => options.agents! } : {}),
       ...(options.connectedAgents
         ? {
@@ -200,6 +196,7 @@ export function composeApiPackagedRest(
       ...(options.dashboard ? { dashboard: options.dashboard.restServices.dashboard } : {}),
       ...(options.dataset ? { datasets: () => options.dataset!.app } : {}),
       ...(options.evaluator ? { evaluators: options.evaluator.restServices.evaluators } : {}),
+      ...(evaluations ? { evaluations: () => evaluations.app } : {}),
       permissions: () => options.authz,
       ...(options.experiment.experiments ? { experiments: () => options.experiment.app } : {}),
       governance: () => options.enterpriseGovernance.governanceApp,
@@ -352,21 +349,6 @@ function trackedEventPortsFrom(
     logger: options.logger,
   });
   return () => ports;
-}
-
-/**
- * The agent cache's store and cipher. Absent without a cipher: an entry holds whatever an
- * agent produced — a session envelope, a provider token — and writing it in the clear so
- * the family could mount would put that on a shared Redis in plaintext.
- */
-function composeAgentCache(
-  options: ApiPackagedRestCompositionOptions,
-): AgentCacheService | undefined {
-  if (!options.encryption) return undefined;
-  const store = options.redis
-    ? RedisAgentCacheEntryStore.create(options.redis)
-    : MemoryAgentCacheEntryStore.create();
-  return new AgentCacheService(store, options.encryption);
 }
 
 /**

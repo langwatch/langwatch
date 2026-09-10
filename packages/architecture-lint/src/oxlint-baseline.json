@@ -5163,10 +5163,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/gateway/server/src/transport/api-rest/elevenlabs-webhook.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/gateway/server/src/transport/api-rest/gateway-internal.api.ts",
       "measured": "2026-09-06"
     },
@@ -8884,10 +8880,6 @@
     },
     {
       "key": "schema-outside-contract|modules/experiment/server/src/transport/experiment-v3.rest.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "schema-outside-contract|modules/gateway/server/src/transport/api-rest/elevenlabs-webhook.api.ts",
       "measured": "2026-09-10"
     },
     {

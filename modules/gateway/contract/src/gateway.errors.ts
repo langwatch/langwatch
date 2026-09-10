@@ -5,11 +5,30 @@
  * client renders copy keyed off `code`. Nothing here writes customer-facing
  * prose — `message` is for whoever reads the trace.
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 type ExternalIdResource = "virtual_key" | "budget";
+
+/** A project holds no live agent-cache entry under the requested name. */
+export class GatewayAgentCacheEntryNotFoundError extends HandledError {
+  declare readonly code: "cache_entry_not_found";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "cache_entry_not_found",
+      "This project holds no cache entry under that name. Store it first, or check the name.",
+      {
+        httpStatus: 404,
+        fault: "customer",
+        ...remediation("cache_entry_not_found"),
+        ...options,
+      },
+    );
+    this.name = "GatewayAgentCacheEntryNotFoundError";
+  }
+}
 
 /**
  * The caller may see the virtual key but not attach guardrails to its project.

@@ -1,16 +1,14 @@
 /**
  * @vitest-environment node
- * Real Postgres. A brokered ElevenLabs conversation reports nothing over its socket, so this route and the reconciler are the only two paths to billing — asserts which deliveries may close a session, since a wrongly closed one is confirmed spend the fold never downgrades. Spec: specs/ai-gateway/realtime-sessions.feature
+ * Real Postgres. This canonical webhook and the reconciler are the two paths
+ * to billing a brokered ElevenLabs call.
+ * Spec: specs/ai-gateway/realtime-sessions.feature
  */
 import { createHmac } from "crypto";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  createAppRestSecurity,
-  type AppRestSecurity,
-  type RestApiServicePorts,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, type MountableRestApp } from "@langwatch/api/rest";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -20,7 +18,7 @@ import {
 } from "@langwatch/prisma-client";
 import { PrismaGatewayElevenLabsCredentialRepository } from "../../../repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ErrorHandler, MiddlewareHandler } from "hono";
+import { createApp } from "@langwatch/runtime-composition";
 
 import { ModelCatalogGatewaySpendRatingAdapter } from "../../../adapters/model-catalog.gateway-spend-rating.adapter.ts";
 import { GatewayModelProviderCredentialsPort } from "../../../ports/gateway-model-provider-credentials.port.ts";
@@ -31,8 +29,9 @@ import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "../../../services/gateway-realtime-session.service.ts";
-import { createElevenLabsWebhookRestApp } from "../elevenlabs-webhook.api.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
+import { gatewayServer } from "../../../gateway.server.ts";
+import { elevenLabsSignature, elevenLabsWebhookRest } from "../../elevenlabs-webhook.rest.ts";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 class AllowTestQueries extends PrismaQueryGuard {
@@ -47,7 +46,13 @@ const connection = databaseUrl
       PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
     )
   : null;
-const prisma = connection?.client as PrismaClient;
+
+function database(): PrismaClient {
+  const client = connection?.client;
+  if (!client) throw new Error("This integration test needs DATABASE_URL");
+
+  return client;
+}
 
 /** Recorded so a confirmation can be asserted without the whole spend spine. */
 const sentConfirmations: ConfirmSpendCommandData[] = [];
@@ -69,37 +74,13 @@ class PlainCustomKeys extends GatewayModelProviderCredentialsPort {
   }
 }
 
-const sessions: GatewayRealtimeSessionCollaborators = {
-  sessions: PrismaGatewayRealtimeSessionRepository.create({
-    get database() {
-      return prisma;
-    },
-  }),
-  spendRating: ModelCatalogGatewaySpendRatingAdapter.create(),
-  spendConfirmation: new RecordingSpendConfirmation(),
-};
+let sessions: GatewayRealtimeSessionCollaborators | undefined;
 
-/** The process boundary reduced to what this route needs: a public endpoint. */
-function testSecurity(): AppRestSecurity {
-  const pass: MiddlewareHandler = async (_c, next) => next();
-  const errorHandler: ErrorHandler = (_error, c) => c.json({ error: "internal_server_error" }, 500);
-  const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: errorHandler,
-    canonicalErrorHandler: errorHandler,
-    authenticateProject: () => pass,
-    authorizeProjectPermission: () => pass,
-    authorizeApiKeyCeiling: () => pass,
-    authenticateOrganization: () => pass,
-    authorizeOrganizationPermission: () => pass,
-    authorizeRouteTeamPermission: () => pass,
-    authorizeRouteProjectPermission: () => pass,
-    authenticateOrganizationThrowing: pass,
-    authorizeOrganizationPermissionThrowing: () => pass,
-  };
-  return createAppRestSecurity(ports);
+function sessionCollaborators(): GatewayRealtimeSessionCollaborators {
+  const collaborators = sessions;
+  if (!collaborators) throw new Error("The realtime session collaborators are not ready");
+
+  return collaborators;
 }
 
 const suffix = nanoid(8);
@@ -110,25 +91,55 @@ const USER_ID = `user-wh-${suffix}`;
 const PROVIDER_ID = `mp-wh-${suffix}`;
 const WEBHOOK_SECRET = "wsec_integration";
 
-const webhookApp = createElevenLabsWebhookRestApp({
-  security: testSecurity(),
-  ports: {
-    credentials: {
-      providers: PrismaGatewayElevenLabsCredentialRepository.create({
-        get database() {
-          return prisma;
+let webhookApp: MountableRestApp | undefined;
+
+async function mountWebhook(): Promise<MountableRestApp> {
+  sessions = {
+    sessions: PrismaGatewayRealtimeSessionRepository.create({ database: database() }),
+    spendRating: ModelCatalogGatewaySpendRatingAdapter.create(),
+    spendConfirmation: new RecordingSpendConfirmation(),
+  };
+  const runtime = await createApp({ name: "gateway-elevenlabs-integration" })
+    .withInfrastructure({})
+    .withModule(gatewayServer, {
+      infrastructure: {
+        elevenLabsWebhook: {
+          credentials: {
+            providers: PrismaGatewayElevenLabsCredentialRepository.create({
+              get database() {
+                return database();
+              },
+            }),
+            credentials: new PlainCustomKeys(),
+          },
+          sessions: sessionCollaborators(),
         },
-      }),
-      credentials: new PlainCustomKeys(),
+      },
+    })
+    .boot({ role: "api" });
+  const gateway = runtime.module(gatewayServer).provided;
+  const rest = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("The public webhook must not authenticate a project credential");
+      },
     },
-    sessions,
-  },
-});
+  });
+
+  return rest.mount(elevenLabsWebhookRest.router(), {
+    app: () => gateway,
+    facts: [
+      bindRestMiddleware(elevenLabsSignature, (context) => ({
+        signature: context.req.header("elevenlabs-signature"),
+      })),
+    ],
+  });
+}
 
 /** An open, correlated session for one conversation id. Returns its id. */
 async function openSession(label: string, conversationId: string) {
   const vkId = `vk-${label}-${nanoid(6)}`;
-  await prisma.virtualKey.create({
+  await database().virtualKey.create({
     data: {
       id: vkId,
       organizationId: ORG_ID,
@@ -150,13 +161,13 @@ async function openSession(label: string, conversationId: string) {
     modelProviderId: PROVIDER_ID,
     vendor: "elevenlabs",
     model: "convai",
-    collaborators: sessions,
+    collaborators: sessionCollaborators(),
   });
   await realtimeSessions.correlateRealtimeSession({
     sessionId,
     projectId: PROJECT_ID,
     vendorConversationId: conversationId,
-    collaborators: sessions,
+    collaborators: sessionCollaborators(),
   });
   return sessionId;
 }
@@ -166,7 +177,10 @@ async function deliver(payload: unknown): Promise<Response> {
   const body = JSON.stringify(payload);
   const ts = String(Math.floor(Date.now() / 1000));
   const mac = createHmac("sha256", WEBHOOK_SECRET).update(`${ts}.${body}`).digest("hex");
-  return webhookApp.request(`/api/elevenlabs/webhook/${PROVIDER_ID}`, {
+  const app = webhookApp;
+  if (!app) throw new Error("The canonical webhook mount is not ready");
+
+  return app.request(`/api/elevenlabs/webhook/${PROVIDER_ID}`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -177,15 +191,16 @@ async function deliver(payload: unknown): Promise<Response> {
 }
 
 async function statusOf(sessionId: string): Promise<string | undefined> {
-  return (await prisma.gatewayRealtimeSession.findUnique({ where: { id: sessionId } }))?.status;
+  return (await database().gatewayRealtimeSession.findUnique({ where: { id: sessionId } }))?.status;
 }
 
 describe.skipIf(!databaseUrl)("given an ElevenLabs credential with a stored webhook secret", () => {
   beforeAll(async () => {
-    await prisma.organization.create({
+    webhookApp = await mountWebhook();
+    await database().organization.create({
       data: { id: ORG_ID, name: `Org ${suffix}`, slug: ORG_ID },
     });
-    await prisma.team.create({
+    await database().team.create({
       data: {
         id: TEAM_ID,
         name: `Team ${suffix}`,
@@ -193,7 +208,7 @@ describe.skipIf(!databaseUrl)("given an ElevenLabs credential with a stored webh
         organizationId: ORG_ID,
       },
     });
-    await prisma.project.create({
+    await database().project.create({
       data: {
         id: PROJECT_ID,
         name: PROJECT_ID,
@@ -204,10 +219,10 @@ describe.skipIf(!databaseUrl)("given an ElevenLabs credential with a stored webh
         apiKey: `key-${PROJECT_ID}`,
       },
     });
-    await prisma.user.create({
+    await database().user.create({
       data: { id: USER_ID, email: `${USER_ID}@acme.test`, name: USER_ID },
     });
-    await prisma.modelProvider.create({
+    await database().modelProvider.create({
       data: {
         id: PROVIDER_ID,
         organizationId: ORG_ID,
@@ -225,22 +240,22 @@ describe.skipIf(!databaseUrl)("given an ElevenLabs credential with a stored webh
 
   afterAll(async () => {
     if (!databaseUrl) return;
-    await prisma.gatewayRealtimeSession.deleteMany({
+    await database().gatewayRealtimeSession.deleteMany({
       where: { organizationId: ORG_ID },
     });
-    await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.modelProvider.deleteMany({
+    await database().virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await database().modelProvider.deleteMany({
       where: { organizationId: ORG_ID },
     });
-    await prisma.project.deleteMany({ where: { teamId: TEAM_ID } });
-    await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.organization.deleteMany({ where: { id: ORG_ID } });
-    await prisma.user.deleteMany({ where: { id: USER_ID } });
-    await prisma.$disconnect();
+    await database().project.deleteMany({ where: { teamId: TEAM_ID } });
+    await database().team.deleteMany({ where: { organizationId: ORG_ID } });
+    await database().organization.deleteMany({ where: { id: ORG_ID } });
+    await database().user.deleteMany({ where: { id: USER_ID } });
+    await database().$disconnect();
   });
 
   beforeEach(async () => {
-    await prisma.gatewayRealtimeSession.deleteMany({
+    await database().gatewayRealtimeSession.deleteMany({
       where: { organizationId: ORG_ID },
     });
     sentConfirmations.length = 0;

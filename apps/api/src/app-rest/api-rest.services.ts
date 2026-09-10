@@ -4,6 +4,7 @@
  * The doors themselves are `api-rest.doors.ts`; nothing here mounts anything.
  */
 import type { AnnotationApi } from "@langwatch/annotation-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type {
   AppRestManagementAuditPort,
   PlatformUrlBuilder,
@@ -57,10 +58,6 @@ import type { RumRateLimiter } from "../features/rum/rum-ingest.service.ts";
 import type { OtlpIngestRestPorts } from "@langwatch/trace-server/api-rest/otlp-ingest";
 import type { CollectorRestPorts } from "@langwatch/trace-server/api-rest/collector";
 import type {
-  ApiEvaluationBatchRestCollaborators,
-  ApiEvaluationRunRestCollaborators,
-} from "../features/evaluation/evaluations-legacy-rest.mount.ts";
-import type {
   ApiTraceLegacyRestCollaborators,
   ApiTracesRestCollaborators,
 } from "../features/trace/trace-rest.mount.ts";
@@ -79,6 +76,8 @@ import type { ApiHandlerManagedCredentialPort } from "./api-rest.runtime.ts";
  * not force its service to be constructed.
  */
 export type ApiRestServices = Readonly<{
+  agentCache?: (() => GatewayApi) | undefined;
+  elevenLabsWebhook?: (() => GatewayApi) | undefined;
   /** The reviewer's comments `/api/annotations` reads and writes. */
   annotations?: (() => AnnotationApi) | undefined;
   /** The charted reads `/api/analytics/timeseries` answers from. */
@@ -156,17 +155,6 @@ export type ApiRestServices = Readonly<{
    * and the workbench's are a browser session and a richer credential.
    */
   experimentInit?: ApiExperimentInitRestCollaborators | undefined;
-  /**
-   * `POST /api/evaluations/batch/log_results`'s collaborators, or none. None where this
-   * process registered no experiment run writer: the rows are a run's history, and a door
-   * that accepted them with nowhere to write is one an SDK believes reported its results.
-   */
-  evaluationBatch?: ApiEvaluationBatchRestCollaborators | undefined;
-  /**
-   * The four evaluate doors' collaborators, or none. None where this process composed no
-   * evaluator RUNTIME.
-   */
-  evaluationRun?: ApiEvaluationRunRestCollaborators | undefined;
   /**
    * The three URLs a synchronous studio run is started from, or none.
    */

@@ -1,14 +1,13 @@
 export { GatewayService } from "./services/gateway.service.ts";
 export { gatewayServer } from "./gateway.server.ts";
 export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
+export { agentCacheRest } from "./transport/agent-cache.rest.ts";
+export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 export { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 export { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
-export {
-  gatewaySessionFact,
-  virtualKeyTrpcTransport,
-} from "./transport/virtual-key.trpc.ts";
+export { gatewaySessionFact, virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 export {
   PrismaGatewayAdapter,
   type GatewayPersistence,
@@ -82,6 +81,7 @@ export {
   type GatewayActor,
   type GatewayAppDependencies,
   type GatewayInfrastructure,
+  type GatewayRestInfrastructure,
   type GatewayApplicableBudgetTarget,
   type GatewayVirtualKeyBudgetInput,
   type GatewayVirtualKeyOperations,

@@ -2,7 +2,6 @@
  * The Go data plane's control-plane calls, filled from this process.
  */
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
-import { createElevenLabsWebhookRestApp } from "@langwatch/gateway-server/api-rest/elevenlabs-webhook";
 import {
   createGatewayInternalRestApp,
   type GatewayInternalRestPorts,
@@ -13,7 +12,6 @@ import {
   GatewayConfigMaterialiserService,
   GatewayGuardrailEvaluationService,
   GatewayJwtAdapter,
-  GatewayModelProviderCredentialsPort,
   ModelCatalogGatewaySpendRatingAdapter,
   PrismaGatewayInternalStoreAdapter,
   type GatewayRealtimeSessionCollaborators,
@@ -22,12 +20,11 @@ import {
 } from "@langwatch/gateway-server";
 import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
 import { PrismaGatewayGuardrailRepository } from "@langwatch/gateway-server/composition/gateway-guardrails";
-import { PrismaGatewayElevenLabsCredentialRepository } from "@langwatch/gateway-server/composition/gateway-elevenlabs-credentials";
 import type { MonitorService } from "@langwatch/monitor-contract";
-import { EncryptedModelProviderCredentialAdapter } from "@langwatch/model-provider-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import { ApiGatewayModelProviderCredentials } from "../features/gateway/gateway-model-provider-credentials.adapter.ts";
 
 import type { ApiGatewayComposition } from "./api-gateway.composition.ts";
 import { PrismaGatewayScopeResolutionRepository } from "@langwatch/gateway-server/composition/gateway-scope-resolution";
@@ -78,25 +75,6 @@ export type ApiGatewayInternalRestOptions = Readonly<{
 type GatewayInternalRestPortsGuardrails = ReturnType<
   NonNullable<GatewayInternalRestPorts["guardrails"]>
 >;
-
-/**
- * A provider row's stored keys, read through the SAME lenient reader the model gateway
- * itself uses.
- */
-class ApiGatewayModelProviderCredentials extends GatewayModelProviderCredentialsPort {
-  static create(encryption: SecretEncryptionPort): ApiGatewayModelProviderCredentials {
-    return new ApiGatewayModelProviderCredentials(encryption);
-  }
-
-  private constructor(private readonly encryption: SecretEncryptionPort) {
-    super();
-  }
-
-  readCustomKeys(stored: unknown): Record<string, unknown> {
-    const read = EncryptedModelProviderCredentialAdapter.readCustomKeys(stored, this.encryption);
-    return read.state === "read" ? read.keys : {};
-  }
-}
 
 /**
  * Composes the internal control plane, or reports that it cannot be served. `undefined`
@@ -180,37 +158,4 @@ export function composeApiGatewayRealtimeSessions(options: {
     spendRating: options.rating ?? ModelCatalogGatewaySpendRatingAdapter.create(),
     spendConfirmation: options.spendConfirmation,
   };
-}
-
-/**
- * The ElevenLabs post-call webhook, over the SAME realtime bag the booking uses.
- */
-export function composeApiElevenLabsWebhookRest(options: {
-  security: AppRestSecurity;
-  /** The one guarded connection the provider row and the session row are read on. */
-  prisma: PrismaClient;
-  /** The cipher the row's webhook secret was written under, if any. */
-  encryption: SecretEncryptionPort | undefined;
-  /** The confirmation a settled session's spend is reported through, if any. */
-  spendConfirmation: GatewaySpendConfirmationPort | undefined;
-}): MountableRestApp | undefined {
-  const { encryption } = options;
-  const sessions = composeApiGatewayRealtimeSessions({
-    prisma: options.prisma,
-    spendConfirmation: options.spendConfirmation,
-  });
-  if (!encryption || !sessions) return undefined;
-
-  return createElevenLabsWebhookRestApp({
-    security: options.security,
-    ports: {
-      credentials: {
-        providers: PrismaGatewayElevenLabsCredentialRepository.create({
-          database: options.prisma,
-        }),
-        credentials: ApiGatewayModelProviderCredentials.create(encryption),
-      },
-      sessions,
-    },
-  });
 }

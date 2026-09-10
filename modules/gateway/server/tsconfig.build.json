@@ -37,7 +37,6 @@
     "./src/transport/api-rest/gateway-platform.api.ts",
     "./src/transport/api-rest/gateway-internal.api.ts",
     "./src/transport/api-rest/gateway-spend.api.ts",
-    "./src/transport/api-rest/elevenlabs-webhook.api.ts",
     "src/__tests__/support/test-project-api.ts",
     "src/__tests__/support/trace-destination-project-service.ts"
   ],

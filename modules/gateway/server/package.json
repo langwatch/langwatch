@@ -80,6 +80,10 @@
       "types": "./dist/projections/gateway-spend.projection.d.ts",
       "default": "./src/projections/gateway-spend.projection.ts"
     },
+    "./composition/gateway-agent-cache-store": {
+      "types": "./dist/stores/gateway-agent-cache/gateway-agent-cache.store.d.ts",
+      "default": "./src/stores/gateway-agent-cache/gateway-agent-cache.store.ts"
+    },
     "./api-rest/gateway-platform": {
       "types": "./dist/transport/api-rest/gateway-platform.api.d.ts",
       "default": "./src/transport/api-rest/gateway-platform.api.ts"
@@ -91,10 +95,6 @@
     "./api-rest/gateway-spend": {
       "types": "./dist/transport/api-rest/gateway-spend.api.d.ts",
       "default": "./src/transport/api-rest/gateway-spend.api.ts"
-    },
-    "./api-rest/elevenlabs-webhook": {
-      "types": "./dist/transport/api-rest/elevenlabs-webhook.api.d.ts",
-      "default": "./src/transport/api-rest/elevenlabs-webhook.api.ts"
     }
   },
   "scripts": {
@@ -104,7 +104,6 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
@@ -121,6 +120,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

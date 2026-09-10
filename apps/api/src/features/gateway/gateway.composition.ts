@@ -6,9 +6,25 @@
 import { HandledError } from "@langwatch/handled-error";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
+import {
+  gatewayServer,
+  ModelCatalogGatewaySpendRatingAdapter,
+  type GatewayRestInfrastructure,
+  type GatewaySpendConfirmationPort,
+} from "@langwatch/gateway-server";
+import {
+  MemoryGatewayAgentCacheEntryStore,
+  RedisGatewayAgentCacheEntryStore,
+} from "@langwatch/gateway-server/composition/gateway-agent-cache-store";
+import { PrismaGatewayElevenLabsCredentialRepository } from "@langwatch/gateway-server/composition/gateway-elevenlabs-credentials";
+import { PrismaGatewayRealtimeSessionRepository } from "@langwatch/gateway-server/composition/gateway-realtime-sessions";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { createApp } from "@langwatch/runtime-composition";
+import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
@@ -60,10 +76,51 @@ export type GatewayFeatureOptions = Readonly<{
   virtualKeyPepper: string | undefined;
   /** The receipt ledger the keyed REST creates run through, where one exists. */
   idempotency?: ApiGatewayIdempotencyPort | undefined;
+  /** Absent without encryption, preserving the agent-cache family's conditional mount. */
+  agentCache?: GatewayRestInfrastructure["agentCache"];
+  /** Absent where the process does not mount the vendor callback. */
+  elevenLabsWebhook?: GatewayRestInfrastructure["elevenLabsWebhook"];
 }>;
 
 import { createGatewayTrpcRouters } from "./gateway-trpc.mount.ts";
 import type { ComposedGatewayFeature } from "./gateway.composition.types.ts";
+import { ApiGatewayModelProviderCredentials } from "./gateway-model-provider-credentials.adapter.ts";
+
+export function composeGatewayAgentCache(options: {
+  encryption: SecretEncryptionPort | undefined;
+  redis: RedisConnection | undefined;
+}): GatewayFeatureOptions["agentCache"] {
+  if (!options.encryption) return void 0;
+
+  return {
+    store: options.redis
+      ? RedisGatewayAgentCacheEntryStore.create(options.redis)
+      : MemoryGatewayAgentCacheEntryStore.create(),
+    encryption: options.encryption,
+  };
+}
+
+export function composeGatewayElevenLabsWebhook(options: {
+  prisma: PrismaClient | undefined;
+  encryption: SecretEncryptionPort | undefined;
+  spendConfirmation: GatewaySpendConfirmationPort | undefined;
+}): GatewayFeatureOptions["elevenLabsWebhook"] {
+  if (!options.prisma || !options.encryption || !options.spendConfirmation) return void 0;
+
+  return {
+    credentials: {
+      providers: PrismaGatewayElevenLabsCredentialRepository.create({
+        database: options.prisma,
+      }),
+      credentials: ApiGatewayModelProviderCredentials.create(options.encryption),
+    },
+    sessions: {
+      sessions: PrismaGatewayRealtimeSessionRepository.create({ database: options.prisma }),
+      spendRating: ModelCatalogGatewaySpendRatingAdapter.create(),
+      spendConfirmation: options.spendConfirmation,
+    },
+  };
+}
 
 /**
  * Installs the gateway on this process: it boots the module at `role: "api"`
@@ -74,7 +131,10 @@ export async function installApiGateway(
   options: GatewayFeatureOptions,
 ): Promise<ComposedGatewayFeature> {
   const { infrastructure, peers } = options;
-  if (!infrastructure || !peers) return refusingGateway();
+  if (!infrastructure || !peers) {
+    const restApp = await installGatewayRestAvailability(options);
+    return refusingGateway(restApp, options);
+  }
 
   const composition = await composeApiGateway({
     prisma: infrastructure.prisma,
@@ -85,12 +145,42 @@ export async function installApiGateway(
     clickhouse: options.clickhouse,
     virtualKeyPepper: options.virtualKeyPepper,
     ...(options.idempotency ? { idempotency: options.idempotency } : {}),
+    ...(options.agentCache ? { agentCache: options.agentCache } : {}),
+    ...(options.elevenLabsWebhook ? { elevenLabsWebhook: options.elevenLabsWebhook } : {}),
   });
 
   return {
     app: composition.app,
     composition,
     routers: (mount) => createGatewayTrpcRouters(mount.runtime),
+    restServices: gatewayRestServices(composition.app, options),
+  };
+}
+
+async function installGatewayRestAvailability(
+  options: GatewayFeatureOptions,
+): Promise<ApiTrpcFeatureApplication["gateway"] | undefined> {
+  if (!options.agentCache && !options.elevenLabsWebhook) return void 0;
+
+  const infrastructure: GatewayRestInfrastructure = {
+    ...(options.agentCache ? { agentCache: options.agentCache } : {}),
+    ...(options.elevenLabsWebhook ? { elevenLabsWebhook: options.elevenLabsWebhook } : {}),
+  };
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withInfrastructure({})
+    .withModule(gatewayServer, { infrastructure })
+    .boot({ role: "api" });
+
+  return runtime.module(gatewayServer).provided;
+}
+
+function gatewayRestServices(
+  app: ApiTrpcFeatureApplication["gateway"],
+  options: GatewayFeatureOptions,
+): ComposedGatewayFeature["restServices"] {
+  return {
+    ...(options.agentCache ? { agentCache: () => app } : {}),
+    ...(options.elevenLabsWebhook ? { elevenLabsWebhook: () => app } : {}),
   };
 }
 
@@ -101,10 +191,13 @@ const logger: Pick<Logger, "info"> = createLogger("langwatch:api:gateway");
  * are this feature's own parsers, not a peer's, so the six namespaces build and publish
  * the same inputs they always did.
  */
-function refusingGateway(): ComposedGatewayFeature {
+function refusingGateway(
+  restApp?: ApiTrpcFeatureApplication["gateway"],
+  options?: GatewayFeatureOptions,
+): ComposedGatewayFeature {
   logger.info(
     {},
-      "API installed no gateway application: the virtual keys, budgets, cache rules, guardrails, usage and spend-event surfaces all mount and refuse by name",
+    "API installed no gateway application: the virtual keys, budgets, cache rules, guardrails, usage and spend-event surfaces all mount and refuse by name",
   );
 
   const app = new Proxy({} as ApiTrpcFeatureApplication["gateway"], {
@@ -126,6 +219,7 @@ function refusingGateway(): ComposedGatewayFeature {
     app,
     composition: undefined,
     routers: (mount) => createGatewayTrpcRouters(mount.runtime),
+    restServices: restApp && options ? gatewayRestServices(restApp, options) : {},
   };
 }
 

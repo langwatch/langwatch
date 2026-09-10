@@ -207,16 +207,6 @@ export {
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,
 } from "@langwatch/stored-object-server";
-export {
-  type AgentCacheStore,
-  CACHE_ENTRY_NAME_REGEX,
-  createAgentCacheRestApp,
-  DEFAULT_TTL_SECONDS,
-  MAX_NAME_LENGTH,
-  MAX_TTL_SECONDS,
-  MAX_VALUE_BYTES,
-  MIN_TTL_SECONDS,
-} from "./features/agent-cache/agent-cache-rest.ts";
 // The five port and actor types this used to re-export beside the family are
 // gone: `GatewayApp` subsumed them. A process composes that application and
 // hands it in — `createGatewayPlatformRestApp({ security, gateway })` — and
@@ -228,7 +218,6 @@ export {
 } from "@langwatch/gateway-server/api-rest/gateway-spend";
 export { createGovernanceRestApp } from "@langwatch/enterprise-api";
 
-
 export { type CodingAgentCallerScope } from "@langwatch/coding-agent-server";
 export { type TrackedEventPorts } from "@langwatch/trace-server";
 export {
@@ -238,10 +227,11 @@ export {
 } from "@langwatch/trace-server";
 export { createGroupRestApp } from "@langwatch/organization-server";
 
-
 export {
+  organizationsProvisioningRest,
   createOrganizationsRestApp,
   ORGANIZATIONS_SPEC_OPTIONS,
+  type OrganizationsProvisioningRestApi,
   type OrganizationProvisioningPort,
   type OrganizationProvisioningSummary,
 } from "@langwatch/organization-server";
@@ -252,9 +242,7 @@ export {
   createScenarioRest,
   createSimulationRunsRest,
 } from "@langwatch/scenario-server";
-export {
-  type WorkflowEvaluationTrigger,
-} from "@langwatch/workflow-server";
+export { type WorkflowEvaluationTrigger } from "@langwatch/workflow-server";
 export {
   apiConfigDefinition,
   apiObservabilityConfiguration,
