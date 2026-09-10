@@ -191,15 +191,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "identity|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "identity|testing-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "identity|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {

@@ -42,6 +42,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-server": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",
     "nanoid": "^6.0.0",

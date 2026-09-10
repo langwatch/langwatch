@@ -348,3 +348,10 @@ export {
   type ConnectionDirectoryRevocation,
 } from "./adapters/sso-connection-teardown.adapter.ts";
 export { PrismaScimSyncProjectionRepository } from "./repositories/prisma/prisma.scim-sync-projection.repository.ts";
+export { identityRepositories } from "./repositories/identity-repositories.registry.ts";
+export type { IdentityRepositories } from "./repositories/identity.repositories.ts";
+export { MemoryIdentityStore } from "./repositories/memory/memory-identity.store.ts";
+export { MemoryIdentityRepositories } from "./repositories/memory/memory.identity.repositories.ts";
+export { PostgresIdentityRepositories } from "./repositories/prisma/prisma.identity.repositories.ts";
+export { PrismaJoinMembershipRepository } from "./repositories/prisma/prisma.join-membership.repository.ts";
+export { PrismaJoinSettingRepository } from "./repositories/prisma/prisma.join-setting.repository.ts";

@@ -17,129 +17,30 @@ import type {
   JoinRequestNotifier,
   JoinSettingPort,
 } from "../rules/join-requests-contract.rules.ts";
-import { PrismaJoinCandidateRepository } from "../repositories/prisma/prisma.join-request.repository.ts";
+import { PrismaJoinMembershipRepository } from "../repositories/prisma/prisma.join-membership.repository.ts";
+import { PrismaJoinSettingRepository } from "../repositories/prisma/prisma.join-setting.repository.ts";
 import type { JoinRequestService } from "../services/join-request.service.ts";
 
 const logger = createLogger("langwatch:identity:join-request-adapters");
 
-/**
- * The KSUID resource an organization-scoped grant is born under. Spelled as a literal, the way
- * every other feature package spells its own: the prefix is a PERSISTED format, and a second
- * description of it writes bindings the revocation queries never find.
- */
-const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
 /**
- * How a join approval becomes a membership: the `OrganizationUser` row plus
- * the organization-scoped grant, the SAME two-step shape invitation
- * acceptance and SSO auto-join already use (ADR-092).
+ * The transitional seams: both classes now live under repositories/prisma.
+ * Each stays here as a one-line factory until every composition outside this
+ * package names the repository directly.
  */
-export class PrismaJoinMembershipAdapter implements JoinMembershipPort {
-  static create(prisma: PrismaClient, writer: AuthzGrantsService): PrismaJoinMembershipAdapter {
-    return new PrismaJoinMembershipAdapter(prisma, writer);
-  }
-
-  private constructor(
-    private readonly prisma: PrismaClient,
-    private readonly writer: AuthzGrantsService,
-  ) {}
-
-  async isMember({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<boolean> {
-    const held = await this.prisma.organizationUser.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
-      select: { userId: true },
-    });
-    return held !== null;
-  }
-
-  async attachDefaultMembership({
-    userId,
-    organizationId,
-    approvedByUserId,
-  }: {
-    userId: string;
-    organizationId: string;
-    approvedByUserId: string | null;
-  }): Promise<void> {
-    await this.prisma.organizationUser.createMany({
-      data: [{ userId, organizationId, role: OrganizationUserRole.MEMBER }],
-      skipDuplicates: true,
-    });
-
-    await this.writer.attachBindings({
-      organizationId,
-      bindings: [
-        {
-          bindingId: generate(ROLE_BINDING_KSUID_RESOURCE).toString(),
-          principal: { userId },
-          role: TeamUserRole.MEMBER,
-          customRoleId: null,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
-      ],
-      // The admin who approved, or the policy that did. Both reach the
-      // customer's audit page — `join-request` is deliberately NOT in
-      // `NON_AUDITABLE_SOURCES`, so a surprising automatic join looks exactly
-      // like a surprising approval somebody clicked.
-      actor: approvedByUserId
-        ? { type: "user", id: approvedByUserId }
-        : { type: "system", id: SYSTEM_ACTORS.joinRequests },
-      source: "join-request",
-      onDuplicate: "skip",
-    });
+export class PrismaJoinMembershipAdapter {
+  static create(prisma: PrismaClient, writer: AuthzGrantsService): JoinMembershipPort {
+    return PrismaJoinMembershipRepository.create(prisma, writer);
   }
 }
 
-/**
- * The organization's joining setting, as two plain columns. Not event-sourced, on purpose: it is
- * configuration an administrator sets, like every other organization setting, and the thing that
- * needs a history is the requests it produces rather than the switch itself.
- */
-export class PrismaJoinSettingsAdapter implements JoinSettingPort {
-  static create(prisma: PrismaClient): PrismaJoinSettingsAdapter {
-    return new PrismaJoinSettingsAdapter(prisma);
-  }
-
-  private constructor(private readonly prisma: PrismaClient) {}
-
-  async read({ organizationId }: { organizationId: string }): Promise<{
-    domainJoin: DomainJoinSetting;
-    joinDomains: string[];
-  }> {
-    const row = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { domainJoin: true, joinDomains: true },
-    });
-    return {
-      domainJoin: row
-        ? PrismaJoinCandidateRepository.readDomainJoin(row.domainJoin)
-        : DEFAULT_DOMAIN_JOIN_SETTING,
-      joinDomains: row?.joinDomains ?? [],
-    };
-  }
-
-  async write({
-    organizationId,
-    domainJoin,
-    joinDomains,
-  }: {
-    organizationId: string;
-    domainJoin: DomainJoinSetting;
-    joinDomains: string[];
-  }): Promise<void> {
-    await this.prisma.organization.update({
-      where: { id: organizationId },
-      data: { domainJoin, joinDomains },
-    });
+export class PrismaJoinSettingsAdapter {
+  static create(prisma: PrismaClient): JoinSettingPort {
+    return PrismaJoinSettingRepository.create(prisma);
   }
 }
+
 
 /** The organization's plan, read only for the fields the seat census needs. */
 export type JoinRequestNotifierPlans = {

@@ -49,6 +49,7 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/project-server": "workspace:*",
     "@langwatch/time": "workspace:*",
