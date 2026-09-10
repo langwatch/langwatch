@@ -21,6 +21,7 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: (...args: unknown[]) => fetchMock(...args),
 }));
 
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { AnthropicAdminPuller } from "../anthropicAdmin.puller";
 import { buildPulledUsageRecord } from "../pulledUsageRecord";
 
@@ -1035,6 +1036,60 @@ describe("the Anthropic Admin puller", () => {
           bucketWidth: "1d",
           schedule: "0 * * * *",
         },
+      );
+
+      expect(result.errorCount).toBe(1);
+      expect(result.cursor).toBe(
+        '{"startingAt":"2026-08-01T00:00:00Z","page":null}',
+      );
+      expect(result.events).toHaveLength(0);
+    });
+  });
+
+  describe("when the provider refuses the admin key", () => {
+    const CONFIG = {
+      adapter: "anthropic_admin",
+      report: "cost",
+      bucketWidth: "1d",
+      schedule: "0 * * * *",
+    } as const;
+
+    /** @scenario "A key the provider refuses is reported as refused and is not retried as an outage" */
+    it.each([
+      401, 403,
+    ])("ends the run as refused and not worth retrying on HTTP %i, without quoting the reply or the key", async (status) => {
+      fetchMock.mockResolvedValue(
+        new Response('{"error":{"message":"invalid x-api-key sk-admin"}}', {
+          status,
+        }),
+      );
+
+      const run = new AnthropicAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+      await expect(run).rejects.toBeInstanceOf(DispatchError);
+      await expect(run).rejects.toMatchObject({
+        retryable: false,
+        message: `HTTP ${status} (anthropic cost_report): key refused`,
+        customerMessage:
+          "Anthropic refused this key. Check the admin key and its permissions.",
+      });
+      const error = await run.catch((e: unknown) => e as DispatchError);
+      expect(error.message).not.toContain("sk-admin");
+      expect(error.message).not.toContain("invalid x-api-key");
+      expect(error.customerMessage).not.toContain("sk-admin");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("still treats a server fault as a transport failure that holds the cursor for a retry", async () => {
+      fetchMock.mockResolvedValue(
+        new Response("upstream fell over", { status: 500 }),
+      );
+
+      const result = await new AnthropicAdminPuller().runOnce(
+        {
+          ...RUN_OPTIONS,
+          cursor: '{"startingAt":"2026-08-01T00:00:00Z","page":null}',
+        },
+        CONFIG,
       );
 
       expect(result.errorCount).toBe(1);

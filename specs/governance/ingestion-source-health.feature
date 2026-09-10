@@ -131,3 +131,44 @@ Feature: A broken puller is visible, a flaky one is not
     # Silence is the worst answer available here. A source that has never
     # completed a run has no successful run to date a gap from, so a rule
     # that reads only that date drops the one source most likely to be wrong.
+
+  # --- A refused key is not an outage ---
+  # A provider answering "this key is not allowed" will answer the same way
+  # on every retry. Treating it like a timeout burns the retry ladder against
+  # a permanent answer and leaves the screen saying only that the pull
+  # failed, when the one thing the admin needs to hear is which key to fix.
+
+  @unit
+  Scenario: A key the provider refuses is reported as refused and is not retried as an outage
+    Given an Anthropic source whose admin key the provider no longer accepts
+    When a run asks the provider for the report
+    Then the run ends saying the provider refused the key
+    And it asks the admin to check the key and its permissions
+    And the run is marked as not worth retrying
+    And nothing from the provider's reply or the key itself is quoted
+    # A request limit and a server fault keep their answers: the first still
+    # carries the provider's wait, the second is still a fault worth retrying.
+
+  @unit
+  Scenario: A refused key ends the run at once and the source keeps its schedule
+    Given an Anthropic source whose admin key the provider no longer accepts
+    When the first attempt of a run is refused
+    Then the run is recorded as failed straight away, without further attempts
+    And the failure names the provider's refusal and what to check
+    And the source is not disabled and its next scheduled run still happens
+    # Retrying a refusal three times buys nothing and hides the answer for
+    # the length of the retry ladder; and the ladder's end is where the
+    # outbox retires a permanent failure, so a refusal that keeps being
+    # rethrown is retired before anything writes it down. Writing it on the
+    # first attempt is what puts it on the screen at all.
+
+  @unit
+  Scenario: The source health row says the key was refused
+    Given a source whose last run ended because the provider refused its key
+    When a viewer looks at the source
+    Then the row says the provider refused the key and asks them to check the key and its permissions
+    And it quotes nothing from the provider's reply and no part of the key
+    # Every other failure collapses to "The last pull failed." on purpose,
+    # because a provider's reply can carry a token. The refusal is the one
+    # failure whose message we wrote ourselves, so it is the one that can be
+    # shown as written.

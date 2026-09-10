@@ -4,6 +4,7 @@ import type {
   IntentContext,
   IntentExecutor,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
   incrementIngestionPullTotal,
   observeIngestionPullDuration,
@@ -289,6 +290,39 @@ export function createIngestionPullRunHandler(
       });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
+      if (isDispatchError(error) && error.retryable === false) {
+        // The provider refused the source outright (a key it no longer
+        // accepts, for one). Another attempt gets the same answer, and the
+        // outbox retires a non-retryable error before the retry ladder
+        // reaches the branch below that writes run_failed — so a refusal
+        // that is rethrown is never recorded. Record it now, on this
+        // attempt, and end the run. The source keeps its schedule: the next
+        // wake starts a fresh run, which is what an admin who has since
+        // replaced the key needs.
+        incrementIngestionPullTotal({ outcome: "failed_final" });
+        logger.warn(
+          {
+            sourceId: payload.sourceId,
+            attempt: intentContext.attempt,
+            error: detail,
+          },
+          "Ingestion pull refused by the provider; not retrying this run",
+        );
+        await commands.recordRunFailed({
+          tenantId: intentContext.projectId,
+          occurredAt: clock(),
+          sourceId: payload.sourceId,
+          runId: payload.runId,
+          scheduledFor: payload.scheduledFor,
+          // The customer sentence is the one the page may show as written;
+          // the diagnostic message is the fallback and carries no reply body.
+          error: error.customerMessage ?? detail,
+          errorCode: "pull_refused",
+          retryable: false,
+          retryAfterMs: providerRetryAfterMs(error),
+        });
+        return;
+      }
       if (intentContext.attempt < maxAttempts) {
         incrementIngestionPullTotal({ outcome: "failed_retryable" });
         logger.warn(

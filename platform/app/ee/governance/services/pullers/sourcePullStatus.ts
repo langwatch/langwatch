@@ -6,7 +6,15 @@ import type { IngestionPullRunProjection } from "~/generated/prisma/client";
 export type PullRunSummary = Pick<
   IngestionPullRunProjection,
   "LastRunAt" | "LastRunOutcome" | "LastRunError"
->;
+> &
+  Partial<Pick<IngestionPullRunProjection, "LastRunErrorCode">>;
+
+/**
+ * The one failure whose message the run handler wrote itself, so it carries
+ * no provider reply and can be shown as written
+ * (`ingestionPullEffects.ts`, the non-retryable branch).
+ */
+const REFUSED_ERROR_CODE = "pull_refused";
 const progressSchema = z.object({
   startingAt: z.string().datetime(),
   watermark: z.string().datetime().nullish(),
@@ -40,7 +48,14 @@ function billingProgress(sourceType: string, cursor: unknown) {
   }
 }
 
-function failureMessage(error: string | null | undefined): string {
+function failureMessage({
+  error,
+  errorCode,
+}: {
+  error: string | null | undefined;
+  errorCode: string | null | undefined;
+}): string {
+  if (errorCode === REFUSED_ERROR_CODE && error) return error;
   if (/Too many simultaneous queries/i.test(error ?? ""))
     return "The database is busy.";
   if (/HTTP 429|rate limit exceeded/i.test(error ?? ""))
@@ -66,7 +81,10 @@ export function sourcePullStatus({
     outcome: pullRun?.LastRunOutcome ?? null,
     error:
       pullRun?.LastRunOutcome === "failed"
-        ? failureMessage(pullRun.LastRunError)
+        ? failureMessage({
+            error: pullRun.LastRunError,
+            errorCode: pullRun.LastRunErrorCode,
+          })
         : null,
     ...billingProgress(sourceType, cursor),
   };

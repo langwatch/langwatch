@@ -1125,6 +1125,20 @@ export class AnthropicAdminPuller
         retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
       });
     }
+    if (response.status === 401 || response.status === 403) {
+      // A refused key answers the same way on every retry, so it is not an
+      // outage to wait out: `retryable: false` stops the ladder, and the
+      // customer sentence names the one thing an admin can act on. The body
+      // is drained and never read — a refusal from this endpoint can echo
+      // request material, and nothing here should quote it.
+      await response.body?.cancel().catch(() => void 0);
+      throw new DispatchError({
+        message: `HTTP ${response.status} (anthropic ${config.report}_report): key refused`,
+        retryable: false,
+        customerMessage:
+          "Anthropic refused this key. Check the admin key and its permissions.",
+      });
+    }
     if (!response.ok) {
       throw await fetchPageError(response, config.report);
     }
