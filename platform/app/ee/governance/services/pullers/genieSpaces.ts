@@ -237,14 +237,8 @@ export async function listGenieAgents(params: {
     // show a subset as the whole set, and the next Sync would walk the same
     // pages and stop in the same place, so repeating the action cannot
     // uncover them.
-    // `complete` false means the page bound cut the walk short, so spaces
-    // exist that this read never saw. The same reasoning as the Copilot
-    // inventory: a screen claiming to list the organization's agents cannot
-    // show a subset as the whole set, and the next Sync would walk the same
-    // pages and stop in the same place, so repeating the action cannot
-    // uncover them.
     if (!walk.complete) {
-      return agentsRefused({ reason: "unavailable", status: null });
+      return agentsRefused({ reason: "too_many_pages", status: null });
     }
 
     return agentsListed(
