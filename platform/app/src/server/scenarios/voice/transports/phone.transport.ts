@@ -145,15 +145,16 @@ const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
 export type PublicBaseUrlSource = "VOICE_PUBLIC_BASE_URL" | "BASE_HOST";
 
 /**
- * Thrown when a present `VOICE_PUBLIC_BASE_URL` or `BASE_HOST` value does not
- * parse as an absolute `http:`/`https:` URL. The vendored SDK builds Twilio's
- * media-stream URL by a bare string replace
- * (`publicBaseUrl.replace(/^https:/, "wss:")...`) with no validation of its
- * own, so a malformed base URL is not rejected here — it is embedded as-is
- * into the TwiML `<Stream url>` Twilio is told to open, and only surfaces
- * later as Twilio error 11100 ("Invalid URL format") with a zero-duration
- * call. Failing loudly at dial time, naming the offending env var and value,
- * is far better than that 120-second silent timeout.
+ * Thrown when a present `VOICE_PUBLIC_BASE_URL` or `BASE_HOST` value can't be
+ * turned into an absolute `http:`/`https:` URL, even after normalization (see
+ * {@link normalizeToHttpUrl}). The vendored SDK builds Twilio's media-stream
+ * URL by a bare string replace (`publicBaseUrl.replace(/^https:/, "wss:")...`)
+ * with no validation of its own, so a malformed base URL is not rejected here
+ * — it is embedded as-is into the TwiML `<Stream url>` Twilio is told to
+ * open, and only surfaces later as Twilio error 11100 ("Invalid URL format")
+ * with a zero-duration call. Failing loudly at dial time, naming the
+ * offending env var and value, is far better than that 120-second silent
+ * timeout.
  */
 export class VoicePublicBaseUrlInvalidError extends Error {
   constructor(envVarName: PublicBaseUrlSource, value: string) {
@@ -179,15 +180,41 @@ function isValidHttpUrl(value: string): boolean {
 }
 
 /**
+ * Accepts an already-valid `http:`/`https:` URL unchanged. Otherwise, if
+ * `value` looks like a bare host (optionally with a port and/or path, no
+ * scheme, no spaces) — the shape `BASE_HOST` legitimately takes in CI
+ * (`BASE_HOST: "localhost:3000"` in `langwatch-app-ci.yml`) and in local dev
+ * — prepends a scheme and re-validates: `http://` for `localhost`,
+ * `127.0.0.1`, or a `.localhost` hostname, `https://` for everything else.
+ * Returns `undefined` when neither shape parses as an absolute http(s) URL,
+ * so the caller can throw {@link VoicePublicBaseUrlInvalidError} naming the
+ * original, unmodified value.
+ */
+function normalizeToHttpUrl(value: string): string | undefined {
+  if (isValidHttpUrl(value)) return value;
+  if (/\s/.test(value) || value.includes("://")) return undefined;
+
+  const hostname = value.split(/[/:]/)[0];
+  const isLocalHost =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.endsWith(".localhost");
+  const candidate = `${isLocalHost ? "http://" : "https://"}${value}`;
+  return isValidHttpUrl(candidate) ? candidate : undefined;
+}
+
+/**
  * The app's public HTTPS base URL the SDK routes Twilio's media stream to.
  * `VOICE_PUBLIC_BASE_URL` when set (the voice worker's own hostname), otherwise
  * the app's own `BASE_HOST`. Read from `process.env` directly, the same way
  * `voice-limits` reads its knobs, so the pool child and the worker both reach
  * it without threading the config object.
  *
- * A present-but-malformed value throws {@link VoicePublicBaseUrlInvalidError}
- * rather than being passed through: see that error's doc comment for why. Only
- * a present value is validated — neither variable set still resolves to
+ * A present value is normalized via {@link normalizeToHttpUrl} — a scheme-less
+ * host like `localhost:3000` or `voice.example.com` is accepted and given a
+ * scheme, not rejected. Only a value that still doesn't parse as an absolute
+ * http(s) URL after that throws {@link VoicePublicBaseUrlInvalidError}: see
+ * that error's doc comment for why. Neither variable set still resolves to
  * `undefined`, unchanged from before.
  */
 export function resolvePublicBaseUrl(
@@ -204,21 +231,23 @@ export function resolvePublicBaseUrlWithSource(
 ): { value: string; source: PublicBaseUrlSource } | undefined {
   const fromWorker = processEnv.VOICE_PUBLIC_BASE_URL?.trim();
   if (fromWorker) {
-    if (!isValidHttpUrl(fromWorker)) {
+    const normalized = normalizeToHttpUrl(fromWorker);
+    if (!normalized) {
       throw new VoicePublicBaseUrlInvalidError(
         "VOICE_PUBLIC_BASE_URL",
         fromWorker,
       );
     }
-    return { value: fromWorker, source: "VOICE_PUBLIC_BASE_URL" };
+    return { value: normalized, source: "VOICE_PUBLIC_BASE_URL" };
   }
 
   const fromApp = processEnv.BASE_HOST?.trim();
   if (fromApp) {
-    if (!isValidHttpUrl(fromApp)) {
+    const normalized = normalizeToHttpUrl(fromApp);
+    if (!normalized) {
       throw new VoicePublicBaseUrlInvalidError("BASE_HOST", fromApp);
     }
-    return { value: fromApp, source: "BASE_HOST" };
+    return { value: normalized, source: "BASE_HOST" };
   }
 
   return undefined;
