@@ -27,6 +27,31 @@ outputs, statuses and permissions do not change. Find the old router with
 record every unavoidable delta with its reason. A status collapsed to 200 or a
 setting that stopped being configurable is a regression, not a delta.
 
+## Where a thing lives
+
+The contract package is the module's vocabulary and the server package is its
+behaviour. That line decides three kinds of file, and getting it wrong is the
+most common review finding:
+
+- **Schemas.** Every Zod schema a request or an answer is shaped by lives in
+  `modules/<m>/contract/src`, not beside the `defineRestRouter` or
+  `defineTrpcContract` file that uses it. A transport file declares routes and
+  imports its schemas. The reason is not tidiness: the browser, the SDK and
+  another module all need the shape, and none of them may import a server
+  package. A schema in `server/src/transport` is a shape only the server can
+  see, so every other side of the wire ends up with a hand-written copy that
+  drifts.
+- **Errors.** Every `HandledError` subclass lives in
+  `modules/<m>/contract/src/<m>.errors.ts` with its stable `code`, beside its
+  entry in `packages/handled-error/src/presentation.ts`. A service throws it;
+  a client reads its code. Both sides need the class, so it cannot live in the
+  server package either.
+- **Types.** A type both sides name goes in the contract. A type only the
+  server's own internals name stays colocated with the code that uses it.
+
+What does stay in the server package: the routers and routers only, the app,
+the services, the repositories, the ports and adapters.
+
 ## Rules that fail review
 
 No git write commands (add, commit, stash, checkout, reset, restore, mv).
