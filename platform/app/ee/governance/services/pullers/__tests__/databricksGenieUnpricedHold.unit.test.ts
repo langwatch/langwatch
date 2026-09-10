@@ -153,6 +153,7 @@ async function pull({
       workspaceUrl: WORKSPACE_URL,
       spaceIds: [],
       schedule: "*/15 * * * *",
+      readPaidGenieBill: false,
       ...(warehouseId ? { warehouseId } : {}),
     },
   );

@@ -1072,7 +1072,9 @@ describe("the Anthropic Admin puller", () => {
         customerMessage:
           "Anthropic refused this key. Check the admin key and its permissions.",
       });
-      const error = await run.catch((e: unknown) => e as DispatchError);
+      // `run` is typed by its resolved value, so the rejection has to be read
+      // off the promise and cast: the assertions above already proved what it is.
+      const error = (await run.catch((e: unknown) => e)) as DispatchError;
       expect(error.message).not.toContain("sk-admin");
       expect(error.message).not.toContain("invalid x-api-key");
       expect(error.customerMessage).not.toContain("sk-admin");

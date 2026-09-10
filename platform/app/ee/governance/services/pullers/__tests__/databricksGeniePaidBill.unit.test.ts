@@ -188,7 +188,9 @@ async function pull({
       spaceIds: [],
       schedule: "*/15 * * * *",
       ...(warehouseId ? { warehouseId } : {}),
-      ...(readPaidGenieBill === undefined ? {} : { readPaidGenieBill }),
+      // What the schema's default would have filled in; the config is built
+      // by hand here rather than parsed.
+      readPaidGenieBill: readPaidGenieBill ?? false,
     },
   );
 }

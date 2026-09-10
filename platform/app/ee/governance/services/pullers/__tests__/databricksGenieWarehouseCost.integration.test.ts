@@ -277,6 +277,7 @@ async function pull({
       workspaceUrl: baseUrl,
       spaceIds: [],
       schedule: "*/15 * * * *",
+      readPaidGenieBill: false,
       ...(warehouseId ? { warehouseId } : {}),
     },
   );
@@ -617,6 +618,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -913,6 +915,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -981,6 +984,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -1055,6 +1059,7 @@ describe("a source that names a warehouse", () => {
           workspaceUrl: baseUrl,
           spaceIds: [],
           schedule: "*/15 * * * *",
+          readPaidGenieBill: false,
           warehouseId: WAREHOUSE_ID,
         },
       );
@@ -1118,6 +1123,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -1299,6 +1305,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -1339,6 +1346,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
       },
     );
 
@@ -1429,6 +1437,7 @@ describe("a billing answer that did not come back", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );

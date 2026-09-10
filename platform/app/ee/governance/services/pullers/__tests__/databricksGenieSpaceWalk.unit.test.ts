@@ -36,6 +36,7 @@ const config = {
   workspaceUrl,
   spaceIds: [],
   schedule: "*/15 * * * *",
+  readPaidGenieBill: false,
 };
 
 const requestedUrls = () =>
