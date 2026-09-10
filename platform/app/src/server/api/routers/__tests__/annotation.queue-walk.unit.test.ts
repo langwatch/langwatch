@@ -129,8 +129,7 @@ const readsTowardsFrontOfQueue = (args: {
  * hides the tenancy predicate from it.
  */
 const guardedQueueItemRead =
-  (action: string, answer: (args: any) => unknown) =>
-  async (args: unknown) => {
+  (action: string, answer: (args: any) => unknown) => async (args: unknown) => {
     await guardProjectId(
       {
         model: "AnnotationQueueItem",
