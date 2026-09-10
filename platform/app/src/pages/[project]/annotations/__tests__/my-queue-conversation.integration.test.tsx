@@ -61,6 +61,7 @@ vi.mock("~/hooks/useAnnotationQueueWalk", () => ({
       nextItemId: item ? (items[index + 1]?.id ?? null) : null,
       queueFinished: items.every((entry) => !entry.trace),
       queueLoading: false,
+      stepIsStale: false,
     };
   },
 }));

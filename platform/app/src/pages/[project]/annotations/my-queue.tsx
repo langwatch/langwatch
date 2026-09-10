@@ -357,13 +357,16 @@ export default function TraceAnnotations() {
 
   const projectId = project?.id;
   const projectSlug = project?.slug;
-  const advanceToNextItem = useCallback(
-    () =>
-      router.push(
-        queueItemHref({ projectSlug, queueItemId: nextPendingItemId }),
-      ),
-    [router, projectSlug, nextPendingItemId],
-  );
+  // Which item comes next is read from the step in hand, so while that step is
+  // still the one the reviewer stepped away from, moving on would carry them
+  // past the item they actually asked for. The hold lives here rather than on
+  // each button because this is where all of them end up.
+  const advanceToNextItem = useCallback(() => {
+    if (stepIsStale) return;
+    return router.push(
+      queueItemHref({ projectSlug, queueItemId: nextPendingItemId }),
+    );
+  }, [router, projectSlug, nextPendingItemId, stepIsStale]);
 
   // Finishing an item lives here rather than on the bar, because the last item
   // is finished off long after the button was pressed: only once the hand-off
@@ -407,6 +410,9 @@ export default function TraceAnnotations() {
   const deleteQueueItems = api.annotation.deleteQueueItems.useMutation();
   const removeQueueItems = deleteQueueItems.mutate;
   const removeCurrentItemFromQueue = useCallback(() => {
+    // The card offering this button is still drawn from the item left behind,
+    // so acting on it would take away what the reviewer has stepped off.
+    if (stepIsStale) return;
     if (!projectId || !currentQueueItemId) return;
     removeQueueItems(
       { projectId, queueItemIds: [currentQueueItemId] },
@@ -428,6 +434,7 @@ export default function TraceAnnotations() {
     removeQueueItems,
     advanceToNextItem,
     refetchQueueItems,
+    stepIsStale,
   ]);
 
   if (queuesLoading) {
@@ -475,6 +482,7 @@ export default function TraceAnnotations() {
               canRemove={hasPermission("annotations:update")}
               canSkip={!!nextPendingItemId}
               isRemoving={deleteQueueItems.isPending}
+              isStale={stepIsStale}
               onRemove={removeCurrentItemFromQueue}
               onSkip={() => void advanceToNextItem()}
             />
@@ -617,12 +625,18 @@ const UnavailableTraceCard = ({
   canRemove,
   canSkip,
   isRemoving,
+  isStale,
   onRemove,
   onSkip,
 }: {
   canRemove: boolean;
   canSkip: boolean;
   isRemoving: boolean;
+  /**
+   * The card sits above the bar, outside the cover that holds the bar's own
+   * buttons while the next item is being read, so it has to hold its own.
+   */
+  isStale: boolean;
   onRemove: () => void;
   onSkip: () => void;
 }) => (
@@ -636,11 +650,19 @@ const UnavailableTraceCard = ({
     </Text>
     <HStack gap={3}>
       {canRemove && (
-        <Button variant="outline" disabled={isRemoving} onClick={onRemove}>
+        <Button
+          variant="outline"
+          disabled={isRemoving || isStale}
+          onClick={onRemove}
+        >
           Remove from queue
         </Button>
       )}
-      <Button colorPalette="blue" disabled={!canSkip} onClick={onSkip}>
+      <Button
+        colorPalette="blue"
+        disabled={!canSkip || isStale}
+        onClick={onSkip}
+      >
         Skip
       </Button>
     </HStack>
@@ -846,9 +868,10 @@ const AnnotationQueuePicker = ({
           // good for, the same way the card behind the bar offers Skip.
           <Button
             variant="outline"
-            disabled={!nextItemId || isNavigating}
+            disabled={!nextItemId || isNavigating || stepIsStale}
             onClick={() => {
-              if (nextItemId) void navigateToQueue(nextItemId);
+              if (stepIsStale || !nextItemId) return;
+              void navigateToQueue(nextItemId);
             }}
           >
             Next <ChevronRight />

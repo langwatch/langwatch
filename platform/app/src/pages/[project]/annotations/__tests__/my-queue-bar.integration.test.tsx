@@ -317,6 +317,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when the reviewer has stepped on and the new item is still being read", () => {
+    /** @scenario "Nothing acts on the item I have just stepped off" */
     it("holds every action that would otherwise act on the item left behind", () => {
       // The URL already names the item asked for, while the step in hand is
       // still the one being left. Acting now finishes, or annotates, the item
@@ -741,6 +742,24 @@ describe("given a reviewer walking their annotation queue", () => {
         screen.getByRole("button", { name: "Remove from queue" }),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Skip" })).toBeInTheDocument();
+    });
+
+    describe("when the reviewer has stepped on and the new item is still being read", () => {
+      /** @scenario "Nothing acts on the item I have just stepped off" */
+      it("holds the card's own actions, which sit outside the bar's cover", () => {
+        // The card is drawn above the bar, in a different part of the page, so
+        // the cover that holds the bar's buttons while the next item is read
+        // cannot reach it. Where it lands next is read from the step in hand,
+        // and that step is still the one being stepped off.
+        mocks.stepIsStale = true;
+        renderPage();
+
+        expect(
+          screen.getByRole("button", { name: "Remove from queue" }),
+        ).toBeDisabled();
+        expect(screen.getByRole("button", { name: "Skip" })).toBeDisabled();
+        expect(screen.getByRole("button", { name: /Next/ })).toBeDisabled();
+      });
     });
 
     /** @scenario "An item whose trace is gone says so and offers a way on" */

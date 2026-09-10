@@ -109,6 +109,15 @@ Feature: Walking an annotation queue into a dataset
       When I leave the queue before it settles
       Then nothing is left waiting to settle the page
 
+    # Stepping to another item reads a whole trace, so for a moment the page is
+    # still showing the one being left. Anything acted on in that moment acts on
+    # the item behind, and where the page would go next is read from it too.
+    @integration
+    Scenario: Nothing acts on the item I have just stepped off
+      Given I have moved on to another item
+      When the item I asked for is still being read
+      Then every action that would act on the item I left is held
+
   Rule: A link into the queue opens on work
 
     A link names one item, and by the time it is followed that item may have
