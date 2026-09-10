@@ -8843,10 +8843,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "module-app-only-across-packages|apps/api/src/features/coding-agent/__tests__/coding-agent-v1-rest.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "module-app-only-across-packages|apps/api/src/features/discovery/__tests__/spend-filter-parity.unit.test.ts",
       "measured": "2026-09-10"
     },
@@ -21589,70 +21585,6 @@
     {
       "key": "unbounded-loop|modules/workflow/server/src/services/workflow-studio-dispatch.service.ts",
       "measured": "2026-09-08"
-    },
-    {
-      "key": "refusal-is-a-handled-error|apps/api/src/app-trpc/app-trpc.sse.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|apps/api/src/features/discovery/openapi-serve.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|enterprise/modules/governance/server/src/transport/api-rest/governance-cli.api.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|enterprise/modules/governance/server/src/transport/api-rest/governance-ingest.api.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|enterprise/modules/governance/server/src/transport/api-rest/governance.api.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/annotation/server/src/transport/annotation.rest.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/automation/server/src/transport/slack-trigger.rest.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/automation/server/src/transport/unsubscribe.rest.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/gateway/server/src/transport/gateway-internal.rest.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/langy/server/src/transport/langy-internal.rest.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/prompt/server/src/transport/prompt-execute.api.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/scenario/server/src/transport/scenario-event.rest.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/scenario/server/src/transport/scenario.rest.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/scenario/server/src/transport/simulation-run.rest.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/suite/server/src/transport/suites-alias.rest.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "refusal-is-a-handled-error|modules/trace/server/src/transport/api-rest/trace-legacy.api.ts",
-      "measured": "2026-09-10"
     }
   ]
 }
