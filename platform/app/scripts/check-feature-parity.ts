@@ -565,6 +565,12 @@ const LEGACY_INERT: string[] = [
   "specs/server/spa-fallback.feature",
   "specs/settings/decompose-model-provider-form-hook.feature",
   "specs/settings/settings-table-responsiveness.feature",
+  // The voice epic's two contract journeys (#7978). Both describe the whole
+  // user journey end to end and neither is built yet, so both scenarios are
+  // @unimplemented and the files are inert by design. They leave this list
+  // when the journeys have e2e tests bound to them.
+  "specs/simulation-testing/voice-agents/testing-elevenlabs-convai.feature",
+  "specs/simulation-testing/voice-agents/testing-phone-agents.feature",
   "specs/setup/docker-dev-worktree-isolation.feature",
   "specs/setup/simplified-setup.feature",
   "specs/skills/agent-insight-skills.feature",
