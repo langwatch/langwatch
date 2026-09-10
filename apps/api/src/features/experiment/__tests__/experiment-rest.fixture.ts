@@ -72,10 +72,19 @@ export function successfulCredential(markUsed: () => void = () => {}): HandlerMa
 }
 
 export function experimentApiRestRuntime(
-  credential: HandlerManagedCredential = successfulCredential(),
+  options: Readonly<{
+    projectKey?: HandlerManagedCredential;
+    signedInUserId?: string | null;
+  }> = {},
 ): ApiRestRuntime {
   return createApiRestRuntime({
-    projectCredential: async () => credential,
+    projectCredential: async () => options.projectKey ?? successfulCredential(),
+    // The session door is open in this fixture; who is signed in is the
+    // test's choice, and nobody when it says nothing.
+    dualCredential: async (context, next) => {
+      if (options.signedInUserId) context.set("userId", options.signedInUserId);
+      await next();
+    },
     organizationCredential: async () => {
       throw new Error("No organization route is mounted in this fixture");
     },

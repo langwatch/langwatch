@@ -4,13 +4,25 @@
  * @see specs/experiments-v3/ci-cd-execution.feature
  */
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { ExperimentApp } from "@langwatch/experiment-server";
+import type {
+  ExecutionDataServices,
+  ExperimentRunPorts,
+  ExperimentRunProgressPort,
+} from "@langwatch/experiment-server";
+import type { OrganizationService } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { WorkflowService } from "@langwatch/workflow-server";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential.ts";
+import type { ApiExperimentRun } from "../../app/api-experiment-run.composition.ts";
+import { ApiRestObservabilityComposition } from "../../app/api-rest-observability.composition.ts";
 import type { ApiExperimentV3RestCollaborators } from "../../features/experiment/experiment-v3-rest.mount.ts";
+import { experimentApp } from "../../features/experiment/__tests__/experiment-rest.fixture.ts";
+import { openApiRestDoors, type ApiRestDoorContext } from "../api-rest.doors.ts";
+import { createApiRestRuntime } from "../api-rest.runtime.ts";
 import { REST_AUTH_PROJECT, RestAuthWorld } from "./support/rest-auth.world.ts";
-import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness.ts";
 
 const PROJECT_KEY = "sk-lw-alpha-cicd";
 const SLUG = "my-evaluation";
@@ -79,7 +91,11 @@ function mount(
     experiment?: { id: string; slug: string; workbenchState: unknown } | null;
     runState?: RunState | null;
   } = {},
-): MountedRestFamily & { startRun: ReturnType<typeof vi.fn> } {
+): Readonly<{
+  get(path: string, headers?: Record<string, string>): Promise<Response>;
+  post(path: string, body?: unknown, headers?: Record<string, string>): Promise<Response>;
+  startRun: ReturnType<typeof vi.fn>;
+}> {
   const world = RestAuthWorld.create({
     keys: [{ token: PROJECT_KEY, projectId: REST_AUTH_PROJECT.id, apiKeyId: "key-cicd" }],
   });
@@ -88,15 +104,10 @@ function mount(
       ? { id: "experiment-1", slug: SLUG, workbenchState: savedWorkbenchState }
       : options.experiment;
   const findBySlugAndType = vi.fn(async () => experiment);
-  const experimentService = {
+  const { app: experiments } = experimentApp({
     findBySlugAndType,
     isActive: async () => true,
-  };
-  const experiments = {
-    findBySlugAndType,
-    isActive: async () => true,
-    experimentService,
-  } as unknown as ExperimentApp;
+  });
 
   const startRun = vi.fn(async () => ({
     runId: "run-1",
@@ -106,39 +117,79 @@ function mount(
 
   const credentials = ApiHandlerManagedCredentials.create({
     apiKeys: world.apiKeys(),
-    authz: {
+    authz: createApiFixture<AuthzService>({
       hasApiKeyPermission: () => Promise.resolve(true),
       getApiKeyProjectDecision: () => Promise.resolve({ outcome: "allowed" }),
-    } as unknown as AuthzService,
+    }),
+    organizations: createApiFixture<OrganizationService>(),
   });
 
   const workbench: ApiExperimentV3RestCollaborators = {
     session: {
       resolve: () => Promise.resolve(null),
       permitted: () => Promise.resolve(false),
-    } as never,
-    credential: (input) => credentials.authenticate(input),
+    },
     experiments: () => experiments,
-    run: {
-      ports: {} as never,
-      progress: {
+    run: createApiFixture<ApiExperimentRun>({
+      ports: createApiFixture<ExperimentRunPorts>(),
+      progress: createApiFixture<ExperimentRunProgressPort>({
         findRunState: async () => options.runState ?? null,
-      } as never,
-      // Every target carries its own prompt and the dataset is inline, so the
-      // load reaches none of these: a call is an arrangement bug, not a stub.
-      services: {} as never,
-      workflows: {} as never,
+      }),
+      services: createApiFixture<ExecutionDataServices>(),
+      workflows: createApiFixture<WorkflowService>(),
+      baseUrl: "https://app.langwatch.test",
       defaultConcurrency: 1,
       startRun,
-    } as never,
+    }),
   };
 
-  const api = mountRestFamily({
-    security: world.security(),
-    services: { experimentWorkbench: workbench },
+  const errors = ApiRestObservabilityComposition.create().legacyErrorHandler;
+  const runtime = createApiRestRuntime({
+    projectCredential: (input) => credentials.authenticate(input),
+    organizationCredential: async () => {
+      throw new Error("No organization route is mounted in this fixture");
+    },
+    organizationIdentity: async () => {
+      throw new Error("No organization route is mounted in this fixture");
+    },
+    routeAuthorization: async () => ({ permitted: true, organizationRole: null }),
+    dualCredential: async (_context, next) => {
+      await next();
+    },
+    errors,
   });
+  const context: ApiRestDoorContext = {
+    runtime,
+    services: { experimentWorkbench: workbench },
+    ports: {
+      handlerManagedCredential: (input) => credentials.authenticate(input),
+      errors,
+      platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
+      rateLimit: async () => ({ allowed: true }),
+    },
+    packaged: void 0,
+  };
+  const hono = new Hono();
+  for (const mounted of openApiRestDoors({ context })) {
+    hono.route("/", mounted);
+  }
 
-  return Object.assign(api, { startRun });
+  const fetch = (path: string, init?: RequestInit) =>
+    hono.fetch(new Request(`http://api.test${path}`, init));
+
+  return {
+    get: (path, headers) => fetch(path, { headers }),
+    post: (path, body, headers) =>
+      fetch(path, {
+        method: "POST",
+        headers: {
+          ...headers,
+          ...(body === void 0 ? {} : { "content-type": "application/json" }),
+        },
+        ...(body === void 0 ? {} : { body: JSON.stringify(body) }),
+      }),
+    startRun,
+  };
 }
 
 describe("given a pipeline holding a project key", () => {

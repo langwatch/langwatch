@@ -8,9 +8,9 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { mountExperimentV3Rest } from "../experiment-v3-rest.mount.ts";
-import type { ApiHandlerManagedSessionPort } from "../../../app/api-handler-managed-session.ts";
 import type { HandlerManagedCredential } from "../../../app/api-handler-managed-credential.ts";
 import {
+  TEST_CREDENTIAL,
   experimentApiRestRuntime,
   experimentApp,
   experimentRun,
@@ -39,12 +39,40 @@ describe("given the workbench's saved-setup doors", () => {
     });
   });
 
+  describe("when a Langy session key saves a setup", () => {
+    it("attributes the new version to Langy", async () => {
+      const saveWorkbenchState = vi.fn(async () => ({ version: 4 }));
+      const api = mount({
+        experiments: { saveWorkbenchState },
+        projectKey: {
+          ...successfulCredential(),
+          resolved: { ...TEST_CREDENTIAL, isLangySessionKey: true },
+        },
+      });
+
+      const response = await api.fetch("/api/experiments/acme/workbench-state", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state: {} }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(saveWorkbenchState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project-1",
+          slug: "acme",
+          actor: { userId: "user-1", label: "langy" },
+        }),
+      );
+    });
+  });
+
   describe("when the key lacks the permission the door gates on", () => {
     it("answers the ceiling refusal as sent, without reading the application", async () => {
       const getWorkbenchState = vi.fn();
       const api = mount({
         experiments: { getWorkbenchState },
-        credential: {
+        projectKey: {
           ok: false,
           status: 403,
           body: { error: "insufficient_permissions", permission: "experiments:view" },
@@ -151,7 +179,7 @@ describe("given the workbench's run doors", () => {
   describe("when nobody is signed in", () => {
     it("refuses the abort at 401 before any run is looked up", async () => {
       const findRunningProjectId = vi.fn();
-      const api = mount({ session: null, abort: { findRunningProjectId } });
+      const api = mount({ signedInUserId: null, abort: { findRunningProjectId } });
 
       const response = await api.fetch("/api/experiments/abort", {
         method: "POST",
@@ -204,9 +232,9 @@ function workbench(): WorkbenchStateView {
 
 type MountOptions = {
   experiments?: Partial<ExperimentService>;
-  credential?: HandlerManagedCredential;
+  projectKey?: HandlerManagedCredential;
   markUsed?: () => void;
-  session?: { user: { id: string } } | null;
+  signedInUserId?: string | null;
   runLoop?: boolean;
   abort?: {
     findRunningProjectId: (runId: string) => Promise<string | null>;
@@ -215,13 +243,12 @@ type MountOptions = {
 };
 
 function mount(options: MountOptions = {}) {
-  const session: ApiHandlerManagedSessionPort = {
-    resolve: async () =>
-      options.session === undefined ? { user: { id: "user-1" } } : options.session,
+  const session = {
+    resolve: async () => null,
     permitted: async () => true,
   };
 
-  const credential = options.credential ?? successfulCredential(options.markUsed);
+  const projectKey = options.projectKey ?? successfulCredential(options.markUsed);
   const { app } = experimentApp(options.experiments);
   const run = experimentRun({
     available: options.runLoop,
@@ -230,10 +257,13 @@ function mount(options: MountOptions = {}) {
   });
 
   const hono = new Hono();
-  for (const mounted of mountExperimentV3Rest(experimentApiRestRuntime(), {
+  const runtime = experimentApiRestRuntime({
+    projectKey,
+    signedInUserId: options.signedInUserId === void 0 ? "user-1" : options.signedInUserId,
+  });
+  for (const mounted of mountExperimentV3Rest(runtime, {
     collaborators: {
       session,
-      credential: async () => credential,
       experiments: () => app,
       run,
     },

@@ -155,11 +155,15 @@ export {
   experimentV3AliasRest,
   ExperimentV3RestApi,
   ExperimentV3AliasApi,
-  type ExperimentV3RestCredential,
+  experimentWorkbenchCredential,
   type ExperimentV3RestSession,
   type ExperimentV3RunLoop,
   type ExperimentV3StartRunInput,
 } from "./transport/experiment-v3.rest.ts";
+export {
+  experimentWorkbenchRunRest,
+  experimentWorkbenchCaller,
+} from "./transport/experiment-workbench-run.rest.ts";
 export {
   ExperimentFindOrCreateService,
   type ExperimentFindOrCreateInput,

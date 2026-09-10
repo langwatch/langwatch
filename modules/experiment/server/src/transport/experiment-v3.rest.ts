@@ -1,12 +1,15 @@
 /**
- * This workbench family mixes session and project-key credentials under one namespace.
- * It declares public framework access while each handler resolves and authorises its caller.
+ * `/api/experiments/*` - the workbench's project-keyed doors: the CI/CD run,
+ * the run reads and the saved setup. Every route names the permission its key
+ * is measured against, so the door resolves the project and the handler is
+ * handed the scope rather than authenticating the caller itself.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
+  defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  requestValidationErrorFrom,
+  projectRestFacts,
   type RestRawResult,
 } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -19,11 +22,8 @@ import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   ExperimentNotFoundError,
   ExperimentRunNotFoundError as RunNotFoundError,
-  type WorkbenchCredential,
   ExperimentVersionNotFoundError,
   InvalidExperimentConfigurationError,
-  createInitialUIState,
-  executionRequestSchema,
   persistedEvaluationsV3StateSchema,
   runInputsBodySchema,
   runsSavedDataset,
@@ -38,12 +38,7 @@ import { ExperimentRunOrchestratorService } from "../services/experiment-run-orc
 import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
 import type { StartPollingRunInput } from "../services/experiment-polling-run.service.ts";
 import { ExperimentSavedStateExecutionService } from "../services/experiment-saved-state-execution.service.ts";
-import {
-  type ExecutionDataServices,
-  ExperimentExecutionDataService,
-} from "../services/experiment-execution-data.service.ts";
-import { ExperimentRunResultsWriterService } from "../services/experiment-run-results-writer.service.ts";
-import { ExperimentRunStateMirrorService } from "../services/experiment-run-state-mirror.service.ts";
+import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
 import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 
@@ -51,16 +46,6 @@ const logger = createLogger("langwatch:experiments-v3");
 
 /** The signed-in person the two workbench-run doors read. */
 export type ExperimentV3RestSession = Readonly<{ user: Readonly<{ id: string }> }>;
-
-/** A resolved project credential, or the refusal to answer in its place. */
-export type ExperimentV3RestCredential =
-  | Readonly<{
-      ok: true;
-      project: Readonly<{ id: string; slug: string }>;
-      credential: WorkbenchCredential | null;
-      markUsed: () => void;
-    }>
-  | Readonly<{ ok: false; status: number; body: object }>;
 
 /**
  * One polling run, as this transport asks for it: the run, and nothing about
@@ -97,19 +82,12 @@ export type ExperimentV3RunLoop = Readonly<{
  * because none of it is installed as a module.
  */
 export interface ExperimentV3RestApi {
-  /** The live session behind this request, or null when there is none. */
-  resolveSession(request: Request): Promise<ExperimentV3RestSession | null>;
-  /** Whether that session holds one permission on one project. */
+  /** Whether the signed-in person holds one permission on one project. */
   probeProjectPermission(
     session: ExperimentV3RestSession,
     projectId: string,
     permission: AuthzPermission,
   ): Promise<boolean>;
-  /** Resolves the request's project key and enforces one permission as its ceiling. */
-  authenticateCredential(input: {
-    request: Request;
-    permission: AuthzPermission;
-  }): Promise<ExperimentV3RestCredential>;
   /** The application the workbench's four setup doors answer from. */
   experiments(): ExperimentApp;
   /** The run loop, as this process composed it. */
@@ -153,45 +131,29 @@ export class ExperimentRunLoopUnavailableError extends HandledError {
 }
 
 /**
- * A route that authenticates in its own handler answers its own statuses, written through
- * rather than validated against one success schema; each states its 200 body in its own words.
+ * A route that answers its own statuses writes them through rather than
+ * validating them against one success schema; each states its 200 body in its
+ * own words.
+ *
+ * A JSON answer this door writes itself.
  */
-const SESSION_REASON =
-  "the process's session port resolves the signed-in person and this handler checks " +
-  "evaluations:manage on the project the request body names, including the two doors that " +
-  "stream server-sent events";
-const READ_REASON =
-  "the process's credential port resolves the project this key may act in and enforces " +
-  "evaluations:view as its ceiling before the handler runs";
-const RUN_REASON =
-  "the process's credential port resolves the project this key may act in and enforces " +
-  "evaluations:create as its ceiling before the handler runs";
-const EXPERIMENTS_VIEW_REASON =
-  "the process's credential port resolves the project this key may act in and enforces " +
-  "experiments:view as its ceiling before the handler runs";
-const EXPERIMENTS_UPDATE_REASON =
-  "the process's credential port resolves the project this key may act in and enforces " +
-  "experiments:update as its ceiling before the handler runs";
-
-const SESSION_ACCESS = publicRoute({
-  reason: SESSION_REASON,
-});
-const RUN_ACCESS = publicRoute({
-  reason: RUN_REASON,
-});
-const EVALUATION_READ_ACCESS = publicRoute({
-  reason: READ_REASON,
-});
-const EXPERIMENT_VIEW_ACCESS = publicRoute({
-  reason: EXPERIMENTS_VIEW_REASON,
-});
-const EXPERIMENT_UPDATE_ACCESS = publicRoute({
-  reason: EXPERIMENTS_UPDATE_REASON,
-});
-
-/** A JSON answer this door writes itself. */
-const jsonAnswer = (body: unknown, status: number): Response =>
+export const jsonAnswer = (body: unknown, status: number): Response =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+/** The resolved project credential used to attribute workbench writes. */
+export const experimentWorkbenchCredential = defineRestMiddleware(
+  "experimentWorkbenchCredential",
+  z.discriminatedUnion("kind", [
+    z
+      .object({
+        kind: z.literal("apiKey"),
+        userId: z.string().nullable(),
+        isLangySessionKey: z.boolean().optional(),
+      })
+      .strict(),
+    z.object({ kind: z.literal("legacyProjectKey") }).strict(),
+  ]),
+);
 
 /**
  * Query parameters and path segments that are optional positive integers, or
@@ -244,7 +206,7 @@ const saveWorkbenchStateBodySchema = z.object({
 });
 
 /** The run loop, or the refusal a process without one owes the caller. */
-function requireRunLoop(run: ExperimentV3RunLoop): {
+export function runLoopOf(run: ExperimentV3RunLoop): {
   ports: ExperimentRunPorts;
   progress: ExperimentRunProgressPort;
 } {
@@ -254,190 +216,9 @@ function requireRunLoop(run: ExperimentV3RunLoop): {
   return { ports: run.ports, progress: run.progress };
 }
 
-/** The person behind a session door, or the refusal in their place. */
-async function requireSession(
-  app: ExperimentV3RestApi,
-  request: Request,
-  projectId: string,
-  permission: AuthzPermission,
-): Promise<ExperimentV3RestSession | Response> {
-  const session = await app.resolveSession(request);
-  if (!session) {
-    return jsonAnswer({ error: "You must be logged in to access this endpoint." }, 401);
-  }
-  if (!(await app.probeProjectPermission(session, projectId, permission))) {
-    return jsonAnswer({ error: "You do not have permission to access this endpoint." }, 403);
-  }
-  return session;
-}
-
 export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withNamespace("experiments")
   .withVersion(MANAGEMENT_API_VERSION)
-
-  // ── POST /execute ──────────────────────────────────────────────────────
-  // Kept out of the published document. The route authenticates with a
-  // browser session and streams workbench UI state, so an API-key caller has
-  // no way to reach it; publishing it would document an endpoint that
-  // answers 401 to everyone reading the reference.
-  .post("/execute", "executeExperiment")
-  .withRawBody("text", { mediaType: "application/json" })
-  .withAccess(SESSION_ACCESS)
-  .withRawResponse({ produces: "text/event-stream" })
-  .withDocs({ hide: true })
-  .handle(async ({ app, raw, request }): Promise<RestRawResult> => {
-    let body: unknown;
-    try {
-      body = JSON.parse(raw);
-    } catch {
-      return jsonAnswer({ error: "Bad Request" }, 400);
-    }
-
-    const parsed = executionRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      throw requestValidationErrorFrom({ target: "json", error: parsed.error, input: body });
-    }
-    const input = parsed.data;
-    const { projectId } = input;
-
-    logger.info({ projectId, scope: input.scope }, "Starting experiment execution");
-
-    const session = await requireSession(app, request, projectId, "evaluations:manage");
-    if (session instanceof Response) return session;
-
-    const { ports: runPorts, progress } = requireRunLoop(app.run);
-
-    const dataResult = await ExperimentExecutionDataService.loadExecutionData(
-      projectId,
-      input.dataset,
-      input.targets,
-      input.evaluators,
-      app.run.services,
-      { data: input.data, datasetId: input.dataset_id, parameters: input.parameters },
-    );
-
-    if ("error" in dataResult) {
-      return jsonAnswer({ error: dataResult.error }, dataResult.status);
-    }
-
-    const {
-      datasetRows,
-      datasetColumns,
-      loadedPrompts,
-      loadedAgents,
-      loadedEvaluators,
-      loadedWorkflows,
-    } = dataResult;
-
-    const state: EvaluationsV3State = {
-      name: input.name,
-      // The wire's column `type` is a plain string and the state's is the
-      // narrowed union, which is the same widening the two casts below
-      // already carry.
-      datasets: [input.dataset as EvaluationsV3State["datasets"][number]],
-      activeDatasetId: input.dataset.id ?? "dataset-1",
-      targets: input.targets as EvaluationsV3State["targets"],
-      evaluators: input.evaluators as EvaluationsV3State["evaluators"],
-      results: {
-        status: "running",
-        targetOutputs: {},
-        targetMetadata: {},
-        evaluatorResults: {},
-        errors: {},
-      },
-      pendingSavedChanges: {},
-      ui: createInitialUIState(),
-    };
-
-    const mirror = ExperimentRunStateMirrorService.create({
-      projectId,
-      experimentId: input.experimentId,
-      experimentSlug: input.experimentSlug ?? "",
-      progress,
-    });
-
-    // The page saves these cells too, and it is the faster of the two. The
-    // server writes them so the board does not depend on the tab surviving.
-    const resultsWriter = ExperimentRunResultsWriterService.findWriterFor({
-      persistence: {
-        experiments: app.experiments().experimentService,
-        actor: { userId: session.user.id, label: "user" },
-      },
-      projectId,
-      experimentId: input.experimentId,
-      scope: input.scope,
-      data: input.data,
-      datasetId: input.dataset_id,
-      parameters: input.parameters,
-    });
-
-    return {
-      status: 200,
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-      body: executeEventStream({
-        app,
-        projectId,
-        input,
-        state,
-        datasetRows,
-        datasetColumns,
-        loadedPrompts,
-        loadedAgents,
-        loadedEvaluators,
-        loadedWorkflows,
-        runPorts,
-        mirror,
-        resultsWriter,
-        userId: session.user.id,
-      }),
-    };
-  })
-
-  // ── POST /abort ────────────────────────────────────────────────────────
-  .post("/abort", "abortExperimentRun")
-  .withRawBody("text", { mediaType: "application/json" })
-  .withAccess(SESSION_ACCESS)
-  .withRawResponse({ produces: "application/json" })
-  .withDocs({ hide: true })
-  .handle(async ({ app, raw, request }): Promise<RestRawResult> => {
-    let body: { projectId?: string; runId?: string };
-    try {
-      body = JSON.parse(raw) as { projectId?: string; runId?: string };
-    } catch {
-      return jsonAnswer({ error: "Invalid request body" }, 400);
-    }
-
-    const { projectId, runId } = body;
-    if (!projectId || !runId) {
-      return jsonAnswer(
-        { error: "Invalid request body", details: "projectId and runId are required" },
-        400,
-      );
-    }
-
-    const session = await requireSession(app, request, projectId, "evaluations:manage");
-    if (session instanceof Response) return session;
-
-    const { ports: runPorts, progress } = requireRunLoop(app.run);
-
-    // The runId is attacker-controlled: verify it is owned by the authenticated project before
-    // signaling an abort, or a caller could abort another tenant's run by guessing its id.
-    const ownerProjectId =
-      (await runPorts.abort.findRunningProjectId(runId)) ??
-      (await progress.findRunState(runId))?.projectId;
-    if (!ownerProjectId || ownerProjectId !== projectId) {
-      throw new RunNotFoundError(runId);
-    }
-
-    logger.info({ projectId, runId }, "Requesting abort");
-    await ExperimentRunOrchestratorService.requestAbort({ abort: runPorts.abort, runId });
-
-    return jsonAnswer({ success: true, runId, message: "Abort requested" }, 200);
-  })
 
   // ── POST /:slug/run  (CI/CD execution) ────────────────────────────────
   .post("/:slug/run", "runExperiment")
@@ -446,7 +227,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // a 400 in this family's own words, and `runInputsBodySchema` parses what
   // is left.
   .withRawBody("text", { mediaType: "application/json" })
-  .withAccess(RUN_ACCESS)
+  .withPermission("evaluations:create")
   .withRawResponse({ produces: ["application/json", "text/event-stream"] })
   .withDocs({
     summary: "Run an experiment",
@@ -462,165 +243,158 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such experiment or run in this project" },
     },
   })
-  .handle(async ({ app, input, raw, request }): Promise<RestRawResult> => {
-    const { slug } = input;
+  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .handle(
+    async ({ app, input, raw, request, scope }, project, credential): Promise<RestRawResult> => {
+      const { slug } = input;
 
-    // Starting a run CREATES a row; it doesn't administer the family, so this
-    // asks for `:create`, not `:manage` - `:manage` still satisfies it
-    // through the permission hierarchy.
-    const credential = await app.authenticateCredential({
-      request,
-      permission: "evaluations:create",
-    });
-    if (!credential.ok) return jsonAnswer(credential.body, credential.status);
+      const experiments = app.experiments();
 
-    const { project, credential: principal, markUsed } = credential;
-    const experiments = app.experiments();
+      const savedExperiment = await experiments.findBySlugAndType({
+        projectId: scope.id,
+        slug,
+        type: "EVALUATIONS_V3",
+      });
 
-    const savedExperiment = await experiments.findBySlugAndType({
-      projectId: project.id,
-      slug,
-      type: "EVALUATIONS_V3",
-    });
-
-    if (!savedExperiment) {
-      throw new ExperimentNotFoundError(slug);
-    }
-
-    const parseResult = persistedEvaluationsV3StateSchema.safeParse(savedExperiment.workbenchState);
-    if (!parseResult.success) {
-      logger.error({ slug, errors: parseResult.error.issues }, "Invalid workbenchState");
-      throw new InvalidExperimentConfigurationError(slug);
-    }
-
-    const workbenchState = parseResult.data;
-    const dataset = workbenchState.datasets[0];
-    if (!dataset) {
-      return jsonAnswer({ error: "No dataset configured" }, 400);
-    }
-
-    let rawBody: unknown = {};
-    if (raw.trim()) {
-      try {
-        rawBody = JSON.parse(raw);
-      } catch {
-        return jsonAnswer({ error: "Invalid JSON body" }, 400);
+      if (!savedExperiment) {
+        throw new ExperimentNotFoundError(slug);
       }
-    }
-    const inputsParse = runInputsBodySchema.safeParse(rawBody);
-    if (!inputsParse.success) {
-      return jsonAnswer(
-        { error: inputsParse.error.issues[0]?.message ?? "Invalid request body" },
-        400,
+
+      const parseResult = persistedEvaluationsV3StateSchema.safeParse(
+        savedExperiment.workbenchState,
       );
-    }
-    const runInputs = inputsParse.data;
+      if (!parseResult.success) {
+        logger.error({ slug, errors: parseResult.error.issues }, "Invalid workbenchState");
+        throw new InvalidExperimentConfigurationError(slug);
+      }
 
-    const prepared = await ExperimentSavedStateExecutionService.prepareSavedStateExecution({
-      experiments: experiments.experimentService,
-      services: app.run.services,
-      projectId: project.id,
-      slug,
-      runInputs: {
-        data: runInputs.data,
-        datasetId: runInputs.dataset_id,
-        parameters: runInputs.parameters,
-      },
-    });
+      const workbenchState = parseResult.data;
+      const dataset = workbenchState.datasets[0];
+      if (!dataset) {
+        return jsonAnswer({ error: "No dataset configured" }, 400);
+      }
 
-    if ("error" in prepared) {
-      return jsonAnswer({ error: prepared.error }, prepared.status);
-    }
+      let rawBody: unknown = {};
+      if (raw.trim()) {
+        try {
+          rawBody = JSON.parse(raw);
+        } catch {
+          return jsonAnswer({ error: "Invalid JSON body" }, 400);
+        }
+      }
+      const inputsParse = runInputsBodySchema.safeParse(rawBody);
+      if (!inputsParse.success) {
+        return jsonAnswer(
+          { error: inputsParse.error.issues[0]?.message ?? "Invalid request body" },
+          400,
+        );
+      }
+      const runInputs = inputsParse.data;
 
-    const {
-      experiment,
-      state,
-      datasetRows,
-      datasetColumns,
-      loadedPrompts,
-      loadedAgents,
-      loadedEvaluators,
-      loadedWorkflows,
-    } = prepared;
-
-    const scope: ExecutionScope = runInputs.row_indices
-      ? { type: "rows", rowIndices: runInputs.row_indices }
-      : { type: "full" };
-
-    const carriedOverCells = ExperimentSavedStateExecutionService.planSavedRunCarryOver({
-      prepared,
-      scope,
-    });
-
-    const isSSE = (request.headers.get("Accept") ?? "").includes("text/event-stream");
-
-    logger.info(
-      { projectId: project.id, slug, isSSE, rowCount: datasetRows.length },
-      "Starting CI/CD experiment execution",
-    );
-
-    markUsed();
-
-    if (isSSE) {
-      const { ports: runPorts } = requireRunLoop(app.run);
-      return {
-        status: 200,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
+      const prepared = await ExperimentSavedStateExecutionService.prepareSavedStateExecution({
+        experiments: experiments.experimentService,
+        services: app.run.services,
+        projectId: scope.id,
+        slug,
+        runInputs: {
+          data: runInputs.data,
+          datasetId: runInputs.dataset_id,
+          parameters: runInputs.parameters,
         },
-        body: runEventStream({
-          app,
-          projectId: project.id,
-          experimentId: experiment.id,
-          slug,
-          scope,
-          state,
-          datasetRows,
-          datasetColumns,
-          loadedPrompts,
-          loadedAgents,
-          loadedEvaluators,
-          loadedWorkflows,
-          runPorts,
-          carriedOverCells,
-        }),
-      };
-    }
+      });
 
-    const { runId, runUrl, total } = await app.run.startRun({
-      projectId: project.id,
-      projectSlug: project.slug,
-      experimentId: experiment.id,
-      experimentSlug: slug,
-      scope,
-      state,
-      datasetRows,
-      datasetColumns,
-      loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
-      loadedAgents: loadedAgents as Map<string, TypedAgent>,
-      loadedEvaluators,
-      loadedWorkflows,
-      ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
-      // A run of the saved dataset fills the cells the workbench shows.
-      ...(runsSavedDataset(runInputs)
-        ? {
-            persistResults: {
-              experiments: experiments.experimentService,
-              actor: workbenchActorFrom({ credential: principal }),
-            },
-          }
-        : {}),
-    });
+      if ("error" in prepared) {
+        return jsonAnswer({ error: prepared.error }, prepared.status);
+      }
 
-    return jsonAnswer({ runId, status: "running", total, runUrl }, 200);
-  })
+      const {
+        experiment,
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts,
+        loadedAgents,
+        loadedEvaluators,
+        loadedWorkflows,
+      } = prepared;
+
+      const runScope: ExecutionScope = runInputs.row_indices
+        ? { type: "rows", rowIndices: runInputs.row_indices }
+        : { type: "full" };
+
+      const carriedOverCells = ExperimentSavedStateExecutionService.planSavedRunCarryOver({
+        prepared,
+        scope: runScope,
+      });
+
+      const isSSE = (request.headers.get("Accept") ?? "").includes("text/event-stream");
+
+      logger.info(
+        { projectId: scope.id, slug, isSSE, rowCount: datasetRows.length },
+        "Starting CI/CD experiment execution",
+      );
+
+      if (isSSE) {
+        const { ports: runPorts } = runLoopOf(app.run);
+        return {
+          status: 200,
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+          body: runEventStream({
+            app,
+            projectId: scope.id,
+            experimentId: experiment.id,
+            slug,
+            scope: runScope,
+            state,
+            datasetRows,
+            datasetColumns,
+            loadedPrompts,
+            loadedAgents,
+            loadedEvaluators,
+            loadedWorkflows,
+            runPorts,
+            carriedOverCells,
+          }),
+        };
+      }
+
+      const { runId, runUrl, total } = await app.run.startRun({
+        projectId: scope.id,
+        projectSlug: project.projectSlug,
+        experimentId: experiment.id,
+        experimentSlug: slug,
+        scope: runScope,
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
+        loadedAgents: loadedAgents as Map<string, TypedAgent>,
+        loadedEvaluators,
+        loadedWorkflows,
+        ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
+        // A run of the saved dataset fills the cells the workbench shows.
+        ...(runsSavedDataset(runInputs)
+          ? {
+              persistResults: {
+                experiments: experiments.experimentService,
+                actor: workbenchActorFrom({ credential }),
+              },
+            }
+          : {}),
+      });
+
+      return jsonAnswer({ runId, status: "running", total, runUrl }, 200);
+    },
+  )
 
   // ── GET /runs?experimentSlug=... (list runs for an experiment) ────────
   .get("/runs", "listExperimentRuns")
   .withQuery(listRunsQuerySchema)
-  .withAccess(EVALUATION_READ_ACCESS)
+  .withPermission("evaluations:view")
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "List runs of an experiment",
@@ -633,14 +407,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such experiment in this project" },
     },
   })
-  .handle(async ({ app, input, request }) => {
-    const credential = await app.authenticateCredential({
-      request,
-      permission: "evaluations:view",
-    });
-    if (!credential.ok) return jsonAnswer(credential.body, credential.status);
-    const { project } = credential;
-
+  .handle(async ({ app, input, scope }) => {
     const { experimentSlug } = input;
     if (!experimentSlug) {
       return jsonAnswer({ error: "experimentSlug query parameter is required" }, 400);
@@ -658,7 +425,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
     const { experiment, runs, totalHits } = await app
       .experiments()
-      .getRunsPageBySlug({ projectId: project.id, experimentSlug, page, pageSize })
+      .getRunsPageBySlug({ projectId: scope.id, experimentSlug, page, pageSize })
       .catch((error: unknown) => {
         if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
           throw new ExperimentNotFoundError(experimentSlug);
@@ -667,7 +434,6 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       });
 
     const offset = (page - 1) * pageSize;
-    credential.markUsed();
 
     return jsonAnswer(
       {
@@ -683,7 +449,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── GET /runs/:runId (poll run status) ─────────────────────────────────
   .get("/runs/:runId", "getExperimentRunStatus")
   .withParams(runIdParamsSchema)
-  .withAccess(EVALUATION_READ_ACCESS)
+  .withPermission("evaluations:view")
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Poll a run",
@@ -695,22 +461,16 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such run in this project" },
     },
   })
-  .handle(async ({ app, input, request }) => {
+  .handle(async ({ app, input, scope }) => {
     const { runId } = input;
 
-    const credential = await app.authenticateCredential({
-      request,
-      permission: "evaluations:view",
-    });
-    if (!credential.ok) return jsonAnswer(credential.body, credential.status);
-    const { project, markUsed } = credential;
-    const { progress } = requireRunLoop(app.run);
+    const { progress } = runLoopOf(app.run);
 
     const runState = await progress.findRunState(runId);
 
     // All three not-found branches raise the SAME code: from outside they
     // are one answer - this run is not yours to read.
-    if (!runState || runState.projectId !== project.id) {
+    if (!runState || runState.projectId !== scope.id) {
       throw new RunNotFoundError(runId);
     }
 
@@ -719,12 +479,11 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     if (runState.experimentId) {
       const stillLive = await app
         .experiments()
-        .isActive({ projectId: project.id, id: runState.experimentId });
+        .isActive({ projectId: scope.id, id: runState.experimentId });
       if (!stillLive) throw new RunNotFoundError(runId);
     }
 
     logger.debug({ runId, status: runState.status }, "Run status queried");
-    markUsed();
 
     if (runState.status === "running" || runState.status === "pending") {
       return jsonAnswer(
@@ -790,7 +549,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/runs/:runId/results", "getExperimentRunResults")
   .withParams(runIdParamsSchema)
   .withQuery(runResultsQuerySchema)
-  .withAccess(EVALUATION_READ_ACCESS)
+  .withPermission("evaluations:view")
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Read run results",
@@ -802,35 +561,29 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such run in this project" },
     },
   })
-  .handle(async ({ app, input, request }) => {
+  .handle(async ({ app, input, scope }) => {
     const { runId } = input;
 
-    const credential = await app.authenticateCredential({
-      request,
-      permission: "evaluations:view",
-    });
-    if (!credential.ok) return jsonAnswer(credential.body, credential.status);
-    const { project, markUsed } = credential;
-    const { progress } = requireRunLoop(app.run);
+    const { progress } = runLoopOf(app.run);
     const experiments = app.experiments();
 
     const runState = await progress.findRunState(runId);
     const slugFromState =
-      runState && runState.projectId === project.id ? runState.experimentSlug : undefined;
+      runState && runState.projectId === scope.id ? runState.experimentSlug : undefined;
     const experimentIdFromState =
-      runState && runState.projectId === project.id ? runState.experimentId : undefined;
+      runState && runState.projectId === scope.id ? runState.experimentId : undefined;
 
     const experimentSlug = input.experimentSlug ?? slugFromState;
     let experimentId = experimentIdFromState;
 
     if (!experimentId && experimentSlug) {
       const experiment = await experiments.findIdBySlug({
-        projectId: project.id,
+        projectId: scope.id,
         slug: experimentSlug,
       });
       experimentId = experiment?.id;
     } else if (experimentId) {
-      const stillLive = await experiments.isActive({ projectId: project.id, id: experimentId });
+      const stillLive = await experiments.isActive({ projectId: scope.id, id: experimentId });
       if (!stillLive) experimentId = undefined;
     }
 
@@ -839,10 +592,9 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     }
 
     try {
-      const run = await experiments.findRun({ projectId: project.id, experimentId, runId });
+      const run = await experiments.findRun({ projectId: scope.id, experimentId, runId });
       if (!run) throw new RunNotFoundError(runId);
 
-      markUsed();
       return jsonAnswer(run, 200);
     } catch (error) {
       // Only a genuine miss is a 404 (ADR-045).
@@ -856,7 +608,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/:slug/workbench-state", "getExperimentWorkbenchState")
   .withParams(slugParamsSchema)
   .withQuery(workbenchStateQuerySchema)
-  .withAccess(EXPERIMENT_VIEW_ACCESS)
+  .withPermission("experiments:view")
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Read an experiment's setup",
@@ -871,18 +623,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such experiment in this project" },
     },
   })
-  .handle(async ({ app, input, request }) => {
+  .handle(async ({ app, input, scope }) => {
     const { slug } = input;
 
-    const credential = await app.authenticateCredential({
-      request,
-      permission: "experiments:view",
-    });
-    if (!credential.ok) return jsonAnswer(credential.body, credential.status);
-    const { project, markUsed } = credential;
-
-    const workbench = await app.experiments().getWorkbenchState({ projectId: project.id, slug });
-    markUsed();
+    const workbench = await app.experiments().getWorkbenchState({ projectId: scope.id, slug });
 
     const identity = {
       id: workbench.experimentId,
@@ -900,7 +644,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .put("/:slug/workbench-state", "saveExperimentWorkbenchState")
   .withParams(slugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
-  .withAccess(EXPERIMENT_UPDATE_ACCESS)
+  .withPermission("experiments:update")
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Save an experiment's setup",
@@ -920,28 +664,21 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       },
     },
   })
-  .handle(async ({ app, input, request }) => {
+  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .handle(async ({ app, input, scope }, _project, credential) => {
     const { slug } = input;
-
-    const credential = await app.authenticateCredential({
-      request,
-      permission: "experiments:update",
-    });
-    if (!credential.ok) return jsonAnswer(credential.body, credential.status);
-    const { project, credential: principal, markUsed } = credential;
 
     const saved = await app.experiments().saveWorkbenchState(
       {
-        projectId: project.id,
+        projectId: scope.id,
         slug,
         state: input.state,
         ...(input.expectedVersion !== undefined ? { expectedVersion: input.expectedVersion } : {}),
         ...(input.commitMessage ? { commitMessage: input.commitMessage } : {}),
       },
-      { kind: "credential", credential: principal },
+      { kind: "credential", credential },
     );
 
-    markUsed();
     return jsonAnswer({ version: saved.version }, 200);
   })
 
@@ -949,7 +686,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/:slug/versions", "listExperimentWorkbenchVersions")
   .withParams(slugParamsSchema)
   .withQuery(listVersionsQuerySchema)
-  .withAccess(EXPERIMENT_VIEW_ACCESS)
+  .withPermission("experiments:view")
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "List an experiment's versions",
@@ -964,21 +701,14 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such experiment in this project" },
     },
   })
-  .handle(async ({ app, input, request }) => {
+  .handle(async ({ app, input, scope }) => {
     const { slug } = input;
 
-    const credential = await app.authenticateCredential({
-      request,
-      permission: "experiments:view",
-    });
-    if (!credential.ok) return jsonAnswer(credential.body, credential.status);
-    const { project, markUsed } = credential;
-
     const experiments = app.experiments();
-    const workbench = await experiments.getWorkbenchState({ projectId: project.id, slug });
+    const workbench = await experiments.getWorkbenchState({ projectId: scope.id, slug });
 
     const { versions, nextCursor } = await experiments.listWorkbenchVersions({
-      projectId: project.id,
+      projectId: scope.id,
       id: workbench.experimentId,
       ...(() => {
         const limit = parseOptionalPositiveInt(input.limit);
@@ -989,8 +719,6 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
         return cursor !== undefined ? { cursor } : {};
       })(),
     });
-
-    markUsed();
 
     return jsonAnswer(
       {
@@ -1013,7 +741,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── POST /:slug/versions/:version/restore ────────────────────────────
   .post("/:slug/versions/:version/restore", "restoreExperimentWorkbenchVersion")
   .withParams(slugVersionParamsSchema)
-  .withAccess(EXPERIMENT_UPDATE_ACCESS)
+  .withPermission("experiments:update")
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Restore an experiment version",
@@ -1029,18 +757,12 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       },
     },
   })
-  .handle(async ({ app, input, request }) => {
+  .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
+  .handle(async ({ app, input, scope }, _project, credential) => {
     const { slug, version } = input;
 
-    const credential = await app.authenticateCredential({
-      request,
-      permission: "experiments:update",
-    });
-    if (!credential.ok) return jsonAnswer(credential.body, credential.status);
-    const { project, credential: principal, markUsed } = credential;
-
     const experiments = app.experiments();
-    const workbench = await experiments.getWorkbenchState({ projectId: project.id, slug });
+    const workbench = await experiments.getWorkbenchState({ projectId: scope.id, slug });
 
     // A path segment that is not a version number names a version this
     // experiment never had, which is the same answer as a number it never
@@ -1054,15 +776,14 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     }
 
     const restored = await experiments.restoreWorkbenchVersion(
-      { projectId: project.id, id: workbench.experimentId, version: parsedVersion },
-      { kind: "credential", credential: principal },
+      { projectId: scope.id, id: workbench.experimentId, version: parsedVersion },
+      { kind: "credential", credential },
     );
 
     logger.info(
-      { projectId: project.id, slug, version: parsedVersion },
+      { projectId: scope.id, slug, version: parsedVersion },
       "Experiment version restored over REST",
     );
-    markUsed();
 
     return jsonAnswer({ version: restored.version }, 200);
   })
@@ -1095,92 +816,6 @@ export const experimentV3AliasRest = defineRestRouter(ExperimentV3AliasApi)
   })
 
   .build();
-
-/**
- * The `execute` event stream: runs the orchestrator, mirrors every frame onto
- * the run store and the saved cells, and writes each one as an SSE frame.
- */
-function executeEventStream(options: {
-  app: ExperimentV3RestApi;
-  projectId: string;
-  input: z.infer<typeof executionRequestSchema>;
-  state: EvaluationsV3State;
-  datasetRows: unknown[];
-  datasetColumns: unknown;
-  loadedPrompts: Map<string, VersionedPrompt>;
-  loadedAgents: Map<string, TypedAgent>;
-  loadedEvaluators: unknown;
-  loadedWorkflows: unknown;
-  runPorts: ExperimentRunPorts;
-  mirror: ReturnType<typeof ExperimentRunStateMirrorService.create>;
-  resultsWriter: ReturnType<typeof ExperimentRunResultsWriterService.findWriterFor>;
-  userId: string;
-}): ReadableStream {
-  const { app, projectId, input, mirror, resultsWriter, userId } = options;
-  const encoder = new TextEncoder();
-
-  return new ReadableStream({
-    async start(controller) {
-      const write = (payload: unknown) =>
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
-
-      try {
-        const isFullRun = input.scope.type === "full";
-
-        const orchestrator = ExperimentRunOrchestratorService.runOrchestrator({
-          projectId,
-          experimentId: input.experimentId,
-          scope: input.scope,
-          state: options.state,
-          datasetRows: options.datasetRows,
-          datasetColumns: options.datasetColumns,
-          loadedPrompts: options.loadedPrompts,
-          loadedAgents: options.loadedAgents,
-          ports: options.runPorts,
-          workflows: app.run.workflows,
-          loadedEvaluators: options.loadedEvaluators,
-          loadedWorkflows: options.loadedWorkflows,
-          defaultConcurrency: app.run.defaultConcurrency,
-          concurrency: input.concurrency,
-          seedTargetOutputs: input.seedTargetOutputs,
-          carriedOverCells: input.carriedOverCells,
-        });
-
-        for await (const event of orchestrator) {
-          // The board first, then the run store, then the customer.
-          await resultsWriter?.record(event);
-          await mirror.record(event);
-          write(event);
-
-          if (event.type === "done" || event.type === "stopped") {
-            app.recordExperimentRan?.({
-              userId,
-              projectId,
-              experimentId: input.experimentId,
-              isFullRun,
-            });
-            break;
-          }
-        }
-      } catch (error) {
-        logger.error({ error, projectId }, "Orchestrator error");
-        app.reportError?.(error, { projectId });
-
-        const failure = mapThrownErrorEvent({ error });
-        if (failure.type === "error") {
-          await mirror.fail({
-            code: failure.message,
-            domainError: failure.domainError,
-            traceId: failure.traceId,
-          });
-        }
-        write(failure);
-      } finally {
-        controller.close();
-      }
-    },
-  });
-}
 
 /** The `:slug/run` SSE stream: the same orchestrator, with no mirror or writer. */
 function runEventStream(options: {

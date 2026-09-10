@@ -1,10 +1,6 @@
 /**
- * The experiment wire, pinned. Twenty tRPC procedures and sixteen REST routes,
- * each with the name, the kind and the permission it answered on `origin/main`
- * before the transports were rewritten against the declaration builders. A
- * rename here is a cache-key change in every browser that calls it and a
- * breaking change in every SDK that posts to it.
- *
+ * The pinned experiment wire: twenty tRPC procedures and sixteen REST routes
+ * with their origin/main names, kinds and permissions.
  * Spec: modules/experiment/specs/experiment-service.feature.
  */
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
@@ -17,6 +13,7 @@ import { experimentInitRest } from "../experiment-init.rest.ts";
 import { experimentRest } from "../experiment.rest.ts";
 import { experimentTrpcTransport } from "../experiment.trpc.ts";
 import { experimentV3AliasRest, experimentV3Rest } from "../experiment-v3.rest.ts";
+import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts";
 
 /** Records the access each declared procedure asked for, building nothing. */
 function accessDeclaredBy(declaration: {
@@ -134,35 +131,52 @@ describe("given the experiment REST families", () => {
       ]).toEqual(["post /api/experiment/init", "post /api/dspy/log_steps"]);
     });
 
-    it("keeps every workbench route self-authenticated with its pinned permission named", () => {
-      const routes = experimentV3Rest.router().routes;
-
+    it("keeps every project-keyed workbench route on the permission it answered before", () => {
       expect(
-        routes.map(({ method, path, operation, access }) => [
+        experimentV3Rest
+          .router()
+          .routes.map(({ method, path, operation, permission }) => [
+            method,
+            path,
+            operation,
+            permission,
+          ]),
+      ).toEqual([
+        ["post", "/:slug/run", "runExperiment", "evaluations:create"],
+        ["get", "/runs", "listExperimentRuns", "evaluations:view"],
+        ["get", "/runs/:runId", "getExperimentRunStatus", "evaluations:view"],
+        ["get", "/runs/:runId/results", "getExperimentRunResults", "evaluations:view"],
+        ["get", "/:slug/workbench-state", "getExperimentWorkbenchState", "experiments:view"],
+        ["put", "/:slug/workbench-state", "saveExperimentWorkbenchState", "experiments:update"],
+        ["get", "/:slug/versions", "listExperimentWorkbenchVersions", "experiments:view"],
+        [
+          "post",
+          "/:slug/versions/:version/restore",
+          "restoreExperimentWorkbenchVersion",
+          "experiments:update",
+        ],
+      ]);
+    });
+
+    it("keeps the two browser run doors at their paths, behind the session door", () => {
+      const router = experimentWorkbenchRunRest.router();
+
+      expect(router.credential).toBe("session");
+      expect(
+        router.routes.map(({ method, path, operation, access }) => [
           method,
           path,
           operation,
           access?.kind,
         ]),
       ).toEqual([
-        ["post", "/execute", "executeExperiment", "public"],
-        ["post", "/abort", "abortExperimentRun", "public"],
-        ["post", "/:slug/run", "runExperiment", "public"],
-        ["get", "/runs", "listExperimentRuns", "public"],
-        ["get", "/runs/:runId", "getExperimentRunStatus", "public"],
-        ["get", "/runs/:runId/results", "getExperimentRunResults", "public"],
-        ["get", "/:slug/workbench-state", "getExperimentWorkbenchState", "public"],
-        ["put", "/:slug/workbench-state", "saveExperimentWorkbenchState", "public"],
-        ["get", "/:slug/versions", "listExperimentWorkbenchVersions", "public"],
-        ["post", "/:slug/versions/:version/restore", "restoreExperimentWorkbenchVersion", "public"],
+        ["post", "/execute", "executeExperiment", "deferred"],
+        ["post", "/abort", "abortExperimentRun", "deferred"],
       ]);
+    });
 
-      const reasons = routes.map(({ access }) => access?.reason ?? "");
-      expect(reasons.filter((reason) => reason.includes("evaluations:manage"))).toHaveLength(2);
-      expect(reasons.filter((reason) => reason.includes("evaluations:create"))).toHaveLength(1);
-      expect(reasons.filter((reason) => reason.includes("evaluations:view"))).toHaveLength(3);
-      expect(reasons.filter((reason) => reason.includes("experiments:view"))).toHaveLength(2);
-      expect(reasons.filter((reason) => reason.includes("experiments:update"))).toHaveLength(2);
+    it("answers the browser run doors under the namespace they have always answered at", () => {
+      expect(experimentWorkbenchRunRest.namespace).toBe(experimentV3Rest.namespace);
     });
 
     it("keeps the legacy evaluations-v3 alias public and literal", () => {
