@@ -182,3 +182,5 @@ export * from "./trace-projection.types.ts";
 export * from "./trace-query-evaluation.types.ts";
 export * from "./trace.config.ts";
 export * from "./trace-captured-span.commands.ts";
+
+export * from "./trace-rest.schemas.ts";
