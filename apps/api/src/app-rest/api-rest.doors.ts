@@ -37,8 +37,10 @@ import { mountAuthRest } from "../features/auth/auth-rest.mount.ts";
 import { mountAgentRest } from "../features/agent/agent-rest.mount.ts";
 import { mountApiKeyRest } from "../features/api-key/api-key-rest.mount.ts";
 import { mountTracesRest } from "../features/trace/traces-rest.mount.ts";
+import { mountGroupsRest } from "../features/organization/groups-rest.mount.ts";
 import { mountOrganizationManagementRest } from "../features/organization/organization-management-rest.mount.ts";
 import { mountOrganizationsRest } from "../features/organization/organizations-rest.mount.ts";
+import { mountTeamsRest } from "../features/organization/team-rest.mount.ts";
 import { mountPromptsRest } from "../features/prompt/prompt-rest.mount.ts";
 import {
   mountCodingAgentRest,
@@ -518,7 +520,17 @@ export const API_REST_DOORS = [
     },
   },
   { family: "governance", owner: "module", paths: ["/api/governance", "/api/v1/governance"] },
-  { family: "groups", owner: "module", paths: ["/api/groups", "/api/v1/groups"] },
+  {
+    family: "groups",
+    owner: "module",
+    paths: ["/api/groups", "/api/v1/groups"],
+    // The same organization application and plan lookup `/api/organization`
+    // answers from: groups are that organization's own access grants.
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.organizationManagement
+        ? [mountGroupsRest(runtime, services.organizationManagement)]
+        : null,
+  },
   {
     family: "me",
     owner: "module",
@@ -677,7 +689,18 @@ export const API_REST_DOORS = [
     absent:
       "API process serves no /api/user-avatar: it composed no stored-object read, or no dual-credential verifier for the browser to load an image with. Every member list, annotation and presence bar falls back to initials rather than the photo a person uploaded.",
   },
-  { family: "teams", owner: "module", paths: ["/api/teams", "/api/v1/teams"] },
+  {
+    family: "teams",
+    owner: "module",
+    paths: ["/api/teams", "/api/v1/teams"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const organization = packaged?.services.organizations;
+      const authz = packaged?.services.permissions;
+      const projects = packaged?.services.projects;
+      if (!organization || !authz || !projects) return null;
+      return mountTeamsRest(runtime, { organization, authz, projects });
+    },
+  },
   {
     family: "tracked-events",
     owner: "module",

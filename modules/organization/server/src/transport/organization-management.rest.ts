@@ -137,7 +137,7 @@ const requestedTeamRole = (team: { role: string; customRoleId?: string | undefin
 export const organizationManagementRest = defineRestRouter(OrganizationApi)
   .withNamespace("organization")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("organizationKey")
+  .withCredential("organization")
 
   .get("/", "getOrganization")
   .withPermission("organization:view")

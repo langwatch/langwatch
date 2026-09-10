@@ -47,7 +47,7 @@ describe("given an organization credential on the teams door", () => {
 
 function mountTeams(appOverrides: Record<string, any>) {
   const resolved: RestResolvedOrganizationCredential = {
-    type: "organizationKey",
+    type: "organization",
     organization: ORGANIZATION,
   };
 

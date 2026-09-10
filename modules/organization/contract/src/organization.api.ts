@@ -323,6 +323,7 @@ export interface OrganizationApi {
   ): Promise<void>;
   addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
   removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
+  listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]>;
   addGroupBinding(
     input: Omit<AddOrganizationGroupBindingInput, "actor">,
     by: OrganizationCaller,

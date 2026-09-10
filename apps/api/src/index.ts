@@ -224,7 +224,6 @@ export {
   type TraceExportRequestFields,
   type TraceExportRestPorts,
 } from "@langwatch/trace-server";
-export { createGroupRestApp } from "@langwatch/organization-server";
 
 export {
   organizationsProvisioningRest,

@@ -23,7 +23,7 @@ import {
 export const organizationsProvisioningRest = defineRestRouter(OrganizationApi)
   .withNamespace("organizations")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("instanceAdminKey")
+  .withCredential("instance-admin")
 
   .post("/", "createOrganization")
   .withAccess({

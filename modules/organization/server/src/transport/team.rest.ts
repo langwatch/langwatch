@@ -92,7 +92,7 @@ export function createTeamRest(options: Readonly<{
   return defineRestRouter(OrganizationApi)
     .withNamespace("teams")
     .withVersion(MANAGEMENT_API_VERSION)
-    .withCredential("organizationKey")
+    .withCredential("organization")
 
     .get("/", "listTeams")
     .withPermission("team:view")

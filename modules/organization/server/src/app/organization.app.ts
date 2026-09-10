@@ -965,6 +965,11 @@ export class ServerOrganizationApp implements OrganizationApi {
     return this.#dependencies.organizations.removeGroupMember(input);
   }
 
+  /** Every access binding one group holds. */
+  listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]> {
+    return this.#dependencies.organizations.listGroupBindings(input);
+  }
+
   /** Adds one access binding to a group, attributed to its caller. */
   addGroupBinding(
     input: Omit<AddOrganizationGroupBindingInput, "actor">,

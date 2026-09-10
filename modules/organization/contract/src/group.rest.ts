@@ -9,6 +9,7 @@
 import { z } from "zod";
 
 import {
+  organizationGroupBindingInputSchema,
   organizationGroupBindingSchema,
   organizationGroupMemberSchema,
   organizationGroupSchema,
@@ -74,3 +75,36 @@ export const organizationGroupRestBindingSchema = organizationGroupBindingSchema
 
 /** What every write with nothing to report answers. */
 export const organizationRestSuccessSchema = z.object({ success: z.boolean() });
+
+/** The page a listing asks for, as query string values arrive - strings, coerced. */
+export const organizationGroupRestListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(1000).optional().default(50),
+});
+
+/** A new group, with the bindings and members it starts life holding. */
+export const organizationGroupRestCreateSchema = z.object({
+  name: z.string().trim().min(1, "name is required").max(100),
+  bindings: z.array(organizationGroupBindingInputSchema).optional(),
+  memberIds: z.array(z.string()).optional(),
+});
+
+/** The only field a group rename changes. */
+export const organizationGroupRestRenameSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+});
+
+/** The member a group gains. */
+export const organizationGroupRestAddMemberSchema = z.object({
+  userId: z.string().min(1, "userId is required"),
+});
+
+export const organizationGroupRestParamsSchema = z.object({ id: z.string().min(1) });
+
+export const organizationGroupRestMemberParamsSchema = organizationGroupRestParamsSchema.extend({
+  userId: z.string().min(1),
+});
+
+export const organizationGroupRestBindingParamsSchema = organizationGroupRestParamsSchema.extend({
+  bindingId: z.string().min(1),
+});
