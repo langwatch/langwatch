@@ -9,24 +9,24 @@ import { getWorkerMetricsPort, isMetricsAuthorized } from "~/server/metrics";
 const logger = createLogger("langwatch:workers");
 
 export interface WorkerHandle {
-  /**
-   * Release every worker-held OS resource (child processes, sockets, timers,
-   * Redis subscribers). Does NOT close the shared App (ClickHouse / Redis /
-   * Prisma) — the caller owns the App lifecycle and closes it after this
-   * resolves, so the in-process dev mode doesn't double-close the App the web
-   * server is still using.
-   */
-  shutdown: () => Promise<void>;
+	/**
+	 * Release every worker-held OS resource (child processes, sockets, timers,
+	 * Redis subscribers). Does NOT close the shared App (ClickHouse / Redis /
+	 * Prisma) — the caller owns the App lifecycle and closes it after this
+	 * resolves, so the in-process dev mode doesn't double-close the App the web
+	 * server is still using.
+	 */
+	shutdown: () => Promise<void>;
 }
 
 export interface StartWorkersOptions {
-  /**
-   * Expose the worker prom-client registry over its own HTTP port. On for the
-   * standalone worker deployment, where a scraper reaches the worker directly
-   * on the metrics port; off for the in-process dev mode, where the web server
-   * already serves the shared registry at `/metrics`.
-   */
-  shouldStartMetricsServer?: boolean;
+	/**
+	 * Expose the worker prom-client registry over its own HTTP port. On for the
+	 * standalone worker deployment, where a scraper reaches the worker directly
+	 * on the metrics port; off for the in-process dev mode, where the web server
+	 * already serves the shared registry at `/metrics`.
+	 */
+	shouldStartMetricsServer?: boolean;
 }
 
 type ShutdownHandles = Array<() => Promise<void> | void>;
@@ -34,30 +34,30 @@ type ShutdownHandles = Array<() => Promise<void> | void>;
 // Fail fast if the database is unreachable — better to fail the boot loudly
 // than to come up green and have every job fail individually.
 async function verifyDatabaseReady(): Promise<void> {
-  const { prisma } = await import("~/server/db");
-  try {
-    await prisma.$queryRaw`-- @tenancy: connectivity probe, touches no rows
+	const { prisma } = await import("~/server/db");
+	try {
+		await prisma.$queryRaw`-- @tenancy: connectivity probe, touches no rows
 SELECT 1`;
-    logger.info("database connection verified");
-  } catch (error) {
-    logger.fatal({ error }, "database unreachable at boot");
-    throw error;
-  }
+		logger.info("database connection verified");
+	} catch (error) {
+		logger.fatal({ error }, "database unreachable at boot");
+		throw error;
+	}
 }
 
 // ClickHouse storage-stats collection (feeds the Ops storage metrics).
 async function bootStorageStatsCollection(
-  shutdownHandles: ShutdownHandles,
+	shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const {
-    startStorageStatsCollectionFromSharedClient,
-    stopStorageStatsCollection,
-  } = await import("~/server/clickhouse/metrics");
-  const hasStarted = startStorageStatsCollectionFromSharedClient();
-  if (hasStarted) {
-    shutdownHandles.push(() => stopStorageStatsCollection());
-    logger.info("storage stats collection ready");
-  }
+	const {
+		startStorageStatsCollectionFromSharedClient,
+		stopStorageStatsCollection,
+	} = await import("~/server/clickhouse/metrics");
+	const hasStarted = startStorageStatsCollectionFromSharedClient();
+	if (hasStarted) {
+		shutdownHandles.push(() => stopStorageStatsCollection());
+		logger.info("storage stats collection ready");
+	}
 }
 
 // Scenario simulation executor: an in-process pool late-bound into the
@@ -65,40 +65,48 @@ async function bootStorageStatsCollection(
 // reads. Without this the intent throws (outbox retries) and simulations
 // never execute on this pod.
 async function bootScenarioProcessor(
-  shutdownHandles: ShutdownHandles,
+	shutdownHandles: ShutdownHandles,
+	options?: { voiceWorkerOnly?: boolean },
 ): Promise<void> {
-  const { getScenarioExecutionPool } = await import(
-    "~/server/app-layer/presets"
-  );
-  const { ScenarioExecutionPool } = await import(
-    "~/server/scenarios/execution/execution-pool"
-  );
-  const { startScenarioProcessor } = await import(
-    "~/server/scenarios/scenario.processor"
-  );
-  const { SCENARIO_WORKER } = await import(
-    "~/server/scenarios/scenario.constants"
-  );
-  const { VoiceConcurrencyGate } = await import(
-    "~/server/scenarios/execution/voice-concurrency-gate"
-  );
-  const { voiceRunsMaxConcurrent } = await import(
-    "~/server/scenarios/voice/voice-limits"
-  );
-  const scenarioPool = new ScenarioExecutionPool({
-    concurrency: SCENARIO_WORKER.CONCURRENCY,
-    // A voice run holds an ElevenLabs socket for the length of a call, so cap
-    // how many a project runs at once; the rest wait in the queue.
-    voiceGate: new VoiceConcurrencyGate({ max: voiceRunsMaxConcurrent() }),
-  });
-  getScenarioExecutionPool()?.set(scenarioPool);
-  const scenarioProcessor = await startScenarioProcessor({
-    pool: scenarioPool,
-  });
-  if (scenarioProcessor) {
-    shutdownHandles.push(() => scenarioProcessor.close());
-  }
-  logger.info("scenario processor ready");
+	const { getScenarioExecutionPool } = await import(
+		"~/server/app-layer/presets"
+	);
+	const { ScenarioExecutionPool } = await import(
+		"~/server/scenarios/execution/execution-pool"
+	);
+	const { startScenarioProcessor } = await import(
+		"~/server/scenarios/scenario.processor"
+	);
+	const { SCENARIO_WORKER } = await import(
+		"~/server/scenarios/scenario.constants"
+	);
+	const { VoiceConcurrencyGate } = await import(
+		"~/server/scenarios/execution/voice-concurrency-gate"
+	);
+	const { voiceRunsMaxConcurrent } = await import(
+		"~/server/scenarios/voice/voice-limits"
+	);
+	const { isVoiceJob } = await import(
+		"~/server/scenarios/execution/voice-worker-only"
+	);
+	const scenarioPool = new ScenarioExecutionPool({
+		concurrency: SCENARIO_WORKER.CONCURRENCY,
+		// A voice run holds an ElevenLabs socket for the length of a call, so cap
+		// how many a project runs at once; the rest wait in the queue.
+		voiceGate: new VoiceConcurrencyGate({ max: voiceRunsMaxConcurrent() }),
+		// A voice worker (VOICE_WORKER_ONLY) runs only voice jobs; a non-voice job
+		// submitted here is refused and retried on another pod. Absent otherwise,
+		// so a normal worker runs every job as before.
+		...(options?.voiceWorkerOnly ? { acceptJob: isVoiceJob } : {}),
+	});
+	getScenarioExecutionPool()?.set(scenarioPool);
+	const scenarioProcessor = await startScenarioProcessor({
+		pool: scenarioPool,
+	});
+	if (scenarioProcessor) {
+		shutdownHandles.push(() => scenarioProcessor.close());
+	}
+	logger.info("scenario processor ready");
 }
 
 // NLP fetch dispatchers (undici Agents, memoized per timeoutMs by
@@ -107,39 +115,39 @@ async function bootScenarioProcessor(
 // here, only a teardown to register, so every dispatcher the process built
 // gets closed on shutdown instead of leaking its connection pool.
 async function bootNlpFetchDispatcherTeardown(
-  shutdownHandles: ShutdownHandles,
+	shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { closeNlpFetchDispatchers } = await import("~/server/nlpgo/timeouts");
-  shutdownHandles.push(() => closeNlpFetchDispatchers());
+	const { closeNlpFetchDispatchers } = await import("~/server/nlpgo/timeouts");
+	shutdownHandles.push(() => closeNlpFetchDispatchers());
 }
 
 // Per-tenant enqueue-rate anomaly detector (surfaces runaway tenants on
 // the Ops page).
 async function bootAnomalyWorker(
-  shutdownHandles: ShutdownHandles,
+	shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startAnomalyWorker } = await import(
-    "~/server/observability/anomalyWorker"
-  );
-  const anomalyWorker = startAnomalyWorker();
-  if (anomalyWorker) {
-    shutdownHandles.push(() => anomalyWorker.stop());
-    logger.info("anomaly worker ready");
-  }
+	const { startAnomalyWorker } = await import(
+		"~/server/observability/anomalyWorker"
+	);
+	const anomalyWorker = startAnomalyWorker();
+	if (anomalyWorker) {
+		shutdownHandles.push(() => anomalyWorker.stop());
+		logger.info("anomaly worker ready");
+	}
 }
 
 // Governance spend-spike anomaly evaluation: a 5-minute tick that
 // evaluates admin-authored spend_spike rules and persists AnomalyAlert
 // rows (specs/ai-gateway/governance/anomaly-detection.feature).
 async function bootSpendSpikeAnomalyWorker(
-  shutdownHandles: ShutdownHandles,
+	shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startSpendSpikeAnomalyWorker } = await import(
-    "@ee/governance/services/spendSpikeAnomalyWorker"
-  );
-  const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker();
-  shutdownHandles.push(() => spendSpikeAnomalyWorker.stop());
-  logger.info("spend spike anomaly worker ready");
+	const { startSpendSpikeAnomalyWorker } = await import(
+		"@ee/governance/services/spendSpikeAnomalyWorker"
+	);
+	const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker();
+	shutdownHandles.push(() => spendSpikeAnomalyWorker.stop());
+	logger.info("spend spike anomaly worker ready");
 }
 
 // Reconciles brokered realtime voice sessions whose post-call webhook never
@@ -147,27 +155,49 @@ async function bootSpendSpikeAnomalyWorker(
 // customer must configure before voice spend can be billed at all
 // (specs/ai-gateway/realtime-sessions.feature).
 async function bootRealtimeSessionPoller(
-  shutdownHandles: ShutdownHandles,
+	shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startRealtimeSessionPoller } = await import(
-    "~/server/gateway/realtimeSessionPoller"
-  );
-  const poller = startRealtimeSessionPoller();
-  shutdownHandles.push(() => poller.stop());
-  logger.info("realtime voice session poller ready");
+	const { startRealtimeSessionPoller } = await import(
+		"~/server/gateway/realtimeSessionPoller"
+	);
+	const poller = startRealtimeSessionPoller();
+	shutdownHandles.push(() => poller.stop());
+	logger.info("realtime voice session poller ready");
+}
+
+// The Twilio media listener: its own HTTP+WS server on VOICE_WS_PORT, booted
+// only on a voice worker (VOICE_WORKER_ONLY). It authenticates the per-call
+// nonce and hands the raw upgrade socket to the scenario child that owns the
+// call. Inert in every default deployment, since the stage is absent from the
+// non-voice boot plan.
+async function bootVoiceListener(
+	shutdownHandles: ShutdownHandles,
+	voiceEnv: { voiceWsPort: number; voicePublicBaseUrl: string | undefined },
+): Promise<void> {
+	const { getVoiceNonceRegistry } = await import(
+		"~/server/scenarios/voice/voice-nonce-registry"
+	);
+	const { bootVoiceWsListener } = await import("./voice-ws-listener");
+	const { close, address } = await bootVoiceWsListener({
+		port: voiceEnv.voiceWsPort,
+		publicBaseUrl: voiceEnv.voicePublicBaseUrl,
+		registry: getVoiceNonceRegistry(),
+	});
+	shutdownHandles.push(() => close());
+	logger.info(`voice media listener ready on port ${address.port}`);
 }
 
 // Self-hosted daily usage telemetry (no-op on SaaS or when
 // DISABLE_USAGE_STATS is set).
 async function bootUsageStatsWorker(
-  shutdownHandles: ShutdownHandles,
+	shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startUsageStatsWorker } = await import("~/server/usageStatsWorker");
-  const usageStatsWorker = startUsageStatsWorker();
-  if (usageStatsWorker) {
-    shutdownHandles.push(() => usageStatsWorker.stop());
-    logger.info("usage stats worker ready");
-  }
+	const { startUsageStatsWorker } = await import("~/server/usageStatsWorker");
+	const usageStatsWorker = startUsageStatsWorker();
+	if (usageStatsWorker) {
+		shutdownHandles.push(() => usageStatsWorker.stop());
+		logger.info("usage stats worker ready");
+	}
 }
 
 /**
@@ -196,39 +226,39 @@ export const WORKER_LIVENESS_PATH = "/healthz";
  * proxy share ONE copy of the security decision (two copies drift).
  */
 async function evaluateMetricsRequest({
-  url,
-  request,
-  isMetricsAuthorized,
+	url,
+	request,
+	isMetricsAuthorized,
 }: {
-  url: string | undefined;
-  /** The auth input, shaped like the parts of IncomingMessage the gate reads. */
-  request: Pick<IncomingMessage, "headers">;
-  isMetricsAuthorized: (req: IncomingMessage) => boolean;
+	url: string | undefined;
+	/** The auth input, shaped like the parts of IncomingMessage the gate reads. */
+	request: Pick<IncomingMessage, "headers">;
+	isMetricsAuthorized: (req: IncomingMessage) => boolean;
 }): Promise<{
-  status: number;
-  headers?: Record<string, string>;
-  body?: string;
+	status: number;
+	headers?: Record<string, string>;
+	body?: string;
 }> {
-  if (url !== "/metrics") return { status: 404 };
-  try {
-    if (!isMetricsAuthorized(request as IncomingMessage))
-      return { status: 401 };
-  } catch (error) {
-    // Fail closed when METRICS_API_KEY is unset in production.
-    logger.error({ error }, "worker metrics auth misconfigured");
-    return { status: 500 };
-  }
-  try {
-    const metrics = await register.metrics();
-    return {
-      status: 200,
-      headers: { "Content-Type": register.contentType },
-      body: metrics,
-    };
-  } catch (error) {
-    logger.error({ error }, "error getting worker metrics");
-    return { status: 500 };
-  }
+	if (url !== "/metrics") return { status: 404 };
+	try {
+		if (!isMetricsAuthorized(request as IncomingMessage))
+			return { status: 401 };
+	} catch (error) {
+		// Fail closed when METRICS_API_KEY is unset in production.
+		logger.error({ error }, "worker metrics auth misconfigured");
+		return { status: 500 };
+	}
+	try {
+		const metrics = await register.metrics();
+		return {
+			status: 200,
+			headers: { "Content-Type": register.contentType },
+			body: metrics,
+		};
+	} catch (error) {
+		logger.error({ error }, "error getting worker metrics");
+		return { status: 500 };
+	}
 }
 
 /**
@@ -238,21 +268,21 @@ async function evaluateMetricsRequest({
  * the same decisions through the thread proxy.
  */
 export function createWorkerMetricsHandler(
-  isMetricsAuthorized: (req: IncomingMessage) => boolean,
+	isMetricsAuthorized: (req: IncomingMessage) => boolean,
 ): RequestListener {
-  return (req: IncomingMessage, res: ServerResponse) => {
-    if (req.url === WORKER_LIVENESS_PATH) {
-      res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
-      return;
-    }
-    void evaluateMetricsRequest({
-      url: req.url,
-      request: req,
-      isMetricsAuthorized,
-    }).then(({ status, headers, body }) => {
-      res.writeHead(status, headers ?? {}).end(body ?? "");
-    });
-  };
+	return (req: IncomingMessage, res: ServerResponse) => {
+		if (req.url === WORKER_LIVENESS_PATH) {
+			res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+			return;
+		}
+		void evaluateMetricsRequest({
+			url: req.url,
+			request: req,
+			isMetricsAuthorized,
+		}).then(({ status, headers, body }) => {
+			res.writeHead(status, headers ?? {}).end(body ?? "");
+		});
+	};
 }
 
 // Expose the worker process's prom-client registry over HTTP on the worker
@@ -339,57 +369,57 @@ server.listen(workerData.port, () => parentPort.postMessage({ isListening: true 
 // thread cannot start, fall back to the old in-loop server rather than boot
 // with no probe target at all.
 async function bootMetricsServer(
-  shutdownHandles: ShutdownHandles,
+	shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const metricsPort = getWorkerMetricsPort();
+	const metricsPort = getWorkerMetricsPort();
 
-  // BigInt64 + Atomics — see the note in LIVENESS_THREAD_SOURCE.
-  const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
-  Atomics.store(heartbeat, 0, BigInt(Date.now()));
-  const heartbeatTimer = setInterval(() => {
-    Atomics.store(heartbeat, 0, BigInt(Date.now()));
-  }, WORKER_HEARTBEAT_INTERVAL_MS);
-  heartbeatTimer.unref();
+	// BigInt64 + Atomics — see the note in LIVENESS_THREAD_SOURCE.
+	const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
+	Atomics.store(heartbeat, 0, BigInt(Date.now()));
+	const heartbeatTimer = setInterval(() => {
+		Atomics.store(heartbeat, 0, BigInt(Date.now()));
+	}, WORKER_HEARTBEAT_INTERVAL_MS);
+	heartbeatTimer.unref();
 
-  let thread: Worker | undefined;
-  try {
-    thread = new Worker(LIVENESS_THREAD_SOURCE, {
-      eval: true,
-      workerData: {
-        port: metricsPort,
-        livenessPath: WORKER_LIVENESS_PATH,
-        heartbeat: heartbeat.buffer,
-        stallBudgetMs: WORKER_HEARTBEAT_STALL_BUDGET_MS,
-        proxyTimeoutMs: METRICS_PROXY_TIMEOUT_MS,
-      },
-    });
-    await wireLivenessThread(thread, isMetricsAuthorized);
-    const startedThread = thread;
-    logger.info(
-      `worker liveness thread serving port ${metricsPort} (heartbeat budget ${WORKER_HEARTBEAT_STALL_BUDGET_MS}ms)`,
-    );
-    shutdownHandles.push(async () => {
-      clearInterval(heartbeatTimer);
-      // terminate() itself emits a non-zero "exit"; that's a graceful
-      // shutdown, not the unexpected-death case the listener reports.
-      startedThread.removeAllListeners("exit");
-      await startedThread.terminate();
-    });
-  } catch (error) {
-    // The fallback server has no heartbeat consumer, so stop stamping it —
-    // and reap the thread if it was spawned but failed before listening.
-    clearInterval(heartbeatTimer);
-    await thread?.terminate().catch(() => undefined);
-    logger.warn(
-      { error },
-      "liveness thread failed to start; serving metrics/liveness on the main loop",
-    );
-    await bootFallbackMetricsServer({
-      metricsPort,
-      isMetricsAuthorized,
-      shutdownHandles,
-    });
-  }
+	let thread: Worker | undefined;
+	try {
+		thread = new Worker(LIVENESS_THREAD_SOURCE, {
+			eval: true,
+			workerData: {
+				port: metricsPort,
+				livenessPath: WORKER_LIVENESS_PATH,
+				heartbeat: heartbeat.buffer,
+				stallBudgetMs: WORKER_HEARTBEAT_STALL_BUDGET_MS,
+				proxyTimeoutMs: METRICS_PROXY_TIMEOUT_MS,
+			},
+		});
+		await wireLivenessThread(thread, isMetricsAuthorized);
+		const startedThread = thread;
+		logger.info(
+			`worker liveness thread serving port ${metricsPort} (heartbeat budget ${WORKER_HEARTBEAT_STALL_BUDGET_MS}ms)`,
+		);
+		shutdownHandles.push(async () => {
+			clearInterval(heartbeatTimer);
+			// terminate() itself emits a non-zero "exit"; that's a graceful
+			// shutdown, not the unexpected-death case the listener reports.
+			startedThread.removeAllListeners("exit");
+			await startedThread.terminate();
+		});
+	} catch (error) {
+		// The fallback server has no heartbeat consumer, so stop stamping it —
+		// and reap the thread if it was spawned but failed before listening.
+		clearInterval(heartbeatTimer);
+		await thread?.terminate().catch(() => undefined);
+		logger.warn(
+			{ error },
+			"liveness thread failed to start; serving metrics/liveness on the main loop",
+		);
+		await bootFallbackMetricsServer({
+			metricsPort,
+			isMetricsAuthorized,
+			shutdownHandles,
+		});
+	}
 }
 
 /**
@@ -400,68 +430,68 @@ async function bootMetricsServer(
  * probes fail, and the pod restarts through the normal Kubernetes path).
  */
 async function wireLivenessThread(
-  thread: Worker,
-  isMetricsAuthorized: (req: IncomingMessage) => boolean,
+	thread: Worker,
+	isMetricsAuthorized: (req: IncomingMessage) => boolean,
 ): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    // Reject on early exit too: a thread that dies before listening without
-    // emitting "error" would otherwise leave this promise pending forever
-    // and the fallback server would never start.
-    const rejectOnEarlyExit = (code: number) =>
-      reject(
-        new Error(`liveness thread exited before listening (code ${code})`),
-      );
-    thread.once("error", reject);
-    thread.once("exit", rejectOnEarlyExit);
-    thread.on("message", (msg: { isListening?: boolean; id?: number }) => {
-      if (msg.isListening) {
-        thread.removeListener("error", reject);
-        thread.removeListener("exit", rejectOnEarlyExit);
-        resolve();
-        return;
-      }
-      if (msg.id === undefined) return;
-      void respondToLivenessThread(
-        thread,
-        msg as { id: number; url: string; authorization: string | null },
-        isMetricsAuthorized,
-      );
-    });
-  });
-  thread.on("error", (error) => {
-    logger.error({ error }, "worker liveness thread errored");
-  });
-  thread.on("exit", (code) => {
-    if (code !== 0) {
-      logger.error({ code }, "worker liveness thread exited unexpectedly");
-    }
-  });
+	await new Promise<void>((resolve, reject) => {
+		// Reject on early exit too: a thread that dies before listening without
+		// emitting "error" would otherwise leave this promise pending forever
+		// and the fallback server would never start.
+		const rejectOnEarlyExit = (code: number) =>
+			reject(
+				new Error(`liveness thread exited before listening (code ${code})`),
+			);
+		thread.once("error", reject);
+		thread.once("exit", rejectOnEarlyExit);
+		thread.on("message", (msg: { isListening?: boolean; id?: number }) => {
+			if (msg.isListening) {
+				thread.removeListener("error", reject);
+				thread.removeListener("exit", rejectOnEarlyExit);
+				resolve();
+				return;
+			}
+			if (msg.id === undefined) return;
+			void respondToLivenessThread(
+				thread,
+				msg as { id: number; url: string; authorization: string | null },
+				isMetricsAuthorized,
+			);
+		});
+	});
+	thread.on("error", (error) => {
+		logger.error({ error }, "worker liveness thread errored");
+	});
+	thread.on("exit", (code) => {
+		if (code !== 0) {
+			logger.error({ code }, "worker liveness thread exited unexpectedly");
+		}
+	});
 }
 
 /** The pre-thread in-loop server, kept as the fallback when the thread cannot start. */
 async function bootFallbackMetricsServer({
-  metricsPort,
-  isMetricsAuthorized,
-  shutdownHandles,
+	metricsPort,
+	isMetricsAuthorized,
+	shutdownHandles,
 }: {
-  metricsPort: number;
-  isMetricsAuthorized: (req: IncomingMessage) => boolean;
-  shutdownHandles: ShutdownHandles;
+	metricsPort: number;
+	isMetricsAuthorized: (req: IncomingMessage) => boolean;
+	shutdownHandles: ShutdownHandles;
 }): Promise<void> {
-  const metricsServer = http.createServer(
-    createWorkerMetricsHandler(isMetricsAuthorized),
-  );
-  await new Promise<void>((resolve, reject) => {
-    metricsServer.once("error", reject);
-    metricsServer.listen(metricsPort, () => {
-      metricsServer.removeListener("error", reject);
-      logger.info(`worker metrics server listening on port ${metricsPort}`);
-      resolve();
-    });
-  });
-  shutdownHandles.push(
-    () => new Promise<void>((resolve) => metricsServer.close(() => resolve())),
-  );
+	const metricsServer = http.createServer(
+		createWorkerMetricsHandler(isMetricsAuthorized),
+	);
+	await new Promise<void>((resolve, reject) => {
+		metricsServer.once("error", reject);
+		metricsServer.listen(metricsPort, () => {
+			metricsServer.removeListener("error", reject);
+			logger.info(`worker metrics server listening on port ${metricsPort}`);
+			resolve();
+		});
+	});
+	shutdownHandles.push(
+		() => new Promise<void>((resolve) => metricsServer.close(() => resolve())),
+	);
 }
 
 /**
@@ -470,16 +500,16 @@ async function bootFallbackMetricsServer({
  * handler.
  */
 async function respondToLivenessThread(
-  thread: Worker,
-  msg: { id: number; url: string; authorization: string | null },
-  isMetricsAuthorized: (req: IncomingMessage) => boolean,
+	thread: Worker,
+	msg: { id: number; url: string; authorization: string | null },
+	isMetricsAuthorized: (req: IncomingMessage) => boolean,
 ): Promise<void> {
-  const { status, headers, body } = await evaluateMetricsRequest({
-    url: msg.url,
-    request: { headers: { authorization: msg.authorization ?? undefined } },
-    isMetricsAuthorized,
-  });
-  thread.postMessage({ id: msg.id, status, headers, body });
+	const { status, headers, body } = await evaluateMetricsRequest({
+		url: msg.url,
+		request: { headers: { authorization: msg.authorization ?? undefined } },
+		isMetricsAuthorized,
+	});
+	thread.postMessage({ id: msg.id, status, headers, body });
 }
 
 /**
@@ -505,62 +535,104 @@ async function respondToLivenessThread(
  * imports as `await import()` for that reason.
  */
 export async function startWorkers(
-  options?: StartWorkersOptions,
+	options?: StartWorkersOptions,
 ): Promise<WorkerHandle> {
-  const shouldStartMetricsServer = options?.shouldStartMetricsServer ?? true;
+	const shouldStartMetricsServer = options?.shouldStartMetricsServer ?? true;
 
-  // Resources that hold OS-level handles — child processes, sockets, timers,
-  // Redis subscribers — and must be released on shutdown. Populated as each
-  // worker boots below.
-  const shutdownHandles: ShutdownHandles = [];
-  const closeRegisteredWorkers = async (): Promise<void> => {
-    // Reverse order: later stages may depend on earlier ones (e.g. the
-    // scenario processor depends on the pool it registered into), so tear
-    // down newest-first.
-    await Promise.allSettled(
-      [...shutdownHandles].reverse().map((close) => close()),
-    );
-  };
+	// Resources that hold OS-level handles — child processes, sockets, timers,
+	// Redis subscribers — and must be released on shutdown. Populated as each
+	// worker boots below.
+	const shutdownHandles: ShutdownHandles = [];
+	const closeRegisteredWorkers = async (): Promise<void> => {
+		// Reverse order: later stages may depend on earlier ones (e.g. the
+		// scenario processor depends on the pool it registered into), so tear
+		// down newest-first.
+		await Promise.allSettled(
+			[...shutdownHandles].reverse().map((close) => close()),
+		);
+	};
 
-  await assertRedisReady();
-  await verifyDatabaseReady();
+	await assertRedisReady();
+	await verifyDatabaseReady();
 
-  try {
-    // Ingestion pulls self-drive through durable process wakes and the
-    // transactional process outbox; there is no separate queue worker to boot.
-    // Topic clustering self-drives (ADR-051): the process wake worker and
-    // process outbox in the event-sourcing runtime own scheduling and
-    // execution; there is no separate queue worker to boot.
-    await bootStorageStatsCollection(shutdownHandles);
-    await bootScenarioProcessor(shutdownHandles);
-    await bootNlpFetchDispatcherTeardown(shutdownHandles);
-    // Langy turns self-drive: the process outbox dispatches to the Go manager,
-    // which pushes signed frames to the relay. No in-process pool/executor to
-    // boot; heartbeat recovery belongs to the direct liveness subscriber.
-    await bootAnomalyWorker(shutdownHandles);
-    await bootSpendSpikeAnomalyWorker(shutdownHandles);
-    await bootUsageStatsWorker(shutdownHandles);
-    await bootRealtimeSessionPoller(shutdownHandles);
-    // One-time in-place data migrations (ADR-092 stage B and successors) are
-    // NOT booted here: they are a worker-only background loop like the
-    // scheduler, so the app layer starts them and the App's graceful
-    // closeables stop them (see presets.ts).
-    if (shouldStartMetricsServer) {
-      await bootMetricsServer(shutdownHandles);
-    }
-  } catch (error) {
-    // A later stage failed after earlier stages already registered live
-    // resources (child processes, timers, sockets) — close them before
-    // rethrowing, or a partial boot failure leaks them silently.
-    logger.error({ error }, "worker boot failed partway — rolling back");
-    await closeRegisteredWorkers();
-    throw error;
-  }
+	// Read the voice worker env FIRST: VOICE_WORKER_ONLY chooses the boot plan,
+	// and this throws (refuses to start) when it is on without VOICE_PUBLIC_BASE_URL.
+	const { readVoiceWorkerEnv } = await import(
+		"~/server/scenarios/voice/voice-worker-env"
+	);
+	const voiceEnv = readVoiceWorkerEnv();
 
-  return {
-    shutdown: async () => {
-      logger.info({ count: shutdownHandles.length }, "shutting down workers");
-      await closeRegisteredWorkers();
-    },
-  };
+	const { resolveWorkerBootPlan } = await import("./worker-boot-plan");
+	const plan = resolveWorkerBootPlan({
+		voiceWorkerOnly: voiceEnv.voiceWorkerOnly,
+		shouldStartMetricsServer,
+	});
+	logger.info(
+		{ voiceWorkerOnly: voiceEnv.voiceWorkerOnly, plan },
+		"worker boot plan",
+	);
+
+	try {
+		// Ingestion pulls self-drive through durable process wakes and the
+		// transactional process outbox; there is no separate queue worker to boot.
+		// Topic clustering self-drives (ADR-051): the process wake worker and
+		// process outbox in the event-sourcing runtime own scheduling and
+		// execution; there is no separate queue worker to boot.
+		//
+		// Langy turns self-drive: the process outbox dispatches to the Go manager,
+		// which pushes signed frames to the relay. No in-process pool/executor to
+		// boot; heartbeat recovery belongs to the direct liveness subscriber.
+		//
+		// One-time in-place data migrations (ADR-092 stage B and successors) are
+		// NOT booted here: they are a worker-only background loop like the
+		// scheduler, so the app layer starts them and the App's graceful
+		// closeables stop them (see presets.ts).
+		for (const stage of plan) {
+			switch (stage) {
+				case "storage-stats":
+					await bootStorageStatsCollection(shutdownHandles);
+					break;
+				case "scenario-processor":
+					await bootScenarioProcessor(shutdownHandles, {
+						voiceWorkerOnly: voiceEnv.voiceWorkerOnly,
+					});
+					break;
+				case "nlp-fetch-teardown":
+					await bootNlpFetchDispatcherTeardown(shutdownHandles);
+					break;
+				case "anomaly":
+					await bootAnomalyWorker(shutdownHandles);
+					break;
+				case "spend-spike-anomaly":
+					await bootSpendSpikeAnomalyWorker(shutdownHandles);
+					break;
+				case "usage-stats":
+					await bootUsageStatsWorker(shutdownHandles);
+					break;
+				case "realtime-session-poller":
+					await bootRealtimeSessionPoller(shutdownHandles);
+					break;
+				case "voice-ws-listener":
+					await bootVoiceListener(shutdownHandles, voiceEnv);
+					break;
+				case "metrics":
+					await bootMetricsServer(shutdownHandles);
+					break;
+			}
+		}
+	} catch (error) {
+		// A later stage failed after earlier stages already registered live
+		// resources (child processes, timers, sockets) — close them before
+		// rethrowing, or a partial boot failure leaks them silently.
+		logger.error({ error }, "worker boot failed partway — rolling back");
+		await closeRegisteredWorkers();
+		throw error;
+	}
+
+	return {
+		shutdown: async () => {
+			logger.info({ count: shutdownHandles.length }, "shutting down workers");
+			await closeRegisteredWorkers();
+		},
+	};
 }
