@@ -11,7 +11,7 @@ Feature: Testing voice agents by phone
   Background:
     Given a LangWatch user with a project
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Simulate a call against a voice agent reachable by phone number
     Given the user has a voice agent reachable by a phone number alone
     When they go to Simulations and author a scenario against that voice agent

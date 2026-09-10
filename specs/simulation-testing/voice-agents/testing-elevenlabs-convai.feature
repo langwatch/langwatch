@@ -10,7 +10,7 @@ Feature: Testing ElevenLabs conversational AI agents
   Background:
     Given a LangWatch user with a project
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Simulate a call against a voice agent reachable through ElevenLabs
     Given the user has a voice agent reachable through ElevenLabs
     When they go to Simulations and author a scenario against that voice agent
