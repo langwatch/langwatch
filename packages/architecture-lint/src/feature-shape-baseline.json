@@ -107,10 +107,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "experiment|legacy-transport-runtime",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "experiment|persistence-adapter",
       "measured": "2026-09-08"
     },
