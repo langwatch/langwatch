@@ -25,7 +25,7 @@
     "./src/transport/otlp-ingest.rest.ts",
     "./src/transport/otlp-path-alias.rest.ts",
     "./src/transport/traces.rest.ts",
-    "./src/transport/api-rest/trace-legacy.api.ts",
+    "./src/transport/trace-legacy.rest.ts",
     "./src/transport/collector.rest.ts",
     "src/repositories/clickhouse/__tests__/stored-span-row.test-fakes.ts"
   ],

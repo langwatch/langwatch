@@ -278,8 +278,8 @@ export class LangyAgentUnavailableError extends HandledError {
 // ── the key-authed public turn surface (`/api/langy`) ───────────────────── Transport
 // refusals, not domain rules: they say why a REQUEST could not be admitted, before any
 // conversation exists to have a rule about. They live here rather than in the route so the
-// route throws and never serialises —
-// `createServiceApp`'s canonical envelope owns the wire shape (ADR-045).
+// route throws and never serialises — the process's REST boundary owns the wire shape,
+// writing every handled refusal in the one canonical envelope (ADR-045).
 
 /** No credential presented at all. */
 export class LangyApiCredentialMissingError extends HandledError {

@@ -1,7 +1,12 @@
 /**
  * Where a validated collector body goes: the age cutoff, the span fan-out through the ingestion
  * pipeline, and the evaluation fan-out through the evaluation pipeline. Both report what they
- * rejected so the handler can answer with `partialSuccess`.
+ * rejected so the door can answer with `partialSuccess`.
+ *
+ * A service rather than a package of functions: it HOLDS the two pipelines and the evaluator-id
+ * rule the process composed, so a caller states them once at construction instead of threading
+ * them through every call. The evaluation pipeline is optional, and a deployment that composed
+ * none refuses evaluations by name rather than dropping them.
  */
 import crypto from "node:crypto";
 
@@ -17,10 +22,36 @@ import {
 
 import { TraceCollectorSpanService } from "#services/span/trace-collector-span.service";
 
-import type { CollectorEvaluationReport, CollectorSpanIngest } from "../collector.rest.ts";
-import type { CollectorMetadata } from "./collector-body.api.ts";
+import type { CollectorMetadata } from "#rules/trace-collector-body.rules";
 
 const logger = createLogger("langwatch.collector");
+
+/** One already-normalized span, handed to the ingestion pipeline. */
+export type CollectorSpanIngest = (input: {
+  tenantId: string;
+  span: ReturnType<typeof TraceCollectorSpanService.convertSpanToOtlp>;
+  resource: ReturnType<typeof TraceCollectorSpanService.buildResource>;
+  instrumentationScope: Readonly<{ name: string }>;
+  piiRedactionLevel: typeof DEFAULT_PII_REDACTION_LEVEL;
+}) => Promise<Readonly<{ status: string; error?: string | undefined }>>;
+
+/** One custom SDK evaluation, reported to the evaluation pipeline. */
+export type CollectorEvaluationReport = (input: {
+  tenantId: string;
+  evaluationId: string;
+  evaluatorId: string;
+  evaluatorType: string;
+  evaluatorName: string;
+  traceId: string;
+  isGuardrail?: boolean | undefined;
+  status: string;
+  score: number | null;
+  passed: boolean | null;
+  label: string | null;
+  details: string | null;
+  error: string | null;
+  occurredAt: number;
+}) => Promise<unknown>;
 
 /**
  * What `partialSuccess.errorMessage` says about a span or an evaluation the pipeline refused.
@@ -30,12 +61,8 @@ const logger = createLogger("langwatch.collector");
 export const SPAN_INGESTION_FAILED = "span ingestion failed, please retry";
 export const EVALUATION_INGESTION_FAILED = "evaluation ingestion failed, please retry";
 
-/**
- * OTLP parity: processSpan drops spans older than SPAN_MAX_PAST_MS before the dedup gate, so
- * apply the same age cutoff here — otherwise the REST path alone would write arbitrarily old
- * timestamps into cold ClickHouse partitions, undermining partition pruning.
- */
-export function partitionFreshSpans(
+/** The age cutoff itself; see the method of the same name for why it is applied. */
+function partitionFreshSpans(
   spans: Span[],
   input: Readonly<{ projectId: string; traceId: string }>,
 ): Readonly<{ freshSpans: Span[]; droppedOldSpans: number }> {
@@ -123,7 +150,7 @@ async function fanOutSpans(
   return ingestionFailureDetails(results);
 }
 
-export async function dispatchSpans(
+async function dispatchSpans(
   freshSpans: Span[],
   input: Readonly<{
     projectId: string;
@@ -178,7 +205,7 @@ export type EvaluationDispatchOutcome = Readonly<{
   evaluationErrors: string[];
 }>;
 
-type CollectorEvaluation = NonNullable<CollectorRESTParamsValidator["evaluations"]>[number];
+export type CollectorEvaluation = NonNullable<CollectorRESTParamsValidator["evaluations"]>[number];
 
 async function reportOneEvaluation(
   evaluation: CollectorEvaluation,
@@ -223,12 +250,8 @@ async function reportOneEvaluation(
   });
 }
 
-/**
- * Dispatches custom SDK evaluations to the event-sourcing evaluation pipeline. The REST
- * collector receives evaluations as a separate field (not as span events), so they are
- * dispatched independently from the spans.
- */
-export async function dispatchEvaluations(
+/** The evaluation fan-out itself; see the method of the same name. */
+async function dispatchEvaluations(
   evaluations: CollectorEvaluation[],
   input: Readonly<{
     projectId: string;
@@ -272,4 +295,76 @@ export async function dispatchEvaluations(
   }
 
   return { rejectedEvaluations, evaluationErrors };
+}
+
+/** What the collector door hands over once, so no call has to thread it through. */
+export interface TraceCollectorDispatchMembers {
+  /** Where a normalized span goes. Required: it is the whole of the span half. */
+  ingestSpan: CollectorSpanIngest;
+  /**
+   * Where a custom SDK evaluation goes, or none. None where the process registered no
+   * evaluation pipeline, and then evaluations are refused by name rather than dropped.
+   */
+  reportEvaluation?: CollectorEvaluationReport | undefined;
+  /**
+   * The evaluator-id slug rule, for an evaluation that names no evaluator. Supplied by the
+   * process because the rule is EVALUATION's - the same one its own `custom-evaluation-sync`
+   * subscriber applies - and one module's server package may not reach into another's.
+   */
+  deriveEvaluatorId: (name: string) => string;
+}
+
+/**
+ * The two fan-outs one validated collector body earns, over the pipelines this deployment
+ * composed. Constructed per request by the door, which already resolved the project the body
+ * is recorded against.
+ */
+export class TraceCollectorDispatchService {
+  static create(members: TraceCollectorDispatchMembers): TraceCollectorDispatchService {
+    return new TraceCollectorDispatchService(members);
+  }
+
+  private constructor(private readonly members: TraceCollectorDispatchMembers) {}
+
+  /**
+   * OTLP parity: processSpan drops spans older than SPAN_MAX_PAST_MS before the dedup gate, so
+   * the same age cutoff applies here - otherwise the REST path alone would write arbitrarily
+   * old timestamps into cold ClickHouse partitions, undermining partition pruning.
+   */
+  partitionFreshSpans(
+    spans: Span[],
+    input: Readonly<{ projectId: string; traceId: string }>,
+  ): Readonly<{ freshSpans: Span[]; droppedOldSpans: number }> {
+    return partitionFreshSpans(spans, input);
+  }
+
+  /** The span fan-out, and what it rejected. */
+  dispatchSpans(
+    freshSpans: Span[],
+    input: Readonly<{
+      projectId: string;
+      traceId: string;
+      droppedOldSpans: number;
+      metadata: CollectorMetadata;
+      expectedOutput: string | null | undefined;
+    }>,
+  ): Promise<SpanDispatchOutcome> {
+    return dispatchSpans(freshSpans, { ...input, ingestSpan: this.members.ingestSpan });
+  }
+
+  /**
+   * Dispatches custom SDK evaluations to the event-sourcing evaluation pipeline. The REST
+   * collector receives evaluations as a separate field (not as span events), so they are
+   * dispatched independently from the spans.
+   */
+  dispatchEvaluations(
+    evaluations: CollectorEvaluation[],
+    input: Readonly<{ projectId: string; traceId: string }>,
+  ): Promise<EvaluationDispatchOutcome> {
+    return dispatchEvaluations(evaluations, {
+      ...input,
+      deriveEvaluatorId: this.members.deriveEvaluatorId,
+      ...(this.members.reportEvaluation ? { reportEvaluation: this.members.reportEvaluation } : {}),
+    });
+  }
 }

@@ -115,14 +115,6 @@ export type {
 export { groupsRest, groupsRestEnterpriseGate } from "./transport/group.rest.ts";
 export { createTeamRest } from "./transport/team.rest.ts";
 export { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
-// See the NOTE above `createOrganizationRestApp`: the legacy provisioning
-// family stays exported for the same four out-of-path consumers.
-export {
-  createOrganizationsRestApp,
-  type OrganizationProvisioning,
-  type OrganizationProvisioningSummary,
-  verifyInstanceAdminKey,
-} from "./transport/api-rest/organization-provisioning.api.ts";
 export { ORGANIZATIONS_SPEC_OPTIONS } from "./rules/organization-provisioning-openapi.rules.ts";
 export { buildInviteAcceptUrl, buildMembersSettingsUrl } from "./rules/invite-link.rules.ts";
 export {

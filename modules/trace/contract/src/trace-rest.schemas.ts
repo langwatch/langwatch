@@ -1,5 +1,6 @@
 /**
- * Shapes for the v1 trace REST family (`/api/traces`): the search body's
+ * Shapes for the v1 trace REST family (`/api/traces`) and the deprecated
+ * `/api/trace` family beside it: the search body's
  * additive half, the path/query params the two `:traceId` reads share, and the
  * metadata PATCH body and answer. The deployment's own analytics filter
  * vocabulary is the other half of the search body and stays a process concern
@@ -53,6 +54,16 @@ export type TraceSearchBody = ProjectionRequest &
     llmMode?: boolean | undefined;
     dateField: TraceDateField;
   }>;
+
+/**
+ * The `:id` segment of the deprecated `/api/trace/:id` and `/api/thread/:id`
+ * reads. A separate schema from {@link traceIdParamsSchema} because the
+ * superseded family spells the parameter `id`, and a declaration's parameters
+ * must match the path it answers at exactly.
+ */
+export const traceLegacyIdParamsSchema = z.object({
+  id: z.string().min(1).describe("The trace ID, or the thread ID on the thread read."),
+});
 
 export const traceIdParamsSchema = z.object({
   traceId: z

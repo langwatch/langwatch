@@ -2,6 +2,7 @@ import { defineServerModule } from "@langwatch/runtime-composition";
 import { TraceApp } from "./app/trace.app.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import { spansTrpcTransport } from "./transport/spans.trpc.ts";
+import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
 import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
 
@@ -18,5 +19,10 @@ export type { TraceInfrastructure } from "./app/trace-composition.types.ts";
 export const traceServer = defineServerModule("trace")
   .withRepositories(traceRepositories)
   .withApp(TraceApp)
-  .withTransports(tracesTrpcTransport, spansTrpcTransport, traceEditOverlayTrpcTransport)
+  .withTransports(
+    tracesTrpcTransport,
+    spansTrpcTransport,
+    traceEditOverlayTrpcTransport,
+    traceLegacyRest,
+  )
   .build();

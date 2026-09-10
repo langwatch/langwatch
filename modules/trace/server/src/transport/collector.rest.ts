@@ -26,12 +26,9 @@ import { fromZodError } from "zod-validation-error";
 
 import {
   collectorRESTParamsValidatorSchema,
-  DEFAULT_PII_REDACTION_LEVEL,
   type CollectorRESTParamsValidator,
   type Span,
 } from "@langwatch/trace-contract";
-
-import type { TraceCollectorSpanService } from "#services/span/trace-collector-span.service";
 
 import {
   applyLegacyMetadataFields,
@@ -44,14 +41,15 @@ import {
   isCollectorRejection,
   parseCollectorMetadata,
   resolveTraceId,
+  type CollectorErrorReport,
   type CollectorMetadata,
   type CollectorRejection,
-} from "./api-rest/collector-body.api.ts";
+} from "#rules/trace-collector-body.rules";
 import {
-  dispatchEvaluations,
-  dispatchSpans,
-  partitionFreshSpans,
-} from "./api-rest/collector-dispatch.api.ts";
+  TraceCollectorDispatchService,
+  type CollectorEvaluationReport,
+  type CollectorSpanIngest,
+} from "#services/trace-collector-dispatch.service";
 
 const logger = createLogger("langwatch.collector");
 
@@ -82,39 +80,6 @@ export type CollectorCredentialResolver = (input: {
  * The plan allowance, enforced before the body is reshaped.
  */
 export type CollectorUsageLimit = (input: { project: CollectorProject }) => Promise<void>;
-
-/** One already-normalized span, handed to the ingestion pipeline. */
-export type CollectorSpanIngest = (input: {
-  tenantId: string;
-  span: ReturnType<typeof TraceCollectorSpanService.convertSpanToOtlp>;
-  resource: ReturnType<typeof TraceCollectorSpanService.buildResource>;
-  instrumentationScope: Readonly<{ name: string }>;
-  piiRedactionLevel: typeof DEFAULT_PII_REDACTION_LEVEL;
-}) => Promise<Readonly<{ status: string; error?: string | undefined }>>;
-
-/** One custom SDK evaluation, reported to the evaluation pipeline. */
-export type CollectorEvaluationReport = (input: {
-  tenantId: string;
-  evaluationId: string;
-  evaluatorId: string;
-  evaluatorType: string;
-  evaluatorName: string;
-  traceId: string;
-  isGuardrail?: boolean | undefined;
-  status: string;
-  score: number | null;
-  passed: boolean | null;
-  label: string | null;
-  details: string | null;
-  error: string | null;
-  occurredAt: number;
-}) => Promise<unknown>;
-
-/** Reports a failure the collector answered but did not raise. */
-export type CollectorErrorReport = (
-  error: Error,
-  context: Readonly<{ projectId: string; traceId?: string | undefined }>,
-) => void;
 
 /** The whole of what `POST /api/collector` asks the process for. */
 export type CollectorApp = Readonly<{
@@ -274,18 +239,23 @@ async function ingestCollectorBody(input: {
   const { project, app, params, prepared } = input;
   const { spans, traceId, metadata } = prepared;
 
-  const { freshSpans, droppedOldSpans } = partitionFreshSpans(spans, {
+  const dispatch = TraceCollectorDispatchService.create({
+    ingestSpan: app.ingestSpan,
+    deriveEvaluatorId: app.deriveEvaluatorId,
+    ...(app.reportEvaluation ? { reportEvaluation: app.reportEvaluation } : {}),
+  });
+
+  const { freshSpans, droppedOldSpans } = dispatch.partitionFreshSpans(spans, {
     projectId: project.id,
     traceId,
   });
 
-  const spanOutcome = await dispatchSpans(freshSpans, {
+  const spanOutcome = await dispatch.dispatchSpans(freshSpans, {
     projectId: project.id,
     traceId,
     droppedOldSpans,
     metadata,
     expectedOutput: params.expected_output,
-    ingestSpan: app.ingestSpan,
   });
 
   if (freshSpans.length > 0 && spanOutcome.dispatchFailures === freshSpans.length) {
@@ -304,12 +274,7 @@ async function ingestCollectorBody(input: {
   const evaluations = params.evaluations ?? [];
   const evaluationOutcome =
     evaluations.length > 0
-      ? await dispatchEvaluations(evaluations, {
-          projectId: project.id,
-          traceId,
-          deriveEvaluatorId: app.deriveEvaluatorId,
-          ...(app.reportEvaluation ? { reportEvaluation: app.reportEvaluation } : {}),
-        })
+      ? await dispatch.dispatchEvaluations(evaluations, { projectId: project.id, traceId })
       : { rejectedEvaluations: 0, evaluationErrors: [] };
 
   return answer(

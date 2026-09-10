@@ -245,9 +245,10 @@ export type {
 // --------------------------------------------------------------------------- The four public and
 // internal REST doors.
 export {
-  createLangyTurnsRestApp,
+  langyTurnsMembers,
+  langyTurnsRest,
   type LangyTurnsRestMembers,
-} from "./transport/api-rest/langy-turns.api.ts";
+} from "./transport/langy-turns.rest.ts";
 export {
   createLangyUiActionsRestApp,
   LangyUiActionRestCatalog,
@@ -283,6 +284,11 @@ export {
   type LangyIdentityToken,
   type LangyKeyIdentity,
 } from "./services/langy-key-identity.service.ts";
+export {
+  LangyRestCallerService,
+  type LangyRestCaller,
+  type LangyRestCallerMembers,
+} from "./services/langy-rest-caller.service.ts";
 
 // The per-user daily cap on pull requests Langy may open on someone's behalf.
 export {

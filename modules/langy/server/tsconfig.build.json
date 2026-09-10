@@ -13,16 +13,15 @@
   },
   "files": [
     "./src/index.ts",
-    "./src/ports/langy-frame-auth.port.ts",
     "./src/rules/langy-capability-progress.rules.ts",
     "./src/rules/langy-turn-settlement.rules.ts",
-    "./src/ports/langy-ids.port.ts",
     "./src/testing.ts",
     "./src/services/langy-cli-envelope.service.ts",
     "./src/services/langy-final-parts.service.ts",
     "./src/services/langy-message.service.ts",
+    "./src/services/langy-rest-caller.service.ts",
     "./src/services/langy-turn.service.ts",
-    "./src/ports/langy-turn-runtime.port.ts",
+    "./src/transport/langy-turns.rest.ts",
     "./src/subscribers/langy-conversation.subscriber.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

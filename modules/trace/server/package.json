@@ -60,10 +60,6 @@
       "types": "./dist/transport/traces.rest.d.ts",
       "default": "./src/transport/traces.rest.ts"
     },
-    "./api-rest/trace-legacy": {
-      "types": "./dist/transport/api-rest/trace-legacy.api.d.ts",
-      "default": "./src/transport/api-rest/trace-legacy.api.ts"
-    },
     "./api-rest/collector": {
       "types": "./dist/transport/collector.rest.d.ts",
       "default": "./src/transport/collector.rest.ts"

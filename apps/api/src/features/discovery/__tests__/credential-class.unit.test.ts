@@ -14,19 +14,21 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import type { HandlerCredential } from "@langwatch/api";
 import {
+  type HandlerCredential,
   anyAuthenticated,
   apiKeyPermission,
   credentialClassFor,
-  documentedPathOf,
   handlerManagedAuth,
   internalSecret,
-  isHttpMethod,
   publicEndpoint,
   requires,
+} from "@langwatch/api";
+import {
+  documentedPathOf,
+  isHttpMethod,
   securityForCredentialClass,
-} from "../../../app-rest/index.ts";
+} from "@langwatch/api/rest";
 
 const SPEC_PATH = join(dirname(fileURLToPath(import.meta.url)), "../openapi-document.json");
 

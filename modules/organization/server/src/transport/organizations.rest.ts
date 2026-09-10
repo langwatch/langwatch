@@ -25,7 +25,7 @@ export const organizationsProvisioningRest = defineRestRouter(OrganizationApi)
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("instance-admin")
 
-  .post("/", "createOrganization")
+  .post("/", "provisionOrganization")
   .withAccess({
     kind: "authenticated",
     reason: "Holding the instance administrator bearer key is the only authority this door checks; there is no tenant to ask a permission of.",
@@ -34,7 +34,7 @@ export const organizationsProvisioningRest = defineRestRouter(OrganizationApi)
   .withOutput(organizationsProvisioningRestCreatedSchema)
   .withStatus(201)
   .withDocs({
-    tags: ["Organizations"],
+    tags: ["Organizations (Self-Hosted)"],
     description:
       "Provision a new organization with its first team and a bootstrap admin service key, self-hosted instance administrators only.",
   })
@@ -55,7 +55,7 @@ export const organizationsProvisioningRest = defineRestRouter(OrganizationApi)
   })
   .withOutput(organizationsProvisioningRestListSchema)
   .withDocs({
-    tags: ["Organizations"],
+    tags: ["Organizations (Self-Hosted)"],
     description: "List every organization this instance hosts, self-hosted instance administrators only.",
   })
   .handle(async ({ app }) => ({
@@ -65,7 +65,7 @@ export const organizationsProvisioningRest = defineRestRouter(OrganizationApi)
     })),
   }))
 
-  .get("/:id", "getOrganization")
+  .get("/:id", "getOrganizationById")
   .withAccess({
     kind: "authenticated",
     reason: "Holding the instance administrator bearer key is the only authority this door checks; there is no tenant to ask a permission of.",
@@ -73,7 +73,7 @@ export const organizationsProvisioningRest = defineRestRouter(OrganizationApi)
   .withParams(organizationsProvisioningRestParamsSchema)
   .withOutput(organizationsProvisioningRestGotOneSchema)
   .withDocs({
-    tags: ["Organizations"],
+    tags: ["Organizations (Self-Hosted)"],
     description: "Read one organization's provisioning summary, self-hosted instance administrators only.",
   })
   .handle(async ({ app, input }) => {

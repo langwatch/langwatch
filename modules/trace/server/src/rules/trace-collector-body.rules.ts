@@ -2,6 +2,10 @@
  * The collector body's own stages: the retrocompatibility rewrites the door has always applied,
  * and the refusals it answers with a 4xx. Each stage keeps the log line and the body it had
  * inside the single handler this was split out of.
+ *
+ * Rules rather than transport: none of it reads a request, opens a connection or holds a
+ * collaborator - it is a package of functions over a body that has already been read, and
+ * `POST /api/collector` is only its first caller.
  */
 import { createLogger, validationMeta } from "@langwatch/observability";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -21,9 +25,16 @@ import {
   type Span,
 } from "@langwatch/trace-contract";
 
-import type { CollectorErrorReport } from "../collector.rest.ts";
-
 const logger = createLogger("langwatch.collector");
+
+/**
+ * Reports a failure the collector answered but did not raise. Declared beside the stages that
+ * call it, rather than on the door, so a stage never has to reach up into its own caller.
+ */
+export type CollectorErrorReport = (
+  error: Error,
+  context: Readonly<{ projectId: string; traceId?: string | undefined }>,
+) => void;
 
 /** One refused body: the JSON the sender receives, and the status it arrives with. */
 export type CollectorRejection = Readonly<{

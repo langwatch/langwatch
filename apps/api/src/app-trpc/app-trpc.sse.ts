@@ -4,8 +4,9 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { handlerManagedAuth } from "@langwatch/api";
-import type { AppRestSecurity, SecuredApp } from "@langwatch/api/rest";
+import { credentialClassFor, handlerManagedAuth } from "@langwatch/api";
+import { registerRoutePolicy } from "@langwatch/api/rest";
+import { Hono } from "hono";
 import { TRPCError } from "@trpc/server";
 import { isCrossSiteRequest } from "../api-rest.cross-site.ts";
 import {
@@ -115,178 +116,197 @@ function logStreamFailure(
 }
 
 /**
- * Mount the subscription lane on one process's REST security.
+ * What this lane answers behind. Handler-managed because the session is resolved
+ * by the process's own caller factory INSIDE the handler rather than by a door
+ * ahead of it: the lane has no scope of its own to resolve.
+ */
+const SSE_ACCESS = handlerManagedAuth({
+  reason: "user session validated in-handler by the process's caller factory",
+  // Stream fan-out; per-message authorization happens upstream.
+  permissions: [],
+  credential: "session",
+});
+
+/**
+ * The subscription lane as one app, for the process to mount at its own root.
+ *
+ * It is deliberately NOT a declared REST family: `defineRestRouter` names the
+ * one module whose App answers a family, and this lane answers for every module
+ * at once, out of the composed tRPC router rather than out of any single App.
+ * The address is written here in full for the same reason - there is no family
+ * namespace to derive it from.
  */
 export function createSseSubscriptionApp(options: {
-  security: AppRestSecurity;
-  ports: SseSubscriptionMembers;
+  members: SseSubscriptionMembers;
   logger?: Logged;
-}): SecuredApp<Record<never, never>> {
-  const { ports } = options;
+}): Hono {
+  const { members } = options;
   const logger = options.logger ?? createLogger("langwatch:api:sse");
-  const secured = options.security.createServiceApp({ basePath: "/api" });
+  const app = new Hono();
 
-  secured
-    .access(
-      handlerManagedAuth({
-        reason: "user session validated in-handler by the process's caller factory",
-        // Stream fan-out; per-message authorization happens upstream.
-        permissions: [],
-        credential: "session",
-      }),
-    )
-    .get("/sse/*", async (c) => {
-      const raw = c.req.raw;
-      const url = new URL(raw.url);
+  // The one statement of this lane's access, so the authorization audit and the
+  // document generator read the same policy a declared family would publish.
+  registerRoutePolicy({
+    method: "GET",
+    path: "/api/sse/*",
+    policy: SSE_ACCESS,
+    family: "sse",
+    credentialClass: credentialClassFor({ scope: "session", policy: SSE_ACCESS }),
+    credential: "browser",
+  });
 
-      // Before anything is parsed or resolved: the channel is opened by this
-      // application's own pages with a cookie the browser attaches to a
-      // cross-site top-level GET as well.
-      if (isCrossSiteRequest(c)) {
-        throw new LiveStreamCrossSiteBlockedError();
-      }
+  app.get("/api/sse/*", async (c) => {
+    const raw = c.req.raw;
+    const url = new URL(raw.url);
 
-      const path = subscriptionPathOf(url);
-      if (!path) {
-        return c.json({ message: "Missing trpc path" }, 400);
-      }
+    // Before anything is parsed or resolved: the channel is opened by this
+    // application's own pages with a cookie the browser attaches to a
+    // cross-site top-level GET as well.
+    if (isCrossSiteRequest(c)) {
+      throw new LiveStreamCrossSiteBlockedError();
+    }
 
-      // Both refusals come BEFORE the caller exists: building one resolves the
-      // request's session and context, and a path this lane will not serve
-      // should cost neither.
-      const procedureType = ports.procedureTypeAt(path);
-      if (!procedureType) {
-        throw new LiveStreamNotFoundError();
-      }
-      if (procedureType !== "subscription") {
-        throw new LiveStreamUnsupportedProcedureError();
-      }
+    const path = subscriptionPathOf(url);
+    if (!path) {
+      return c.json({ message: "Missing trpc path" }, 400);
+    }
 
-      const inputParam = url.searchParams.get("input") ?? undefined;
-      const input = inputParam ? (JSON.parse(inputParam) as unknown) : undefined;
+    // Both refusals come BEFORE the caller exists: building one resolves the
+    // request's session and context, and a path this lane will not serve
+    // should cost neither.
+    const procedureType = members.procedureTypeAt(path);
+    if (!procedureType) {
+      throw new LiveStreamNotFoundError();
+    }
+    if (procedureType !== "subscription") {
+      throw new LiveStreamUnsupportedProcedureError();
+    }
 
-      const caller = await ports.createCaller({ request: raw, signal: raw.signal });
-      const procedure = procedureAt(caller, path);
-      if (!procedure) {
-        throw new LiveStreamNotFoundError();
-      }
+    const inputParam = url.searchParams.get("input") ?? undefined;
+    const input = inputParam ? (JSON.parse(inputParam) as unknown) : undefined;
 
-      c.header("Content-Type", "text/event-stream; charset=utf-8");
-      c.header("Cache-Control", "no-cache, no-transform");
-      c.header("Connection", "keep-alive");
-      c.header("X-Accel-Buffering", "no");
+    const caller = await members.createCaller({ request: raw, signal: raw.signal });
+    const procedure = procedureAt(caller, path);
+    if (!procedure) {
+      throw new LiveStreamNotFoundError();
+    }
 
-      const body = new ReadableStream({
-        start(controller) {
-          const encoder = new TextEncoder();
-          let ended = false;
-          let unsubscribe: (() => void) | null = null;
+    c.header("Content-Type", "text/event-stream; charset=utf-8");
+    c.header("Cache-Control", "no-cache, no-transform");
+    c.header("Connection", "keep-alive");
+    c.header("X-Accel-Buffering", "no");
 
-          const write = (text: string) => {
-            if (ended) return;
-            try {
-              controller.enqueue(encoder.encode(text));
-            } catch {
-              // Stream already closed
-              end();
-            }
-          };
+    const body = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        let ended = false;
+        let unsubscribe: (() => void) | null = null;
 
-          const writeData = (value: unknown) => {
-            if (ended) return;
-            const payload = JSON.stringify(value);
-            for (const line of payload.split(/\r?\n/)) {
-              write(`data: ${line}\n`);
-            }
-            write("\n");
-          };
+        const write = (text: string) => {
+          if (ended) return;
+          try {
+            controller.enqueue(encoder.encode(text));
+          } catch {
+            // Stream already closed
+            end();
+          }
+        };
 
-          const end = () => {
-            if (ended) return;
-            ended = true;
-            clearInterval(ping);
-            try {
-              unsubscribe?.();
-            } catch {
-              // Ignore cleanup errors
-            }
-            unsubscribe = null;
-            try {
-              controller.close();
-            } catch {
-              // Stream already closed
-            }
-          };
+        const writeData = (value: unknown) => {
+          if (ended) return;
+          const payload = JSON.stringify(value);
+          for (const line of payload.split(/\r?\n/)) {
+            write(`data: ${line}\n`);
+          }
+          write("\n");
+        };
 
-          const ping = setInterval(() => {
-            if (ended) {
-              end();
-            } else {
-              write(": ping\n\n");
-            }
-          }, SSE_KEEPALIVE_INTERVAL_MS);
+        const end = () => {
+          if (ended) return;
+          ended = true;
+          clearInterval(ping);
+          try {
+            unsubscribe?.();
+          } catch {
+            // Ignore cleanup errors
+          }
+          unsubscribe = null;
+          try {
+            controller.close();
+          } catch {
+            // Stream already closed
+          }
+        };
 
-          writeData({ type: "connected" });
+        const ping = setInterval(() => {
+          if (ended) {
+            end();
+          } else {
+            write(": ping\n\n");
+          }
+        }, SSE_KEEPALIVE_INTERVAL_MS);
 
-          // Deliberately fire-and-forget: the stream stays open while this
-          // runs, and the catch below is the only place a rejection surfaces.
-          void (async () => {
-            try {
-              const result = await procedure(input);
+        writeData({ type: "connected" });
 
-              if (isAsyncIterable(result)) {
-                for await (const data of result) {
-                  if (ended) break;
-                  writeData(data);
-                }
-                writeData({ type: "complete" });
-                end();
-                return;
+        // Deliberately fire-and-forget: the stream stays open while this
+        // runs, and the catch below is the only place a rejection surfaces.
+        void (async () => {
+          try {
+            const result = await procedure(input);
+
+            if (isAsyncIterable(result)) {
+              for await (const data of result) {
+                if (ended) break;
+                writeData(data);
               }
-
-              if (isObservable(result)) {
-                const sub = result.subscribe({
-                  next: (data: unknown) => writeData(data),
-                  complete: () => {
-                    writeData({ type: "complete" });
-                    end();
-                  },
-                  error: (err: unknown) => {
-                    logStreamFailure(logger, err, { err, path }, "SSE observable error");
-                    writeData(sseErrorFrame(err));
-                    end();
-                  },
-                });
-
-                if (typeof sub === "function") unsubscribe = sub;
-                else if (sub && typeof sub.unsubscribe === "function")
-                  unsubscribe = () => sub.unsubscribe();
-
-                return; // Keep the connection open for an observable
-              }
-
-              writeData(result);
               writeData({ type: "complete" });
               end();
-            } catch (error) {
-              // No `input` here: it is the raw request payload, which may carry
-              // PII — same contract as the observable error path above.
-              logStreamFailure(logger, error, { error, path }, "SSE handler error");
-              writeData(sseErrorFrame(error));
-              end();
+              return;
             }
-          })();
 
-          raw.signal?.addEventListener("abort", () => {
+            if (isObservable(result)) {
+              const sub = result.subscribe({
+                next: (data: unknown) => writeData(data),
+                complete: () => {
+                  writeData({ type: "complete" });
+                  end();
+                },
+                error: (err: unknown) => {
+                  logStreamFailure(logger, err, { err, path }, "SSE observable error");
+                  writeData(sseErrorFrame(err));
+                  end();
+                },
+              });
+
+              if (typeof sub === "function") unsubscribe = sub;
+              else if (sub && typeof sub.unsubscribe === "function")
+                unsubscribe = () => sub.unsubscribe();
+
+              return; // Keep the connection open for an observable
+            }
+
+            writeData(result);
+            writeData({ type: "complete" });
             end();
-          });
-        },
-      });
+          } catch (error) {
+            // No `input` here: it is the raw request payload, which may carry
+            // PII — same contract as the observable error path above.
+            logStreamFailure(logger, error, { error, path }, "SSE handler error");
+            writeData(sseErrorFrame(error));
+            end();
+          }
+        })();
 
-      return new Response(body, { status: 200, headers: c.res.headers });
+        raw.signal?.addEventListener("abort", () => {
+          end();
+        });
+      },
     });
 
-  return secured;
+  return new Response(body, { status: 200, headers: c.res.headers });
+  });
+
+  return app;
 }
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
