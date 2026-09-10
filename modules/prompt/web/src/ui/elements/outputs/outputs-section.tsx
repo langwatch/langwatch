@@ -14,7 +14,7 @@ import {
   FieldTypeSelect,
   TYPE_LABELS,
   VariableTypeIcon,
-} from "../../../surfaces/variables/index.ts";
+} from "../../../variables.ts";
 import { outputsSchema } from "@langwatch/prompt-contract";
 import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
 

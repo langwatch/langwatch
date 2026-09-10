@@ -325,7 +325,7 @@
       "id": "prompt-studio",
       "root": "prompt",
       "uses": {
-        "screens": ["@langwatch/prompt-web/screens/prompt-studio"],
+        "screens": ["@langwatch/prompt-web/prompt-studio"],
         "surfaces": ["@langwatch/prompt-web/drawers"]
       }
     },

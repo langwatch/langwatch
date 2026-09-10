@@ -19,7 +19,7 @@ import {
   normalizeMaxTokens,
   ParameterRow,
   toFormKey,
-} from "../../../surfaces/llm-parameters/index.ts";
+} from "../../../llm-parameters.ts";
 import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";
 
 // Default output when structured outputs is disabled

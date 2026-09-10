@@ -1,6 +1,6 @@
 /** Prompts: Prompt Studio's tabbed browser, chat, sidebar and six dialogs, all in `@langwatch/prompt-web`. */
 
-import { promptApi } from "@langwatch/prompt-web/screens/prompt-studio";
+import { promptApi } from "@langwatch/prompt-web/prompt-studio";
 import { lazyDrawer } from "@langwatch/ui-drawer";
 import { uiFeature } from "../../behavior/ui-feature";
 import { promptPageLoaders } from "./ui/sections/prompt-routes";

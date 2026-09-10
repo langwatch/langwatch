@@ -8,7 +8,7 @@ import {
   promptApi,
   PromptHostProvider,
   type PromptHostPort,
-} from "@langwatch/prompt-web/screens/prompt-studio";
+} from "@langwatch/prompt-web/prompt-studio";
 import { useMemo, type ReactNode } from "react";
 import { browserUiLogger, browserUiStorage } from "../../../../behavior/ui-browser-storage";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

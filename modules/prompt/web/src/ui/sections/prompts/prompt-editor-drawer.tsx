@@ -12,7 +12,7 @@ import {
   type AvailableSource,
   type FieldMapping,
   FormVariablesSection,
-} from "../../../surfaces/variables/index.ts";
+} from "../../../variables.ts";
 import { useEvaluationMappings } from "@langwatch/experiment-web/surfaces/evaluation-mappings";
 import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
 import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/surfaces/mapping-validation";
@@ -28,7 +28,7 @@ import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-
 import { useRegisterDrawerFooter } from "@langwatch/workflow-web/surfaces/studio-drawer-footer";
 import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
 import { PromptEditorHeader } from "./prompt-editor-header.tsx";
-import { VersionBadge } from "../../../surfaces/prompt-version/index.ts";
+import { VersionBadge } from "../../../prompt-version.ts";
 import { ChangeHandleDialog } from "./forms/change-handle-dialog.tsx";
 import { PromptMessagesField } from "../../elements/prompts/forms/fields/message-history-fields/prompt-messages-field.tsx";
 import {
@@ -43,7 +43,7 @@ import {
   type ChangeHandleFormValues,
   getSaveBlockerMessage,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "../../../surfaces/prompt-form/index.ts";
+} from "../../../prompt-form.ts";
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import type { LlmConfigInputType } from "@langwatch/workflow-web/surfaces/component-types";

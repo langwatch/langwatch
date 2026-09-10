@@ -24,7 +24,7 @@ import { modelProviderIcons } from "@langwatch/model-provider-web/surfaces/provi
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 
 import { useAllPromptsForProject } from "../../behavior/use-all-prompts-for-project.ts";
-import { getDisplayHandle } from "../../surfaces/prompt-reference/index.ts";
+import { getDisplayHandle } from "../../prompt-reference.ts";
 
 export type PromptListDrawerProps = {
   open?: boolean;

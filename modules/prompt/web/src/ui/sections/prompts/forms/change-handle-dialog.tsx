@@ -10,7 +10,7 @@ import { usePromptHandleCheck } from "../../../../behavior/prompts/use-prompt-ha
 import {
   type ChangeHandleFormValues,
   createChangeHandleFormSchema,
-} from "../../../../surfaces/prompt-form/index.ts";
+} from "../../../../prompt-form.ts";
 
 export interface ChangeHandleDialogProps {
   currentHandle?: string | null;

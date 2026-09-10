@@ -6,7 +6,7 @@
  * Conversation tab posts to.
  */
 
-import type { PromptPlaygroundChatAvailability } from "@langwatch/prompt-web/screens/prompt-studio";
+import type { PromptPlaygroundChatAvailability } from "@langwatch/prompt-web/prompt-studio";
 
 /** What this application answers the Prompt package's playground-chat port with. */
 export function promptPlaygroundChatAvailability(): PromptPlaygroundChatAvailability {

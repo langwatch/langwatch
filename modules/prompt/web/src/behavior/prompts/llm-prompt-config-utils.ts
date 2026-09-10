@@ -11,7 +11,7 @@ import {
   PromptScope,
   type Signature,
 } from "@langwatch/workflow-contract";
-import { inputsAndOutputsToDemostrationColumns } from "../../surfaces/prompt-form/index.ts";
+import { inputsAndOutputsToDemostrationColumns } from "../../prompt-form.ts";
 import type { SaveVersionParams } from "../../model/prompts/providers/types.ts";
 import {
   type LlmConfigInputType,

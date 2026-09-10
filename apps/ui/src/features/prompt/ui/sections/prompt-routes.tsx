@@ -1,6 +1,6 @@
 /** Which page key the Prompt Studio address answers: `prompts:view`, unchanged from the platform page. */
 
-import { promptScreens } from "@langwatch/prompt-web/screens/prompt-studio";
+import { promptScreens } from "@langwatch/prompt-web/prompt-studio";
 import type { ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

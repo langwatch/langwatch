@@ -11,10 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
-vi.mock("@langwatch/prompt-web/screens/prompt-studio", async () => {
+vi.mock("@langwatch/prompt-web/prompt-studio", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/prompt-web/screens/prompt-studio")
-  >("@langwatch/prompt-web/screens/prompt-studio");
+    typeof import("@langwatch/prompt-web/prompt-studio")
+  >("@langwatch/prompt-web/prompt-studio");
   return {
     ...actual,
     promptApi: {

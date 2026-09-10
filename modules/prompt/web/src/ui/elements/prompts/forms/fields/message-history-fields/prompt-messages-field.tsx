@@ -17,7 +17,7 @@ import {
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
   type Variable,
-} from "../../../../../../surfaces/variables/index.ts";
+} from "../../../../../../variables.ts";
 import { useLayoutMode } from "../../../../../../model/layout-mode.ts";
 import {
   EditingModeTitle,

@@ -6,7 +6,7 @@ import { useModelLimits } from "@langwatch/model-provider-web/surfaces/model-lim
 import {
   buildDefaultFormValues,
   inputsAndOutputsToDemostrationColumns,
-} from "../../surfaces/prompt-form/index.ts";
+} from "../../prompt-form.ts";
 import { salvageValidData } from "@langwatch/design-system/zod-salvage";
 import {
   formSchema,
