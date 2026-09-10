@@ -20,8 +20,8 @@
  * does NOT go through them.
  */
 
-import { createLogger } from "@langwatch/observability";
 import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
 import type {
