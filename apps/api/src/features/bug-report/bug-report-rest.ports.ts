@@ -1,34 +1,12 @@
 /**
- * What the public report intake reaches on this process. The family's own
- * transport moved into the ops module's application, so the shape the
- * composition still fills is stated here, beside the process that fills it.
+ * What `/api/bug-reports` reaches on this process. The intake's own behaviour
+ * — the repository, the rate limiter, the notifier and the project lookup —
+ * moved into the ops module's application; this door composes nothing of its
+ * own any more.
  */
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type {
-  BugReportNotifier,
-  BugReportRateLimiter,
-  BugReportRepository,
-} from "@langwatch/ops-server";
+import type { OpsApi } from "@langwatch/ops-contract";
 
-/** Reads the optional project credential off a report request. */
-export type BugReportRestCredentialReader = (
-  request: Request,
-) => Readonly<{ token: string; projectId: string | null }> | null;
-
-/** Everything the intake reaches that the report itself does not own. */
+/** The operator application the intake answers from. */
 export type BugReportRestPorts = Readonly<{
-  /** Where a filed report is written. */
-  reports: () => BugReportRepository;
-  /** The deployment's fixed-window counter, keyed on the nearest-hop IP. */
-  rateLimiter: BugReportRateLimiter;
-  /** Where the team is alerted. Best-effort; intake already succeeded. */
-  notifier: BugReportNotifier;
-  /** Reads the optional project credential off the request. */
-  credentials: BugReportRestCredentialReader;
-  /**
-   * Resolves that credential to a project, where this process has a directory
-   * to resolve it through. Absent means every report files unlinked, which is
-   * the same degradation an invalid key already produces.
-   */
-  apiKeys?: (() => ApiKeyApi) | undefined;
+  ops: () => OpsApi;
 }>;

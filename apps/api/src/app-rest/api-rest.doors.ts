@@ -20,6 +20,10 @@ import { mountTriggersRest } from "../features/automation/triggers-rest.mount.ts
 import { mountUnsubscribeRest } from "../features/automation/unsubscribe-rest.mount.ts";
 import { mountWebhookRest } from "../features/webhook/webhook-rest.mount.ts";
 import { mountEvaluationsLegacyRest } from "../features/evaluation/evaluations-legacy-rest.mount.ts";
+import { mountAdminRest } from "../features/ops/admin-rest.mount.ts";
+import { mountBugReportRest } from "../features/bug-report/bug-report-rest.mount.ts";
+import { mountOpsClickHouseExplainRest } from "../features/ops/ops-clickhouse-explain-rest.mount.ts";
+import { mountPlaygroundRest } from "../features/model-provider/playground-rest.mount.ts";
 import {
   mountModelProviderRest,
   mountModelDefaultsRest,
@@ -245,7 +249,15 @@ export const API_REST_DOORS = [
       services.workflowStudio ? [mountWorkflowStudioRest(runtime, services.workflowStudio)] : null,
   },
   { family: "scenario-generate", owner: "process", paths: ["/api/scenario/generate"] },
-  { family: "playground", owner: "process", paths: ["/api/playground"] },
+  {
+    family: "playground",
+    owner: "process",
+    paths: ["/api/playground"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.authoring?.playground
+        ? [mountPlaygroundRest(runtime, services.authoring.playground)]
+        : null,
+  },
   {
     family: "experiment-workbench",
     owner: "module",
@@ -296,8 +308,20 @@ export const API_REST_DOORS = [
     mount: ({ runtime, services }: ApiRestDoorContext) =>
       services.storedObjects ? [mountStoredObjectRest(runtime, services.storedObjects)] : null,
   },
-  { family: "admin", owner: "process", paths: ["/api/admin", "/api/v1/admin"] },
-  { family: "bug-reports", owner: "process", paths: ["/api/bug-reports"] },
+  {
+    family: "admin",
+    owner: "process",
+    paths: ["/api/admin", "/api/v1/admin"],
+    mount: ({ runtime, ports }: ApiRestDoorContext) =>
+      ports.admin ? [mountAdminRest(runtime, ports.admin)] : null,
+  },
+  {
+    family: "bug-reports",
+    owner: "process",
+    paths: ["/api/bug-reports"],
+    mount: ({ runtime, ports }: ApiRestDoorContext) =>
+      ports.bugReports ? [mountBugReportRest(runtime, ports.bugReports)] : null,
+  },
   {
     family: "unsubscribe",
     owner: "process",
@@ -686,7 +710,15 @@ export const API_REST_DOORS = [
       services.webhooks ? [mountWebhookRest(runtime, { webhooks: services.webhooks })] : null,
   },
   { family: "workflows", owner: "module", paths: ["/api/workflows", "/api/v1/workflows"] },
-  { family: "ops-clickhouse-explain", owner: "process", paths: ["/api/ops/clickhouse/explain"] },
+  {
+    family: "ops-clickhouse-explain",
+    owner: "process",
+    paths: ["/api/ops/clickhouse/explain"],
+    mount: ({ runtime, ports }: ApiRestDoorContext) =>
+      ports.opsClickHouseExplain
+        ? [mountOpsClickHouseExplainRest(runtime, ports.opsClickHouseExplain)]
+        : null,
+  },
   {
     family: "dspy-steps",
     owner: "module",

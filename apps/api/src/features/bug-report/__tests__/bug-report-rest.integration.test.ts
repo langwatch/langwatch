@@ -1,15 +1,17 @@
 /**
- * Characterisation of `POST /api/bug-reports` through the real Hono app the API process
- * mounts, over fakes at every port.
+ * `POST /api/bug-reports` through the real Hono app the API process mounts —
+ * `runtime.mount` over the ops module's own application.
+ * @see specs/support/bug-reports.feature
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import {
-  createBugReportsRestApp,
-  SilentBugReportNotifier,
-  type BugReportRestPorts,
-} from "@langwatch/ops-server";
-import { Hono, type ErrorHandler } from "hono";
-import { describe, expect, it } from "vitest";
+// @vitest-environment node
+import { HandledError } from "@langwatch/handled-error";
+import type { OpsApi } from "@langwatch/ops-contract";
+import { Hono } from "hono";
+import { describe, expect, it, vi } from "vitest";
+
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import { createApiRestRuntime } from "../../../app-rest/api-rest.runtime.ts";
+import { mountBugReportRest } from "../bug-report-rest.mount.ts";
 
 const validReport = {
   source: "cli",
@@ -20,72 +22,71 @@ const validReport = {
 
 describe("given the public issue-report intake", () => {
   describe("when a coding agent files a well-formed report", () => {
-    it("answers 201 with the stored id and writes it unlinked without a credential", async () => {
-      const written: { linkedProjectId: string | null; title: string }[] = [];
-      const api = mount({ written });
+    it("answers 201 with the stored id, unlinked without a credential", async () => {
+      const submitBugReport = vi.fn(async () => ({ id: "bugreport_1" }));
+      const world = mount({ submitBugReport });
 
-      const response = await api.fetch("/api/bug-reports", {
+      const response = await world.send("/api/bug-reports", {
         method: "POST",
-        body: JSON.stringify(validReport),
+        body: validReport,
       });
 
       expect(response.status).toBe(201);
       await expect(response.json()).resolves.toEqual({ id: "bugreport_1" });
-      expect(written).toEqual([{ linkedProjectId: null, title: "the run stopped answering" }]);
+      expect(submitBugReport).toHaveBeenCalledWith(
+        expect.objectContaining({ apiToken: undefined, projectIdHint: null }),
+      );
     });
   });
 
   describe("when the report carries a project credential", () => {
-    it("links it to the project the credential resolves to", async () => {
-      const written: { linkedProjectId: string | null; title: string }[] = [];
-      const api = mount({
-        written,
-        credentials: () => ({ token: "lw_key", projectId: null }),
-      });
+    it("reads it as a bound fact and passes it through to the application", async () => {
+      const submitBugReport = vi.fn(async () => ({ id: "bugreport_2" }));
+      const world = mount({ submitBugReport });
 
-      const response = await api.fetch("/api/bug-reports", {
+      await world.send("/api/bug-reports", {
         method: "POST",
-        body: JSON.stringify(validReport),
+        headers: { authorization: "Bearer lw_key" },
+        body: validReport,
       });
 
-      expect(response.status).toBe(201);
-      expect(written[0]?.linkedProjectId).toBe("project_1");
+      expect(submitBugReport).toHaveBeenCalledWith(
+        expect.objectContaining({ apiToken: "lw_key", projectIdHint: null }),
+      );
     });
   });
 
   describe("when the body is neither JSON nor a report", () => {
-    it("answers 400 for each, without reaching the intake", async () => {
-      const written: { linkedProjectId: string | null; title: string }[] = [];
-      const api = mount({ written });
+    it("answers 400 for each, without reaching the application", async () => {
+      const submitBugReport = vi.fn(async () => ({ id: "unreached" }));
+      const world = mount({ submitBugReport });
 
-      const notJson = await api.fetch("/api/bug-reports", {
-        method: "POST",
-        body: "{",
-      });
+      const notJson = await world.send("/api/bug-reports", { method: "POST", raw: "{" });
       expect(notJson.status).toBe(400);
-      await expect(notJson.json()).resolves.toEqual({
-        error: "Invalid body, expecting JSON",
-      });
+      await expect(notJson.json()).resolves.toEqual({ error: "Invalid body, expecting JSON" });
 
-      const noProse = await api.fetch("/api/bug-reports", {
+      const noProse = await world.send("/api/bug-reports", {
         method: "POST",
-        body: JSON.stringify({ source: "cli", kind: "summary", title: "hello" }),
+        body: { source: "cli", kind: "summary", title: "hello" },
       });
       expect(noProse.status).toBe(400);
       await expect(noProse.json()).resolves.toMatchObject({ error: "Invalid report" });
 
-      expect(written).toEqual([]);
+      expect(submitBugReport).not.toHaveBeenCalled();
     });
   });
 
   describe("when the caller has already filled the window", () => {
-    it("answers the handled 429 as `{ error, code }` rather than a generic envelope", async () => {
-      const api = mount({ written: [], allowed: false });
-
-      const response = await api.fetch("/api/bug-reports", {
-        method: "POST",
-        body: JSON.stringify(validReport),
+    it("answers the handled refusal as `{ error, code }` rather than a generic envelope", async () => {
+      const submitBugReport = vi.fn(async () => {
+        throw new HandledError("agent_report_rate_limited", "Too many reports, try again later", {
+          httpStatus: 429,
+          fault: "customer",
+        });
       });
+      const world = mount({ submitBugReport });
+
+      const response = await world.send("/api/bug-reports", { method: "POST", body: validReport });
 
       expect(response.status).toBe(429);
       await expect(response.json()).resolves.toEqual({
@@ -94,90 +95,47 @@ describe("given the public issue-report intake", () => {
       });
     });
   });
-
-  describe("when the caller is behind a proxy chain", () => {
-    it("counts the hop NEAREST us, not the client-supplied first one", async () => {
-      const keys: string[] = [];
-      const api = mount({ written: [], keys });
-
-      await api.fetch("/api/bug-reports", {
-        method: "POST",
-        headers: { "x-forwarded-for": "1.2.3.4, 9.9.9.9, 10.0.0.1" },
-        body: JSON.stringify(validReport),
-      });
-
-      expect(keys).toEqual(["bug-report:ip:10.0.0.1"]);
-    });
-  });
 });
 
-function mount(options: {
-  written: { linkedProjectId: string | null; title: string }[];
-  allowed?: boolean;
-  keys?: string[];
-  credentials?: BugReportRestPorts["credentials"];
-}) {
-  let nextId = 0;
-  const ports: BugReportRestPorts = {
-    reports: () =>
-      ({
-        create: async ({ data }: { data: { title: string; linkedProjectId?: string | null } }) => {
-          nextId += 1;
-          options.written.push({
-            title: data.title,
-            linkedProjectId: data.linkedProjectId ?? null,
-          });
-          return { id: `bugreport_${nextId}`, ...data };
-        },
-      }) as never,
-    rateLimiter: {
-      consume: async ({ key }: { key: string }) => {
-        options.keys?.push(key);
-        return { allowed: options.allowed ?? true };
-      },
+// ---------------------------------------------------------------------------
+
+function mount(overrides: { submitBugReport: OpsApi["submitBugReport"] }) {
+  const errors = ApiRestObservabilityComposition.create().legacyErrorHandler;
+  const runtime = createApiRestRuntime({
+    projectCredential: () => {
+      throw new Error("This door resolves no project credential of its own.");
     },
-    notifier: new SilentBugReportNotifier(),
-    credentials: options.credentials ?? (() => null),
-    apiKeys: () =>
-      ({
-        findResolvedToken: async () => ({ project: { id: "project_1" } }),
-      }) as never,
-  };
+    organizationCredential: () => {
+      throw new Error("This door resolves no organization credential of its own.");
+    },
+    organizationIdentity: () => {
+      throw new Error("This door resolves no organization credential of its own.");
+    },
+    routeAuthorization: () => {
+      throw new Error("This suite authorizes no route-scoped permission.");
+    },
+    errors,
+  });
 
-  const hono = new Hono().route(
-    "/",
-    createBugReportsRestApp({ security: passThroughSecurity(), ports }),
-  );
+  const ops = { submitBugReport: overrides.submitBugReport } as OpsApi;
+  const mounted = mountBugReportRest(runtime, { ops: () => ops });
+  const hono = new Hono().route("/", mounted);
+
   return {
-    fetch: (path: string, init?: RequestInit) =>
-      hono.fetch(new Request(`http://api.test${path}`, init)),
+    send: (
+      path: string,
+      init: { method?: string; body?: unknown; raw?: string; headers?: Record<string, string> } = {},
+    ) =>
+      hono.fetch(
+        new Request(`http://api.test${path}`, {
+          method: init.method ?? "GET",
+          headers: { "Content-Type": "application/json", ...init.headers },
+          ...(init.raw !== undefined
+            ? { body: init.raw }
+            : init.body === undefined
+              ? {}
+              : { body: JSON.stringify(init.body) }),
+        }),
+      ),
   };
-}
-
-/** A failure here must be legible rather than swallowed into a generic 500. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A public endpoint must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
 }

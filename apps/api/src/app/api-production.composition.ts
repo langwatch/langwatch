@@ -64,7 +64,7 @@ import {
   ApiClickHouseInfrastructure,
 } from "../platform/infrastructure/api-clickhouse.infrastructure.ts";
 import { PostgresBillingAdapter } from "@langwatch/enterprise-billing-server";
-import { PostgresOrganizationLicenseAdapter } from "@langwatch/enterprise-licensing-server";
+import { PrismaOrganizationLicenseRepository } from "@langwatch/enterprise-licensing-server";
 import { installApiAgent, type ApiAgentComposition } from "./api-agents.composition.ts";
 import { ApiConnectedAgentsComposition } from "./api-connected-agents.composition.ts";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
@@ -327,8 +327,7 @@ import {
 } from "./api-trace-ingest.composition.ts";
 import { composeApiTraceSpool } from "./api-trace-spool.composition.ts";
 import { ApiTraceMediaStore } from "./api-packaged-rest.composition.ts";
-import { AdminAccessService, PrismaBugReportRepository } from "@langwatch/ops-server";
-import type { BugReportRestPorts } from "../features/bug-report/bug-report-rest.ports.ts";
+import { AdminAccessService } from "@langwatch/ops-server";
 import { HandledError } from "@langwatch/handled-error";
 import {
   SkipPermissionsService,
@@ -368,10 +367,8 @@ import { composeApiGovernanceIngestRest } from "../features/enterprise/governanc
 import { installApiScim, LoggedApiScimAbsence } from "./api-scim.composition.ts";
 import { composeApiAudit, LoggedApiAuditAbsence } from "./api-audit.composition.ts";
 import type { PlatformOperatorPort } from "@langwatch/identity-server";
-import {
-  HttpWorkflowNlpRuntimeAdapter,
-  RedisNlpLambdaArnCacheAdapter,
-} from "@langwatch/workflow-server";
+import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
+import { RedisNlpLambdaArnCache } from "./nlp-lambda-arn-cache.ts";
 import {
   composeApiEnterpriseApplication,
   LoggedApiEnterpriseApplicationAbsence,
@@ -1910,7 +1907,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ...(payloads ? { payloads } : {}),
       report: LoggedApiTraceIngestAbsence.create(createLogger(serviceName)),
     });
-    const bugReports = this.composeBugReports(tenancy);
     const webhookDoorApp = this.composedWebhook?.app;
     const cron = this.composeCron();
     const langyRest = this.composeLangyRest(publicBaseUrl);
@@ -2413,7 +2409,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           platformUrl: createPlatformUrlBuilder(publicBaseUrl),
           ...(otlpIngest ? { otlpIngest: otlpIngest.otlp } : {}),
           ...(collector ? { collector } : {}),
-          ...(bugReports ? { bugReports } : {}),
+          bugReports: { ops: () => this.composedOps.app },
           ...(cron ? { cron } : {}),
           ...(langyRest ? { langy: langyRest } : {}),
           ...(githubRest ? { github: githubRest } : {}),
@@ -2425,7 +2421,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           ...(publicBaseUrl ? { publicBaseUrl } : {}),
           ...(healthProbes ? { healthProbes } : {}),
           ...(this.composedOpsExplain
-            ? { opsClickHouseExplain: this.composedOpsExplain.ports }
+            ? { opsClickHouseExplain: { ops: () => this.composedOps.app } }
             : {}),
           ...(dspySteps ? { dspySteps } : {}),
           ...(mcpAuthorize ? { mcpAuthorize } : {}),
@@ -2660,23 +2656,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       killSwitch: EventingKillSwitchAdapter.create(this.composedFeatureFlagApi),
       report: LoggedApiEventingAbsence.create(logger),
     });
-  }
-
-  private composeBugReports(tenancy: ApiResolvedTenancy): BugReportRestPorts | undefined {
-    const database = this.composedDatabase?.connection;
-    if (!database) return undefined;
-    const reports = PrismaBugReportRepository.create({ prisma: database.client });
-    return {
-      reports: () => reports,
-      // The process's ONE counter, the same one every other public rule meters
-      // through: two limiters would give one address two flood budgets.
-      rateLimiter: { consume: (input) => this.rateLimiter.consume(input) },
-      // This deployment alerts nowhere: intake already succeeded, and a
-      // notifier that threw would fail a report that was written.
-      notifier: { notify: () => Promise.resolve() },
-      credentials: (request) => extractApiKeyRequestCredentials(request),
-      apiKeys: () => tenancy.apiKeys,
-    };
   }
 
   /**
@@ -3779,7 +3758,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // membership counts the organization half spends a seat against: a member refused there
       // and a member counted here cannot be told two different numbers.
       seats: this.composedSeatAllowances,
-      licensingStore: PostgresOrganizationLicenseAdapter.create(database.client).build(),
+      licensingStore: PrismaOrganizationLicenseRepository.create(database.client),
       licensePublicKey: options.config.infrastructure.licensing.publicKey,
     });
   }
@@ -3994,8 +3973,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ? {
             explain: {
               clients: this.composedOpsExplain.clients,
-              findApiKey: () => this.composedOpsExplain?.ports.opsApiKey() ?? null,
-              isProduction: this.composedOpsExplain.ports.isProduction,
+              findApiKey: () => this.composedOpsExplain?.opsApiKey ?? null,
+              isProduction: this.composedOpsExplain.isProduction,
             },
           }
         : {}),
@@ -4220,7 +4199,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ...(database
         ? {
             subscriptions: PostgresBillingAdapter.create(database.client).build().subscriptions,
-            licenses: PostgresOrganizationLicenseAdapter.create(database.client).build(),
+            licenses: PrismaOrganizationLicenseRepository.create(database.client),
           }
         : {}),
       // The rotated verification key, where the operator named one. The
@@ -4399,7 +4378,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         nlpLambdaFleet: options.config.nlpLambdaFleet,
         nlpLambdaFleetNamed: options.config.nlpLambdaFleetNamed,
         arnCache: this.composedQueueRedis
-          ? RedisNlpLambdaArnCacheAdapter.create(this.composedQueueRedis)
+          ? RedisNlpLambdaArnCache.create(this.composedQueueRedis)
           : void 0,
       });
 
