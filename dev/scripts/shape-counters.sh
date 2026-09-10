@@ -5,7 +5,11 @@ L='createTrpcService|createTrpcApiService|createServiceApp|createProjectVersione
 legacy=$(git grep -lE "$L" HEAD -- 'apps/api/src/*.ts' 'modules/*.ts' 'enterprise/*.ts' | grep -v __tests__ | wc -l | tr -d ' ')
 mods=$(node -e 'const b=require("./packages/architecture-lint/src/feature-shape-baseline.json");console.log(String(b.entries.filter(e=>e.key.includes("legacy-transport")).length))')
 rows=$(node -e 'console.log(String(require("./packages/architecture-lint/src/feature-shape-baseline.json").entries.length))')
-absent=$(( $(git show HEAD:apps/api/src/app-rest/api-rest.doors.ts | grep -c 'family: "') - $(git show HEAD:apps/api/src/app-rest/api-rest.doors.ts | grep -c 'mount:') ))
+# The doors table is deleted. A family is now a module's own REST declaration,
+# and it is absent until a process mounts it.
+declared=$(git ls-tree -r --name-only HEAD modules enterprise/modules | grep -cE "/transport/[^/]+\.rest\.ts$")
+mounted=$(git grep -l "withTransports" HEAD -- 'apps/*.ts' 'enterprise/packages/*.ts' | wc -l | tr -d " ")
+absent=$([ "$mounted" -gt 0 ] && echo 0 || echo "$declared")
 apiside=$(git ls-tree -r --name-only HEAD apps/api/src/features | grep -cE '\.(composition|composition\.types|mount)\.ts$')
 portsfiles=$(git ls-tree -r --name-only HEAD modules enterprise/modules | grep -E "/(ports|adapters)/[^/]+\.ts$" | grep -v __tests__ | wc -l | tr -d " ")
 portnames=$(LC_ALL=C git grep -hoP '\b[A-Z][A-Za-z0-9]*Ports?\b' HEAD -- 'modules/*.ts' 'enterprise/*.ts' 'packages/*.ts' 'apps/*.ts' | sort -u | wc -l | tr -d " ")
