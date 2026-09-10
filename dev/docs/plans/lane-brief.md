@@ -39,6 +39,17 @@ while working, the package suite once at the end, never backgrounded, and
 `env -u CI pnpm install --filter "<package>..."`. Never read `.env*`. No
 subagents, no forks.
 
+The developer's stack runs from this tree while a lane works, so every step
+keeps it bootable. A new dependency is declared in `package.json` and linked
+with `env -u CI pnpm install --filter "<package>..."` before the first import
+of it is written. An export a process still imports is deleted only in the
+same step that repoints or removes the importer (`git grep -n "<name>" --
+apps enterprise modules packages` before deleting). A constructor's shape
+changes only with every caller in the same step. After each landed step the
+lane reads `haven logs backend --since 2m --agent` and treats a `SyntaxError`,
+an `ERR_MODULE_NOT_FOUND` or a `fatal boot failure` naming its files as its
+own defect to fix before continuing.
+
 Shared files are the coordinator's; hand over exact lines instead:
 `apps/api/src/app/api-production.composition.ts`,
 `apps/api/src/app-trpc/app-trpc.features.ts`, `app-trpc.namespaces.ts`,
