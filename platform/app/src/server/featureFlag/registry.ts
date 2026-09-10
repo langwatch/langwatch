@@ -192,6 +192,13 @@ export const FEATURE_FLAGS = [
     description:
       "Voice agents: register an ElevenLabs agent, talk to it, call it from a run, and run scenarios with a simulated caller. Off by default; enable per project or organization via the operator store.",
   },
+  {
+    key: "release_voice_phone_targets_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Reveals the Phone number transport option in the voice agent drawer. Off by default until the voice worker that dials phone targets ships (langwatch/langwatch#8014); an existing phone target still renders its fields regardless. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_voice_phone_targets_enabled.",
+  },
   // Per-project gate for the transient S3 spool at the ingestion edge
   // (#4215 / ADR-022). ON by default, so a deployment with object storage
   // configured keeps oversized span content intact with no flag setup: a span

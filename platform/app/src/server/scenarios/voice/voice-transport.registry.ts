@@ -9,6 +9,7 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
 import type { CallRecord } from "./call-record";
 import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport";
+import { phoneTransport } from "./transports/phone.transport";
 
 /** The provider key and host a runner reads a conversation back with. Never
  *  reaches the browser — a runner keeps it and returns only the signed URL. */
@@ -68,4 +69,5 @@ export const voiceTransportRegistry: Record<
   VoiceTransportRunner
 > = {
   elevenlabs_convai: elevenLabsConvaiTransport,
+  phone: phoneTransport,
 };

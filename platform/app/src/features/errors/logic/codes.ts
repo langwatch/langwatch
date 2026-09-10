@@ -441,6 +441,7 @@ export const APP_ERROR_CODES = [
   "voice_key_missing",
   "voice_mint_failed",
   "voice_name_required",
+  "voice_phone_transport_unavailable",
   "voice_recording_key_missing",
   "voice_recording_unavailable",
   "voice_session_invalid",
