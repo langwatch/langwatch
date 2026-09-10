@@ -88,11 +88,20 @@ export interface AgentInstanceRecorder {
   }): Promise<void>;
 }
 
+/** Marks a run as ended at the maximum call duration on the run's record. */
+export interface CutAtLimitRecorder {
+  recordCutAtLimit(params: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<void>;
+}
+
 /** Dependencies for the scenario processor's job outcome handling */
 export interface ProcessorDependencies {
   scenarioLookup: ScenarioLookup;
   failureEmitter: FailureEmitter;
   agentInstanceRecorder: AgentInstanceRecorder;
+  cutAtLimitRecorder: CutAtLimitRecorder;
 }
 
 // ============================================================================
@@ -123,17 +132,27 @@ export function createProcessorDependencies(): ProcessorDependencies {
           occurredAt: Date.now(),
         }),
     },
+    cutAtLimitRecorder: {
+      recordCutAtLimit: ({ projectId, scenarioRunId }) =>
+        getApp().simulations.recordCutAtLimit({
+          tenantId: projectId,
+          scenarioRunId,
+          occurredAt: Date.now(),
+        }),
+    },
   };
 }
 
 /**
- * Handle a job that ran to the end: record which connected agent instance
- * answered it, when one did.
+ * Handle a job that ran to the end: record the post-exit facts the child
+ * learned during the run — which connected agent instance answered it, and
+ * whether the call was cut at the maximum duration.
  *
- * The run's own finished event comes from the child through the SDK; the
- * instance is what the parent learns from the child's result line, so it is
- * recorded here, after the child exits. A failure to record it is logged and
- * not raised: the run is complete, and the instance is a detail of it.
+ * The run's own finished event comes from the child through the SDK; these
+ * facts are what the parent learns from the child's result line, so they are
+ * recorded here, after the child exits. Each is independent: a run can carry
+ * either, both, or neither. A failure to record one is logged and not raised —
+ * the run is complete, and each is a detail of it.
  */
 export async function handleSucceededJobResult({
   jobData,
@@ -144,18 +163,33 @@ export async function handleSucceededJobResult({
   result: ScenarioExecutionResult;
   deps: ProcessorDependencies;
 }): Promise<void> {
-  if (!result.agentInstance) return;
-  try {
-    await deps.agentInstanceRecorder.recordAgentInstance({
-      projectId: jobData.projectId,
-      scenarioRunId: jobData.scenarioRunId,
-      agentInstance: result.agentInstance,
-    });
-  } catch (err) {
-    logger.warn(
-      { err, scenarioRunId: jobData.scenarioRunId },
-      "Could not record the agent instance that served the run",
-    );
+  if (result.agentInstance) {
+    try {
+      await deps.agentInstanceRecorder.recordAgentInstance({
+        projectId: jobData.projectId,
+        scenarioRunId: jobData.scenarioRunId,
+        agentInstance: result.agentInstance,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, scenarioRunId: jobData.scenarioRunId },
+        "Could not record the agent instance that served the run",
+      );
+    }
+  }
+
+  if (result.isCutAtLimit) {
+    try {
+      await deps.cutAtLimitRecorder.recordCutAtLimit({
+        projectId: jobData.projectId,
+        scenarioRunId: jobData.scenarioRunId,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, scenarioRunId: jobData.scenarioRunId },
+        "Could not record that the run was cut at the call limit",
+      );
+    }
   }
 }
 

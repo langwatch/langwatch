@@ -51,6 +51,11 @@ const getScenarioRunData = vi.fn();
 const appStub = {
   simulations: {
     runs: { getScenarioRunData: (...a: unknown[]) => getScenarioRunData(...a) },
+    // No-op run writes so a saved-agent finish can complete without a real
+    // event-sourcing pipeline (the authz tests only care about who is let in).
+    startRun: vi.fn(async () => {}),
+    messageSnapshot: vi.fn(async () => {}),
+    finishRun: vi.fn(async () => {}),
   },
 };
 vi.mock("~/server/app-layer/app", () => ({
@@ -133,6 +138,24 @@ describe("Feature: Voice session HTTP door", () => {
         const res = await post("/api/voice/session", MINT_BODY);
         expect(res.status).toBe(401);
         expect(mintSession).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a finish request carries a garbage token", () => {
+      // Auth runs before token verification, so a logged-out caller is refused
+      // 401 and cannot probe token validity (which would answer 400) through
+      // the finish route.
+      it("refuses as unauthenticated, not as an invalid token", async () => {
+        getServerAuthSession.mockResolvedValue(null);
+        const res = await post("/api/voice/session/conv_1/finish", {
+          projectId: PROJECT_ID,
+          sessionToken: "not.a.valid.token",
+          transcript: [],
+          startedAt: 1,
+          endedAt: 2,
+        });
+        expect(res.status).toBe(401);
+        expect(fetchCallRecord).not.toHaveBeenCalled();
       });
     });
   });
@@ -253,6 +276,134 @@ describe("Feature: Voice session HTTP door", () => {
         ) as { agentExternalId: string; agentId: string | null };
         expect(claims.agentExternalId).toBe("agent_from_body");
         expect(claims.agentId).toBeNull();
+      });
+    });
+  });
+
+  describe("given a member with scenarios:create but not evaluations:manage", () => {
+    // Any create-an-agent path (mint with no row, finish with no agent id)
+    // needs evaluations:manage; the scenarios:create-only member is denied it.
+    beforeEach(() => {
+      probeProjectPermission.mockImplementation(
+        (_witness: unknown, _projectId: string, permission: string) =>
+          Promise.resolve(permission !== "evaluations:manage"),
+      );
+    });
+
+    describe("when they mint without a saved agent row", () => {
+      /** @scenario "Talk to it without agent-management rights and no saved row is refused" */
+      it("refuses with project_permission_denied for evaluations:manage and mints nothing", async () => {
+        const res = await post("/api/voice/session", {
+          projectId: PROJECT_ID,
+          transport: "elevenlabs_convai",
+          agentId: "agent_from_body",
+        });
+
+        expect(res.status).toBe(403);
+        // The error handler spreads a HandledError's meta bag flat into the
+        // body, so the field is `permission`, not `meta.permission`.
+        const body = (await res.json()) as {
+          error: string;
+          permission?: string;
+        };
+        expect(body.error).toBe("project_permission_denied");
+        expect(body.permission).toBe("evaluations:manage");
+        expect(mintSession).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when they finish a session that carries no saved agent id", () => {
+      /** @scenario "Finishing an unsaved session without agent-management rights is refused" */
+      it("refuses with a 403 and never creates an agent", async () => {
+        const token = signVoiceSessionToken({
+          payload: {
+            sessionId: "sess_1",
+            projectId: PROJECT_ID,
+            agentId: null,
+            agentExternalId: "el_agent_mine",
+            transport: "elevenlabs_convai",
+            exp: Date.now() + 60_000,
+          },
+        });
+
+        const res = await post("/api/voice/session/conv_1/finish", {
+          projectId: PROJECT_ID,
+          sessionToken: token,
+          name: "New agent",
+          conversationId: "conv_1",
+          transcript: [],
+          startedAt: 1,
+          endedAt: 2,
+        });
+
+        expect(res.status).toBe(403);
+        expect((await res.json()).error).toBe("project_permission_denied");
+        expect(fetchCallRecord).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when they mint against a saved agent row", () => {
+      /** @scenario "Talk to it against a saved agent needs only scenario rights" */
+      it("mints, because the saved-row path creates no agent", async () => {
+        mintSession.mockResolvedValue({
+          signedUrl: "wss://signed.example/abc",
+        });
+
+        const res = await post("/api/voice/session", MINT_BODY);
+
+        expect(res.status).toBe(200);
+        expect(mintSession).toHaveBeenCalled();
+      });
+    });
+
+    describe("when they finish a session that carries a saved agent id", () => {
+      /** @scenario "Talk to it against a saved agent needs only scenario rights" */
+      it("is not refused for permission, because no agent is created", async () => {
+        const token = signVoiceSessionToken({
+          payload: {
+            sessionId: "sess_1",
+            projectId: PROJECT_ID,
+            agentId: "agent_row",
+            agentExternalId: "el_agent_mine",
+            transport: "elevenlabs_convai",
+            exp: Date.now() + 60_000,
+          },
+        });
+        // Provider not ready: the finish writes the (empty) browser transcript
+        // and succeeds without creating an agent.
+        fetchCallRecord.mockResolvedValue(null);
+
+        const res = await post("/api/voice/session/conv_1/finish", {
+          projectId: PROJECT_ID,
+          sessionToken: token,
+          conversationId: "conv_1",
+          transcript: [],
+          startedAt: 1,
+          endedAt: 2,
+        });
+
+        expect(res.status).toBe(200);
+      });
+    });
+  });
+
+  describe("given a member with both scenarios:create and evaluations:manage", () => {
+    describe("when they mint without a saved agent row", () => {
+      /** @scenario "Talk to it with agent-management rights mints an unsaved session" */
+      it("mints the session that will create the agent on finish", async () => {
+        probeProjectPermission.mockResolvedValue(true);
+        mintSession.mockResolvedValue({
+          signedUrl: "wss://signed.example/abc",
+        });
+
+        const res = await post("/api/voice/session", {
+          projectId: PROJECT_ID,
+          transport: "elevenlabs_convai",
+          agentId: "agent_from_body",
+        });
+
+        expect(res.status).toBe(200);
+        expect(mintSession).toHaveBeenCalled();
       });
     });
   });

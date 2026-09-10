@@ -51,6 +51,27 @@ export interface VoiceSessionServices {
   };
 }
 
+/** The terminal-retry fields a finished run persisted, narrowed from the loose
+ *  run metadata to the shapes {@link VoiceSessionPorts.findExistingRun}
+ *  promises. The persisted audioUrl is already the same-origin proxy url the
+ *  transport wrote (fetchCallRecord sets it from audioProxyUrl), so it is kept
+ *  as-is. */
+function narrowPersistedRunFields(rawMetadata: unknown): {
+  agentId: string | null;
+  source: "provider" | "browser" | null;
+  audioUrl: string | null;
+} {
+  const metadata = rawMetadata as
+    | { agentId?: unknown; source?: unknown; audioUrl?: unknown }
+    | undefined;
+  const { agentId, source, audioUrl } = metadata ?? {};
+  return {
+    agentId: typeof agentId === "string" ? agentId : null,
+    source: source === "provider" || source === "browser" ? source : null,
+    audioUrl: typeof audioUrl === "string" ? audioUrl : null,
+  };
+}
+
 /**
  * Compose the ports from already-built services. Split out from
  * {@link createVoiceSessionPorts} so a unit test can pass in-memory fakes for
@@ -91,9 +112,19 @@ export function createVoiceSessionPortsFromServices({
         scenarioRunId,
       });
       if (!run) return null;
-      const agentId = (run.metadata as { agentId?: unknown } | undefined)
-        ?.agentId;
-      return { agentId: typeof agentId === "string" ? agentId : null };
+      // The status decides whether a retried finish short-circuits (written)
+      // or re-drives a half-written run (#7973). The persisted source,
+      // recording and set let a terminal retry report the original run's
+      // transcript origin, Play control and deep link (AC14).
+      return {
+        ...narrowPersistedRunFields(run.metadata),
+        status: run.status,
+        // The scenario and set the run landed under, reused on a re-drive so a
+        // scenario archived between attempts cannot break the retry (#7973 AC1).
+        scenarioId: typeof run.scenarioId === "string" ? run.scenarioId : null,
+        scenarioSetId:
+          typeof run.scenarioSetId === "string" ? run.scenarioSetId : null,
+      };
     },
 
     async createVoiceAgent({ projectId, name, transport, agentId }) {

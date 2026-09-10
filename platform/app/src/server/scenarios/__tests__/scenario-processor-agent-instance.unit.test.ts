@@ -22,9 +22,11 @@ const JOB: ExecutionJobData = {
 describe("handleSucceededJobResult", () => {
   let deps: ProcessorDependencies;
   let recordAgentInstance: ReturnType<typeof vi.fn>;
+  let recordCutAtLimit: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     recordAgentInstance = vi.fn().mockResolvedValue(undefined);
+    recordCutAtLimit = vi.fn().mockResolvedValue(undefined);
     deps = {
       scenarioLookup: { getById: vi.fn().mockResolvedValue(null) },
       failureEmitter: {
@@ -33,6 +35,10 @@ describe("handleSucceededJobResult", () => {
       agentInstanceRecorder: {
         recordAgentInstance:
           recordAgentInstance as ProcessorDependencies["agentInstanceRecorder"]["recordAgentInstance"],
+      },
+      cutAtLimitRecorder: {
+        recordCutAtLimit:
+          recordCutAtLimit as ProcessorDependencies["cutAtLimitRecorder"]["recordCutAtLimit"],
       },
     };
   });
@@ -82,6 +88,47 @@ describe("handleSucceededJobResult", () => {
       });
 
       expect(recordAgentInstance).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the child cut the call at the limit", () => {
+    /** @scenario "A simulated voice run cut at the call limit records the cutoff marker" */
+    it("records the cutoff marker on the run", async () => {
+      await handleSucceededJobResult({
+        jobData: JOB,
+        result: { success: true, isCutAtLimit: true },
+        deps,
+      });
+
+      expect(recordCutAtLimit).toHaveBeenCalledWith({
+        projectId: "proj_123",
+        scenarioRunId: "scenariorun_test123",
+      });
+    });
+
+    it("does not fail the job when the marker cannot be written", async () => {
+      recordCutAtLimit.mockRejectedValue(new Error("event log down"));
+
+      await expect(
+        handleSucceededJobResult({
+          jobData: JOB,
+          result: { success: true, isCutAtLimit: true },
+          deps,
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when the child did not cut the call at the limit", () => {
+    /** @scenario "A simulated voice run that finished normally records no cutoff marker" */
+    it("records no cutoff marker", async () => {
+      await handleSucceededJobResult({
+        jobData: JOB,
+        result: { success: true },
+        deps,
+      });
+
+      expect(recordCutAtLimit).not.toHaveBeenCalled();
     });
   });
 });

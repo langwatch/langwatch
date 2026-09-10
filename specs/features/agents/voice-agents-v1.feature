@@ -543,3 +543,173 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Given a suite run whose target is a voice agent and the project's flag is off
     When the run is prepared
     Then it is refused before anything is resolved or queued
+
+  # ---------------------------------------------------------------------------
+  # Empty transcript and Call it myself scenario scoping (#8019)
+  # ---------------------------------------------------------------------------
+
+  # #8019 AC1
+  @unit @regression
+  Scenario: An unfinished provider record keeps the live transcript
+    Given ElevenLabs answers the conversation read with status "processing" right after hang-up
+    And the browser captured at least one turn during the call
+    When the call is finished
+    Then the run holds the turns the browser captured
+    And the run source is "browser"
+
+  # #8019 AC2
+  @unit @regression
+  Scenario: A finished provider record with turns is written as the provider transcript
+    Given ElevenLabs answers the conversation read with status "done" and a non-empty transcript
+    When the call is finished
+    Then the run holds the provider turns
+    And the run source is "provider"
+
+  # #8019 AC3
+  @unit @regression
+  Scenario: A finished provider record with no turns keeps the live transcript
+    Given ElevenLabs answers the conversation read with status "done" but no turns
+    And the browser captured at least one turn during the call
+    When the call is finished
+    Then the run holds the turns the browser captured
+    And the run source is "browser"
+
+  # #8019 AC4
+  @unit @regression
+  Scenario: A failed provider record keeps the live transcript without a fetch-failed notice
+    Given ElevenLabs answers the conversation read with status "failed"
+    And the browser captured at least one turn during the call
+    When the call is finished
+    Then the run holds the turns the browser captured
+    And the run source is "browser"
+    And the finish does not report the fetch as failed
+
+  # #8019 AC5
+  @unit @regression
+  Scenario: The provider record is read only once the status is done
+    Given ElevenLabs answers the conversation read with a status
+    When the record is read
+    Then a "done" status returns the record
+    And a "processing" status, a "failed" status or a 404 returns nothing
+
+  # #8019 AC8
+  @unit @regression
+  Scenario: A single-scenario suite scores a Call it myself run under that scenario
+    Given a run dialog opened on a suite that holds exactly one scenario
+    When the voice-call target is resolved
+    Then it carries that scenario id so the call is scored under it
+
+  # #8019 AC9
+  @unit @regression
+  Scenario: Call it myself is offered only when one scenario is in scope
+    Given a run dialog opened on a subject with more than one scenario
+    When the dialog footer renders
+    Then it offers no "Call it myself" action
+
+  # #8019 AC10
+  @unit @regression
+  Scenario: Finish refuses an unresolvable scenario and writes nothing
+    Given a finish names a scenario that no longer resolves to a set
+    When the call is finished
+    Then it is refused with the scenario_not_found code
+    And no run is written
+
+  # ---------------------------------------------------------------------------
+  # A retried hang-up completes a half-written run (#7973)
+  # ---------------------------------------------------------------------------
+
+  # 7973 AC1
+  @unit @regression
+  Scenario: A retried hang-up leaves a terminal run untouched
+    Given a run for the session already reached a terminal status
+    When the call is finished again
+    Then no run is written
+    And the existing run id and agent id are returned unchanged
+
+  # 7973 AC2, AC3, AC4
+  @unit @regression
+  Scenario: A retried hang-up completes a half-written run
+    Given a run for the session is still in progress after a failed write
+    When the call is finished again
+    Then the run is re-driven under the same run id
+    And its finish is emitted exactly once
+    And the message ids are identical to the first attempt
+
+  # 7973 AC5
+  @e2e @unimplemented
+  Scenario: A retried hang-up completes an in-progress run end to end
+    Given a call left a run in progress
+    When the browser retries the finish
+    Then the run completes with no duplicate messages
+
+  # 7973 AC6
+  @unit @regression
+  Scenario: A re-driven finish keeps the first attempt's metadata
+    Given a run for the session was started twice with different metadata
+    When a snapshot and the finish are folded onto it
+    Then the run keeps the first attempt's metadata
+    And it reaches the finished status with the snapshot's messages
+
+  # ---------------------------------------------------------------------------
+  # Talk to it authorization and the cutoff marker (#8021)
+  # ---------------------------------------------------------------------------
+
+  # 8021 AC1
+  @integration @regression
+  Scenario: Talk to it without agent-management rights and no saved row is refused
+    Given a member with scenario rights but not agent-management rights
+    When they mint a Talk to it session without a saved agent row
+    Then the mint is refused for the evaluations:manage permission
+    And no session is minted
+
+  # 8021 AC2
+  @integration @regression
+  Scenario: Finishing an unsaved session without agent-management rights is refused
+    Given a member with scenario rights but not agent-management rights
+    And a session token that carries no saved agent id
+    When they finish the call with a name
+    Then the finish is refused
+    And no agent is created
+
+  # 8021 AC3
+  @integration @regression
+  Scenario: Talk to it against a saved agent needs only scenario rights
+    Given a member with scenario rights but not agent-management rights
+    When they mint and finish against a saved agent row
+    Then neither is refused for the evaluations:manage permission
+
+  # 8021 AC4
+  @integration @regression
+  Scenario: Talk to it with agent-management rights mints an unsaved session
+    Given a member with scenario rights and agent-management rights
+    When they mint a Talk to it session without a saved agent row
+    Then the session is minted so the agent is created on finish
+
+  # 8021 AC5
+  @unit @regression
+  Scenario: A simulated voice run cut at the call limit records the cutoff marker
+    Given a succeeded simulated voice run whose child was cut at the call limit
+    When the processor handles the result
+    Then the cutoff marker is recorded on the run
+    And the run read back has metadata.langwatch.isCutAtLimit true
+
+  # 8021 AC6
+  @unit @regression
+  Scenario: A simulated voice run that finished normally records no cutoff marker
+    Given a succeeded simulated voice run whose child was not cut at the limit
+    When the processor handles the result
+    Then no cutoff event is dispatched
+
+  # 8021 AC8
+  @unit @regression
+  Scenario: The cutoff marker folded twice sets the flag once
+    Given the cutoff marker is recorded twice for the same run
+    When the run state is folded
+    Then the flag is set once and the metadata is unchanged on the second fold
+
+  # 8021 AC7
+  @integration @regression
+  Scenario: A voice run stops at the maximum call duration and is marked as cut at the limit
+    Given a run whose metadata marks it cut at the call limit
+    When the run header renders
+    Then it shows the "Cut at the call limit" marker

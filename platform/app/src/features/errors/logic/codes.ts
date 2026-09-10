@@ -343,6 +343,7 @@ export const APP_ERROR_CODES = [
   "saved_workbench_charts_disabled_for_playground",
   "scenario_field_type_invalid",
   "scenario_field_unknown",
+  "scenario_not_found",
   "scenario_parameter_missing",
   "scenario_parameter_option_invalid",
   "scenario_parameter_required",

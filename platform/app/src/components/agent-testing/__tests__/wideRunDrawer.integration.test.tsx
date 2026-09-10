@@ -894,6 +894,32 @@ describe("the wide run detail drawer", () => {
     );
   });
 
+  /** @scenario "A voice run stops at the maximum call duration and is marked as cut at the limit" */
+  it("marks a run that was cut at the call limit in the header band", () => {
+    setRunState(
+      makeRunState({
+        metadata: {
+          langwatch: {
+            targetReferenceId: "agent_1",
+            targetType: "voice",
+            scenarioVersion: 3,
+            isCutAtLimit: true,
+          },
+        },
+      }),
+    );
+    renderWide();
+
+    expect(screen.getByText("Cut at the call limit")).toBeInTheDocument();
+  });
+
+  /** @scenario "A voice run stops at the maximum call duration and is marked as cut at the limit" */
+  it("shows no cut-at-limit marker on a run that ran its course", () => {
+    renderWide();
+
+    expect(screen.queryByText("Cut at the call limit")).not.toBeInTheDocument();
+  });
+
   // --- The version the run used ---
 
   /** @scenario "The run detail drawer shows the version the run used" */

@@ -80,6 +80,9 @@ describe("executeScenarioRun with a child that ran to the end", () => {
         recordAgentInstance:
           recordAgentInstance as ProcessorDependencies["agentInstanceRecorder"]["recordAgentInstance"],
       },
+      cutAtLimitRecorder: {
+        recordCutAtLimit: vi.fn(async () => {}),
+      },
     };
   });
 
