@@ -20,6 +20,7 @@ export * from "./virtual-key.schemas.ts";
 export * from "./gateway-wire-enums.ts";
 export * from "./gateway.rows.ts";
 export * from "./gateway.responses.ts";
+export * from "./gateway-platform.schemas.ts";
 export * from "./gateway.config.ts";
 export * from "./gateway-spend.schemas.ts";
 export * from "./gateway-spend-event.trpc.ts";

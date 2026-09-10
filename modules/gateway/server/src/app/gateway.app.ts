@@ -2,7 +2,11 @@
  * The gateway feature's application: the one typed thing every door is given, replacing seven previously-separate bags (six private Gateway*Application types plus GatewayPlatformRestPorts) that named the same members differently or with different signatures. Virtual-key WRITE pre-flight, run identically by every door, lives here as behaviour rather than duplicated thirteen times. A caller arrives as {@link GatewayActor}, an argument rather than read from session/request, so one check serves both a browser session and an API key. Budget row shapes moved to @langwatch/gateway-contract ({@link GatewayApplicableBudget}, {@link GatewayVirtualKeyDirectBudget}) since a generic type parameter never actually reached the browser — every tRPC transport declared `app` with no type arguments, so it always typed against `unknown`.
  */
 import { toDate, type Instant } from "@langwatch/time";
-import type { GatewayVirtualKeyScope, VirtualKeyWithScopes } from "@langwatch/gateway-contract";
+import type {
+  GatewayRequestCredential,
+  GatewayVirtualKeyScope,
+  VirtualKeyWithScopes,
+} from "@langwatch/gateway-contract";
 import type { IdempotentRunner } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -55,22 +59,6 @@ import {
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped API key or legacy project key, and what any of those IS belongs to the process's authentication, not this feature — the doors hand one straight to the checks below and never read it.
  */
 export type GatewayActor = unknown;
-
-/**
- * The credential a REST request arrived with, as this feature is told about it.
- *
- * The transport takes the caller as typed input rather than reading loose keys
- * off the request context, so the credential CLASS stays visible here: a
- * legacy project key is its own arm and never a null-user API key.
- */
-export type GatewayRequestCredential =
-  | Readonly<{
-      kind: "apiKey";
-      apiKeyId: string;
-      userId: string | null;
-      organizationId: string;
-    }>
-  | Readonly<{ kind: "legacyProjectKey" }>;
 
 /**
  * A key's own budget, as the write service takes it. The canonical parser is schemas.virtualKeyBudgetInput, so the decimal regex and positive-amount refinement are never restated here.

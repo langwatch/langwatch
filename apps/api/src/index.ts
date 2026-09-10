@@ -211,7 +211,6 @@ export {
 // gone: `GatewayApp` subsumed them. A process composes that application and
 // hands it in — `createGatewayPlatformRestApp({ security, gateway })` — and
 // reaches the class through `@langwatch/gateway-server`, where it is declared.
-export { createGatewayPlatformRestApp } from "@langwatch/gateway-server/api-rest/gateway-platform";
 export {
   createGatewaySpendRestApp,
   type GatewaySpendRestPorts,

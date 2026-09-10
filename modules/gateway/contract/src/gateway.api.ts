@@ -42,6 +42,51 @@ import type {
   GatewayGuardrailResource,
   UpdateGatewayGuardrailInput,
 } from "./gateway-guardrail.ts";
+import type { GatewayBudgetHealth, GatewayBudgetScopeReachResult } from "./gateway.budget.ts";
+import type { GatewayCacheRuleCursor } from "./gateway-cache-rule.ts";
+
+/**
+ * The REST credential a project door presented, as this module is told about
+ * it: a scoped API key acts as its owning user, a legacy project key carries
+ * none and acts as a stable synthetic machine principal.
+ */
+export type GatewayRequestCredential =
+  | Readonly<{
+      kind: "apiKey";
+      apiKeyId: string;
+      userId: string | null;
+      organizationId: string;
+    }>
+  | Readonly<{ kind: "legacyProjectKey" }>;
+
+/** A minted or read virtual key, published in the public REST surface's snake_case shape. */
+export type GatewayVirtualKeySnakeDto = {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  status: "active" | "disabled" | "revoked";
+  purpose: "user" | "langy";
+  display_prefix: string;
+  principal_user_id: string | null;
+  trace_project_id: string | null;
+  trace_project_archived: boolean;
+  external_id: string | null;
+  metadata: Record<string, string>;
+  scopes: Array<{
+    scope_type: "organization" | "team" | "project";
+    scope_id: string;
+  }>;
+  routing_policy_id: string | null;
+  routing_mode: "none" | "fallback_all" | "policy";
+  config: unknown;
+  revision: string;
+  created_at: string;
+  updated_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  expires_at: string | null;
+};
 
 /** A window a usage or spend read is taken over. */
 export type GatewayUsageWindow = Readonly<{ fromDate: Instant; toDate: Instant }>;
@@ -153,6 +198,19 @@ export interface GatewayApi {
   assertOrganizationExists(organizationId: string): Promise<void>;
   /** The organization a project belongs to, or null when the project is unknown. */
   findProjectOrganization(projectId: string): Promise<string | null>;
+  /** The organization behind the project a REST credential authenticated as. */
+  organizationIdForProject(projectId: string): Promise<string>;
+  /** Identity a REST credential authorizes as, plus a stable audit-row actor id. */
+  actorForCredential(input: {
+    projectId: string;
+    credential: GatewayRequestCredential;
+  }): { actor: GatewayCaller; actorUserId: string };
+  /** A tenant-wide write a project credential names by id, checked at the organization it acts on. */
+  authorizeOrganizationWideOperation(input: {
+    actor: GatewayCaller;
+    organizationId: string;
+    permission: string;
+  }): Promise<void>;
 
   listBudgetsWithHealth(organizationId: string): Promise<GatewayBudgetListWithHealth>;
   listProjectBudgetsWithHealth(projectId: string): Promise<GatewayBudgetListWithHealth>;
@@ -168,15 +226,43 @@ export interface GatewayApi {
   updateBudget(input: UpdateGatewayBudgetInput): Promise<GatewayBudgetResource>;
   archiveBudget(input: ArchiveGatewayBudgetInput): Promise<GatewayBudgetResource>;
   resetBudget(input: ResetGatewayBudgetInput): Promise<GatewayBudgetResource>;
+  /** A cursor page of an organization's budgets, with live health, for the credentialed listing. */
+  listBudgetPageWithHealth(input: {
+    organizationId: string;
+    limit: number;
+    cursor: { createdAt: Instant; id: string } | null;
+    scopeTypes?: readonly string[] | undefined;
+    externalId?: string | undefined;
+  }): Promise<GatewayBudgetListWithHealth>;
+  /** One budget with live health, or null when it does not exist in this organization. */
+  tryGetBudgetWithHealth(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetHealth | null>;
+  /** Whether any active key could produce traffic against this budget's own scope target. */
+  budgetScopeReach(input: {
+    organizationId: string;
+    scope: { scopeType: string; scopeId: string };
+  }): Promise<GatewayBudgetScopeReachResult>;
   /** Provider row id to its display label, for a whole page in one read. */
   resolveProviderLabels(
     budgets: ReadonlyArray<{ providerKey: string | null }>,
   ): Promise<Map<string, string>>;
   listGroupTargets(organizationId: string): Promise<ReadonlyArray<GatewayGroupTarget>>;
+  /** How many members a per-member GROUP allowance currently covers, batched over a page of rows. */
+  groupMemberCounts(
+    budgets: readonly { scopeType: string; scopeId: string }[],
+  ): Promise<Map<string, number>>;
   /** The budgets one debit lands on, as the spend graph resolves them. */
   resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]>;
 
   listCacheRules(organizationId: string): Promise<GatewayCacheRuleResource[]>;
+  /** A cursor page of an organization's cache rules, priority-ordered, for the credentialed listing. */
+  listCacheRulePage(input: {
+    organizationId: string;
+    limit: number;
+    cursor: GatewayCacheRuleCursor | null;
+  }): Promise<GatewayCacheRuleResource[]>;
   findCacheRule(input: {
     id: string;
     organizationId: string;
@@ -219,11 +305,50 @@ export interface GatewayApi {
     userId: string;
   }): Promise<GatewayVirtualKeyRecord>;
   findVirtualKeyById(id: string, organizationId: string): Promise<GatewayVirtualKeyRecord | null>;
+  /** One key anchored to this organization, without any visibility rule. */
+  requireExistingVirtualKey(input: {
+    organizationId: string;
+    id: string;
+  }): Promise<GatewayVirtualKeyRecord>;
+  /**
+   * Keys a PROJECT CREDENTIAL may see on a page: org-scoped keys, its own
+   * team's, its own project's -- never a sibling team's. Applied to the page,
+   * not the query, so a page can be shorter than `limit` without the walk
+   * being done.
+   */
+  visibleToProjectCredential(input: {
+    project: { id: string };
+    virtualKeys: readonly GatewayVirtualKeyRecord[];
+  }): GatewayVirtualKeyRecord[];
+  /** One key under that same credential-visibility rule, or the not-found refusal. */
+  requireVisibleVirtualKeyForProjectCredential(input: {
+    project: { id: string };
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayVirtualKeyRecord>;
+  /** A page of an organization's keys, newest first, for the credentialed listing. */
+  getVirtualKeyPage(input: {
+    organizationId: string;
+    limit: number;
+    cursor: { createdAt: Instant; id: string } | null;
+    externalId?: string | undefined;
+  }): Promise<GatewayVirtualKeyRecord[]>;
   /** The camelCase projection, for a page of keys in ONE destination read. */
   toVirtualKeyCamelDtos(input: {
     virtualKeys: readonly GatewayVirtualKeyRecord[];
   }): Promise<VirtualKeyCamelDtoResponse[]>;
   toVirtualKeyCamelDto(virtualKey: GatewayVirtualKeyRecord): Promise<VirtualKeyCamelDtoResponse>;
+  /** The published snake_case projection, batched the same way. */
+  toVirtualKeySnakeDtos(input: {
+    virtualKeys: readonly GatewayVirtualKeyRecord[];
+  }): Promise<GatewayVirtualKeySnakeDto[]>;
+  toVirtualKeySnakeDto(virtualKey: GatewayVirtualKeyRecord): Promise<GatewayVirtualKeySnakeDto>;
+  /** Parses a REST budget-write field against the same schema the tRPC door validates with. */
+  parseVirtualKeyBudget(
+    input: unknown,
+  ):
+    | { success: true; data: VirtualKeyBudgetInput }
+    | { success: false; error: { message: string } };
 
   createVirtualKey(input: GatewayVirtualKeyCreateCommand): Promise<GatewayMintedVirtualKey>;
   updateVirtualKey(input: GatewayVirtualKeyUpdateCommand): Promise<GatewayVirtualKeyRecord>;
