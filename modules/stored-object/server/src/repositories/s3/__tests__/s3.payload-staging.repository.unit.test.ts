@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AbsentPayloadStagingAdapter,
   PayloadStagingUnavailableError,
-} from "../absent.payload-staging.adapter.ts";
-import { PayloadStagingS3TargetPort, S3PayloadStagingAdapter } from "../s3.payload-staging.adapter.ts";
+} from "#adapters/absent.payload-staging.adapter";
+import { PayloadStagingS3TargetPort, S3PayloadStagingAdapter } from "#repositories/s3/s3.payload-staging.repository";
 
 function s3(): { client: S3Client; sent: unknown[] } {
   const client = new S3Client({

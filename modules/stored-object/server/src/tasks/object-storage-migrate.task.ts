@@ -3,25 +3,25 @@
  */
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import { AzureBlobStoredObjectDriverAdapter } from "#adapters/azure-blob.stored-object-driver.adapter";
+import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
 import {
   type AzureCredentials,
   type AzureInjectedIdentity,
 } from "#adapters/azure-blob-credentials.adapter";
 import { AzureBlobCredentialsAdapter } from "#adapters/azure-blob-credentials.adapter";
 const { assertTokenModeTransportSafety } = AzureBlobCredentialsAdapter;
-import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage-registry.adapter";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import { z } from "zod";
-import type { ObjectStorageMigrationInventoryPort } from "#ports/object-storage-migration-inventory.port";
+import type { ObjectStorageMigrationInventoryPort } from "#repositories/object-storage-migration-inventory.repository";
 import {
   ObjectStorageMigrationService,
   type ObjectStorageMigrationDeps,
 } from "../services/object-storage-migration.service.ts";
 import { createMigrationStorageEndpoint } from "../rules/object-storage-migration-transfer.rules.ts";
 import {
-  MigrationCutoverRedisAuditAdapter,
+  MigrationCutoverAuditRedisRepository,
   type MigrationCutoverRedisConfig,
-} from "../adapters/redis.object-storage-migration.adapter.ts";
+} from "#repositories/redis/redis.object-storage-migration-audit.repository";
 
 const logger = createLogger("langwatch:tasks:migrate-object-storage");
 
@@ -239,7 +239,7 @@ export function createMigrationTask({
 
 /** The cutover's group-queue check, over the process's own Redis resolution. */
 export async function auditQueuesForCutover(config: MigrationCutoverRedisConfig) {
-  return MigrationCutoverRedisAuditAdapter.create({ config, logger }).audit();
+  return MigrationCutoverAuditRedisRepository.create({ config, logger }).audit();
 }
 
 /** Runs one phase of the migration. */

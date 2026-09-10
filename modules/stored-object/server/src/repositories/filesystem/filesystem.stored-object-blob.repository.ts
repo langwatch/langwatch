@@ -1,5 +1,5 @@
 /**
- * LocalFilesystemStoredObjectDriverAdapter — byte operations over the local
+ * StoredObjectBlobFilesystemRepository — byte operations over the local
  * filesystem.
  */
 import crypto from "node:crypto";
@@ -10,7 +10,7 @@ import type { Readable } from "node:stream";
 import { createLogger } from "@langwatch/observability";
 import { getStoredObjectStorageScheme } from "@langwatch/stored-object-contract";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import type { StoredObjectStorageDriver } from "./stored-object-storage-registry.adapter.ts";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 
 const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
 
@@ -21,7 +21,7 @@ function parseFileUri(uri: string): string {
   const scheme = getStoredObjectStorageScheme(uri);
   if (scheme !== "file") {
     throw new Error(
-      `LocalFilesystemStoredObjectDriverAdapter only handles file: URIs, got: "${uri}"`,
+      `StoredObjectBlobFilesystemRepository only handles file: URIs, got: "${uri}"`,
     );
   }
   const parsed = new URL(uri);
@@ -35,7 +35,7 @@ function parseFileUri(uri: string): string {
   const hasParentSegment = decoded.split("/").includes("..");
   if (hasParentSegment) {
     throw new Error(
-      `LocalFilesystemStoredObjectDriverAdapter refuses a file: URI whose decoded path contains a ".." segment — ` +
+      `StoredObjectBlobFilesystemRepository refuses a file: URI whose decoded path contains a ".." segment — ` +
         `it resolves outside the location it names. Keep every path segment a single component.`,
     );
   }
@@ -47,9 +47,9 @@ function parseFileUri(uri: string): string {
  *
  * See class-level JSDoc for single-replica constraints and atomicity guarantees.
  */
-export class LocalFilesystemStoredObjectDriverAdapter implements StoredObjectStorageDriver {
-  static create(): LocalFilesystemStoredObjectDriverAdapter {
-    return new LocalFilesystemStoredObjectDriverAdapter();
+export class StoredObjectBlobFilesystemRepository implements StoredObjectStorageDriver {
+  static create(): StoredObjectBlobFilesystemRepository {
+    return new StoredObjectBlobFilesystemRepository();
   }
 
   /**

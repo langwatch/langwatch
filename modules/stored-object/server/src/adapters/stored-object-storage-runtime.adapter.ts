@@ -1,10 +1,8 @@
 import type { Readable } from "node:stream";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
-import {
-  StoredObjectStorageRegistryAdapter,
-  type StoredObjectStorageDriver,
-} from "./stored-object-storage-registry.adapter.ts";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+import { StoredObjectStorageRegistryAdapter } from "./stored-object-storage-registry.adapter.ts";
 
 export type StoredObjectStorageProject = {
   objectStore: StoredObjectByteStore;

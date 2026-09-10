@@ -9,17 +9,17 @@ import { TieredBlobStore } from "@langwatch/group-queue/operational";
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter.ts";
+import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
 import {
   StoredObjectAzureDestinationPort,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
-} from "../stored-object-destination-policy.adapter.ts";
-import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.adapter.ts";
-import { StoredObjectsService } from "../../services/stored-objects.service.ts";
-import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
-import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
-import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port.ts";
+} from "#adapters/stored-object-destination-policy.adapter";
+import { StoredObjectStorageRegistryAdapter } from "#adapters/stored-object-storage-registry.adapter";
+import { StoredObjectsService } from "#services/stored-objects.service";
+import type { StoredObject } from "#rules/stored-object-row.rules";
+import type { StoredObjectsRepository } from "#repositories/stored-objects.repository";
+import type { StoredObjectsTelemetryPort } from "#ports/stored-objects-telemetry.port";
 
 const ACCOUNT = "lwacct";
 const CONTAINER = "stored-objects";

@@ -10,11 +10,11 @@ import {
   mintS3StoredObjectUri,
   redactStoredObjectStorageUri,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage-registry.adapter";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import type {
   MigrationDataset,
   MigrationPageRequest,
-} from "../ports/object-storage-migration-inventory.port.ts";
+} from "#repositories/object-storage-migration-inventory.repository";
 import type {
   MigrationProvider,
   MigrationStorageEndpoint,

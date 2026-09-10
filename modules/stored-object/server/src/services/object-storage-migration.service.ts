@@ -3,13 +3,13 @@
  */
 import { redactStoredObjectStorageUri } from "@langwatch/stored-object-contract";
 import type { StoredObject } from "#rules/stored-object-row.rules";
-import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage-registry.adapter";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import type {
   MigrationDataset,
   MigrationPageRequest,
   MigrationProject,
   ObjectStorageMigrationInventoryPort,
-} from "#ports/object-storage-migration-inventory.port";
+} from "#repositories/object-storage-migration-inventory.repository";
 import {
   assertUriDigest,
   copyVerified,

@@ -13,7 +13,7 @@ import type {
   MigrationDataset,
   MigrationProject,
   ObjectStorageMigrationInventoryPort,
-} from "../../ports/object-storage-migration-inventory.port.ts";
+} from "#repositories/object-storage-migration-inventory.repository";
 import {
   ObjectStorageMigrationService,
   type QueueMigrationBlocker,

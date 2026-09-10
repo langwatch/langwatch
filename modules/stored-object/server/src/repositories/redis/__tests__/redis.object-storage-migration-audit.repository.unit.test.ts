@@ -11,7 +11,7 @@ vi.mock("@langwatch/redis-client", () => ({
   },
 }));
 
-import { MigrationCutoverRedisAuditAdapter } from "../redis.object-storage-migration.adapter.ts";
+import { MigrationCutoverAuditRedisRepository } from "#repositories/redis/redis.object-storage-migration-audit.repository";
 
 const logger = {
   error: vi.fn(),
@@ -32,7 +32,7 @@ function emptyAuditRedis() {
   };
 }
 
-describe("MigrationCutoverRedisAuditAdapter", () => {
+describe("MigrationCutoverAuditRedisRepository", () => {
   beforeEach(() => {
     connect.mockReset();
     connection.disconnect.mockReset();
@@ -46,7 +46,7 @@ describe("MigrationCutoverRedisAuditAdapter", () => {
     connect.mockReturnValue(redis);
 
     await expect(
-      MigrationCutoverRedisAuditAdapter.create({
+      MigrationCutoverAuditRedisRepository.create({
         config: { url: "redis://migration.example.test" },
         logger,
       }).audit(),
@@ -63,7 +63,7 @@ describe("MigrationCutoverRedisAuditAdapter", () => {
     connect.mockReturnValue(redis);
 
     await expect(
-      MigrationCutoverRedisAuditAdapter.create({ config: {}, logger }).audit(),
+      MigrationCutoverAuditRedisRepository.create({ config: {}, logger }).audit(),
     ).rejects.toThrow(operationFailure);
 
     expect(connection.disconnect).toHaveBeenCalledOnce();
@@ -88,7 +88,7 @@ describe("MigrationCutoverRedisAuditAdapter", () => {
     connect.mockReturnValue(auditConnection);
 
     await expect(
-      MigrationCutoverRedisAuditAdapter.create({
+      MigrationCutoverAuditRedisRepository.create({
         config: {},
         createLease: async () => lease,
         logger,

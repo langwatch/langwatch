@@ -7,8 +7,8 @@ import { Cluster } from "ioredis";
 import {
   GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
-} from "./group-queue.object-storage-migration.adapter.ts";
-import type { QueueMigrationBlocker } from "../services/object-storage-migration.service.ts";
+} from "#adapters/group-queue.object-storage-migration.adapter";
+import type { QueueMigrationBlocker } from "#services/object-storage-migration.service";
 
 export type MigrationCutoverRedisConfig = {
   url?: string;
@@ -28,7 +28,7 @@ type MigrationCutoverAuditLeaseFactory = (
 ) => Promise<MigrationCutoverAuditLease>;
 
 /** Task-local Redis owner for the final GroupQueue cutover audit. */
-export class MigrationCutoverRedisAuditAdapter {
+export class MigrationCutoverAuditRedisRepository {
   /**
    * The shared app cluster client runs `scaleReads: "all"`, allowing reads from a
    * lagging replica. Finalization must instead audit through a master-only
@@ -74,11 +74,11 @@ export class MigrationCutoverRedisAuditAdapter {
     config: MigrationCutoverRedisConfig;
     logger: RedisLogger;
     createLease?: MigrationCutoverAuditLeaseFactory;
-  }): MigrationCutoverRedisAuditAdapter {
-    return new MigrationCutoverRedisAuditAdapter(
+  }): MigrationCutoverAuditRedisRepository {
+    return new MigrationCutoverAuditRedisRepository(
       input.config,
       input.logger,
-      input.createLease ?? MigrationCutoverRedisAuditAdapter.createAuditLease,
+      input.createLease ?? MigrationCutoverAuditRedisRepository.createAuditLease,
     );
   }
 

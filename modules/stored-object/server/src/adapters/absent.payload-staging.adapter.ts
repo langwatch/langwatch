@@ -4,7 +4,7 @@
  * being posted inline into a 6 MB Lambda cap that fails opaquely.
  */
 import { HandledError } from "@langwatch/handled-error";
-import { PayloadStagingPort, type StagedPayload } from "../ports/payload-staging.port.ts";
+import { PayloadStagingPort, type StagedPayload } from "#repositories/payload-staging.repository";
 
 export class PayloadStagingUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";

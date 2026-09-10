@@ -32,11 +32,11 @@ function parseS3Uri(uri: string): { bucket: string; key: string } {
   return { bucket, key };
 }
 
-export class S3UriAdapter {
+export class S3UriRules {
   private constructor() {}
 
-  static create(): S3UriAdapter {
-    return new S3UriAdapter();
+  static create(): S3UriRules {
+    return new S3UriRules();
   }
 
   static parseS3Uri = parseS3Uri;

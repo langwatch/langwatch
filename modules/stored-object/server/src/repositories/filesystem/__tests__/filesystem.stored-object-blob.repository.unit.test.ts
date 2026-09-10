@@ -1,5 +1,5 @@
 /**
- * Unit tests for LocalFilesystemStoredObjectDriverAdapter.
+ * Unit tests for StoredObjectBlobFilesystemRepository.
  * @vitest-environment node
  */
 import { randomBytes } from "node:crypto";
@@ -10,7 +10,7 @@ import type { Readable } from "node:stream";
 import { mintFileStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import { LocalFilesystemStoredObjectDriverAdapter } from "../local-filesystem.stored-object-driver.adapter.ts";
+import { StoredObjectBlobFilesystemRepository } from "#repositories/filesystem/filesystem.stored-object-blob.repository";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -30,12 +30,12 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
 // ---------------------------------------------------------------------------
 
 let tmpDir: string;
-let driver: LocalFilesystemStoredObjectDriverAdapter;
+let driver: StoredObjectBlobFilesystemRepository;
 
 beforeEach(async () => {
   tmpDir = path.join(os.tmpdir(), `lw-fs-driver-${randomBytes(6).toString("hex")}`);
   await fs.mkdir(tmpDir, { recursive: true });
-  driver = LocalFilesystemStoredObjectDriverAdapter.create();
+  driver = StoredObjectBlobFilesystemRepository.create();
 });
 
 afterEach(async () => {

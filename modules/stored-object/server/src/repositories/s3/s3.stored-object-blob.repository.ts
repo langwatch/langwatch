@@ -1,5 +1,5 @@
 /**
- * S3StoredObjectDriverAdapter — byte operations over S3-compatible object
+ * StoredObjectBlobS3Repository — byte operations over S3-compatible object
  * storage.
  */
 import type { Readable } from "node:stream";
@@ -12,13 +12,13 @@ import {
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import { S3UriAdapter } from "./s3-uri.adapter.ts";
-const { parseS3Uri } = S3UriAdapter;
+import { S3UriRules } from "#rules/s3-uri.rules";
+const { parseS3Uri } = S3UriRules;
 import type {
   StoredObjectS3Target,
   StoredObjectS3TargetPort,
-} from "../ports/stored-object-s3-target.port.ts";
-import type { StoredObjectStorageDriver } from "./stored-object-storage-registry.adapter.ts";
+} from "#ports/stored-object-s3-target.port";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 
 /**
  * The process's shared AWS transport policy, as this driver asks for it.
@@ -33,13 +33,13 @@ export type StoredObjectS3ClientPolicy = Readonly<{
 }>;
 
 /** Storage driver for S3-compatible object storage, scoped to one project. */
-export class S3StoredObjectDriverAdapter implements StoredObjectStorageDriver {
+export class StoredObjectBlobS3Repository implements StoredObjectStorageDriver {
   static create(options: {
     projectId: string;
     targets: StoredObjectS3TargetPort;
     policy: StoredObjectS3ClientPolicy;
-  }): S3StoredObjectDriverAdapter {
-    return new S3StoredObjectDriverAdapter(options.projectId, options.targets, options.policy);
+  }): StoredObjectBlobS3Repository {
+    return new StoredObjectBlobS3Repository(options.projectId, options.targets, options.policy);
   }
 
   private constructor(

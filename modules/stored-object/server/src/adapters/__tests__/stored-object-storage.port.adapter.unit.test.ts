@@ -8,7 +8,7 @@ import {
   StoredObjectStorageRuntimeAdapter,
   StoredObjectProjectDestinationResolverPort,
 } from "../stored-object-storage-runtime.adapter.ts";
-import type { StoredObjectStorageDriver } from "../stored-object-storage-registry.adapter.ts";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 
 class NoProxy {
   tryResolveForHost() {

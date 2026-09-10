@@ -33,13 +33,13 @@ export {
   StoredObjectProjectS3ConfigPort,
   type StoredObjectStorageSelection,
 } from "./adapters/stored-object-destination-policy.adapter.ts";
-export {
-  StoredObjectStorageRegistryAdapter,
-  type StoredObjectStorageDriver,
-  type StoredObjectStorageDriverFactory,
-} from "./adapters/stored-object-storage-registry.adapter.ts";
+export { StoredObjectStorageRegistryAdapter } from "./adapters/stored-object-storage-registry.adapter.ts";
+export type {
+  StoredObjectStorageDriver,
+  StoredObjectStorageDriverFactory,
+} from "./repositories/stored-object-blob.repository.ts";
 export { StoredObjectStoragePortAdapter } from "./adapters/stored-object-storage.port.adapter.ts";
-export { AzureBlobStoredObjectDriverAdapter } from "./adapters/azure-blob.stored-object-driver.adapter.ts";
+export { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
 export {
   ALLOW_INSECURE_TOKEN_ENDPOINT_ENV,
   AzureBackendMisconfiguredError,
@@ -107,11 +107,11 @@ export {
   type StoredObjectsServiceOptions,
 } from "./services/stored-objects.service.ts";
 export { PrometheusStoredObjectsTelemetryAdapter } from "./adapters/prometheus.stored-objects-telemetry.adapter.ts";
-export { LocalFilesystemStoredObjectDriverAdapter } from "./adapters/local-filesystem.stored-object-driver.adapter.ts";
+export { StoredObjectBlobFilesystemRepository } from "#repositories/filesystem/filesystem.stored-object-blob.repository";
 export {
-  S3StoredObjectDriverAdapter,
+  StoredObjectBlobS3Repository,
   type StoredObjectS3ClientPolicy,
-} from "./adapters/s3.stored-object-driver.adapter.ts";
+} from "#repositories/s3/s3.stored-object-blob.repository";
 
 export {
   auditQueuesForCutover,
@@ -126,7 +126,7 @@ export {
   type MigrationDataset,
   type MigrationPageRequest,
   type MigrationProject,
-} from "./ports/object-storage-migration-inventory.port.ts";
+} from "./repositories/object-storage-migration-inventory.repository.ts";
 export {
   MigrationBlockedError,
   ObjectStorageMigrationService,
@@ -141,21 +141,21 @@ export {
   MigrationS3StorageDriverAdapter,
   type MigrationS3Configuration,
   type MigrationS3RegionConfiguration,
-} from "./adapters/aws.object-storage-migration.adapter.ts";
+} from "#repositories/s3/s3.object-storage-migration-blob.repository";
 export {
-  MigrationCutoverRedisAuditAdapter,
+  MigrationCutoverAuditRedisRepository,
   type MigrationCutoverRedisConfig,
-} from "./adapters/redis.object-storage-migration.adapter.ts";
+} from "#repositories/redis/redis.object-storage-migration-audit.repository";
 export {
   GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
 } from "./adapters/group-queue.object-storage-migration.adapter.ts";
-export { PayloadStagingPort, type StagedPayload } from "./ports/payload-staging.port.ts";
+export { PayloadStagingPort, type StagedPayload } from "./repositories/payload-staging.repository.ts";
 export {
   PayloadStagingS3TargetPort,
   S3PayloadStagingAdapter,
   type PayloadStagingS3Target,
-} from "./adapters/s3.payload-staging.adapter.ts";
+} from "#repositories/s3/s3.payload-staging.repository";
 export {
   AbsentPayloadStagingAdapter,
   PayloadStagingUnavailableError,

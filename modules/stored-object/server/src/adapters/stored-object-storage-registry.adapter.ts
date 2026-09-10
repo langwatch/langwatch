@@ -5,16 +5,11 @@ import {
   type StoredObjectStorageScheme,
 } from "@langwatch/stored-object-contract";
 import { StoredObjectStoragePort } from "../ports/stored-object-storage.port.ts";
+import type {
+  StoredObjectStorageDriver,
+  StoredObjectStorageDriverFactory,
+} from "#repositories/stored-object-blob.repository";
 
-/** Provider byte operations supplied by process composition. */
-export interface StoredObjectStorageDriver {
-  get(uri: string): Promise<Readable>;
-  put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
-  delete(uri: string): Promise<void>;
-  exists(uri: string): Promise<boolean>;
-}
-
-export type StoredObjectStorageDriverFactory = () => StoredObjectStorageDriver | undefined;
 
 /**
  * Provider-neutral scheme dispatch owned by Stored Objects.

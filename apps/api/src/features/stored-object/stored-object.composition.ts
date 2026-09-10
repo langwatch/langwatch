@@ -19,12 +19,12 @@ import {
   AbsentPayloadStagingAdapter,
   AzureBlobCredentialsAdapter,
   AzureBlobStoredObjectDriverAdapter,
-  LocalFilesystemStoredObjectDriverAdapter,
+  StoredObjectBlobFilesystemRepository,
   PayloadStagingPort,
   PayloadStagingS3TargetPort,
   PrometheusStoredObjectsTelemetryAdapter,
   S3PayloadStagingAdapter,
-  S3StoredObjectDriverAdapter,
+  StoredObjectBlobS3Repository,
   StoredObjectDeliveryPort,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectOwnerInstanceDirectoryPort,
@@ -135,12 +135,12 @@ export async function installApiStoredObject(
   // and the project-keyed runtime published beside it, so a consumer that
   // writes bytes without a row lands in the same place a stored object does.
   const s3ForProject = (projectId: string, awsRuntime: AwsClientProcessRuntime) =>
-    S3StoredObjectDriverAdapter.create({
+    StoredObjectBlobS3Repository.create({
       projectId,
       targets,
       policy: { build: (input) => awsRuntime.build(input) },
     });
-  const fileForProject = () => LocalFilesystemStoredObjectDriverAdapter.create();
+  const fileForProject = () => StoredObjectBlobFilesystemRepository.create();
   // A FACTORY rather than a driver, which is the registry's own Azure policy: a
   // deployment that never reads an `azure-blob://` URI never resolves credentials,
   // so an install with no Azure block configured is not made to fail at boot over a

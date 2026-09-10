@@ -18,16 +18,16 @@ import {
 // responses.
 const getAzureBlobTokenMock = vi.fn();
 const invalidateAzureBlobTokenMock = vi.fn();
-vi.mock("../azure-blob-token-provider.adapter.ts", () => ({
+vi.mock("#adapters/azure-blob-token-provider.adapter", () => ({
   AzureBlobTokenProviderAdapter: {
     getAzureBlobToken: (...args: unknown[]) => getAzureBlobTokenMock(...args),
     invalidateAzureBlobToken: (...args: unknown[]) => invalidateAzureBlobTokenMock(...args),
   },
 }));
 
-import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter.ts";
-import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.adapter.ts";
-import type { StoredObjectStorageDriver } from "../stored-object-storage-registry.adapter.ts";
+import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
+import { StoredObjectStorageRegistryAdapter } from "#adapters/stored-object-storage-registry.adapter";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 
 const ACCOUNT_NAME = "lwtestacct";

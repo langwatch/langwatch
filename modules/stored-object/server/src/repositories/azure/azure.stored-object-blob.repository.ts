@@ -9,10 +9,10 @@ import {
   redactStoredObjectStorageErrorText,
   redactStoredObjectStorageUri,
 } from "@langwatch/stored-object-contract";
-import type { AzureCredentials } from "./azure-blob-credentials.adapter.ts";
-import { AzureBlobTokenProviderAdapter } from "./azure-blob-token-provider.adapter.ts";
+import type { AzureCredentials } from "#adapters/azure-blob-credentials.adapter";
+import { AzureBlobTokenProviderAdapter } from "#adapters/azure-blob-token-provider.adapter";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import type { StoredObjectStorageDriver } from "./stored-object-storage-registry.adapter.ts";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import { nowInstant, toDate } from "@langwatch/time";
 
 interface ParsedAzureBlobUri {
