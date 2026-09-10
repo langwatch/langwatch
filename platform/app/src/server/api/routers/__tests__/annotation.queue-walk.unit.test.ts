@@ -6,8 +6,6 @@
  * this pins is the bound — a queue of twelve thousand costs the same read as a
  * queue of three, and no path here hands ClickHouse a list of every queued
  * trace id, which is what stopped working once queues grew.
- *
- * BDD structure: given/when nested describes, action-based it() names.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,10 +13,12 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { annotationRouter } from "../annotation";
 
-const { mockCreate, mockGetTracesWithSpans } = vi.hoisted(() => ({
-  mockCreate: vi.fn(),
-  mockGetTracesWithSpans: vi.fn(),
-}));
+const { mockCreate, mockGetTracesWithSpans, mockFindExistingTraceIds } =
+  vi.hoisted(() => ({
+    mockCreate: vi.fn(),
+    mockGetTracesWithSpans: vi.fn(),
+    mockFindExistingTraceIds: vi.fn(),
+  }));
 
 const mockQueueItemFindFirst = vi.fn();
 const mockQueueItemFindMany = vi.fn().mockResolvedValue([]);
@@ -40,6 +40,12 @@ vi.mock("~/server/traces/trace.service", () => ({
 
 vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
   buildTraceBlobResolutionDeps: vi.fn(() => ({})),
+}));
+
+vi.mock("~/server/traces/clickhouse-trace.service", () => ({
+  ClickHouseTraceService: {
+    create: () => ({ findExistingTraceIds: mockFindExistingTraceIds }),
+  },
 }));
 
 vi.mock("../../rbac", async (importOriginal) => {
@@ -215,6 +221,31 @@ describe("given a queue far longer than one read could carry", () => {
       });
 
       expect(step.item?.id).toBe(FRONT_ITEM.id);
+    });
+  });
+
+  describe("when every trace in it has aged out", () => {
+    /**
+     * Reporting "done" needs proof that nothing readable is left, and the only
+     * proof available is a read of the queue's trace ids — the read this whole
+     * change exists to bound. Past the lookahead the walk stops asking and
+     * reports unfinished instead, which keeps a reviewer looking at work that
+     * cannot be read rather than sending one away while work waits.
+     *
+     * The cost is real and deliberate: a queue this long whose traces have all
+     * expired never reports itself finished. Anything that makes this say
+     * `true` has either found a cheaper proof or restored the unbounded read.
+     */
+    it("stops short of claiming the queue is done", async () => {
+      mockGetTracesWithSpans.mockResolvedValue([]);
+
+      const step = await caller.getQueueWalkStep({
+        projectId: PROJECT_ID,
+        queueItemId: "qi-2",
+      });
+
+      expect(step.queueFinished).toBe(false);
+      expect(mockFindExistingTraceIds).not.toHaveBeenCalled();
     });
   });
 
