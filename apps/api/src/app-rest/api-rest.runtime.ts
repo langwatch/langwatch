@@ -162,6 +162,8 @@ export type ApiRestRuntimePorts = Readonly<{
   rateLimiter?: RateLimiter | undefined;
   /** The store behind every route that declared how long its answer stands. */
   cache?: ResponseCache | undefined;
+  /** The receipt ledger behind every create declared replayable under a caller's key. */
+  idempotency?: IdempotentRunner | undefined;
 }>;
 
 /** What one family states beyond its declaration and its application. */
@@ -216,6 +218,7 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
   const stores = {
     ...(ports.rateLimiter ? { rateLimiter: ports.rateLimiter } : {}),
     ...(ports.cache ? { cache: ports.cache } : {}),
+    ...(ports.idempotency ? { idempotency: ports.idempotency } : {}),
   };
 
   const openDoors: Record<OpenApiRestDoor, RestRuntime> = {

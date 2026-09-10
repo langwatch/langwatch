@@ -2341,6 +2341,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         instanceAdminKey: packaged.ports.instanceAdminKey,
         isSaas: packaged.ports.isSaas,
       }),
+      // The process's ONE receipt ledger, for every create declared replayable.
+      ...(this.composedIdempotency ? { idempotency: this.composedIdempotency.run } : {}),
       // The SAME application the three SCIM families answer from: the bearer a
       // door accepts and the tenant a route then provisions cannot be resolved
       // by two objects.
