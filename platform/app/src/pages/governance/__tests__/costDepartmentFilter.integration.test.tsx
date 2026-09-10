@@ -78,6 +78,7 @@ vi.mock("~/utils/api", () => ({
       // own subject.
       spenders: { useQuery: () => ({ data: undefined }) },
       dailyByProvider: { useQuery: () => ({ data: undefined }) },
+      spendByModel: { useQuery: () => ({ data: undefined }) },
       summary: {
         useQuery: () => ({
           data: {

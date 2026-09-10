@@ -68,6 +68,8 @@ vi.mock("~/components/LoadingScreen", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     governanceCost: {
+      // Its own panel with its own tests; nothing here.
+      spendByModel: { useQuery: () => ({ data: undefined }) },
       spenders: {
         useQuery: () => ({
           data: undefined,

@@ -1165,6 +1165,68 @@ Feature: One cost screen, three honest lanes
   # here.
   # =========================================================================
 
+  Rule: Pulled spend says which model it was spent on
+
+    # ADR-128 §1: wave 1 answers WHERE the money goes — company, source,
+    # agent, model. The model is the one of those four that every pulled
+    # provider already fills, so this Rule is the read that puts it on the
+    # screen. It reads the SAME rollup the billed lane reads, not the metered
+    # trace store: pulled bills are the only money this deployment has, and a
+    # panel pointed at the traces reported "nothing in this window" over a
+    # table that held the answer.
+    #
+    # Grouped by the model string EXACTLY as the provider reported it. A
+    # provider that bills per token kind writes a line item ("<model>, input")
+    # and that is what its bill says; splitting it here would invent a
+    # grouping the provider did not report and would silently merge two
+    # figures a reader may need apart.
+    #
+    # The breakdown reads the PULLED lane only, for the reason the spender
+    # breakdown does: the gateway lane writes a different provider vocabulary
+    # into the same table, and an unfiltered read would cross-sum the two
+    # lanes this screen keeps apart.
+
+    @unit
+    Scenario: Pulled spend is grouped by the model the provider named
+      Given pulled cost recorded under two different models
+      When the model breakdown is read
+      Then each model's rows total under their own model and nobody else's
+
+    @unit
+    Scenario: Gateway rows never enter the model breakdown
+      Given pulled cost and gateway cost recorded for the same model
+      When the model breakdown is read
+      Then only the pulled rows are counted
+
+    @unit
+    Scenario: A model billed per token kind keeps the line item the provider sent
+      # OpenAI's admin bill names a line item rather than a bare model, and
+      # the puller stores it unsplit on purpose. The read repeats it.
+      Given pulled cost recorded under a line item naming a model and a token kind
+      When the model breakdown is read
+      Then the row is named with the line item exactly as it was billed
+
+    @integration
+    Scenario: The ranked model panel fills from the billed lane
+      # Reported from a live screen: every model the organization had been
+      # billed for was sitting in the rollup and the panel said the window
+      # held nothing, because it was reading the metered trace store instead.
+      Given billed spend recorded against two models
+      And a reader who has turned the invented panels off
+      When the cost screen is drawn
+      Then the model panel names both models
+      And it does not say the window holds nothing
+
+    @unit
+    Scenario: A model holding an unpriced cell states no figure
+      # The same withholding rule every other figure on this screen obeys: a
+      # priced part alone reads as the whole one, and the reader has no way
+      # to see it is short.
+      Given a model whose rows include a cell with no amount
+      When the model breakdown is read
+      Then that model states no figure
+      And it reports how many of its cells hold no amount
+
   # A REFUSAL IS NOT A FAILURE.
   #
   # Reported from a first visit: an organization that had configured nothing

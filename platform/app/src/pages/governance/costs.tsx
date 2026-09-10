@@ -965,7 +965,16 @@ interface Breakdowns {
   }> | null;
   activeUsers: number | null;
   overTime: DailyBucket[] | null;
-  modelOverTime: DailyBucket[] | null;
+  /**
+   * Model spend from the PULLED rollup, not from metered traces.
+   *
+   * Ranked rows rather than a bucket series because the panel is a ranked list:
+   * it never drew the days, so carrying them here only meant re-totalling them
+   * on every render. `amountUsd` is null when the figure is WITHHELD — some
+   * cell behind that model holds no USD amount — which is not the same as zero
+   * and must not be summed as one.
+   */
+  modelRows: Array<{ model: string; amountUsd: number | null }> | null;
   /**
    * Which of these reads FAILED, as opposed to answering nothing.
    *
@@ -1040,10 +1049,14 @@ function useBreakdownQueries({
     { ...args, groupBy: "team" as const },
     options,
   );
-  const byModel = api.activityMonitor.spendOverTime.useQuery(
-    { ...args, groupBy: "model" as const },
-    options,
-  );
+  // The PULLED rollup, not the metered trace store the panels around it read.
+  // ADR-128 §1 files the model under wave 1 because the bill already carries
+  // it, and it is the only one of wave 1's "where" dimensions that pulled rows
+  // actually fill — so this panel can be a measurement while its neighbours
+  // wait on gateway traffic (by team, by person) or on wave 2 (by department).
+  // Pointed at the traces it reported "nothing in this window yet" over a
+  // table holding every model the organization had been billed for.
+  const byModel = api.governanceCost.spendByModel.useQuery(args, options);
 
   const departmentRows = byDepartment.data ?? null;
   // The picker is the one place an unanswered read may fall back to empty: it
@@ -1076,9 +1089,10 @@ function useBreakdownQueries({
       overTime.isFetching ||
       byModel.isFetching,
     refetchAll: () => {
-      // Both groupings of the over-time read are asked: they are two reads
-      // sharing one procedure, and refreshing the chart while leaving the
-      // panel beside it stale is the half-refresh this control exists against.
+      // Every read, including the model one that now comes from a different
+      // router than its neighbours: refreshing some panels and leaving others
+      // stale is the half-refresh this control exists against, and which
+      // procedure a panel happens to call is not a reason to skip it.
       void summary.refetch();
       void byDepartment.refetch();
       void byUser.refetch();
@@ -1089,7 +1103,9 @@ function useBreakdownQueries({
     // handing the wrapper to a function that maps over an array throws the
     // moment a real answer arrives.
     overTime: overTime.data ? toDailyBuckets(overTime.data.buckets) : null,
-    modelOverTime: byModel.data ? toDailyBuckets(byModel.data.buckets) : null,
+    // `.rows`, and only once the read has answered: an unanswered read stays
+    // null so the panel draws its empty state rather than a measured zero.
+    modelRows: byModel.data?.rows ?? null,
   };
 }
 
@@ -1401,8 +1417,11 @@ function BreakdownGrid({
             rows={orSample(rows.byModel, sample.models)}
             empty={costPanelEmpty({
               what: "Spend per model, largest first.",
-              source:
-                "Fills from gateway traffic and from usage rows that name a model.",
+              // The billed lane only, so the copy no longer promises gateway
+              // traffic will fill it: this read is the same rollup the billed
+              // panels use, and naming a source that cannot feed it is the
+              // kind of advice that leaves a reader waiting on nothing.
+              source: "Fills from the bills a connected source reports.",
               action: ADD_A_SOURCE,
             })}
           />
@@ -1557,6 +1576,17 @@ function CostBreakdowns({
   );
 }
 
+/**
+ * The ranked model list's key for rows the provider named no model on.
+ *
+ * A key of its own rather than the empty string: the list keys its rows, and
+ * "" is falsy in enough of the places a key travels through that a row with
+ * one is a bug waiting for a re-render. The LABEL beside it says no model was
+ * named rather than inventing one, the same honesty the spender panel's
+ * not-named bucket keeps.
+ */
+const UNNAMED_MODEL_KEY = "__no_model__";
+
 /** The four measured series the grid draws. Null is an unanswered read. */
 interface MeasuredRows {
   byTeam: DailyBucket[] | null;
@@ -1627,10 +1657,23 @@ function measuredRows({
               label: row.departmentName,
               value: Number(row.spendUsd),
             })),
+    // Already totalled and already ranked by the service. A model the
+    // provider named nothing for keeps an honest label rather than an
+    // invented one, the same choice the spender panel makes for its
+    // not-named bucket. A WITHHELD figure (null) is dropped from the ranked
+    // list: the list draws bar lengths, and there is no length that means
+    // "we do not know" — the cells-without-amount count that explains it
+    // rides on the row and belongs to a panel that can state it in words.
     byModel:
-      breakdowns.modelOverTime === null
+      breakdowns.modelRows === null
         ? null
-        : totalPerSeries(breakdowns.modelOverTime),
+        : breakdowns.modelRows
+            .filter((row) => row.amountUsd !== null)
+            .map((row) => ({
+              key: row.model === "" ? UNNAMED_MODEL_KEY : row.model,
+              label: row.model === "" ? "No model named" : row.model,
+              value: row.amountUsd ?? 0,
+            })),
     byUser:
       breakdowns.userRows === null
         ? null

@@ -107,6 +107,9 @@ vi.mock("~/utils/api", () => {
         // about the lanes.
         spenders: empty,
         dailyByProvider: empty,
+        // The ranked model panel reads the billed rollup now rather
+        // than the activity monitor; it answers nothing here too.
+        spendByModel: empty,
       },
       activityMonitor: {
         summary: empty,

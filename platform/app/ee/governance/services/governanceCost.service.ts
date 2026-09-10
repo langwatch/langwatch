@@ -367,6 +367,30 @@ export interface GovernanceCostProviderDayBreakdownDto {
 }
 
 /**
+ * One model's spend over the window.
+ *
+ * The model string is repeated EXACTLY as the provider billed it. A provider
+ * that charges per token kind sends a line item rather than a bare model name,
+ * and the puller stores it unsplit on purpose; re-cutting it here would invent
+ * a grouping the bill does not make and merge two figures a reader may need
+ * apart.
+ */
+export interface GovernanceCostModelRowDto {
+  /** Empty when the provider's rows named no model. */
+  model: string;
+  /** Withheld (null) unless every cell behind it is priced in USD. */
+  amountUsd: number | null;
+  cellsWithoutAmount: number;
+}
+
+export interface GovernanceCostModelBreakdownDto {
+  unavailableReason: GovernanceCostUnavailableReason | null;
+  /** Largest spend first; withheld figures last. Empty while unavailable. */
+  rows: GovernanceCostModelRowDto[];
+  windowDays: number;
+}
+
+/**
  * One record behind a (day, provider) figure: what it was for and what it
  * cost.
  *
@@ -705,6 +729,79 @@ export class GovernanceCostService {
       })),
       windowDays,
     };
+  }
+
+  /**
+   * The billed lane split by MODEL over the window, largest first.
+   *
+   * This panel used to read the metered trace store, which in a deployment
+   * whose only money arrives on pulled bills holds nothing — so a screen with
+   * a fully populated `Model` column sat there reporting "nothing in this
+   * window yet". Same rollup as every other figure on this screen now, which
+   * is also what makes it add up against the billed lane beside it.
+   *
+   * Ordered by spend rather than alphabetically, because the panel is a ranked
+   * list and the question it answers is which model costs the most. A withheld
+   * figure sorts last: it is not a small number, it is an unknown one, and
+   * putting it at the top or in the middle would read as a measurement.
+   *
+   * Each figure obeys the same withholding rule as every other on this screen:
+   * a model holding any cell we have no USD amount for states no figure,
+   * because the priced part alone reads as the whole one.
+   */
+  async spendByModel({
+    organizationId,
+    windowDays,
+    now = new Date(),
+  }: {
+    organizationId: string;
+    windowDays: number;
+    now?: Date;
+  }): Promise<GovernanceCostModelBreakdownDto> {
+    const { costRollup, prisma } = this.deps;
+    if (!costRollup) {
+      return { unavailableReason: "no_cost_store", rows: [], windowDays };
+    }
+    const tenantId = await resolveGovProjectId({ prisma, organizationId });
+    if (!tenantId) {
+      return {
+        unavailableReason: "no_governance_project",
+        rows: [],
+        windowDays,
+      };
+    }
+
+    const toDay = utcDay(now);
+    const fromDay = utcDay(
+      new Date(now.getTime() - (windowDays - 1) * 86_400_000),
+    );
+    const groups = await costRollup.sumWindowByModel({
+      tenantId,
+      fromDay,
+      toDay,
+    });
+
+    const rows = groups.map((group) => ({
+      model: group.model,
+      ...spenderFigure([group]),
+    }));
+    // Sorted here rather than in SQL: the ordering is over the WITHHELD figure,
+    // which only exists once the withholding rule has been applied, and that
+    // rule lives in this layer.
+    rows.sort((left, right) => {
+      if (left.amountUsd === null && right.amountUsd === null) {
+        return left.model.localeCompare(right.model);
+      }
+      if (left.amountUsd === null) return 1;
+      if (right.amountUsd === null) return -1;
+      if (right.amountUsd !== left.amountUsd) {
+        return right.amountUsd - left.amountUsd;
+      }
+      // Ties broken by name so the list does not reshuffle between reads.
+      return left.model.localeCompare(right.model);
+    });
+
+    return { unavailableReason: null, rows, windowDays };
   }
 
   /**

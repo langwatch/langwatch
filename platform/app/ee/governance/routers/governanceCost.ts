@@ -127,6 +127,34 @@ export const governanceCostRouter = createTRPCRouter({
     }),
 
   /**
+   * The billed lane split by model over the window, largest spend first.
+   *
+   * Gated on the cost permission alone, like `summary` and `dailyByProvider`
+   * and unlike `spenders`: a model is not a person, so this joins no identity
+   * data and buying figures is enough to see it.
+   */
+  spendByModel: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        windowDays: z.number().int().min(1).max(365).default(30),
+      }),
+    )
+    .permission("governanceCost:view")
+    .use(enterpriseGate)
+    .query(async ({ ctx, input }) => {
+      const service = GovernanceCostService.create({
+        prisma: ctx.prisma,
+        costRollup: getApp().governance.costRollup,
+        ocsfEvents: getApp().governance.ocsfEvents,
+      });
+      return await service.spendByModel({
+        organizationId: input.organizationId,
+        windowDays: input.windowDays,
+      });
+    }),
+
+  /**
    * The records behind one day at one provider. Same grant as the figure they
    * explain — a reader allowed to see a total is allowed to see what it is
    * made of.

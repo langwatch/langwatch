@@ -1230,6 +1230,90 @@ export class GovernanceCostRollupClickHouseRepository {
   }
 
   /**
+   * Current pulled costs by MODEL over the window.
+   *
+   * ADR-128 §1 files the model under wave 1 because every pulled provider
+   * already fills it: the dimension arrives on the bill and needs no identity
+   * work to become readable. It is the only one of wave 1's four "where"
+   * dimensions actually populated today — the agent and actor columns are
+   * still blank on every pulled cell — so this is the read that makes the
+   * ranked model panel a measurement instead of a placeholder.
+   *
+   * Grouped on `Model` exactly as the provider reported it. A provider that
+   * bills per token kind writes a line item ("<model>, input"); splitting that
+   * here would invent a grouping the bill does not make.
+   *
+   * PULLED ONLY, by predicate, for the reason `sumWindowBySpender` gives: the
+   * gateway lane writes a different provider vocabulary into the same table
+   * and an unfiltered read would cross-sum two lanes the screen keeps apart.
+   *
+   * Same two-pass shape as its neighbours — the inner query collapses each
+   * cell to its surviving version and the outer one sums only survivors, so
+   * retries and corrections do not double the bill. `sumOrNull` because a
+   * wholly unpriced group holds nothing, and 0 would be a claim.
+   *
+   * The STRICT unpriced rule (`LatestAmountNanoUsd IS NULL`), the one
+   * `sumWindowBySpender` keeps rather than the looser
+   * `HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL`: a model row is a name and a number
+   * with no currency channel beside it, so narrowing the count would turn a
+   * correctly withheld figure into one silently short of the non-USD spend
+   * behind it, with nowhere on the row to say so.
+   */
+  async sumWindowByModel(input: {
+    tenantId: string;
+    /** Inclusive, `YYYY-MM-DD`. */
+    fromDay: string;
+    /** Inclusive, `YYYY-MM-DD`. */
+    toDay: string;
+  }): Promise<
+    Array<{
+      /** Empty when the provider's row named no model. */
+      model: string;
+      amountNanoUsd: number | null;
+      /** Cells of this model holding no USD figure. Above zero, withhold. */
+      cellsWithoutAmount: number;
+    }>
+  > {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          Model                                AS Model,
+          sumOrNull(LatestAmountNanoUsd)       AS AmountNanoUsd,
+          countIf(LatestAmountNanoUsd IS NULL) AS CellsWithoutAmount
+        FROM (
+          SELECT
+            ${KEY_COLUMNS.join(", ")},
+            argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd
+          FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
+          WHERE TenantId = {tenantid:String}
+            AND Day >= {fromday:Date}
+            AND Day <= {today:Date}
+            AND CostSource = {costsource:String}
+            AND Version = {version:String}
+          GROUP BY ${KEY_COLUMNS.join(", ")}
+        )
+        GROUP BY Model
+        ORDER BY Model
+      `,
+      query_params: {
+        tenantid: input.tenantId,
+        fromday: input.fromDay,
+        today: input.toDay,
+        costsource: GOVERNANCE_COST_SOURCE.PULLED,
+        version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      model: str(row.Model),
+      amountNanoUsd: nullableInt(row.AmountNanoUsd),
+      cellsWithoutAmount: int(row.CellsWithoutAmount),
+    }));
+  }
+
+  /**
    * Whether ONE source put any cell at all into a lane over a day range —
    * priced or not.
    *

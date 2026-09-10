@@ -106,6 +106,7 @@ vi.mock("~/utils/api", () => {
           summary: invalidator("governanceCost.summary"),
           spenders: invalidator("governanceCost.spenders"),
           dailyByProvider: invalidator("governanceCost.dailyByProvider"),
+          spendByModel: invalidator("governanceCost.spendByModel"),
           dayRecords: invalidator("governanceCost.dayRecords"),
         },
         activityMonitor: {
@@ -148,6 +149,13 @@ vi.mock("~/utils/api", () => {
         }),
         spenders: read("governanceCost.spenders", { rows: [] }),
         dailyByProvider: read("governanceCost.dailyByProvider", { rows: [] }),
+        spendByModel: read("governanceCost.spendByModel", {
+          unavailableReason: null,
+          rows: [
+            { model: "claude-opus-5", amountUsd: 310.5, cellsWithoutAmount: 0 },
+          ],
+          windowDays: 30,
+        }),
         // `dayRecords` is deliberately NOT in `READS_ON_THE_SCREEN`, and this
         // mock is what makes that absence enforceable rather than decorative.
         // The read is issued only once a reader opens a day, so a refresh
@@ -201,8 +209,10 @@ const renderScreen = () =>
  *
  * Named rather than counted, because a count breaks on the next read the
  * screen legitimately gains and says nothing about which one went missing.
- * `spendOverTime` appears once: the screen issues it twice, grouped two ways,
- * and one key covers both.
+ * The model panel is `governanceCost.spendByModel`, not a second grouping of
+ * `spendOverTime`: it reads the billed rollup, which is where the money this
+ * deployment has actually lands. Being on a different router is not a reason
+ * for the refresh control to skip it.
  */
 const READS_ON_THE_SCREEN = [
   "activityMonitor.spendByDepartment",
@@ -210,6 +220,7 @@ const READS_ON_THE_SCREEN = [
   "activityMonitor.spendOverTime",
   "activityMonitor.summary",
   "governanceCost.dailyByProvider",
+  "governanceCost.spendByModel",
   "governanceCost.spenders",
   "governanceCost.summary",
 ];
@@ -309,8 +320,10 @@ describe("bringing the cost screen up to date", () => {
       expect(department.queryByText("Not available.")).not.toBeInTheDocument();
 
       // Its neighbours answered and keep their figures, so this cannot pass
-      // against an implementation that fails the whole screen.
-      expect(screen.getByText("Team A")).toBeInTheDocument();
+      // against an implementation that fails the whole screen. The model panel
+      // is the neighbour asked, because it is the one that renders its series
+      // as text a query can find — the team panel draws bars and no labels.
+      expect(screen.getByText("claude-opus-5")).toBeInTheDocument();
     });
   });
 

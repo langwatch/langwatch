@@ -34,6 +34,16 @@ const harness = vi.hoisted(() => ({
     spendByUser: undefined as unknown,
     spendOverTime: undefined as unknown,
   },
+  /**
+   * The ranked model read's answer. `undefined` means it has not answered.
+   *
+   * On the billed router rather than the activity monitor: this panel reads
+   * the same rollup the lanes above it read, which is where pulled bills land.
+   * Pointed at the metered traces it reported an empty window over a table
+   * that held every model the organization had been billed for.
+   */
+  modelSpend: undefined as unknown,
+  modelSpendFails: false,
   /** The spender breakdown read: its answer, whether it failed, retry spy. */
   spenders: {
     data: undefined as unknown,
@@ -103,6 +113,13 @@ vi.mock("~/components/LoadingScreen", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     governanceCost: {
+      spendByModel: {
+        useQuery: () => ({
+          data: harness.modelSpend,
+          isLoading: false,
+          isError: harness.modelSpendFails,
+        }),
+      },
       spenders: {
         useQuery: () => ({
           data: harness.spenders.data,
@@ -182,6 +199,8 @@ beforeEach(() => {
   harness.providers = [];
   harness.dailyByProvider = undefined;
   harness.dayRecords = undefined;
+  harness.modelSpend = undefined;
+  harness.modelSpendFails = false;
 });
 
 afterEach(() => cleanup());
@@ -245,6 +264,46 @@ describe("the cost breakdown panels", () => {
     });
   });
 
+  describe("given billed spend recorded against two models", () => {
+    /** @scenario "The ranked model panel fills from the billed lane" */
+    it("names both models and does not say the window holds nothing", () => {
+      // The activity reads stay silent on purpose: this panel must fill from
+      // the billed rollup alone. Pointed at the metered traces it reported an
+      // empty window over a table holding every model that had been billed.
+      harness.modelSpend = {
+        unavailableReason: null,
+        rows: [
+          { model: "claude-opus-5", amountUsd: 34.95, cellsWithoutAmount: 0 },
+          {
+            model: "gpt-5-mini-2025-08-07, output",
+            amountUsd: 4.34,
+            cellsWithoutAmount: 0,
+          },
+        ],
+        windowDays: 30,
+      };
+
+      renderScreen();
+
+      const panel = screen
+        .getByText("Cost by model")
+        .closest('[data-testid="cost-panel"]');
+      expect(panel).not.toBeNull();
+      const models = within(panel as HTMLElement);
+
+      expect(models.getByText("claude-opus-5")).toBeInTheDocument();
+      // The line item verbatim: OpenAI bills per token kind and the puller
+      // stores that unsplit, so re-cutting it anywhere would invent a
+      // grouping the invoice does not make.
+      expect(
+        models.getByText("gpt-5-mini-2025-08-07, output"),
+      ).toBeInTheDocument();
+      expect(
+        models.queryByText("Nothing in this window yet."),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("given an activity read has not answered", () => {
     it("says so rather than printing a zero nobody measured", () => {
       renderScreen();
@@ -269,9 +328,7 @@ describe("the cost breakdown panels", () => {
         screen.getByText("Spend per model, largest first."),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(
-          "Fills from gateway traffic and from usage rows that name a model.",
-        ),
+        screen.getByText("Fills from the bills a connected source reports."),
       ).toBeInTheDocument();
       expect(
         screen.getAllByRole("link", { name: /Add a source/ }).length,
