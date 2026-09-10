@@ -13,8 +13,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Cron } from "croner";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
-import type { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
-import type { AutomationSlackProvider } from "../ports/automation-provider.port.ts";
+import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:report-dispatch");

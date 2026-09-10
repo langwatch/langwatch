@@ -20,7 +20,7 @@ import type {
 import { AuthzApi as AuthzApiToken } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
-import { EventingAuthzGrantAdapter } from "../adapters/eventing.authz-grant.adapter.ts";
+import { AuthzGrantIdentity } from "../services/authz-grant-identity.service.ts";
 import {
   PostgresAuthzAdapter,
   type PostgresAuthzAdapterOptions,
@@ -148,7 +148,7 @@ export class AuthzApp implements AuthzApi {
    * does not own the ledger for. It reads nothing and awaits nothing: the id
    * is a function of the grant's own content.
    */
-  deriveGrantId: AuthzApi["deriveGrantId"] = (a) => EventingAuthzGrantAdapter.deriveGrantId(a);
+  deriveGrantId: AuthzApi["deriveGrantId"] = (a) => AuthzGrantIdentity.deriveGrantId(a);
   attach: AuthzApi["attach"] = (a) => this.#grants.attach(a);
   update: AuthzApi["update"] = (a) => this.#grants.update(a);
   revoke: AuthzApi["revoke"] = (a) => this.#grants.revoke(a);

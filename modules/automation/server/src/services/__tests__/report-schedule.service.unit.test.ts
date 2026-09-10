@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AutomationClock } from "../../app/automation.infrastructure.ts";
-import { ScheduledJobStorePort, type ScheduledJobRecord } from "../../ports/scheduled-jobs.port.ts";
-import { SchedulerWake } from "../../ports/scheduler-wake.port.ts";
+import { AutomationScheduledJobRepository, type ScheduledJobRecord } from "../../repositories/automation-scheduled-job.repository.ts";
+import { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
 import type {
   ReportScheduleTarget,
   TriggerRepository,
@@ -25,7 +25,7 @@ class Wake extends SchedulerWake {
     this.count++;
   }
 }
-class Jobs extends ScheduledJobStorePort {
+class Jobs extends AutomationScheduledJobRepository {
   rows: ScheduledJobRecord[] = [];
   async upsertForTarget(input: {
     projectId: string;

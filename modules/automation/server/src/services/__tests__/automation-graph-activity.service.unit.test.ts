@@ -3,10 +3,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import {
-  SlackProviderAdapter,
-  SlackBotTokenDecryptorAdapter,
-} from "../../adapters/slack-provider.adapter.ts";
-import { WebhookProviderAdapter } from "../../adapters/webhook-provider.adapter.ts";
+  AutomationSlackSecretsService,
+  AutomationSlackBotTokenDecryptorService,
+} from "../automation-slack-secrets.service.ts";
+import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
 import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
@@ -60,8 +60,8 @@ function compose(
     projects: new OneProject() as unknown as ProjectApi,
     analytics: new BreachingAnalytics() as unknown as AnalyticsService,
     delivery,
-    webhooks: WebhookProviderAdapter.create(crypto),
-    slackTokens: new SlackBotTokenDecryptorAdapter(SlackProviderAdapter.create(crypto)),
+    webhooks: AutomationWebhookSecretsService.create(crypto),
+    slackTokens: new AutomationSlackBotTokenDecryptorService(AutomationSlackSecretsService.create(crypto)),
     emailCaps: AutomationEmailCapService.create({ store: null }),
     logger,
     dispatchErrors: new TestDispatchErrors(),

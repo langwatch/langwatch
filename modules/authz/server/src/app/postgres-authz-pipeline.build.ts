@@ -1,4 +1,4 @@
-import { EventingAuthzAdapter } from "../adapters/eventing.authz.adapter.ts";
+import { EventingAuthzAdapter } from "../eventing/authz-grant.pipeline.ts";
 import type { AuthzPipeline } from "./postgres-authz.build.ts";
 import {
   type AuthzAuditDatabase,

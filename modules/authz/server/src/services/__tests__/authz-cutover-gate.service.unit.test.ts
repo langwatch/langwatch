@@ -3,7 +3,7 @@ import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.auth
 import {
   AuthzCutoverFailureReporter,
   type AuthzCutoverReadFailure,
-} from "../../ports/authz-cutover-telemetry.port.ts";
+} from "../authz-cutover-telemetry.service.ts";
 import {
   type AuthzCutoverDatabase,
   PrismaAuthzCutoverRepository,

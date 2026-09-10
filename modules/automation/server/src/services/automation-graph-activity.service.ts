@@ -12,11 +12,11 @@ import type { AutomationClock } from "../app/automation.infrastructure.ts";
 import {
   type AutomationDispatchError,
   type AutomationLogger,
-  type AutomationSlackBotTokenDecryptor,
-} from "../ports/automation-graph.port.ts";
+} from "./automation-graph-runtime.service.ts";
+import { type AutomationSlackBotTokenDecryptor } from "./automation-slack-secrets.service.ts";
 import type { AutomationGraphDelivery } from "../app/automation.infrastructure.ts";
-import type { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
-import type { AutomationWebhookProvider } from "../ports/automation-provider.port.ts";
+import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";

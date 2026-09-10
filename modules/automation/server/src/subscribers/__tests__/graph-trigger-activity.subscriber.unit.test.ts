@@ -3,10 +3,10 @@ import type { GraphTriggerEvaluationResult, TriggerSummary } from "@langwatch/au
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 import {
-  SlackProviderAdapter,
-  SlackBotTokenDecryptorAdapter,
-} from "../../adapters/slack-provider.adapter.ts";
-import { WebhookProviderAdapter } from "../../adapters/webhook-provider.adapter.ts";
+  AutomationSlackSecretsService,
+  AutomationSlackBotTokenDecryptorService,
+} from "../../services/automation-slack-secrets.service.ts";
+import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
 import {
   BreachingAnalytics,
   createGraphActivityPrismaDouble,
@@ -101,8 +101,8 @@ describe("createGraphTriggerActivityHandler", () => {
           projects: new OneProject() as unknown as ProjectApi,
           analytics: new BreachingAnalytics() as unknown as AnalyticsService,
           delivery,
-          webhooks: WebhookProviderAdapter.create(crypto),
-          slackTokens: new SlackBotTokenDecryptorAdapter(SlackProviderAdapter.create(crypto)),
+          webhooks: AutomationWebhookSecretsService.create(crypto),
+          slackTokens: new AutomationSlackBotTokenDecryptorService(AutomationSlackSecretsService.create(crypto)),
           emailCaps: AutomationEmailCapService.create({ store: null }),
           logger: new SilentLogger(),
           dispatchErrors: new TestDispatchErrors(),

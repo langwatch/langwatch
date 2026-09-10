@@ -1,21 +1,21 @@
-export * from "./adapters/child-egress-policy.adapter.ts";
-export * from "./adapters/child-logger.adapter.ts";
-export * from "./adapters/child-process-spawn.adapter.ts";
-export * from "./adapters/child-tls-env.adapter.ts";
+export * from "./services/child-egress-policy.service.ts";
+export * from "./services/child-logger.service.ts";
+export * from "./services/child-process-spawn.service.ts";
+export * from "./services/child-tls-env.service.ts";
 export {
     COMPUTE_METRICS_RETRY_DELAY_MS,
     ComputeRunMetricsAdapter,
     ComputeRunMetricsCommand,
     scenarioDeferredComputeRunMetricsJob
-} from "./adapters/compute-run-metrics.adapter.ts";
-export type { ComputeRunMetricsDeps } from "./adapters/compute-run-metrics.adapter.ts";
-export { FinishRunCommand, type FinishRunDeps } from "./adapters/finish-run.adapter.ts";
-export * from "./adapters/http-auth.adapter.ts";
-export * from "./adapters/litellm-model.adapter.ts";
-export { NlpFetchAdapter, type NlpFetchTimeouts } from "./adapters/nlp-fetch.adapter.ts";
-export * from "./adapters/node-scenario-child-process.adapter.ts";
-export { OtelScenarioProcessorMetricsAdapter } from "./adapters/otel.scenario-processor-metrics.adapter.ts";
-export * from "./adapters/prompt-template.adapter.ts";
+} from "./eventing/compute-run-metrics.commands.ts";
+export type { ComputeRunMetricsDeps } from "./eventing/compute-run-metrics.commands.ts";
+export { FinishRunCommand, type FinishRunDeps } from "./eventing/finish-run.commands.ts";
+export * from "./services/http-auth.service.ts";
+export * from "./services/litellm-model.service.ts";
+export { NlpFetchAdapter, type NlpFetchTimeouts } from "./services/nlp-fetch.service.ts";
+export * from "./services/node-scenario-child-process.service.ts";
+export { OtelScenarioProcessorMetricsAdapter } from "./services/scenario-processor-metrics.service.ts";
+export * from "./services/prompt-template.service.ts";
 export * from "./repositories/redis/redis.cancellation-channel.repository.ts";
 export {
     CANCELLATION_CHANNEL,
@@ -24,15 +24,15 @@ export {
     type CancellationPublisher
 } from "./repositories/redis/redis.cancellation-channel.repository.ts";
 export * from "./repositories/redis/redis.scenario-tab-store.repository.ts";
-export * from "./adapters/remote-trace-run.adapter.ts";
-export * from "./adapters/scenario-child-execution.adapter.ts";
-export * from "./adapters/scenario-role-model.adapter.ts";
-export * from "./adapters/scenario-secret-reference.adapter.ts";
-export * from "./adapters/serialized-agent-registry.adapter.ts";
-export * from "./adapters/serialized-code-agent.adapter.ts";
-export * from "./adapters/serialized-http-agent.adapter.ts";
-export * from "./adapters/serialized-prompt-config.adapter.ts";
-export * from "./adapters/serialized-workflow-agent.adapter.ts";
+export * from "./services/remote-trace-run.service.ts";
+export * from "./services/scenario-child-execution.service.ts";
+export * from "./services/scenario-role-model.service.ts";
+export * from "./services/scenario-secret-reference.service.ts";
+export * from "./services/serialized-agent-registry.service.ts";
+export * from "./services/serialized-code-agent.service.ts";
+export * from "./services/serialized-http-agent.service.ts";
+export * from "./services/serialized-prompt-config.service.ts";
+export * from "./services/serialized-workflow-agent.service.ts";
 export {
     BACKFILL_STALE_THRESHOLD_MS,
     SimulationRunMetricsStoreAdapter,
@@ -40,11 +40,11 @@ export {
     SimulationStalledRunAdapter,
     type SimulationStalledRun
 } from "./repositories/clickhouse/clickhouse.simulation-eventing.repository.ts";
-export * from "./adapters/simulation-processing-commands.adapter.ts";
+export * from "./eventing/simulation-processing.commands.ts";
 export {
     SimulationProcessingPipelineAdapter,
     type SimulationProcessingPipelineDeps
-} from "./adapters/simulation-processing-pipeline.adapter.ts";
+} from "./eventing/simulation-processing.pipeline.ts";
 export { ClickhouseSimulationProcessingProducerRepository as SimulationProcessingProducerAdapter } from "./repositories/clickhouse/clickhouse.simulation-processing-producer.repository.ts";
 export {
     ScenarioApp,
@@ -58,7 +58,7 @@ export {
 // shape, the raw client boundary), so the folded interfaces stay reachable
 // only through ScenarioAppInfrastructure to avoid a duplicate barrel export.
 export type { CancellationMessage } from "./app/scenario.app.ts";
-export * from "./ports/scenario-activity.port.ts";
+export * from "./services/scenario-activity.service.ts";
 export type {
   ScenarioChildEnvironment,
   ScenarioChildExecutionSession,

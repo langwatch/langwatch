@@ -46,7 +46,7 @@ function job(projectId: string, runId: string): ExecutionJobData {
 const config: ScenarioChildProcessConfig = {
   packageRoot: "/app/modules/scenario/server",
   sourcePath:
-    "/app/modules/scenario/server/src/adapters/scenario-child-execution.adapter.ts",
+    "/app/modules/scenario/server/src/services/scenario-child-execution.service.ts",
   sourceRoots: ["/app/modules/scenario/server/src"],
   nodeEnv: "production",
   isSaas: true,

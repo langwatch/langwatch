@@ -33,7 +33,7 @@ import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type {
   AutomationHeartbeat,
   AutomationLogger,
-} from "../ports/automation-graph.port.ts";
+} from "./automation-graph-runtime.service.ts";
 import type { Instant } from "@langwatch/time";
 import { fromDate } from "@langwatch/time";
 

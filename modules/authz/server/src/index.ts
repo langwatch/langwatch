@@ -22,29 +22,29 @@ export {
   AuthzGrantsCommandDispatcher,
   AuthzLedgerUnavailableError,
   LEDGER_APP_HANDLE_WAIT_MS,
+  EventingAuthzCommandDispatcherAdapter,
   type AuthzGrantsCommandSenders,
-} from "./ports/authz-grants-command-dispatcher.port.ts";
-export { EventingAuthzCommandDispatcherAdapter } from "./adapters/eventing.authz-command-dispatcher.adapter.ts";
-export { KsuidAuthzBindingIdAdapter } from "./adapters/ksuid.authz-binding-id.adapter.ts";
+} from "./services/authz-grants-command-dispatcher.service.ts";
+export { KsuidAuthzBindingIdAdapter } from "./services/authz-binding-id.service.ts";
 export {
   AuthzMetrics,
   UncountedAuthzMetrics,
+  ObservabilityAuthzMetricsAdapter,
   type AuthzCounter,
-} from "./ports/authz-metrics.port.ts";
-export { AuthzRevocationTelemetry } from "./ports/authz-revocation-telemetry.port.ts";
-export type { AuthzRevocationReason } from "./ports/authz-revocation-telemetry.port.ts";
+} from "./services/authz-metrics.service.ts";
 export {
+  AuthzRevocationTelemetry,
   ObservabilityAuthzRevocationAdapter,
+  type AuthzRevocationReason,
   type AuthzRevocationCounter,
   type ObservabilityAuthzRevocationAdapterOptions,
-} from "./adapters/observability.authz-revocation.adapter.ts";
-export { ObservabilityAuthzMetricsAdapter } from "./adapters/observability.authz-metrics.adapter.ts";
-export type { PostgresAuthzDatabase } from "./ports/postgres-authz-database.port.ts";
+} from "./services/authz-revocation-telemetry.service.ts";
+export type { PostgresAuthzDatabase } from "./repositories/prisma/prisma.authz.database.ts";
 export {
   ObservabilityAuthzCutoverAdapter,
   type AuthzCutoverCounter,
-} from "./adapters/observability.authz-cutover.adapter.ts";
-export { EventingAuthzGrantAdapter } from "./adapters/eventing.authz-grant.adapter.ts";
+} from "./services/authz-cutover-telemetry.service.ts";
+export { AuthzGrantIdentity } from "./services/authz-grant-identity.service.ts";
 export { authzRepositories } from "./repositories/authz-repositories.registry.ts";
 export type { AuthzRepositories } from "./repositories/authz.repositories.ts";
 export { AuthzApp } from "./app/authz.app.ts";

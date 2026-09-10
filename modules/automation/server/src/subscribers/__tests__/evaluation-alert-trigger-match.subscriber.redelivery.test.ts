@@ -18,7 +18,7 @@ import {
   AutomationTriggerMatchRecorder,
 } from "../../index.ts";
 import type { AutomationGraphActivity } from "../../app/automation.infrastructure.ts";
-import type { AutomationTraceTriggerCatalogue } from "../../ports/automation-trace-trigger-catalogue.port.ts";
+import type { AutomationTraceTriggerCatalogue } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
 
 function trigger(): TriggerSummary {
   return {

@@ -1,6 +1,6 @@
 import { GrantValidationError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { EventingAuthzLedgerAdapter } from "../adapters/eventing.authz-ledger.adapter.ts";
+import type { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
 import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";

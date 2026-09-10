@@ -26,7 +26,7 @@
  * `deduplication` option, and `withCommand` never reads a handler class's
  * static `makeJobId` (only `CommandHandlerOptions.deduplication` reaches the
  * queue, the way `computeRunMetrics` wires it at
- * modules/scenario/server/src/adapters/simulation-processing-pipeline.adapter.ts:84).
+ * modules/scenario/server/src/eventing/simulation-processing.pipeline.ts:88).
  * `SuiteRunStateFoldProjection` then accumulates (`CompletedCount + 1`,
  * `GradedCount + 1`), and `FoldProjectionExecutor.dropAlreadyApplied` skips
  * redeliveries by `event.id` only, which two distinct events sharing an

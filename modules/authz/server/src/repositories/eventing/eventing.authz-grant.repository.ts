@@ -27,7 +27,7 @@ import {
 import {
   AuthzLedgerMapper,
   type EventingAuthzLedgerAdapter,
-} from "../../adapters/eventing.authz-ledger.adapter.ts";
+} from "../../eventing/authz-grant.store.ts";
 import {
   AuthzGrantRepository,
   type BindingPrincipalWhere,

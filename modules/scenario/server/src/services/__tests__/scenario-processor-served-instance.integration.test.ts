@@ -14,14 +14,14 @@ import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const childScript = vi.hoisted(() => ({ current: "" }));
-vi.mock("../../adapters/child-process-spawn.adapter.ts", () => ({
+vi.mock("../../services/child-process-spawn.service.ts", () => ({
   resolveChildProcessSpawn: () => ({
     command: process.execPath,
     args: ["-e", childScript.current],
   }),
 }));
 
-import { NodeScenarioChildProcessAdapter } from "../../adapters/node-scenario-child-process.adapter.ts";
+import { NodeScenarioChildProcessAdapter } from "../node-scenario-child-process.service.ts";
 import { CancellationSubscriber } from "../../app/scenario.app.ts";
 import { ScenarioProcessorServiceMetrics } from "../../app/scenario.app.ts";
 import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";

@@ -1,10 +1,6 @@
+import type { ApiKeyServerConfig } from "@langwatch/api-key-contract";
 import {
-  ApiKeyBindingIdAdapter,
-  ApiKeyDiagnosticsAdapter,
-  type ApiKeyInfrastructure,
-} from "@langwatch/api-key-server";
-import {
-  EventingAuthzGrantAdapter,
+  AuthzGrantIdentity,
   KsuidAuthzBindingIdAdapter,
   type AuthzGrantsCommandDispatcher,
 } from "@langwatch/authz-server";
@@ -79,12 +75,10 @@ export function createWorkerTenancyInfrastructure(
   const logger = options.logger ?? createLogger(options.config.serviceName);
   const encryption = resolveWorkerStoredSecretCipher(options.config);
   const authzBindingIds = KsuidAuthzBindingIdAdapter.create();
-  const apiKeys: ApiKeyInfrastructure = {
-    pepper: options.config.apiKeyPepper,
-    bindingIds: ApiKeyBindingIdAdapter.create(),
-    deriveBindingId: EventingAuthzGrantAdapter.deriveGrantId,
-    diagnostics: ApiKeyDiagnosticsAdapter.create(logger),
-  };
+  // The pepper the stored hashes were written under, and nothing else: the
+  // module derives its own ksuid generator, its warning log and the grant-id
+  // derivation it writes legacy bindings under.
+  const apiKeys: ApiKeyServerConfig = { pepper: options.config.apiKeyPepper };
   const project: ProjectInfrastructure = {
     topicClustering: options.topicClustering,
   };

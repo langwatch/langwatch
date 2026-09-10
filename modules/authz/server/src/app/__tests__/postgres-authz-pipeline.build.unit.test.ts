@@ -9,7 +9,7 @@ import {
   type AuthzGrantPipelineDatabase,
   PostgresAuthzPipelineAdapter,
 } from "../postgres-authz-pipeline.build.ts";
-import type { AuthzGrantsEvent } from "../../adapters/eventing.authz.adapter.ts";
+import type { AuthzGrantsEvent } from "../../eventing/authz-grant.events.ts";
 import type { AuthzGrantProjection } from "../../projections/authz-grant.projection.ts";
 
 const ORGANIZATION = "organization_acme";

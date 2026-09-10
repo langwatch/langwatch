@@ -31,7 +31,7 @@ import { EmailSuppressionNameRepository } from "../repositories/email-suppressio
 import { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository.ts";
 import { TriggerRepository } from "../repositories/trigger.repository.ts";
-import { UnsubscribeTokenVerifier } from "../ports/unsubscribe-token.port.ts";
+import { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import { AutomationClock } from "../app/automation.infrastructure.ts";
 import { ReportScheduleService } from "./report-schedule.service.ts";
 import { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";

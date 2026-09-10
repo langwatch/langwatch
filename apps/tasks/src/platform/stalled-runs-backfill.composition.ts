@@ -1,7 +1,7 @@
 import { NullSimulationRepository, SimulationService } from "@langwatch/scenario-server";
 import { SimulationStalledRunAdapter } from "@langwatch/scenario-server/composition/simulation-eventing";
-import { SimulationExecutionRepository } from "@langwatch/scenario-server/composition/simulation-execution-port";
-import { SimulationProcessingProducerAdapter } from "@langwatch/scenario-server/composition/simulation-processing-producer";
+import { SimulationExecutionRepository } from "@langwatch/scenario-server/composition/simulation-execution";
+import { ClickhouseSimulationProcessingProducerRepository as SimulationProcessingProducerAdapter } from "@langwatch/scenario-server/composition/simulation-processing-producer";
 import { StalledRunsBackfillTask } from "@langwatch/scenario-server/composition/stalled-runs-backfill";
 import { nowInstant } from "@langwatch/time";
 import {

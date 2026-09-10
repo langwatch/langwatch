@@ -14,20 +14,16 @@ import { createLogger } from "@langwatch/observability";
 import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
 import type { AutomationClock } from "../app/automation.infrastructure.ts";
 import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
-import type { AutomationSettlementLedger } from "../ports/automation-settlement-ledger.port.ts";
+import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
 import {
   AutomationTraceRecordUnavailableError,
   type AutomationSettlementTraceReader,
-} from "../ports/automation-settlement-read.port.ts";
-import type { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
-import type {
-  AutomationSlackProvider,
-  AutomationWebhookProvider,
-} from "../ports/automation-provider.port.ts";
-import type {
-  AutomationSettlementMatchConfirmation,
-  AutomationSettlementObservability,
-} from "../ports/automation-settlement.port.ts";
+} from "../repositories/automation-settlement-read.repository.ts";
+import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
+import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
+import type { AutomationSettlementMatchConfirmation } from "../services/automation-settlement-policy.service.ts";
+import type { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import {
   TriggerSettlementEmailService,

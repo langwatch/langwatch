@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { AutomationIntentRetention } from "../ports/automation-intent-retention.port.ts";
-import type { AutomationScheduledIntent } from "../ports/automation-scheduled-intent.port.ts";
+import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
+import type { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
 
 const logger = createLogger("langwatch:automation:webhook-delivery-prune");
 const PRUNE_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;

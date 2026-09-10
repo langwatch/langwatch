@@ -10,7 +10,7 @@ const planMock = vi.hoisted(() => ({
 // when Redis is down, which the email caps already pin.
 // The TTL cache would otherwise carry one test's plan answer into the next.
 import { AutomationPersistCapService } from "../persist-cap.service.ts";
-import { SettlementProjectService } from "../../ports/__tests__/support/settlement.fixtures.ts";
+import { SettlementProjectService } from "../../fixtures/settlement.fixtures.ts";
 import { Temporal } from "@langwatch/time";
 
 const PROJECT_ID = "proj-1";

@@ -7,9 +7,9 @@ import {
   PrismaTriggerFireHistoryRepository,
   PrismaTriggerRepository,
   ReportScheduleService,
-  ScheduledJobStorePort,
+  AutomationScheduledJobRepository,
   SchedulerWake,
-  SlackProviderAdapter,
+  AutomationSlackSecretsService,
   ReportChartService,
   ReportDispatchService,
   ReportTraceRowService,
@@ -245,7 +245,7 @@ export function createWorkerReportSchedule(
     loadTrigger: ({ projectId, triggerId }) => triggers.tryFindById({ triggerId, projectId }),
     loadProject: (projectId) => options.projects.tryGetById(projectId),
     delivery: options.delivery.delivery,
-    slackProvider: SlackProviderAdapter.create(options.delivery.crypto),
+    slackProvider: AutomationSlackSecretsService.create(options.delivery.crypto),
     filterSuppressedRecipients: (input) => graphDelivery.filterSuppressed(input),
     listReportTraces: (input) => options.traces.listReportTraces(input),
     loadReportCharts: ({ projectId, source, from, to }) =>
@@ -322,7 +322,7 @@ export function createWorkerReportSchedule(
  * describe the same table from opposite ends — Automation writes a report's slot, Eventing claims
  * and settles it — and this is the one place they meet.
  */
-class WorkerReportScheduleJobs extends ScheduledJobStorePort {
+class WorkerReportScheduleJobs extends AutomationScheduledJobRepository {
   static create(store: ScheduledJobStore): WorkerReportScheduleJobs {
     return new WorkerReportScheduleJobs(store);
   }

@@ -27,7 +27,7 @@ import type {
   RoleHeadRow,
   ShareLinkFactRow,
 } from "../repositories/authz-migration.repository.ts";
-import { EventingAuthzGrantAdapter } from "../adapters/eventing.authz-grant.adapter.ts";
+import { AuthzGrantIdentity } from "../services/authz-grant-identity.service.ts";
 import {
   AuthzGrantMapper,
   PRINCIPAL_TO_DB,
@@ -740,7 +740,7 @@ export class AuthzExpectedFactsMapper {
         const scope = { type: "TEAM" as const, id: row.teamId };
         return [
           {
-            grantId: EventingAuthzGrantAdapter.deriveGrantId({
+            grantId: AuthzGrantIdentity.deriveGrantId({
               organizationId,
               principal,
               scope,
@@ -780,7 +780,7 @@ export class AuthzExpectedFactsMapper {
     if (organizationCreatedAtMs !== null) {
       const principal = { type: "organization" as const, id: organizationId };
       facts.push({
-        grantId: EventingAuthzGrantAdapter.deriveGrantId({
+        grantId: AuthzGrantIdentity.deriveGrantId({
           organizationId,
           principal,
           scope,
@@ -801,7 +801,7 @@ export class AuthzExpectedFactsMapper {
       if (bindingRows.some((row) => covers({ row, userId: member.userId }))) continue;
       const principal = { type: "user" as const, id: member.userId };
       facts.push({
-        grantId: EventingAuthzGrantAdapter.deriveGrantId({
+        grantId: AuthzGrantIdentity.deriveGrantId({
           organizationId,
           principal,
           scope,
@@ -818,7 +818,7 @@ export class AuthzExpectedFactsMapper {
     for (const member of externalMembers.slice().sort((a, b) => a.userId.localeCompare(b.userId))) {
       const principal = { type: "user" as const, id: member.userId };
       facts.push({
-        grantId: EventingAuthzGrantAdapter.deriveGrantId({
+        grantId: AuthzGrantIdentity.deriveGrantId({
           organizationId,
           principal,
           scope,
@@ -847,7 +847,7 @@ export class AuthzExpectedFactsMapper {
     const principal = { type: "project" as const, id: credential.projectId };
     const scope = { type: "PROJECT" as const, id: credential.projectId };
     return {
-      grantId: EventingAuthzGrantAdapter.deriveGrantId({
+      grantId: AuthzGrantIdentity.deriveGrantId({
         organizationId,
         principal,
         scope,

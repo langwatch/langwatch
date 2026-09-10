@@ -30,13 +30,13 @@ import {
   createAutomationsPipeline,
   GraphTriggerHeartbeatService,
   OtelAutomationRunawayMetricsAdapter,
-  PostgresAutomationSettlementLedgerAdapter,
+  PrismaAutomationSettlementLedgerRepository,
   PrismaGraphTriggerSentRepository,
   PrismaTriggerRepository,
   PrismaWebhookDeliveryRepository,
   RunawayContainmentService,
-  SlackProviderAdapter,
-  WebhookProviderAdapter,
+  AutomationSlackSecretsService,
+  AutomationWebhookSecretsService,
   type AutomationEvent,
   type AutomationGraphActivity,
   type AutomationIntentRetention,
@@ -243,7 +243,7 @@ export function createWorkerAutomationSettlement(
   // automation honour an unsubscribe the other ignored. The knot is tied with one late read rather
   // than a second suppression reader.
   let containment: RunawayContainmentService | undefined;
-  const ledger = PostgresAutomationSettlementLedgerAdapter.create({
+  const ledger = PrismaAutomationSettlementLedgerRepository.create({
     prisma: options.prisma,
     clock: options.clock,
     redis: options.redis ?? null,
@@ -290,8 +290,8 @@ export function createWorkerAutomationSettlement(
     }),
     delivery: notifications.delivery,
     emailCaps: notifications.emailCaps,
-    slack: SlackProviderAdapter.create(notifications.crypto),
-    webhooks: WebhookProviderAdapter.create(notifications.crypto),
+    slack: AutomationSlackSecretsService.create(notifications.crypto),
+    webhooks: AutomationWebhookSecretsService.create(notifications.crypto),
     clock: options.clock,
     observability: WorkerSettlementObservability.create(logger),
     emailHourlyCap: options.config.automation.emailHourlyCap,

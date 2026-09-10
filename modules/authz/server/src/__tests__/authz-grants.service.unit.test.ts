@@ -5,7 +5,7 @@ import {
   OffboardIncompleteError,
 } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import type { EventingAuthzLedgerAdapter } from "../adapters/eventing.authz-ledger.adapter.ts";
+import type { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
 import {
   type AuthzGrantRepository,
   BindingMissingError,

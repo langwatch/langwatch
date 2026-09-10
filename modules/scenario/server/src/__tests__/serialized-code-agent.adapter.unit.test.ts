@@ -5,7 +5,7 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CodeAgentData } from "@langwatch/scenario-contract";
-import { NlpFetchAdapter } from "../adapters/nlp-fetch.adapter.ts";
+import { NlpFetchAdapter } from "../services/nlp-fetch.service.ts";
 import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
 
 // Capture withActiveSpan calls so the timeout/error paths can be verified.

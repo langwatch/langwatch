@@ -4,7 +4,7 @@ import {
   automationProcessDefinition,
   InertIntentRetention,
   InertScheduledIntents,
-} from "../../ports/__tests__/pipeline-test-harness.ts";
+} from "../../fixtures/pipeline-test-harness.ts";
 import { WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS } from "../webhook-delivery-prune.process.ts";
 
 describe("webhook delivery prune process", () => {

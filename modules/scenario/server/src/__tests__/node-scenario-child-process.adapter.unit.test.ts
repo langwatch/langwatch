@@ -8,7 +8,7 @@ import { EventEmitter } from "events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChildProcessJobData } from "@langwatch/scenario-contract";
 
-vi.mock("../adapters/child-process-spawn.adapter.ts", () => ({
+vi.mock("../services/child-process-spawn.service.ts", () => ({
   resolveChildProcessSpawn: () => ({ command: "node", args: ["/dist/bundle.cjs"] }),
 }));
 
@@ -29,7 +29,7 @@ vi.mock("node:child_process", () => ({
   }),
 }));
 
-import { NodeScenarioChildProcessAdapter } from "../adapters/node-scenario-child-process.adapter.ts";
+import { NodeScenarioChildProcessAdapter } from "../services/node-scenario-child-process.service.ts";
 import { ScenarioExecutionPoolService, ScenarioExecutionRunnerPort } from "../index.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 

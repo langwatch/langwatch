@@ -4,15 +4,15 @@ import {
 } from "@langwatch/authz-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
-import { type AuthzMetrics, UncountedAuthzMetrics } from "../ports/authz-metrics.port.ts";
-import type { PostgresAuthzDatabase } from "../ports/postgres-authz-database.port.ts";
+import { type AuthzMetrics, UncountedAuthzMetrics } from "../services/authz-metrics.service.ts";
+import type { PostgresAuthzDatabase } from "../repositories/prisma/prisma.authz.database.ts";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
 import type {
   AuthzGrantsCommandDispatcher,
   AuthzGrantsCommandSenders,
-} from "../ports/authz-grants-command-dispatcher.port.ts";
+} from "../services/authz-grants-command-dispatcher.service.ts";
 import {
   type AuthzEngineLedger,
   LegacyImportAuthzGrantMigration,
@@ -42,15 +42,15 @@ import {
   type AuthzLedgerDatabase,
   type EventingAuthzLedgerAdapterOptions,
   EventingAuthzLedgerAdapter,
-} from "../adapters/eventing.authz-ledger.adapter.ts";
-import { EventingAuthzAdapter } from "../adapters/eventing.authz.adapter.ts";
+} from "../eventing/authz-grant.store.ts";
+import { EventingAuthzAdapter } from "../eventing/authz-grant.pipeline.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import {
   type AuthzCutoverDatabase,
   PrismaAuthzCutoverRepository,
 } from "../repositories/prisma/prisma.authz-cutover.repository.ts";
-import { ObservabilityAuthzCutoverAdapter } from "../adapters/observability.authz-cutover.adapter.ts";
-import { ObservabilityAuthzRevocationAdapter } from "../adapters/observability.authz-revocation.adapter.ts";
+import { ObservabilityAuthzCutoverAdapter } from "../services/authz-cutover-telemetry.service.ts";
+import { ObservabilityAuthzRevocationAdapter } from "../services/authz-revocation-telemetry.service.ts";
 import { fromDate } from "@langwatch/time";
 
 /**

@@ -9,18 +9,14 @@ import type {
 } from "../intents/trigger-settlement.intent.ts";
 import { TRIGGER_SETTLEMENT_INTENT_TYPES } from "../intents/trigger-settlement.intent.ts";
 import type { AutomationClock } from "../app/automation.infrastructure.ts";
-import type { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
-import type {
-  AutomationSlackProvider,
-  AutomationWebhookProvider,
-} from "../ports/automation-provider.port.ts";
-import type {
-  AutomationSettlementMatchConfirmation,
-  AutomationSettlementObservability,
-} from "../ports/automation-settlement.port.ts";
-import { AutomationSettlementExecutor } from "../ports/automation-settlement.port.ts";
-import type { AutomationSettlementLedger } from "../ports/automation-settlement-ledger.port.ts";
-import type { AutomationSettlementTraceReader } from "../ports/automation-settlement-read.port.ts";
+import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
+import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
+import type { AutomationSettlementMatchConfirmation } from "../services/automation-settlement-policy.service.ts";
+import type { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
+import { AutomationSettlementExecutor } from "./automation-settlement-executor.service.ts";
+import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import type { AutomationPersistActionService } from "./persist-action.service.ts";

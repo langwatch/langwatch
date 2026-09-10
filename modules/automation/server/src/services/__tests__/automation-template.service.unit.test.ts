@@ -10,7 +10,7 @@ import {
 } from "@langwatch/automation-contract";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { AutomationTestFire } from "../../ports/automation-test-fire.port.ts";
+import { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
 
 const BASE_HOST = "https://app.langwatch.ai";

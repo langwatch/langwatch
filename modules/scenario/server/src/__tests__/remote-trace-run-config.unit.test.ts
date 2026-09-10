@@ -100,7 +100,7 @@ describe("buildRemoteTraceRunConfig", () => {
 
 describe("scenario child process wiring", () => {
   const source = fs.readFileSync(
-    path.resolve(__dirname, "../adapters/scenario-child-execution.adapter.ts"),
+    path.resolve(__dirname, "../services/scenario-child-execution.service.ts"),
     "utf8",
   );
 

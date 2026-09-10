@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { GraphTriggerSweepCandidate } from "@langwatch/automation-contract";
 import { z } from "zod";
-import type { AutomationIntentRetention } from "../ports/automation-intent-retention.port.ts";
-import type { AutomationScheduledIntent } from "../ports/automation-scheduled-intent.port.ts";
+import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
+import type { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
 import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automation:graph-alert-sweep");

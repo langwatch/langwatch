@@ -51,8 +51,8 @@ const PACKAGE_ROOT = path.resolve(import.meta.dirname, "..");
 const SOURCE_PATH = path.join(
   PACKAGE_ROOT,
   "src",
-  "adapters",
-  "scenario-child-execution.adapter.ts",
+  "services",
+  "scenario-child-execution.service.ts",
 );
 const SOURCE_ROOTS = [path.dirname(SOURCE_PATH)];
 

@@ -3,8 +3,8 @@ import { AutomationProjectIdentityPort } from "../app/automation.infrastructure.
 import {
   AutomationDispatchError,
   AutomationLogger,
-} from "../ports/automation-graph.port.ts";
-import { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
+} from "../services/automation-graph-runtime.service.ts";
+import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 /**

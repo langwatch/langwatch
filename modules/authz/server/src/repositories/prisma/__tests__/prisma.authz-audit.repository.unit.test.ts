@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AuthzAuditRow } from "../../../adapters/eventing.authz-audit.adapter.ts";
+import type { AuthzAuditRow } from "../../authz-audit-trail.repository.ts";
 import {
   type AuthzAuditDatabase,
   type AuthzAuditInsert,

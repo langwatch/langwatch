@@ -9,12 +9,10 @@ import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract"
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
-import {
-  AutomationDatasetMapper,
-  AutomationPersistActionWriter,
-} from "../ports/automation-persist-action.port.ts";
-import type { AutomationSettlementLedger } from "../ports/automation-settlement-ledger.port.ts";
-import type { AutomationSettlementTraceReader } from "../ports/automation-settlement-read.port.ts";
+import { AutomationDatasetMapper } from "./automation-dataset-mapper.service.ts";
+import { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
+import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
 
 /** The project read this path makes: an existence check, and nothing else. */
 type PersistActionProject = { id: string; name: string; slug: string };

@@ -4,12 +4,10 @@ import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing
 import { createLogger } from "@langwatch/observability";
 import type { AutomationClock } from "../app/automation.infrastructure.ts";
 import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
-import type { AutomationSettlementLedger } from "../ports/automation-settlement-ledger.port.ts";
-import type { AutomationSettlementTraceReader } from "../ports/automation-settlement-read.port.ts";
-import type {
-  AutomationSettlementMatchConfirmation,
-  AutomationSettlementObservability,
-} from "../ports/automation-settlement.port.ts";
+import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
+import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-policy.service.ts";
+import type { AutomationSettlementObservability } from "./automation-settlement-observability.service.ts";
 import type { AutomationPersistActionService } from "./persist-action.service.ts";
 
 const logger = createLogger("langwatch:automation:settlement-persistence");

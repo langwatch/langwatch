@@ -3,7 +3,7 @@ import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { DerivedTraceEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { TraceService } from "@langwatch/trace-contract";
-import { AutomationSettlementFilterEvaluator } from "../../ports/automation-settlement.port.ts";
+import { AutomationSettlementFilterEvaluator } from "../automation-settlement-policy.service.ts";
 import { AutomationSettlementMatchConfirmationService } from "../automation-settlement-match-confirmation.service.ts";
 
 function unavailable(): never {

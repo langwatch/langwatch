@@ -8,8 +8,8 @@ import {
 import { DispatchError } from "@langwatch/eventing";
 import type { TraceRecord } from "@langwatch/trace-contract";
 import type { AutomationClock } from "../app/automation.infrastructure.ts";
-import type { AutomationSettlementLedger } from "../ports/automation-settlement-ledger.port.ts";
-import type { AutomationNotificationDelivery } from "../ports/automation-notification-delivery.port.ts";
+import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import { fromDate } from "@langwatch/time";
 

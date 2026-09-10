@@ -71,16 +71,16 @@ import {
   BillableEventsMeterClickHouseRepository,
   BillableEventsQueryService,
   ClickHouseBillingAdapter,
-  EventingBillableEventsMeterAdapter,
-  EventingBillingMeterDispatchAdapter,
-  EventingBillingReportingAdapter,
-  ObservabilityBillingErrorAdapter,
+  BillableEventsMeterProjection,
+  BillingMeterDispatchSubscriber,
+  BillingReportingPipeline,
+  BillingErrorReporterService,
   RedisBillingOrganizationCacheAdapter,
   RedisBillingTenantOrganizationCacheAdapter,
-  StripeUsageReportingAdapter,
+  StripeUsageReportingBuilder,
   BillingTenantOrganizationService,
   PostgresBillingRepositories,
-  PlanLimitsPlanCatalogueAdapter,
+  PlanLimitsCatalogueService,
   type BillingCheckpointDatabase,
   type BillingReportOrganizationDatabase,
   type BillingTenantOrganizationDatabase,
@@ -164,7 +164,7 @@ import type { DatasetContentDatabase } from "@langwatch/dataset-server/compositi
 import {
   AutomationGraphActivity,
   AutomationTriggerMatchRecorder,
-  PostgresAutomationTraceTriggerCatalogueAdapter,
+  PrismaAutomationTraceTriggerCatalogueRepository,
   type AutomationGraphActivityDatabase,
   type AutomationTraceTriggerCatalogueDatabase,
 } from "@langwatch/automation-server";
@@ -1180,7 +1180,7 @@ export class WorkerProductionComposition {
                           options.connection.client,
                         ),
                         nextStep: PlanNextStepService.create({
-                          catalogue: PlanLimitsPlanCatalogueAdapter.create(),
+                          catalogue: PlanLimitsCatalogueService.create(),
                         }),
                         baseHost: mail.baseHost,
                         ...(options.observability ? { logger: options.observability.logger } : {}),
@@ -1213,7 +1213,7 @@ export class WorkerProductionComposition {
     // Automation and BEFORE the trace producer check because its two terminal subscribers dispatch
     // through Automation's own recorder and re-evaluate through the graph vertical composed above,
     // while Trace's evaluation trigger dispatches into the commands this installer produces.
-    const evaluationTriggerCatalogue = PostgresAutomationTraceTriggerCatalogueAdapter.create({
+    const evaluationTriggerCatalogue = PrismaAutomationTraceTriggerCatalogueRepository.create({
       prisma: traceDatabase,
       clock: automationClock,
     });
@@ -1412,7 +1412,7 @@ export class WorkerProductionComposition {
             contributeSpanFacts: codingAgent.commands.contributeSpanFacts,
             triggerMatches: traceProducers.triggerMatches,
           },
-          traceTriggers: PostgresAutomationTraceTriggerCatalogueAdapter.create({
+          traceTriggers: PrismaAutomationTraceTriggerCatalogueRepository.create({
             prisma: traceDatabase,
             clock: new WorkerAutomationClock(),
           }),
@@ -1524,13 +1524,13 @@ export class WorkerProductionComposition {
       }).build(),
     );
     const usageReporting = options.config.deployment.saas
-      ? StripeUsageReportingAdapter.create({
+      ? StripeUsageReportingBuilder.create({
           secretKey: options.config.stripe.secretKey,
           nodeEnvironment: options.config.nodeEnvironment,
         }).build()
       : undefined;
     const billingReporting = BillingReportingWorkerFeatureInstaller.create({
-      installer: EventingBillingReportingAdapter.create({
+      installer: BillingReportingPipeline.create({
         organizations: billingReportingPersistence.reportOrganizations,
         billingCheckpoints: billingReportingPersistence.checkpoints,
         getUsageReportingService: () => usageReporting,
@@ -1538,7 +1538,7 @@ export class WorkerProductionComposition {
         organizationCache: RedisBillingOrganizationCacheAdapter.create({
           redis: eventingOptions.groupQueue.redis,
         }),
-        errorReporter: ObservabilityBillingErrorAdapter.create(),
+        errorReporter: BillingErrorReporterService.create(),
       }),
       eventing,
     });
@@ -2179,13 +2179,13 @@ export function saasBillableEventsMeter(options: {
       .tenantOrganizations,
     cache: RedisBillingTenantOrganizationCacheAdapter.create({ redis: options.redis }),
   });
-  const meter = EventingBillableEventsMeterAdapter.create({
+  const meter = BillableEventsMeterProjection.create({
     organizations,
     meter: BillableEventsMeterClickHouseRepository.create({
       resolveClient: (organizationId) => options.resolveClickHouseClient(organizationId),
     }),
   }).build();
-  const dispatch = EventingBillingMeterDispatchAdapter.create({
+  const dispatch = BillingMeterDispatchSubscriber.create({
     organizations,
     getDispatch: options.getDispatch,
   }).build();

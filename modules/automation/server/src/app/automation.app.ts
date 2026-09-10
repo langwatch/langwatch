@@ -61,12 +61,14 @@ import type {
   AutomationLogger,
   AutomationSlackBotTokenDecryptor,
 } from "./automation.infrastructure.ts";
-import type { AutomationWebhookStoredParams } from "../ports/automation-provider.port.ts";
-import type { AutomationRunaway } from "../ports/automation-runaway.port.ts";
-import type { AutomationTestFire } from "../ports/automation-test-fire.port.ts";
-import type { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
-import type { SchedulerWake } from "../ports/scheduler-wake.port.ts";
-import type { UnsubscribeTokenVerifier } from "../ports/unsubscribe-token.port.ts";
+import type { AutomationWebhookStoredParams } from "../services/automation-webhook-secrets.service.ts";
+import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
+import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
+import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
+import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import type { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
+import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
+import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
 import { AutomationService } from "../services/automation.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
@@ -171,7 +173,7 @@ export interface AutomationAuditSink {
 
 export type AutomationInfrastructure = Readonly<{
   verifier: UnsubscribeTokenVerifier;
-  jobs: ScheduledJobStorePort;
+  jobs: AutomationScheduledJobRepository;
   clock: AutomationClock;
   wake: SchedulerWake;
   notifier: AutomationGraphNotifier;
@@ -179,7 +181,7 @@ export type AutomationInfrastructure = Readonly<{
   slackTokens: AutomationSlackBotTokenDecryptor;
   dispatchErrors: AutomationDispatchError;
   heartbeat: AutomationHeartbeat;
-  runaway: AutomationRunaway;
+  runaway: AutomationRunaway & AutomationRunawayNotice & AutomationRunawaySignals;
   testFire: AutomationTestFire;
   redis: AutomationPersistCapRedis | null;
   providers: AutomationProviderSecrets;

@@ -5,7 +5,7 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowAgentData } from "@langwatch/scenario-contract";
-import { NlpFetchAdapter } from "../adapters/nlp-fetch.adapter.ts";
+import { NlpFetchAdapter } from "../services/nlp-fetch.service.ts";
 import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
 
 vi.mock("@langwatch/observability/tracing", () => ({

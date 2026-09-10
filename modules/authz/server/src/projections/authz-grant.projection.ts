@@ -27,7 +27,7 @@ import type {
   RoleDefinedEvent,
   RoleDeletedEvent,
   RolePermissionsChangedEvent,
-} from "../adapters/eventing.authz.adapter.ts";
+} from "../eventing/authz-grant.events.ts";
 import { type Instant, Temporal } from "@langwatch/time";
 
 export type GrantProjectionWrite =

@@ -7,7 +7,7 @@
  * @see specs/migration/authz-grants-rollout.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AuthzCutoverFailureReporter } from "../../ports/authz-cutover-telemetry.port.ts";
+import { AuthzCutoverFailureReporter } from "../authz-cutover-telemetry.service.ts";
 import {
   type AuthzCutoverDatabase,
   PrismaAuthzCutoverRepository,

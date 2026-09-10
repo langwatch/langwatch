@@ -5,6 +5,8 @@ import {
   AutomationLogger,
   AutomationHeartbeat,
   AutomationRunaway,
+  AutomationRunawayNotice,
+  AutomationRunawaySignals,
   AutomationSlackBotTokenDecryptor,
   AutomationTestFire,
   AutomationPersistCapService,
@@ -64,7 +66,10 @@ class TestDispatchErrors extends AutomationDispatchError {
     return new Error(message);
   }
 }
-class TestRunaway extends AutomationRunaway {
+class TestRunaway
+  extends AutomationRunaway
+  implements AutomationRunawayNotice, AutomationRunawaySignals
+{
   async countProjectTraces24h() {
     return 0;
   }

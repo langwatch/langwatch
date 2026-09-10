@@ -83,7 +83,7 @@ import type { Logger } from "@langwatch/observability";
 import {
   SilentScenarioActivity,
   type ScenarioActivity,
-} from "../ports/scenario-activity.port.ts";
+} from "../services/scenario-activity.service.ts";
 
 /**
  * The process's per-tenant fan-out, as this feature uses it: one emitter per project that relays

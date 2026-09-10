@@ -9,7 +9,7 @@ import {
 } from "@langwatch/authz-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { AuthzGrantsEvent } from "../../adapters/eventing.authz.adapter.ts";
+import type { AuthzGrantsEvent } from "../../eventing/authz-grant.events.ts";
 import {
   AuthzGrantProjection,
   type GrantProjectionWrite,

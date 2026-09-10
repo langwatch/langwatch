@@ -16,7 +16,9 @@ import type {
   AutomationHeartbeat,
   AutomationSlackBotTokenDecryptor,
 } from "../app/automation.infrastructure.ts";
-import { AutomationRunaway } from "../ports/automation-runaway.port.ts";
+import { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
+import { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
+import { AutomationRunawaySignals } from "./automation-runaway-signals.service.ts";
 import { AutomationClock } from "../app/automation.infrastructure.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
 import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service.ts";
@@ -42,7 +44,7 @@ export class AutomationGraphService {
     slackTokens: AutomationSlackBotTokenDecryptor;
     dispatchErrors: AutomationDispatchError;
     heartbeat: AutomationHeartbeat;
-    runaway: AutomationRunaway;
+    runaway: AutomationRunaway & AutomationRunawayNotice & AutomationRunawaySignals;
     clock: AutomationClock;
     baseHost: string;
   }): AutomationGraphService {

@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { AutomationEmailCapStore } from "../ports/email-cap.port.ts";
+import type { AutomationEmailCapRepository } from "../repositories/automation-email-cap.repository.ts";
 import type { Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:outbox:emailHourlyCap");
@@ -110,9 +110,9 @@ export type ConsumeDailyEmailCapInput = {
 export class AutomationEmailCapService {
   private readonly memory = new EmailCapMemoryStore();
 
-  private constructor(private readonly store: AutomationEmailCapStore | null) {}
+  private constructor(private readonly store: AutomationEmailCapRepository | null) {}
 
-  static create(input: { store: AutomationEmailCapStore | null }): AutomationEmailCapService {
+  static create(input: { store: AutomationEmailCapRepository | null }): AutomationEmailCapService {
     return new AutomationEmailCapService(input.store);
   }
 

@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   type AuthzRevocationReason,
   AuthzRevocationTelemetry,
-} from "../../ports/authz-revocation-telemetry.port.ts";
+} from "../../services/authz-revocation-telemetry.service.ts";
 import type { AuthzDatabase } from "../authz-read.repository.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 

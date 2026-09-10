@@ -3,7 +3,7 @@ import {
   AutomationClock,
   AutomationDispatchError,
   AutomationEmailCapService,
-  type AutomationEmailCapStore,
+  type AutomationEmailCapRepository,
   AutomationGraphActivity,
   AutomationLogger,
   AutomationProjectIdentityPort,
@@ -105,7 +105,7 @@ export function tryCreateWorkerAutomationDelivery(options: {
       logger,
     }),
     emailCaps: AutomationEmailCapService.create({
-      store: options.redis ? createWorkerAutomationEmailCapStore(options.redis) : null,
+      store: options.redis ? createWorkerAutomationEmailCapRepository(options.redis) : null,
     }),
     crypto: resolveWorkerStoredSecretCipher(config),
   };
@@ -286,9 +286,9 @@ class WorkerAutomationDispatchErrors extends AutomationDispatchError {
  * here at the composition root so the cap service names a narrow capability
  * and never an ioredis client.
  */
-function createWorkerAutomationEmailCapStore(
+function createWorkerAutomationEmailCapRepository(
   connection: RedisConnection,
-): AutomationEmailCapStore {
+): AutomationEmailCapRepository {
   return {
     trySet: (key, value, expiry, seconds, condition) =>
       connection.set(key, value, expiry, seconds, condition),

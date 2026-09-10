@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { TriggerAction } from "@langwatch/automation-contract";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "@langwatch/automation-contract";
 import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contract";
-import { automationProcessDefinition } from "../../ports/__tests__/pipeline-test-harness.ts";
+import { automationProcessDefinition } from "../../fixtures/pipeline-test-harness.ts";
 import {
   MAX_PENDING_MATCHES,
   PERSIST_PAGE_MAX,

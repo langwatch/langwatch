@@ -12,12 +12,12 @@ import { EmailSuppressionNameRepository } from "../../repositories/email-suppres
 import { TriggerFireHistoryRepository } from "../../repositories/trigger-fire-history.repository.ts";
 import { TriggerRepository } from "../../repositories/trigger.repository.ts";
 import type { ReportScheduleTarget } from "../../repositories/trigger.repository.ts";
-import { UnsubscribeTokenVerifier } from "../../ports/unsubscribe-token.port.ts";
+import { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
 import { ReportScheduleService } from "../report-schedule.service.ts";
 import { AutomationClock } from "../../app/automation.infrastructure.ts";
-import { ScheduledJobStorePort } from "../../ports/scheduled-jobs.port.ts";
-import type { ScheduledJobRecord } from "../../ports/scheduled-jobs.port.ts";
-import { SchedulerWake } from "../../ports/scheduler-wake.port.ts";
+import { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
+import type { ScheduledJobRecord } from "../../repositories/automation-scheduled-job.repository.ts";
+import { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
 import { CustomGraphRepository } from "../../repositories/custom-graph.repository.ts";
 import { WebhookDeliveryRepository } from "../../repositories/webhook-delivery.repository.ts";
 import { GraphTriggerSentRepository } from "../../repositories/graph-trigger-sent.repository.ts";
@@ -122,7 +122,7 @@ class Verifier extends UnsubscribeTokenVerifier {
     return null;
   }
 }
-class Jobs extends ScheduledJobStorePort {
+class Jobs extends AutomationScheduledJobRepository {
   rows: ScheduledJobRecord[] = [];
   async upsertForTarget(input: {
     projectId: string;

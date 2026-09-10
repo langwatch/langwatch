@@ -15,11 +15,13 @@ import type {
   AutomationGraphNotifier,
   AutomationLogger,
 } from "../automation.infrastructure.ts";
-import type { SchedulerWake } from "../../ports/scheduler-wake.port.ts";
-import type { ScheduledJobStorePort } from "../../ports/scheduled-jobs.port.ts";
-import type { UnsubscribeTokenVerifier } from "../../ports/unsubscribe-token.port.ts";
-import type { AutomationRunaway } from "../../ports/automation-runaway.port.ts";
-import type { AutomationTestFire } from "../../ports/automation-test-fire.port.ts";
+import type { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
+import type { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
+import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
+import type { AutomationRunaway } from "../../repositories/automation-runaway.repository.ts";
+import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
+import type { AutomationRunawaySignals } from "../../services/automation-runaway-signals.service.ts";
+import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
 
 export function createCanonicalAutomationApp(): {
   app: AutomationApp;
@@ -56,7 +58,7 @@ export function createCanonicalAutomationApp(): {
   const verifier: UnsubscribeTokenVerifier = {
     tryVerify: vi.fn(() => null),
   };
-  const jobs: ScheduledJobStorePort = {
+  const jobs: AutomationScheduledJobRepository = {
     upsertForTarget: vi.fn(async () => undefined),
     deactivateForTarget: vi.fn(async () => undefined),
     findAllForProject: vi.fn(async () => []),
@@ -79,7 +81,7 @@ export function createCanonicalAutomationApp(): {
     info: vi.fn(),
     warn: vi.fn(),
   };
-  const runaway: AutomationRunaway = {
+  const runaway: AutomationRunaway & AutomationRunawayNotice & AutomationRunawaySignals = {
     countProjectTraces24h: vi.fn(async () => 0),
     notificationRecipients: vi.fn(async () => []),
     sendLimitEmail: vi.fn(async () => undefined),

@@ -12,8 +12,8 @@ import type {
 } from "@langwatch/automation-contract";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import { describe, expect, it, vi } from "vitest";
-import { AutomationNotificationDelivery } from "../../ports/automation-notification-delivery.port.ts";
-import { AutomationSlackProvider } from "../../ports/automation-provider.port.ts";
+import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
+import { AutomationSlackProvider } from "../../services/automation-slack-secrets.service.ts";
 import { ReportChartService } from "../report-chart.service.ts";
 import { ReportDispatchService, type ReportDispatchDeps } from "../report-dispatch.service.ts";
 import { ReportTraceRowService } from "../report-trace-row.service.ts";

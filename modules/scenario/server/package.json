@@ -29,16 +29,16 @@
       "default": "./src/repositories/clickhouse/simulation-clickhouse.repository.ts"
     },
     "./composition/simulation-eventing": {
-      "types": "./dist/adapters/simulation-eventing.adapter.d.ts",
-      "default": "./src/adapters/simulation-eventing.adapter.ts"
+      "types": "./dist/repositories/clickhouse/clickhouse.simulation-eventing.repository.d.ts",
+      "default": "./src/repositories/clickhouse/clickhouse.simulation-eventing.repository.ts"
     },
-    "./composition/simulation-execution-port": {
+    "./composition/simulation-execution": {
       "types": "./dist/repositories/clickhouse/simulation-clickhouse.repository.d.ts",
       "default": "./src/repositories/clickhouse/simulation-clickhouse.repository.ts"
     },
     "./composition/simulation-processing-producer": {
-      "types": "./dist/adapters/simulation-processing-producer.adapter.d.ts",
-      "default": "./src/adapters/simulation-processing-producer.adapter.ts"
+      "types": "./dist/repositories/clickhouse/clickhouse.simulation-processing-producer.repository.d.ts",
+      "default": "./src/repositories/clickhouse/clickhouse.simulation-processing-producer.repository.ts"
     },
     "./composition/stalled-runs-backfill": {
       "types": "./dist/tasks/stalled-runs-backfill.task.d.ts",

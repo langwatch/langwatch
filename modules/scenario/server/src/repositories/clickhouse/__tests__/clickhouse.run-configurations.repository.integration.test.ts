@@ -15,7 +15,7 @@ import {
 } from "@langwatch/suite-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { QueueRunCommand } from "../../../adapters/simulation-processing-commands.adapter.ts";
+import { QueueRunCommand } from "../../../eventing/simulation-processing.commands.ts";
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunStateData,
