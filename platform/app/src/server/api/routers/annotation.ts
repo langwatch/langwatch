@@ -364,6 +364,91 @@ const optimizedQueueItemsWhere = ({
   return whereCondition;
 };
 
+/**
+ * The walk's order: newest first, with the id breaking ties.
+ *
+ * The id is not decoration. Two items queued in the same millisecond would
+ * otherwise take turns sorting first, and a walk that steps by "the row after
+ * this one" would step back and forth between them forever.
+ */
+const queueWalkOrder: Prisma.AnnotationQueueItemOrderByWithRelationInput[] = [
+  { createdAt: "desc" },
+  { id: "desc" },
+];
+
+/** The same order read backwards, for stepping towards the front of the queue. */
+const queueWalkOrderReversed: Prisma.AnnotationQueueItemOrderByWithRelationInput[] =
+  [{ createdAt: "asc" }, { id: "asc" }];
+
+/**
+ * Everything that sorts before (or after) one item, in the walk's order.
+ *
+ * The neighbours are found by seeking from the item the reviewer is on rather
+ * than by numbering the queue and counting into it, so a step returns two rows
+ * whatever the queue's length. The sort behind that seek is not indexed yet:
+ * `AnnotationQueueItem` carries no index ending in `createdAt`, so the work
+ * still grows with the filtered set until one is added.
+ */
+const queueWalkNeighbourhood = (
+  item: { createdAt: Date; id: string },
+  side: "before" | "after",
+): Prisma.AnnotationQueueItemWhereInput =>
+  side === "before"
+    ? {
+        OR: [
+          { createdAt: { gt: item.createdAt } },
+          { createdAt: item.createdAt, id: { gt: item.id } },
+        ],
+      }
+    : {
+        OR: [
+          { createdAt: { lt: item.createdAt } },
+          { createdAt: item.createdAt, id: { lt: item.id } },
+        ],
+      };
+
+/**
+ * How far ahead the walk looks for something readable before it decides the
+ * queue is finished.
+ *
+ * An item whose trace no longer resolves is not work, but it is also rare: the
+ * enqueue path refuses ids that answer to no trace, so one can only appear
+ * after retention has since dropped it. Looking at a bounded window keeps the
+ * answer cheap on a queue of any size; a queue longer than the window that
+ * holds nothing readable stays walkable rather than celebrating, which leaves
+ * the reviewer somewhere they can act instead of somewhere they cannot.
+ */
+const QUEUE_WALK_LOOKAHEAD = 50;
+
+/**
+ * What one walked item carries. The same shape the list builds, for one row:
+ * members are scoped to the organization and scores to the project, so a walk
+ * never reads further than the list would have.
+ */
+const queueWalkItemInclude = ({
+  projectId,
+  organizationId,
+}: {
+  projectId: string;
+  organizationId: string;
+}) =>
+  ({
+    user: true,
+    createdByUser: true,
+    annotationQueue: {
+      include: {
+        members: {
+          where: { user: { orgMemberships: { some: { organizationId } } } },
+          include: { user: true },
+        },
+        AnnotationQueueScores: {
+          where: { annotationScore: { projectId } },
+          include: { annotationScore: true },
+        },
+      },
+    },
+  }) satisfies Prisma.AnnotationQueueItemInclude;
+
 /** Pending items have no `doneAt`, completed ones have one, "all" reads both. */
 const doneAtFilter = (selectedAnnotations: string) => {
   if (selectedAnnotations === "pending") return null;
@@ -823,62 +908,6 @@ export const annotationRouter = createTRPCRouter({
         },
       });
     }),
-  getQueueItems: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .permission("annotations:view")
-    .query(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
-      const organizationId = await service.getProjectOrganizationId({
-        projectId: input.projectId,
-      });
-      const queueItems = await ctx.prisma.annotationQueueItem.findMany({
-        where: queueItemReferenceFilter({
-          projectId: input.projectId,
-          organizationId,
-        }),
-        include: {
-          user: true,
-          createdByUser: true,
-          annotationQueue: {
-            include: {
-              members: {
-                where: {
-                  user: {
-                    orgMemberships: { some: { organizationId } },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-      const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
-      // Annotation queue shows trace content for labeling — resolve full IO (#4991).
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-      );
-      const traces = await traceService.getTracesWithSpans(
-        input.projectId,
-        traceIds,
-        protections,
-        undefined,
-        { full: true },
-      );
-      const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
-
-      return queueItems.map((item) => ({
-        ...item,
-        trace: traceMap.get(item.traceId) ?? null,
-      }));
-    }),
   getPendingItemsCount: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("annotations:view")
@@ -1115,8 +1144,15 @@ export const annotationRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         selectedAnnotations: z.string(),
-        pageSize: z.number(),
-        pageOffset: z.number(),
+        /**
+         * Bounded because it reaches the client as a URL query parameter, and
+         * the items this page size selects have their trace ids bound into a
+         * single ClickHouse parameter downstream. An unbounded page is an
+         * unbounded parameter, which the server refuses outright rather than
+         * truncating.
+         */
+        pageSize: z.number().int().min(1).max(100).default(25),
+        pageOffset: z.number().int().min(0).default(0),
         queueId: z.string().optional(),
         /**
          * Narrows the read to these queues. Only ever narrows: it is applied
@@ -1125,7 +1161,6 @@ export const annotationRouter = createTRPCRouter({
          */
         queueIds: z.array(z.string()).optional(),
         showQueueAndUser: z.boolean().optional(),
-        allQueueItems: z.boolean().optional(),
         // The list's date range. A queue item is dated by when it was queued,
         // which is what the reviewer sees in the list and filters on.
         startDate: z.date().optional(),
@@ -1176,8 +1211,8 @@ export const annotationRouter = createTRPCRouter({
       // Get paginated queue items first
       const queueItems = await ctx.prisma.annotationQueueItem.findMany({
         where: whereCondition,
-        take: input.allQueueItems ? undefined : input.pageSize,
-        skip: input.allQueueItems ? undefined : input.pageOffset,
+        take: input.pageSize,
+        skip: input.pageOffset,
         include: {
           user: true,
           createdByUser: true,
@@ -1291,7 +1326,225 @@ export const annotationRouter = createTRPCRouter({
         totalCount,
       };
     }),
+
+  /**
+   * One step of the annotation queue walk.
+   *
+   * The reviewer reads one item at a time, so this resolves one item at a
+   * time: the item the URL names (or the first one still waiting), where it
+   * sits in the queue, and the ids either side of it: a fixed handful of rows
+   * and exactly one trace, whatever the queue's length. The two counts behind
+   * the position still scan the filtered set, because no index ends in
+   * `createdAt` yet — so this reads a bounded number of rows, not a bounded
+   * amount of work.
+   *
+   * Reading one item instead of all of them is the point. Resolving a whole
+   * queue to display one item of it
+   * sent every queued trace id to ClickHouse inside a single query parameter,
+   * which fails outright once the ids no longer fit in one — and long before
+   * that, quietly pays for thousands of full traces, with their IO resolved,
+   * to render one.
+   */
+  getQueueWalkStep: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        /** The item the URL names. Absent starts at the front of the queue. */
+        queueItemId: z.string().optional(),
+      }),
+    )
+    .permission("annotations:view")
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const organizationId = await service.getProjectOrganizationId({
+        projectId: input.projectId,
+      });
+      const memberQueues = await ctx.prisma.annotationQueue.findMany({
+        where: {
+          projectId: input.projectId,
+          members: { some: { userId } },
+        },
+        select: { id: true },
+      });
+
+      // The walk is the reviewer's own pending work, which is the one shape
+      // this procedure serves: what is left to review, newest first.
+      const where = optimizedQueueItemsWhere({
+        input: { projectId: input.projectId, selectedAnnotations: "pending" },
+        userId,
+        organizationId,
+        userQueueIds: memberQueues.map((queue) => queue.id),
+      });
+      const include = queueWalkItemInclude({
+        projectId: input.projectId,
+        organizationId,
+      });
+
+      const total = await ctx.prisma.annotationQueueItem.count({ where });
+      const current = await findWalkItem({
+        ctx,
+        where,
+        include,
+        queueItemId: input.queueItemId,
+      });
+
+      if (!current) {
+        return {
+          item: null,
+          position: 0,
+          total,
+          previousItemId: null,
+          nextItemId: null,
+          queueFinished: true,
+        };
+      }
+
+      const [place, protections] = await Promise.all([
+        resolveWalkPlace({ ctx, where, current }),
+        getUserProtectionsForProject(ctx, { projectId: input.projectId }),
+      ]);
+
+      const [item] = await enrichQueueItemsWithTracesAndAnnotations(
+        ctx,
+        input.projectId,
+        [current],
+        protections,
+      );
+
+      return {
+        item: item ?? null,
+        position: place.ahead + 1,
+        total,
+        previousItemId: place.previousItemId,
+        nextItemId: place.nextItemId,
+        // The item in hand reading back is proof enough that work is left, and
+        // it is the answer almost every time. Only when it does not resolve is
+        // the window worth asking about.
+        queueFinished: item?.trace
+          ? false
+          : await noReadableItemsLeft({
+              ctx,
+              projectId: input.projectId,
+              where,
+              total,
+            }),
+      };
+    }),
 });
+
+/**
+ * The item the walk is on: the one the URL names, or the first still waiting.
+ *
+ * A link to an item that has since been finished, removed, or was never the
+ * reviewer's lands them at the next thing waiting rather than on an empty page.
+ */
+const findWalkItem = async ({
+  ctx,
+  where,
+  include,
+  queueItemId,
+}: {
+  ctx: { prisma: PrismaClient };
+  where: QueueItemWhere;
+  include: ReturnType<typeof queueWalkItemInclude>;
+  queueItemId?: string;
+}) => {
+  const named = queueItemId
+    ? await ctx.prisma.annotationQueueItem.findFirst({
+        where: { AND: [where, { id: queueItemId }] },
+        include,
+      })
+    : null;
+
+  return (
+    named ??
+    (await ctx.prisma.annotationQueueItem.findFirst({
+      where,
+      orderBy: queueWalkOrder,
+      include,
+    }))
+  );
+};
+
+/**
+ * Where one item sits in the walk: how many are ahead of it, and the ids
+ * either side of it.
+ *
+ * Everything here seeks outwards from the item the reviewer is on, which is
+ * what keeps a step the same price on a queue of ten and a queue of twenty
+ * thousand: the queue is never numbered in order to find one place in it.
+ */
+const resolveWalkPlace = async ({
+  ctx,
+  where,
+  current,
+}: {
+  ctx: { prisma: PrismaClient };
+  where: QueueItemWhere;
+  current: { createdAt: Date; id: string };
+}) => {
+  const before = queueWalkNeighbourhood(current, "before");
+  const after = queueWalkNeighbourhood(current, "after");
+
+  const [ahead, previous, next] = await Promise.all([
+    ctx.prisma.annotationQueueItem.count({ where: { AND: [where, before] } }),
+    ctx.prisma.annotationQueueItem.findFirst({
+      where: { AND: [where, before] },
+      orderBy: queueWalkOrderReversed,
+      select: { id: true },
+    }),
+    ctx.prisma.annotationQueueItem.findFirst({
+      where: { AND: [where, after] },
+      orderBy: queueWalkOrder,
+      select: { id: true },
+    }),
+  ]);
+
+  return {
+    ahead,
+    previousItemId: previous?.id ?? null,
+    nextItemId: next?.id ?? null,
+  };
+};
+
+/**
+ * Whether the queue holds nothing the reviewer could actually read.
+ *
+ * An unreadable item cannot be reviewed, annotated or finished, so a queue of
+ * only those is finished in every sense that matters — but a queue longer than
+ * the window this can see is given the benefit of the doubt, because telling a
+ * reviewer they are done while work waits is the worse of the two mistakes.
+ */
+const noReadableItemsLeft = async ({
+  ctx,
+  projectId,
+  where,
+  total,
+}: {
+  ctx: { prisma: PrismaClient };
+  projectId: string;
+  where: QueueItemWhere;
+  total: number;
+}): Promise<boolean> => {
+  if (total === 0) return true;
+  if (total > QUEUE_WALK_LOOKAHEAD) return false;
+
+  const lookahead = await ctx.prisma.annotationQueueItem.findMany({
+    where,
+    orderBy: queueWalkOrder,
+    take: QUEUE_WALK_LOOKAHEAD,
+    select: { traceId: true },
+  });
+  const traceIds = [...new Set(lookahead.map((item) => item.traceId))];
+  if (traceIds.length === 0) return true;
+
+  const existing = await ClickHouseTraceService.create({
+    prisma: ctx.prisma,
+  }).findExistingTraceIds({ projectId, traceIds });
+
+  return existing.length === 0;
+};
 
 /** Which of these ids the project holds a trace for. */
 type FindExistingTraceIds = (args: {
