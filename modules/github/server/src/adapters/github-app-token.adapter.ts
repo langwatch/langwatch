@@ -10,14 +10,14 @@ import {
   type GithubInstallationDetails,
   type GithubInstallationToken,
   type GithubPullRequestSummary,
-  type GithubRedisPort,
   type MintInstallationTokenInput,
 } from "../ports/github-app-token.port.ts";
+import type { GithubRedisPort } from "../repositories/redis/github-redis.connection.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
-import type { GithubTokenCachePort } from "../ports/github-token-cache.port.ts";
+import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
+import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";
 import { GithubApiAdapter } from "./github-api.adapter.ts";
-import { GithubHostAdapter } from "./github-host.adapter.ts";
-import { GithubTokenCacheAdapter } from "./github-token-cache.adapter.ts";
+import { GithubHostService } from "../services/github-host.service.ts";
 
 export {
   GITHUB_READ_PULL_PERMISSIONS,
@@ -27,9 +27,9 @@ export {
   type GithubInstallationDetails,
   type GithubInstallationToken,
   type GithubPullRequestSummary,
-  type GithubRedisPort,
   type MintInstallationTokenInput,
 } from "../ports/github-app-token.port.ts";
+export type { GithubRedisPort } from "../repositories/redis/github-redis.connection.ts";
 
 const INSTALLATION_TOKEN_CACHE_TTL_SEC = 50 * 60;
 const LIVENESS_RECHECK_TTL_SEC = 5 * 60;
@@ -40,16 +40,16 @@ export class GithubAppTokenAdapter extends GithubAppTokenPort {
     appId: string,
     privateKey: string,
     redis: GithubRedisPort | null,
-    host: GithubHostPort = GithubHostAdapter.create(),
+    host: GithubHostPort = GithubHostService.create(),
   ): GithubAppTokenAdapter {
     const api = GithubApiAdapter.create(appId, privateKey, host);
-    const cache = GithubTokenCacheAdapter.create(redis, host);
+    const cache = GithubTokenCacheRedisRepository.create({ redis, host });
     return new GithubAppTokenAdapter(api, cache);
   }
 
   private constructor(
     private readonly api: GithubApiPort,
-    private readonly cache: GithubTokenCachePort,
+    private readonly cache: GithubTokenCacheRepository,
   ) {
     super();
   }
@@ -99,15 +99,15 @@ export class GithubAppTokenAdapter extends GithubAppTokenPort {
       scopeKey,
     };
 
-    const cached = await this.cache.tryGetToken(cacheKey);
+    const cached = await this.cache.findToken(cacheKey);
     if (cached) {
       await this.assertInstallationStillExists(input.installationId);
       return { token: cached, expiresAt: "" };
     }
 
-    const lock = await this.cache.tryAcquireMintLock(cacheKey);
+    const lock = await this.cache.acquireMintLock(cacheKey);
     try {
-      const fresh = await this.cache.tryGetToken(cacheKey);
+      const fresh = await this.cache.findToken(cacheKey);
       if (fresh) {
         return { token: fresh, expiresAt: "" };
       }
@@ -183,7 +183,7 @@ export class GithubAppTokenAdapter extends GithubAppTokenPort {
       return;
     }
 
-    const lock = await this.cache.tryAcquireLivenessLock(installationId);
+    const lock = await this.cache.acquireLivenessLock(installationId);
     if (!lock) {
       return;
     }
@@ -206,7 +206,7 @@ export class GithubAppTokenAdapter extends GithubAppTokenPort {
         ttlSec: LIVENESS_FAILURE_BACKOFF_SEC,
       });
     } finally {
-      await this.cache.releaseLivenessLock(installationId, lock);
+      await this.cache.releaseLivenessLock({ installationId, token: lock });
     }
   }
 }

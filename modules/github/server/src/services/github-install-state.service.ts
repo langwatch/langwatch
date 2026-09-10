@@ -4,24 +4,29 @@ import {
   type GithubInstallStatePayload,
 } from "@langwatch/github-contract";
 
-import type { GithubRedisPort } from "../ports/github-app-token.port.ts";
 import { GithubInstallStatePort } from "../ports/github-install-state.port.ts";
+import type { GithubInstallNonceRepository } from "../repositories/github-install-nonce.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const STATE_MAX_FUTURE_SKEW_MS = 60 * 1000;
 
-export class GithubInstallStateAdapter extends GithubInstallStatePort {
+/**
+ * The install state a popup carries: an HMAC over the payload, verified within
+ * a ten-minute window, and the one-shot nonce beside it that a replayed Setup
+ * URL cannot spend twice.
+ */
+export class GithubInstallStateService extends GithubInstallStatePort {
   static create(options: {
     signingKey: string;
-    redis: GithubRedisPort | null;
-  }): GithubInstallStateAdapter {
-    return new GithubInstallStateAdapter(options.signingKey, options.redis);
+    nonces: GithubInstallNonceRepository;
+  }): GithubInstallStateService {
+    return new GithubInstallStateService(options.signingKey, options.nonces);
   }
 
   private constructor(
     private readonly signingKey: string,
-    private readonly redis: GithubRedisPort | null,
+    private readonly nonces: GithubInstallNonceRepository,
   ) {
     super();
   }
@@ -30,50 +35,12 @@ export class GithubInstallStateAdapter extends GithubInstallStatePort {
     return STATE_TTL_MS;
   }
 
-  async registerNonce(input: { nonce: string; ttlSec: number }): Promise<boolean> {
-    if (!this.redis) {
-      return false;
-    }
-
-    try {
-      await this.redis.trySet(this.nonceKey(input.nonce), "1", "EX", input.ttlSec);
-      return true;
-    } catch {
-      return false;
-    }
+  registerNonce(input: { nonce: string; ttlSec: number }): Promise<boolean> {
+    return this.nonces.registerNonce(input);
   }
 
-  async tryConsumeNonce(nonce: string): Promise<boolean | null> {
-    if (!this.redis) {
-      return null;
-    }
-
-    try {
-      const key = this.nonceKey(nonce);
-      const deleted = await this.redis.tryGetDelete(key);
-      if (deleted !== null) {
-        return true;
-      }
-
-      const result = await this.redis.tryEval(
-        "local v = redis.call('GET', KEYS[1])\nif v then redis.call('DEL', KEYS[1]) return 1 else return 0 end",
-        1,
-        key,
-      );
-      if (result !== null) {
-        return result === 1 || result === "1";
-      }
-
-      const value = await this.redis.tryGet(key);
-      if (value === null) {
-        return false;
-      }
-
-      await this.redis.delete(key);
-      return true;
-    } catch {
-      return null;
-    }
+  tryConsumeNonce(nonce: string): Promise<boolean | null> {
+    return this.nonces.consumeNonce(nonce);
   }
 
   sign(payload: GithubInstallStatePayload): string {
@@ -124,10 +91,6 @@ export class GithubInstallStateAdapter extends GithubInstallStatePort {
     }
 
     return payload;
-  }
-
-  private nonceKey(nonce: string): string {
-    return `langy:gh:nonce:${nonce}`;
   }
 
   private tryParseBody(body: string): GithubInstallStatePayload | null {

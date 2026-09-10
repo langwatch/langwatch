@@ -1,23 +1,26 @@
 import { randomBytes } from "node:crypto";
-
-import type { GithubRedisPort } from "../ports/github-app-token.port.ts";
-import type { GithubHostPort } from "../ports/github-host.port.ts";
-import { GithubTokenCachePort } from "../ports/github-token-cache.port.ts";
 import { nowInstant } from "@langwatch/time";
+
+import type { GithubRedisPort } from "./github-redis.connection.ts";
+import type { GithubHostPort } from "../../ports/github-host.port.ts";
+import { GithubTokenCacheRepository } from "../github-token-cache.repository.ts";
 
 const LOCK_TTL_SEC = 15;
 const LOCK_RETRY_MS = 100;
 const LOCK_MAX_WAIT_MS = 3_000;
 
-function installationPrefix(installationId: string, host: GithubHostPort): string {
-  const hostname = host.getHost();
-  const segment = hostname === "github.com" ? "" : `${hostname}:`;
-  return `langy:gh:insttoken:${segment}${installationId}`;
-}
-
-export class GithubTokenCacheAdapter extends GithubTokenCachePort {
-  static create(redis: GithubRedisPort | null, host: GithubHostPort): GithubTokenCacheAdapter {
-    return new GithubTokenCacheAdapter(redis, host);
+/**
+ * The Redis tier. The connection is nullable because this module's Redis is
+ * optional infrastructure: a process that opened none keeps every row absent,
+ * which is the same answer a cold cache gives, so the App degrades to asking
+ * GitHub every time rather than refusing to boot.
+ */
+export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository {
+  static create(parts: {
+    redis: GithubRedisPort | null;
+    host: GithubHostPort;
+  }): GithubTokenCacheRedisRepository {
+    return new GithubTokenCacheRedisRepository(parts.redis, parts.host);
   }
 
   private constructor(
@@ -27,8 +30,8 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
     super();
   }
 
-  tryGetToken(input: { installationId: string; scopeKey: string }): Promise<string | null> {
-    return this.tryGet(`${this.prefix(input.installationId)}:${input.scopeKey}`);
+  findToken(input: { installationId: string; scopeKey: string }): Promise<string | null> {
+    return this.read(`${this.prefix(input.installationId)}:${input.scopeKey}`);
   }
 
   storeToken(input: {
@@ -37,7 +40,7 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
     token: string;
     ttlSec: number;
   }): Promise<void> {
-    return this.trySet(
+    return this.write(
       `${this.prefix(input.installationId)}:${input.scopeKey}`,
       input.token,
       input.ttlSec,
@@ -45,7 +48,7 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
   }
 
   async hasLiveness(installationId: string): Promise<boolean> {
-    return Boolean(await this.tryGet(this.livenessKey(installationId)));
+    return Boolean(await this.read(this.livenessKey(installationId)));
   }
 
   markLiveness(input: {
@@ -53,19 +56,19 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
     value: "alive" | "backoff";
     ttlSec: number;
   }): Promise<void> {
-    return this.trySet(this.livenessKey(input.installationId), input.value, input.ttlSec);
+    return this.write(this.livenessKey(input.installationId), input.value, input.ttlSec);
   }
 
-  tryAcquireLivenessLock(installationId: string): Promise<string | null> {
-    return this.tryAcquire(`${this.livenessKey(installationId)}:lock`);
+  acquireLivenessLock(installationId: string): Promise<string | null> {
+    return this.acquireOnce(`${this.livenessKey(installationId)}:lock`);
   }
 
-  tryAcquireMintLock(input: { installationId: string; scopeKey: string }): Promise<string | null> {
-    return this.acquire(`${this.prefix(input.installationId)}:${input.scopeKey}:lock`);
+  acquireMintLock(input: { installationId: string; scopeKey: string }): Promise<string | null> {
+    return this.acquireWaiting(`${this.prefix(input.installationId)}:${input.scopeKey}:lock`);
   }
 
-  releaseLivenessLock(installationId: string, token: string): Promise<void> {
-    return this.release(`${this.livenessKey(installationId)}:lock`, token);
+  releaseLivenessLock(input: { installationId: string; token: string }): Promise<void> {
+    return this.release(`${this.livenessKey(input.installationId)}:lock`, input.token);
   }
 
   releaseMintLock(input: {
@@ -77,14 +80,16 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
   }
 
   private prefix(installationId: string): string {
-    return installationPrefix(installationId, this.host);
+    const hostname = this.host.getHost();
+    const segment = hostname === "github.com" ? "" : `${hostname}:`;
+    return `langy:gh:insttoken:${segment}${installationId}`;
   }
 
   private livenessKey(installationId: string): string {
     return `${this.prefix(installationId)}:liveness`;
   }
 
-  private async tryGet(key: string): Promise<string | null> {
+  private async read(key: string): Promise<string | null> {
     if (!this.redis) {
       return null;
     }
@@ -96,7 +101,7 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
     }
   }
 
-  private async trySet(key: string, value: string, ttlSec: number): Promise<void> {
+  private async write(key: string, value: string, ttlSec: number): Promise<void> {
     if (!this.redis) {
       return;
     }
@@ -108,7 +113,7 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
     }
   }
 
-  private async tryAcquire(key: string): Promise<string | null> {
+  private async acquireOnce(key: string): Promise<string | null> {
     if (!this.redis) {
       return null;
     }
@@ -122,7 +127,7 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
     }
   }
 
-  private async acquire(key: string): Promise<string | null> {
+  private async acquireWaiting(key: string): Promise<string | null> {
     if (!this.redis) {
       return null;
     }

@@ -13,14 +13,18 @@ import { createHmac } from "node:crypto";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { GithubInstallStateAdapter } from "../../adapters/github-install-state.adapter.ts";
+import { GithubInstallStateService } from "../../services/github-install-state.service.ts";
+import { GithubInstallNonceRedisRepository } from "../../repositories/redis/redis.github-install-nonce.repository.ts";
 import { githubInstallRest, type GithubInstallApi } from "../github-install.rest.ts";
 
 const SIGNING_KEY = "x".repeat(64);
 const WEBHOOK_SECRET = "whsecret";
 const INSTALL_URL = "https://github.com/apps/langwatch/installations/new";
 
-const state = GithubInstallStateAdapter.create({ signingKey: SIGNING_KEY, redis: null });
+const state = GithubInstallStateService.create({
+  signingKey: SIGNING_KEY,
+  nonces: GithubInstallNonceRedisRepository.create({ redis: null }),
+});
 
 const appConfig: GithubAppConfig = {
   appSlug: "langwatch",

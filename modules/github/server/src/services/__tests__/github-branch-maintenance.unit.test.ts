@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { GithubAppTokenAdapter } from "../../adapters/github-app-token.adapter.ts";
-import { GithubHostAdapter } from "../../adapters/github-host.adapter.ts";
+import { GithubHostService } from "../github-host.service.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
   type GithubBranchCheckRow,
@@ -58,7 +58,7 @@ function service(repository: MaintenanceRepository) {
       repository,
       installations: access,
       appTokens,
-      host: GithubHostAdapter.create(),
+      host: GithubHostService.create(),
       now: () => NOW,
     }),
     now: () => NOW,

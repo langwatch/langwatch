@@ -13,7 +13,7 @@ import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,
 } from "../repositories/github-pull-requests.repository.ts";
-import type { GithubPullRequestStatusCacheService } from "./github-pull-request-status-cache.service.ts";
+import type { GithubPullRequestStatusCacheRepository } from "../repositories/github-pull-request-status-cache.repository.ts";
 import { Temporal, toDate, toEpochMs, type Instant } from "@langwatch/time";
 import type { GithubPullRequestLiveStatus as ContractLiveStatus } from "@langwatch/github-contract";
 
@@ -42,7 +42,7 @@ export interface GithubPullRequestStatusServiceDeps {
   repository: GithubPullRequestsRepository;
   installations: GithubInstallationsService;
   appTokens: GithubAppTokenPort;
-  cache: GithubPullRequestStatusCacheService;
+  cache: GithubPullRequestStatusCacheRepository;
 }
 
 /**
@@ -125,7 +125,7 @@ export class GithubPullRequestStatusService {
       return null;
     }
 
-    const cached = await this.deps.cache.tryRead({ organizationId, ref });
+    const cached = await this.deps.cache.findStatus({ organizationId, ref });
     if (cached) {
       return {
         ...ref,
@@ -146,7 +146,7 @@ export class GithubPullRequestStatusService {
         state: live.state,
         draft: live.draft,
       });
-      await this.deps.cache.write({ organizationId, ref, status });
+      await this.deps.cache.storeStatus({ organizationId, ref, status });
       if (status !== this.statusFromRow(stored)) {
         this.refreshSnapshot({ organizationId, ref, live });
       }

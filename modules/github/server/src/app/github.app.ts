@@ -25,14 +25,15 @@ import type { GithubRepositories } from "../repositories/github.repositories.ts"
 import type { GithubProjectActivityPort } from "../ports/github-project-activity.port.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
 import { GithubAppTokenAdapter } from "../adapters/github-app-token.adapter.ts";
-import { GithubHostAdapter } from "../adapters/github-host.adapter.ts";
-import { GithubInstallResponseAdapter } from "../adapters/github-install-response.adapter.ts";
-import { GithubInstallStateAdapter } from "../adapters/github-install-state.adapter.ts";
-import { GithubPullRequestEventAdapter } from "../adapters/github-pull-request-event.adapter.ts";
+import { GithubHostService } from "../services/github-host.service.ts";
+import { GithubInstallResponseRules } from "../rules/github-install-response.rules.ts";
+import { GithubInstallStateService } from "../services/github-install-state.service.ts";
+import { GithubInstallNonceRedisRepository } from "../repositories/redis/redis.github-install-nonce.repository.ts";
+import { GithubPullRequestEventRules } from "../rules/github-pull-request-event.rules.ts";
 import {
   RedisGithubAdapter,
   type GithubRedisConnection,
-} from "../adapters/redis.github.adapter.ts";
+} from "../repositories/redis/github-redis.connection.ts";
 import { GithubBranchDemandPort } from "../ports/github-branch-demand.port.ts";
 import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
@@ -42,7 +43,7 @@ import { GithubBranchMappingService } from "../services/github-branch-mapping.se
 import { GithubInstallationAccessService } from "../services/github-installation-access.service.ts";
 import { GithubInstallationsService } from "../services/github-installations.service.ts";
 import { GithubPullRequestMappingService } from "../services/github-pull-request-mapping.service.ts";
-import { GithubPullRequestStatusCacheService } from "../services/github-pull-request-status-cache.service.ts";
+import { GithubPullRequestStatusCacheRedisRepository } from "../repositories/redis/redis.github-pull-request-status-cache.repository.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
 import { GithubFeatureService } from "../services/github.service.ts";
 
@@ -80,7 +81,7 @@ export type GithubComposition = Readonly<{
  * and the installation flow's own signing and rendering.
  */
 export function composeGithubApi(parts: GithubComposition): GithubFeatureService {
-  const host = GithubHostAdapter.create(parts.hostConfig);
+  const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
   const appTokens = GithubAppTokenAdapter.create(
     parts.config.appId,
@@ -125,7 +126,7 @@ export function composeGithubApi(parts: GithubComposition): GithubFeatureService
     repository: pullRequestsRepository,
     installations,
     appTokens,
-    cache: GithubPullRequestStatusCacheService.create(redis),
+    cache: GithubPullRequestStatusCacheRedisRepository.create({ redis }),
   });
 
   return GithubFeatureService.create({
@@ -137,12 +138,12 @@ export function composeGithubApi(parts: GithubComposition): GithubFeatureService
       webhookSecret: parts.config.webhookSecret,
     },
     host,
-    installState: GithubInstallStateAdapter.create({
+    installState: GithubInstallStateService.create({
       signingKey: parts.config.signingKey,
-      redis,
+      nonces: GithubInstallNonceRedisRepository.create({ redis }),
     }),
-    installResponse: GithubInstallResponseAdapter.create(),
-    pullRequestEvents: GithubPullRequestEventAdapter.create(),
+    installResponse: GithubInstallResponseRules.create(),
+    pullRequestEvents: GithubPullRequestEventRules.create(),
   });
 }
 
@@ -163,7 +164,7 @@ export type GithubBranchMaintenanceComposition = Readonly<{
 export function composeGithubBranchMaintenance(
   parts: GithubBranchMaintenanceComposition,
 ): GithubBranchMaintenancePort {
-  const host = GithubHostAdapter.create(parts.hostConfig);
+  const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
   const appTokens = GithubAppTokenAdapter.create(
     parts.config.appId,
@@ -201,7 +202,7 @@ export type GithubBranchDemandComposition = Readonly<{
 export function composeGithubBranchDemand(
   parts: GithubBranchDemandComposition,
 ): GithubBranchDemandPort {
-  const host = GithubHostAdapter.create(parts.hostConfig);
+  const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
   const appTokens = GithubAppTokenAdapter.create(
     parts.config.appId,

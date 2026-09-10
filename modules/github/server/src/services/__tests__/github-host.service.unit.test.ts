@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { GithubHostAdapter } from "../github-host.adapter.ts";
+import { GithubHostService } from "../github-host.service.ts";
 
 type HostConfig = { host?: string };
 
-function host(config: HostConfig = {}): GithubHostAdapter {
-  return GithubHostAdapter.create(config);
+function host(config: HostConfig = {}): GithubHostService {
+  return GithubHostService.create(config);
 }
 
 function getGithubHost(config: HostConfig = {}): string {

@@ -1,4 +1,3 @@
-import { GithubRedisPort } from "../ports/github-app-token.port.ts";
 
 export type GithubRedisConnection = {
   get(key: string): Promise<string | null>;
@@ -17,6 +16,23 @@ function isRedisConnection(value: object): value is GithubRedisConnection {
     "del" in value &&
     typeof value.del === "function"
   );
+}
+
+/**
+ * The command surface every Redis-backed GitHub row is written through, and
+ * the process client behind it. It lives here rather than beside the App
+ * token minter because it is the store, not a provider.
+ */
+export abstract class GithubRedisPort {
+  abstract tryGet(key: string): Promise<string | null>;
+  abstract trySet(key: string, value: string, ...args: (string | number)[]): Promise<string | null>;
+  abstract delete(key: string): Promise<number>;
+  abstract tryGetDelete(key: string): Promise<string | null>;
+  abstract tryEval(
+    script: string,
+    numKeys: number,
+    ...args: string[]
+  ): Promise<number | string | null>;
 }
 
 /** Keeps the process Redis client behind the GitHub feature's private port. */

@@ -2,19 +2,22 @@ import { createHmac } from "node:crypto";
 import type { GithubInstallStatePayload } from "@langwatch/github-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GithubInstallStateAdapter } from "../github-install-state.adapter.ts";
+import { GithubInstallNonceRedisRepository } from "../../repositories/redis/redis.github-install-nonce.repository.ts";
+import { GithubInstallStateService } from "../github-install-state.service.ts";
+
+const noNonceStore = () => GithubInstallNonceRedisRepository.create({ redis: null });
 
 const SIGNING_KEY = "test-secret-not-real";
 const NOW = 1_700_000_000_000;
-const STATE_TTL_MS = GithubInstallStateAdapter.create({
+const STATE_TTL_MS = GithubInstallStateService.create({
   signingKey: SIGNING_KEY,
-  redis: null,
+  nonces: noNonceStore(),
 }).getTtlMs();
 
 function signGithubInstallState(payload: GithubInstallStatePayload, signingKey: string): string {
-  return GithubInstallStateAdapter.create({
+  return GithubInstallStateService.create({
     signingKey,
-    redis: null,
+    nonces: noNonceStore(),
   }).sign(payload);
 }
 
@@ -32,9 +35,9 @@ function verifyGithubInstallState(
 ): GithubInstallStatePayload | null {
   vi.useFakeTimers();
   vi.setSystemTime(now);
-  return GithubInstallStateAdapter.create({
+  return GithubInstallStateService.create({
     signingKey,
-    redis: null,
+    nonces: noNonceStore(),
   }).tryVerify(token);
 }
 

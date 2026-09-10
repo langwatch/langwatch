@@ -72,18 +72,6 @@ export abstract class GithubAppTokenPort {
   }): string;
 }
 
-export abstract class GithubRedisPort {
-  abstract tryGet(key: string): Promise<string | null>;
-  abstract trySet(key: string, value: string, ...args: (string | number)[]): Promise<string | null>;
-  abstract delete(key: string): Promise<number>;
-  abstract tryGetDelete(key: string): Promise<string | null>;
-  abstract tryEval(
-    script: string,
-    numKeys: number,
-    ...args: string[]
-  ): Promise<number | string | null>;
-}
-
 export class GithubInstallationNotFoundError extends Error {
   readonly installationId: string;
 

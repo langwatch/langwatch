@@ -14,9 +14,9 @@ import {
   type GithubInstallationDetails,
   type GithubInstallationToken,
   type GithubPullRequestSummary,
-  GithubRedisPort,
   type MintInstallationTokenInput,
 } from "../../ports/github-app-token.port.ts";
+import { GithubRedisPort } from "../../repositories/redis/github-redis.connection.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
   type GithubPullRequestRow,
@@ -25,7 +25,7 @@ import {
 } from "../../repositories/github-pull-requests.repository.ts";
 import { GithubInstallationAccessService } from "../github-installation-access.service.ts";
 import { GithubInstallationsService } from "../github-installations.service.ts";
-import { GithubPullRequestStatusCacheService } from "../github-pull-request-status-cache.service.ts";
+import { GithubPullRequestStatusCacheRedisRepository } from "../../repositories/redis/redis.github-pull-request-status-cache.repository.ts";
 import { TestOrganizationService } from "./fixtures/github-services.fixture.ts";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 
@@ -203,7 +203,7 @@ function serviceWith({
     repository,
     installations,
     appTokens,
-    cache: GithubPullRequestStatusCacheService.create(redis),
+    cache: GithubPullRequestStatusCacheRedisRepository.create({ redis }),
   });
   return { service, refreshSnapshot: repository.refreshSnapshot };
 }

@@ -6,9 +6,9 @@ export type GithubHostConfig = {
   host?: string;
 };
 
-export class GithubHostAdapter extends GithubHostPort {
-  static create(config: GithubHostConfig = {}): GithubHostAdapter {
-    return new GithubHostAdapter(config);
+export class GithubHostService extends GithubHostPort {
+  static create(config: GithubHostConfig = {}): GithubHostService {
+    return new GithubHostService(config);
   }
 
   private constructor(private readonly config: GithubHostConfig) {

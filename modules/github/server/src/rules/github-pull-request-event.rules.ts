@@ -29,9 +29,9 @@ const githubPullRequestEventSchema = z.object({
   }),
 });
 
-export class GithubPullRequestEventAdapter extends GithubPullRequestEventPort {
-  static create(): GithubPullRequestEventAdapter {
-    return new GithubPullRequestEventAdapter();
+export class GithubPullRequestEventRules extends GithubPullRequestEventPort {
+  static create(): GithubPullRequestEventRules {
+    return new GithubPullRequestEventRules();
   }
 
   private constructor() {

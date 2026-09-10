@@ -1,8 +1,8 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { GithubPullRequestEventAdapter } from "../github-pull-request-event.adapter.ts";
+import { GithubPullRequestEventRules } from "../github-pull-request-event.rules.ts";
 
-const protocol = GithubPullRequestEventAdapter.create();
+const protocol = GithubPullRequestEventRules.create();
 const parseGithubPullRequestEvent = (payload: unknown) => protocol.tryParse(payload);
 
 function delivery(overrides: Record<string, unknown> = {}) {
