@@ -9,7 +9,7 @@ export {
   DatasetNormalizeQueuePort,
   DatasetUploadPort,
   DatasetContentPort,
-} from "./ports/dataset.port.ts";
+} from "./app/dataset.app.ts";
 export {
   DatasetAzureConfigResolverPort,
   DatasetS3ClientResolverPort,
@@ -18,31 +18,30 @@ export {
   type DatasetAzureConfig,
   type DatasetS3Client,
   type DatasetS3ClientLease,
-} from "./ports/dataset-storage.port.ts";
+} from "./app/dataset.app.ts";
 export {
   S3DatasetStorage,
   S3DatasetStorageAdapter,
-} from "./adapters/s3.dataset-storage.adapter.ts";
+} from "./services/s3.dataset-storage.service.ts";
 export {
   AzureDatasetStorage,
   AzureDatasetStorageAdapter,
-} from "./adapters/azure.dataset-storage.adapter.ts";
+} from "./services/azure.dataset-storage.service.ts";
 export {
   LocalDatasetStorage,
   LocalDatasetStorageAdapter,
-} from "./adapters/local.dataset-storage.adapter.ts";
+} from "./services/local.dataset-storage.service.ts";
 export {
   DatasetObjectStorageResolverAdapter,
   DatasetObjectStorageS3ClientResolverAdapter,
   DatasetStorageDestinationPort,
   type DatasetStorageDestination,
   type DatasetS3Target,
-} from "./adapters/dataset-object-storage-resolver.adapter.ts";
-export { DatasetUploadAdapter } from "./adapters/dataset-upload.adapter.ts";
-export { DatasetContentAdapter } from "./adapters/dataset-content.adapter.ts";
-export { DatasetNormalizeAdapter } from "./adapters/dataset-normalize.adapter.ts";
+} from "./services/dataset-object-storage-resolver.service.ts";
+export { DatasetUploadAdapter } from "./services/dataset-upload.service.ts";
+export { DatasetContentAdapter } from "./services/dataset-content.service.ts";
+export { DatasetNormalizeAdapter } from "./services/dataset-normalize.service.ts";
 export { DatasetService } from "./services/dataset.service.ts";
-export { DatasetNormalizePort } from "./ports/dataset-normalize.port.ts";
 export { DatasetNormalizationService } from "./services/dataset-normalization.service.ts";
 export * from "./rules/dataset-chunking.rules.ts";
 export { DatasetChunkService } from "./services/dataset-chunk.service.ts";
