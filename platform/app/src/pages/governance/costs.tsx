@@ -1,14 +1,17 @@
 import {
   Alert,
+  Button,
   Heading,
   HStack,
   SimpleGrid,
   Skeleton,
+  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type {
   GovernanceCostDayDto,
+  GovernanceCostProviderDayRowDto,
   GovernanceCostStaleSourcesDto,
   GovernanceCostSummaryDto,
   GovernanceCostUnpricedWindowDto,
@@ -48,6 +51,7 @@ import {
   costPanelEmpty,
 } from "~/components/governance/costs/CostPanelEmpty";
 import { CostProviderBreakdown } from "~/components/governance/costs/CostProviderBreakdown";
+import { CostProviderDayPanel } from "~/components/governance/costs/CostProviderDayPanel";
 import {
   CostSpenderError,
   CostSpenderList,
@@ -161,6 +165,33 @@ interface CostFilters {
 }
 
 /**
+ * The screen's filter state, and the two ways it is allowed to change.
+ *
+ * The frame and the interval are not independent, which is why they move
+ * together here rather than at the call site. Narrowing the frame can leave
+ * the reader on an interval the new frame cannot draw — a quarter over three
+ * months is one bar wearing a chart's clothes. `chooseFrame` steps down to the
+ * widest interval that still fits, in one place so every governance page
+ * answers alike.
+ */
+function useCostFilters() {
+  const [filters, setFilters] = useState<CostFilters>({
+    department: ALL_DEPARTMENTS,
+    departmentName: null,
+    frame: DEFAULT_TIME_FRAME,
+    interval: DEFAULT_TIME_INTERVAL,
+  });
+  const patch = (next: Partial<CostFilters>) =>
+    setFilters((current) => ({ ...current, ...next }));
+  const chooseFrame = (frame: TimeFrame) =>
+    patch({
+      frame,
+      interval: coerceInterval({ interval: filters.interval, frame }),
+    });
+  return { filters, setFilters, patch, chooseFrame };
+}
+
+/**
  * Drops a department selection the current window no longer contains.
  *
  * A window can answer without the department the reader is standing on: it
@@ -232,6 +263,7 @@ function useSpenderRows({
     // A decline is not an outage. Carried apart from `isError` so the panel can
     // show what it holds instead of accusing the read of breaking.
     refused: isRefusedRead(spenders.error),
+    isFetching: spenders.isFetching,
     retry: () => void spenders.refetch(),
   };
 }
@@ -242,46 +274,12 @@ function CostsPage() {
     redirectToProjectOnboarding: false,
   });
   const organizationId = organization?.id ?? "";
-  const [filters, setFilters] = useState<CostFilters>({
-    department: ALL_DEPARTMENTS,
-    departmentName: null,
-    frame: DEFAULT_TIME_FRAME,
-    interval: DEFAULT_TIME_INTERVAL,
-  });
-  const patch = (next: Partial<CostFilters>) =>
-    setFilters((current) => ({ ...current, ...next }));
-
-  /**
-   * Narrowing the frame can leave the reader on an interval the new frame
-   * cannot draw — a quarter over three months is one bar wearing a chart's
-   * clothes. The section-wide rule steps down to the widest that still fits,
-   * in one place so every governance page answers alike.
-   */
-  const chooseFrame = (frame: TimeFrame) =>
-    patch({
-      frame,
-      interval: coerceInterval({ interval: filters.interval, frame }),
-    });
+  const { filters, setFilters, patch, chooseFrame } = useCostFilters();
 
   const windowDays = windowDaysForFrame({ frame: filters.frame });
 
-  const summary = api.governanceCost.summary.useQuery(
-    { organizationId, windowDays },
-    { enabled: !!organizationId },
-  );
-  const breakdowns = useBreakdownQueries({
-    organizationId,
-    windowDays,
-    // The page opens on `governanceCost:view`, but the breakdowns read the
-    // activity monitor, which is its own grant. A viewer holding one and not
-    // the other gets the lanes and no failed queries underneath them.
-    enabled: !!organizationId && hasAnyPermission("activityMonitor:view"),
-  });
-  const spenders = useSpenderRows({
-    organizationId,
-    windowDays,
-    enabled: !!organizationId && hasAnyPermission("governance:view"),
-  });
+  const { summary, providerDays, breakdowns, spenders, busy, refresh } =
+    useCostScreenReads({ organizationId, windowDays, hasAnyPermission });
 
   const { active: showSample, toggle: toggleSample } = useSampleMode();
   const samplePeriods = useSamplePeriods(filters.frame);
@@ -296,10 +294,13 @@ function CostsPage() {
   return (
     <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
       <VStack align="stretch" gap={5} width="full">
-        <HStack justify="space-between" align="center">
-          <Heading size="md">Costs</Heading>
-          <SampleDataToggle active={showSample} onToggle={toggleSample} />
-        </HStack>
+        <CostsHeader
+          lastReadAt={summary.dataUpdatedAt}
+          busy={busy}
+          onRefresh={refresh}
+          showSample={showSample}
+          onToggleSample={toggleSample}
+        />
         {showSample && <SampleDataBanner />}
         {/* Everything under the banner inherits what the banner said. While it
             is up, the per-panel marks stand down rather than restating it
@@ -337,10 +338,237 @@ function CostsPage() {
             showSample={showSample}
             spenders={spenders}
             sourcesConnected={holdsFigures}
+            organizationId={organizationId}
+            providerDays={providerDays.data?.rows ?? []}
+            hasProviderDaysFailure={providerDays.isError}
           />
         </SampleSaidOnce>
       </VStack>
     </GovernanceLayout>
+  );
+}
+
+/**
+ * Every read this screen issues, and the one control that runs them again.
+ *
+ * One place rather than five call sites, because the guarantees this screen
+ * makes are about the SET: none of them polls, none re-reads on focus, and
+ * refreshing runs all of them or the screen is half up to date. A read added
+ * next to its neighbours here is a read the refresh cannot silently miss.
+ */
+function useCostScreenReads({
+  organizationId,
+  windowDays,
+  hasAnyPermission,
+}: {
+  organizationId: string;
+  windowDays: number;
+  hasAnyPermission: (
+    permission: "activityMonitor:view" | "governance:view",
+  ) => boolean;
+}) {
+  const { summary, providerDays } = useLaneReads({
+    organizationId,
+    windowDays,
+  });
+  const breakdowns = useBreakdownQueries({
+    organizationId,
+    windowDays,
+    // The page opens on `governanceCost:view`, but the breakdowns read the
+    // activity monitor, which is its own grant. A viewer holding one and not
+    // the other gets the lanes and no failed queries underneath them.
+    enabled: !!organizationId && hasAnyPermission("activityMonitor:view"),
+  });
+  const spenders = useSpenderRows({
+    organizationId,
+    windowDays,
+    enabled: !!organizationId && hasAnyPermission("governance:view"),
+  });
+  return {
+    summary,
+    providerDays,
+    breakdowns,
+    spenders,
+    // EVERY read the refresh runs, not most of them. `refresh` re-runs the
+    // spender read too, so leaving it out drops `aria-busy` while that one is
+    // still in flight — and a reader who sees the control go quiet with the
+    // panel unchanged clicks it again, which is the thing the busy state is on
+    // the page to prevent.
+    busy:
+      summary.isFetching ||
+      providerDays.isFetching ||
+      breakdowns.isFetching ||
+      spenders.isFetching,
+    refresh: () =>
+      refreshEveryRead({ summary, providerDays, spenders, breakdowns }),
+  };
+}
+
+/**
+ * The two reads the lanes and the day split are drawn from.
+ *
+ * Neither polls and neither re-reads when the reader returns to the window.
+ * That rule is stated HERE, at each call site, rather than inherited from the
+ * global query defaults: another governance screen already overrides that
+ * global to re-read on focus, so a money read that does not say the rule
+ * itself is one edit away from polling by accident — and the edit would be
+ * made in a different file by somebody with no reason to think about this
+ * screen. Figures that move under a reader mid-decision, often with the window
+ * shared, are worse than figures they chose to bring up to date.
+ */
+function useLaneReads({
+  organizationId,
+  windowDays,
+}: {
+  organizationId: string;
+  windowDays: number;
+}) {
+  const options = {
+    enabled: !!organizationId,
+    refetchOnWindowFocus: false as const,
+  };
+  const args = { organizationId, windowDays };
+  return {
+    summary: api.governanceCost.summary.useQuery(args, options),
+    providerDays: api.governanceCost.dailyByProvider.useQuery(args, options),
+  };
+}
+
+/**
+ * Bringing every figure on this screen up to date, by name.
+ *
+ * The set is NAMED rather than counted. The collection warning rides the
+ * summary read and the figures ride the others, and a figure brought up to
+ * date beside a stalled warning that was not is a worse screen than one where
+ * both are old together — so the absence of any single name here is a screen
+ * that half-refreshes, and a count would not say which one went missing.
+ *
+ * Each read is asked to run again directly rather than having its cache key
+ * invalidated. Both reissue the read; asking the query objects this screen
+ * already holds keeps the list of what gets refreshed in the same place as the
+ * list of what gets read, where a new read added to one and forgotten in the
+ * other is visible.
+ *
+ * The records behind a day are deliberately absent: that read is issued only
+ * once a reader opens a day, and re-running a read nothing is showing would be
+ * work for nobody.
+ */
+function refreshEveryRead({
+  summary,
+  providerDays,
+  spenders,
+  breakdowns,
+}: {
+  summary: { refetch: () => unknown };
+  providerDays: { refetch: () => unknown };
+  spenders: SpenderReadState;
+  breakdowns: Breakdowns;
+}) {
+  summary.refetch();
+  providerDays.refetch();
+  spenders.retry();
+  breakdowns.refetchAll();
+}
+
+/**
+ * The page's title row: what it is, how old the figures are, and the two
+ * controls that change either.
+ *
+ * The controls are SIBLINGS of the heading rather than nested in a group of
+ * their own. The sample toggle sits beside the heading by design, and a
+ * wrapper around it would put it in a different row as far as anything reading
+ * the page structure is concerned.
+ */
+function CostsHeader({
+  lastReadAt,
+  busy,
+  onRefresh,
+  showSample,
+  onToggleSample,
+}: {
+  /** When the summary read's answer arrived, epoch ms. */
+  lastReadAt: number | undefined;
+  /** Whether the reads are in flight, so the control can say it is working. */
+  busy: boolean;
+  onRefresh: () => void;
+  showSample: boolean;
+  onToggleSample: () => void;
+}) {
+  return (
+    <HStack align="center" gap={3}>
+      <Heading size="md">Costs</Heading>
+      <Spacer />
+      <FiguresLastRead at={lastReadAt} />
+      {/* `aria-busy` rather than a disabled control: a reader who sees nothing
+          move clicks again, and a button that goes dead says nothing about
+          why. */}
+      <Button size="xs" variant="outline" aria-busy={busy} onClick={onRefresh}>
+        Refresh
+      </Button>
+      <SampleDataToggle active={showSample} onToggle={onToggleSample} />
+    </HStack>
+  );
+}
+
+/**
+ * When the figures on this screen were last read.
+ *
+ * An ABSOLUTE clock time, in the reader's own local time, never "9 hours ago".
+ * A relative phrase goes stale the moment it is rendered and has to be
+ * re-rendered to stay true, which is exactly the self-refreshing behaviour
+ * this screen refuses; and the reader's real question — is this older than the
+ * pull I am waiting on — is a comparison of two instants, which only an
+ * absolute reading makes legible.
+ *
+ * Taken from when the ANSWER arrived, never from the render: a stamp on the
+ * render says when the page was opened, which tells a reader nothing about how
+ * old the money is.
+ */
+function FiguresLastRead({ at }: { at: number | undefined }) {
+  if (!at) return null;
+  return (
+    <Text
+      fontSize="xs"
+      color="fg.muted"
+      data-testid="cost-figures-last-read"
+      fontVariantNumeric="tabular-nums"
+    >
+      Last read{" "}
+      {new Date(at).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}
+    </Text>
+  );
+}
+
+/**
+ * What a panel says when its read failed rather than answering nothing.
+ *
+ * Every panel here renders an unanswered read and an absent figure the same
+ * way, so without this a failed refresh lands as a blank beside freshly filled
+ * neighbours and reads as no spend. The two states ask the reader for opposite
+ * things: an empty window is a finding, a failed read is something to try
+ * again.
+ */
+function CostPanelUnrefreshed({ height = "220px" }: { height?: string }) {
+  return (
+    <VStack
+      data-testid="cost-panel-unrefreshed"
+      align="start"
+      justify="center"
+      height={height}
+      gap={1}
+      color="fg.muted"
+    >
+      <Text fontSize="sm" color="fg">
+        This panel could not be brought up to date.
+      </Text>
+      <Text fontSize="sm">
+        Its figures were not read, so none are shown. Refreshing again is worth
+        a try.
+      </Text>
+    </VStack>
   );
 }
 
@@ -586,6 +814,7 @@ function CostLanes({
           amountUsd={data.billed.amountUsd}
           cellsWithoutAmount={data.billed.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.billed.currenciesWithoutUsdAmount}
+          currencyTotals={data.billed.currencyTotals}
           laneNote={
             data.azureBilling
               ? azureBillingNoteSentence(data.azureBilling)
@@ -605,6 +834,7 @@ function CostLanes({
           amountUsd={data.gateway.amountUsd}
           cellsWithoutAmount={data.gateway.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.gateway.currenciesWithoutUsdAmount}
+          currencyTotals={data.gateway.currencyTotals}
           trend={trendOf((day) => day.gatewayUsd)}
           trendPct={trendPctOf((day) => day.gatewayUsd)}
           interval={interval}
@@ -736,6 +966,25 @@ interface Breakdowns {
   activeUsers: number | null;
   overTime: DailyBucket[] | null;
   modelOverTime: DailyBucket[] | null;
+  /**
+   * Which of these reads FAILED, as opposed to answering nothing.
+   *
+   * Carried apart from the rows because every panel here renders an
+   * unanswered read and an absent figure the same way, so a failed read would
+   * otherwise land as a blank beside freshly filled neighbours and read as no
+   * spend. `null` rows are what the panel draws its empty state from; this is
+   * what stops it drawing one at all.
+   */
+  failed: {
+    byDepartment: boolean;
+    byUser: boolean;
+    byTeam: boolean;
+    byModel: boolean;
+  };
+  /** Whether any of them is currently in flight, for the refresh control. */
+  isFetching: boolean;
+  /** Ask every one of them to run again. See the refresh control's comment. */
+  refetchAll: () => void;
 }
 
 /** Wire buckets carry money as strings; the charts want numbers. */
@@ -814,6 +1063,28 @@ function useBreakdownQueries({
     departments,
     userRows: byUser.data ?? null,
     activeUsers: summary.data?.activeUsersThisWindow ?? null,
+    failed: {
+      byDepartment: byDepartment.isError,
+      byUser: byUser.isError,
+      byTeam: overTime.isError,
+      byModel: byModel.isError,
+    },
+    isFetching:
+      summary.isFetching ||
+      byDepartment.isFetching ||
+      byUser.isFetching ||
+      overTime.isFetching ||
+      byModel.isFetching,
+    refetchAll: () => {
+      // Both groupings of the over-time read are asked: they are two reads
+      // sharing one procedure, and refreshing the chart while leaving the
+      // panel beside it stale is the half-refresh this control exists against.
+      void summary.refetch();
+      void byDepartment.refetch();
+      void byUser.refetch();
+      void overTime.refetch();
+      void byModel.refetch();
+    },
     // `.buckets`, not the result object: the read answers a wrapper, and
     // handing the wrapper to a function that maps over an array throws the
     // moment a real answer arrives.
@@ -906,6 +1177,8 @@ interface SpenderReadState {
   isError: boolean;
   /** Declined by the plan gate or a missing grant, rather than broken. */
   refused: boolean;
+  /** Whether it is in flight, for the refresh control. Same reason as the rest. */
+  isFetching: boolean;
   retry: () => void;
 }
 
@@ -1054,6 +1327,7 @@ function SampleHeadlinePanels({
 function BreakdownGrid({
   interval,
   rows,
+  failed,
   sample,
   showSample,
   spenders,
@@ -1061,12 +1335,19 @@ function BreakdownGrid({
   interval: TimeInterval;
   /** Every measured series, already folded and filtered. Null is unanswered. */
   rows: MeasuredRows;
+  /** Which reads FAILED, as opposed to answering nothing. */
+  failed: Breakdowns["failed"];
   sample: SampleSeries;
   showSample: boolean;
   spenders: SpenderReadState;
 }) {
   const orSample = <T,>(measured: T[] | null, samples: T[]): T[] | null =>
     showSample ? samples : measured;
+  // Sample mode outranks a failed read: the reader asked to be shown invented
+  // figures, and a failure notice over the top of them would be reporting on a
+  // read this screen is not currently showing.
+  const unrefreshed = (which: keyof Breakdowns["failed"]) =>
+    !showSample && failed[which];
 
   return (
     <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
@@ -1076,27 +1357,35 @@ function BreakdownGrid({
         </CostPanel>
       )}
       <CostPanel title="Cost over time · by team" sample={showSample}>
-        <CostStackedBars
-          buckets={orSample(rows.byTeam, sample.overTime)}
-          interval={interval}
-          empty={costPanelEmpty({
-            what: "Spend per team, one bar per period.",
-            source:
-              "Fills from gateway traffic and from usage a connected source reports.",
-            action: ADD_A_SOURCE,
-          })}
-        />
+        {unrefreshed("byTeam") ? (
+          <CostPanelUnrefreshed />
+        ) : (
+          <CostStackedBars
+            buckets={orSample(rows.byTeam, sample.overTime)}
+            interval={interval}
+            empty={costPanelEmpty({
+              what: "Spend per team, one bar per period.",
+              source:
+                "Fills from gateway traffic and from usage a connected source reports.",
+              action: ADD_A_SOURCE,
+            })}
+          />
+        )}
       </CostPanel>
       <CostPanel title="Cost by department" sample={showSample}>
-        <CostRankList
-          rows={orSample(rows.byDepartment, sample.departments)}
-          empty={costPanelEmpty({
-            what: "Spend split across the departments people belong to.",
-            source:
-              "Fills once people who are spending are assigned to a department.",
-            action: MANAGE_DEPARTMENTS,
-          })}
-        />
+        {unrefreshed("byDepartment") ? (
+          <CostPanelUnrefreshed />
+        ) : (
+          <CostRankList
+            rows={orSample(rows.byDepartment, sample.departments)}
+            empty={costPanelEmpty({
+              what: "Spend split across the departments people belong to.",
+              source:
+                "Fills once people who are spending are assigned to a department.",
+              action: MANAGE_DEPARTMENTS,
+            })}
+          />
+        )}
       </CostPanel>
 
       {showSample && (
@@ -1105,15 +1394,19 @@ function BreakdownGrid({
         </CostPanel>
       )}
       <CostPanel title="Cost by model" sample={showSample}>
-        <CostRankList
-          rows={orSample(rows.byModel, sample.models)}
-          empty={costPanelEmpty({
-            what: "Spend per model, largest first.",
-            source:
-              "Fills from gateway traffic and from usage rows that name a model.",
-            action: ADD_A_SOURCE,
-          })}
-        />
+        {unrefreshed("byModel") ? (
+          <CostPanelUnrefreshed />
+        ) : (
+          <CostRankList
+            rows={orSample(rows.byModel, sample.models)}
+            empty={costPanelEmpty({
+              what: "Spend per model, largest first.",
+              source:
+                "Fills from gateway traffic and from usage rows that name a model.",
+              action: ADD_A_SOURCE,
+            })}
+          />
+        )}
       </CostPanel>
       {/* "Metered", not "Cost", because the panel below it also ranks people
           by money and the two figures are different money — this one is what
@@ -1121,15 +1414,19 @@ function BreakdownGrid({
           put on the invoice. They disagree routinely, so each title has to
           name its lane or the pair reads as the same list rendered twice. */}
       <CostPanel title="Metered spend by person" sample={showSample}>
-        <CostRankList
-          rows={orSample(rows.byUser, sample.users)}
-          empty={costPanelEmpty({
-            what: "Spend recorded against each person as their traffic was served.",
-            source:
-              "Fills from gateway traffic and from usage rows that name an actor.",
-            action: ADD_A_SOURCE,
-          })}
-        />
+        {unrefreshed("byUser") ? (
+          <CostPanelUnrefreshed />
+        ) : (
+          <CostRankList
+            rows={orSample(rows.byUser, sample.users)}
+            empty={costPanelEmpty({
+              what: "Spend recorded against each person as their traffic was served.",
+              source:
+                "Fills from gateway traffic and from usage rows that name an actor.",
+              action: ADD_A_SOURCE,
+            })}
+          />
+        )}
       </CostPanel>
       <SpenderPanelSlot spenders={spenders} showSample={showSample} />
 
@@ -1194,6 +1491,9 @@ function CostBreakdowns({
   showSample,
   spenders,
   sourcesConnected: connected,
+  organizationId,
+  providerDays,
+  hasProviderDaysFailure,
 }: {
   filters: CostFilters;
   breakdowns: Breakdowns;
@@ -1203,6 +1503,16 @@ function CostBreakdowns({
   spenders: SpenderReadState;
   /** See `sourcesConnected`: the Adoption count cannot state its own absence. */
   sourcesConnected: boolean;
+  organizationId: string;
+  /** One figure per (day, provider) of the billed lane. */
+  providerDays: readonly GovernanceCostProviderDayRowDto[];
+  /**
+   * Whether that read FAILED, which an empty row list cannot say on its own.
+   * Without it a failed read is an empty list, an empty list hides the panel,
+   * and a hidden panel beside filled neighbours reads as no spend — the same
+   * confusion `CostPanelUnrefreshed` exists to prevent.
+   */
+  hasProviderDaysFailure: boolean;
 }) {
   const sample = useSampleSeries(periods, filters.interval, filters.department);
   const rows = measuredRows({ breakdowns, filters });
@@ -1217,9 +1527,28 @@ function CostBreakdowns({
       {showSample && (
         <SampleHeadlinePanels sample={sample} interval={filters.interval} />
       )}
+      {/* Not in the grid below it. The grid's panels each rank ONE dimension
+          and fit a third of a row; this one is a day axis crossed with a
+          provider axis, and squeezing it into a third of a row would put the
+          window's days behind a scrollbar — which is exactly where they were
+          before this panel existed. */}
+      {!showSample && hasProviderDaysFailure && (
+        <CostPanel title="Cost by provider and day">
+          <CostPanelUnrefreshed />
+        </CostPanel>
+      )}
+      {!showSample && !hasProviderDaysFailure && providerDays.length > 0 && (
+        <CostPanel title="Cost by provider and day">
+          <CostProviderDayPanel
+            organizationId={organizationId}
+            rows={providerDays}
+          />
+        </CostPanel>
+      )}
       <BreakdownGrid
         interval={filters.interval}
         rows={rows}
+        failed={breakdowns.failed}
         sample={sample}
         showSample={showSample}
         spenders={spenders}

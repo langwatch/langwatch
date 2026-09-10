@@ -349,15 +349,136 @@ describe("listCopilotAgents paging", () => {
 
       const listing = await listCopilotAgents({ environmentUrl, token: "t" });
 
-      // `too_many_pages` rather than `unavailable`: every request in that walk
-      // came back 200, so nothing upstream misbehaved and the bound that
-      // stopped it is ours. The distinction is what stops the screen telling
-      // this reader to ask again.
+      // Not `unavailable`: every one of those pages answered, and answered
+      // 200. The bound that ended the walk is ours, so the reason names our
+      // side and the retry advice the provider reasons carry does not apply.
       expect(listing).toEqual({
         outcome: "refused",
         refusal: { reason: "too_many_pages", status: null },
       });
       expect(fetchMock).toHaveBeenCalledTimes(MAX_BOT_PAGES);
+    });
+  });
+});
+
+/**
+ * Spec: specs/governance/pulled-usage-cost-reporting.feature
+ *
+ * The listing and the transcript walk read the same table through the same
+ * function and stop at different places on purpose. The walk wants a name for
+ * the conversations it is about to map, and one it lacks costs that
+ * conversation a label. This is the list itself, and an agent it stops short
+ * of shows its provider identifier everywhere a name is expected.
+ */
+describe("given a tenant holding more agents than one page returns", () => {
+  const pageOf = (params: { rows: unknown[]; next?: string }) =>
+    reply({
+      ok: true,
+      status: 200,
+      body: {
+        value: params.rows,
+        ...(params.next === undefined
+          ? {}
+          : { "@odata.nextLink": params.next }),
+      },
+    });
+
+  /** @scenario "The agent list follows the provider next-page link" */
+  it("reads the following pages as well", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        pageOf({
+          rows: [{ botid: "BOT-1", name: "Sales Copilot" }],
+          next: "https://org1.crm.dynamics.com/page-2",
+        }),
+      )
+      .mockResolvedValueOnce(
+        pageOf({ rows: [{ botid: "BOT-2", name: "Support Copilot" }] }),
+      );
+
+    const listing = await listCopilotAgents({
+      environmentUrl,
+      token: "t",
+      signal: undefined,
+    });
+
+    expect(listing.outcome).toBe("listed");
+    if (listing.outcome !== "listed") return;
+    expect(listing.items.map((item) => item.rawAgentId)).toEqual([
+      "BOT-1",
+      "BOT-2",
+    ]);
+  });
+
+  /** @scenario "The agent list follows the provider next-page link" */
+  it("leaves no agent showing an identifier in place of its name", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        pageOf({
+          rows: [{ botid: "BOT-1", name: "Sales Copilot" }],
+          next: "https://org1.crm.dynamics.com/page-2",
+        }),
+      )
+      .mockResolvedValueOnce(
+        pageOf({ rows: [{ botid: "BOT-2", name: "Support Copilot" }] }),
+      );
+
+    const listing = await listCopilotAgents({
+      environmentUrl,
+      token: "t",
+      signal: undefined,
+    });
+
+    if (listing.outcome !== "listed") throw new Error("expected a listing");
+    // The second page's agent used to be absent entirely, and absent is where
+    // the raw identifier comes from: nothing downstream has a name to show.
+    expect(listing.items.map((item) => item.displayText)).toEqual([
+      "Sales Copilot",
+      "Support Copilot",
+    ]);
+  });
+
+  it("follows the provider's own link rather than one it rebuilt", async () => {
+    // This case reads the recorded calls by position, and the mock is shared
+    // across the file, so the count has to start here.
+    fetchMock.mockReset();
+    fetchMock
+      .mockResolvedValueOnce(
+        pageOf({
+          rows: [{ botid: "BOT-1", name: "Sales Copilot" }],
+          next: "https://org1.crm.dynamics.com/page-2?token=opaque",
+        }),
+      )
+      .mockResolvedValueOnce(pageOf({ rows: [] }));
+
+    await listCopilotAgents({ environmentUrl, token: "t", signal: undefined });
+
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "https://org1.crm.dynamics.com/page-2?token=opaque",
+    );
+  });
+
+  it("stops the whole read when a page mid-walk refuses", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        pageOf({
+          rows: [{ botid: "BOT-1", name: "Sales Copilot" }],
+          next: "https://org1.crm.dynamics.com/page-2",
+        }),
+      )
+      .mockResolvedValueOnce(reply({ ok: false, status: 403 }));
+
+    const listing = await listCopilotAgents({
+      environmentUrl,
+      token: "t",
+      signal: undefined,
+    });
+
+    // Reporting the first page alone would present a partial list as the
+    // whole tenant, which is the failure this scenario exists to stop.
+    expect(listing).toEqual({
+      outcome: "refused",
+      refusal: { reason: "unauthorized", status: 403 },
     });
   });
 });
@@ -397,8 +518,7 @@ describe("listGenieAgents", () => {
 
       const listing = await listGenieAgents({ workspaceUrl, token: "t" });
 
-      // Same reasoning as the Copilot bound above: the workspace answered
-      // every page it was asked for, so this is our limit and not its fault.
+      // Same reasoning as the Copilot walk: the pages answered, we stopped.
       expect(listing).toEqual({
         outcome: "refused",
         refusal: { reason: "too_many_pages", status: null },

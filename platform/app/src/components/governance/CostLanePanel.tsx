@@ -10,6 +10,7 @@ import { MeterBar } from "~/components/ui/MeterBar";
 
 import { CHART_SEAT_FILL } from "./chartTheme";
 import {
+  formatLaneCurrencyTotal,
   formatLaneUsd,
   laneTrendBadge,
   laneWithheldTotalNote,
@@ -38,6 +39,7 @@ export function CostLanePanel({
   amountUsd,
   cellsWithoutAmount,
   currenciesWithoutUsdAmount,
+  currencyTotals,
   laneNote,
   trend,
   trendPct,
@@ -54,6 +56,19 @@ export function CostLanePanel({
   cellsWithoutAmount: number;
   /** Which currencies those cells were billed in. May be empty. */
   currenciesWithoutUsdAmount: readonly string[];
+  /**
+   * One total per currency the lane was billed in.
+   *
+   * The US dollar entry IS `amountUsd` and is already the headline, so only
+   * the others are drawn — printing it twice would put two figures for one
+   * amount on one card, which is the shape of every defect this screen is
+   * built against.
+   */
+  currencyTotals?: ReadonlyArray<{
+    currencyCode: string;
+    amount: number | null;
+    cellsWithoutAmount: number;
+  }>;
   /**
    * A read-side sentence explaining this lane's figure or its absence — the
    * Azure billing note today. Rendered verbatim: the panel never composes
@@ -88,6 +103,13 @@ export function CostLanePanel({
   children?: ReactNode;
 }) {
   const badge = laneTrendBadge(trendPct ?? null);
+  // NO RATE IS APPLIED and nothing here is added to the headline. Money a
+  // provider billed in euros is money we can state exactly, and it gets its
+  // own line rather than being folded into a dollar figure nobody was charged
+  // (ADR-128 §3).
+  const otherCurrencies = (currencyTotals ?? []).filter(
+    (total) => total.currencyCode !== "USD",
+  );
   return (
     <Box
       data-testid={testId}
@@ -128,6 +150,20 @@ export function CostLanePanel({
             </Text>
           )}
         </HStack>
+        {otherCurrencies.length > 0 && (
+          <VStack align="start" gap={0}>
+            {otherCurrencies.map((total) => (
+              <Text
+                key={total.currencyCode}
+                fontSize="sm"
+                color="fg.muted"
+                fontVariantNumeric="tabular-nums"
+              >
+                {formatLaneCurrencyTotal(total)}
+              </Text>
+            ))}
+          </VStack>
+        )}
         {/* The middle of the card used to be blank, and a reader looking at it
             was owed an answer about what it was for. A lane states one figure,
             and the question a single figure always raises is which way it has
@@ -145,7 +181,7 @@ export function CostLanePanel({
         </Text>
         {cellsWithoutAmount > 0 ? (
           <Text fontSize="xs" color="fg.subtle" data-testid={`${testId}-note`}>
-            {laneWithheldTotalNote({ currenciesWithoutUsdAmount })}
+            {laneWithheldTotalNote()}
           </Text>
         ) : null}
         {laneNote ? (

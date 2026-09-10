@@ -231,6 +231,13 @@ function stateWithSentinels(): IngestionPullRunStatusData {
     LastRunError: null,
     LastRunErrorCode: null,
     LastRunScheduledFor: 900,
+    // Plain values, not sentinels. This guard fails when a field carrying
+    // something personal reaches a customer-facing surface, so the fields it
+    // watches are seeded with sentinels it can spot. How far a run read and
+    // whether it finished are facts about the run, not about any person, so
+    // they are free to appear anywhere and get ordinary values here.
+    LastReadThroughAt: 1_000,
+    LastRunCompleteness: "complete",
     LastAgentsListingAt: 1_100,
     LastAgentsListingOutcome: "refused",
     LastAgentsListingCount: null,

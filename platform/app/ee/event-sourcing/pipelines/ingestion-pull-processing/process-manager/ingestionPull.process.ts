@@ -32,12 +32,68 @@ export const INGESTION_PULL_STALE_RUN_MS = 30 * 60 * 1000;
  */
 export const INGESTION_PULL_STALE_LISTING_MS = INGESTION_PULL_STALE_RUN_MS;
 
+/**
+ * The longest wait a provider can talk us into.
+ *
+ * The wait is a number read out of a provider's answer, not one we choose.
+ * Left unbounded, a single malformed answer parks a money source for years
+ * with nothing on any screen explaining the silence. A day is long enough to
+ * be a real cooldown and short enough that the worst case self-corrects.
+ */
+export const INGESTION_PULL_MAX_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
 function nextWake({ cron, after }: { cron: string; after: number }): number {
   return computeNextRunAt({
     cron,
     timezone: "UTC",
     after: new Date(after),
   }).getTime();
+}
+
+/**
+ * Turns a wait a provider named into the instant this connection may ask
+ * again, or into nothing at all.
+ *
+ * The one place a provider's number becomes one of ours, so there is a single
+ * rule rather than one per caller. Anything that is not a readable, positive
+ * length of time is no wait: absent, null, NaN, infinite, zero or negative.
+ * That answer used to be handed straight to the part that works out the next
+ * run, which rejects what it cannot read — so one provider answering strangely
+ * stopped every scheduled connection rather than the one it answered.
+ *
+ * `refusedAt` is the instant the provider said it, never the instant we got
+ * round to reading it. The provider named a length of time starting from its
+ * own answer, so the deadline it asked for is an absolute one; measuring from
+ * the handling instant instead would stretch the wait by however far the
+ * subscriber was behind, and a replay of an old refusal would re-arm a wait
+ * that expired weeks ago and park a live money source all over again.
+ */
+export function cooldownUntilFrom({
+  retryAfterMs,
+  refusedAt,
+}: {
+  retryAfterMs: number | null | undefined;
+  refusedAt: number;
+}): number | null {
+  if (retryAfterMs == null || !Number.isFinite(retryAfterMs)) return null;
+  if (retryAfterMs <= 0) return null;
+  return refusedAt + Math.min(retryAfterMs, INGESTION_PULL_MAX_COOLDOWN_MS);
+}
+
+/**
+ * Whether a wait this connection was told about is still running.
+ *
+ * Absence is not a wait, and a wait whose instant has passed is not a wait,
+ * so both read the same way here rather than at each call site.
+ */
+function inCooldown({
+  state,
+  now,
+}: {
+  state: IngestionPullProcessState;
+  now: number;
+}): boolean {
+  return state.cooldownUntil != null && state.cooldownUntil > now;
 }
 
 /**
@@ -58,6 +114,11 @@ export function buildProcessEventView(
           : null,
     runId: "runId" in event.data ? event.data.runId : null,
     requestId: "requestId" in event.data ? event.data.requestId : null,
+    // A duration, not content: how long the provider asked to be left alone.
+    // Written by a failure and read by the connection, which is the only way
+    // a wait can outlive the run that was told about it.
+    retryAfterMs:
+      "retryAfterMs" in event.data ? (event.data.retryAfterMs ?? null) : null,
   };
 }
 
@@ -91,12 +152,19 @@ function settle({
   after: number;
   intents?: ProcessIntent[];
 }) {
+  if (!state.enabled || !state.cron) {
+    return { state, nextWakeAt: null, intents };
+  }
+  const scheduled = nextWake({ cron: state.cron, after });
+  // Later of the two, never either alone. The cadence an admin chose is not
+  // edited by a provider having a bad afternoon, and a tick falling inside a
+  // wait is moved to the end of that wait rather than spent being refused.
   return {
     state,
     nextWakeAt:
-      state.enabled && state.cron
-        ? nextWake({ cron: state.cron, after })
-        : null,
+      state.cooldownUntil != null
+        ? Math.max(scheduled, state.cooldownUntil)
+        : scheduled,
     intents,
   };
 }
@@ -174,11 +242,26 @@ export const handlePullRunFailed: EventHandler<
   IngestionPullIntents
 > = (state, payload, ctx) => {
   const view = ingestionPullProcessEventViewSchema.parse(payload);
+  // The wait is kept whichever run was told about it, including a run this
+  // process has already stopped tracking. A provider that asked for silence
+  // asked the connection, and an abandoned run's wait is exactly the one that
+  // used to die with it.
+  const told = cooldownUntilFrom({
+    retryAfterMs: view.retryAfterMs,
+    // The failure's own time, not the handling time: see `cooldownUntilFrom`.
+    refusedAt: ctx.at,
+  });
   return settle({
     state: {
       ...state,
       currentRun:
         state.currentRun?.runId === view.runId ? null : state.currentRun,
+      // Never shortens a wait already running: two refusals in a row leave the
+      // later instant standing rather than the most recent one.
+      cooldownUntil:
+        told === null
+          ? state.cooldownUntil
+          : Math.max(told, state.cooldownUntil ?? 0),
     },
     after: schedulingRef(ctx),
   });
@@ -363,10 +446,23 @@ export const ingestionPullWake: WakeHandler<
     ctx.now - state.currentRun.startedAt < INGESTION_PULL_STALE_RUN_MS;
   if (active) return settle({ state, after: ctx.now });
 
+  // The wait is checked before a run is minted, not inside one. A replacement
+  // that starts and then discovers the wait has already spent the provider
+  // call the wait existed to prevent. `settle` moves the wake to the end of
+  // the wait, so this returns rather than reschedules.
+  if (inCooldown({ state, now: ctx.now })) {
+    return settle({ state, after: ctx.now });
+  }
+
   // Identity comes from the slot the wake was scheduled for (`ctx.at`), never
   // the handling instant: a redelivered wake must mint the same runId, or it
   // would start a second pull over the same window.
   const runId = String(ctx.at);
+  // A run still tracked here at this point outlived its allowance and is being
+  // taken over. It used to end without recording anything at all, so the
+  // history showed a run that started and no run that finished. The
+  // replacement carries its id and records the abandonment naming itself.
+  const abandonedRunId = state.currentRun?.runId;
   return settle({
     state: {
       ...state,
@@ -379,6 +475,7 @@ export const ingestionPullWake: WakeHandler<
         runId,
         scheduledFor: ctx.at,
         cursor: state.cursor,
+        ...(abandonedRunId !== undefined ? { abandonedRunId } : {}),
       }),
     ],
   });

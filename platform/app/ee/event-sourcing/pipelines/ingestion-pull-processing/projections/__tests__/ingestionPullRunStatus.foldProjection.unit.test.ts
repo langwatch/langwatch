@@ -553,6 +553,89 @@ describe("IngestionPullRunStatusFoldProjection", () => {
       });
     });
   });
+
+  describe("given a run that stops before it has read everything", () => {
+    /**
+     * The two fields a run reports about how far it actually got.
+     *
+     * Field not yet on the event schema (held by PR #8043 work): the run
+     * completed event gains `readThroughAt` (the instant of the newest bucket
+     * the run really read) and `completeness` (`complete` | `truncated`), and
+     * the fold keeps them as `LastReadThroughAt` and `LastRunCompleteness`.
+     * Both are built inline as plain objects here, and the state is read
+     * through this widening, because neither the event nor the projection
+     * carries them yet.
+     */
+    type RunStatusWithReadThrough = IngestionPullRunStatusData & {
+      LastReadThroughAt: number | null;
+      LastRunCompleteness: "complete" | "truncated" | null;
+    };
+
+    const stopEarly = ({
+      readThroughAt,
+      scheduledFor,
+      occurredAt,
+    }: {
+      readThroughAt: number;
+      scheduledFor: number;
+      occurredAt: number;
+    }) =>
+      projection.apply(
+        projection.init(),
+        event(
+          "lw.obs.ingestion_pull.run_completed",
+          {
+            sourceId: "source-1",
+            runId: String(scheduledFor),
+            scheduledFor,
+            nextCursor: `cursor-${scheduledFor}`,
+            eventCount: 3,
+            // No error count: a page limit and a time limit both end a run
+            // with nothing to report as an error, which is exactly why the
+            // run instant is not the point the read reached.
+            readThroughAt,
+            completeness: "truncated",
+          },
+          occurredAt,
+        ),
+      ) as RunStatusWithReadThrough;
+
+    describe("when the run stops at the page limit it is allowed", () => {
+      /** @scenario "A run that stopped at its page limit records the point it read through to" */
+      it("records the point it read through to and that it stopped before the end", () => {
+        const readThroughAt = Date.parse("2026-01-15T06:00:00.000Z");
+        const stopped = stopEarly({
+          readThroughAt,
+          scheduledFor: 1_000,
+          occurredAt: Date.parse("2026-01-15T09:00:00.000Z"),
+        });
+
+        // The point the read REACHED, which is never later than the run that
+        // made it and is usually much earlier. Every honesty rule downstream
+        // reasons from this rather than from the moment the run finished.
+        expect(stopped.LastReadThroughAt).toBe(readThroughAt);
+        expect(stopped.LastRunCompleteness).toBe("truncated");
+      });
+    });
+
+    describe("when the run stops because it ran out of time", () => {
+      /** @scenario "A run that ran out of time before the end is remembered the same way" */
+      it("records the same two things as a run that hit its page limit", () => {
+        const readThroughAt = Date.parse("2026-01-15T02:30:00.000Z");
+        const stopped = stopEarly({
+          readThroughAt,
+          scheduledFor: 2_000,
+          occurredAt: Date.parse("2026-01-15T09:00:00.000Z"),
+        });
+
+        // Same two fields, because the provider still holds pages either way.
+        // Splitting the two reasons would give the read side two states to
+        // reason about where the customer-visible fact is one.
+        expect(stopped.LastReadThroughAt).toBe(readThroughAt);
+        expect(stopped.LastRunCompleteness).toBe("truncated");
+      });
+    });
+  });
   describe("given a source whose pull is working", () => {
     const configured = projection.apply(
       projection.init(),

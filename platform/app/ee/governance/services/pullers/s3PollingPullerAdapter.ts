@@ -90,14 +90,17 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     const client = this.makeClient({ config, options });
     const cursor = options.cursor;
 
-    const listed = await this.listKeys({
+    const { keys: listed, isTruncated } = await this.listKeys({
       client,
       config,
       startAfter: cursor ?? undefined,
       signal: options.signal,
     });
+    let completeness: "complete" | "truncated" = isTruncated
+      ? "truncated"
+      : "complete";
     if (listed.length === 0) {
-      return { events: [], cursor, errorCount: 0 };
+      return { events: [], cursor, errorCount: 0, completeness };
     }
 
     const events: NormalizedPullEvent[] = [];
@@ -110,7 +113,9 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
           { adapter: this.id, key, processed: events.length },
           "deadline reached mid-pull, returning partial results",
         );
-        return { events, cursor: lastSuccessfulKey, errorCount };
+        // A deadline leaves the store half-read whatever the listing said.
+        completeness = "truncated";
+        break;
       }
       try {
         const body = await this.readObject({
@@ -122,26 +127,12 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
         const { records, unreadable } = this.parseBody({ body, config });
         errorCount += unreadable;
         await this.reportUnreadableLines({ key, unreadable });
-        for (const raw of records) {
-          try {
-            events.push(this.mapEvent(raw, config));
-          } catch (error) {
-            errorCount += 1;
-            logger.warn(
-              {
-                adapter: this.id,
-                key,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "skipping malformed event",
-            );
-            await withScope(async (scope) => {
-              scope.setTag?.("adapter", this.id);
-              scope.setExtra?.("key", key);
-              captureException(toError(error));
-            });
-          }
-        }
+        errorCount += await this.collectEvents({
+          records,
+          config,
+          key,
+          events,
+        });
         lastSuccessfulKey = key;
       } catch (error) {
         // Reading the file itself failed — this is more serious than a
@@ -169,7 +160,49 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       }
     }
 
-    return { events, cursor: lastSuccessfulKey, errorCount };
+    return { events, cursor: lastSuccessfulKey, errorCount, completeness };
+  }
+
+  /**
+   * Maps one file's records onto `events`, returning how many it could not.
+   *
+   * A record that will not map is skipped rather than thrown: one malformed
+   * line must not cost the whole file, let alone the run. The count it returns
+   * is what tells the caller the run was a partial success.
+   */
+  private async collectEvents({
+    records,
+    config,
+    key,
+    events,
+  }: {
+    records: unknown[];
+    config: S3PollingConfig;
+    key: string;
+    events: NormalizedPullEvent[];
+  }): Promise<number> {
+    let unmapped = 0;
+    for (const raw of records) {
+      try {
+        events.push(this.mapEvent(raw, config));
+      } catch (error) {
+        unmapped += 1;
+        logger.warn(
+          {
+            adapter: this.id,
+            key,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "skipping malformed event",
+        );
+        await withScope(async (scope) => {
+          scope.setTag?.("adapter", this.id);
+          scope.setExtra?.("key", key);
+          captureException(toError(error));
+        });
+      }
+    }
+    return unmapped;
   }
 
   private makeClient({
@@ -209,7 +242,22 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     config: S3PollingConfig;
     startAfter?: string;
     signal?: AbortSignal;
-  }): Promise<string[]> {
+    /**
+     * The keys to read, and whether the store held more than this run may take.
+     *
+     * `isTruncated` is returned rather than inferred by the caller from
+     * `keys.length`: a listing that happens to hold exactly the cap is
+     * indistinguishable from one cut short by it, and the caller would have
+     * to re-derive a rule that already lives here.
+     *
+     * It becomes the run's `completeness`. A listing cut short by the file cap
+     * and one that drained the bucket used to leave through the same exit, so
+     * a source permanently stuck on a fraction of its objects looked exactly
+     * like a healthy quiet one. Neither is a failure — the events and money
+     * already gathered are kept and the cursor still advances — so the answer
+     * rides beside `errorCount` rather than raising it.
+     */
+  }): Promise<{ keys: string[]; isTruncated: boolean }> {
     const keys: string[] = [];
     let continuationToken: string | undefined;
     let pages = 0;
@@ -234,10 +282,12 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
         : undefined;
       if (keys.length >= MAX_FILES_PER_RUN) {
         // Safety cap — the cursor will pick up the rest on the next run
-        return keys.slice(0, MAX_FILES_PER_RUN);
+        return { keys: keys.slice(0, MAX_FILES_PER_RUN), isTruncated: true };
       }
     } while (continuationToken && pages < 50);
-    return keys;
+    // A token still in hand means the page cap above stopped the walk, which
+    // leaves the store just as half-read as the file cap does.
+    return { keys, isTruncated: continuationToken !== undefined };
   }
 
   private async readObject({

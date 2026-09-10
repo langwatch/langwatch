@@ -43,6 +43,16 @@ export interface IngestionPullRunPort {
      * completion as a clean one by a port simply omitting the field.
      */
     errorCount: number;
+    /**
+     * Whether the run reached the end of what it set out to read, and the
+     * instant it read through to.
+     *
+     * Optional so a port that has not been taught to report cannot be forced
+     * to invent an answer — and absent stays absent all the way to the
+     * source row, where it reads as unknown rather than as either answer.
+     */
+    completeness?: "complete" | "truncated";
+    readThroughAt?: number | null;
   }>;
 }
 
@@ -105,6 +115,8 @@ export interface IngestionPullOutcomeCommands {
     nextCursor: string | null;
     eventCount: number;
     errorCount: number;
+    completeness?: "complete" | "truncated";
+    readThroughAt?: number | null;
   }): Promise<void>;
   recordRunFailed(args: {
     tenantId: string;
@@ -115,6 +127,14 @@ export interface IngestionPullOutcomeCommands {
     error: string;
     errorCode: string;
     retryable: boolean;
+    /**
+     * How long the provider asked to be left alone, when it said so. Optional
+     * because most failures are not a provider asking for silence, and null is
+     * reserved for one that refused without naming a wait.
+     */
+    retryAfterMs?: number | null;
+    /** The run that took this one's place, on an abandonment only. */
+    replacedByRunId?: string;
   }): Promise<void>;
   recordAgentsListed(args: {
     tenantId: string;
@@ -176,6 +196,71 @@ export interface IngestionPullDispatchDeps {
  * durable cursor, and the outcome commands carry deterministic idempotency
  * keys, so it cannot double-record.
  */
+/**
+ * The wait a provider named, read off the error a puller threw.
+ *
+ * By shape rather than by class, and deliberately so: the outbox reads the
+ * same property the same way to space out its own attempts, and the pullers
+ * throw an ordinary error carrying it. Requiring a particular error type here
+ * would mean a puller can space out its retries and still lose the wait on the
+ * way to the connection, which is the exact loss this fixes.
+ *
+ * Returns null, never undefined, for an error that named nothing: the schema
+ * distinguishes a refusal with no wait from a failure written before waits
+ * were recorded, and only this path can say which this is.
+ */
+function providerRetryAfterMs(error: unknown): number | null {
+  if (typeof error !== "object" || error === null) return null;
+  const named = Reflect.get(error, "retryAfterMs");
+  return typeof named === "number" && Number.isFinite(named) && named > 0
+    ? named
+    : null;
+}
+
+/**
+ * Records that this run took over from one that outlived its allowance, when
+ * it did, and does nothing when it did not.
+ *
+ * Runs BEFORE the provider is asked anything: the replaced run ended the
+ * moment this one was minted, and until that is written the history shows a
+ * run that started and no run that ended, which reads on every screen as a
+ * source still working.
+ *
+ * On EVERY delivery, not only the first. The command's idempotency key is
+ * built from the abandoned run, so a redelivery settles onto the write that
+ * already happened and costs one deduplicated call. Skipping later attempts
+ * saved that call and paid for it with the case that matters: if this write is
+ * the thing that failed, the outbox redelivers at a higher attempt and a
+ * first-attempt-only guard would never write the abandonment at all, leaving
+ * the replaced run open forever.
+ */
+async function recordAbandonmentIfReplacing({
+  commands,
+  payload,
+  intentContext,
+  occurredAt,
+}: {
+  commands: IngestionPullOutcomeCommands;
+  payload: IngestionPullRunIntent;
+  intentContext: IntentContext;
+  occurredAt: number;
+}): Promise<void> {
+  if (payload.abandonedRunId === undefined) return;
+  await commands.recordRunFailed({
+    tenantId: intentContext.projectId,
+    occurredAt,
+    sourceId: payload.sourceId,
+    runId: payload.abandonedRunId,
+    scheduledFor: payload.scheduledFor,
+    error: `Run abandoned after exceeding its allowed duration; replaced by run ${payload.runId}.`,
+    errorCode: "run_abandoned",
+    // Nothing will retry the abandoned run — this run IS the retry, from the
+    // same durable cursor.
+    retryable: false,
+    replacedByRunId: payload.runId,
+  });
+}
+
 export function createIngestionPullRunHandler(
   deps: IngestionPullDispatchDeps,
 ): IntentExecutor<IngestionPullRunIntent> {
@@ -188,6 +273,14 @@ export function createIngestionPullRunHandler(
   ) => {
     const commands = deps.commands();
     const pullStartedAtMs = clock();
+
+    await recordAbandonmentIfReplacing({
+      commands,
+      payload,
+      intentContext,
+      occurredAt: clock(),
+    });
+
     let result: Awaited<ReturnType<IngestionPullRunPort["run"]>>;
     try {
       result = await deps.runPort.run({
@@ -222,6 +315,11 @@ export function createIngestionPullRunHandler(
         // Retries are exhausted — nothing will retry THIS run. The next
         // scheduled wake starts a fresh run from the durable cursor.
         retryable: false,
+        // The wait leaves with the run rather than dying with it. Every
+        // attempt of this run has now been refused, so the next wake is the
+        // thing that must not walk back into the window the provider closed,
+        // and it reads this off the connection.
+        retryAfterMs: providerRetryAfterMs(error),
       });
       return;
     }

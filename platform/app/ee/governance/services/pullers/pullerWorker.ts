@@ -307,12 +307,15 @@ function assertRunMadeProgress(params: {
   );
 }
 
-export async function runIngestionPull(params: {
-  sourceId: string;
-  cursor: string | null;
-  pulledUsage?: PulledUsageDispatcher;
-  identityMatch?: DiscoveredPeopleMatcher;
-}): Promise<{
+/**
+ * What one pull run reports back to whoever asked for it.
+ *
+ * Named a report rather than an outcome because `IngestionPullRunOutcome` in
+ * the pipeline's own constants is already taken, and means something
+ * narrower: the single word "completed" or "failed" that lands on the
+ * run-status row. This is the whole of what the run has to say.
+ */
+export type IngestionPullRunReport = {
   nextCursor: string | null;
   eventCount: number;
   /**
@@ -321,7 +324,66 @@ export async function runIngestionPull(params: {
    * instead of returning, so a nonzero value here always means partial success.
    */
   errorCount: number;
-}> {
+  /**
+   * Whether the run reached the end of what it set out to read.
+   *
+   * Carried up from the adapter unchanged. A truncated run is NOT a failed
+   * one: the money and audit rows it gathered are written and its cursor
+   * advances, so `errorCount` stays zero and this is the only thing that
+   * distinguishes a source permanently stuck on a fraction of its data from a
+   * healthy quiet one. Adapters that say nothing read as complete.
+   */
+  completeness: "complete" | "truncated";
+  /**
+   * The instant the source is known to have been read up to, or null when the
+   * adapter states none.
+   *
+   * Deliberately NOT the instant the run finished. The run clock advances on
+   * every attempt, so a stuck source re-reading the same half would look like
+   * steady progress to anything reasoning from it.
+   */
+  readThroughAt: Date | null;
+};
+
+/**
+ * The outcome a source that is not currently pulling reports, or null when it
+ * is pulling and the run should go ahead.
+ *
+ * A paused or archived source is not a failure and not an empty read: it is a
+ * run that never started. Reporting it as complete with the incoming cursor
+ * untouched is what keeps a pause from moving the source's position, and
+ * `readThroughAt` null is what keeps it from claiming it read up to now.
+ */
+function outcomeForSourceNotPulling({
+  status,
+  ingestionSourceId,
+  cursor,
+}: {
+  status: string;
+  ingestionSourceId: string;
+  cursor: string | null;
+}): IngestionPullRunReport | null {
+  if (status === "active" || status === "awaiting_first_event") return null;
+  logger.info(
+    { ingestionSourceId, status },
+    "IngestionSource not active, skipping",
+  );
+  return {
+    nextCursor: cursor,
+    eventCount: 0,
+    errorCount: 0,
+    // Nothing was read, so nothing was left half-read either.
+    completeness: "complete",
+    readThroughAt: null,
+  };
+}
+
+export async function runIngestionPull(params: {
+  sourceId: string;
+  cursor: string | null;
+  pulledUsage?: PulledUsageDispatcher;
+  identityMatch?: DiscoveredPeopleMatcher;
+}): Promise<IngestionPullRunReport> {
   registerBuiltInPullers();
 
   const ingestionSourceId = params.sourceId;
@@ -333,13 +395,12 @@ export async function runIngestionPull(params: {
   if (!source) {
     throw new Error(`IngestionSource ${ingestionSourceId} not found`);
   }
-  if (source.status !== "active" && source.status !== "awaiting_first_event") {
-    logger.info(
-      { ingestionSourceId, status: source.status },
-      "IngestionSource not active, skipping",
-    );
-    return { nextCursor: params.cursor, eventCount: 0, errorCount: 0 };
-  }
+  const notPulling = outcomeForSourceNotPulling({
+    status: source.status,
+    ingestionSourceId,
+    cursor: params.cursor,
+  });
+  if (notPulling !== null) return notPulling;
 
   const pullConfig = (source.parserConfig ?? {}) as Record<string, unknown>;
   const { adapterId, adapter, validatedConfig } = resolvePullAdapter({
@@ -398,7 +459,55 @@ export async function runIngestionPull(params: {
     nextCursor: result.cursor,
     eventCount: result.events.length,
     errorCount: result.errorCount,
+    completeness: result.completeness ?? "complete",
+    readThroughAt: readThroughInstant(result),
   };
+}
+
+/**
+ * The instant a run read through to.
+ *
+ * Three sources, in falling order of authority, and the ordering is the point.
+ *
+ * The adapter's own statement wins: it alone knows what its cursor means. Next
+ * comes the newest event this run actually emitted, which is a fact about the
+ * data rather than about the attempt — it does not move when a run stalls, so
+ * a source stuck re-reading the same half reports the same point every time,
+ * which is precisely how being stuck becomes visible. Only a run that reached
+ * the END falls through to the clock, and there it is not a guess: a complete
+ * read has been read through to now by definition.
+ *
+ * A truncated run that emitted nothing gets null. It read up to nowhere, and
+ * the clock would say otherwise.
+ */
+/**
+ * The newest timestamp among the events one run emitted, or null when it
+ * emitted none this run could read.
+ *
+ * Unreadable stamps are skipped rather than treated as the epoch: one adapter
+ * writing a malformed timestamp would otherwise drag the answer to 1970 and
+ * report the source as read through to a point half a century behind.
+ */
+function newestEventInstant(events: PullResult["events"]): Date | null {
+  let newestMs: number | null = null;
+  for (const event of events) {
+    const ms = Date.parse(event.event_timestamp);
+    if (Number.isNaN(ms)) continue;
+    if (newestMs === null || ms > newestMs) newestMs = ms;
+  }
+  return newestMs === null ? null : new Date(newestMs);
+}
+
+function readThroughInstant(result: PullResult): Date | null {
+  if (result.readThroughAt !== undefined) {
+    const stated = new Date(result.readThroughAt);
+    if (!Number.isNaN(stated.getTime())) return stated;
+  }
+
+  const newest = newestEventInstant(result.events);
+  if (newest !== null) return newest;
+
+  return (result.completeness ?? "complete") === "complete" ? new Date() : null;
 }
 
 /** The IngestionSource fields the write paths below actually read. */

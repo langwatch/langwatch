@@ -117,6 +117,11 @@ export const SAMPLE_INGESTION_SOURCES: Source[] = sampleSourceTypeOptions().map(
       status: state.status,
       errorCount,
       lastSuccessAt: lastEventAt,
+      // Unknown, which is what a connection nobody has made has read through
+      // to. Naming either answer here would put a collection verdict on a
+      // row that has never collected anything.
+      lastReadThroughAt: null,
+      lastRunCompleteness: null,
       // Left empty on purpose. Health still reads `errorCount`, and a sample
       // row inventing a pull run would put a timestamp on a connection nobody
       // has made.

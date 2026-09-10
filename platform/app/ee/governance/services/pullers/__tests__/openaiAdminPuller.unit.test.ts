@@ -956,3 +956,69 @@ describe("given an OpenAI Admin cost source", () => {
     });
   });
 });
+
+describe("given a provider that refuses to break a period down per key", () => {
+  describe("when the read falls back to asking for the period undivided", () => {
+    /**
+     * The fallback is correct and the money survives it. What was missing was
+     * any trace that it happened, so a provider quietly widening what it
+     * refuses would cost every customer their attribution in silence.
+     *
+     * The notice rides on the run's own result rather than on a log line: a
+     * log is not something a reader of the source can be shown. The carrier
+     * (`notices`) and its code are this binding's choice — nothing in the
+     * settlements names them — so change both together if the implementer
+     * prefers others.
+     */
+    /** @scenario "A read that loses per-person attribution says so before carrying on" */
+    it("records that it continued without per-key attribution, and still records the money", async () => {
+      fetchMock
+        .mockResolvedValueOnce(KEY_GROUPING_REFUSAL)
+        .mockResolvedValueOnce(
+          jsonResponse(
+            page({
+              results: [costRow({ api_key_id: null, line_item: null })],
+            }),
+          ),
+        );
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      // Not yet implemented: PullResult.notices. Field not yet on the port
+      // (held by PR #8043 work), so it is read off a widened view here.
+      const reported = result as typeof result & { notices?: string[] };
+      expect(reported.notices ?? []).toContain(
+        "per_key_attribution_unavailable",
+      );
+
+      // And the money for the period is still recorded — the notice is a
+      // trace beside the events, never instead of them.
+      const record = buildPulledUsageRecord({
+        event: result.events[0]!,
+        source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+      // The minor-units field, not the dollar-denominated one. That second
+      // field only ever holds the biller's own SEPARATE conversion, and
+      // OpenAI publishes none, so it is null on every provider-reported row.
+      expect(record?.costNanoMinor).toBeGreaterThan(0);
+    });
+
+    /**
+     * The arm from the far side: a run the provider never refused must not
+     * claim it lost attribution, or the notice means nothing.
+     */
+    /** @scenario "A read that loses per-person attribution says so before carrying on" */
+    it("says nothing of the sort on a run the provider answered whole", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(page()));
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      const reported = result as typeof result & { notices?: string[] };
+      expect(reported.notices ?? []).not.toContain(
+        "per_key_attribution_unavailable",
+      );
+    });
+  });
+});

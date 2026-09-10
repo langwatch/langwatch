@@ -62,6 +62,34 @@ export interface IngestionPullRunStatusData {
    */
   LastRunScheduledFor: number | null;
   /**
+   * The instant the last run actually READ THROUGH TO -- the newest bucket it
+   * got from the provider, not the moment it stopped.
+   *
+   * A run that hit its page limit or ran out of time ends without an error and
+   * with a perfectly recent finish time, while the provider still holds pages
+   * behind it. Coverage asked `LastSuccessAt` whether a day had been read, and
+   * `LastSuccessAt` answers a different question: whether the run FINISHED,
+   * which a half-read run also did. Everything downstream that claims a day
+   * was collected reasons from this instead.
+   *
+   * Null until a run reports one, and on every row written before the column
+   * existed. Null reads as unknown, never as "read through to now".
+   */
+  LastReadThroughAt: number | null;
+  /**
+   * Whether the last run reached the end of what the provider had, or stopped
+   * short of it.
+   *
+   * One fact rather than two, deliberately: a page limit and a time limit are
+   * different reasons for the same customer-visible thing, and splitting them
+   * would give every reader two states to reason about where there is one.
+   *
+   * Null on every row written before the column existed, which reads as
+   * unknown rather than as complete -- claiming a run we have no record of was
+   * complete is the one answer that could quietly bless a half-read source.
+   */
+  LastRunCompleteness: "complete" | "truncated" | null;
+  /**
    * What the last agents listing did, in its own set of fields.
    *
    * A listing is a different scope on the same connection as the pull above: a
@@ -134,6 +162,43 @@ const ingestionPullEvents = [
   IngestionPullPeopleListingRefusedEventSchema,
 ] as const;
 
+/**
+ * What the run reported about how far it read, off a completion event.
+ *
+ * Both fields are optional on the event, and that is the correct reading
+ * rather than a gap: the log is append-only, every completion already on it
+ * was written before runs said how far they read, and the answer for those is
+ * "we do not know" rather than any particular value.
+ *
+ * Absent means the two stay at whatever the row already held, so a producer
+ * that has not been taught to report yet cannot erase what an earlier one did.
+ *
+ * An explicit `readThroughAt: null` is held the same way, and that is a
+ * decision rather than an oversight. `LastReadThroughAt` is how far this
+ * SOURCE has been read, not how far its most recent run got, and a run that
+ * reached nowhere read nothing back out of the source. Two ordinary runs
+ * report null: a paused or archived source, which completes without asking the
+ * provider anything, and a truncated run that emitted no readable event.
+ * Clearing on either would turn a known read-through point into "unknown" —
+ * which is exactly the state the field's own doc reserves for a source nobody
+ * has read yet, and which would drop the truncation notice off the stuck
+ * sources it exists to mark.
+ */
+function readThroughOf(event: IngestionPullRunCompletedEvent): {
+  LastReadThroughAt?: number;
+  LastRunCompleteness?: "complete" | "truncated";
+} {
+  const reported = event.data;
+  return {
+    ...(typeof reported.readThroughAt === "number"
+      ? { LastReadThroughAt: reported.readThroughAt }
+      : {}),
+    ...(reported.completeness !== undefined
+      ? { LastRunCompleteness: reported.completeness }
+      : {}),
+  };
+}
+
 export class IngestionPullRunStatusFoldProjection
   extends AbstractFoldProjection<
     IngestionPullRunStatusData,
@@ -173,6 +238,8 @@ export class IngestionPullRunStatusFoldProjection
       ConsecutiveErrors: 0,
       LastRunScheduledFor: null,
       LastSuccessAt: null,
+      LastReadThroughAt: null,
+      LastRunCompleteness: null,
       // Null on every listing column, and null is the reading itself rather
       // than a placeholder for one: no listing of that kind has been recorded
       // for this source. A zero would say the provider named nobody, which is
@@ -274,6 +341,7 @@ export class IngestionPullRunStatusFoldProjection
       // new: reaching the provider and being told "no usage" is a working
       // puller.
       LastSuccessAt: partlySucceeded ? state.LastSuccessAt : event.occurredAt,
+      ...readThroughOf(event),
     };
   }
 

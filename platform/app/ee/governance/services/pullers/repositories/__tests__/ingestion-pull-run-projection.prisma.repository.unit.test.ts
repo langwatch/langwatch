@@ -39,6 +39,8 @@ function storedProjection(): StoredProjection<IngestionPullRunStatusData> {
       ConsecutiveErrors: 0,
       LastSuccessAt: 2_000,
       LastRunScheduledFor: 1_500,
+      LastReadThroughAt: null,
+      LastRunCompleteness: null,
       // A listed agents outcome and a refused people one, on the same row at
       // the same time: the two kinds keep their own columns precisely so this
       // is representable, and a fixture that only ever carried one kind would

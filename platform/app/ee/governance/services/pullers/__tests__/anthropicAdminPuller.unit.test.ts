@@ -666,6 +666,51 @@ describe("the Anthropic Admin puller", () => {
       });
     });
 
+    it("holds the cost window still when run after run is cut off before reading a page", async () => {
+      // A drained cost cursor carries no page token, and `parseCursor` gives
+      // exactly those cursors the repair look-back — so the window a run ASKS
+      // from sits earlier than the position on record. Saving the asked-from
+      // value when the deadline fires before page one would hand the next run
+      // an already-rewound position to look back from again, and each cut-off
+      // run would walk the window further into the past. With no page token
+      // there is nothing to resume, so the position on record is saved.
+      fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
+      const puller = new AnthropicAdminPuller();
+      const costConfig = {
+        adapter: "anthropic_admin" as const,
+        report: "cost" as const,
+        bucketWidth: "1d" as const,
+        schedule: "0 * * * *",
+        startingAt: "2026-08-01T00:00:00.000Z",
+      };
+
+      const drained = await puller.runOnce(RUN_OPTIONS, costConfig);
+      const drainedPosition = JSON.parse(drained.cursor!) as {
+        startingAt: string;
+        page: string | null;
+      };
+      expect(drainedPosition.page).toBeNull();
+
+      let cursor = drained.cursor!;
+      const positions: string[] = [];
+      for (let run = 0; run < 3; run += 1) {
+        const cutOff = await puller.runOnce(
+          { ...RUN_OPTIONS, cursor, deadlineMs: Date.now() - 1 },
+          costConfig,
+        );
+        cursor = cutOff.cursor!;
+        positions.push(
+          (JSON.parse(cursor) as { startingAt: string }).startingAt,
+        );
+      }
+
+      expect(positions).toEqual([
+        drainedPosition.startingAt,
+        drainedPosition.startingAt,
+        drainedPosition.startingAt,
+      ]);
+    });
+
     it("keeps a pre-query-binding usage watermark rather than rewinding into duplicates", async () => {
       fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
 
@@ -1287,6 +1332,184 @@ describe("the Anthropic Admin puller", () => {
       expect(run.events[0]!.source_event_id).toBe(
         run.events[1]!.source_event_id,
       );
+    });
+  });
+});
+
+/**
+ * Reading back over a window the provider may still correct.
+ *
+ * The sibling OpenAI adapter already re-reads a few days behind its watermark
+ * and floors that at the configured start (`windowStartFor`). This adapter
+ * read strictly forward, so the first figure it ever saw for a day was the
+ * last one it would ever hold — and that figure disagreed with the provider's
+ * own console within a week.
+ *
+ * Every run below mints its cursor by running once, rather than hand-writing
+ * one: the cost cursor's identity embeds the configured start, so a
+ * hand-written cursor would take the stale-cursor rewind path instead of the
+ * look-back path these scenarios are about.
+ */
+describe("given an Anthropic cost source that has already read up to a day", () => {
+  /** One page whose only bucket starts where the caller says. */
+  function costPageStartingAt(bucketStart: string) {
+    return {
+      ...COST_PAGE,
+      data: [{ ...COST_PAGE.data[0]!, starting_at: bucketStart }],
+    };
+  }
+
+  function costConfig(startingAt: string) {
+    return {
+      adapter: "anthropic_admin" as const,
+      report: "cost" as const,
+      bucketWidth: "1d" as const,
+      schedule: "0 * * * *",
+      startingAt,
+    };
+  }
+
+  /** Runs once from nothing, so the cursor it returns carries this config's identity. */
+  async function drainedCursor({
+    puller,
+    config,
+    bucketStart,
+  }: {
+    puller: AnthropicAdminPuller;
+    config: ReturnType<typeof costConfig>;
+    bucketStart: string;
+  }) {
+    fetchMock.mockResolvedValue(jsonResponse(costPageStartingAt(bucketStart)));
+    const run = await puller.runOnce(RUN_OPTIONS, config);
+    fetchMock.mockClear();
+    return run.cursor;
+  }
+
+  function requestedStart(callIndex = 0): string | null {
+    return new URL(
+      String(fetchMock.mock.calls[callIndex]?.[0]),
+    ).searchParams.get("starting_at");
+  }
+
+  describe("when the next cost read starts", () => {
+    /** @scenario "A cost read looks back a few days so a late correction is picked up" */
+    it("starts a few days behind the day it had reached, but never before the configured start", async () => {
+      const puller = new AnthropicAdminPuller();
+      const config = costConfig("2026-07-01T00:00:00.000Z");
+      const cursor = await drainedCursor({
+        puller,
+        config,
+        bucketStart: "2026-08-01T00:00:00Z",
+      });
+
+      fetchMock.mockResolvedValue(
+        jsonResponse(costPageStartingAt("2026-07-29T00:00:00Z")),
+      );
+      await puller.runOnce({ ...RUN_OPTIONS, cursor }, config);
+
+      // Three days, the same margin the sibling connection already pays for
+      // on one request per run.
+      expect(requestedStart()).toBe("2026-07-29T00:00:00.000Z");
+    });
+
+    /** @scenario "A cost read looks back a few days so a late correction is picked up" */
+    it("stops the look-back at the day the connection was told to begin at", async () => {
+      const puller = new AnthropicAdminPuller();
+      // A start only one day behind the day reached, so the look-back would
+      // otherwise reach before the connection existed.
+      const config = costConfig("2026-07-31T00:00:00.000Z");
+      const cursor = await drainedCursor({
+        puller,
+        config,
+        bucketStart: "2026-08-01T00:00:00Z",
+      });
+
+      fetchMock.mockResolvedValue(
+        jsonResponse(costPageStartingAt("2026-07-31T00:00:00Z")),
+      );
+      await puller.runOnce({ ...RUN_OPTIONS, cursor }, config);
+
+      expect(requestedStart()).toBe("2026-07-31T00:00:00.000Z");
+    });
+  });
+
+  describe("when a read that looked back finishes", () => {
+    /** @scenario "Looking back does not move the saved position backwards" */
+    it("saves a position no earlier than the one it started from, and looks back from that same day next time", async () => {
+      const puller = new AnthropicAdminPuller();
+      const config = costConfig("2026-07-01T00:00:00.000Z");
+      const cursor = await drainedCursor({
+        puller,
+        config,
+        bucketStart: "2026-08-01T00:00:00Z",
+      });
+
+      // The looked-back read answers with nothing newer than the day it
+      // looked back to — an empty window, a credit, or a workspace somebody
+      // deleted all look exactly like this.
+      fetchMock.mockResolvedValue(
+        jsonResponse(costPageStartingAt("2026-07-29T00:00:00Z")),
+      );
+      const lookedBack = await puller.runOnce(
+        { ...RUN_OPTIONS, cursor },
+        config,
+      );
+      fetchMock.mockClear();
+
+      // The saved position stays at the day already reached. Saving the
+      // looked-back day instead walks the source backwards on every run
+      // until it reaches the day it was first connected.
+      expect(
+        (JSON.parse(lookedBack.cursor ?? "{}") as { startingAt?: string })
+          .startingAt,
+      ).toBe("2026-08-01T00:00:00Z");
+
+      fetchMock.mockResolvedValue(
+        jsonResponse(costPageStartingAt("2026-07-29T00:00:00Z")),
+      );
+      await puller.runOnce(
+        { ...RUN_OPTIONS, cursor: lookedBack.cursor },
+        config,
+      );
+
+      // And the run after it looks back from the day reached, not from the
+      // day it looked back to.
+      expect(requestedStart()).toBe("2026-07-29T00:00:00.000Z");
+    });
+  });
+});
+
+describe("given an Anthropic source reading token usage rather than money", () => {
+  describe("when the next read starts", () => {
+    /**
+     * The arm from the far side of the look-back: usage rows are identified
+     * partly by how the customer asked for them to be bucketed, so re-reading
+     * a period after that choice changed lands the same usage beside itself
+     * rather than replacing it. Money rows carry no such choice.
+     */
+    /** @scenario "The token usage read is not rewound" */
+    it("starts exactly where the last one finished", async () => {
+      const puller = new AnthropicAdminPuller();
+      const config = {
+        adapter: "anthropic_admin" as const,
+        report: "usage" as const,
+        bucketWidth: "1d" as const,
+        schedule: "0 * * * *",
+        startingAt: "2026-07-01T00:00:00.000Z",
+      };
+
+      fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
+      const drained = await puller.runOnce(RUN_OPTIONS, config);
+      fetchMock.mockClear();
+      fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
+
+      await puller.runOnce({ ...RUN_OPTIONS, cursor: drained.cursor }, config);
+
+      expect(
+        new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get(
+          "starting_at",
+        ),
+      ).toBe("2026-08-01T00:00:00Z");
     });
   });
 });

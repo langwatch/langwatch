@@ -687,31 +687,33 @@ Feature: One cost screen, three honest lanes
 
   @unit
   Scenario: A lane with usage we cannot state in US dollars holds no total
-    # The partial-sum defect. When part of a lane has an amount we cannot
-    # state in US dollars, adding up only the rest produces a smaller
-    # number that still reads as the lane's whole figure — and nothing on
-    # the screen says how much was left out. A lane we cannot total is a
-    # lane with no total, and the screen would rather say nothing than
-    # understate what an organization spent.
-    Given one lane has usage billed in a currency other than US dollars
-    And that same lane also has usage billed in US dollars
+    # The partial-sum defect. When part of a lane has spend we hold no
+    # dollar figure for, adding up only the rest produces a smaller number
+    # that still reads as the lane's whole figure — and nothing on the
+    # screen says how much was left out. A lane we cannot total is a lane
+    # with no total, and the screen would rather say nothing than
+    # understate what an organization spent. The per-currency lines shown
+    # beside it follow the same rule, one currency at a time.
+    Given one lane has spend we hold no dollar figure for
+    And that same lane also has spend stated in US dollars
     When the cost screen reads that window
-    Then that lane holds no total
-    And the total of only its US dollar usage is not offered as the lane figure
+    Then that lane holds no dollar total
+    And the sum of only the parts stated in US dollars is not offered as the lane figure
 
   @integration
   Scenario: A lane with no total says why instead of showing a figure
     # The note is the whole reason withholding is acceptable rather than
-    # broken. It must describe what actually happened: for the dominant
-    # cause the provider DID state an amount, in another currency, and
-    # nothing converts it — so copy claiming the amount is missing is
-    # wrong, and a reader who checks against the provider invoice finds it
-    # wrong.
-    Given a lane whose total is withheld because some usage is billed in another currency
+    # broken, so it has to describe what actually happened. What the screen
+    # knows is that part of the lane has no dollar figure, and that covers
+    # two different causes: spend the provider billed in another currency,
+    # and spend read on a day when cost recording was off. Copy naming
+    # another currency as the cause states a false reason for the second of
+    # them, and a reader who checks it against the provider invoice finds
+    # it wrong.
+    Given a lane whose dollar total is withheld because part of it has no dollar figure
     When a permitted viewer opens the cost screen
-    Then that lane shows no amount
-    And that lane says some of its usage is billed in a currency other than US dollars
-    And that lane names that currency
+    Then that lane shows no dollar amount
+    And that lane says we hold no dollar figure for part of what it covers
 
   @unit
   Scenario: A day mixing stated and unstated amounts holds no figure for that lane
@@ -720,7 +722,7 @@ Feature: One cost screen, three honest lanes
     # partial amount is a claim about that day nobody can stand behind —
     # and a gap is the one shape a reader cannot misread as a low-spend
     # day.
-    Given a day where one lane has both US dollar usage and usage billed in another currency
+    Given a day where one lane holds both spend stated in US dollars and spend we hold no dollar figure for
     When the cost screen reads that window
     Then that lane holds no figure for that day
     And the other lane keeps its own figure for that day
@@ -764,6 +766,120 @@ Feature: One cost screen, three honest lanes
     Given a billed day whose total is negative
     When a permitted viewer opens the cost screen
     Then the billed lane shows the negative amount as reported
+
+  # =========================================================================
+  # Bringing the screen up to date, and the two things a reader has to be
+  # able to take apart: which day, and which currency.
+  #
+  # The figures on this screen go stale the moment a pull lands, and nothing
+  # on the page ever said so or offered to look again. A reader who knew a
+  # pull had just run had no way to see its money without reloading the
+  # browser. Refreshing has to bring the collection state with it: a figure
+  # brought up to date beside a warning that is not is a worse screen than
+  # one where both are old together.
+  # =========================================================================
+
+  @integration
+  Scenario: One control brings the figures and the collection state up to date together
+    Given the screen has been open long enough for its figures to age
+    When a permitted viewer asks the screen to refresh
+    Then the lane figures, the spender breakdown, every other breakdown on the screen and the note about stalled collection are all read again
+    And the control says it is working until they answer
+    # ENFORCEMENT GAP: parity binds by title, so a test can satisfy this by
+    # re-issuing one read and letting the rest happen to be fresh already.
+    # The bound test has to name each read the screen issues and assert
+    # every one of them was issued again — the set by name, never a count,
+    # because a count breaks on the next read the screen legitimately gains.
+
+  @integration
+  Scenario: The header says when the figures were last read
+    When a permitted viewer opens the cost screen
+    Then the header says when its figures were last read
+    And the time shown is when the answer arrived, not when the screen was opened
+    # Nothing reads again on its own here, so without this a reader cannot
+    # tell a screen opened a moment ago from one left open since the
+    # morning, and the refresh control beside it has nothing to argue with.
+
+  @integration
+  Scenario: A panel that fails to refresh says so instead of emptying
+    Given a permitted viewer has asked the screen to refresh
+    When one of the reads fails
+    Then that panel says it could not be brought up to date
+    And it is not left looking as though there was nothing to show
+    # Every panel on this screen renders an unanswered read and an absent
+    # figure the same way, so a failed refresh lands as a blank beside
+    # freshly filled neighbours and reads as no spend — the one confusion
+    # the whole screen exists to prevent.
+
+  @integration
+  Scenario: The screen does not quietly read the figures again on its own
+    When a permitted viewer leaves the cost screen open
+    Then the screen does not read the figures again by itself
+    And returning to the window does not read them again either
+    # The source pages do poll, and that stays true: a connection is
+    # watched while it is being set up, and a failure there is minutes old.
+    # This screen is read while a decision is being made, often with the
+    # window shared, and figures that move under the reader are worse than
+    # figures they chose to bring up to date. The reads are also expensive
+    # and this screen carries several of them.
+
+  @integration
+  Scenario: A viewer can see each day of the window split by provider
+    Given a window in which two providers were billed on the same days
+    And every day of that window carries a dollar figure
+    When a permitted viewer reads the provider breakdown
+    Then each day shows a separate figure per provider
+    And those daily figures add up to the window total each provider already reports
+    # The screen could say a provider cost a certain amount over a quarter
+    # and could say the organization spent a certain amount on a given day,
+    # and had no way to answer which provider caused a day that stood out.
+
+  @integration
+  Scenario: A provider holding a day with no dollar figure shows no window total
+    Given a window in which one provider has a day we hold no dollar figure for
+    When a permitted viewer reads the provider breakdown
+    Then that provider shows no total for the window
+    And its daily figures are marked as covering only part of what was spent
+    # Its other days each hold a real number, so a reader who adds the bars
+    # up rebuilds exactly the partial sum the lane refused to show them.
+    # The mark on the bars is what stops the chart from being that sum.
+
+  @integration
+  Scenario: Opening one day at one provider lists the records behind its figure
+    Given a day at one provider whose figure comes from several records
+    When a permitted viewer opens that day and provider
+    Then the records that make up the figure are listed
+    And each record names what it was for and what it cost
+
+  @integration
+  Scenario: A window billed in two currencies shows one total per currency
+    Given a window holding spend billed in dollars and spend billed in euros
+    When a permitted viewer opens the cost screen
+    Then a separate total is shown for each currency
+    And no figure on the screen combines the two
+    And no exchange rate is applied to produce either
+
+  @unit
+  Scenario: A currency nobody converted still totals in the currency it was billed in
+    Given spend billed in a currency the provider published no dollar figure for
+    When the window totals are read
+    Then that currency has a total of its own
+    And the dollar total is unchanged by it
+    # The amount in the provider's own currency has been stored on every row
+    # since the summary was built and has never been read by any total. The
+    # dollar column being empty is not the same as there being no money.
+
+  @unit
+  Scenario: A currency total is withheld when part of what it covers holds no amount
+    Given spend billed in one currency where part of it holds no amount at all
+    When the window totals are read
+    Then no total is shown for that currency
+    And it says part of what it covers is unpriced
+    # An amount of zero and no amount at all are written the same way in
+    # the provider-currency figure, so the parts holding no amount are
+    # counted separately. Without that count a day nobody ever priced
+    # charts as a genuine nothing in the provider's own currency — the one
+    # thing the dollar figure was allowed to be empty in order to prevent.
 
   Rule: The screen says where its numbers stop being complete
     # ADR-128 4a. A source whose pulls keep failing brings nothing back, so it

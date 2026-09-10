@@ -1445,3 +1445,124 @@ describe("given an Azure bill that does not fit in one reply", () => {
     });
   });
 });
+
+describe("given a source reading a period of conversations", () => {
+  describe("when it asks the environment for a page", () => {
+    /**
+     * Naming a row count without stating it as a preference leaves this
+     * provider free to answer with its own far larger page, so the limit on
+     * how many pages one run may take bounds a much bigger read than intended.
+     *
+     * The header is Dataverse's own way of asking: `Prefer:
+     * odata.maxpagesize=<n>`, and it has to agree with the row count already
+     * in the query, which is why both are read off the same call here.
+     */
+    /** @scenario "The conversation read asks the provider for the page size it intends to read" */
+    it("states the page size it wants as a preference the provider will honour", async () => {
+      const adapter = await newAdapter();
+      queueSignInAndBots();
+      responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
+
+      await adapter.runOnce(
+        { cursor: null, credentials: CREDENTIALS },
+        adapter.validateConfig(CONFIG),
+      );
+
+      const call = transcriptCall();
+      const requested = new URL(call.url).searchParams.get("$top");
+      expect(requested).not.toBeNull();
+      const headers = (call.init?.headers ?? {}) as Record<string, string>;
+      const preference = Object.entries(headers).find(
+        ([name]) => name.toLowerCase() === "prefer",
+      )?.[1];
+
+      expect(preference).toBe(`odata.maxpagesize=${requested}`);
+    });
+  });
+});
+
+/**
+ * Which lines of the bill become recorded AI cost.
+ *
+ * Asserted HERE, at the step that decides, rather than against the parser or
+ * the event builder one layer down. `readAzureCostRows` records faithfully
+ * what Azure said and `azureCostEvents` promises exactly one event per day the
+ * reply named; a category filter inside either would falsify a stated
+ * contract, and inside the parser it would turn a reader into a policy engine.
+ *
+ * The recording step is reached directly, the same way the page walk above is.
+ * Driving a whole run would need a cursor and a write path, neither of which
+ * this is about, and both of which would hide the property behind their own
+ * failures.
+ */
+describe("given a subscription billing both AI services and unrelated infrastructure", () => {
+  interface CostRead {
+    readAzureCost(params: {
+      config: unknown;
+      options: unknown;
+      previous: {
+        pricedThroughDay: string | null;
+        heldSinceMs: number | null;
+        readAtMs: number | null;
+        deepReadDay: string | null;
+      };
+    }): Promise<{ events: Array<{ target: string }> }>;
+  }
+
+  /** A bill naming one AI line and one that is plainly not. */
+  function mixedBill() {
+    return {
+      properties: {
+        columns: [
+          { name: "UsageDate" },
+          { name: "Cost" },
+          { name: "CostUSD" },
+          { name: "Currency" },
+          { name: "MeterCategory" },
+        ],
+        rows: [
+          [20260115, 4.5, 4.5, "USD", "Foundry Models"],
+          [20260115, 99.0, 99.0, "USD", "Load Balancer"],
+        ],
+        nextLink: null,
+      },
+    };
+  }
+
+  describe("when the bill is read", () => {
+    /** @scenario "The cloud bill is asked only for the lines that carry AI spend" */
+    it("does not record an unrelated infrastructure line as AI cost", async () => {
+      const adapter = await newAdapter();
+      // The billing sign-in, then the bill itself.
+      responseQueue.push({ status: 200, body: { access_token: "token-xyz" } });
+      responseQueue.push({ status: 200, body: mixedBill() });
+
+      const read = await (adapter as unknown as CostRead).readAzureCost({
+        config: { ...CONFIG, azureSubscriptionId: "sub-1" },
+        options: {
+          cursor: null,
+          credentials: {
+            ...CREDENTIALS,
+            billingClientId: "billing-client-id",
+            billingClientSecret: "billing-client-secret",
+          },
+        },
+        // Never read before, so this run is due to ask — and no deep read has
+        // finished either, which is a state production reaches and the omitted
+        // fourth one (a caller that does no deep reads at all) is not.
+        previous: {
+          pricedThroughDay: null,
+          heldSinceMs: null,
+          readAtMs: null,
+          deepReadDay: null,
+        },
+      });
+
+      // Belt and braces on top of the request filter: Azure answered with a
+      // category outside the list, and it becomes no recorded cost at all.
+      expect(read.events.map((event) => event.target)).toEqual([
+        "Foundry Models",
+      ]);
+    });
+  });
+});

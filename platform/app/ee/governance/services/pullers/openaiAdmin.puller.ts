@@ -528,6 +528,16 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     let page = cursor.page;
     let watermark = cursor.watermark;
     let hasKeyGrouping = cursor.hasKeyGrouping;
+    /**
+     * Whether any page in THIS run came back without per-key attribution.
+     *
+     * The fallback itself is correct — the money survives it, undivided —
+     * but it left no trace, so a provider quietly widening what it refuses
+     * would cost every customer their attribution in silence. Read off this
+     * run's own pages rather than off the cursor: a window already being read
+     * undivided is not this run's news to report.
+     */
+    let hasLostKeyAttribution = false;
 
     /**
      * What an unfinished run persists as its resume point. With a page token
@@ -537,22 +547,35 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
      */
     const resumeStart = () => (page === null ? cursor.storedStart : startingAt);
 
+    /**
+     * What a run that stopped before draining the window returns.
+     *
+     * Both ways out of the loop — the deadline and the page cap — leave the
+     * same thing behind: every event read so far, a cursor pointing at where
+     * to resume, and no error, because nothing failed. `truncated` is the part
+     * that must not be forgotten at either exit; a half-read window that says
+     * nothing is recorded as complete.
+     */
+    const stoppedShort = (): PullResult => ({
+      events,
+      cursor: encodeCursor({
+        startingAt: resumeStart(),
+        page,
+        query,
+        watermark,
+        hasKeyGrouping,
+        keyGroupingUpgrade: false,
+      }),
+      errorCount: 0,
+      completeness: "truncated",
+      ...runNotices(hasLostKeyAttribution),
+    });
+
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
       if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
         // Everything read so far is kept and the cursor says where to resume,
         // so a deadline costs latency rather than a window.
-        return {
-          events,
-          cursor: encodeCursor({
-            startingAt: resumeStart(),
-            page,
-            query,
-            watermark,
-            hasKeyGrouping,
-            keyGroupingUpgrade: false,
-          }),
-          errorCount: 0,
-        };
+        return stoppedShort();
       }
 
       const read = await this.readPage({
@@ -567,6 +590,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         return { events, cursor: options.cursor, errorCount: 1 };
       }
       events.push(...read.events);
+      if (!read.hasKeyGrouping) hasLostKeyAttribution = true;
       hasKeyGrouping = read.hasKeyGrouping;
       watermark = laterOf(watermark, read.watermark);
 
@@ -582,6 +606,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
             }),
           ),
           errorCount: 0,
+          ...runNotices(hasLostKeyAttribution),
         };
       }
       page = read.nextPage;
@@ -591,18 +616,8 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       { adapter: this.id },
       "openai admin hit MAX_PAGES_PER_RUN; the next run resumes from the cursor",
     );
-    return {
-      events,
-      cursor: encodeCursor({
-        startingAt: resumeStart(),
-        page,
-        query,
-        watermark,
-        hasKeyGrouping,
-        keyGroupingUpgrade: false,
-      }),
-      errorCount: 0,
-    };
+    // A page token still in hand means the window was not drained.
+    return stoppedShort();
   }
 
   /**
@@ -965,6 +980,30 @@ function drainCursor({
     hasKeyGrouping: true,
     keyGroupingUpgrade: !hasKeyGrouping,
   };
+}
+
+/**
+ * The run continued without per-key attribution, and said so.
+ *
+ * A code rather than a sentence: it is read by a source-health surface that
+ * owns its own wording, and it has to survive a trip through storage. A log
+ * line was the alternative and is not one — a reader looking at the source
+ * cannot be shown a log.
+ */
+export const PER_KEY_ATTRIBUTION_UNAVAILABLE =
+  "per_key_attribution_unavailable" as const;
+
+/**
+ * The notices field, or nothing at all.
+ *
+ * Absent rather than empty on a clean run, so a reader never has to tell an
+ * adapter that reported no notices from one that reports none because it does
+ * not know how.
+ */
+function runNotices(hasLostKeyAttribution: boolean): { notices?: string[] } {
+  return hasLostKeyAttribution
+    ? { notices: [PER_KEY_ATTRIBUTION_UNAVAILABLE] }
+    : {};
 }
 
 /** The later of two ISO instants, tolerating nulls and unparseable input. */

@@ -3976,6 +3976,18 @@ model IngestionSource {
   /// NOT the deferred cost-attribution projectId (ADR-088 Decision 4).
   traceProjectId String?
 
+  /// The account the provider itself named when this connection was saved -
+  /// an OpenAI or Anthropic organization id, read once per save and compared
+  /// so a second connection cannot read one account's spend twice. NOT
+  /// derived from the administrator key: nothing worked out from a customer
+  /// credential is stored here or anywhere else, because the account id is
+  /// not a secret and cannot be turned back into a key.
+  /// Nullable because every connection that predates the guard has none, and
+  /// because Azure and Power Platform name what they read in parserConfig
+  /// instead. "Unknown account" has to be a storable state.
+  /// Spec: specs/ai-gateway/governance/ingestion-sources.feature
+  providerAccountId String?
+
   /// Last event timestamp observed (any direction). Surfaces in the
   /// admin UI as "last event 2 minutes ago".
   lastEventAt DateTime?
@@ -3988,6 +4000,25 @@ model IngestionSource {
   /// rather than zero.
   /// Spec: specs/governance/ingestion-source-health.feature
   lastSuccessAt DateTime?
+
+  /// ADR-128 - how far the last run actually read, and whether it reached the
+  /// end. Mirrored from the ingestionPullRunStatus projection, in the same way
+  /// and for the same reason as lastSuccessAt above: every reader of this
+  /// surface selects from this row, and two of them render a LIST of sources,
+  /// so reaching a per-run projection would be one query per row on a screen
+  /// built to show many at once.
+  ///
+  /// These two are the only evidence separating a source that truncated once
+  /// and then finished from one that is stuck. A stuck source's run clock
+  /// advances on every attempt, so the clock cannot be that evidence and is
+  /// deliberately not stored here - only the point the run REACHED.
+  ///
+  /// Completeness is "complete" or "truncated". Null on both is unknown, which
+  /// is what every row written before this existed reads as, and unknown must
+  /// never render as either answer.
+  /// Spec: specs/governance/ingestion-source-health.feature
+  lastReadThroughAt   DateTime?
+  lastRunCompleteness String?
 
   /// ADR-088 - the window this source read while pulled cost recording was
   /// off for the organization, so its spend was dropped rather than priced.
@@ -4007,6 +4038,21 @@ model IngestionSource {
   createdById String?
   createdBy   User?    @relation("IngestionSourceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
+  // One live connection per provider account and report is held by
+  // "IngestionSource_provider_account_report_live_idx", a UNIQUE index from
+  // migration 20260907120012_ingestion_source_one_connection_per_account. It is
+  // both PARTIAL (`WHERE "providerAccountId" IS NOT NULL AND "archivedAt" IS
+  // NULL` - a connection that names no account claims none, and only archiving
+  // gives an account up) and over an EXPRESSION (the report normalised out of
+  // parserConfig the way the service normalises it). Prisma can express
+  // neither, so - exactly as Grant's partial indexes above are - it is NOT
+  // declared here: an `@@unique` would make the next `prisma migrate dev` drop
+  // the WHERE and the expression and rebuild a constraint that means something
+  // else entirely.
+  //
+  // The service refuses a duplicate before the write and says which connection
+  // holds the account; the index is what holds when two saves race the
+  // provider round trip that sits between that read and the write.
   @@unique([organizationId, name])
   @@index([organizationId])
   @@index([teamId])
@@ -4819,6 +4865,19 @@ model IngestionPullRunProjection {
   /// superseded run arrive with a smaller value and are ignored, so a late
   /// completion cannot regress Cursor or the status fields.
   LastRunScheduledFor Float? @map("lastRunScheduledFor")
+
+  /// ADR-128 - how far the last run read, in epoch milliseconds, and whether
+  /// it reached the end. The fold writes both; the IngestionSource row mirrors
+  /// them for the screens. Null read-through means no run has reported one.
+  /// Null completeness reads as unknown, never as either answer, which is what
+  /// every row written before this existed holds.
+  ///
+  /// Nullable on purpose, so replay is not required to make this migration
+  /// safe: a row that has never seen a run carrying these stays null and every
+  /// reader already handles unknown.
+  /// Spec: specs/governance/ingestion-source-health.feature
+  LastReadThroughAt   Float?  @map("lastReadThroughAt")
+  LastRunCompleteness String? @map("lastRunCompleteness")
 
   /// The last time somebody asked this source to enumerate its agents, and how
   /// that ask ended. A listing is a different scope on the same connection as

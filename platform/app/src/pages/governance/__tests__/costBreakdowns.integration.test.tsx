@@ -55,6 +55,21 @@ const harness = vi.hoisted(() => ({
    * before it was a variable.
    */
   lanesReport: true,
+  /**
+   * The billed lane's per-provider window totals, as the summary read answers
+   * them. Empty by default: the provider panel is not what most of this file
+   * is about, and an empty list renders nothing.
+   */
+  providers: [] as unknown[],
+  /**
+   * Not yet implemented: the per-(day, provider) read. It is the one thing the
+   * screen could never answer — it could say what a provider cost over a
+   * quarter and what the organization spent on a given day, and had no way to
+   * say which provider caused a day that stood out.
+   */
+  dailyByProvider: undefined as unknown,
+  /** Not yet implemented: the records behind one day at one provider. */
+  dayRecords: undefined as unknown,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -95,10 +110,25 @@ vi.mock("~/utils/api", () => ({
           refetch: harness.spenders.refetch,
         }),
       },
+      dailyByProvider: {
+        useQuery: () => ({
+          data: harness.dailyByProvider,
+          isLoading: false,
+          isError: false,
+        }),
+      },
+      dayRecords: {
+        useQuery: () => ({
+          data: harness.dayRecords,
+          isLoading: false,
+          isError: false,
+        }),
+      },
       summary: {
         useQuery: () => ({
           data: {
             unavailableReason: null,
+            providers: harness.providers,
             billed: harness.lanesReport
               ? { amountUsd: 123.45, cellsWithoutAmount: 0 }
               : { amountUsd: null, cellsWithoutAmount: 0 },
@@ -149,6 +179,9 @@ beforeEach(() => {
   };
   harness.spenders = { data: undefined, isError: false, refetch: vi.fn() };
   harness.lanesReport = true;
+  harness.providers = [];
+  harness.dailyByProvider = undefined;
+  harness.dayRecords = undefined;
 });
 
 afterEach(() => cleanup());
@@ -451,6 +484,150 @@ describe("the cost breakdown panels", () => {
       expect(panel).not.toBeNull();
       expect(
         within(panel as HTMLElement).getByText("Nothing in this window yet."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given two providers billed on the same days of the window", () => {
+    /**
+     * Distinct at every figure on purpose. With any two of them equal, an
+     * implementation that mixed up a day, a provider or a total would still
+     * satisfy the assertions below.
+     */
+    beforeEach(() => {
+      harness.providers = [
+        { provider: "openai_admin", amountUsd: 90, cellsWithoutAmount: 0 },
+        { provider: "anthropic_admin", amountUsd: 62, cellsWithoutAmount: 0 },
+      ];
+      harness.dailyByProvider = {
+        rows: [
+          {
+            day: "2026-01-15",
+            provider: "openai_admin",
+            amountUsd: 60,
+            cellsWithoutAmount: 0,
+          },
+          {
+            day: "2026-01-15",
+            provider: "anthropic_admin",
+            amountUsd: 41,
+            cellsWithoutAmount: 0,
+          },
+          {
+            day: "2026-01-16",
+            provider: "openai_admin",
+            amountUsd: 30,
+            cellsWithoutAmount: 0,
+          },
+          {
+            day: "2026-01-16",
+            provider: "anthropic_admin",
+            amountUsd: 21,
+            cellsWithoutAmount: 0,
+          },
+        ],
+      };
+    });
+
+    /** @scenario "A viewer can see each day of the window split by provider" */
+    it("splits each day by provider and adds those days back to the window total", () => {
+      renderScreen();
+
+      const region = within(screen.getByLabelText("Cost by provider and day"));
+
+      // Each day carries a separate figure per provider, not one figure for
+      // the day and one for the provider.
+      const figure = (provider: string, day: string) =>
+        Number(
+          region
+            .getByTestId(`cost-provider-day-${provider}-${day}`)
+            .textContent?.replace(/[^0-9.-]/g, "") ?? "",
+        );
+      expect(figure("openai_admin", "2026-01-15")).toBe(60);
+      expect(figure("anthropic_admin", "2026-01-15")).toBe(41);
+      expect(figure("openai_admin", "2026-01-16")).toBe(30);
+      expect(figure("anthropic_admin", "2026-01-16")).toBe(21);
+
+      // Read back out of the DOM and held against what the window panel says,
+      // rather than against the fixture: a split that draws one thing and
+      // totals another is exactly the defect a reader would find by adding
+      // the bars up themselves.
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(
+        figure("openai_admin", "2026-01-15") +
+          figure("openai_admin", "2026-01-16"),
+      ).toBe(90);
+      expect(billed.getByText("$90.00")).toBeInTheDocument();
+      expect(
+        figure("anthropic_admin", "2026-01-15") +
+          figure("anthropic_admin", "2026-01-16"),
+      ).toBe(62);
+      expect(billed.getByText("$62.00")).toBeInTheDocument();
+    });
+
+    /** @scenario "Opening one day at one provider lists the records behind its figure" */
+    it("lists the records behind one day at one provider, each with what it was for and what it cost", () => {
+      harness.dayRecords = {
+        records: [
+          { label: "gpt-5-mini", amountUsd: 36 },
+          { label: "gpt-5", amountUsd: 24 },
+        ],
+      };
+      renderScreen();
+
+      const region = within(screen.getByLabelText("Cost by provider and day"));
+      fireEvent.click(
+        region.getByTestId("cost-provider-day-openai_admin-2026-01-15"),
+      );
+
+      const records = within(screen.getByLabelText("Records behind this day"));
+      // What each record was for...
+      expect(records.getByText("gpt-5-mini")).toBeInTheDocument();
+      expect(records.getByText("gpt-5")).toBeInTheDocument();
+      // ...and what it cost.
+      expect(records.getByText("$36.00")).toBeInTheDocument();
+      expect(records.getByText("$24.00")).toBeInTheDocument();
+    });
+  });
+
+  describe("given one provider holds a day we have no dollar figure for", () => {
+    /** @scenario "A provider holding a day with no dollar figure shows no window total" */
+    it("shows that provider no window total and marks its days as covering only part of the spend", () => {
+      harness.providers = [
+        { provider: "openai_admin", amountUsd: 90, cellsWithoutAmount: 0 },
+        // The window total is withheld: one of its days holds no figure, so
+        // adding up the rest would understate what the provider charged.
+        { provider: "anthropic_admin", amountUsd: null, cellsWithoutAmount: 1 },
+      ];
+      harness.dailyByProvider = {
+        rows: [
+          {
+            day: "2026-01-15",
+            provider: "anthropic_admin",
+            amountUsd: 41,
+            cellsWithoutAmount: 0,
+          },
+          {
+            day: "2026-01-16",
+            provider: "anthropic_admin",
+            amountUsd: null,
+            cellsWithoutAmount: 1,
+          },
+        ],
+      };
+      renderScreen();
+
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(billed.getByText("Anthropic")).toBeInTheDocument();
+      expect(billed.getByText("USD amount unavailable")).toBeInTheDocument();
+
+      // Its other days each hold a real number, so a reader who adds the bars
+      // up rebuilds exactly the partial sum the window total refused to show
+      // them. The mark on the bars is what stops the chart from being that
+      // sum.
+      const region = within(screen.getByLabelText("Cost by provider and day"));
+      expect(
+        region.getByLabelText(/covers only part of what was spent/i),
       ).toBeInTheDocument();
     });
   });

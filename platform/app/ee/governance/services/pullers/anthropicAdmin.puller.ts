@@ -184,19 +184,76 @@ function queryIdentity(config: AnthropicAdminPullConfig): string {
     : `cost:${COST_REPORT_BUCKET_WIDTH}:${COST_GROUP_BY.join(",")}:${config.startingAt ?? ""}`;
 }
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * How far behind its own watermark a COST read starts again.
+ *
+ * Anthropic keeps correcting a day's cost for a while after the day ends, and
+ * a read that only ever moved forward held the FIRST figure it ever saw for a
+ * day as the last one it would ever hold. That figure disagreed with the
+ * provider's own console inside a week, and nothing in the pipeline could ever
+ * notice: a day nobody re-reads is a day nobody can correct.
+ *
+ * Three days, the same margin the sibling OpenAI connection already pays, and
+ * it costs the same single request per run — the window is wider, not the
+ * number of asks. Re-reading is only safe because a cost restatement REPLACES:
+ * the same day and group produce the same restatement key on every run, so a
+ * corrected figure lands ON the earlier one rather than beside it. Usage rows
+ * carry no such promise, which is why this is applied to cost alone.
+ */
+const COST_RESTATEMENT_LOOKBACK_DAYS = 3;
+
+/**
+ * Where a run ASKS from, given where it had got to.
+ *
+ * Never before the day the connection was told to begin at — a look-back that
+ * reached past it would ask about a period the customer did not connect us
+ * for — and never forward of the watermark itself, which would skip days.
+ *
+ * Kept apart from the position that gets SAVED. Reading from further back is
+ * the whole point; recording that we had only got that far is the defect it
+ * would otherwise introduce.
+ */
+function costRequestStart({
+  stored,
+  config,
+}: {
+  stored: string;
+  config: AnthropicAdminPullConfig;
+}): string {
+  const storedMs = Date.parse(stored);
+  if (Number.isNaN(storedMs)) return stored;
+
+  const configuredStart = config.startingAt ?? defaultStartingAt("cost");
+  const floorMs = Date.parse(configuredStart);
+  const lookedBackMs = storedMs - COST_RESTATEMENT_LOOKBACK_DAYS * MS_PER_DAY;
+  const notBeforeConfigured = Number.isNaN(floorMs)
+    ? lookedBackMs
+    : Math.max(lookedBackMs, floorMs);
+  return new Date(Math.min(notBeforeConfigured, storedMs)).toISOString();
+}
+
 function parseCursor({
   cursor,
   config,
 }: {
   cursor: string | null;
   config: AnthropicAdminPullConfig;
-}): Pick<z.infer<typeof cursorSchema>, "startingAt" | "page" | "watermark"> {
+}): ParsedCursor {
   if (cursor) {
     try {
       const parsed = cursorSchema.parse(JSON.parse(cursor));
       if (parsed.query === queryIdentity(config)) {
         return {
           startingAt: parsed.startingAt,
+          // Mid-window, with a page token in hand, the ask must stay exactly
+          // what that token was minted against or the provider refuses it.
+          // Only a drained cursor gets the look-back.
+          requestStart:
+            config.report === "cost" && parsed.page === null
+              ? costRequestStart({ stored: parsed.startingAt, config })
+              : parsed.startingAt,
           page: parsed.page,
           watermark: parsed.watermark,
         };
@@ -213,11 +270,32 @@ function parseCursor({
       );
     }
   }
+  const fresh = config.startingAt ?? defaultStartingAt(config.report);
+  // No look-back on a first run: there is nothing behind the configured start
+  // to look back at, and the floor would return this same instant anyway.
   return {
-    startingAt: config.startingAt ?? defaultStartingAt(config.report),
+    startingAt: fresh,
+    requestStart: fresh,
     page: null,
     watermark: null,
   };
+}
+
+/**
+ * A parsed cursor, and the two starts it implies.
+ *
+ * `startingAt` is the position ON RECORD — where the source has got to, and
+ * the value a cut-off run writes back. `requestStart` is the instant this run
+ * ASKS from, which for a drained cost cursor sits a few days behind it. They
+ * were one field until a cost read started looking back, and collapsing them
+ * again is what walks the saved position backwards on every run.
+ */
+interface ParsedCursor
+  extends Pick<
+    z.infer<typeof cursorSchema>,
+    "startingAt" | "page" | "watermark"
+  > {
+  requestStart: string;
 }
 
 /**
@@ -231,7 +309,7 @@ function staleCursorRestart({
 }: {
   parsed: z.infer<typeof cursorSchema>;
   config: AnthropicAdminPullConfig;
-}): Pick<z.infer<typeof cursorSchema>, "startingAt" | "page" | "watermark"> {
+}): ParsedCursor {
   if (config.report === "usage") {
     // No rewind: usage identity is not stable across a query change, so
     // re-reading history would duplicate spend rather than restate it.
@@ -250,9 +328,11 @@ function staleCursorRestart({
     const resumeFrom = [parsed.watermark, parsed.startingAt].find(
       (candidate) => candidate !== null && !Number.isNaN(Date.parse(candidate)),
     );
+    const usageRestart =
+      resumeFrom ?? config.startingAt ?? defaultStartingAt(config.report);
     return {
-      startingAt:
-        resumeFrom ?? config.startingAt ?? defaultStartingAt(config.report),
+      startingAt: usageRestart,
+      requestStart: usageRestart,
       page: null,
       watermark: null,
     };
@@ -272,7 +352,14 @@ function staleCursorRestart({
     Number.isNaN(watermarkMs) || Date.parse(configuredStart) <= watermarkMs
       ? configuredStart
       : parsed.startingAt;
-  return { startingAt: rewoundStart, page: null, watermark: null };
+  // A rewind has already reached back as far as it means to, so no look-back
+  // is stacked on top of it.
+  return {
+    startingAt: rewoundStart,
+    requestStart: rewoundStart,
+    page: null,
+    watermark: null,
+  };
 }
 
 function encodeCursor({
@@ -739,6 +826,39 @@ function reportUrl({
   return url;
 }
 
+/**
+ * Whether this run has spent the time it was given.
+ *
+ * A run with no deadline never has: `undefined` is "run until the window
+ * drains", not "stop now".
+ */
+function hasSpentDeadline(deadlineMs: number | undefined): boolean {
+  return deadlineMs !== undefined && Date.now() > deadlineMs;
+}
+
+/**
+ * The window start to save when a run stops before the window has drained.
+ *
+ * With a page token in hand, save the window start actually asked with, so
+ * that token is resumed against the same `starting_at` that minted it. With NO
+ * token there is nothing to resume and nothing requires the rewound value —
+ * and saving it would walk the cursor backwards, because `parseCursor` applies
+ * the look-back a second time to any cursor whose page is null. Save the
+ * position on record instead, which is the floor this cursor may never drop
+ * below.
+ */
+function unfinishedWindowStart({
+  page,
+  requestStart,
+  positionOnRecord,
+}: {
+  page: string | null;
+  requestStart: string;
+  positionOnRecord: string;
+}): string {
+  return page === null ? positionOnRecord : requestStart;
+}
+
 export class AnthropicAdminPuller
   implements PullerAdapter<AnthropicAdminPullConfig>
 {
@@ -761,7 +881,20 @@ export class AnthropicAdminPuller
     // that record is what lets a later identity mismatch resume near the
     // token instead of re-reading the window (see `cursorSchema`).
     const cursor = parseCursor({ cursor: options.cursor, config });
-    const startingAt = cursor.startingAt;
+    /**
+     * The instant this run ASKS from, which on a cost source is a few days
+     * behind the position on record so a late restatement is picked up.
+     *
+     * The look-back was being computed and then thrown away: every request
+     * went out at `cursor.startingAt`, so the repair window existed on paper
+     * and never once reached the provider.
+     */
+    const requestStart = cursor.requestStart;
+    /**
+     * The position ON RECORD — how far the source has actually got. The floor
+     * the saved cursor may never drop below, and NOT what this run asks from.
+     */
+    const positionOnRecord = cursor.startingAt;
     const query = queryIdentity(config);
     let page = cursor.page;
     let watermark = cursor.watermark;
@@ -782,17 +915,33 @@ export class AnthropicAdminPuller
     let newestEmitted = cursor.watermark;
 
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
-      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
+      if (hasSpentDeadline(options.deadlineMs)) {
         // Everything read so far is kept and the cursor says where to resume,
-        // so a deadline costs latency rather than a window.
+        // so a deadline costs latency rather than a window. It is still a
+        // window left half-read, and saying nothing reads as complete.
         return {
           events,
-          cursor: encodeCursor({ startingAt, page, query, watermark }),
+          cursor: encodeCursor({
+            startingAt: unfinishedWindowStart({
+              page,
+              requestStart,
+              positionOnRecord,
+            }),
+            page,
+            query,
+            watermark,
+          }),
           errorCount: 0,
+          completeness: "truncated",
         };
       }
 
-      const read = await this.readPage({ config, startingAt, page, options });
+      const read = await this.readPage({
+        config,
+        startingAt: requestStart,
+        page,
+        options,
+      });
       if (!read.ok) {
         // The unadvanced cursor is what makes the window get retried instead
         // of skipped. Never return a partial window as if it were complete.
@@ -810,7 +959,16 @@ export class AnthropicAdminPuller
         return {
           events,
           cursor: encodeCursor({
-            startingAt: newestEmitted ?? startingAt,
+            // Floored at the position on record. Without this floor a run
+            // that looked back and found nothing newer saves the day it
+            // looked back TO, and the source walks three days backwards on
+            // every run until it reaches the day it was first connected —
+            // re-reading and re-emitting the whole history on the way. An
+            // empty window, a credit, and a workspace somebody deleted all
+            // produce exactly that page. This is the floor the sibling
+            // connection already applies at its own drain.
+            startingAt:
+              laterInstant(newestEmitted, positionOnRecord) ?? positionOnRecord,
             page: null,
             query,
             watermark: null,
@@ -827,8 +985,17 @@ export class AnthropicAdminPuller
     );
     return {
       events,
-      cursor: encodeCursor({ startingAt, page, query, watermark }),
+      // As above: the start this run asked with, not the position on record,
+      // so the unfinished window resumes where its page token points.
+      cursor: encodeCursor({
+        startingAt: requestStart,
+        page,
+        query,
+        watermark,
+      }),
       errorCount: 0,
+      // A page token still in hand means the window was not drained.
+      completeness: "truncated",
     };
   }
 

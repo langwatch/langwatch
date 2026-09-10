@@ -67,9 +67,11 @@ vi.mock("~/components/LoadingScreen", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     governanceCost: {
-      // The spender panel is its own read with its own tests; here it
-      // answers nothing so these tests stay about their own subject.
+      // The spender panel and the day split are their own reads with their
+      // own tests; here they answer nothing so these tests stay about their
+      // own subject.
       spenders: { useQuery: () => ({ data: undefined }) },
+      dailyByProvider: { useQuery: () => ({ data: undefined }) },
       summary: {
         useQuery: () => ({
           data: harness.costSummary,

@@ -16,11 +16,13 @@ function summary(
       amountUsd: null,
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
+      currencyTotals: [],
     },
     gateway: {
       amountUsd: null,
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
+      currencyTotals: [],
     },
     seats: { status: "awaiting_data" },
     ...overrides,
@@ -50,6 +52,9 @@ describe("reading the headline summary as a real-data read", () => {
             amountUsd: 123.45,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 123.45, cellsWithoutAmount: 0 },
+            ],
           },
         }),
       );
@@ -65,6 +70,9 @@ describe("reading the headline summary as a real-data read", () => {
             amountUsd: null,
             cellsWithoutAmount: 4,
             currenciesWithoutUsdAmount: ["EUR"],
+            currencyTotals: [
+              { currencyCode: "USD", amount: null, cellsWithoutAmount: 4 },
+            ],
           },
         }),
       );

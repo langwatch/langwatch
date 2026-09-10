@@ -31,6 +31,27 @@ const enterpriseGate = requireEnterprisePlan(
 );
 
 /**
+ * `YYYY-MM-DD` naming a day the calendar actually has.
+ *
+ * The shape alone is not enough. `2026-02-31` and `2026-99-99` both match the
+ * pattern, and the read binds the value as a ClickHouse `Date`, so an
+ * impossible day travels all the way to the driver and comes back as a parse
+ * failure — a generic "unknown error" and a trace id for a rejection we can
+ * name here, on the boundary, in one comparison.
+ *
+ * The round trip is what does the checking rather than the parse alone: it
+ * holds whether or not the engine's ISO parser happens to range-check the day,
+ * and it is what makes `2026-02-29` fail in a common year and pass in a leap
+ * one without a calendar table.
+ */
+export function isUtcCalendarDay(day: string): boolean {
+  const parsed = new Date(`${day}T00:00:00Z`);
+  return (
+    !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === day
+  );
+}
+
+/**
  * The spender breakdown needs BOTH permissions: the figures are the cost
  * screen's (`governanceCost:view`) and the labels are the People screen's
  * (`governance:view`). A finance role holding only the cost permission gets
@@ -74,6 +95,66 @@ export const governanceCostRouter = createTRPCRouter({
       return await service.summary({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
+      });
+    }),
+
+  /**
+   * The billed lane split by day AND provider over the window.
+   *
+   * Gated on the cost permission alone, like `summary` and unlike `spenders`:
+   * a provider is not a person, so this joins no identity data and buying
+   * figures is enough to see it.
+   */
+  dailyByProvider: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        windowDays: z.number().int().min(1).max(365).default(30),
+      }),
+    )
+    .permission("governanceCost:view")
+    .use(enterpriseGate)
+    .query(async ({ ctx, input }) => {
+      const service = GovernanceCostService.create({
+        prisma: ctx.prisma,
+        costRollup: getApp().governance.costRollup,
+        ocsfEvents: getApp().governance.ocsfEvents,
+      });
+      return await service.dailyByProvider({
+        organizationId: input.organizationId,
+        windowDays: input.windowDays,
+      });
+    }),
+
+  /**
+   * The records behind one day at one provider. Same grant as the figure they
+   * explain — a reader allowed to see a total is allowed to see what it is
+   * made of.
+   */
+  dayRecords: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        /** `YYYY-MM-DD`, the provider's business day in UTC. */
+        day: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .refine(isUtcCalendarDay, "Not a day on the calendar."),
+        provider: z.string(),
+      }),
+    )
+    .permission("governanceCost:view")
+    .use(enterpriseGate)
+    .query(async ({ ctx, input }) => {
+      const service = GovernanceCostService.create({
+        prisma: ctx.prisma,
+        costRollup: getApp().governance.costRollup,
+        ocsfEvents: getApp().governance.ocsfEvents,
+      });
+      return await service.dayRecords({
+        organizationId: input.organizationId,
+        day: input.day,
+        provider: input.provider,
       });
     }),
 

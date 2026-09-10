@@ -60,14 +60,21 @@ export function sampleCostSummary(periods: string[]): GovernanceCostSummaryDto {
     // the bill's and swings a little wider.
     const billedDrift = 1 + Math.sin(index / 2.4) * 0.18;
     const gatewayDrift = 1 + Math.sin(index / 2.4 + 0.9) * 0.24;
+    const billedUsd = Math.round(BILLED_PER_PERIOD * billedDrift);
     return {
       day,
-      billedUsd: Math.round(BILLED_PER_PERIOD * billedDrift),
+      billedUsd,
       gatewayUsd: Math.round(GATEWAY_PER_PERIOD * gatewayDrift),
       billedCellsWithoutAmount: 0,
       gatewayCellsWithoutAmount: 0,
       billedRevisedAt: null,
-      billedPreviousUsd: null,
+      // Invented spend, all of it in dollars and none of it ever revised. A
+      // second currency here would be a made-up story about a customer's
+      // billing arrangement on a screen that has no data of its own.
+      billedByCurrency: [
+        { currencyCode: "USD", amount: billedUsd, previousAmount: null },
+      ],
+      billedCurrenciesWithoutUsdAmount: [],
       billedProvisional: false,
     };
   });
@@ -78,6 +85,13 @@ export function sampleCostSummary(periods: string[]): GovernanceCostSummaryDto {
       amountUsd: series.reduce((sum, day) => sum + (day.billedUsd ?? 0), 0),
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
+      currencyTotals: [
+        {
+          currencyCode: "USD",
+          amount: series.reduce((sum, day) => sum + (day.billedUsd ?? 0), 0),
+          cellsWithoutAmount: 0,
+        },
+      ],
     },
     providers: [
       { provider: "openai_admin", share: 0.6 },
@@ -92,6 +106,13 @@ export function sampleCostSummary(periods: string[]): GovernanceCostSummaryDto {
       amountUsd: series.reduce((sum, day) => sum + (day.gatewayUsd ?? 0), 0),
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
+      currencyTotals: [
+        {
+          currencyCode: "USD",
+          amount: series.reduce((sum, day) => sum + (day.gatewayUsd ?? 0), 0),
+          cellsWithoutAmount: 0,
+        },
+      ],
     },
     azureBilling: null,
     seats: {

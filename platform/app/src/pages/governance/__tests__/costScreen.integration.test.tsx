@@ -102,9 +102,11 @@ vi.mock("~/utils/api", () => {
         summary: {
           useQuery: () => harness.query,
         },
-        // The spender panel is its own read with its own tests; here it
-        // answers nothing so the lane assertions stay about the lanes.
+        // The spender panel and the day split are their own reads with their
+        // own tests; here they answer nothing so the lane assertions stay
+        // about the lanes.
         spenders: empty,
+        dailyByProvider: empty,
       },
       activityMonitor: {
         summary: empty,
@@ -154,11 +156,19 @@ function summaryFixture(overrides: Record<string, unknown> = {}) {
       amountUsd: 123.45,
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
+      // The US dollar line IS the lane's dollar total, so the default fixture
+      // states it once and the two agree by construction.
+      currencyTotals: [
+        { currencyCode: "USD", amount: 123.45, cellsWithoutAmount: 0 },
+      ],
     },
     gateway: {
       amountUsd: 67.89,
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
+      currencyTotals: [
+        { currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 },
+      ],
     },
     seats: { status: "awaiting_data" },
     series: [
@@ -510,15 +520,18 @@ describe("the governance cost screen", () => {
     });
   });
 
-  describe("given a lane whose total was withheld over a foreign currency", () => {
+  describe("given a lane whose dollar total was withheld over an unpriced part", () => {
     /** @scenario "A lane with no total says why instead of showing a figure" */
-    it("shows no amount and names the currency behind the missing total", () => {
+    it("shows no amount and says we hold no dollar figure for part of what it covers", () => {
       harness.query = {
         data: summaryFixture({
           billed: {
             amountUsd: null,
             cellsWithoutAmount: 4,
             currenciesWithoutUsdAmount: ["EUR"],
+            currencyTotals: [
+              { currencyCode: "USD", amount: null, cellsWithoutAmount: 4 },
+            ],
           },
           series: [
             {
@@ -542,8 +555,16 @@ describe("the governance cost screen", () => {
       expect(within(billed).getByText("—")).toBeInTheDocument();
 
       const note = within(billed).getByTestId("cost-lane-billed-note");
-      expect(note).toHaveTextContent(/billed in EUR rather than US dollars/i);
-      expect(note).toHaveTextContent(/No total is shown/i);
+      // What the screen actually knows, and all it knows: part of this lane
+      // holds no dollar figure. Two different causes produce that — spend the
+      // provider billed in another currency, and spend read on a day when
+      // cost recording was off — and copy naming a currency states a false
+      // reason for the second, which a reader checking the invoice finds
+      // wrong. Money billed in euros that we DO hold a figure for now has a
+      // euro line of its own and is no longer a reason to withhold anything.
+      expect(note).toHaveTextContent(/we hold no dollar figure for part of/i);
+      expect(note).not.toHaveTextContent(/rather than US dollars/i);
+      expect(note).not.toHaveTextContent(/billed in EUR/i);
       // The old copy said the usage "arrived without a stated amount", which
       // is not what happened: the provider stated it, in euros.
       expect(note).not.toHaveTextContent(/without a stated amount/i);
@@ -556,6 +577,54 @@ describe("the governance cost screen", () => {
       expect(
         within(gateway).queryByTestId("cost-lane-gateway-note"),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a window billed in two currencies", () => {
+    /** @scenario "A window billed in two currencies shows one total per currency" */
+    it("shows one total per currency, combines neither, and applies no rate", () => {
+      harness.query = {
+        data: summaryFixture({
+          billed: {
+            // The US dollar line IS this number. It is stated once, and the
+            // screen renders the lines rather than a second headline beside
+            // them.
+            amountUsd: 100,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 100, cellsWithoutAmount: 0 },
+              { currencyCode: "EUR", amount: 40, cellsWithoutAmount: 0 },
+            ],
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(billed.getByText("$100.00")).toBeInTheDocument();
+      // The euros, in the currency they were billed in and named as such.
+      const euros = billed.getByText(/(€|EUR)/);
+      expect(euros).toBeInTheDocument();
+      expect(readableStrings(euros).join(" ")).toMatch(/40/);
+
+      // Nothing on the screen adds the two. 140 is what a rate of exactly one
+      // would produce — but rejecting 140 alone only rules out that one rate,
+      // and a conversion at 1.08 renders $143.20 through the same assertion
+      // untouched. So the lane is read for EVERY money figure standing in it
+      // and the whole list is pinned: one dollar figure, which is the dollars,
+      // and one named-currency figure, which is the euros. A third of any size
+      // fails, whatever rate produced it.
+      const lane = screen.getByTestId("cost-lane-billed");
+      const spoken = lane.textContent ?? "";
+      expect(spoken.match(/-?\$[\d,]+(?:\.\d+)?/g) ?? []).toEqual(["$100.00"]);
+      // No word boundary before the code: the card's text runs together as
+      // `$100.00EUR 40.00`, and a `\b` there never matches.
+      expect(spoken.match(/[A-Z]{3} -?[\d,]+(?:\.\d+)?/g) ?? []).toEqual([
+        "EUR 40.00",
+      ]);
     });
   });
 

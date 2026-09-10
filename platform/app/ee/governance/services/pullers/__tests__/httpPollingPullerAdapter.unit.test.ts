@@ -50,7 +50,12 @@ interface FetchCall {
 }
 
 let capturedCalls: FetchCall[] = [];
-let responseQueue: Array<{ status: number; body: unknown }> = [];
+let responseQueue: Array<{
+  status: number;
+  body: unknown;
+  /** Extra response headers, for the answers whose meaning is in a header. */
+  headers?: Record<string, string>;
+}> = [];
 
 beforeEach(() => {
   capturedCalls = [];
@@ -72,7 +77,7 @@ beforeEach(() => {
       }
       return new Response(JSON.stringify(next.body), {
         status: next.status,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...next.headers },
       });
     },
   }));
@@ -379,6 +384,65 @@ describe("HttpPollingPullerAdapter", () => {
         adapter.validateConfig(VALID_CONFIG),
       );
       expect(result.cursor).toBeNull();
+    });
+  });
+
+  /**
+   * Spec: specs/ai-gateway/governance/ingestion-sources.feature
+   *
+   * This adapter is one of the two scheduled sources that used to let a
+   * provider's wait fall on the floor: a 429 landed in the generic 4xx branch,
+   * which ends the run correctly and throws away the header saying when it is
+   * safe to come back.
+   */
+  describe("given a provider answering that too many requests were made", () => {
+    /** @scenario "A provider that says too many requests were made is asked only once in that run" */
+    it("stops the run rather than asking a second time", async () => {
+      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
+        "../httpPollingPullerAdapter"
+      );
+      const adapter = new AdapterUnderTest();
+      responseQueue.push({
+        status: 429,
+        body: { message: "slow down" },
+        headers: { "retry-after": "120" },
+      });
+
+      await expect(
+        adapter.runOnce(
+          { cursor: null, credentials: { token: "secret-xyz" } },
+          adapter.validateConfig(VALID_CONFIG),
+        ),
+      ).rejects.toThrow(/429/);
+
+      // One queued answer, one request. A second would have emptied the queue
+      // and failed with the harness's own "no queued response".
+      expect(capturedCalls).toHaveLength(1);
+    });
+
+    /** @scenario "A provider that says too many requests were made is asked only once in that run" */
+    it("carries away the wait the provider named", async () => {
+      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
+        "../httpPollingPullerAdapter"
+      );
+      const adapter = new AdapterUnderTest();
+      responseQueue.push({
+        status: 429,
+        body: { message: "slow down" },
+        headers: { "retry-after": "120" },
+      });
+
+      const thrown = await adapter
+        .runOnce(
+          { cursor: null, credentials: { token: "secret-xyz" } },
+          adapter.validateConfig(VALID_CONFIG),
+        )
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      expect(Reflect.get(thrown as object, "retryAfterMs")).toBe(120_000);
     });
   });
 });
