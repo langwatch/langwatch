@@ -277,6 +277,44 @@ describe("people listing on the ingestion pull process manager", () => {
       expect(disabled.state.currentPeopleListing).toBeNull();
       expect(disabled.nextWakeAt).toBeNull();
     });
+
+    /**
+     * The other half, and the one that could strand a source.
+     *
+     * Disabling clears the slot, but nothing stopped a request that arrived
+     * AFTER the disable from taking it again: the command and the read that
+     * offers the button both branch on source type, which says a provider can
+     * list, not that this source is still connected.
+     *
+     * The dispatched provider call was the visible half. The slot was the
+     * lasting one — a disabled process settles with `nextWakeAt: null`, so no
+     * timer remained to notice the listing never came back, and re-enabling
+     * found the source already busy with a request that will never settle.
+     */
+    it("asks nothing for a request that arrives after the disable", () => {
+      const booted = bootConfigured();
+      const disabled = evolve({
+        previousState: booted.state,
+        event: envelope({
+          eventType: INGESTION_PULL_EVENT_TYPES.DISABLED,
+          occurredAt: Date.parse("2026-09-09T10:04:00Z"),
+          payload: { sourceId: "source-1", cron: null, cursor: null },
+        }),
+        now: Date.parse("2026-09-09T10:04:00Z"),
+      });
+
+      const late = evolve({
+        previousState: disabled.state,
+        ...requested({
+          requestId: "req-late",
+          at: Date.parse("2026-09-09T10:05:00Z"),
+        }),
+      });
+
+      expect(late.intents).toEqual([]);
+      // And the slot is still free, so re-enabling does not find it busy.
+      expect(late.state.currentPeopleListing).toBeNull();
+    });
   });
 
   describe("when a requested event was committed without a request id", () => {
