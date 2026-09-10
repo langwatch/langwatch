@@ -70,8 +70,17 @@ export function useAnnotationQueues(
   const { project } = useOrganizationTeamProject();
 
   const router = useRouter();
-  const pageOffset = parseInt(router.query.pageOffset as string) || 0;
-  const pageSize = parseInt(router.query.pageSize as string) || 25;
+  // Both arrive from the URL, so both are whatever the address bar says.
+  // Clamped to the range the procedure accepts: an out-of-range page is worth
+  // a smaller list, not a failed request.
+  const pageOffset = Math.max(
+    0,
+    parseInt(router.query.pageOffset as string) || 0,
+  );
+  const pageSize = Math.min(
+    100,
+    Math.max(1, parseInt(router.query.pageSize as string) || 25),
+  );
 
   const optimizedData = api.annotation.getOptimizedAnnotationQueues.useQuery(
     queueReadInput({

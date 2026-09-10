@@ -373,6 +373,33 @@ describe("given a reviewer walking their annotation queue", () => {
         t: String(OTHER_TURN.timestamp),
       });
     });
+
+    describe("given they have stepped on and the new item is still being read", () => {
+      /** @scenario "Nothing acts on the item I have just stepped off" */
+      it("does not let the press reach the thread they left", async () => {
+        const user = userEvent.setup();
+        mocks.query = { "queue-item": "item-2" };
+        mocks.stepIsStale = true;
+        renderPage();
+
+        // The thread on screen is still the one being left, so a press aimed
+        // at it would annotate, or open, the wrong item. Nothing here is
+        // disabled — the conversation owns these controls — so what is being
+        // asked is whether the press lands at all.
+        const annotate = screen.getByRole("button", {
+          name: "annotate this turn",
+        });
+        const openTurn = screen.getByRole("button", {
+          name: "pick another turn",
+        });
+
+        await expect(user.click(annotate)).rejects.toThrow(/pointer-events/);
+        await expect(user.click(openTurn)).rejects.toThrow(/pointer-events/);
+
+        expect(mocks.annotateClicked).not.toHaveBeenCalled();
+        expect(mocks.openDrawer).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("given the open item's trace belongs to no thread", () => {

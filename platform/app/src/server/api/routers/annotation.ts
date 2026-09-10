@@ -908,62 +908,6 @@ export const annotationRouter = createTRPCRouter({
         },
       });
     }),
-  getQueueItems: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .permission("annotations:view")
-    .query(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
-      const organizationId = await service.getProjectOrganizationId({
-        projectId: input.projectId,
-      });
-      const queueItems = await ctx.prisma.annotationQueueItem.findMany({
-        where: queueItemReferenceFilter({
-          projectId: input.projectId,
-          organizationId,
-        }),
-        include: {
-          user: true,
-          createdByUser: true,
-          annotationQueue: {
-            include: {
-              members: {
-                where: {
-                  user: {
-                    orgMemberships: { some: { organizationId } },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-      const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
-      // Annotation queue shows trace content for labeling — resolve full IO (#4991).
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-      );
-      const traces = await traceService.getTracesWithSpans(
-        input.projectId,
-        traceIds,
-        protections,
-        undefined,
-        { full: true },
-      );
-      const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
-
-      return queueItems.map((item) => ({
-        ...item,
-        trace: traceMap.get(item.traceId) ?? null,
-      }));
-    }),
   getPendingItemsCount: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("annotations:view")
@@ -1200,8 +1144,15 @@ export const annotationRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         selectedAnnotations: z.string(),
-        pageSize: z.number(),
-        pageOffset: z.number(),
+        /**
+         * Bounded because it reaches the client as a URL query parameter, and
+         * the items this page size selects have their trace ids bound into a
+         * single ClickHouse parameter downstream. An unbounded page is an
+         * unbounded parameter, which the server refuses outright rather than
+         * truncating.
+         */
+        pageSize: z.number().int().min(1).max(100).default(25),
+        pageOffset: z.number().int().min(0).default(0),
         queueId: z.string().optional(),
         /**
          * Narrows the read to these queues. Only ever narrows: it is applied

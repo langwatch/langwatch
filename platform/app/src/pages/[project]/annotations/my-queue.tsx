@@ -665,8 +665,9 @@ const UnavailableTraceCard = ({
   canSkip: boolean;
   isRemoving: boolean;
   /**
-   * The card sits above the bar, outside the cover that holds the bar's own
-   * buttons while the next item is being read, so it has to hold its own.
+   * Whether the item this card was drawn from is the one the reviewer has
+   * left. The bar holds its own buttons by disabling them; this card is a
+   * separate surface, so it is told and holds its own.
    */
   isStale: boolean;
   onRemove: () => void;
