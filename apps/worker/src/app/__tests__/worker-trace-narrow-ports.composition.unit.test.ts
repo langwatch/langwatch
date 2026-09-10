@@ -1,4 +1,4 @@
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
@@ -28,7 +28,7 @@ const project = { id: "project-1", firstMessage: false, integrated: false };
 function services(): {
   projects: ProjectApi;
   monitors: MonitorService;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   calls: {
     tryGetById: ReturnType<typeof vi.fn>;
     updateMetadata: ReturnType<typeof vi.fn>;
@@ -49,7 +49,7 @@ function services(): {
   return {
     projects: calls as unknown as ProjectApi,
     monitors: calls as unknown as MonitorService,
-    modelProviders: calls as unknown as ModelProviderService,
+    modelProviders: calls as unknown as ModelProviderApi,
     calls,
   };
 }

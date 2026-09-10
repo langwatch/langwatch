@@ -2,7 +2,7 @@
  * Technical engine stream composition shared by the Workflow application.
  */
 import { HandledError } from "@langwatch/handled-error";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   AwsNlpLambdaArnResolverAdapter,
@@ -27,7 +27,7 @@ import { LambdaClient } from "@aws-sdk/client-lambda";
  */
 export function composeApiWorkflowStudioDispatch(options: {
   nlpServiceUrl: string | undefined;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   payloadStaging?: NlpPayloadStagingPort | undefined;
   arnCache?: NlpLambdaArnCachePort | undefined;
   nlpLambdaFleet?: StudioLambdaConfig | undefined;

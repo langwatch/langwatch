@@ -8,7 +8,7 @@ import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
 } from "@langwatch/coding-agent-contract";
-import type { GithubPullRequest, GithubService } from "@langwatch/github-contract";
+import type { GithubApi, GithubPullRequest } from "@langwatch/github-contract";
 import { CodingAgentBillingPolicyPort } from "../coding-agent-billing.port.ts";
 import { CodingAgentFeatureService } from "../../services/coding-agent.service.ts";
 import type { SessionModelTotalsRow } from "../../repositories/coding-agent-session-event.repository.ts";
@@ -260,7 +260,7 @@ function personalServiceWith({
   organizationSessions = [],
   modelTotals = [],
   isSourceNonBillable = allBilled,
-  findAllByBranches = vi.fn<GithubService["findAllByBranches"]>().mockResolvedValue(pullRequests),
+  findAllByBranches = vi.fn<GithubApi["findAllByBranches"]>().mockResolvedValue(pullRequests),
 }: {
   pullRequests: GithubPullRequest[];
   personalSessions: CodingAgentSession[];
@@ -273,7 +273,7 @@ function personalServiceWith({
   // Typed from the contract, not `ReturnType<typeof vi.fn>`: the assertions
   // below name the exact lookup input, and an untyped mock would accept any
   // call shape at all.
-  findAllByBranches?: Mock<GithubService["findAllByBranches"]>;
+  findAllByBranches?: Mock<GithubApi["findAllByBranches"]>;
 }) {
   const sessionRepository = new TestSessions();
   sessionRepository.recentRowsByTenant.set("project-1", personalSessions);

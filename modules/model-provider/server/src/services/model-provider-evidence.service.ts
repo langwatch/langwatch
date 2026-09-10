@@ -12,7 +12,7 @@ import type {
  * The setup checklist's provider step, and nothing else: one boolean, derived
  * from the project's own scope chain and one existence read. It is a service of
  * its own for the same reason {@link ModelCostCatalogService} is — composing
- * `ModelProviderService` to answer it would mean an organization service, an
+ * `ModelProviderApi` to answer it would mean an organization service, an
  * authz service, a provider catalog, a translation port, an id service, a
  * credential codec, a Codex token refresher and a connection rate limiter, for
  * a question that asks none of them anything.

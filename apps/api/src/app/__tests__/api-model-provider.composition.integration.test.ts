@@ -27,7 +27,7 @@
  */
 import {
   ModelProviderTestRateLimitedError,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -160,7 +160,7 @@ function compose(
     environment?: Record<string, string | undefined>;
     isSaas?: boolean;
   } = {},
-): ModelProviderService {
+): ModelProviderApi {
   return composeApiModelProviders({
     prisma: testPrisma(overrides.rows ?? []),
     projects: testProjects(),

@@ -4,7 +4,7 @@
 import { newEvaluatorId } from "@langwatch/evaluator-contract";
 import {
   ModelNotConfiguredError,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 import { createEvaluatorTestApp, testModelResolution } from "./evaluator.fixture.ts";
@@ -24,7 +24,7 @@ const runnableCode = {
 function harness({
   modelProviders = {},
 }: {
-  modelProviders?: Partial<ModelProviderService>;
+  modelProviders?: Partial<ModelProviderApi>;
 } = {}) {
   return createEvaluatorTestApp({ modelProviders });
 }

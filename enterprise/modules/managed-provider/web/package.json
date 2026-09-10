@@ -10,8 +10,8 @@
   "type": "module",
   "exports": {
     "./surfaces/managed-provider-alert": {
-      "types": "./dist/surfaces/managed-provider-alert/index.d.ts",
-      "default": "./src/surfaces/managed-provider-alert/index.ts"
+      "types": "./dist/ui/sections/managed-provider-alert/index.d.ts",
+      "default": "./src/ui/sections/managed-provider-alert/index.ts"
     }
   },
   "scripts": {

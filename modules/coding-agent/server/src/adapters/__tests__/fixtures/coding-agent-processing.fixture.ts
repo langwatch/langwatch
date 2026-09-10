@@ -1,7 +1,7 @@
 import { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
-import type { GithubService } from "@langwatch/github-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import {
-  ModelProviderService,
+  type ModelProviderApi,
   type ModelCostEstimateInput,
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
@@ -76,12 +76,10 @@ class TestTraceCanonicalisationService extends TraceCanonicalisationService {
 
 const redis = new Redis({ lazyConnect: true });
 
-export class TestModelProviderService extends ModelProviderService {
+export class TestModelProviderService implements ModelProviderApi {
   constructor(
     private readonly estimate: (input: ModelCostEstimateInput) => number = () => 0,
-  ) {
-    super();
-  }
+  ) {}
 
   estimateCost(input: ModelCostEstimateInput): number {
     return this.estimate(input);
@@ -202,11 +200,47 @@ export class TestModelProviderService extends ModelProviderService {
   translate(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");
   }
+
+  upsertUnattributed(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
+  validateStoredKey(): Promise<ModelProviderCredentialVerdict> {
+    return Promise.resolve({
+      outcome: "unchecked",
+      valid: true,
+      reason: "provider_not_probeable",
+    });
+  }
+
+  startCodexDeviceSignIn(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
+  pollCodexDeviceSignIn(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
+  getDefaultSnapshotUnattributed(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
+  findModelLimits(): null {
+    return null;
+  }
+
+  previewCostRuleMatchingSpans(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
+  applyCodexCodingDefaults(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 /** Builds the real pipeline definition without opening its runtime adapters. */
 export function buildTestCodingAgentProcessingPipeline(
-  github?: GithubService,
+  github?: GithubApi,
   foldCacheTtlSeconds?: number,
 ) {
   return EventingCodingAgentProcessingAdapter.create({

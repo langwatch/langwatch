@@ -4,7 +4,7 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { defineModule, type FeatureSetup } from "@langwatch/runtime-composition";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -43,7 +43,7 @@ export type WorkerEvaluationInfrastructure = Readonly<{
   datasets: DatasetApi;
   /** The ONE monitor application this process installed. */
   monitors: MonitorApi;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   models: WorkerModelProviders;
   secretDecryptor: WorkflowEnvironmentDecryptor;
   nlpServiceUrl: string | undefined;

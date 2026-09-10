@@ -14,7 +14,7 @@ export type ModelProviderEvidenceDatabase = Pick<PrismaClient, "modelProvider">;
  * The twin of {@link PostgresModelCostCatalogAdapter}, and it exists for the
  * same reason: the question is a project's own, the answer is a row that is
  * already scoped to that project's cascade, and every collaborator
- * `ModelProviderService` would demand to answer it is there for writing
+ * `ModelProviderApi` would demand to answer it is there for writing
  * credentials rather than for counting them.
  *
  * What it replaces is a `prisma.modelProvider.findFirst` written in the API's

@@ -22,7 +22,7 @@ import {
   type CodexTokenKeys,
   type ModelProviderSummary,
   type ModelDefaultFeature,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
@@ -237,7 +237,10 @@ export abstract class ModelTranslationPort {
     projectId: string;
     text: string;
     model: string;
-    modelProviders: ModelProviderService;
+    modelProviders: Pick<
+      ModelProviderApi,
+      "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders"
+    >;
   }): Promise<string>;
 }
 
@@ -344,7 +347,7 @@ export abstract class ModelProviderCredentialProbePort {
     projectId: string;
     provider: string;
     customBaseUrl: string | undefined;
-    modelProviders: ModelProviderService;
+    modelProviders: Pick<ModelProviderApi, "tryGetProviderForProject">;
   }): Promise<ModelProviderCredentialVerdict>;
 }
 

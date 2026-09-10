@@ -12,7 +12,7 @@ import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   ModelDefaultApiKeyScopeCheck,
-  ModelProviderService,
+  ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -54,7 +54,7 @@ function mount(
     credential?: Credential;
     /** Refuses the key's own ceiling for the permission the route named. */
     ceilingRefuses?: boolean;
-    modelProviders?: Partial<ModelProviderService>;
+    modelProviders?: Partial<ModelProviderApi>;
   } = {},
 ) {
   const asked: AuthzPermission[] = [];

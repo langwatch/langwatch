@@ -10,7 +10,7 @@ import {
   MASKED_KEY_PLACEHOLDER,
   ModelProviderNotFoundError,
   ModelProviderRoutingHandleTakenError,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -66,7 +66,7 @@ function storedProviders() {
   );
 }
 
-function mount(modelProviders: Partial<ModelProviderService>) {
+function mount(modelProviders: Partial<ModelProviderApi>) {
   const { app } = mountableModelProviderApp({ modelProviders });
   const hono = createRestRuntime({
     identity: {

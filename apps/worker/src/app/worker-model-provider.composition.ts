@@ -9,8 +9,8 @@ import {
   ManagedProviderConfigurationReporter,
   ManagedProviderService as EnterpriseManagedProviderService,
 } from "@langwatch/enterprise-managed-provider-server";
-import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   CodexAccountService,
   CodexOAuthModelProviderTokenRefresherAdapter,
@@ -85,8 +85,8 @@ export type WorkerModelProviderCompositionOptions = Readonly<{
  * The model gateway and the managed-provider service behind it.
  */
 export type WorkerModelProviders = Readonly<{
-  modelProviders: ModelProviderService;
-  managedProviders: ManagedProviderService;
+  modelProviders: ModelProviderApi;
+  managedProviders: ManagedProviderApi;
   /**
    * What the installed model-provider module is built over in this same
    * process: the deployment's credential cipher, which travels with the
@@ -226,7 +226,7 @@ function composeWorkerManagedProviders(input: {
   projects: ProjectApi;
   environment: Readonly<Record<string, string | undefined>>;
   logger: Logger;
-}): ManagedProviderService {
+}): ManagedProviderApi {
   return EnterpriseManagedProviderService.create({
     projects: input.projects,
     configuration: EnvironmentManagedProviderConfigurationAdapter.create({
@@ -263,12 +263,12 @@ class WorkerManagedProviderConfigurationReporter extends ManagedProviderConfigur
  */
 class WorkerManagedModelProviderGatewayAdapter extends ModelProviderManagedGatewayPort {
   static create(input: {
-    service: ManagedProviderService;
+    service: ManagedProviderApi;
   }): WorkerManagedModelProviderGatewayAdapter {
     return new WorkerManagedModelProviderGatewayAdapter(input.service);
   }
 
-  private constructor(private readonly service: ManagedProviderService) {
+  private constructor(private readonly service: ManagedProviderApi) {
     super();
   }
 

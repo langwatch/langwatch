@@ -22,13 +22,13 @@ import type {
   ScimApi,
   SsoApi,
   GovernanceApp,
-  GovernanceService,
+  GovernanceApi,
   OrganizationSessionPolicyService,
   WebhookApp,
 } from "@langwatch/enterprise-api";
 import type { LicensingApi, LimitType } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApp } from "@langwatch/gateway-server";
-import type { GithubService } from "@langwatch/github-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import type { AuthzApi, AuthzService } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
@@ -112,12 +112,12 @@ export type ApiTrpcFeatureApplication = Readonly<{
   /**
    * The GitHub App an organization connected, as `github.*` reads it.
    */
-  github: GithubService;
+  github: GithubApi;
   /**
    * The Enterprise governance capability the console's ten surfaces read, and the `/`
    * landing decision reads the setup rollup from.
    */
-  governance: GovernanceService;
+  governance: GovernanceApi;
   /**
    * The governance APPLICATION beside the capability: the personal virtual keys a member
    * mints and the routing policies their traffic follows.

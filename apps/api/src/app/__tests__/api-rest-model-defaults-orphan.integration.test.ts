@@ -9,7 +9,7 @@ import {
   type RestApiServicePorts,
 } from "@langwatch/api/rest";
 import { ModelDefaultNotFoundError } from "@langwatch/model-provider-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
 import type { MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
@@ -51,11 +51,11 @@ function permittedSecurity(scopeChecks: string[]): AppRestSecurity {
   return createAppRestSecurity(ports);
 }
 
-function mount(modelProviders: Partial<ModelProviderService>) {
+function mount(modelProviders: Partial<ModelProviderApi>) {
   const scopeChecks: string[] = [];
   const family = createModelDefaultsRestApp({
     security: permittedSecurity(scopeChecks),
-    modelProviders: () => modelProviders as ModelProviderService,
+    modelProviders: () => modelProviders as ModelProviderApi,
   });
   return { hono: family, scopeChecks };
 }
@@ -90,7 +90,7 @@ describe("given a model-defaults config id that resolves to no scope attachments
     it("answers 404, not 500, when the ownership backstop refuses", async () => {
       // The backstop the handler keeps for a service that answers nothing at
       // all rather than refusing: it must still read as not-found.
-      const saveDefaultConfig: ModelProviderService["saveDefaultConfig"] = vi.fn(
+      const saveDefaultConfig: ModelProviderApi["saveDefaultConfig"] = vi.fn(
         async () => undefined as never,
       );
       const { hono } = mount({ saveDefaultConfig });

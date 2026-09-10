@@ -1,4 +1,4 @@
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   resolveRunModels,
@@ -17,14 +17,14 @@ const logger = createLogger("langwatch:suite-run:run-models");
 export class SuiteRunModelsService {
   static create(options: {
     scenarios: ScenarioApi;
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
   }): SuiteRunModelsService {
     return new SuiteRunModelsService(options.scenarios, options.modelProviders);
   }
 
   private constructor(
     private readonly scenarios: ScenarioApi,
-    private readonly modelProviders: ModelProviderService,
+    private readonly modelProviders: ModelProviderApi,
   ) {}
 
   /** The models each named scenario will run on, keyed by scenario id. */

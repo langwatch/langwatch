@@ -2,7 +2,7 @@
  * The four AUTHORING doors this process composes, driven through the real Hono app
  * the door registry opens.
  */
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS } from "@langwatch/scenario-server/api-rest/scenario-generate";
 import type { WorkflowApp } from "@langwatch/workflow-server";
 import { Hono } from "hono";
@@ -319,7 +319,7 @@ function mount(options: MountOptions = {}) {
           getExecutionProviders: async () => ({}),
           prepareExecution: async () => ({ api_key: "k", model: "m" }),
           ...options.modelProviders,
-        }) as unknown as ModelProviderService,
+        }) as unknown as ModelProviderApi,
       executionProxyBaseUrl: "http://nlp.test/go/proxy/v1",
     },
     datasetGenerate: { session, resolveModel: options.resolveModel ?? (async () => stubModel()) },

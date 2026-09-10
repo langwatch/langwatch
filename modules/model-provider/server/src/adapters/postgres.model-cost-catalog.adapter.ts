@@ -13,14 +13,14 @@ export type ModelCostCatalogDatabase = Pick<PrismaClient, "customLLMModelCost">;
  *
  * A background process that folds spans prices each LLM call against the rates
  * the customer stored, and the rates are scoped to the project, its team and
- * its organization. Reaching them through `ModelProviderService` meant
+ * its organization. Reaching them through `ModelProviderApi` meant
  * composing nine collaborators — an organization service, an authz service, a
  * provider catalog, a translation port, an id service, a credential codec, a
  * Codex token refresher and a connection rate limiter — for a read that asks
  * none of them anything.
  *
  * The object it builds satisfies Trace's `TraceModelCostCatalogPort`.
- * `ModelProviderService` satisfies it as well, because it composes this same
+ * `ModelProviderApi` satisfies it as well, because it composes this same
  * service and delegates to it, which is what keeps the application's own
  * compositions compiling unchanged and what keeps the two processes pricing
  * from one implementation rather than two.

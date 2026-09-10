@@ -3,7 +3,7 @@
  *
  * `modelProvider.*`, `llmModelCost.*` and `translate.*` are all this feature
  * answering, and before this each declared its own private bag —
- * `Readonly<{ modelProviders: ModelProviderService }>` in two of them and
+ * `Readonly<{ modelProviders: ModelProviderGateway }>` in two of them and
  * `Readonly<{ modelProviders; traces: { spans } }>` in the third. Three
  * descriptions of one composition, agreeing by attention rather than by
  * construction, and none of them reachable from the others.
@@ -69,7 +69,6 @@ import {
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
   type ModelProviderResolution,
-  type ModelProviderService,
   type ModelProviderSummary,
   type TranslateInput,
   type TranslateOutput,
@@ -204,7 +203,7 @@ export class ModelProviderApp implements ModelProviderApi {
   readonly #aiCallFailures = AiCallFailureService.create();
 
   /** The read, write, defaults and cost lifecycles, over the chosen backend. */
-  readonly #modelProviders: ModelProviderService;
+  readonly #modelProviders: ModelProviderGateway;
   readonly #credentialProbe: ModelProviderCredentialProbePort;
   readonly #codexAccounts: ModelProviderCodexDeviceFlow;
   readonly #spans: SpanReader;

@@ -5,7 +5,7 @@
  * @see specs/settings/model-provider-skip-permissions.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -50,7 +50,7 @@ const storedProvider = (overrides: Record<string, unknown> = {}) => ({
 
 function mount(
   options: {
-    modelProviders?: Partial<ModelProviderService>;
+    modelProviders?: Partial<ModelProviderApi>;
     permits?: ModelProviderTestDecision;
     probe?: RecordingCredentialProbe;
     codexAccounts?: CodexAccountService;

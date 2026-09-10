@@ -13,7 +13,7 @@ import {
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { createServer, type Server } from "node:http";
 import {
-  GithubService,
+  type GithubApi,
   type GithubPullRequest,
 } from "@langwatch/github-contract";
 import {
@@ -463,7 +463,7 @@ export class TestBillingPolicy extends CodingAgentBillingPolicyPort {
   }
 }
 
-export class TestGithubService extends GithubService {
+export class TestGithubService implements GithubApi {
   readonly configured = true;
   pullRequests: GithubPullRequest[] = [];
   mappingRequests: Array<{

@@ -6,7 +6,7 @@
  *
  * "Actually serve" is the load-bearing part: a registry model is listed in
  * no row's custom catalog, so execution keeps the scope-collapse winner
- * (ModelProviderService.findRowServingModel returns null, resolveServingRow
+ * (ModelProviderApi.findRowServingModel returns null, resolveServingRow
  * falls back). Availability therefore follows the winner, not the union of
  * accessible rows.
  *

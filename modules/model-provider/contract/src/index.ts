@@ -1,6 +1,5 @@
 export * from "./model-provider.ts";
 export * from "./model-provider.errors.ts";
-export * from "./model-provider.service.ts";
 export * from "./model-provider.api.ts";
 export * from "./model-provider-wire-format.ts";
 export * from "./model-provider-credential.ts";

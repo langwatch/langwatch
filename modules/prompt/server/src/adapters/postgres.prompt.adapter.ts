@@ -1,4 +1,4 @@
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { PromptService } from "../services/prompt.service.ts";
 import { PromptTagService } from "../services/prompt-tag.service.ts";
 import { PromptVersionService } from "../services/prompt-version.service.ts";
@@ -30,7 +30,7 @@ export interface PostgresPromptAdapterOptions {
   /**
    * The provider cascade a prompt created without a model falls back to.
    */
-  modelProvider?: ModelProviderService;
+  modelProvider?: ModelProviderApi;
 }
 
 /** Process-owned PostgreSQL composition for the Prompt feature. */

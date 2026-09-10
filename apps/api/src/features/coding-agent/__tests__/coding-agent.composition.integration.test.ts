@@ -7,7 +7,7 @@
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { GithubService } from "@langwatch/github-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -36,7 +36,7 @@ function testInfrastructure(): ApiTrpcInfrastructure {
 }
 
 async function composeApplication(projects: ProjectApi = createApiFixture<ProjectApi>()) {
-  const github = createApiFixture<GithubService>({
+  const github = createApiFixture<GithubApi>({
     getWebBase: () => "https://github.test",
   });
 

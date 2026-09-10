@@ -3,7 +3,7 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 
@@ -19,7 +19,7 @@ export type ApiAuthoringModelResolver = (input: {
  * The resolver, or `undefined` where this process composed no model gateway.
  */
 export function composeApiAuthoringModelResolver(options: {
-  modelProviders: ModelProviderService | undefined;
+  modelProviders: ModelProviderApi | undefined;
   projects: ProjectApi | undefined;
   nlpServiceUrl: string | undefined;
 }): ApiAuthoringModelResolver | undefined {

@@ -13,14 +13,14 @@ import {
  * nothing in this process prices anything yet. What has to be true today is
  * that this composition root CAN build the path from what it already holds:
  * the model-cost catalog port, which `createWorkerTraceNarrowPorts` already
- * answers from a published `ModelProviderService`. That is the whole
+ * answers from a published `ModelProviderApi`. That is the whole
  * dependency list — no Prisma client, no scope resolver, no static registry.
  *
  *     TraceSpanCostEnrichmentPort          (trace-server declares it)
  *       └─ OtlpSpanCostEnrichmentService   (trace-server owns it)
  *            ├─ matchModelCost             (model-provider-contract owns it)
  *            └─ TraceModelCostCatalogPort  the project's own cost rules
- *                 └─ ModelProviderService  scope cascade, three tiers
+ *                 └─ ModelProviderApi  scope cascade, three tiers
  *
  * The catalog port is taken rather than built here, because the four-port
  * composition already renames `listCosts` onto it; a second adapter doing the

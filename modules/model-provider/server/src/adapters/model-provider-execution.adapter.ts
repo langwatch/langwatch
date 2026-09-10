@@ -1,6 +1,6 @@
 import type {
   ModelProviderExecution,
-  ModelProviderService,
+  ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { TopicClusteringModelsPort } from "@langwatch/topic-contract";
 
@@ -12,11 +12,11 @@ const CLUSTERING_EMBEDDINGS_FEATURE_KEY = "analytics.topic_clustering_embeddings
  * receives only the portable execution material it needs for langevals.
  */
 export class ModelProviderExecutionAdapter extends TopicClusteringModelsPort<ModelProviderExecution> {
-  static create(options: { modelProviders: ModelProviderService }): ModelProviderExecutionAdapter {
+  static create(options: { modelProviders: ModelProviderApi }): ModelProviderExecutionAdapter {
     return new ModelProviderExecutionAdapter(options.modelProviders);
   }
 
-  private constructor(private readonly modelProviders: ModelProviderService) {
+  private constructor(private readonly modelProviders: ModelProviderApi) {
     super();
   }
 

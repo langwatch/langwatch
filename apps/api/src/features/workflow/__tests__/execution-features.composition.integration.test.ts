@@ -11,7 +11,7 @@ import type {
 } from "@langwatch/authz-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EventSourcing } from "@langwatch/eventing";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
@@ -207,12 +207,12 @@ function testEventing() {
 }
 
 /** The model gateway, answering the one shape a Studio graph asks it for. */
-function testModelProviders(): ModelProviderService {
+function testModelProviders(): ModelProviderApi {
   return {
     getExecutionProviders: async () => [],
     resolveModelForFeature: async () => ({ model: "openai/gpt-5-mini" }),
     prepareExecution: async () => ({}),
-  } as unknown as ModelProviderService;
+  } as unknown as ModelProviderApi;
 }
 
 function testAgents(): AgentApi {

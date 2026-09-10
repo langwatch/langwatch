@@ -1,5 +1,5 @@
 import {
-  GithubService,
+  type GithubApi,
   type GithubAppConfig,
   type GithubConnectionStatus,
   type GithubDisconnectResult,
@@ -20,7 +20,7 @@ type MappingRequest = {
   headBranch: string;
 };
 
-export class TestGithubService extends GithubService {
+export class TestGithubService implements GithubApi {
   readonly configured = true;
   readonly mappingRequests: MappingRequest[] = [];
   mappingError: Error | null = null;
@@ -29,9 +29,7 @@ export class TestGithubService extends GithubService {
     return new TestGithubService(host);
   }
 
-  private constructor(private readonly host: string) {
-    super();
-  }
+  private constructor(private readonly host: string) {}
 
   getAppConfig(): GithubAppConfig {
     return { appSlug: "test", webhookSecret: "test", configured: true };

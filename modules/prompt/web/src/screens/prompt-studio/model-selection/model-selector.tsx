@@ -98,7 +98,7 @@ const scopeRank = (scopeType?: string): number =>
  * A registry model is listed in no row's custom catalog, so
  * `findRowServingModel` finds nothing and `resolveServingRow` keeps the
  * scope-collapse winner — enabled beats disabled, then narrowest scope
- * (ModelProviderService.isNarrower). An AI Studio row at organization
+ * (ModelProviderApi.isNarrower). An AI Studio row at organization
  * scope therefore does NOT rescue an Agent Platform row at project scope:
  * the project row wins and answers 404 on the embeddings endpoint.
  *

@@ -4,7 +4,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { PrismaConnection } from "@langwatch/prisma-client";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import type { ScenarioApi, SimulationService } from "@langwatch/scenario-contract";
@@ -93,7 +93,7 @@ describe("createWorkerAgentApps", () => {
       prerequisites: {
         config,
         connection: databaseFixture(),
-        modelProviders: createApiFixture<ModelProviderService>(),
+        modelProviders: createApiFixture<ModelProviderApi>(),
         projects: peers.projects,
         redis,
         resolveClickHouseClient: async () => {

@@ -1,4 +1,4 @@
-import { GithubService as GithubServiceContract } from "@langwatch/github-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import type {
   GithubConnectionStatus,
   GithubDisconnectResult,
@@ -44,7 +44,7 @@ type GithubServiceDependencies = {
  * implementation details of this service; Coding Agent, Langy and transports
  * depend on this facade rather than constructing repositories or sub-services.
  */
-export class GithubFeatureService extends GithubServiceContract {
+export class GithubFeatureService implements GithubApi {
   private readonly connection: GithubConnectionService;
 
   static create(dependencies: GithubServiceDependencies): GithubFeatureService {
@@ -70,7 +70,6 @@ export class GithubFeatureService extends GithubServiceContract {
     private readonly installResponse: GithubInstallResponsePort,
     private readonly pullRequestEvents: GithubPullRequestEventPort,
   ) {
-    super();
     this.connection = GithubConnectionService.create({
       installations,
       getAppConfig: () => this.getAppConfig(),

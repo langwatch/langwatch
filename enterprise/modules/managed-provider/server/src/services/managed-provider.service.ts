@@ -1,21 +1,19 @@
 import {
   type BuildManagedProviderParametersInput,
-  ManagedProviderService as ManagedProviderServiceContract,
+  type ManagedProviderApi,
 } from "@langwatch/enterprise-managed-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ManagedProviderConfigurationPort } from "../ports/managed-provider-configuration.port.ts";
 import type { ManagedProviderCredentialsPort } from "../ports/managed-provider-credentials.port.ts";
 
-export class ManagedProviderService extends ManagedProviderServiceContract {
+export class ManagedProviderService implements ManagedProviderApi {
   private readonly projectOrganizations = new Map<string, string>();
 
   private constructor(
     private readonly configuration: ManagedProviderConfigurationPort,
     private readonly projects: ProjectApi,
     private readonly credentials: ManagedProviderCredentialsPort,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(options: {
     configuration: ManagedProviderConfigurationPort;

@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ModelTranslationPort } from "../ports/model-provider.port.ts";
 import {
   ModelProviderExecutionHandleService,
@@ -26,7 +26,10 @@ export class VercelAiModelTranslationAdapter extends ModelTranslationPort {
     projectId: string;
     text: string;
     model: string;
-    modelProviders: ModelProviderService;
+    modelProviders: Pick<
+      ModelProviderApi,
+      "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders"
+    >;
   }): Promise<string> {
     const model = await ModelProviderExecutionHandleService.getVercelAIModel({
       ...this.options,

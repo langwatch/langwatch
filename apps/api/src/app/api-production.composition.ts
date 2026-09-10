@@ -14,7 +14,7 @@ import {
 } from "@langwatch/observability/node";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwatch/authz-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { bindTenantDirectoryReader } from "@langwatch/organization-server";
@@ -470,7 +470,7 @@ export type ApiProductionCompositionOptions = {
    * composes its own — see {@link ApiProductionComposition.resolveModelProviders} and
    * `api-model-provider.composition.ts` for the six ports and where each is answered from.
    */
-  modelProviders?: ModelProviderService;
+  modelProviders?: ModelProviderApi;
   /**
    * The four facts a person-shaped surface needs that are the DEPLOYMENT's: its public host,
    * the sign-in provider it mounted, whether it registered passkeys, and who its operators are.
@@ -761,7 +761,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composedEncryption: SecretEncryptionPort | undefined;
   private composedGithub: GithubApi | undefined;
-  private composedModelProviders: ModelProviderService | undefined;
+  private composedModelProviders: ModelProviderApi | undefined;
   /** The gateway's options, kept so the module install reads the same list. */
   private modelProviderOptions: ApiModelProviderCompositionOptions | undefined;
   private composedPlanProvider: PlanProvider | undefined;
@@ -4239,7 +4239,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private resolveModelProviders(
     options: ApiRuntimeCompositionOptions,
     encryption: SecretEncryptionPort | undefined,
-  ): ModelProviderService | undefined {
+  ): ModelProviderApi | undefined {
     if (this.options.modelProviders) return this.options.modelProviders;
     // Memoized: two halves ask for it — the execution half for the studio's
     // model calls, the observability half for the provider surface itself —

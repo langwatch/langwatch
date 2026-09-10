@@ -4,7 +4,7 @@
  * rename here is a cache-key change in every browser that calls it.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -20,7 +20,7 @@ const PROJECT_ID = "project-1";
 
 function mount(
   options: {
-    modelProviders?: Partial<ModelProviderService>;
+    modelProviders?: Partial<ModelProviderApi>;
     permits?: ModelProviderTestDecision;
     spans?: unknown;
   } = {},

@@ -1,5 +1,5 @@
 import { histogram } from "@langwatch/observability/metrics";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ModelProviderExecutionAdapter } from "@langwatch/model-provider-server";
 import type {
   BatchClusteringParams,
@@ -39,7 +39,7 @@ export type WorkerTopicClusteringOptions = Readonly<{
    * path resolves its `X_LITELLM_*` environment through — see `worker-model-
    * provider.composition.ts`.
    */
-  modelProviders?: ModelProviderService;
+  modelProviders?: ModelProviderApi;
   absence?: WorkerTopicAbsenceReportPort;
   /** Injected by the mount test; the process's own `fetch` otherwise. */
   fetch?: typeof globalThis.fetch;

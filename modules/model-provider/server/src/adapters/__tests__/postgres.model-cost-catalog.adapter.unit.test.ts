@@ -5,7 +5,7 @@ import { PostgresModelCostCatalogAdapter } from "../postgres.model-cost-catalog.
 /**
  * Spec: modules/model-provider/specs/model-cost-catalog-seam.feature
  *
- * The cost listing record-time enrichment reads. `ModelProviderService`
+ * The cost listing record-time enrichment reads. `ModelProviderApi`
  * requires nine collaborators — an organization service, an authz service, a
  * catalog, a translation port, an id service, a credential codec, a Codex
  * token refresher and a connection rate limiter — because writing a cost

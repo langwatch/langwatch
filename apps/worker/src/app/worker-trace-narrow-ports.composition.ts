@@ -21,13 +21,13 @@ import {
  * or writes a project flag yet. What has to be true today is that this
  * composition root CAN answer all four from published services, without
  * building the fourteen-method `ProjectApi`, the fourteen-method
- * `MonitorService` or the whole `ModelProviderService` graph first. That is
+ * `MonitorService` or the whole `ModelProviderApi` graph first. That is
  * exactly what blocked the conversion: the subscribers named the services, so
  * a process that wanted one capability had to be able to build all of them.
  *
  * WHAT EACH PARAMETER ASKS FOR IS NOW WHAT EACH ADAPTER CALLS, spelled out
  * below rather than named as a whole service. `ProjectApi`,
- * `MonitorService` and `ModelProviderService` each satisfy their parameter,
+ * `MonitorService` and `ModelProviderApi` each satisfy their parameter,
  * and so do the read-side services their own features publish
  * (`ProjectMetadataService`, `MonitorCatalogService`,
  * `ModelCostCatalogService`) — which is what `createWorkerTraceCapabilityServices`

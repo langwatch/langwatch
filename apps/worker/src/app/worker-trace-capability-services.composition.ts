@@ -29,7 +29,7 @@ import {
  * credentials port and an `OrganizationService` because `create` mints an
  * ingestion key and `ensureInternal` resolves a team; `DataPrivacyApi`
  * requires an organization directory because `setForScope` has to decide which
- * organization a team scope belongs to; `ModelProviderService` requires nine
+ * organization a team scope belongs to; `ModelProviderApi` requires nine
  * collaborators including an `AuthzService` because writing a cost authorizes
  * a scope; `MonitorService` requires an `EvaluatorApi` because creating a
  * monitor resolves the evaluator behind it. Ingestion creates no project,

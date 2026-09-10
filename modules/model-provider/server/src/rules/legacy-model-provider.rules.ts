@@ -11,7 +11,7 @@ import {
   type Model,
   type ModelMetadataForFrontend,
   type ModelProviderExecution,
-  type ModelProviderService,
+  type ModelProviderApi,
   type ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
 
@@ -150,7 +150,7 @@ export function toLegacyProviderSummary(
 }
 
 export const getProjectModelProviders = async (
-  service: Pick<ModelProviderService, "getExecutionProviders">,
+  service: Pick<ModelProviderApi, "getExecutionProviders">,
   projectId: string,
 ): Promise<Record<string, LegacyModelProviderExecution>> => {
   const providers = await service.getExecutionProviders({ projectId });
@@ -229,7 +229,7 @@ export const mergeCustomModelMetadata = (
 
 // Frontend-only function that masks API keys for security and includes model metadata
 export const getProjectModelProvidersForFrontend = async (
-  service: ModelProviderService,
+  service: ModelProviderApi,
   projectId: string,
 ) => {
   const providers = await service.getForProject({ projectId });
@@ -256,7 +256,7 @@ export const getProjectModelProvidersForFrontend = async (
 // Record-by-provider-key `getProjectModelProvidersForFrontend` collapses those duplicates
 // and is not safe to use here.
 export const listOrgModelProvidersForFrontend = async (
-  service: ModelProviderService,
+  service: ModelProviderApi,
   organizationId: string,
 ) => {
   const providers = (await service.listForOrganization({ organizationId })).map(
@@ -276,7 +276,7 @@ export const listOrgModelProvidersForFrontend = async (
 };
 
 export const listProjectModelProvidersForFrontend = async (
-  service: ModelProviderService,
+  service: ModelProviderApi,
   projectId: string,
 ) => {
   const providers = (await service.listForProject({ projectId })).map(toLegacyProviderSummary);
@@ -351,7 +351,7 @@ export const prepareEnvKeys = ({
  * here reads it and naming the type would put an enterprise dependency on this package for a parameter with no body.
  */
 export const prepareLitellmParams = async (
-  service: ModelProviderService,
+  service: ModelProviderApi,
   _managedProviders: unknown,
   {
     model,

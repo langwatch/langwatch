@@ -3,7 +3,7 @@
  * prompt, the character budget and the transcript; it declares {@link LangyTitleModelPort} for the
  * one thing it does not own, which is WHICH model a project's title call reaches.
  */
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
 import { LangyTitleModelPort } from "@langwatch/langy-server";
@@ -25,7 +25,7 @@ export type WorkerLangyTitleProjectDirectory = {
 
 export type WorkerLangyTitleModelOptions = Readonly<{
   /** The gateway this process composed, when it composed one. */
-  modelProviders: ModelProviderService | undefined;
+  modelProviders: ModelProviderApi | undefined;
   /** The project directory the cascade derives a scope chain from. */
   projects: WorkerLangyTitleProjectDirectory | undefined;
   /** The NLP engine's address, as the deployment named it. */
@@ -53,7 +53,7 @@ export function tryCreateWorkerLangyTitleModel(
 /** The cascade, then the named fallback, over one gateway instance. */
 class WorkerLangyTitleModelAdapter extends LangyTitleModelPort {
   static create(options: {
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
     projects: WorkerLangyTitleProjectDirectory;
     executionProxyBaseUrl: string;
   }): WorkerLangyTitleModelAdapter {
@@ -62,7 +62,7 @@ class WorkerLangyTitleModelAdapter extends LangyTitleModelPort {
 
   private constructor(
     private readonly options: {
-      modelProviders: ModelProviderService;
+      modelProviders: ModelProviderApi;
       projects: WorkerLangyTitleProjectDirectory;
       executionProxyBaseUrl: string;
     },

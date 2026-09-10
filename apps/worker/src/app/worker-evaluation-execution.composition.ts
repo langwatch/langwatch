@@ -15,7 +15,7 @@ import {
   EvaluationCostService,
 } from "@langwatch/evaluation-server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { PrismaEvaluationCostRepository } from "@langwatch/evaluation-server/composition/evaluation-cost";
@@ -187,14 +187,14 @@ class UncomposedMonitorReplication extends MonitorReplicationPort {
 
 class WorkerEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCredentialsPort {
   static create(input: {
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
   }): WorkerEvaluationAzureSafetyCredentials {
     return new WorkerEvaluationAzureSafetyCredentials(input.modelProviders);
   }
 
-  #modelProviders: ModelProviderService;
+  #modelProviders: ModelProviderApi;
 
-  private constructor(modelProviders: ModelProviderService) {
+  private constructor(modelProviders: ModelProviderApi) {
     super();
     this.#modelProviders = modelProviders;
   }

@@ -70,7 +70,7 @@ import {
 import type { ApiPackagedRestCollaborators } from "../app-rest/api-rest.packaged-services.ts";
 import type { ApiConnectedAgentsComposition } from "./api-connected-agents.composition.ts";
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ProjectManagementDirectory } from "@langwatch/project-server";
@@ -139,7 +139,7 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   /** The management door's writer, which the API's read operations do not carry. */
   projectDirectory: ProjectManagementDirectory | undefined;
   /** The provider gateway the two model families read, where one was composed. */
-  modelProviders: ModelProviderService | undefined;
+  modelProviders: ModelProviderApi | undefined;
   /**
    * The API-key ceiling for one permission, as the framework chain applies it.
    */

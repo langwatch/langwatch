@@ -5,7 +5,7 @@
  */
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { ExperimentApp } from "@langwatch/experiment-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -71,7 +71,7 @@ function bearer(token: string, projectId?: string): Record<string, string> {
 
 function mount(
   overrides: {
-    modelProviders?: Partial<ModelProviderService>;
+    modelProviders?: Partial<ModelProviderApi>;
     experiments?: Partial<ExperimentApp>;
     analytics?: Partial<AnalyticsApp>;
   } = {},
@@ -94,7 +94,7 @@ function mount(
     })),
     upsert: vi.fn(async () => []),
     ...overrides.modelProviders,
-  } as unknown as ModelProviderService;
+  } as unknown as ModelProviderApi;
 
   return mountRestFamily({
     security: world.security(),

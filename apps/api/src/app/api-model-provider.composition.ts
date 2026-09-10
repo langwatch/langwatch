@@ -8,8 +8,8 @@ import {
   ManagedProviderConfigurationReporter,
   ManagedProviderService as EnterpriseManagedProviderService,
 } from "@langwatch/enterprise-managed-provider-server";
-import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   CodexOAuthModelProviderTokenRefresherAdapter,
   EncryptedModelProviderCredentialAdapter,
@@ -136,7 +136,7 @@ export function apiModelProviderParts(options: ApiModelProviderCompositionOption
 /** Composes the model gateway from this process's own graph. */
 export function composeApiModelProviders(
   options: ApiModelProviderCompositionOptions,
-): ModelProviderService {
+): ModelProviderApi {
   const parts = apiModelProviderParts(options);
 
   return PostgresModelProviderAdapter.create({
@@ -158,7 +158,7 @@ function composeManagedProviders(input: {
   projects: ProjectApi;
   environment: Readonly<Record<string, string | undefined>>;
   logger: Logger;
-}): ManagedProviderService {
+}): ManagedProviderApi {
   return EnterpriseManagedProviderService.create({
     projects: input.projects,
     configuration: EnvironmentManagedProviderConfigurationAdapter.create({
@@ -194,11 +194,11 @@ class ApiManagedProviderConfigurationReporter extends ManagedProviderConfigurati
  * Enterprise and may not name an Enterprise contract.
  */
 class ApiManagedModelProviderGatewayAdapter extends ModelProviderManagedGatewayPort {
-  static create(input: { service: ManagedProviderService }): ApiManagedModelProviderGatewayAdapter {
+  static create(input: { service: ManagedProviderApi }): ApiManagedModelProviderGatewayAdapter {
     return new ApiManagedModelProviderGatewayAdapter(input.service);
   }
 
-  private constructor(private readonly service: ManagedProviderService) {
+  private constructor(private readonly service: ManagedProviderApi) {
     super();
   }
 

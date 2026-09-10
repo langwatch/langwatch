@@ -9,7 +9,7 @@ import { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimat
  * Session cost priced from the platform's immutable model catalog.
  *
  * Frozen twin of `ModelProviderCostsService.estimate`, which the App reaches
- * through `ModelProviderService.estimateCost`: the same pure function over the
+ * through `ModelProviderApi.estimateCost`: the same pure function over the
  * same static rates, because that method already reads nothing else. Custom
  * per-tenant rates are not missing here — they travel on the span attributes
  * `estimateModelCost` reads (`custom_input_rate` and its siblings), so a

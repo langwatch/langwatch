@@ -4,8 +4,8 @@ import {
 } from "@langwatch/evaluation-server";
 import { isAzureEvaluatorType, EvaluatorConfigError } from "@langwatch/evaluation-contract";
 import type { AVAILABLE_EVALUATORS, EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
-import { clampMaxTokens, type ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
+import { clampMaxTokens, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   getProjectModelProviders,
   prepareEnvKeys,
@@ -40,8 +40,8 @@ export function createWorkerEvaluationModelEnv(input: {
  */
 export class WorkerEvaluationModelEnv extends EvaluationModelEnvPort {
   static create(input: {
-    modelProviders: ModelProviderService;
-    managedProviders: ManagedProviderService;
+    modelProviders: ModelProviderApi;
+    managedProviders: ManagedProviderApi;
     azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
     /** The process environment an evaluator's own `envVars` are read from. */
     environment: Readonly<Record<string, string | undefined>>;
@@ -51,8 +51,8 @@ export class WorkerEvaluationModelEnv extends EvaluationModelEnvPort {
 
   private constructor(
     private readonly deps: {
-      modelProviders: ModelProviderService;
-      managedProviders: ManagedProviderService;
+      modelProviders: ModelProviderApi;
+      managedProviders: ManagedProviderApi;
       azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
       environment: Readonly<Record<string, string | undefined>>;
     },
@@ -128,8 +128,8 @@ export class WorkerEvaluationModelEnv extends EvaluationModelEnvPort {
  * generation params. Throws `EvaluatorConfigError` for misconfigured providers.
  */
 export async function setupModelEnv(
-  modelProvidersService: ModelProviderService,
-  managedProviders: ManagedProviderService,
+  modelProvidersService: ModelProviderApi,
+  managedProviders: ManagedProviderApi,
   model: string,
   embeddings: boolean,
   projectId: string,

@@ -1,5 +1,4 @@
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import type { EvaluationService as EvaluationServiceContract } from "@langwatch/evaluation-contract";
 import {
   EvaluationExecutionPort,
   EvaluationInputsResolutionPort,
@@ -29,7 +28,7 @@ class PassthroughEvaluationInputsResolution extends EvaluationInputsResolutionPo
 
 /** Composes one Evaluation service from ClickHouse and canonical capabilities. */
 export class EvaluationAdapter {
-  static create(options: EvaluationAdapterOptions): EvaluationServiceContract {
+  static create(options: EvaluationAdapterOptions): EvaluationService {
     return EvaluationService.create({
       repository: ClickHouseEvaluationRepository.create({
         resolveClient: options.resolveClickHouse,

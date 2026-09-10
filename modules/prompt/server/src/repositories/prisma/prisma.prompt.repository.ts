@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { nanoid } from "nanoid";
 import type {
   LlmPromptConfig,
@@ -56,7 +56,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   }: {
     prisma: PromptConfigDatabase;
     versions?: PrismaLlmConfigVersionsRepository;
-    modelProvider?: ModelProviderService;
+    modelProvider?: ModelProviderApi;
   }): PrismaLlmConfigRepository {
     return new PrismaLlmConfigRepository(prisma, versions, modelProvider);
   }
@@ -66,7 +66,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   private constructor(
     private readonly prisma: PromptConfigDatabase,
     versions: PrismaLlmConfigVersionsRepository | undefined,
-    private readonly modelProvider?: ModelProviderService,
+    private readonly modelProvider?: ModelProviderApi,
   ) {
     super();
     this.versions = versions ?? PrismaLlmConfigVersionsRepository.create({ prisma });

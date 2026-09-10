@@ -22,7 +22,7 @@ import {
   SchedulerService,
   type ScheduledJobStore,
 } from "@langwatch/eventing/server";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import {
   ClickHouseEvaluationRepository,
   EvaluationRetentionFloorPort,
@@ -144,7 +144,7 @@ export function createWorkerReportTraceList(options: {
     traces: TraceListService.create({
       repository: TraceListClickHouseRepository.create(options.resolveClickHouseClient),
       evaluations: Object.assign(
-        refuseReportRead<EvaluationService>("the evaluation runs behind a trace"),
+        refuseReportRead<EvaluationApi>("the evaluation runs behind a trace"),
         {
           findSummariesByTraceIds: (
             input: Parameters<typeof evaluations.findSummariesByTraceIds>[0],

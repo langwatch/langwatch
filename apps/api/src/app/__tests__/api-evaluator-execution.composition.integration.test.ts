@@ -11,7 +11,7 @@ import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
 } from "@langwatch/gateway-server/api-rest/gateway-internal";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -215,12 +215,12 @@ function recordingEvaluators(): EvaluatorApi {
  * for "nothing configured at any scope", and the doors turn it into the evaluator's own
  * default rather than a failure.
  */
-function unconfiguredModelProviders(): ModelProviderService {
+function unconfiguredModelProviders(): ModelProviderApi {
   return {
     resolveModelForFeature: async () => {
       throw new Error("no model default configured at any scope");
     },
-  } as unknown as ModelProviderService;
+  } as unknown as ModelProviderApi;
 }
 
 type LangevalsCall = {

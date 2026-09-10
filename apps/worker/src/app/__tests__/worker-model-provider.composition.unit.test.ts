@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -272,7 +272,7 @@ describe("given the worker composes its own model gateway", () => {
           calls.push("evaluation");
           return {};
         },
-      } as unknown as ModelProviderService;
+      } as unknown as ModelProviderApi;
       const models: WorkerModelProviders = {
         modelProviders,
         managedProviders: {

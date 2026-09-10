@@ -36,11 +36,3 @@ export interface ManagedProviderApi {
 }
 
 export const ManagedProviderApi = moduleApi<ManagedProviderApi>(MANAGED_PROVIDER_FEATURE_ID);
-
-/** Compatibility type for service-level tests and existing package callers. */
-export abstract class ManagedProviderService implements ManagedProviderApi {
-  abstract isManagedProvider(input: { organizationId: string; provider: string }): boolean;
-  abstract buildLitellmParameters(
-    input: BuildManagedProviderParametersInput,
-  ): Promise<Record<string, string>>;
-}

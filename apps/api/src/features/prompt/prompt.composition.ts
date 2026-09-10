@@ -5,7 +5,7 @@
  */
 import type { Logger } from "@langwatch/observability";
 import { createLogger } from "@langwatch/observability";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -35,7 +35,7 @@ export type PromptPeers = Readonly<{
   /** The authorization service a tag-catalogue write's cascade is checked against. */
   permissions: AuthzApi;
   /** The model gateway a stored prompt's model reference is resolved against. */
-  modelProviders?: ModelProviderService;
+  modelProviders?: ModelProviderApi;
   /** The nurturing sink, where the deployment composed one. */
   nurturing?: ApiPromptNurturingPort;
 }>;

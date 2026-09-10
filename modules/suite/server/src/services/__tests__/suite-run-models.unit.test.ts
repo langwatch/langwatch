@@ -3,7 +3,7 @@
  * @see specs/scenarios/resolved-run-models-on-runs.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   JUDGE_MODEL_FEATURE_KEY,
   SIMULATOR_MODEL_FEATURE_KEY,
@@ -29,7 +29,7 @@ function buildModelProviders(defaults: Record<string, string>) {
       const model = defaults[featureKey];
       return model ? { model, source: "role_default", scope: "project" } : null;
     }),
-  } as unknown as ModelProviderService;
+  } as unknown as ModelProviderApi;
 }
 
 describe("SuiteRunModelsService.resolve", () => {

@@ -14,7 +14,7 @@ import type {
   ExperimentFindOrCreateService,
   ExperimentService,
 } from "@langwatch/experiment-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { ApiEvaluatorExecution } from "../../app/api-evaluator-execution.composition.ts";
@@ -42,7 +42,7 @@ export type ApiEvaluationRunRestCollaborators = Readonly<{
   /** The experiment a dataset evaluation's rows are grouped under. */
   experiments: ExperimentService;
   /** The cascade a project's default evaluator model is resolved through. */
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   /** The verdict command; the same one the batch log and the collector send. */
   reportEvaluation: (input: Record<string, unknown>) => Promise<unknown>;
   /** The ONE evaluator-id slug rule on this process. */

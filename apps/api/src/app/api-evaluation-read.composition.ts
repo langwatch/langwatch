@@ -3,16 +3,17 @@
  * asks for the evaluations behind that trace, and the grid asks for the summaries behind
  * a page of them.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
 import {
   EvaluationAdapter,
   EvaluationExecutionPort,
   type EvaluationClickHouseResolver,
+  type EvaluationService,
 } from "@langwatch/evaluation-server";
 import { TraceRetentionFloorService } from "@langwatch/trace-server";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 
 /** Names the refusal, so a stand-in says which process reached it. */
 function refuse(processName: string, capability: string): Error {

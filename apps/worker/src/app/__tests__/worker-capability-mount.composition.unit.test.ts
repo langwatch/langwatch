@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
@@ -221,7 +221,7 @@ describe("given a worker that composes every capability for itself", () => {
       },
       getExecutionProviders: async () => ({ openai }),
       prepareExecution: async ({ model }: { model: string }) => ({ model }),
-    } as unknown as ModelProviderService;
+    } as unknown as ModelProviderApi;
     const execution = createWorkerTopicClusteringExecution({
       config: resolveWorkerConfig({ NODE_ENV: "test" }),
       resolveClickHouseClient: async () =>

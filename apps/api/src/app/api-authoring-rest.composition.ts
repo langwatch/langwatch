@@ -1,7 +1,7 @@
 /**
  * The four doors a person reaches while AUTHORING something, composed for this process.
  */
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { WorkflowApp, WorkflowStudioDispatchService } from "@langwatch/workflow-server";
@@ -18,7 +18,7 @@ import { readScenarioGenerateTimeoutMs } from "../features/scenario/scenario-gen
 /** The playground's collaborators, or none. */
 export type ApiPlaygroundRestCollaborators = Readonly<{
   session: ApiHandlerManagedSessionPort;
-  modelProviders: () => ModelProviderService;
+  modelProviders: () => ModelProviderApi;
   executionProxyBaseUrl: string;
 }>;
 
@@ -59,7 +59,7 @@ export function composeApiAuthoringRest(options: {
   /** The browser-session transport, where this process composed one. */
   session: ApiHandlerManagedSessionPort | undefined;
   /** The SAME gateway the execution half resolves a run's models through. */
-  modelProviders: ModelProviderService | undefined;
+  modelProviders: ModelProviderApi | undefined;
   /** The project directory a model resolution names a tenant through. */
   projects: ProjectApi | undefined;
   /** The workflow application the `workflow.*` namespace answers from. */

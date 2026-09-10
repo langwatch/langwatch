@@ -1,4 +1,4 @@
-import type { ModelCost, ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { TraceSpanCostEnrichmentPort } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
@@ -11,7 +11,7 @@ import { createWorkerTraceModelCostCatalogPort } from "../worker-trace-narrow-po
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so nothing in this
  * process enriches a span. What has to be true today is that this composition
  * root can build the whole record-time pricing path out of a published
- * `ModelProviderService` — and that the path really does run THROUGH the narrow
+ * `ModelProviderApi` — and that the path really does run THROUGH the narrow
  * port, because the port is what made the enrichment composable at all.
  */
 
@@ -55,7 +55,7 @@ function catalogFromPublishedService(costs: ModelCost[] = [projectRule]): {
   listCosts: ReturnType<typeof vi.fn>;
 } {
   const listCosts = vi.fn(async (_input: { projectId: string }) => costs);
-  const modelProviders = { listCosts } as unknown as ModelProviderService;
+  const modelProviders = { listCosts } as unknown as ModelProviderApi;
   return { modelCosts: createWorkerTraceModelCostCatalogPort(modelProviders), listCosts };
 }
 

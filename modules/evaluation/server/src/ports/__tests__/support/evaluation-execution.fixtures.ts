@@ -12,7 +12,6 @@ import type {
 import {
   executeEvaluationCommandDataSchema,
   EXECUTE_EVALUATION_COMMAND_TYPE,
-  EvaluationService as EvaluationServiceContract,
   type ExecuteEvaluationCommand as ExecuteEvaluationInput,
 } from "@langwatch/evaluation-contract";
 import type { MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
@@ -180,7 +179,7 @@ export class TestTraceService extends TraceService {
   }
 }
 
-export class TestEvaluationService extends EvaluationServiceContract {
+export class TestEvaluationService {
   readonly executeForTrace = vi.fn(
     async (_input: ExecuteEvaluationInput): Promise<EvaluationExecutionResult> => ({
       status: "processed",

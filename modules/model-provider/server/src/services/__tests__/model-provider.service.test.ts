@@ -16,7 +16,7 @@ import { TestProjectApi } from "./test-project-api.ts";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { nowInstant, toDate } from "@langwatch/time";
-import { ModelProviderService } from "../model-provider.service.ts";
+import { ModelProviderApi } from "../model-provider.service.ts";
 import {
   ModelProviderCatalog,
   ModelProviderCredentialPolicy,
@@ -754,7 +754,7 @@ function service(
   credentialPolicy: ModelProviderCredentialPolicy = new CredentialPolicy(),
   defaults = new Defaults(),
 ) {
-  return ModelProviderService.create({
+  return ModelProviderApi.create({
     repository: providers,
     projects: new Projects(),
     organizations: new Organizations(),
@@ -770,7 +770,7 @@ function service(
   });
 }
 
-function serviceWithDefaults(defaults: Defaults): ModelProviderService {
+function serviceWithDefaults(defaults: Defaults): ModelProviderApi {
   return service(
     new Providers(),
     new Catalog(),
@@ -782,7 +782,7 @@ function serviceWithDefaults(defaults: Defaults): ModelProviderService {
   );
 }
 
-describe("ModelProviderService", () => {
+describe("ModelProviderApi", () => {
   /** @scenario An org-scoped config sets the DEFAULT for every project in that org */
   it("resolves the newest feature default through the project scope chain", async () => {
     const defaults = new Defaults();
@@ -1270,7 +1270,7 @@ describe("ModelProviderService", () => {
         description: "Translates user-supplied text into English.",
       },
     ];
-    const modelProviders = ModelProviderService.create({
+    const modelProviders = ModelProviderApi.create({
       repository: new Providers(),
       projects: new Projects(),
       organizations: new Organizations(),
@@ -1301,7 +1301,7 @@ describe("ModelProviderService", () => {
       }),
     ];
     const managed = new ManagedCatalog();
-    const modelProviders = ModelProviderService.create({
+    const modelProviders = ModelProviderApi.create({
       repository: providers,
       projects: new Projects(),
       organizations: new Organizations(),
@@ -1699,7 +1699,7 @@ describe("ModelProviderService", () => {
     const providers = new Providers();
     providers.rows = [];
     const defaults = new Defaults();
-    const modelProviders = ModelProviderService.create({
+    const modelProviders = ModelProviderApi.create({
       repository: providers,
       projects: new Projects(),
       organizations: new Organizations(),
@@ -1746,7 +1746,7 @@ describe("ModelProviderService", () => {
       },
     ];
 
-    await ModelProviderService.create({
+    await ModelProviderApi.create({
       repository: providers,
       projects: new Projects(),
       organizations: new Organizations(),

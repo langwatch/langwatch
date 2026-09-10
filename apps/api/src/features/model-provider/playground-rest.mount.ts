@@ -14,7 +14,7 @@
  * streaming response.
  */
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createPlaygroundRestApp } from "@langwatch/model-provider-server";
 
 import type {
@@ -26,7 +26,7 @@ import type {
 export function mountPlaygroundRest(options: {
   security: AppRestSecurity;
   session: ApiHandlerManagedSessionPort;
-  modelProviders: () => ModelProviderService;
+  modelProviders: () => ModelProviderApi;
   executionProxyBaseUrl: string;
 }): MountableRestApp {
   const { security, session } = options;

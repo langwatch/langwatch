@@ -1,6 +1,5 @@
 import {
   EvaluationNotFoundError,
-  EvaluationService as EvaluationServiceContract,
   evaluationInputsQuerySchema,
   evaluationRunDataSchema,
   evaluationRunLookupSchema,
@@ -38,7 +37,7 @@ export type EvaluationServiceOptions = {
 };
 
 /** One canonical Evaluation capability for API, workers and projections. */
-export class EvaluationService extends EvaluationServiceContract {
+export class EvaluationService {
   static create(options: EvaluationServiceOptions): EvaluationService {
     return new EvaluationService(options);
   }
@@ -46,7 +45,6 @@ export class EvaluationService extends EvaluationServiceContract {
   private readonly monitorPerformance: MonitorPerformanceService;
 
   private constructor(private readonly options: EvaluationServiceOptions) {
-    super();
     // The trend is composable on its own, and one process composes it that
     // way: the monitors page reads it without an executor. Delegated rather
     // than duplicated so both callers fold the same buckets the same way.

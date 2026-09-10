@@ -18,7 +18,7 @@ import type {
 } from "@langwatch/experiment-contract";
 import { createInitialUIState } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -152,7 +152,7 @@ function testEventing() {
  * project has (the dispatch's parameter strip), what a model costs (the cell's
  * price), and which cost rules the project wrote (none).
  */
-function testModelProviders(): ModelProviderService {
+function testModelProviders(): ModelProviderApi {
   return {
     getExecutionProviders: async () => [],
     getForProject: async () => ({}),
@@ -160,7 +160,7 @@ function testModelProviders(): ModelProviderService {
     prepareExecution: async () => ({}),
     listCosts: async () => [],
     estimateCost: () => 0,
-  } as unknown as ModelProviderService;
+  } as unknown as ModelProviderApi;
 }
 
 /** Keys, values and their expiries, as ioredis writes them. */

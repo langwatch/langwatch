@@ -1,4 +1,4 @@
-import type { GithubService } from "@langwatch/github-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
@@ -39,7 +39,7 @@ type PostgresGithubAdapterOptions = {
 export class PostgresGithubAdapter {
   private constructor() {}
 
-  static create(options: PostgresGithubAdapterOptions): GithubService {
+  static create(options: PostgresGithubAdapterOptions): GithubApi {
     return composeGithubApi({
       repositories: {
         installations: PrismaGithubInstallationsRepository.create(options.database),

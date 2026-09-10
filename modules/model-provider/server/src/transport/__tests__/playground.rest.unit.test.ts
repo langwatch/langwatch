@@ -7,7 +7,7 @@ import {
   createRestRuntime,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -61,7 +61,7 @@ function mount(
     caller?: Caller;
     projectHeader?: string | null;
     modelHeader?: string | null;
-    modelProviders?: Partial<ModelProviderService>;
+    modelProviders?: Partial<ModelProviderApi>;
   } = {},
 ) {
   const { app } = mountableModelProviderApp({ modelProviders: options.modelProviders ?? {} });

@@ -29,7 +29,6 @@ import {
   type ModelProviderResolution,
   type ModelProviderExecutionParameters,
   type ModelProviderExecutionPrepareInput,
-  ModelProviderService as ModelProviderServiceContract,
   type ModelProviderSummary,
   type ModelProviderTestConnectionInput,
   type ModelProviderWriteInput,
@@ -88,7 +87,7 @@ export interface ModelProviderServiceOptions {
  * The canonical contract delegates coherent read, write, defaults, and costs
  * lifecycles to private collaborators in this feature.
  */
-export class ModelProviderService extends ModelProviderServiceContract {
+export class ModelProviderService {
   private readonly commands: ModelProviderCommandService;
   private readonly codex: ModelProviderCodexService;
   private readonly costs: ModelProviderCostsService;
@@ -100,8 +99,6 @@ export class ModelProviderService extends ModelProviderServiceContract {
   private readonly writeAuthorization: ModelProviderWriteAuthorizationService;
 
   private constructor(private readonly options: ModelProviderServiceOptions) {
-    super();
-
     const authorization = ModelProviderAuthorizationService.create(options.authorization);
     const writeAuthorization = ModelProviderWriteAuthorizationService.create(authorization);
     this.writeAuthorization = writeAuthorization;

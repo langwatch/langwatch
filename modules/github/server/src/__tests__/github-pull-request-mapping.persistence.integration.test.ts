@@ -3,7 +3,7 @@
  */
 import { generateKeyPairSync } from "crypto";
 import { GithubPrismaInstaller } from "@langwatch/github-server";
-import { type GithubPullRequestEvent, type GithubService } from "@langwatch/github-contract";
+import { type GithubPullRequestEvent, type GithubApi } from "@langwatch/github-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -195,7 +195,7 @@ function branchRequest(headBranch: string, repositoryHost = "github.com") {
   };
 }
 
-async function storedFor(github: GithubService, headBranch: string, repositoryHost = "github.com") {
+async function storedFor(github: GithubApi, headBranch: string, repositoryHost = "github.com") {
   return await github.findAllByBranches({
     organizationId,
     repositoryHost,

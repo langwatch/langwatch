@@ -4,7 +4,7 @@ import {
   MASKED_KEY_PLACEHOLDER,
   tryGetModelProviderDefinition,
   type ModelProviderCredentialVerdict,
-  type ModelProviderService,
+  type ModelProviderApi,
   type ModelProviderUncheckedReason,
 } from "@langwatch/model-provider-contract";
 import {
@@ -899,7 +899,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     projectId: string;
     provider: string;
     customBaseUrl: string | undefined;
-    modelProviders: ModelProviderService;
+    modelProviders: Pick<ModelProviderApi, "tryGetProviderForProject">;
     /**
      * The process environment the fallback key is read from, passed in rather
      * than read here: a package has no environment of its own, and the caller
@@ -1061,7 +1061,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
     projectId: string;
     provider: string;
     customBaseUrl: string | undefined;
-    modelProviders: ModelProviderService;
+    modelProviders: Pick<ModelProviderApi, "tryGetProviderForProject">;
   }): Promise<ModelProviderCredentialVerdict> {
     return HttpModelProviderCredentialProbeAdapter.validateKeyWithCustomUrl({
       ...input,
@@ -1090,7 +1090,7 @@ export class UnavailableModelProviderCredentialProbeAdapter extends ModelProvide
     projectId: string;
     provider: string;
     customBaseUrl: string | undefined;
-    modelProviders: ModelProviderService;
+    modelProviders: Pick<ModelProviderApi, "tryGetProviderForProject">;
   }): Promise<ModelProviderCredentialVerdict> {
     return this.unchecked();
   }

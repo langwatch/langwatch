@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import { EvaluationService } from "@langwatch/evaluation-contract";
 import type { DerivedTraceEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { TraceService } from "@langwatch/trace-contract";
 import { AutomationSettlementFilterEvaluatorPort } from "../../ports/automation-settlement.port.ts";
@@ -11,7 +10,7 @@ function unavailable(): never {
   throw new Error("not used by this test");
 }
 
-class TestEvaluations extends EvaluationService {
+class TestEvaluations {
   readonly lookups: Array<{ tenantId: string; traceId: string }> = [];
   runs: EvaluationRunData[] = [];
 

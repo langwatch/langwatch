@@ -15,7 +15,7 @@ import type {
  * process that only prices spans can now compose it WITHOUT the rest of the
  * feature.
  *
- * The distinction is a real one. `ModelProviderService` requires an
+ * The distinction is a real one. `ModelProviderApi` requires an
  * `OrganizationService`, an `AuthzService`, a provider catalog, a translation
  * port, an id service, a credential codec, a Codex token refresher and a
  * connection rate limiter, because writing a cost authorizes a scope, minting
