@@ -17,7 +17,6 @@ import {
   type SignInMethod,
   type SignInRoutingReasonCode,
 } from "@langwatch/identity";
-import { generate } from "@langwatch/ksuid";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import {
   IdentityBackfillService,
@@ -48,8 +47,8 @@ import {
   IdentityCeremonies,
   MfaCeremonies,
 } from "@langwatch/identity-server/better-auth";
+import { generate } from "@langwatch/ksuid";
 import { RedisConfigService } from "@langwatch/redis-client";
-import { SignInLinkEvidence } from "./signin-link-evidence";
 import { compare, hash } from "bcrypt";
 import type { BetterAuthOptions } from "better-auth";
 import type { AdapterFactory } from "better-auth/adapters";
@@ -113,6 +112,7 @@ import {
   PrismaSessionFactors,
 } from "./organization-mfa-adapters";
 import { AdminEmailPlatformOperators } from "./platform-operators";
+import { PriorSessionService } from "./prior-session.service";
 import { PrismaCredentialAccountRepository } from "./repositories/credential-account.prisma.repository";
 import { PrismaIdentityAccountsRepository } from "./repositories/identity-accounts.prisma.repository";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
@@ -137,7 +137,9 @@ import { PrismaLegacySsoOrganizationRepository } from "./repositories/legacy-sso
 import { PrismaMfaEnrollmentRepository } from "./repositories/mfa-enrollment.prisma.repository";
 import { PrismaMfaEnrollmentProjectionRepository } from "./repositories/mfa-enrollment-projection.prisma.repository";
 import { PrismaPasskeyRemovalRepository } from "./repositories/passkey-removal.prisma.repository";
+import { PrismaPriorSessionRepository } from "./repositories/prior-session.prisma.repository";
 import { PrismaSignUpHealthRepository } from "./repositories/sign-up-health.prisma.repository";
+import { PrismaSignInLinkEvidenceRepository } from "./repositories/signin-link-evidence.prisma.repository";
 import {
   PrismaSignUpAccountDirectory,
   PrismaSignUpVerificationTokenStore,
@@ -163,6 +165,7 @@ import { SessionRevocationService } from "./session-revocation.service";
 import { SignUpHealthService } from "./sign-up-health.service";
 import { SignUpIdentifierService } from "./sign-up-identifier";
 import { ProjectionSignInAccountLookup } from "./signin-account-lookup";
+import { SignInLinkEvidence } from "./signin-link-evidence";
 import {
   deploymentOffersTwoStepVerification,
   resolveFederatedMethod,
@@ -264,9 +267,25 @@ export function identityService(): IdentityService {
  * is the reads it needs and the proposal a refusal leaves behind. See
  * `SignInLinkEvidence` for what it judges and what it deliberately does not.
  */
+/**
+ * Why somebody is looking at the signed-out screen, when the answer is
+ * knowable (ADR-117).
+ *
+ * Composed here rather than at the router so the query stays in the
+ * repository tier: the procedure asks a service, the service asks a port, and
+ * only the port spells Prisma. See `PriorSessionService` for what may be said
+ * about a session and why a REVOKED one answers like no session at all.
+ */
+export function priorSession(): PriorSessionService {
+  return new PriorSessionService({
+    repository: new PrismaPriorSessionRepository(prisma),
+    now: () => new Date(),
+  });
+}
+
 export function signInLinkEvidence(): SignInLinkEvidence {
   return new SignInLinkEvidence({
-    prisma,
+    repository: new PrismaSignInLinkEvidenceRepository(prisma),
     proposeLink: (input) => identityService().proposeLink(input),
     now: Date.now,
     newCommandId: newIdentityCommandId,
