@@ -324,6 +324,28 @@ function listingRequestedHandler({
       return settle({ state, after: schedulingRef(ctx) });
     }
 
+    // A disabled source is not asked, whatever the request says.
+    //
+    // Nothing upstream checks this: the command and `listableSources` both
+    // branch on source TYPE, which says a provider is capable of listing, not
+    // that this source is still connected. So a press that raced a disable —
+    // or a redelivery of one that did — reached here and dispatched a provider
+    // call against a source an administrator had just switched off.
+    //
+    // Recording the slot was the worse half. `handlePullDisabled` settles a
+    // disabled process with `nextWakeAt: null`, so there is no timer left to
+    // notice the listing never came back and free it. The slot stayed taken,
+    // and re-enabling the source found it already busy with a request that
+    // will never settle — until the stale window elapses, which needs another
+    // event to arrive before anyone can observe it.
+    //
+    // Settled rather than dropped so the schedule is still written down, and
+    // with no intent and no slot: nothing was asked, so there is nothing to
+    // wait for.
+    if (!state.enabled) {
+      return settle({ state, after: schedulingRef(ctx) });
+    }
+
     const inFlight = state[slot];
     const isBusy =
       inFlight != null &&

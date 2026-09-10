@@ -21,7 +21,7 @@
  * A refusal writes NOTHING. It is not evidence that an agent stopped existing,
  * and there is no write here that would improve on the rows already stored.
  *
- * Spec: specs/governance/governance-people-discovery.feature
+ * Spec: specs/ai-governance/dashboard/agents-page.feature
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -29,6 +29,10 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 
 import { DiscoveredAgentRepository } from "../repositories/governanceIdentity.repository";
+import {
+  type AgentListingSourceType,
+  sourceTypeCanListAgents,
+} from "./logic/agentListingProviders";
 import {
   type AgentListing,
   type AgentListingRefusal,
@@ -63,23 +67,21 @@ export type AgentSyncResult =
   | { outcome: "empty" }
   | { outcome: "refused"; refusal: AgentListingRefusal };
 
-/**
- * The source types that can list agents.
- *
- * Every other source type is a refusal rather than an error, and deliberately:
- * a screen that offers this for one source in a list must be able to say "this
- * one cannot" without the request failing. `not_configured` is the honest
- * reason — the source holds no credential this listing could use, because there
- * is no listing for its provider at all.
- */
-const AGENT_LISTING_SOURCE_TYPES: ReadonlySet<string> = new Set([
-  DATABRICKS_GENIE_ADAPTER_ID,
-  COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
-]);
+/** What every provider's lister is handed. */
+type AgentListerParams = {
+  context: SourceCredentialContext;
+  signal?: AbortSignal;
+};
 
-export function sourceTypeCanListAgents(sourceType: string): boolean {
-  return AGENT_LISTING_SOURCE_TYPES.has(sourceType);
-}
+/**
+ * Re-exported so existing callers keep one import, but OWNED by the leaf.
+ *
+ * The question "can this source type list agents" is answered from the same
+ * list the dispatch table below is keyed by, and that list lives in a module
+ * with no prisma and no adapters so the pure logic can ask it without dragging
+ * this service in.
+ */
+export { sourceTypeCanListAgents };
 
 /**
  * A sign-in failure as a listing refusal.
@@ -178,77 +180,124 @@ export class AgentDiscoveryService {
   }
 }
 
+/**
+ * The config parse sits OUTSIDE the `try` in each lister below, and has to
+ * stay there.
+ *
+ * These used to parse inside one wide `try`. The catch was written for exactly
+ * that parse -- a config that no longer matches its schema really is a source
+ * that is not set up to be asked -- and then two network calls were added
+ * inside the same block and silently inherited its verdict. Every DNS failure,
+ * TLS failure, timeout and blocked egress during sign-in was recorded as an
+ * unconfigured source, and the page told an administrator to go audit a
+ * permission that was never at fault.
+ *
+ * The comment on that catch described one case and the code covered all of
+ * them. Scoping each `try` to the network calls alone is what stops that
+ * recurring: a third provider or a fourth await inherits the safe default
+ * instead of the config verdict, without anyone remembering to.
+ */
+async function listGenieAgentsForSource({
+  context,
+  signal,
+}: AgentListerParams): Promise<AgentListing> {
+  const parsed = databricksGeniePullConfigSchema.safeParse(context.config);
+  if (!parsed.success) {
+    return agentsRefused({ reason: "not_configured", status: null });
+  }
+  const config: DatabricksGeniePullConfig = parsed.data;
+
+  try {
+    const token = await resolveWorkspaceToken({
+      credentials: context.credentials,
+      workspaceUrl: config.workspaceUrl,
+      signal,
+    });
+    return await listGenieAgents({
+      workspaceUrl: config.workspaceUrl,
+      token,
+      signal,
+    });
+  } catch (error) {
+    return agentsRefusedFromThrow(error);
+  }
+}
+
+/** Same shape as the Genie lister above, including where the `try` starts. */
+async function listCopilotAgentsForSource({
+  context,
+  signal,
+}: AgentListerParams): Promise<AgentListing> {
+  const parsed = copilotStudioDataversePullConfigSchema.safeParse(
+    context.config,
+  );
+  if (!parsed.success) {
+    return agentsRefused({ reason: "not_configured", status: null });
+  }
+  const config: CopilotStudioDataverseConfig = parsed.data;
+
+  try {
+    const token = await resolveEnvironmentToken({
+      credentials: context.credentials,
+      environmentUrl: config.environmentUrl,
+      signal,
+    });
+    return await listCopilotAgents({
+      environmentUrl: config.environmentUrl,
+      token,
+      signal,
+    });
+  } catch (error) {
+    return agentsRefusedFromThrow(error);
+  }
+}
+
+/**
+ * Every provider that can list agents, and the one function that does it.
+ *
+ * ONE LIST, because this used to be two. A set named the providers for
+ * `sourceTypeCanListAgents` and a chain of `if` blocks dispatched them, and
+ * both encoded the same fact. Adding a third provider to the set alone made
+ * every ask return `not_configured` from a screen that had just offered the
+ * button; adding it to the chain alone meant the screen never offered it.
+ * Neither mistake breaks a build and both are silent.
+ *
+ * Keyed by `AgentListingSourceType`, so the ids and the listers cannot drift:
+ * a provider added to the leaf's list and not given a lister here fails to
+ * compile, which is the only moment anybody is in a position to write one.
+ */
+const LISTER_BY_SOURCE_TYPE: Record<
+  AgentListingSourceType,
+  (params: AgentListerParams) => Promise<AgentListing>
+> = {
+  [DATABRICKS_GENIE_ADAPTER_ID]: listGenieAgentsForSource,
+  [COPILOT_STUDIO_DATAVERSE_ADAPTER_ID]: listCopilotAgentsForSource,
+};
+
+/**
+ * The same table as a `Map`, which is what the dispatch actually reads.
+ *
+ * `sourceType` arrives from a database column, and indexing an object literal
+ * with an untrusted string reaches its prototype — `constructor` would come
+ * back a function and be dispatched as a lister. `Map.get` answers undefined
+ * for every key it was not given. The Record above is kept for the
+ * exhaustiveness the compiler can only check on an object type, so this gets
+ * both: the type says the table is complete, the Map says the lookup is safe.
+ */
+const AGENT_LISTERS: ReadonlyMap<
+  string,
+  (params: AgentListerParams) => Promise<AgentListing>
+> = new Map(Object.entries(LISTER_BY_SOURCE_TYPE));
+
 /** Dispatches to the provider that owns this source type. */
-async function listAgentsForSource(params: {
-  context: SourceCredentialContext;
-  signal?: AbortSignal;
-}): Promise<AgentListing> {
-  const { context, signal } = params;
-
-  // The config parse sits OUTSIDE the `try` blocks below, and has to stay
-  // there.
-  //
-  // This function used to parse inside one wide `try`. The catch was written
-  // for exactly that parse -- a config that no longer matches its schema
-  // really is a source that is not set up to be asked -- and then two network
-  // calls were added inside the same block and silently inherited its verdict.
-  // Every DNS failure, TLS failure, timeout and blocked egress during sign-in
-  // was recorded as an unconfigured source, and the page told an administrator
-  // to go audit a permission that was never at fault.
-  //
-  // The comment on that catch described one case and the code covered all of
-  // them. Scoping each `try` to the network calls alone is what stops that
-  // recurring: a third provider or a fourth await now inherits the safe
-  // default instead of the config verdict, without anyone remembering to.
-  if (context.sourceType === DATABRICKS_GENIE_ADAPTER_ID) {
-    const parsed = databricksGeniePullConfigSchema.safeParse(context.config);
-    if (!parsed.success) {
-      return agentsRefused({ reason: "not_configured", status: null });
-    }
-    const config: DatabricksGeniePullConfig = parsed.data;
-
-    try {
-      const token = await resolveWorkspaceToken({
-        credentials: context.credentials,
-        workspaceUrl: config.workspaceUrl,
-        signal,
-      });
-      return await listGenieAgents({
-        workspaceUrl: config.workspaceUrl,
-        token,
-        signal,
-      });
-    } catch (error) {
-      return agentsRefusedFromThrow(error);
-    }
-  }
-
-  if (context.sourceType === COPILOT_STUDIO_DATAVERSE_ADAPTER_ID) {
-    const parsed = copilotStudioDataversePullConfigSchema.safeParse(
-      context.config,
-    );
-    if (!parsed.success) {
-      return agentsRefused({ reason: "not_configured", status: null });
-    }
-    const config: CopilotStudioDataverseConfig = parsed.data;
-
-    try {
-      const token = await resolveEnvironmentToken({
-        credentials: context.credentials,
-        environmentUrl: config.environmentUrl,
-        signal,
-      });
-      return await listCopilotAgents({
-        environmentUrl: config.environmentUrl,
-        token,
-        signal,
-      });
-    } catch (error) {
-      return agentsRefusedFromThrow(error);
-    }
-  }
-
-  return agentsRefused({ reason: "not_configured", status: null });
+async function listAgentsForSource(
+  params: AgentListerParams,
+): Promise<AgentListing> {
+  const lister = AGENT_LISTERS.get(params.context.sourceType);
+  // Not an error, deliberately: a screen offering this for one source in a
+  // list must be able to say "this one cannot" without the request failing.
+  if (!lister) return agentsRefused({ reason: "not_configured", status: null });
+  return lister(params);
 }
 
 /**

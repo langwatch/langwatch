@@ -47,6 +47,17 @@ const harness = vi.hoisted(() => ({
    * the proxy about any particular page.
    */
   queryResults: {} as Record<string, Record<string, unknown>>,
+  /**
+   * The resolved organization, or undefined while it is still resolving.
+   *
+   * Settable because that window is a real state of the page and not a
+   * hypothetical: every governance read is disabled until this resolves, and a
+   * disabled query reports `isLoading: false`, so the page can be asked to
+   * render before it knows whose agents it is showing.
+   */
+  organization: undefined as
+    | { id: string; slug: string; name: string; teams: unknown[] }
+    | undefined,
 }));
 
 /** The org-member floor plus the governance product grant. */
@@ -62,7 +73,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", async () => {
   return {
     useOrganizationTeamProject: () => ({
       isLoading: false,
-      organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
+      organization: harness.organization,
       organizations: [],
       project: undefined,
       hasPermission: holds,
@@ -153,6 +164,7 @@ beforeEach(() => {
   harness.requested = [];
   harness.permissions = VIEWER_PERMISSIONS;
   harness.queryResults = {};
+  harness.organization = { id: "org-1", slug: "acme", name: "ACME", teams: [] };
   // The reader has said no to the sample cards, which is what puts each
   // pane's own empty-state sentence on screen.
   window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
@@ -237,8 +249,36 @@ describe("the agents page address contract", () => {
       };
       renderAgentsAt(["/governance/agents"]);
 
+      // The spinner itself, and not only the absence of the empty state. Those
+      // two assertions alone were satisfied by a blank content pane, which is
+      // the one rendering this scenario is written to rule out: a reader who
+      // sees nothing cannot tell a wait from an answer of "none".
+      expect(screen.getByLabelText("Loading agents")).toBeVisible();
       expect(screen.queryByTestId("agents-empty")).toBeNull();
+      // Neither agents nor an empty state, which is the scenario's own wording.
+      expect(screen.queryByText("support-copilot")).toBeNull();
       expect(screen.getByRole("heading", { name: "Agents" })).toBeVisible();
+    });
+
+    /**
+     * The window before any read has started, which the loading branch missed.
+     *
+     * Every governance read is disabled until the organization resolves, and a
+     * disabled query reports `isLoading: false`. The page therefore had an
+     * un-asked read and no loading flag, fell through to the empty state, and
+     * told the reader no agent had registered — a claim about an organization
+     * it had not identified yet.
+     *
+     * `queryResults` is deliberately left alone here. The point is that the
+     * reads were never issued, so overriding their results would describe a
+     * different situation than the one that was broken.
+     */
+    it("waits rather than claiming an unresolved organization has no agents", () => {
+      harness.organization = undefined;
+      renderAgentsAt(["/governance/agents"]);
+
+      expect(screen.getByLabelText("Loading agents")).toBeVisible();
+      expect(screen.queryByTestId("agents-empty")).toBeNull();
     });
   });
 

@@ -56,10 +56,9 @@ ALTER TABLE "IngestionPullRunProjection" ADD COLUMN "lastPeopleListingStatus" IN
 -- rebuilt, because the projection is folded from the event log: replaying it
 -- after a re-apply restores every value.
 --
--- Left commented, like the sibling migrations that carry a Down block. Prisma
--- runs no down step, so an executable one here would be a statement nobody
--- calls; this is the script an operator runs by hand, kept next to the up it
--- undoes.
+-- To roll back, uncomment and run manually. Prisma runs no down step, so an
+-- executable one here would be a statement nobody calls; this is the script an
+-- operator runs by hand, kept next to the up it undoes.
 --
 -- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastAgentsListingAt";
 -- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastAgentsListingOutcome";

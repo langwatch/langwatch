@@ -12,7 +12,7 @@
  * records nothing while an empty list records nothing for a different reason
  * the caller can see.
  *
- * Spec: specs/governance/governance-people-discovery.feature
+ * Spec: specs/ai-governance/dashboard/agents-page.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
