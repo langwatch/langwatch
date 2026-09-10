@@ -1,6 +1,7 @@
 export { presenceServer } from "./presence.server.ts";
 export { presenceTrpcTransport } from "./transport/presence.trpc.ts";
 export type { PresenceInfrastructure } from "./app/presence.app.ts";
+export { presenceRepositories } from "./repositories/presence-repositories.registry.ts";
 export {
   PresenceBroadcastPort,
   PresenceDiagnosticsPort,

@@ -335,10 +335,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "presence|memory-twin-untested",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "project|persistence-adapter",
       "measured": "2026-09-08"
     },
@@ -360,10 +356,6 @@
     },
     {
       "key": "prompt|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "role|memory-twin-untested",
       "measured": "2026-09-08"
     },
     {
