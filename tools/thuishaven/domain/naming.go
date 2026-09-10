@@ -39,6 +39,14 @@ const DesignSystemService = "design-system"
 // Its lane is called mail-room too.
 const MailRoomService = "mail-room"
 
+// APIService is the Hono API's own routed hostname
+// (api.<slug>.langwatch.localhost). It is additive, not a replacement: the
+// same-origin app.<slug>.../api path (Vite's own proxy to Stack.APIPort)
+// keeps working unchanged. This hostname is a direct route to the same port
+// for tooling that wants the API without the UI dev server in front of it  - 
+// see Stack.APIPort.
+const APIService = "api"
+
 // DefaultNaming is the standard scheme: <service>.<slug>.langwatch.localhost.
 func DefaultNaming(tld string) Naming {
 	if tld == "" {

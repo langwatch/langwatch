@@ -15,10 +15,19 @@ Feature: Optional Haven hooks for coding agents
     And existing feature settings are unchanged
     And Codex retains control of hook review and trust
 
+  # The gate used to rewrite Codex's command through `haven run` because
+  # Codex's own permission system does not have the prefix-matching hazard
+  # that made Claude's gate stop rewriting. The rule is simpler than that
+  # exception: no hook rewrites the command it admits, full stop. Codex's
+  # gate now shares Claude's own message-or-deny answer, and enforcement
+  # lives in the heavy tools themselves - the compiler/lint/format/test/
+  # vitest bin shims and `make go-lint`, which already take a slot through
+  # `haven slot run` on their own.
   Scenario: Codex heavy commands use the existing Haven gate
     Given a Codex session already permits its shell command
     When a typecheck needs admission to Haven's heavy-command slot
-    Then only the command is rewritten through haven run
+    Then the command Codex runs is exactly the command it asked for
+    And Codex sees a system message describing what haven expects to happen
     And the hook adds no compiler memory or worker caps
     And an ordinary or undecided command keeps Codex's normal permission flow
 

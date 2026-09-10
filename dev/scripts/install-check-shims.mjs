@@ -24,13 +24,19 @@ import { fileURLToPath } from "node:url";
  * more — the root scripts call the binaries directly. Shimming the bin is what
  * makes the queue's accounting complete regardless of how a run was started.
  *
+ * vitest belongs for the same reason once more: a bare `vitest` or `vitest run`
+ * with no path spins up every suite in the workspace member it runs from, at
+ * the same cost as a whole-tree typecheck. Naming test files stays targeted and
+ * instant, matching the tsc rule, and `--watch` never queues - it would hold
+ * its slot for the whole session.
+ *
  * The shim's classification is tool-agnostic on purpose: a directory argument
  * or no argument at all is a whole-tree run and queues; naming files is
  * targeted and stays instant. That reads `oxfmt --write .` and `oxlint --config
  * X apps …` as whole-tree, and `oxfmt --write src/one.ts` as targeted, which is
  * the same split it already made for tsc.
  */
-export const TOOLS = ["tsgo", "tsc", "oxlint", "oxfmt"];
+export const TOOLS = ["tsgo", "tsc", "oxlint", "oxfmt", "vitest"];
 const MARKER = "langwatch-check-queue-shim";
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), "../../..");

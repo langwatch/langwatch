@@ -3,7 +3,7 @@
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
 .PHONY: dogfood-langy-local
 .PHONY: herrgen herrgen-check
-.PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-changed
+.PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-slot go-lint-changed
 .PHONY: _dev-up-deprecation-warning
 
 # Surface every target — boxd-* are pulled in via include below.
@@ -268,9 +268,16 @@ lint-rules-test:
 GOLANGCI := $(shell if command -v golangci-lint >/dev/null 2>&1 && golangci-lint --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION))"; then echo golangci-lint; else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
 GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
 
-go-lint:
-	@echo "==> golangci-lint $(GOLANGCI_VERSION)"
-	@$(GOLANGCI) run $(GO_LINT_PKGS)
+# golangci-lint saturates cores the same way a whole-tree typecheck does, so it
+# takes a slot from the same machine-wide counter (`haven slot run`) before it
+# runs, and queues behind a typecheck already running rather than piling onto
+# it. go-lint-changed stays direct: it scans only the diff against
+# origin/main, not the whole tree, and is not the cost this queue exists for.
+go-lint-slot:
+	@echo "==> golangci-lint $(GOLANGCI_VERSION) (queued through haven slot run)"
+	@$(HAVEN) slot run --label golangci-lint -- $(GOLANGCI) run $(GO_LINT_PKGS)
+
+go-lint: go-lint-slot
 
 go-lint-changed:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION) (new/changed lines only)"

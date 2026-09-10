@@ -64,7 +64,9 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		}
 		width, widthSource := domain.UnitTestFullWidth(system.New().TotalMemory(), runtime.NumCPU(), os.Getenv("HAVEN_TEST_WORKERS"))
 		fmt.Printf("unit_test_full_width=%d source=%s\n", width, widthSource)
-		explainHolders(fileregistry.New(havenHome()))
+		store := fileregistry.New(havenHome())
+		explainHolders(store)
+		explainWaiters(store)
 		return nil
 	case "run":
 		label, argv, err := parseSlotRun(inv.raw[1:])
@@ -72,12 +74,18 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 			return err
 		}
 		reportGateOffIgnored(slotCheckEnv())
+		store := fileregistry.New(havenHome())
+		agentID, caller, overrideHonored := resolvePriorityState(store)
 		job := &slotJob{
-			sem:      semaphore.New(havenHome()),
-			label:    label,
-			argv:     argv,
-			progress: os.Stderr,
-			pressure: resolveSlotPressure(),
+			sem:             semaphore.New(havenHome()),
+			label:           label,
+			argv:            argv,
+			progress:        os.Stderr,
+			pressure:        resolveSlotPressure(),
+			registry:        store,
+			caller:          caller,
+			agentID:         agentID,
+			overrideHonored: overrideHonored,
 		}
 		if code := job.run(ctx); code != 0 {
 			os.Exit(code)
@@ -85,6 +93,61 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		return nil
 	default:
 		return fmt.Errorf("unknown slot subcommand %q — use `slot run -- <cmd>` or `slot explain`", inv.raw[0])
+	}
+}
+
+// resolvePriorityState reads what the priority scheduler needs from this
+// process's own environment: HAVEN_AGENT_ID is the same signal
+// domain.CallerFromAgentID already reads out of a hook payload's agent id -
+// set means a sub-agent, absent and a terminal means an interactive person,
+// absent and no terminal means a main session. HAVEN_PRIORITY=high is an
+// agent stating this run matters; it is honored at most once per agent id
+// (empty id is its own shared bucket) per domain.PriorityOverrideWindow, and
+// an honored claim is appended to run-history.jsonl so it is visible.
+func resolvePriorityState(store *fileregistry.Store) (agentID string, caller domain.CallerKind, overrideHonored bool) {
+	agentID = os.Getenv("HAVEN_AGENT_ID")
+	caller = domain.CallerFromAgentID(agentID, stdoutIsTTY())
+	if !strings.EqualFold(strings.TrimSpace(os.Getenv("HAVEN_PRIORITY")), "high") {
+		return agentID, caller, false
+	}
+	now := time.Now()
+	last, hasLast := domain.LastPriorityClaim(store.RunHistory(), agentID)
+	if !domain.PriorityOverrideHonored(domain.PriorityOverrideRequest{Requested: true, LastHonoredAt: last, HasLast: hasLast, Now: now}) {
+		return agentID, caller, false
+	}
+	if err := store.AppendRunHistory(domain.NewPriorityClaim(agentID, now)); err != nil {
+		fmt.Fprintf(os.Stderr, "checks: could not record the HAVEN_PRIORITY=high claim (%v)\n", err)
+	}
+	return agentID, caller, true
+}
+
+// explainWaiters prints who is currently queued for the shared slot: each
+// waiter's class, how long it has waited, and its effective priority right
+// now - the ordering `haven slot run` is actually scheduling by.
+func explainWaiters(store *fileregistry.Store) {
+	waiters := store.WaiterSnapshots(checkSlotName)
+	if len(waiters) == 0 {
+		fmt.Println("waiters: none")
+		return
+	}
+	now := time.Now()
+	for _, w := range waiters {
+		waited := now.Sub(w.QueuedAt)
+		state := domain.WaiterState{Caller: w.Caller, Waited: waited, OverrideHonored: w.OverrideHonored}
+		fmt.Printf("waiter: %s, waited %s, priority %d\n", callerLabel(w.Caller), formatSlotWait(waited), state.Priority())
+	}
+}
+
+// callerLabel is the human name for a CallerKind, for `haven slot explain`'s
+// waiter lines.
+func callerLabel(c domain.CallerKind) string {
+	switch c {
+	case domain.Interactive:
+		return "person"
+	case domain.MainSession:
+		return "main session"
+	default:
+		return "sub-agent"
 	}
 }
 
@@ -261,6 +324,15 @@ type slotAcquirer interface {
 	TryAcquire(name string, slots int) (release func(), slot int, ok bool, err error)
 }
 
+// waiterRegistry is what a slot job needs to register itself as queued and
+// see who else currently is - the priority scheduler
+// (specs/setup/check-slots.feature, "Priority with aging"), kept as its own
+// small interface so a test can pass a fake without a real home directory.
+type waiterRegistry interface {
+	ClaimWaiter(pid int, name string, claim fileregistry.WaiterClaim) (func(), error)
+	WaiterSnapshots(name string) []fileregistry.WaiterSnapshot
+}
+
 // slotJob is one command's trip through the queue: what to run, how the run
 // is named to a human, where progress lines go, and the wait state the
 // announcements are computed from.
@@ -270,6 +342,16 @@ type slotJob struct {
 	argv     []string
 	progress io.Writer
 	pressure domain.Pressure
+
+	// registry, caller, agentID and overrideHonored are all optional: a nil
+	// registry (every existing call site that builds a slotJob directly, and
+	// every test that does not care about priority) skips waiter registration
+	// entirely and behaves exactly as it always has - first past the flock
+	// wins, same as before this existed.
+	registry        waiterRegistry
+	caller          domain.CallerKind
+	agentID         string
+	overrideHonored bool
 
 	slots     int
 	queuedAt  time.Time
@@ -305,13 +387,10 @@ func (j *slotJob) run(ctx context.Context) int {
 // proceeds without one (semaphore failure or the maximum wait elapsed — both
 // already reported); canceled means the context ended the wait.
 func (j *slotJob) wait(ctx context.Context) (release func(), canceled bool) {
+	unregister := j.registerWaiter()
+	defer unregister()
 	for {
-		rel, _, ok, err := j.sem.TryAcquire(checkSlotName, j.slots)
-		if err != nil {
-			fmt.Fprintf(j.progress, "checks: queue unavailable (%v), running without a slot\n", err)
-			return nil, false
-		}
-		if ok {
+		if rel, done := j.attemptAcquire(); done {
 			return rel, false
 		}
 		waited := time.Since(j.queuedAt)
@@ -328,6 +407,72 @@ func (j *slotJob) wait(ctx context.Context) (release func(), canceled bool) {
 		case <-time.After(slotPollInterval):
 		}
 	}
+}
+
+// attemptAcquire is one poll tick's worth of trying for the slot: a higher-
+// priority waiter (if any is registered) means sitting this tick out
+// entirely, and a semaphore error is treated the same as a granted slot -
+// both end the wait, one with something to run under and one without. done
+// is true whenever wait should stop looping, whatever the result; release is
+// only ever non-nil alongside done.
+func (j *slotJob) attemptAcquire() (release func(), done bool) {
+	if j.shouldYieldToHigherPriority() {
+		return nil, false
+	}
+	rel, _, ok, err := j.sem.TryAcquire(checkSlotName, j.slots)
+	if err != nil {
+		fmt.Fprintf(j.progress, "checks: queue unavailable (%v), running without a slot\n", err)
+		return nil, true
+	}
+	if ok {
+		return rel, true
+	}
+	return nil, false
+}
+
+// registerWaiter records this run as queued for name's slot, so every other
+// waiter's priority scheduler can see it and compare itself against it. A
+// registry error, or none at all wired, degrades to no registration: this
+// run still competes for the slot exactly as before, it simply never yields
+// to anyone and nobody yields to it.
+func (j *slotJob) registerWaiter() func() {
+	if j.registry == nil {
+		return func() {}
+	}
+	release, err := j.registry.ClaimWaiter(os.Getpid(), checkSlotName, fileregistry.WaiterClaim{
+		Command:         strings.Join(j.argv, " "),
+		Caller:          j.caller,
+		AgentID:         j.agentID,
+		QueuedAt:        j.queuedAt,
+		OverrideHonored: j.overrideHonored,
+	})
+	if err != nil {
+		return func() {}
+	}
+	return release
+}
+
+// shouldYieldToHigherPriority reports that some other run queued for the
+// same slot right now has a strictly higher effective priority than this one
+// does - class, aging and an honored HAVEN_PRIORITY=high claim, all as
+// domain.EffectivePriority weighs them. With no registry wired this is
+// always false, which is what keeps every call site that never opted in
+// unchanged.
+func (j *slotJob) shouldYieldToHigherPriority() bool {
+	if j.registry == nil {
+		return false
+	}
+	now := time.Now()
+	self := domain.WaiterState{Caller: j.caller, Waited: now.Sub(j.queuedAt), OverrideHonored: j.overrideHonored}
+	pid := os.Getpid()
+	var others []domain.WaiterState
+	for _, w := range j.registry.WaiterSnapshots(checkSlotName) {
+		if w.PID == pid {
+			continue
+		}
+		others = append(others, domain.WaiterState{Caller: w.Caller, Waited: now.Sub(w.QueuedAt), OverrideHonored: w.OverrideHonored})
+	}
+	return domain.ShouldYield(self, others)
 }
 
 // report announces a queued run once, then heartbeats so a long wait never

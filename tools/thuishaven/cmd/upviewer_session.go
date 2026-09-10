@@ -27,7 +27,7 @@ func (m *viewerModel) dashboardBody() string {
 
 	b.WriteString(" " + m.stackLine() + "\n\n")
 
-	b.WriteString(" \x1b[1mSERVICES\x1b[0m  \x1b[2m↑↓ move · enter opens its logs · r restart · a restart all\x1b[0m\n")
+	b.WriteString(" \x1b[1mSERVICES\x1b[0m  \x1b[2m↑↓ move · enter opens its logs · o/shift+enter opens its URL · r restart · a restart all\x1b[0m\n")
 	for i, svc := range m.snap.Services {
 		b.WriteString(m.serviceRow(i, svc) + "\n")
 	}

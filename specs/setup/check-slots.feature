@@ -479,3 +479,102 @@ Feature: Machine-wide slots for whole-repo checks
     When a run is queued behind another
     Then it reports being queued behind 1 run
     And it says nothing about how long the wait might be, exactly as before the estimate existed
+
+  # --- vitest joins the shimmed tools ---
+
+  # A bare `vitest` or `vitest run` with no path spins up every suite in the
+  # workspace member it runs from, at the same cost as a whole-tree
+  # typecheck - and until now it was the one gap the gate's own prediction
+  # could describe but nothing downstream enforced. vitest now takes a slot
+  # through `haven slot run` on its own, the same way tsc/tsgo/oxlint/oxfmt
+  # already do, so the gate's prediction and the enforcement agree for every
+  # heavy command it classifies.
+  #
+  # The mechanism (dev/scripts/install-check-shims.mjs, TOOLS) is shared,
+  # tool-agnostic code already proven for tsc/tsgo/oxlint/oxfmt by
+  # packages/architecture-lint/tests/check-shims.test.ts, which is outside
+  # this lane's touched paths for this change. Tagged @unimplemented here
+  # rather than left silently unbound: the code change (vitest added to
+  # TOOLS) shipped in this change, the dedicated test naming vitest did not.
+
+  @unimplemented
+  Scenario: vitest takes a slot on its own, the same way tsc and oxlint do
+    Given the check-shims installer has shimmed vitest beside tsc, tsgo, oxlint and oxfmt
+    When a bare "vitest" or "vitest run" with no path is run
+    Then it counts against the machine-wide check slot
+    And "vitest run src/foo.test.ts" naming a real file stays instant and unqueued
+    And "vitest --watch" starts without waiting, because it holds its slot for the whole session
+
+  # --- Priority with ageing ---
+
+  # The shared slot used to serve waiters strictly in arrival order. A person
+  # is worth more than an agent's own turn: their wait is not backed by a
+  # prompt cache with its own clock running out, and nobody wants to watch a
+  # laptop finish somebody else's queued sub-agent before their own `pnpm
+  # test:unit` starts. domain.CallerKind already ranks who is asking -
+  # Interactive above MainSession above SubAgent; this adds two things on
+  # top: a queued run's effective priority rises with how long it has
+  # waited, so a lower-ranked run is never starved forever, only ever slower
+  # than a caller who has waited exactly as long; and an agent's own
+  # HAVEN_PRIORITY=high claim that a run matters, metered so it is a claim
+  # and not a lever. Same-rank waiters keep arrival order in practice: ageing
+  # is monotonic with wait time, so the one that queued first keeps a strictly
+  # higher effective priority at every check, all the way to a tie only the
+  # flock itself resolves.
+
+  @unit
+  Scenario: Priority classes rank a person above a main session above a sub-agent
+    Given a sub-agent and a person queued for the same slot at the same moment
+    When the slot frees
+    Then the person's effective priority outranks the sub-agent's
+    And the sub-agent yields its attempt on that poll tick to the person
+
+  @unit
+  Scenario: A queued run's effective priority rises with how long it has waited
+    Given a run that has been queued for a while
+    When its effective priority is computed again
+    Then it is higher than it was when the run had waited less
+    And ageing never adds more than one caller-rank's worth on its own
+
+  @unit
+  Scenario: Aging alone lets a sub-agent catch up to a main session, never past a person waiting the same time
+    Given a sub-agent that has waited long enough for ageing to reach its cap
+    When its effective priority is compared to a main session that just queued
+    Then the two are equal
+    But a person who queued at the same moment as the sub-agent still outranks it
+
+  @unit
+  Scenario: An explicit HAVEN_PRIORITY=high raises effective priority by one class step
+    Given two otherwise identical queued runs, one with an honored HAVEN_PRIORITY=high claim
+    When their effective priorities are compared
+    Then the claiming run's priority is higher by exactly one caller-rank's worth
+    And the claim alone never lets a sub-agent outrank a person who queued at the same moment
+
+  @unit
+  Scenario: An honored HAVEN_PRIORITY=high claim is limited to once per agent id per 10 minutes
+    Given an agent id whose claim was already honored
+    When the same agent id claims HAVEN_PRIORITY=high again inside 10 minutes
+    Then the second claim is refused
+    And a claim from the same agent id 10 minutes or more after the first is honored again
+
+  @unit
+  Scenario: An explicit HAVEN_PRIORITY=high in the caller's environment lets an agent state that this run matters
+    Given a caller sets HAVEN_PRIORITY=high in its own shell environment before a shimmed command runs
+    When the claim is honored
+    Then the run's effective priority carries the override for the rest of its own wait
+    And an honored claim is written to run-history.jsonl so it is visible
+    And with HAVEN_PRIORITY unset, or a claim inside the metering window, nothing is claimed and nothing is written
+
+  @unit
+  Scenario: haven slot explain shows each holder and waiter with class, age and effective priority
+    Given at least one run holding the shared slot and at least one run queued behind it
+    When "haven slot explain" runs
+    Then each holder is listed with its own kind and how long it has held the slot
+    And each waiter is listed with its caller class, how long it has waited, and its effective priority right now
+
+  @unit
+  Scenario: Priority scheduling is additive: with no registry wired, nothing yields
+    Given a slot run built with no waiter registry at all
+    When it decides whether to yield this poll tick
+    Then it never yields
+    And it behaves exactly as the queue did before priority scheduling existed

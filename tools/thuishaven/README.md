@@ -17,6 +17,7 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | Hostname                                | Service                                 |
 | --------------------------------------- | --------------------------------------- |
 | `app.<slug>.langwatch.localhost`        | App — the UI, **and its API at `/api`** |
+| `api.<slug>.langwatch.localhost`        | The API, direct - additive alongside `app.<slug>.../api`, not a replacement |
 | `gateway.<slug>.langwatch.localhost`    | AI Gateway (Go)                         |
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                         |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database  |
@@ -33,11 +34,14 @@ The design system answers to a shorter spelling too: `ds` stands in for
 `design-system`. The mail studio has no alias — its hostname is
 `mail-room.<slug>`, full stop.
 
-The **app and its API are one origin**: open `app.<slug>.langwatch.localhost` for
-the UI and hit `app.<slug>.langwatch.localhost/api` for the API. There is no
-separate `api.<slug>` hostname — the frontend and backend never split into two
-confusable URLs. Vite serves the SPA and proxies `/api` (plus `/mcp`, `/sse`,
-`/oauth`, `/.well-known/*`) to the API backend on loopback.
+The **app and its API share one origin** for the browser: open
+`app.<slug>.langwatch.localhost` for the UI and hit
+`app.<slug>.langwatch.localhost/api` for the API - Vite serves the SPA and
+proxies `/api` (plus `/mcp`, `/sse`, `/oauth`, `/.well-known/*`) to the API
+backend on loopback. `api.<slug>.langwatch.localhost` additionally routes
+straight to that same backend, no UI dev server in front of it - a direct
+route for a CLI, a script, or an agent that wants the API and nothing else.
+It does not replace the app's own `/api` path; both point at the same port.
 
 Shared, machine-wide (one daemon serves all worktrees):
 
@@ -130,8 +134,14 @@ haven hmr        AI-gated HMR: `on [--ttl 30s]` defers Vite reloads, `off` resum
 haven slot       run any command under the machine-wide check slot:
                  `slot run [--label <l>] -- <cmd> [args…]` waits for a slot,
                  runs with stdio passed through, releases; `slot explain`
-                 prints the resolved limit. check-queue.mjs delegates every
-                 whole-repo check here when haven is installed
+                 prints the resolved limit plus every current holder and
+                 waiter (class, age, effective priority). check-queue.mjs
+                 delegates every whole-repo check here when haven is
+                 installed, and so do the tsc/tsgo/oxlint/oxfmt/vitest bin
+                 shims and `make go-lint`. A queued run's priority ages the
+                 longer it waits, so a sub-agent is never starved forever;
+                 HAVEN_PRIORITY=high states a run matters, honoured once per
+                 agent id every ten minutes
 haven typecheck  pnpm typecheck under a machine-wide RAM slot
 haven upgrade    reinstall the haven binary from this checkout
 haven help       exhaustive, copy-pasteable reference

@@ -28,17 +28,25 @@ const (
 )
 
 // RunRecord is one completed heavy run - the unit the wait estimate and the
-// per-holder "how long left" figure are both built from.
+// per-holder "how long left" figure are both built from. It also carries an
+// honored HAVEN_PRIORITY=high claim (see priority.go): AgentID and
+// PriorityOverride are set only on that marker shape, appended at the moment
+// the claim is honored rather than when a run completes, with ExitCode
+// PriorityClaimExitCode so it is invisible to every duration estimate.
 type RunRecord struct {
-	Kind      HistoryKind   `json:"kind"`
-	StartedAt time.Time     `json:"startedAt"`
-	Duration  time.Duration `json:"duration"`
-	ExitCode  int           `json:"exitCode"`
+	Kind             HistoryKind   `json:"kind"`
+	StartedAt        time.Time     `json:"startedAt"`
+	Duration         time.Duration `json:"duration"`
+	ExitCode         int           `json:"exitCode"`
+	AgentID          string        `json:"agentId,omitempty"`
+	PriorityOverride bool          `json:"priorityOverride,omitempty"`
 }
 
 // Succeeded reports whether this run exited cleanly. Only a completed run
 // that succeeded is evidence of how long its kind usually takes - the same
-// principle ObserveDuration already applies to the narrowing estimate.
+// principle ObserveDuration already applies to the narrowing estimate. A
+// priority-claim marker (ExitCode PriorityClaimExitCode) is never a completed
+// run and never succeeds, so it can never enter a duration estimate.
 func (r RunRecord) Succeeded() bool { return r.ExitCode == 0 }
 
 // RunHistoryCap is how many recent runs the history keeps. Old enough entries

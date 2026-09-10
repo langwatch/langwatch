@@ -308,6 +308,51 @@ func TestDashboardEnterFallsBackToCombined(t *testing.T) {
 	}
 }
 
+// @scenario "o and shift+enter open the highlighted row's URL"
+func TestDashboardOpensSelectedURL(t *testing.T) {
+	t.Run("given the highlighted service has a URL", func(t *testing.T) {
+		for _, k := range []string{"o", "shift+enter"} {
+			t.Run(k, func(t *testing.T) {
+				m := dashModel(t, []app.SessionServiceStatus{
+					{Name: "app", URL: "https://app.feat-x.langwatch.localhost"},
+				}, nil)
+				var opened []string
+				m.openURL = func(url string) error { opened = append(opened, url); return nil }
+
+				m.handleKey(k)
+
+				if len(opened) != 1 || opened[0] != "https://app.feat-x.langwatch.localhost" {
+					t.Fatalf("%q must open the highlighted row's own URL, got %v", k, opened)
+				}
+				if m.toast == "" {
+					t.Error("opening a URL must leave the operator some feedback")
+				}
+			})
+		}
+	})
+
+	t.Run("given the highlighted service has no URL", func(t *testing.T) {
+		m := dashModel(t, []app.SessionServiceStatus{{Name: "workers", Port: 6002}}, nil)
+		called := false
+		m.openURL = func(string) error { called = true; return nil }
+
+		m.handleKey("o")
+
+		if called {
+			t.Fatal("a row with no URL has nothing to open")
+		}
+	})
+}
+
+// @scenario "o and shift+enter open the highlighted row's URL"
+func TestDashboardFooterNamesTheOpenKey(t *testing.T) {
+	m := dashModel(t, []app.SessionServiceStatus{{Name: "app", URL: "https://app.feat-x.langwatch.localhost"}}, nil)
+	body := m.dashboardBody()
+	if !strings.Contains(body, "o/shift+enter") {
+		t.Errorf("the services hint must name the open-URL key, got %q", body)
+	}
+}
+
 // @scenario "Restarting a service from the dashboard bounces just that one"
 func TestDashboardRestartDispatch(t *testing.T) {
 	t.Run("given a restartable service under the cursor", func(t *testing.T) {

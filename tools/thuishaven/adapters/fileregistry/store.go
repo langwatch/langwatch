@@ -435,6 +435,111 @@ func (s *Store) ClaimHeavyRun(pid int, command string) (func(), error) {
 	return func() { _ = os.Remove(path) }, nil
 }
 
+func (s *Store) waitersDir(name string) string { return filepath.Join(s.home, "waiters", name) }
+
+// WaiterClaimTTL is how long a queued-run marker is believed. Comfortably
+// above domain.LongFailsafe (the longest anything waits before running
+// anyway), so a live, still-waiting run is never mistaken for a stale one.
+const WaiterClaimTTL = 2 * time.Hour
+
+// WaiterClaim is one queued run's registration - what the priority scheduler
+// (specs/setup/check-slots.feature, "Priority with aging") needs to compare
+// it against every other current waiter.
+type WaiterClaim struct {
+	Command         string            `json:"command"`
+	Caller          domain.CallerKind `json:"caller"`
+	AgentID         string            `json:"agentId,omitempty"`
+	QueuedAt        time.Time         `json:"queuedAt"`
+	OverrideHonored bool              `json:"overrideHonored,omitempty"`
+}
+
+// WaiterSnapshot is one currently-queued run, as WaiterClaim plus the pid it
+// was registered under - what lets a caller exclude its own registration
+// when it compares itself against everyone else waiting.
+type WaiterSnapshot struct {
+	PID int
+	WaiterClaim
+}
+
+// ClaimWaiter registers this process as queued for name's slot. The release
+// removes the marker; unlike a heavy-run claim there is nothing here to
+// resume from a crash - a queued run that dies simply stops competing, which
+// a dropped pid file already expresses with no further bookkeeping.
+func (s *Store) ClaimWaiter(pid int, name string, claim WaiterClaim) (func(), error) {
+	dir := s.waitersDir(name)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return func() {}, err
+	}
+	path := filepath.Join(dir, strconv.Itoa(pid)+".json")
+	b, err := json.Marshal(claim)
+	if err != nil {
+		return func() {}, err
+	}
+	if err := writeFileAtomic(path, b, 0o644); err != nil {
+		return func() {}, err
+	}
+	return func() { _ = os.Remove(path) }, nil
+}
+
+// WaiterSnapshots lists every run currently queued for name's slot, across
+// every worktree and terminal. Same liveness rule as HeavyRunSnapshots: a
+// dead pid or an expired marker is swept as it is found rather than reported,
+// and a marker this cannot parse is dropped rather than reaching code that
+// assumes its fields.
+func (s *Store) WaiterSnapshots(name string) []WaiterSnapshot {
+	dir := s.waitersDir(name)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var out []WaiterSnapshot
+	for _, e := range entries {
+		if snap, ok := waiterFromEntry(dir, e.Name()); ok {
+			out = append(out, snap)
+		}
+	}
+	return out
+}
+
+// waiterFromEntry reads one waiter marker file, sweeping it away and
+// reporting ok=false whenever it is not a live, current waiter: not a pid at
+// all, a dead process, unparseable, or a marker past WaiterClaimTTL.
+func waiterFromEntry(dir, name string) (WaiterSnapshot, bool) {
+	pid, err := strconv.Atoi(strings.TrimSuffix(name, ".json"))
+	if err != nil {
+		return WaiterSnapshot{}, false
+	}
+	path := filepath.Join(dir, name)
+	if !processAlive(pid) {
+		_ = os.Remove(path)
+		return WaiterSnapshot{}, false
+	}
+	claim, ok := readWaiterClaim(path)
+	if !ok {
+		return WaiterSnapshot{}, false
+	}
+	if age := time.Since(claim.QueuedAt); age < 0 || age > WaiterClaimTTL {
+		_ = os.Remove(path)
+		return WaiterSnapshot{}, false
+	}
+	return WaiterSnapshot{PID: pid, WaiterClaim: claim}, true
+}
+
+// readWaiterClaim reads and parses one waiter marker. ok is false when the
+// file cannot be read or parsed at all - the caller drops it rather than
+// reaching code that assumes its fields.
+func readWaiterClaim(path string) (WaiterClaim, bool) {
+	b, err := os.ReadFile(path) // #nosec G304 -- path is built from haven's own home dir
+	if err != nil {
+		return WaiterClaim{}, false
+	}
+	var claim WaiterClaim
+	if json.Unmarshal(b, &claim) != nil || claim.QueuedAt.IsZero() {
+		return WaiterClaim{}, false
+	}
+	return claim, true
+}
+
 // processAlive reports whether a pid is a live process. Signal 0 tests for
 // existence without delivering anything; EPERM means it exists but belongs to
 // someone else, which still counts as occupied — a heavy run started under

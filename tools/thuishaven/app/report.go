@@ -160,9 +160,10 @@ type stackStatus struct {
 	// Services shadows the embedded record's list to add per-service liveness.
 	Services []serviceStatus `json:"services"`
 	// Lanes are the three Node applications the stack supervises. The routed
-	// Services list cannot answer this on its own: only `ui` has a hostname —
-	// api and workers hold loopback ports — so a reader asking "is this stack
-	// actually running the whole application" had nowhere to look.
+	// Services list cannot answer this on its own: `ui` and (additively) `api`
+	// have their own hostnames, but the worker lane holds only a loopback
+	// metrics port, so a reader asking "is this stack actually running the
+	// whole application" had nowhere to look for it.
 	Lanes []laneStatus `json:"lanes"`
 }
 

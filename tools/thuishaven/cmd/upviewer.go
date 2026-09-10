@@ -113,7 +113,13 @@ type viewerModel struct {
 	preferred string
 
 	// session, when set, drives the leading dashboard tab.
-	session       *sessionActions
+	session *sessionActions
+	// openURL launches the highlighted service's own URL in the browser ("o"
+	// or shift+enter on the session tab) - a field rather than calling
+	// openInBrowser directly, the same seam viewer.Sources.Open already is
+	// for the traces and profiles tabs, so a test can hand it a spy instead
+	// of actually shelling out to `open`/`xdg-open`.
+	openURL       func(url string) error
 	snap          app.SessionReport
 	cursor        int    // highlighted service row on the dashboard
 	destroyOnQuit bool   // play's contract, for the dashboard footer copy
@@ -164,6 +170,7 @@ func newViewerModel(slug, combined, capDir string) *viewerModel {
 		seen:        map[string]time.Time{},
 		now:         time.Now,
 		hoverRow:    -1,
+		openURL:     openInBrowser,
 		banner:      fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · X stops it\x1b[0m\n", slug),
 	}
 	m.install(m.sources(combined, capDir))
@@ -447,6 +454,9 @@ func (m *viewerModel) handleDashboardKey(s string) (tea.Model, tea.Cmd, bool) {
 	case "enter":
 		m.openSelectedLogs()
 		return m, nil, true
+	case "o", "shift+enter":
+		m.openSelectedURL()
+		return m, nil, true
 	case "r":
 		return m, m.restartSelected(), true
 	case "a":
@@ -649,6 +659,28 @@ func (m *viewerModel) openSelectedLogs() {
 	if svc, ok := m.selectedService(); ok {
 		m.logs.SelectSubTab(svc.Name)
 	}
+}
+
+// openSelectedURL opens the highlighted service's own URL in the browser -
+// "o" or shift+enter, the session tab's other action on the highlighted row
+// besides enter's "open its logs". Silent when the row has no URL at all (a
+// service reached only by loopback port, not a routed hostname) or the OS
+// opener could not be started - a toast for a background action nobody is
+// blocked on would outlive its own usefulness.
+func (m *viewerModel) openSelectedURL() {
+	svc, ok := m.selectedService()
+	if !ok || svc.URL == "" {
+		return
+	}
+	open := m.openURL
+	if open == nil {
+		open = openInBrowser
+	}
+	if err := open(svc.URL); err != nil {
+		m.setToast("could not open " + svc.URL)
+		return
+	}
+	m.setToast("opened " + svc.URL)
 }
 
 func (m *viewerModel) restartSelected() tea.Cmd {

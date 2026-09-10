@@ -91,3 +91,15 @@ Feature: haven up terminal viewer — scroll and search
     Then the earlier capture moves to its kept generation
     And the tab and haven logs read only this up's lines
     And a lane restarted within the same up keeps appending to the same capture
+
+  # The session tab already lets "enter" jump from a highlighted service to
+  # its own logs. Opening its URL is the same idea for the other thing a
+  # developer wants from a highlighted row: to look at it in a browser,
+  # without leaving the terminal to go find and type the hostname.
+  Scenario: o and shift+enter open the highlighted row's URL
+    Given the developer is on the session tab with a service row highlighted
+    When the developer presses "o", or shift+enter
+    Then the highlighted row's own URL opens in the browser (macOS "open",
+      Linux "xdg-open")
+    And the footer key line names it
+    And a row with no URL of its own (a loopback-only port) has nothing to open

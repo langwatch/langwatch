@@ -140,3 +140,21 @@ Feature: The local development topology
     When a developer names "gateway" or "nlp" to restart
     Then the command is refused with the restartable list
     And "go" is the name that bounces them
+
+  # --- The api.<slug> hostname ---
+
+  # The backend lane's API has always been reachable at app.<slug>.../api  - 
+  # Vite proxies /api to the api process's own loopback port, so the browser
+  # and its API share one origin. That stays exactly as it is: this hostname
+  # is additive, a second, direct way to the same port for tooling (a CLI, a
+  # script, an agent) that wants the API with no dev-server proxy in front of
+  # it, not a replacement for the browser's own path.
+  @unit
+  Scenario: The additive api.<slug> hostname routes to the api process
+    Given a running stack
+    When the stack is provisioned
+    Then api.<slug>.langwatch.localhost routes to the same port as app.<slug>.../api
+    And app.<slug>.../api keeps working exactly as it did before
+    And "haven status" lists api.<slug>.langwatch.localhost as the backend URL
+    And tools/havenrun's layout-aware readiness is unaffected, because it reads
+      lanes, not the routed services list

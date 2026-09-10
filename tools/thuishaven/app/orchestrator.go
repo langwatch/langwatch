@@ -244,6 +244,28 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 			}
 		}
 	}
+	// The Hono API additionally gets its own routed hostname
+	// (api.<slug>.langwatch.localhost, domain.APIService), alongside the
+	// same-origin app.<slug>.../api path Vite still proxies - additive, not a
+	// replacement, so nothing that already reaches the API through app's own
+	// origin changes. Unlike gateway/nlp/langyagent, the API never opts out:
+	// it runs wherever app does, so its port is always live once APIPort is.
+	if st.APIPort != 0 {
+		apiSvc := domain.Service{
+			Name:     domain.APIService,
+			Role:     "Hono API - its own hostname, alongside app.<slug>.../api",
+			Port:     st.APIPort,
+			Hostname: o.cfg.Naming.Hostname(domain.APIService, slug),
+		}
+		scheme, port := o.serviceEndpoint(proxyScheme, proxyPort, apiSvc.Port)
+		apiSvc.URL = o.cfg.Naming.URL(domain.APIService, slug, scheme, port)
+		st.Services = append(st.Services, apiSvc)
+		if !o.cfg.PortlessDisabled {
+			if err := o.proxy.Register(domain.APIService, slug, apiSvc.Port); err != nil {
+				o.log.Warn("alias registration failed", zap.String("host", apiSvc.Hostname), zap.Error(err))
+			}
+		}
+	}
 	if shouldManageDBs {
 		o.ensureClickHouse(ctx, &st)
 		o.ensurePostgres(ctx, &st)
@@ -1076,8 +1098,10 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 			target = fmt.Sprintf("baseline :%d", s.Port)
 		}
 		fmt.Printf("    %-10s %s  ->  %s\n", s.Name, s.URL, target)
-		// The API shares app's origin — surface it right under app so the single
-		// URL is obvious (no separate api.<slug> hostname to reach for).
+		// The same-origin path stays worth its own line too, even though api
+		// also gets its own row further down (domain.APIService, appended to
+		// st.Services after this loop): app.<slug>.../api is what the browser
+		// and existing tooling reach the API through day to day.
 		if s.Name == "app" && st.APIPort != 0 {
 			fmt.Printf("    %-10s %s/api  ->  127.0.0.1:%d\n", "└ api", s.URL, st.APIPort)
 		}

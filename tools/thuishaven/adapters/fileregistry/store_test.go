@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -293,5 +294,92 @@ func TestReapEventsPersistBoundedNewestLast(t *testing.T) {
 	}
 	if events[0].At.Equal(time.Unix(0, 0)) {
 		t.Fatal("the oldest event past the cap must be dropped")
+	}
+}
+
+// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+func TestWaiterSnapshotsListsLiveRegistrations(t *testing.T) {
+	s := New(t.TempDir())
+
+	if got := s.WaiterSnapshots("checks"); got != nil {
+		t.Fatalf("an empty registry must report no waiters, got %v", got)
+	}
+
+	queuedAt := time.Now().Add(-90 * time.Second)
+	release, err := s.ClaimWaiter(os.Getpid(), "checks", WaiterClaim{
+		Command:  "pnpm test:unit",
+		Caller:   domain.SubAgent,
+		AgentID:  "agent_7",
+		QueuedAt: queuedAt,
+	})
+	if err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	defer release()
+
+	got := s.WaiterSnapshots("checks")
+	if len(got) != 1 {
+		t.Fatalf("expected 1 waiter, got %d", len(got))
+	}
+	if got[0].PID != os.Getpid() || got[0].Caller != domain.SubAgent || got[0].AgentID != "agent_7" {
+		t.Fatalf("waiter snapshot lost its own fields: %+v", got[0])
+	}
+	if !got[0].QueuedAt.Equal(queuedAt) {
+		t.Fatalf("queuedAt = %v, want %v", got[0].QueuedAt, queuedAt)
+	}
+
+	release()
+	if got := s.WaiterSnapshots("checks"); len(got) != 0 {
+		t.Fatalf("a released waiter must not still be listed, got %v", got)
+	}
+}
+
+// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+func TestWaiterSnapshotsDropsDeadAndExpiredEntries(t *testing.T) {
+	s := New(t.TempDir())
+	dir := s.waitersDir("checks")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// A pid nothing alive uses.
+	deadPID := 999999
+	writeWaiterFixture(t, dir, deadPID, WaiterClaim{Command: "x", QueuedAt: time.Now()})
+
+	// A live pid (this test process) whose marker is far older than the TTL.
+	writeWaiterFixture(t, dir, os.Getpid(), WaiterClaim{Command: "x", QueuedAt: time.Now().Add(-3 * WaiterClaimTTL)})
+
+	if got := s.WaiterSnapshots("checks"); len(got) != 0 {
+		t.Fatalf("a dead pid and an expired marker must both be dropped, got %v", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, strconv.Itoa(deadPID)+".json")); !os.IsNotExist(err) {
+		t.Fatal("a dead pid's marker must be swept as it is found")
+	}
+}
+
+// @scenario "A malformed entry from another branch cannot crash the queue"
+func TestWaiterSnapshotsDropsAnUnparseableEntry(t *testing.T) {
+	s := New(t.TempDir())
+	dir := s.waitersDir("checks")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, strconv.Itoa(os.Getpid())+".json"), []byte("not json"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	if got := s.WaiterSnapshots("checks"); len(got) != 0 {
+		t.Fatalf("a malformed entry must be dropped rather than crash the reader, got %v", got)
+	}
+}
+
+func writeWaiterFixture(t *testing.T, dir string, pid int, claim WaiterClaim) {
+	t.Helper()
+	b, err := json.Marshal(claim)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, strconv.Itoa(pid)+".json"), b, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
 	}
 }

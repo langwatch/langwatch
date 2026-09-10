@@ -49,8 +49,8 @@ func bashPayload(command string) map[string]any {
 }
 
 // askCodex runs one hook payload through Codex's own gate and decodes the
-// reply - GateCodex, not Gate, because Codex is still the one wire format
-// that rewrites the command.
+// reply - GateCodex projects Codex's own wire shape, but shares every
+// admission decision with Gate and, like Gate, never rewrites the command.
 func askCodex(t *testing.T, o *Orchestrator, payload map[string]any) hookReply {
 	t.Helper()
 	in, err := json.Marshal(payload)
@@ -137,8 +137,9 @@ func TestClaudeGateNeverRewritesTheCommand(t *testing.T) {
 	})
 }
 
-// @scenario "The rewrap carries the decision it was given"
-func TestCodexGateRewriteCarriesWhatItDecided(t *testing.T) {
+// @scenario "Codex heavy commands use the existing Haven gate"
+// @scenario "The gate never changes the command it admits"
+func TestCodexGateNeverRewritesTheCommandEither(t *testing.T) {
 	t.Run("given a sub-agent whose short unit run finds no free slot", func(t *testing.T) {
 		// One slot, one run already in it: the machine is full, and a run
 		// observed to finish well inside five minutes is narrowed rather than
@@ -148,41 +149,37 @@ func TestCodexGateRewriteCarriesWhatItDecided(t *testing.T) {
 
 		t.Run("when Codex's gate answers", func(t *testing.T) {
 			reply := askCodex(t, gateOrch(store, sys), bashPayload("pnpm test:unit run src/x"))
-			command, _ := reply.Specific.UpdatedInput["command"].(string)
 
-			t.Run("the command is rewritten to run under haven's slot", func(t *testing.T) {
-				if reply.Specific.PermissionDecision != "allow" || command == "" {
-					t.Fatalf("expected a rewrite, got %+v", reply.Specific)
+			t.Run("the command is not rewritten", func(t *testing.T) {
+				if reply.Specific.UpdatedInput != nil {
+					t.Fatalf("expected no updatedInput at all, got %+v", reply.Specific)
 				}
 			})
 
-			t.Run("and it carries the agent id, which picks the wait ceiling", func(t *testing.T) {
-				// Without it `haven run` resolves an empty id as a main session and
-				// holds a sub-agent on the thirty-minute failsafe, six times its
-				// own five-minute cache floor.
-				if !strings.Contains(command, "--agent-id 'agent_7'") {
-					t.Fatalf("the caller was dropped on the way through: %q", command)
+			t.Run("and no allow is handed out on its strength", func(t *testing.T) {
+				if reply.Specific.PermissionDecision == "allow" {
+					t.Fatalf("an allow with nothing rewritten approves whatever Codex already asked for: %+v", reply.Specific)
 				}
 			})
 
-			t.Run("and it carries a width, so the narrowing is something that happens", func(t *testing.T) {
-				if !strings.Contains(command, "--workers ") {
-					t.Fatalf("a narrowing nobody applies is not a narrowing: %q", command)
+			t.Run("but Codex still sees a system message describing what haven expects", func(t *testing.T) {
+				if reply.SystemMessage == "" {
+					t.Fatal("a decision that changes nothing about the run must still be described")
 				}
 			})
 		})
 	})
 
-	t.Run("given a session that still prompts for permission", func(t *testing.T) {
+	t.Run("given a session that already permits its own shell commands", func(t *testing.T) {
 		store := &fakeStore{heavyRuns: 1, observed: map[string]time.Duration{"unit": 20 * time.Second}}
 		sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: time.Now()}
 		payload := bashPayload("pnpm test:unit run src/x")
-		payload["permission_mode"] = "default"
+		payload["permission_mode"] = "bypassPermissions"
 
-		t.Run("nothing is rewritten, because rewriting needs an approval to ride on", func(t *testing.T) {
+		t.Run("permission_mode changes nothing: still no rewrite, only a message", func(t *testing.T) {
 			reply := askCodex(t, gateOrch(store, sys), payload)
-			if reply.Specific.PermissionDecision != "" || reply.Specific.UpdatedInput != nil {
-				t.Fatalf("expected an untouched, neutral answer, got %+v", reply.Specific)
+			if reply.Specific.UpdatedInput != nil {
+				t.Fatalf("expected no updatedInput regardless of permission mode, got %+v", reply.Specific)
 			}
 		})
 	})
@@ -191,7 +188,7 @@ func TestCodexGateRewriteCarriesWhatItDecided(t *testing.T) {
 		store := &fakeStore{}
 		sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: time.Now()}
 
-		t.Run("it is waved through untouched", func(t *testing.T) {
+		t.Run("it is waved through untouched, and keeps Codex's normal permission flow", func(t *testing.T) {
 			reply := askCodex(t, gateOrch(store, sys), bashPayload("git status"))
 			if reply.Specific.PermissionDecision != "" || reply.Specific.UpdatedInput != nil {
 				t.Fatalf("gating `git status` is its own outage; got %+v", reply.Specific)

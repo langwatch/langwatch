@@ -62,19 +62,6 @@ func deferReply() hookReply {
 	}}
 }
 
-// autoApprovingModes are the permission modes where a session already approves
-// tool calls on its own. Only GateCodex still reads this: Codex's own
-// permission system does not have the prefix-matching hazard that made Claude's
-// gate stop rewriting (see decideHeavyMessage's doc comment), so Codex's
-// command is still rewritten, and only in a mode that can already carry an
-// "allow" it did not ask a human for.
-var autoApprovingModes = map[string]bool{
-	"bypassPermissions": true,
-	"acceptEdits":       true,
-	"auto":              true,
-	"dontAsk":           true,
-}
-
 // gateContext is what both wire formats need after decoding and classifying
 // one hook payload. Ready is false - and Early carries the whole answer -
 // whenever there is nothing left to decide: a decode failure, a cache-cost
@@ -150,16 +137,19 @@ func (o *Orchestrator) Gate(stdin io.Reader, stdout io.Writer) {
 	})
 }
 
-// decideHeavyMessage is Claude's ladder for a command decided heavy. It NEVER
-// rewrites tool_input.
+// decideHeavyMessage is the shared ladder for a command decided heavy - Gate
+// and GateCodex both call it, and it NEVER rewrites tool_input.
 //
 // A rewrite used to mask the real command from three things at once: Claude
 // Code's own permission rules (a prefix rule matching "haven run" over-admits
 // an allow and a deny never gets to fire on the command it was written for),
-// every log line, and every prompt the agent or a human reads back. Gating now
-// lives in the heavy tools themselves - the compiler/lint/format/test bin
-// shims and package scripts, which already take a slot through
-// `haven slot run` on their own - so the command the model asked for is
+// every log line, and every prompt the agent or a human reads back. Codex's
+// gate used to keep rewriting anyway, on the theory that its own permission
+// system does not share that prefix-matching hazard - but the rule is simpler
+// than that exception: no hook rewrites the command it admits. Gating now
+// lives in the heavy tools themselves - the compiler/lint/format/test/vitest
+// bin shims and `make go-lint`, which already take a slot through
+// `haven slot run` on their own - so the command either agent asked for is
 // exactly the command that runs, and this only classifies and reports.
 //
 // The only permission decision left is a deny under red memory pressure with
@@ -217,19 +207,17 @@ type predictionRequest struct {
 	hasWait    bool
 }
 
-// predictiveMessage is what Claude's gate says about a decision it is not
+// predictiveMessage is what the gate says about a decision it is not
 // enforcing itself - the classification and the queue estimate, silent for
-// Admit, the same rule admissionMessage already keeps: a line worth printing
-// names something the caller did not already know and could act on.
+// Admit: a line worth printing names something the caller did not already
+// know and could act on.
 //
-// KNOWN GAP, not silently accepted: this is a PREDICTION now, not an
-// instruction, because nothing here rewrites the command any more. For a
-// command whose bin shim or package script already takes a slot on its own
-// (tsc, tsgo, typecheck, lint, format), the prediction and the enforcement
-// agree. For one that does not yet (a bare vitest invocation, golangci-lint),
-// the message can currently describe a queue or a narrower width that nothing
-// downstream applies - closing that gap means giving vitest and golangci-lint
-// their own slot-taking shim, tracked as follow-up work, not built here.
+// This is a PREDICTION, not an instruction, because nothing here rewrites the
+// command any more. It agrees with the enforcement for every heavy command
+// the gate classifies: the compiler, linter, formatter and vitest bin shims
+// all take a slot through `haven slot run` on their own (dev/scripts/
+// install-check-shims.mjs), and `make go-lint` does the same for
+// golangci-lint - the gap this comment used to flag is closed.
 func predictiveMessage(r predictionRequest) string {
 	switch r.decision {
 	case domain.Narrow:
@@ -241,86 +229,22 @@ func predictiveMessage(r predictionRequest) string {
 	}
 }
 
-// GateCodex shares admission decisions with Claude's gate and projects the
-// Codex wire format. Unlike Gate, it still rewrites the command through
-// `haven run`: Codex's own permission system does not match on a command
-// prefix the way Claude's does, so the hazard that made Claude's gate stop
-// rewriting does not apply here, and specs/setup/haven-agent-hooks.feature's
-// "Codex heavy commands use the existing Haven gate" scenario is unchanged.
+// GateCodex answers Codex's own PreToolUse-shaped hook. It shares every
+// admission decision with Gate and, like Gate, never rewrites tool_input: no
+// hook rewrites the command it admits. See
+// specs/setup/haven-agent-hooks.feature, "Codex heavy commands use the
+// existing Haven gate" - enforcement lives in the heavy tools themselves
+// (the compiler/lint/format/test/vitest bin shims and `make go-lint`, which
+// already take a slot through `haven slot run` on their own), so the command
+// Codex actually runs is exactly the command it asked to run.
 func (o *Orchestrator) GateCodex(stdin io.Reader, stdout io.Writer) {
 	o.runGated(stdout, func() hookReply {
 		ctx, early := o.decodeGateContext(stdin)
 		if !ctx.ready {
 			return early
 		}
-		reply := o.decideHeavy(ctx.payload, ctx.command, ctx.kind)
-		// Gate itself already leaves PermissionDecision unset for a neutral call -
-		// there is nothing left here to strip.
-		//
-		// Codex preserves execution options around the rewritten command. Claude's
-		// background/timeout fields are not part of its documented Bash rewrite.
-		if reply.Specific.UpdatedInput["run_in_background"] == true {
-			reply.SystemMessage = "haven: queued"
-		}
-		for field := range reply.Specific.UpdatedInput {
-			if field != "command" {
-				delete(reply.Specific.UpdatedInput, field)
-			}
-		}
-		return reply
+		return o.decideHeavyMessage(ctx.payload, ctx.command, ctx.kind)
 	})
-}
-
-// decideHeavy is Codex's ladder for a command decided heavy: it still
-// rewrites the command through `haven run`, carrying the decision with it.
-func (o *Orchestrator) decideHeavy(p hookPayload, command string, kind domain.RunKind) hookReply {
-	caller := domain.CallerFromAgentID(p.AgentID, false)
-	level := domain.ReadPressure(o.readPressureRecord())
-	slots := o.slotState()
-	queueDepth := 0
-	if !slots.free() {
-		queueDepth = slots.position()
-	}
-
-	decision := domain.DecideAdmission(domain.AdmissionRequest{
-		Pressure:             level,
-		IsSlotFree:           slots.free(),
-		Caller:               caller,
-		Kind:                 kind,
-		ObservedDuration:     o.observedDuration(command),
-		HasCallerWorkerCount: domain.CallerSetWorkers(command),
-		EstimatedWait:        o.estimatedWait(queueDepth, command),
-		CanBackground:        autoApprovingModes[p.PermissionMode],
-	})
-
-	switch decision {
-	case domain.Refuse:
-		var hint *domain.RetryHint
-		if h, ok := domain.NewRetryHint(queueDepth, o.observedDuration(command), caller); ok {
-			hint = &h
-		}
-		return refuse(level, queueDepth, hint)
-	case domain.Admit, domain.Background, domain.Narrow, domain.Queue:
-		// All admitted runs hold a slot; decisions differ in how the wrapped run
-		// behaves. Rewriting needs an approval, so a session that still prompts is
-		// left alone entirely.
-		if !autoApprovingModes[p.PermissionMode] {
-			return deferReply()
-		}
-		req := rewrapRequest{
-			command:    command,
-			decision:   decision,
-			queueDepth: queueDepth,
-			agentID:    p.AgentID,
-			slots:      slots,
-		}
-		if decision == domain.Queue || decision == domain.Background {
-			req.estimatedWait, req.hasWaitEstimate = o.queueEstimate(queueDepth, command)
-		}
-		return o.rewrap(req)
-	default:
-		return deferReply()
-	}
 }
 
 // refuse denies with a reason the model can act on. The reason is the only
@@ -332,85 +256,6 @@ func refuse(level domain.Pressure, queueDepth int, hint *domain.RetryHint) hookR
 		PermissionDecision:       "deny",
 		PermissionDecisionReason: domain.RefusalReason(level, queueDepth, hint),
 	}}
-}
-
-// rewrapRequest is everything the rewrite needs from the decision that was just
-// taken. It travels as one value because dropping any part of it is exactly the
-// failure this seam had: a rewrite that encodes none of what was decided leaves
-// `haven run` to re-derive it from an empty command line, and every decision
-// collapses back to the default.
-type rewrapRequest struct {
-	command    string
-	decision   domain.Admission
-	queueDepth int
-	agentID    string
-	slots      slotState
-	// estimatedWait and hasWaitEstimate are queueNote's coarse figure for a
-	// Queue or Background decision. hasWaitEstimate false means there is no
-	// history to estimate from, and the message says nothing about time at
-	// all - exactly what it said before this existed.
-	estimatedWait   time.Duration
-	hasWaitEstimate bool
-}
-
-// rewrap rewrites the command to run under haven's slot, carrying the decision
-// with it.
-func (o *Orchestrator) rewrap(r rewrapRequest) hookReply {
-	opts := domain.WrapOptions{AgentID: r.agentID}
-	if r.decision == domain.Narrow {
-		opts.Workers = o.narrowedWidth(r.slots)
-	}
-	input := map[string]any{
-		"command": domain.WrapCommand(o.havenPath(), r.command, opts),
-	}
-	systemMessage := admissionMessage(r, opts.Workers)
-
-	if r.decision == domain.Background {
-		input["run_in_background"] = true
-		input["description"] = domain.BackgroundDescription(r.queueDepth)
-	} else {
-		// The tool's own timeout has to cover the admission wait as well as the
-		// run. Only the WAIT is bounded by the cache window; capping total
-		// runtime there would kill a long suite outright.
-		//
-		// A session configured with a lower BASH_MAX_TIMEOUT_MS clamps this back
-		// down to its own maximum, which is the same ceiling the command would
-		// have had unwrapped — the rewrite cannot raise a limit the harness sets,
-		// and asking for more than it allows costs nothing.
-		input["timeout"] = int(domain.LongFailsafe / time.Millisecond)
-	}
-
-	return hookReply{
-		SystemMessage: systemMessage,
-		Specific: hookSpecificOutput{
-			HookEventName:            "PreToolUse",
-			PermissionDecision:       "allow",
-			PermissionDecisionReason: "haven admission control",
-			UpdatedInput:             input,
-		},
-	}
-}
-
-// admissionMessage is what the gate says about a decision, and it says nothing
-// at all about the ordinary one. "haven: admitted" was printed above every
-// gated command a session ran - forty-one of them in one turn on 2026-09-09 -
-// and it carries no information: the command ran, which the caller can see. A
-// line worth printing names something the caller did not already know and could
-// act on, which is only true when the run was changed.
-func admissionMessage(r rewrapRequest, workers int) string {
-	switch r.decision {
-	case domain.Narrow:
-		return fmt.Sprintf("haven: narrowed to %d test workers - the machine is busy, so this runs at a width that fits", workers)
-	case domain.Queue:
-		return "haven: " + queueNote(r.queueDepth, r.estimatedWait, r.hasWaitEstimate)
-	case domain.Background:
-		return "haven: backgrounded, " + queueNote(r.queueDepth, r.estimatedWait, r.hasWaitEstimate) + " - the result arrives as a notification"
-	case domain.Refuse:
-		return "haven: refused"
-	case domain.Admit:
-		return ""
-	}
-	return ""
 }
 
 // queueNote spells the wait a caller is about to have, in runs ahead plus - when
@@ -431,16 +276,6 @@ func queueNote(depth int, wait time.Duration, hasWait bool) string {
 		base += ", " + domain.FormatWait(wait)
 	}
 	return base
-}
-
-// havenPath is haven's own absolute path, because `make haven install` is
-// optional and a rewrite that yields "command not found" would have broken a
-// working command in the name of failing open.
-func (o *Orchestrator) havenPath() string {
-	if exe, err := os.Executable(); err == nil && exe != "" {
-		return exe
-	}
-	return "haven"
 }
 
 func (o *Orchestrator) readPressureRecord() (domain.PressureRecord, bool, time.Time) {

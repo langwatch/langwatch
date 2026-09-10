@@ -41,10 +41,12 @@ type Stack struct {
 	Branch      string `json:"branch"`
 	LauncherPID int    `json:"launcherPid"`
 	RedisDB     int    `json:"redisDb"`
-	// APIPort is the Hono API's loopback port. The API is NOT a routed hostname
-	// of its own: it is a backend of `app`, reached same-origin at
-	// app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort). One app URL, not
-	// two confusable ones — the frontend and its API share a single origin.
+	// APIPort is the Hono API's loopback port. It is reached two ways: same-
+	// origin at app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort, so
+	// the frontend and its API still share one URL for the browser), and
+	// additionally at its own routed hostname, api.<slug>.langwatch.localhost
+	// (domain.APIService) - a direct route for tooling that wants the API
+	// with no dev-server proxy in front of it. Both point at this same port.
 	APIPort int `json:"apiPort"`
 	// WorkerMetricsPort is the background worker lane's own loopback port
 	// (/metrics and /healthz). It belongs to that process alone: the worker is
@@ -128,13 +130,16 @@ type Stack struct {
 }
 
 // PerWorktreeServices are the routed hostnames a stack always plans for — each
-// gets its own <name>.<slug>.langwatch.localhost. The Hono API is deliberately
-// absent: it shares `app`'s origin at /api (see Stack.APIPort), so the app and
-// its API are one URL. `app` is the browser application's port — the `ui` lane
-// (apps/ui, Vite) is what listens on it. The last two are developer tools
-// rather than parts of the product: off unless the worktree selects them, and
-// never counted among the three Node lanes (see Lanes). Order is the launch +
-// print order.
+// gets its own <name>.<slug>.langwatch.localhost, and a port allocated from
+// the same pool. The Hono API is deliberately absent from THIS list: it needs
+// no port of its own (it reuses Stack.APIPort, allocated separately) and
+// never opts out the way gateway/nlp/langyagent can, so it is registered as
+// its own domain.APIService entry right after this loop rather than
+// complicating this one's allocation and fallback logic. `app` is the browser
+// application's port - the `ui` lane (apps/ui, Vite) is what listens on it.
+// The last two are developer tools rather than parts of the product: off
+// unless the worktree selects them, and never counted among the three Node
+// lanes (see Lanes). Order is the launch + print order.
 var PerWorktreeServices = []struct{ Name, Role string }{
 	{"app", "App — UI + API at /api"},
 	{"gateway", "AI Gateway (Go)"},
