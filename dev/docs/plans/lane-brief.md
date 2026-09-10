@@ -54,6 +54,18 @@ no `as never`, no `ctx: unknown`, no non-null `!`, no inline `import()`, no
 files, no file under twenty lines, `it("does x")`, nested describe given/when,
 assert on `code` not message prose, every `@scenario` annotation kept bound.
 
+## Cache window
+
+A lane's prompt cache lives five minutes. One tool call or wait longer than
+that discards the whole context and re-reads it at full price. So: no single
+tool call over four minutes; anything longer runs with `run_in_background` and
+is checked every four minutes with a short command. Test runs are split by
+directory while working and the package suite runs once at the end. No
+`typecheck:one` mid-work (it queues behind the machine-wide slot and takes the
+cache with it); `tsc --noEmit --ignoreConfig <file>` while working, the package
+check once at the end. Every tool output is filtered (`tail`, `grep`, vitest
+`--reporter=dot`); a raw log or a whole `git show` is re-read on every miss.
+
 ## Budget
 
 The cap is 90 minutes or 250 tool calls, whichever comes first. A lane does not
