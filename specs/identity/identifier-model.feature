@@ -111,6 +111,13 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And an attach for an identifier the projection lacks is still emitted
 
   @unit
+  Scenario: A sign-up states its identifier against the credential it just opened
+    Given "sam" registers with an address and a password
+    When the account is opened
+    Then the identifier is stated against that same credential, never a second one
+    And the backfill, which links by the credential, converges on one row
+
+  @unit
   Scenario: Signing up makes the address routable before the fold lands
     Given "sam" is a newborn whose projection has never folded
     When a sign-up commits the attach of "sam"'s credential identifier
