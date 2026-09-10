@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { JoinRequestAudiencePort } from "../../ports/join-request-audience.port.ts";
-import { JoinRequestMailPort } from "../../ports/join-request-mail.port.ts";
+import { JoinRequestAudiencePort } from "../../repositories/join-request-audience.repository.ts";
+import { JoinRequestMailPort } from "../../app/identity.infrastructure.ts";
 import { JoinRequestNotificationService } from "../join-request-notification.service.ts";
 
 /**
@@ -44,12 +44,11 @@ class Audience extends JoinRequestAudiencePort {
   }
 }
 
-class RecordingMail extends JoinRequestMailPort {
+class RecordingMail implements JoinRequestMailPort {
   readonly stillWaiting: { adminEmail: string; organizationName: string }[] = [];
   readonly expired: { requesterEmail: string; organizationName: string }[] = [];
 
   constructor(private readonly bouncing: ReadonlySet<string> = new Set()) {
-    super();
   }
 
   async sendStillWaiting(input: {

@@ -6,8 +6,8 @@
  */
 import { IdentityApi, IdentityCapabilityUnavailableError } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter.ts";
-import { LocalDoorBreakGlassBindingAdapter } from "../adapters/local-door-break-glass-binding.adapter.ts";
+import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
+import { LocalDoorBreakGlassBindingAdapter } from "../services/local-door-break-glass-binding.service.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { CachedIdentityLatch } from "../services/per-subject-cached-latch.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
@@ -24,8 +24,8 @@ import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
-import { IdentityIdentifierBackfillMigrationAdapter } from "../adapters/system-migration.identity-identifier-backfill.adapter.ts";
-import { IdentitySecretHealMigrationAdapter } from "../adapters/system-migration.identity-secret-heal.adapter.ts";
+import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
+import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
 import type { IdentityInfrastructure } from "./identity-infrastructure.ts";
 
 type IdentitySetup = FeatureSetup<Record<string, never>, IdentityInfrastructure, never> &

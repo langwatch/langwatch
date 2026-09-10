@@ -2,11 +2,11 @@ export { ssoServer } from "./sso.server.ts";
 export { ssoConnectionTrpcTransport } from "./transport/sso-connection.trpc.ts";
 export type { SsoInfrastructure } from "./app/sso.app.ts";
 export {
-  SsoConnectionLedgerPort,
+  type SsoConnectionLedgerPort,
   type SsoConnectionLedgerOperator,
   type SsoConnectionTeardownRequest,
-} from "./ports/sso-connection-ledger.port.ts";
-export { SsoGateLoggerPort } from "./ports/sso-gate-logger.port.ts";
+  type SsoGateLoggerPort,
+} from "./app/sso.infrastructure.ts";
 export { SsoProviderMountInspector } from "./services/sso-gate.service.ts";
 export {
   BetterAuthSsoAdapter,
@@ -21,4 +21,4 @@ export {
   legacyCallbackUrl,
   oidcProviderConfig,
   parseIssuerUrl,
-} from "./adapters/better-auth.better-auth.adapter.ts";
+} from "./services/better-auth-sso.service.ts";

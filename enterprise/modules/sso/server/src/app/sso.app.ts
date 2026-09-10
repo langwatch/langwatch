@@ -32,12 +32,12 @@ import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 
-import { BetterAuthSsoProviderMount } from "../adapters/better-auth.better-auth.adapter.ts";
+import { BetterAuthSsoProviderMount } from "../services/better-auth-sso.service.ts";
 import type {
   SsoConnectionLedgerOperator,
   SsoConnectionLedgerPort,
-} from "../ports/sso-connection-ledger.port.ts";
-import type { SsoGateLoggerPort } from "../ports/sso-gate-logger.port.ts";
+} from "./sso.infrastructure.ts";
+import type { SsoGateLoggerPort } from "./sso.infrastructure.ts";
 import { SsoGateService } from "../services/sso-gate.service.ts";
 
 /** What the process composes this feature's application over. */

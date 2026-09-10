@@ -10,7 +10,7 @@ import {
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter.ts";
+import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 import type {
   BackfillAccountRow,
   BackfillUserRow,

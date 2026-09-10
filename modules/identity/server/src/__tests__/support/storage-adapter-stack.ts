@@ -1,19 +1,20 @@
-import { type IdentityCommand, normalizeIdentifierValue } from "@langwatch/identity-contract";
+import {
+  type IdentityCommand,
+  IdentityEngineUnavailableError,
+  normalizeIdentifierValue,
+} from "@langwatch/identity-contract";
 import type { BetterAuthOptions } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { CryptoIdentifierIdentityAdapter } from "../../adapters/crypto.identifier-identity.adapter.ts";
+import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
 import { deriveNewbornUserId } from "../../rules/identifier-hash.rules.ts";
-import { BetterAuthIdentityBirthAdapter } from "../../adapters/better-auth.identity-birth.adapter.ts";
-import {
-  type IdentityBirthPort,
-  IdentityEngineUnavailableError,
-} from "../../ports/identity-birth.port.ts";
+import { BetterAuthIdentityBirthAdapter } from "../../services/better-auth-identity-birth.service.ts";
+import { type IdentityBirthPort } from "../../app/identity.infrastructure.ts";
 import {
   BetterAuthCeremonyBridgeAdapter,
   IdentityCeremoniesAdapter,
-} from "../../adapters/better-auth.identity-ceremonies.adapter.ts";
-import { BetterAuthIdentityStorageAdapter } from "../../adapters/better-auth.identity-storage.adapter.ts";
+} from "../../services/better-auth-identity-ceremonies.service.ts";
+import { BetterAuthIdentityStorageAdapter } from "../../services/better-auth-identity-storage.service.ts";
 import type {
   IdentityAccountsPort,
   IdentityResolutionPort,

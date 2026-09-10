@@ -4,7 +4,7 @@ import type {
   LicensingApi,
   PlatformLicenseInspection,
 } from "@langwatch/enterprise-licensing-contract";
-import type { SsoGateLoggerPort } from "../ports/sso-gate-logger.port.ts";
+import type { SsoGateLoggerPort } from "../app/sso.infrastructure.ts";
 
 export abstract class SsoProviderMountInspector {
   abstract isMounted(configuration: SsoConfiguration): boolean;

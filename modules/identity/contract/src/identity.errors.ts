@@ -494,3 +494,20 @@ export class IdentityDetachStrandsUserError extends IdentityCommandRefusedError 
     this.name = "IdentityDetachStrandsUserError";
   }
 }
+
+/**
+ * The event-sourcing stack could not accept the newborn's facts.
+ * This is the coupling ADR-116 §3 re-introduces on purpose and scopes to the
+ * one call that must not silently succeed without a ledger entry.
+ */
+export class IdentityEngineUnavailableError extends HandledError {
+  constructor(detail: string, cause: unknown) {
+    super("identity_engine_unavailable", "identity_engine_unavailable", {
+      httpStatus: 503,
+      fault: "platform",
+      reasons: [new Error(detail), ...(cause instanceof Error ? [cause] : [])],
+      tips: ["Try creating the account again in a moment."],
+    });
+    this.name = "IdentityEngineUnavailableError";
+  }
+}

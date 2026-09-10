@@ -4,14 +4,14 @@
  * The born-finalized entrance's SEQUENCE (ADR-116 §3).
  */
 import { IdentityGuardsService } from "../identity-guards.service.ts";
-import { IdentityEngineUnavailableError } from "../../ports/identity-birth.port.ts";
+import { IdentityEngineUnavailableError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { IdentityEvent } from "../../projections/identity-state.projection.ts";
 import { IdentityBirthService } from "../identity-birth.service.ts";
-import type { IdentityBirthLedgerPort } from "../../ports/identity-birth-ledger.port.ts";
+import type { IdentityBirthLedgerPort } from "../../app/identity.infrastructure.ts";
 import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository.ts";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
-import { CryptoIdentifierIdentityAdapter } from "../../adapters/crypto.identifier-identity.adapter.ts";
+import { CryptoIdentifierIdentityAdapter } from "../crypto-identifier-identity.service.ts";
 
 const EMAIL = "newborn@acme.com";
 const T0 = 1_690_000_000_000;

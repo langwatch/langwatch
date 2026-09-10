@@ -127,6 +127,7 @@ export {
   IdentityIdentifierNotVerifiableError,
   IdentityMfaBackupCodesExhaustedError,
   IdentityMfaCodeInvalidError,
+  IdentityEngineUnavailableError,
   IdentityMfaEnrollmentExpiredError,
   IdentityMfaEnrollmentRequiredError,
   IdentityMfaLockedOutError,

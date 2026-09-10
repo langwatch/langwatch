@@ -1,7 +1,7 @@
 import type { IdentifierFact } from "@langwatch/identity-contract";
 import { isLiveIdentifierState, LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
 import type { IdentityReservationRepository } from "../identity-reservations.repository.ts";
-import { BetterAuthAccountQueriesAdapter } from "../../adapters/better-auth.account-queries.adapter.ts";
+import { BetterAuthAccountQueriesAdapter } from "../../services/better-auth-account-queries.service.ts";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import type { IdentityFoldState } from "../../projections/identity-state.projection.ts";

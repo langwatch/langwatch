@@ -5,10 +5,10 @@
  * pipelines fold into (Q3(b) - each stays process-side rather than becoming
  * a thirteenth-and-up row, because building them needs `EventSourcing`).
  */
-import type { IdentityEventingPort } from "../ports/identity-eventing.port.ts";
-import type { JoinRequestMailPort } from "../ports/join-request-mail.port.ts";
-import type { PlatformOperatorPort } from "../ports/platform-operator.port.ts";
-import type { JoinRequestAudiencePort } from "../ports/join-request-audience.port.ts";
+import type { IdentityEventingPort } from "./identity.infrastructure.ts";
+import type { JoinRequestMailPort } from "./identity.infrastructure.ts";
+import type { PlatformOperatorPort } from "./identity.infrastructure.ts";
+import type { JoinRequestAudiencePort } from "../repositories/join-request-audience.repository.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";

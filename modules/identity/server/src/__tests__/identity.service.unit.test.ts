@@ -11,7 +11,7 @@ import { IdentityService } from "../services/identity.service.ts";
 import { ACTOR, attachData, InMemoryHeads, T0, USER } from "./support/in-memory-heads.ts";
 import { InMemoryUsers } from "./support/in-memory-users.ts";
 import { InMemoryReservations } from "./support/in-memory-reservations.ts";
-import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter.ts";
+import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 
 /** No legacy holder: this suite is about the service's sequencing, not the
  *  cross-population collision guard. */

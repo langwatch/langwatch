@@ -9,8 +9,8 @@ import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import { SsoApp, type SsoInfrastructure } from "../sso.app.ts";
-import { SsoConnectionLedgerPort } from "../../ports/sso-connection-ledger.port.ts";
-import { SsoGateLoggerPort } from "../../ports/sso-gate-logger.port.ts";
+import { SsoConnectionLedgerPort } from "../sso.infrastructure.ts";
+import { SsoGateLoggerPort } from "../sso.infrastructure.ts";
 
 /** The one operator on the staff list, exactly as `ADMIN_EMAILS` decides it. */
 export const SSO_TEST_STAFF_EMAIL = "olive@langwatch.ai";
@@ -70,7 +70,7 @@ export function createSsoTestAuditLog(): AuditLogApi {
 type Ledger = SsoConnectionLedgerPort;
 
 /** Every ledger verb, recorded, so a test reads what was commanded. */
-export class RecordingSsoConnectionLedger extends SsoConnectionLedgerPort {
+export class RecordingSsoConnectionLedger implements SsoConnectionLedgerPort {
   static create(): RecordingSsoConnectionLedger {
     return new RecordingSsoConnectionLedger();
   }
@@ -89,7 +89,7 @@ export class RecordingSsoConnectionLedger extends SsoConnectionLedgerPort {
 }
 
 /** The gate's log lines, kept so a test can read what an operator would. */
-export class RecordingSsoGateLogger extends SsoGateLoggerPort {
+export class RecordingSsoGateLogger implements SsoGateLoggerPort {
   static create(): RecordingSsoGateLogger {
     return new RecordingSsoGateLogger();
   }

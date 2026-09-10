@@ -5,20 +5,17 @@ import {
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   type IdentityGuardsApi,
   IdentityEmailInUseError,
+  IdentityEngineUnavailableError,
   type IdentityFactInput,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
 import { deriveNewbornUserId } from "../rules/identifier-hash.rules.ts";
 import { adoptUserEmailCommandId } from "../rules/identity-command-id.rules.ts";
 import { type IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
-import {
-  IdentityBirthPort,
-  IdentityEngineUnavailableError,
-  type IdentityNewborn,
-} from "../ports/identity-birth.port.ts";
+import { IdentityBirthPort, type IdentityNewborn } from "../app/identity.infrastructure.ts";
 import { createLogger } from "@langwatch/observability";
 import type { IdentityEvent } from "../projections/identity-state.projection.ts";
-import type { IdentityBirthLedgerPort } from "../ports/identity-birth-ledger.port.ts";
+import type { IdentityBirthLedgerPort } from "../app/identity.infrastructure.ts";
 import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository.ts";
 import { identityEventsFor } from "../intents/identity-events.intent.ts";
 

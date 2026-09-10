@@ -4,7 +4,7 @@ import {
   identifierProviderFor,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import type { IdentifierIdentityPort } from "../ports/identifier-identity.port.ts";
+import type { IdentifierIdentityPort } from "../app/identity.infrastructure.ts";
 import type {
   BackfillAccountRow,
   BackfillUserRow,

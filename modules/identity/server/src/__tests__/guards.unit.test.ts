@@ -18,7 +18,7 @@ import {
 } from "./support/in-memory-heads.ts";
 import { InMemoryReservations } from "./support/in-memory-reservations.ts";
 import { InMemoryUsers } from "./support/in-memory-users.ts";
-import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter.ts";
+import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 
 /** No legacy user holds anything, which is what every test below assumes
  *  unless it says otherwise — the cross-population collision guard has its

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { PlatformOperatorPort } from "../../ports/platform-operator.port.ts";
+import type { PlatformOperatorPort } from "../../app/identity.infrastructure.ts";
 import type { SsoPlatformOperatorRepository } from "../sso-connection.repository.ts";
 
 /** The one model an operator check reads, and no other. */
