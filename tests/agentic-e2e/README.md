@@ -165,6 +165,27 @@ The `auth.setup.ts` handles this:
 
 To reset authentication, delete `.auth/user.json` and re-run tests.
 
+## Credential-gated tests
+
+Some journeys drive real third-party calls and skip cleanly when their
+credentials are absent (`test.skip(cond, reason)`). Set these to run them.
+
+**Voice agent contract** (`tests/voice/voice-agent-contract.spec.ts`):
+
+| Variable | Test | Purpose |
+|---|---|---|
+| `TWILIO_ACCOUNT_SID` | phone | Twilio account SID that can place calls |
+| `TWILIO_AUTH_TOKEN` | phone | Twilio auth token |
+| `TWILIO_FROM_NUMBER` | phone | E.164 number Twilio dials from |
+| `E2E_VOICE_PHONE_NUMBER` | phone | E.164 number of the agent under test to call |
+| `ELEVENLABS_API_KEY` | ElevenLabs | Key that signs a ConvAI session |
+| `E2E_ELEVENLABS_AGENT_ID` | ElevenLabs | ElevenLabs agent id to talk to |
+
+Both also need, in the target project (not gated — prerequisites): the
+`release_voice_agents_enabled` feature flag on, and an LLM model provider so the
+simulated user and judge can run. Pin a fresh project with `E2E_PROJECT_SLUG` so
+the voice agent can be created through the drawer's "Setup agent" box.
+
 ## Running Tests
 
 ```bash
