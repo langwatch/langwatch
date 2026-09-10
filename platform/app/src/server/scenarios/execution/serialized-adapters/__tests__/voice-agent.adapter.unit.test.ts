@@ -1,5 +1,6 @@
 import type { AgentAdapter } from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
+import { phoneTransport } from "../../../voice/transports/phone.transport";
 import type { voiceTransportRegistry } from "../../../voice/voice-transport.registry";
 import type { VoiceAgentData } from "../../types";
 import {
@@ -20,6 +21,7 @@ function fakeRegistry(
       fetchCallRecord: vi.fn(),
       endCall: vi.fn(),
     },
+    phone: phoneTransport,
   };
 }
 

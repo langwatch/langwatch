@@ -186,6 +186,14 @@ export interface VoiceSessionPorts {
     projectId: string;
     agentRowId: string;
   }): Promise<{ id: string; agentExternalId: string } | null>;
+  /** Whether this project saved a voice agent for the given vendor agent id,
+   *  matched on the row's identity key. A drawer call writes no run to check
+   *  playback against (#8020), so this is what authorizes its recording. */
+  hasVoiceAgentForExternalId(input: {
+    projectId: string;
+    transport: VoiceTransport;
+    agentExternalId: string;
+  }): Promise<boolean>;
   /** The run already written for this id, or null. Returns the agent id it
    *  attached so a duplicate finish can answer with it, and the run status so a
    *  finish short-circuits on a written run but re-drives a half-written one
@@ -225,16 +233,17 @@ export interface VoiceSessionPorts {
     scenario?: { scenarioId: string; scenarioSetId: string };
     scenarioRunId: string;
   }): Promise<{ turnTraceIds: string[] }>;
-  /** Write the call down as a run the results pages render. When `scenario`
-   *  is given the run lands under that scenario (a "Call it myself" run);
-   *  otherwise it lands in the voice-call set (a drawer call). */
+  /** Write the call down as a run the results pages render. Only ever called
+   *  for a "Call it myself" call, so `scenario` is always named: the run lands
+   *  under that scenario and its set and is judged. A drawer call is never
+   *  written as a run (#8020). */
   writeCallRun(input: {
     projectId: string;
     scenarioRunId: string;
     agentRowId: string;
     agentDisplayName: string;
     record: CallRecord;
-    scenario?: { scenarioId: string; scenarioSetId: string };
+    scenario: { scenarioId: string; scenarioSetId: string };
     turnTraceIds: readonly string[];
   }): Promise<void>;
   /** The set a scenario's runs are listed under, so a "Call it myself" run
@@ -313,6 +322,7 @@ export async function mintVoiceSession({
   const agentId = row?.agentExternalId ?? bodyAgentId;
 
   const runner = runnerFor(ports, transport);
+  runner.assertAvailable?.();
   const credential = await ports.resolveCredential({ projectId, transport });
   if (!credential) throw new VoiceKeyMissingError(runner.missingKeyMessage);
 
@@ -377,10 +387,12 @@ async function fetchProviderRecord(
     projectId,
   }: { transport: VoiceTransport; conversationId: string; projectId: string },
 ): Promise<{ record: CallRecord | null; hasFetchFailed: boolean }> {
+  const runner = runnerFor(ports, transport);
+  runner.assertAvailable?.();
   const credential = await ports.resolveCredential({ projectId, transport });
   if (!credential) return { record: null, hasFetchFailed: false };
   try {
-    const record = await runnerFor(ports, transport).fetchCallRecord({
+    const record = await runner.fetchCallRecord({
       conversationId,
       credential,
       audioProxyUrl: ports.audioProxyUrl({ conversationId, projectId }),
@@ -439,16 +451,15 @@ async function resolveAgentRow(
 
 /**
  * Resolve the scenario a "Call it myself" run is written under and the set it
- * shares with that scenario's simulated runs (AC23). Undefined only for a
- * drawer call (no scenario id). A named scenario that cannot be resolved throws
- * {@link VoiceScenarioNotFoundError}: writing it as an unscored drawer call
- * would lose the verdict the caller asked for (#8019).
+ * shares with that scenario's simulated runs (AC23). A named scenario that
+ * cannot be resolved throws {@link VoiceScenarioNotFoundError}: writing it as
+ * an unscored run would lose the verdict the caller asked for (#8019). Called
+ * only on the scenario branch, so `scenarioId` is always present.
  */
 async function resolveScenarioContext(
   ports: VoiceSessionPorts,
-  { projectId, scenarioId }: { projectId: string; scenarioId?: string },
-): Promise<{ scenarioId: string; scenarioSetId: string } | undefined> {
-  if (!scenarioId) return undefined;
+  { projectId, scenarioId }: { projectId: string; scenarioId: string },
+): Promise<{ scenarioId: string; scenarioSetId: string }> {
   const scenario = await ports.resolveScenarioSet?.({ projectId, scenarioId });
   if (!scenario) throw new VoiceScenarioNotFoundError();
   return { scenarioId, scenarioSetId: scenario.scenarioSetId };
@@ -564,17 +575,149 @@ const WRITTEN_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([
   ScenarioRunStatus.SUCCESS,
   ScenarioRunStatus.FAILED,
 ]);
+/**
+ * The shared tail of a finished call: read the provider record (or fall back to
+ * the live transcript), reject a conversation the token has no claim to,
+ * resolve the agent row and record one trace per exchange. Returns the record
+ * and agent id both branches build their result from. A drawer call runs only
+ * this much; a scenario call goes on to write the run.
+ */
+async function ingestFinishedCall(
+  input: {
+    ports: VoiceSessionPorts;
+    token: VoiceSessionTokenPayload;
+    projectId: string;
+    name?: string;
+    transcript: BrowserTranscriptTurn[];
+    startedAt: number;
+    endedAt: number;
+    isCutAtLimit: boolean;
+  },
+  {
+    transport,
+    conversationId,
+    scenarioRunId,
+    scenario,
+    existingAgentId,
+  }: {
+    transport: VoiceTransport;
+    conversationId: string;
+    scenarioRunId: string;
+    scenario?: { scenarioId: string; scenarioSetId: string };
+    existingAgentId?: string;
+  },
+): Promise<{
+  record: CallRecord;
+  hasFetchFailed: boolean;
+  agentRowId: string;
+  agentDisplayName: string;
+  turnTraceIds: readonly string[];
+}> {
+  const { ports, token } = input;
+
+  // Prefer the provider's record; fall back to the live transcript when it is
+  // not ready or the fetch fails. Fetched BEFORE the agent row is created so a
+  // mismatched conversation is rejected without leaving an orphan agent behind.
+  const { record: providerRecord, hasFetchFailed } = await fetchProviderRecord(
+    ports,
+    { transport, conversationId, projectId: input.projectId },
+  );
+
+  assertProviderRecordMatchesToken(providerRecord, token);
+
+  const { agentRowId, agentDisplayName } = await resolveAgentRow(ports, {
+    token,
+    projectId: input.projectId,
+    transport,
+    name: input.name,
+    existingAgentId,
+  });
+
+  const record = selectCallRecord({
+    providerRecord,
+    transcript: input.transcript,
+    conversationId,
+    transport,
+    startedAt: input.startedAt,
+    endedAt: input.endedAt,
+    isCutAtLimit: input.isCutAtLimit,
+  });
+
+  // Record one trace per exchange before any run is written, so every message
+  // links to its exchange's trace (3a). Best effort: recording failures are
+  // swallowed inside the port, and the ids come back regardless (decision 7).
+  // Re-run on a re-drive: the ids are deterministic, so the fold dedupes.
+  const { turnTraceIds } = await ports.recordCallTraces({
+    projectId: input.projectId,
+    record,
+    scenarioRunId,
+    ...(scenario ? { scenario } : {}),
+  });
+
+  return { record, hasFetchFailed, agentRowId, agentDisplayName, turnTraceIds };
+}
 
 /**
- * Ingest a finished call as a run, exactly once per conversation.
+ * Finish a drawer "Talk to it" call. Every browser call records one trace per
+ * exchange (3a), which is where the transcript and recording live; a drawer
+ * call is scored against no scenario, so it is NOT written as a run (#8020).
+ * Writing it as a SUCCESS run with no verdict is exactly the forever-"the judge
+ * is reading the conversation" state this issue removes. The agent row is still
+ * created on first hang-up (unrelated to run-writing, decision 3), deduped by
+ * its identity key so a retried finish for a not-yet-saved agent reuses the
+ * same row rather than creating a second one (decision 1).
+ */
+async function finishDrawerCall(
+  input: {
+    ports: VoiceSessionPorts;
+    token: VoiceSessionTokenPayload;
+    projectId: string;
+    name?: string;
+    transcript: BrowserTranscriptTurn[];
+    startedAt: number;
+    endedAt: number;
+    isCutAtLimit: boolean;
+  },
+  {
+    transport,
+    conversationId,
+    scenarioRunId,
+  }: {
+    transport: VoiceTransport;
+    conversationId: string;
+    scenarioRunId: string;
+  },
+): Promise<FinishResult> {
+  const { record, hasFetchFailed, agentRowId } = await ingestFinishedCall(
+    input,
+    { transport, conversationId, scenarioRunId },
+  );
+
+  return {
+    // No run: a drawer call is not persisted as one (#8020). The agent id is
+    // still returned so the panel can register the row it just created.
+    runId: "",
+    agentId: agentRowId,
+    source: record.source,
+    hasFetchFailed,
+    hasAudio: Boolean(record.audioUrl),
+    audioUrl: record.audioUrl,
+  };
+}
+
+/**
+ * Ingest a finished call.
  *
- * Idempotent on the conversation id: a second hang-up, a mid-call reload or a
- * late webhook all resolve to the same run id. A fully written run
- * (SUCCESS/FAILED) is returned untouched (AC14, #7973 AC1); a half-written or
- * cancelled run is re-driven through `writeCallRun` (#7973 AC2). Creates the
- * agent row when the drawer had none; falls back
- * to the live transcript when the provider record is not ready or the fetch
- * fails, marking the latter so the panel can say so (AC15).
+ * Two shapes, split on whether the call names a scenario:
+ *  - A drawer "Talk to it" call (no scenario id) records its traces and returns;
+ *    it is never written as a run (#8020). See {@link finishDrawerCall}.
+ *  - A "Call it myself" call (a scenario id) is written as a run and judged,
+ *    idempotently on the conversation id: a second hang-up, a mid-call reload or
+ *    a late webhook all resolve to the same run id. A fully written run
+ *    (SUCCESS/FAILED) is returned untouched (AC14, #7973 AC1); a half-written or
+ *    cancelled run is re-driven through `writeCallRun` (#7973 AC2). Falls back to
+ *    the live transcript when the provider record is not ready or the fetch
+ *    fails, marking the latter so the panel can say so (AC15).
  */
 export async function finishVoiceSession(input: {
   ports: VoiceSessionPorts;
@@ -589,13 +732,24 @@ export async function finishVoiceSession(input: {
   isCutAtLimit: boolean;
   conversationId?: string;
   /** Set for a "Call it myself" run: the scenario the call is scored under
-   *  (AC23). Absent for a drawer call. */
+   *  (AC23). Absent for a drawer call, which is not written as a run (#8020). */
   scenarioId?: string;
 }): Promise<FinishResult> {
   const { ports, token } = input;
   const transport = token.transport;
   const conversationId = input.conversationId?.trim() || token.sessionId;
   const scenarioRunId = scenarioRunIdForConversation(conversationId);
+
+  // A drawer call is scored against no scenario, so it is never written as a
+  // run: there is never a run to find, re-drive or write for its conversation id
+  // (#8020). It still records its traces and creates the agent row.
+  if (!input.scenarioId) {
+    return finishDrawerCall(input, {
+      transport,
+      conversationId,
+      scenarioRunId,
+    });
+  }
 
   // A terminal run is complete: a duplicate finish returns it untouched (AC14,
   // #7973 AC1). A non-terminal run is half-written — startRun landed but a
@@ -634,44 +788,14 @@ export async function finishVoiceSession(input: {
           scenarioId: input.scenarioId,
         });
 
-  // Prefer the provider's record; fall back to the live transcript when it is
-  // not ready or the fetch fails. Fetched BEFORE the agent row is created so a
-  // mismatched conversation is rejected without leaving an orphan agent behind.
-  const { record: providerRecord, hasFetchFailed } = await fetchProviderRecord(
-    ports,
-    { transport, conversationId, projectId: input.projectId },
-  );
-
-  assertProviderRecordMatchesToken(providerRecord, token);
-
-  const { agentRowId, agentDisplayName } = await resolveAgentRow(ports, {
-    token,
-    projectId: input.projectId,
-    transport,
-    name: input.name,
-    existingAgentId: existing?.agentId ?? undefined,
-  });
-
-  const record = selectCallRecord({
-    providerRecord,
-    transcript: input.transcript,
-    conversationId,
-    transport,
-    startedAt: input.startedAt,
-    endedAt: input.endedAt,
-    isCutAtLimit: input.isCutAtLimit,
-  });
-
-  // Record one trace per exchange before the run is written, so every message
-  // links to its exchange's trace (decision 1). Best effort: recording failures
-  // are swallowed inside the port, and the ids come back regardless (decision
-  // 7). Re-run on a re-drive — the ids are deterministic, so the fold dedupes.
-  const { turnTraceIds } = await ports.recordCallTraces({
-    projectId: input.projectId,
-    record,
-    scenarioRunId,
-    ...(scenarioContext ? { scenario: scenarioContext } : {}),
-  });
+  const { record, hasFetchFailed, agentRowId, agentDisplayName, turnTraceIds } =
+    await ingestFinishedCall(input, {
+      transport,
+      conversationId,
+      scenarioRunId,
+      scenario: scenarioContext,
+      existingAgentId: existing?.agentId ?? undefined,
+    });
 
   await ports.writeCallRun({
     projectId: input.projectId,
@@ -680,7 +804,7 @@ export async function finishVoiceSession(input: {
     agentDisplayName,
     record,
     turnTraceIds,
-    ...(scenarioContext ? { scenario: scenarioContext } : {}),
+    scenario: scenarioContext,
   });
 
   return {
@@ -690,6 +814,93 @@ export async function finishVoiceSession(input: {
     hasFetchFailed,
     hasAudio: Boolean(record.audioUrl),
     audioUrl: record.audioUrl,
-    scenarioSetId: scenarioContext?.scenarioSetId,
+    scenarioSetId: scenarioContext.scenarioSetId,
   };
+}
+
+/**
+ * Whether a drawer call's recording belongs to this project. A drawer call is
+ * never written as a run (#8020), so there is nothing to authorize its playback
+ * against; instead the provider is asked which agent the conversation ran
+ * against, and playback is allowed only when this project saved that voice
+ * agent. A refused redirect, a not-yet-ready record or a fetch failure all read
+ * the same way: not this project's to play. Traces are deliberately not
+ * consulted, since a trace write goes through the ingest pipeline and can lag
+ * the hang-up.
+ */
+async function drawerRecordingBelongsToProject(
+  ports: VoiceSessionPorts,
+  {
+    projectId,
+    transport,
+    conversationId,
+    credential,
+  }: {
+    projectId: string;
+    transport: VoiceTransport;
+    conversationId: string;
+    credential: VoiceTransportCredential;
+  },
+): Promise<boolean> {
+  let record: CallRecord | null;
+  try {
+    record = await runnerFor(ports, transport).fetchCallRecord({
+      conversationId,
+      credential,
+      audioProxyUrl: ports.audioProxyUrl({ conversationId, projectId }),
+    });
+  } catch {
+    return false;
+  }
+  const agentExternalId = record?.agentExternalId;
+  if (!agentExternalId) return false;
+  return ports.hasVoiceAgentForExternalId({
+    projectId,
+    transport,
+    agentExternalId,
+  });
+}
+
+/**
+ * Authorize a recording-playback request and return the provider credential the
+ * route streams the audio with. A scenario "Call it myself" run authorizes
+ * playback directly (a run for the conversation exists in this project). A
+ * drawer call writes no run (#8020), so it is authorized only when the provider
+ * conversation ran against a voice agent this project saved. Anything else
+ * throws {@link VoiceRecordingUnavailableError}; the credential is returned only
+ * on success, so it never leaks on a refusal. Throws
+ * {@link VoiceRecordingKeyMissingError} when the project has no provider key.
+ * Drawer calls only run on ElevenLabs today.
+ */
+export async function authorizeRecordingPlayback({
+  ports,
+  projectId,
+  conversationId,
+}: {
+  ports: VoiceSessionPorts;
+  projectId: string;
+  conversationId: string;
+}): Promise<VoiceTransportCredential> {
+  const transport: VoiceTransport = "elevenlabs_convai";
+  const existing = await ports.findExistingRun({
+    projectId,
+    scenarioRunId: scenarioRunIdForConversation(conversationId),
+  });
+
+  const credential = await ports.resolveCredential({ projectId, transport });
+  if (!credential) throw new VoiceRecordingKeyMissingError();
+
+  // A scenario run authorizes playback directly; no provider call needed.
+  if (existing) return credential;
+
+  // No run was written (a drawer call, #8020): authorize only when the provider
+  // conversation ran against a voice agent this project actually saved.
+  const allowed = await drawerRecordingBelongsToProject(ports, {
+    projectId,
+    transport,
+    conversationId,
+    credential,
+  });
+  if (!allowed) throw new VoiceRecordingUnavailableError();
+  return credential;
 }

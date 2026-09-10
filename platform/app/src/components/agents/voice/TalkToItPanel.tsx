@@ -13,7 +13,6 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { z } from "zod";
 
 import {
-  VOICE_CALL_SCENARIO_SET_ID,
   VOICE_TRANSPORTS,
   type VoiceTransport,
 } from "~/server/agents/voice/voice-agent.config";
@@ -32,13 +31,18 @@ import {
   talkReducer,
 } from "./talkToItMachine";
 import {
+  getVoiceTransportClient,
   type VoiceCallSession,
   type VoiceTurn,
-  voiceTransportClientRegistry,
 } from "./voice-transport-client.registry";
 
 /** The settings route that adds a model provider key (mirrors the drawer). */
 const MODEL_PROVIDERS_ROUTE = "/settings/model-providers";
+
+/** Shown instead of the call controls for a transport with no browser client
+ *  (a phone target is dialled from a scenario run, not from the browser). */
+export const PHONE_NO_BROWSER_CALL_NOTICE =
+  "This agent is reached by phone. Call it from a scenario run; browser calls are not available for phone targets.";
 
 /** Placeholder cap before minting; the session mint response replaces it. */
 const PRE_MINT_MAX_SECONDS_PLACEHOLDER = VOICE_CALL_MAX_SECONDS_DEFAULT;
@@ -122,7 +126,12 @@ function createTalkRefs(agentRowId: string | undefined): TalkRefs {
   };
 }
 
-/** The run link the done view offers, or undefined until a run exists. */
+/**
+ * The run link the done view offers, or undefined when there is no run to link.
+ * Only a "Call it myself" call writes a run (#8020), and that path always
+ * learns its set from the finish response, so a run id without a set never
+ * occurs; a drawer call has an empty run id and links nowhere.
+ */
 function runHrefOf({
   state,
   runSetId,
@@ -132,10 +141,10 @@ function runHrefOf({
   runSetId: string | undefined;
   projectSlug: string;
 }): string | undefined {
-  if (state.kind !== "done" || !state.runId) return undefined;
-  return `/${projectSlug}/simulations/${
-    runSetId ?? VOICE_CALL_SCENARIO_SET_ID
-  }/${encodeURIComponent(state.runId)}`;
+  if (state.kind !== "done" || !state.runId || !runSetId) return undefined;
+  return `/${projectSlug}/simulations/${runSetId}/${encodeURIComponent(
+    state.runId,
+  )}`;
 }
 
 function stopTick(refs: TalkRefs): void {
@@ -397,9 +406,21 @@ async function runStart({
   refs.sessionToken.current = mint.sessionToken;
   refs.startedAt.current = Date.now();
 
+  const client = getVoiceTransportClient(props.transport);
+  if (!client) {
+    // A transport with no browser client cannot open a call here; the panel
+    // renders the phone notice instead of ever reaching this path.
+    dispatch({
+      type: "MINT_FAILED",
+      code: "mint_failed",
+      message: PHONE_NO_BROWSER_CALL_NOTICE,
+    });
+    return;
+  }
+
   let session: VoiceCallSession;
   try {
-    session = await voiceTransportClientRegistry[props.transport].openCall({
+    session = await client.openCall({
       signedUrl: mint.connect.signedUrl,
       handlers: {
         onConnected: ({ conversationId }) => {
@@ -545,6 +566,27 @@ function useTalkToItCall(props: TalkToItPanelProps) {
  * @see specs/features/agents/voice-agents-v1.feature
  */
 export function TalkToItPanel(props: TalkToItPanelProps) {
+  // A transport with no browser client (phone) is dialled from a scenario run,
+  // not the browser: show the notice instead of the call machine, which would
+  // otherwise try to mint a session it cannot open. Split so the call hooks
+  // below never run for such a transport.
+  if (!getVoiceTransportClient(props.transport)) {
+    return (
+      <VStack align="stretch" gap={4} data-testid="talk-to-it-panel">
+        <Text
+          fontSize="sm"
+          color="fg.muted"
+          data-testid="talk-phone-no-browser-notice"
+        >
+          {PHONE_NO_BROWSER_CALL_NOTICE}
+        </Text>
+      </VStack>
+    );
+  }
+  return <BrowserCallPanel {...props} />;
+}
+
+function BrowserCallPanel(props: TalkToItPanelProps) {
   const {
     state,
     micLevel,

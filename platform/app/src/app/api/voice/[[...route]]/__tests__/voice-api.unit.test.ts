@@ -70,10 +70,14 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 
 const findById = vi.fn();
+const findByIdentityKey = vi.fn();
 vi.mock("~/server/agents/agent.repository", () => ({
   AgentRepository: class {
     findById(...args: unknown[]) {
       return findById(...args);
+    }
+    findByIdentityKey(...args: unknown[]) {
+      return findByIdentityKey(...args);
     }
   },
 }));
@@ -130,6 +134,8 @@ beforeEach(() => {
     type: "voice",
     config: { transport: "elevenlabs_convai", agentId: "el_agent" },
   });
+  // No saved voice agent matches by default; drawer-authz tests opt in.
+  findByIdentityKey.mockResolvedValue(null);
 });
 
 describe("Feature: Voice session HTTP door", () => {
@@ -411,6 +417,41 @@ describe("Feature: Voice session HTTP door", () => {
     });
   });
 
+  describe("given a drawer finish that names no scenario", () => {
+    describe("when the finish is handled", () => {
+      /** @scenario "A drawer Talk to it call writes no run" */
+      it("succeeds with no run id, since a drawer call writes no run", async () => {
+        const token = signVoiceSessionToken({
+          payload: {
+            sessionId: "sess_1",
+            projectId: PROJECT_ID,
+            agentId: "agent_row",
+            agentExternalId: "el_agent",
+            transport: "elevenlabs_convai",
+            exp: Date.now() + 60_000,
+          },
+        });
+        fetchCallRecord.mockResolvedValue(null);
+
+        const res = await post("/api/voice/session/conv_1/finish", {
+          projectId: PROJECT_ID,
+          sessionToken: token,
+          conversationId: "conv_1",
+          transcript: [{ role: "caller", text: "hi" }],
+          startedAt: 1,
+          endedAt: 2,
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        // A drawer call is not persisted as a run (#8020): the response carries
+        // no run id and no scenario set id.
+        expect(body.runId).toBe("");
+        expect(body.scenarioSetId).toBeUndefined();
+      });
+    });
+  });
+
   describe("given a finish with a bad session token", () => {
     describe("when the finish request is sent", () => {
       /** @scenario "A finish with an invalid or expired session token is refused" */
@@ -500,15 +541,77 @@ describe("Feature: Voice session HTTP door", () => {
   });
 
   describe("given a recording request for a conversation with no run", () => {
-    describe("when the audio proxy is requested", () => {
-      /** @scenario "The recording proxy refuses a conversation with no run in the project" */
-      it("answers recording_unavailable and never fetches the provider", async () => {
+    describe("when the provider record is not a saved voice agent's call", () => {
+      /** @scenario "The recording proxy refuses a conversation that is neither a run nor a saved voice agent's call in the project" */
+      it("answers recording_unavailable after checking the provider with this project's credential", async () => {
         getScenarioRunData.mockResolvedValue(null);
+        findByIdentityKey.mockResolvedValue(null);
+        fetchCallRecord.mockResolvedValue({
+          conversationId: "conv_1",
+          transport: "elevenlabs_convai",
+          agentExternalId: "el_agent_someone_else",
+          startedAt: 1,
+          endedAt: 2,
+          durationMs: 1,
+          turns: [],
+          isCutAtLimit: false,
+          source: "provider",
+        });
+
         const res = await app.request(
           `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
         );
+
         expect(res.status).toBe(404);
         expect((await res.json()).error).toBe("voice_recording_unavailable");
+        expect(fetchCallRecord).toHaveBeenCalledWith(
+          expect.objectContaining({
+            credential: expect.objectContaining({ apiKey: "sk-secret" }),
+          }),
+        );
+      });
+    });
+
+    describe("when the provider record is a saved voice agent's call", () => {
+      /** @scenario "A drawer call's recording still plays after hang-up" */
+      it("streams the recording once the provider agent matches a saved row", async () => {
+        getScenarioRunData.mockResolvedValue(null);
+        fetchCallRecord.mockResolvedValue({
+          conversationId: "conv_1",
+          transport: "elevenlabs_convai",
+          agentExternalId: "el_agent",
+          startedAt: 1,
+          endedAt: 2,
+          durationMs: 1,
+          turns: [],
+          isCutAtLimit: false,
+          source: "provider",
+        });
+        findByIdentityKey.mockResolvedValue({
+          id: "agent_row",
+          projectId: PROJECT_ID,
+          type: "voice",
+          config: { transport: "elevenlabs_convai", agentId: "el_agent" },
+        });
+        const upstreamFetch = vi.fn(async () => ({
+          ok: true,
+          body: new ReadableStream(),
+          headers: new Headers({ "content-type": "audio/mpeg" }),
+        }));
+        vi.stubGlobal("fetch", upstreamFetch);
+
+        // finally so a failing assertion cannot leak the stub onto later tests (isolate: false)
+        try {
+          const res = await app.request(
+            `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
+          );
+
+          expect(res.status).toBe(200);
+          expect(res.headers.get("cache-control")).toBe("no-store");
+          expect(upstreamFetch).toHaveBeenCalled();
+        } finally {
+          vi.unstubAllGlobals();
+        }
       });
     });
   });

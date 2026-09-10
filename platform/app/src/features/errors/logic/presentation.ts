@@ -3222,6 +3222,11 @@ const presentations = {
     title: "A name is required to save the agent",
     describe: () => "",
   },
+  voice_phone_transport_unavailable: {
+    title: "Phone targets are not available yet",
+    describe: () =>
+      "Phone targets are called from the voice worker, which is not available yet. Track langwatch/langwatch#8014.",
+  },
   voice_recording_unavailable: {
     title: "The call recording is not available",
     describe: () => "",

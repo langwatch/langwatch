@@ -20,11 +20,17 @@ const { openCall } = vi.hoisted(() => ({
     hangUp: vi.fn(async () => {}),
   })),
 }));
-vi.mock("../voice-transport-client.registry", () => ({
-  voiceTransportClientRegistry: { elevenlabs_convai: { openCall } },
-}));
+vi.mock("../voice-transport-client.registry", () => {
+  const registry: Record<string, { openCall: typeof openCall }> = {
+    elevenlabs_convai: { openCall },
+  };
+  return {
+    voiceTransportClientRegistry: registry,
+    getVoiceTransportClient: (transport: string) => registry[transport],
+  };
+});
 
-import { TalkToItPanel } from "../TalkToItPanel";
+import { PHONE_NO_BROWSER_CALL_NOTICE, TalkToItPanel } from "../TalkToItPanel";
 import {
   CONSENT_NOTICE,
   MIC_BLOCKED_MESSAGE,
@@ -74,6 +80,27 @@ describe("TalkToItPanel", () => {
           CONSENT_NOTICE,
         );
       });
+    });
+  });
+
+  describe("when the transport is a phone target", () => {
+    /** @scenario "A phone target has no browser call" */
+    it("shows the phone notice and never opens a browser call", async () => {
+      render(
+        <TalkToItPanel
+          projectId="p1"
+          projectSlug="proj"
+          transport="phone"
+          agentId=""
+        />,
+        { wrapper: Wrapper },
+      );
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("talk-phone-no-browser-notice"),
+        ).toHaveTextContent(PHONE_NO_BROWSER_CALL_NOTICE);
+      });
+      expect(openCall).not.toHaveBeenCalled();
     });
   });
 
@@ -131,6 +158,9 @@ describe("TalkToItPanel", () => {
 
       const player = await screen.findByTestId("talk-play");
       expect(player.querySelector("audio")).toHaveAttribute("src", audioUrl);
+      // A drawer call is not a run (#8020): the panel offers no run link, only
+      // the transcript and the Play control.
+      expect(screen.queryByTestId("talk-run-link")).toBeNull();
     });
   });
 
