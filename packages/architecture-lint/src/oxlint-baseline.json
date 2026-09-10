@@ -15,14 +15,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|apps/api/src/app-rest/app-rest.packaged-families.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|apps/api/src/app-rest/app-rest.process-features.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|apps/api/src/app-trpc/app-trpc.sse.ts",
       "measured": "2026-09-06"
     },
@@ -52,10 +44,6 @@
     },
     {
       "key": "cognitive-complexity|apps/api/src/features/dataset/dataset-direct-upload-auth.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|apps/api/src/features/health/health-probe-rest.ts",
       "measured": "2026-09-06"
     },
     {
@@ -347,14 +335,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/scim/server/src/transport/api-rest/scim-protocol.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|enterprise/modules/scim/server/src/transport/api-rest/scim-webhook-intake.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|enterprise/packages/composition/api/src/governance/ingestion-pull-worker.adapter.ts",
       "measured": "2026-09-06"
     },
@@ -440,26 +420,6 @@
     },
     {
       "key": "cognitive-complexity|mcp/typescript/src/tools/update-prompt.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/agent/server/src/adapters/connected-agent-dispatch.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/agent/server/src/transport/api-trpc/http-proxy.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/agent/web/src/features/http/ui/sections/agent-http-editor-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/agent/web/src/features/http/ui/sections/http-test-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/agent/web/src/features/management/ui/sections/agent-management-page.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -583,14 +543,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/annotation/server/src/transport/api-rest/annotation.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/annotation/server/src/transport/api-trpc/annotation.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/annotation/web/src/ui/sections/annotation-score-form.tsx",
       "measured": "2026-09-06"
     },
@@ -615,10 +567,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/api-key/server/src/transport/api-rest/api-key.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/api-key/web/src/behavior/use-first-trace-watch.ts",
       "measured": "2026-09-06"
     },
@@ -636,18 +584,6 @@
     },
     {
       "key": "cognitive-complexity|modules/api-key/web/src/ui/sections/token-created-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/auth/server/src/transport/api-rest/auth.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/auth/server/src/transport/api-trpc/front-door.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -700,14 +636,6 @@
     },
     {
       "key": "cognitive-complexity|modules/automation/server/src/services/graph-trigger-heartbeat.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/automation/server/src/transport/api-rest/automation.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/automation/server/src/transport/api-trpc/automation.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -851,23 +779,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/dataset/server/src/adapters/postgres.dataset-migration.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/dataset/server/src/services/dataset-chunk.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/dataset/server/src/transport/api-rest/dataset.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/dataset/server/src/transport/api-trpc/dataset-record.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/dataset/server/src/transport/api-trpc/dataset.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -963,14 +875,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/evaluation/server/src/transport/api-trpc/evaluation.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/evaluator/contract/src/evaluation-result-parsing.ts",
       "measured": "2026-09-06"
     },
@@ -984,14 +888,6 @@
     },
     {
       "key": "cognitive-complexity|modules/evaluator/server/src/services/evaluator.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/evaluator/server/src/transport/api-rest/evaluator.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/evaluator/server/src/transport/api-trpc/evaluator.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -1108,18 +1004,6 @@
     },
     {
       "key": "cognitive-complexity|modules/experiment/server/src/services/experiment-target-loading.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/experiment/server/src/transport/api-rest/experiment-dspy-steps.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/experiment/server/src/transport/api-rest/experiment-v3.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/experiment/server/src/transport/api-trpc/experiment.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -1364,10 +1248,6 @@
     },
     {
       "key": "cognitive-complexity|modules/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/hosted-mcp/server/src/transport/api-rest/mcp-authorize.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -1643,18 +1523,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/model-provider/server/src/transport/api-rest/model-defaults.api.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "cognitive-complexity|modules/model-provider/server/src/transport/api-rest/playground.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/monitor/server/src/transport/api-trpc/monitor.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/monitor/web/src/ui/sections/online-evaluations.screen.tsx",
       "measured": "2026-09-06"
     },
@@ -1759,10 +1627,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/ops/server/src/adapters/ops-clickhouse-explain.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/ops/server/src/adapters/otel.storage-stats-metrics.adapter.ts",
       "measured": "2026-09-06"
     },
@@ -1780,14 +1644,6 @@
     },
     {
       "key": "cognitive-complexity|modules/ops/server/src/services/replay.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/ops/server/src/transport/api-rest/admin.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/ops/server/src/transport/api-trpc/ops.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -1907,14 +1763,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/organization/server/src/transport/api-trpc/onboarding.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/organization/server/src/transport/api-trpc/organization.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/organization/web/src/behavior/use-invite-actions.ts",
       "measured": "2026-09-06"
     },
@@ -1960,14 +1808,6 @@
     },
     {
       "key": "cognitive-complexity|modules/organization/web/src/ui/sections/team-form.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/project/server/src/transport/api-rest/project.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/project/server/src/transport/api-trpc/project.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -2019,24 +1859,12 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/prompt/server/src/ports/prompt-merge-auto-detected-inputs.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/prompt/server/src/repositories/prisma/prisma.prompt.repository.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|modules/prompt/server/src/rules/prompt-output-format.rules.ts",
       "measured": "2026-09-07"
-    },
-    {
-      "key": "cognitive-complexity|modules/prompt/server/src/transport/api-rest/prompt.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/prompt/server/src/transport/api-trpc/prompt.api.ts",
-      "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|modules/prompt/web/src/behavior/prompts/llm-prompt-config-utils.ts",
@@ -2231,10 +2059,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/scenario/web/src/behavior/agents/use-workflow-target-agent-data.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/scenario/web/src/behavior/suites/use-run-suite.ts",
       "measured": "2026-09-06"
     },
@@ -2259,15 +2083,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/scenario/web/src/model/coerce-content-to-array.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/scenario/web/src/model/poll-for-scenario-run.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/scenario/web/src/model/scenario-message-display.ts",
       "measured": "2026-09-06"
     },
     {
@@ -2307,23 +2123,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/scenario/web/src/ui/sections/agents/agent-code-editor-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/scenario/web/src/ui/sections/agents/agent-list-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/scenario/web/src/ui/sections/agents/agent-workflow-editor-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/scenario/web/src/ui/sections/media-part.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/scenario/web/src/ui/sections/scenario-message-renderer.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -2863,10 +2663,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/user/server/src/transport/api-trpc/user.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/user/web/src/behavior/use-personal-context.ts",
       "measured": "2026-09-06"
     },
@@ -2899,23 +2695,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/workflow/server/src/adapters/prisma.workflow-agent-mapping.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/workflow/server/src/services/workflow-studio-dispatch.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/workflow/server/src/transport/api-rest/workflow-run.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/workflow/server/src/transport/api-rest/workflow-studio.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/workflow/server/src/transport/api-trpc/workflow.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3075,51 +2855,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/api/src/rest/builder.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/api/src/rest/definition.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/api/src/rest/middleware.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/api/src/rest/pipeline.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/api/src/rest/response.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/api/src/rest/route-mounting.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/api/src/rest/security/rest-api-service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/api/src/rest/versioning.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/api/src/trpc/trpc-audit.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/api/src/trpc/trpc-call-logging.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/api/src/trpc/trpc-declared-authz.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/api/src/trpc/trpc-runtime-policy.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3687,14 +3423,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|apps/api/src/app-rest/app-rest.packaged-families.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|apps/api/src/app-rest/app-rest.process-features.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|apps/api/src/app/api-production.composition.ts",
       "measured": "2026-09-06"
     },
@@ -3775,15 +3503,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|modules/authz/web/src/ui/sections/scope-picker/scope-chip-picker.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|modules/automation/server/src/transport/api-trpc/automation.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3828,10 +3548,6 @@
     },
     {
       "key": "complexity|modules/dataset/web/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|modules/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4027,10 +3743,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/ops/server/src/adapters/ops-clickhouse-explain.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|modules/ops/server/src/repositories/redis/queue.repository.ts",
       "measured": "2026-09-06"
     },
@@ -4052,10 +3764,6 @@
     },
     {
       "key": "complexity|modules/organization/server/src/repositories/prisma/prisma.organization-membership.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|modules/organization/server/src/transport/api-trpc/organization.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4112,18 +3820,6 @@
     },
     {
       "key": "complexity|modules/prompt/web/src/ui/sections/prompts/prompt-editor-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|modules/scenario/web/src/ui/sections/agents/agent-code-editor-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|modules/scenario/web/src/ui/sections/agents/agent-list-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|modules/scenario/web/src/ui/sections/agents/agent-workflow-editor-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -4259,10 +3955,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/workflow/server/src/adapters/prisma.workflow-agent-mapping.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|modules/workflow/web/src/behavior/optimization_studio/use-get-dataset-data.ts",
       "measured": "2026-09-06"
     },
@@ -4316,14 +4008,6 @@
     },
     {
       "key": "complexity|modules/workflow/web/src/ui/sections/workflow-node-execution.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/api/src/rest/builder.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/api/src/rest/pipeline.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4445,10 +4129,6 @@
     {
       "key": "condition-shape|apps/api/scripts/check-gateway-control-plane.ts",
       "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|apps/api/src/app-rest/app-rest.packaged-families.ts",
-      "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|apps/api/src/app-static/app-static.handler.ts",
@@ -4823,10 +4503,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/scim/server/src/transport/api-rest/scim-webhook.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|enterprise/modules/sso/server/src/adapters/better-auth.better-auth.adapter.ts",
       "measured": "2026-09-06"
     },
@@ -4887,10 +4563,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/agent/server/src/adapters/connected-agent-state.adapter.ts",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "condition-shape|modules/agent/server/src/services/connected-agent-long-poll.service.ts",
       "measured": "2026-09-07"
     },
@@ -4900,14 +4572,6 @@
     },
     {
       "key": "condition-shape|modules/agent/server/src/services/connected-agent-session.service.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|modules/agent/server/src/transport/api-trpc/agent.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|modules/agent/server/src/transport/api-ws/connected-agent-connect.api.ts",
       "measured": "2026-09-07"
     },
     {
@@ -4937,10 +4601,6 @@
     {
       "key": "condition-shape|modules/analytics/contract/src/visualization/scan-langwatch-ql-chart-values.ts",
       "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|modules/annotation/server/src/transport/api-trpc/annotation.api.ts",
-      "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|modules/annotation/web/src/model/annotation-export.ts",
@@ -5003,16 +4663,8 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/auth/server/src/services/auth.service.ts",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "condition-shape|modules/auth/server/src/services/auth0-password.service.ts",
       "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|modules/auth/server/src/transport/api-rest/auth.api.ts",
-      "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|modules/auth/server/src/transport/better-auth/__tests__/helm-auth-base-url.unit.test.ts",
@@ -5112,10 +4764,6 @@
     },
     {
       "key": "condition-shape|modules/automation/server/src/services/trigger-settlement-notification.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|modules/automation/server/src/transport/api-trpc/automation.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5255,10 +4903,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/data-retention/server/src/rules/platform-default-retention.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/data-retention/server/src/services/data-retention-policy.service.ts",
       "measured": "2026-09-06"
     },
@@ -5325,10 +4969,6 @@
     {
       "key": "condition-shape|modules/evaluation/server/src/services/evaluator-availability.service.ts",
       "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|modules/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
-      "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|modules/evaluator/contract/src/__tests__/shipped-evaluator-types.unit.test.ts",
@@ -5400,10 +5040,6 @@
     },
     {
       "key": "condition-shape|modules/experiment/server/src/services/experiment.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|modules/experiment/server/src/transport/api-rest/experiment-dspy-steps.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5823,14 +5459,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/ops/server/src/adapters/__tests__/postgres.system-migrations.adapter.unit.test.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|modules/ops/server/src/adapters/ops-clickhouse-explain.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/ops/server/src/adapters/ops-worker-contribution.adapter.ts",
       "measured": "2026-09-07"
     },
@@ -5867,18 +5495,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/ops/server/src/transport/api-rest/admin.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|modules/ops/server/src/transport/api-rest/ops-clickhouse-explain.api.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|modules/ops/server/src/transport/api-trpc/bug-report.api.ts",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "condition-shape|modules/organization/server/src/ports/__tests__/organization.service.unit.test.ts",
       "measured": "2026-09-07"
     },
@@ -5899,10 +5515,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/organization/server/src/transport/api-trpc/organization.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/organization/web/src/model/audit-period.ts",
       "measured": "2026-09-07"
     },
@@ -5912,10 +5524,6 @@
     },
     {
       "key": "condition-shape|modules/presence/server/src/adapters/broadcast.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|modules/presence/server/src/transport/api-trpc/presence.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5945,10 +5553,6 @@
     {
       "key": "condition-shape|modules/prompt/server/src/repositories/prisma/prisma.prompt.repository.ts",
       "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|modules/prompt/server/src/transport/api-rest/prompt.api.ts",
-      "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|modules/prompt/web/src/screens/prompt-studio/dialogs/version-history-list-popover.tsx",
@@ -6023,10 +5627,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/scenario/server/src/repositories/__tests__/fixtures/memory-scenario.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts",
       "measured": "2026-09-06"
     },
@@ -6051,10 +5651,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/scenario/web/src/behavior/agents/use-workflow-target-agent-data.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/scenario/web/src/behavior/suites/use-agent-testing-redirect.ts",
       "measured": "2026-09-06"
     },
@@ -6071,15 +5667,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/scenario/web/src/model/coerce-content-to-array.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/scenario/web/src/model/pcm-to-wav.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|modules/scenario/web/src/model/scenario-message-display.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6088,14 +5676,6 @@
     },
     {
       "key": "condition-shape|modules/scenario/web/src/ui/sections/agent-testing/run/run-configuration.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|modules/scenario/web/src/ui/sections/agents/agent-test-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|modules/scenario/web/src/ui/sections/agents/agent-workflow-editor-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -6187,10 +5767,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/stored-object/server/src/transport/api-trpc/__tests__/stored-object.probe-permission.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/suite/contract/src/plan-config.ts",
       "measured": "2026-09-06"
     },
@@ -6247,10 +5823,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/user/server/src/transport/api-trpc/user.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|modules/user/web/src/model/handled-error.ts",
       "measured": "2026-09-07"
     },
@@ -6276,10 +5848,6 @@
     },
     {
       "key": "condition-shape|modules/workflow/server/src/adapters/aws.nlp-lambda-arn-resolver.adapter.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|modules/workflow/server/src/adapters/prisma.workflow-agent-mapping.adapter.ts",
       "measured": "2026-09-07"
     },
     {
@@ -6328,34 +5896,6 @@
     },
     {
       "key": "condition-shape|modules/workflow/web/src/ui/sections/workflow-node-execution.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/api/src/rest/__tests__/raw-body-and-response.unit.test.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|packages/api/src/rest/builder.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/api/src/rest/definition.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/api/src/rest/idempotency-ledger.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/api/src/rest/rest-version-selector.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|packages/api/src/rest/v1-alias.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|packages/api/src/trpc/trpc-runtime-policy.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6943,10 +6483,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "id-generation-origin|modules/automation/server/src/transport/api-rest/automation.api.ts",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "id-generation-origin|modules/dataset/server/src/adapters/azure.dataset-storage.adapter.ts",
       "measured": "2026-09-08"
     },
@@ -6991,19 +6527,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "id-generation-origin|modules/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "id-generation-origin|modules/evaluator/server/src/app/evaluator.app.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "id-generation-origin|modules/evaluator/server/src/transport/api-trpc/evaluator-replication.api.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "id-generation-origin|modules/evaluator/server/src/transport/api-trpc/evaluator.api.ts",
       "measured": "2026-09-08"
     },
     {
@@ -7044,10 +6568,6 @@
     },
     {
       "key": "id-generation-origin|modules/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "id-generation-origin|modules/hosted-mcp/server/src/transport/api-rest/mcp-authorize.api.ts",
       "measured": "2026-09-08"
     },
     {
@@ -7416,14 +6936,6 @@
     },
     {
       "key": "namespace-class|modules/coding-agent/server/src/projections/coding-agent-session.projection.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "namespace-class|modules/data-retention/server/src/adapters/clickhouse.retroactive-retention.adapter.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "namespace-class|modules/data-retention/server/src/adapters/prisma.data-retention.adapter.ts",
       "measured": "2026-09-08"
     },
     {
@@ -8015,10 +7527,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/scim/server/src/transport/api-rest/__tests__/scim-webhook-intake.api.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "no-nested-ternary|mcp/typescript/src/langwatch-api.ts",
       "measured": "2026-09-06"
     },
@@ -8051,10 +7559,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/agent/web/src/features/management/ui/blocks/agent-push-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "no-nested-ternary|modules/analytics/contract/src/analytics.precondition-matchers.ts",
       "measured": "2026-09-06"
     },
@@ -8064,10 +7568,6 @@
     },
     {
       "key": "no-nested-ternary|modules/annotation/server/src/repositories/prisma/prisma.annotation-queue.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/annotation/server/src/transport/api-trpc/annotation.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -8256,14 +7756,6 @@
     },
     {
       "key": "no-nested-ternary|modules/evaluation/server/src/rules/evaluation-causality.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/evaluation/server/src/transport/api-trpc/evaluation.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -8595,10 +8087,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/ops/server/src/transport/api-rest/admin.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "no-nested-ternary|modules/organization/server/src/repositories/__tests__/prisma.organization-membership.repository.purge.unit.test.ts",
       "measured": "2026-09-06"
     },
@@ -8675,19 +8163,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/scenario/web/src/behavior/agents/use-workflow-target-agent-data.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "no-nested-ternary|modules/scenario/web/src/behavior/suites/use-suite-routing.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "no-nested-ternary|modules/scenario/web/src/model/agent-testing/run/parameter-line.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/scenario/web/src/model/scenario-message-display.ts",
       "measured": "2026-09-06"
     },
     {
@@ -8724,14 +8204,6 @@
     },
     {
       "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/run/use-compare-rows.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/agents/__tests__/agent-editor-test-panel.integration.test.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/agents/agent-list-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8863,10 +8335,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/user/server/src/transport/api-trpc/user.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "no-nested-ternary|modules/user/web/src/ui/sections/devices-panel.tsx",
       "measured": "2026-09-07"
     },
@@ -8888,10 +8356,6 @@
     },
     {
       "key": "no-nested-ternary|modules/webhook/server/src/transport/api-rest/__tests__/webhook-events.api.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/workflow/server/src/transport/api-trpc/workflow.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -8943,36 +8407,12 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "no-nested-ternary|packages/api/src/rest/family-error-handler.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|packages/api/src/rest/pipeline.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|packages/api/src/rest/security/rest-api-service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "no-nested-ternary|packages/api/src/trpc/audit.ts",
       "measured": "2026-09-09"
     },
     {
       "key": "no-nested-ternary|packages/api/src/trpc/runtime.ts",
       "measured": "2026-09-09"
-    },
-    {
-      "key": "no-nested-ternary|packages/api/src/trpc/trpc-call-logging.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|packages/api/src/trpc/trpc-error-formatter.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "no-nested-ternary|packages/api/src/trpc/trpc-service-builder.ts",
-      "measured": "2026-09-07"
     },
     {
       "key": "no-nested-ternary|packages/architecture-lint/src/cli.ts",
@@ -9239,10 +8679,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|apps/api/src/features/health/health-probe-rest.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|apps/api/src/features/trace/trace-rest.mount.ts",
       "measured": "2026-09-06"
     },
@@ -9451,10 +8887,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|modules/project/contract/src/project.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|modules/project/server/src/repositories/project.repository.ts",
       "measured": "2026-09-06"
     },
@@ -9647,22 +9079,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|modules/scenario/web/src/ui/sections/agents/agent-list-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|modules/scenario/web/src/ui/sections/agents/agent-workflow-editor-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|modules/scenario/web/src/ui/sections/agents/agent-workflow-target-editor-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|modules/scenario/web/src/ui/sections/agents/connected/connected-agent-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|modules/scenario/web/src/ui/sections/scenario-target-selector.tsx",
       "measured": "2026-09-06"
     },
@@ -9776,10 +9192,6 @@
     },
     {
       "key": "temporal-only|modules/user/server/src/services/user.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/api/src/rest/idempotency-ledger.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10188,10 +9600,6 @@
     },
     {
       "key": "unbounded-loop|modules/dataset/server/src/adapters/local.dataset-storage.adapter.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "unbounded-loop|modules/dataset/server/src/adapters/postgres.dataset-migration.adapter.ts",
       "measured": "2026-09-08"
     },
     {
