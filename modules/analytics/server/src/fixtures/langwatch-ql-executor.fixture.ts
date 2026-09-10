@@ -6,7 +6,7 @@ import {
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
   LangWatchQLExecutorPort,
-} from "../ports/langwatch-ql-executor.port.ts";
+} from "../repositories/langwatch-ql-executor.repository.ts";
 
 export class RecordingLangWatchQLExecutor extends LangWatchQLExecutorPort {
   readonly calls: LangWatchQLExecutionRequest[] = [];

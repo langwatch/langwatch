@@ -8,7 +8,7 @@ import {
   FilterOptionsPort,
   type FilterOption,
   type FindFilterOptionsInput,
-} from "../../ports/filter-options.port.ts";
+} from "../filter-options.repository.ts";
 
 /** How this repository reaches the tenant's ClickHouse client. */
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;

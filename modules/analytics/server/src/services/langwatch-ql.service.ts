@@ -27,7 +27,7 @@ import { DEFAULT_LWQL_RESULT_LIMITS } from "./langwatch-ql-executor.service.ts";
 import type {
   LangWatchQLExecutorPort,
   LangWatchQLResultLimits,
-} from "../ports/langwatch-ql-executor.port.ts";
+} from "../repositories/langwatch-ql-executor.repository.ts";
 import {
   type LangWatchQLGranularityResolution,
   LangWatchQLTimeWindowService,

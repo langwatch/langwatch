@@ -3,7 +3,7 @@ import type {
   AnalyticsService as AnalyticsServiceContract,
 } from "@langwatch/analytics-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { AnalyticsService } from "../services/analytics.service.ts";
+import { AnalyticsService } from "./analytics.service.ts";
 import { ClickHouseAnalyticsRepository } from "../repositories/clickhouse/clickhouse.analytics.repository.ts";
 import { NullAnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
 import {

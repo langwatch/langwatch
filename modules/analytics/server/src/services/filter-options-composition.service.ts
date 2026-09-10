@@ -3,7 +3,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { FilterOptionsClickHouseRepository } from "../repositories/clickhouse/clickhouse.filter-options.repository.ts";
-import { FilterService } from "../services/filter.service.ts";
+import { FilterService } from "./filter.service.ts";
 
 export class FilterOptionsAdapter {
   static create(options: {

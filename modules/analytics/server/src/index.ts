@@ -1,4 +1,4 @@
-export { AnalyticsAdapter } from "./adapters/analytics.adapter.ts";
+export { AnalyticsAdapter } from "./services/analytics-composition.service.ts";
 export { analyticsServer } from "./analytics.server.ts";
 
 /** The transport declarations a process mounts, and the doors they open on. */
@@ -43,7 +43,7 @@ export { ANALYTICS_CLICKHOUSE_SETTINGS } from "./rules/clickhouse-settings.rules
  * schemas, and statement ceiling — moved here so a process composes it from
  * one package rather than from six platform paths.
  */
-export { LangWatchQLAdapter } from "./adapters/langwatch-ql.adapter.ts";
+export { LangWatchQLAdapter } from "./services/langwatch-ql-composition.service.ts";
 export {
   DEFAULT_LWQL_DATABASE,
   LangWatchQLService,
@@ -64,17 +64,17 @@ export {
   type LangWatchQLConnection,
   LangWatchQLExecutorPort,
   type LangWatchQLResultLimits,
-} from "./ports/langwatch-ql-executor.port.ts";
-export { ClickHouseLangWatchQLExecutorAdapter } from "./adapters/clickhouse.langwatch-ql-executor.adapter.ts";
+} from "./repositories/langwatch-ql-executor.repository.ts";
+export { ClickHouseLangWatchQLExecutorAdapter } from "./repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 
 /**
  * The filter picker: the values one field can offer, and the two facts a door
  * refuses on before it asks for them.
  */
-export { FilterOptionsAdapter } from "./adapters/filter-options.adapter.ts";
+export { FilterOptionsAdapter } from "./services/filter-options-composition.service.ts";
 export { FilterService, type GetFilterOptionsInput } from "./services/filter.service.ts";
-export { FilterOptionsPort, type FindFilterOptionsInput } from "./ports/filter-options.port.ts";
-export type { FilterOption } from "./ports/filter-options.port.ts";
+export { FilterOptionsPort, type FindFilterOptionsInput } from "./repositories/filter-options.repository.ts";
+export type { FilterOption } from "./repositories/filter-options.repository.ts";
 export {
   filterFieldRequiresKey,
   filterFieldRequiresSubkey,

@@ -4,8 +4,8 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ClickHouseLangWatchQLExecutorAdapter } from "../../adapters/clickhouse.langwatch-ql-executor.adapter.ts";
-import type { LangWatchQLExecutorPort } from "../../ports/langwatch-ql-executor.port.ts";
+import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import type { LangWatchQLExecutorPort } from "../../repositories/langwatch-ql-executor.repository.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service.ts";
 import {
   type LangWatchQLClickHouseHarness,

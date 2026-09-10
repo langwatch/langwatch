@@ -45,10 +45,10 @@ import type {
 } from "@langwatch/analytics-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import { AnalyticsAdapter } from "../adapters/analytics.adapter.ts";
-import { FilterOptionsAdapter } from "../adapters/filter-options.adapter.ts";
-import { LangWatchQLAdapter } from "../adapters/langwatch-ql.adapter.ts";
-import type { LangWatchQLConnection } from "../ports/langwatch-ql-executor.port.ts";
+import { AnalyticsAdapter } from "../services/analytics-composition.service.ts";
+import { FilterOptionsAdapter } from "../services/filter-options-composition.service.ts";
+import { LangWatchQLAdapter } from "../services/langwatch-ql-composition.service.ts";
+import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 
 /**
  * The filter-value read this feature makes on the host's filter registry.

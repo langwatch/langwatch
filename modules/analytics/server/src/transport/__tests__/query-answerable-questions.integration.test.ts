@@ -14,7 +14,7 @@ import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.
 import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
 import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
 
-import { ClickHouseLangWatchQLExecutorAdapter } from "../../adapters/clickhouse.langwatch-ql-executor.adapter.ts";
+import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import {
   type LangWatchQLClickHouseHarness,

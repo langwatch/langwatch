@@ -8,7 +8,7 @@ import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLCatalogShapesService } from "../services/langwatch-ql-catalog-shapes.service.ts";
-import type { LangWatchQLConnection } from "../ports/langwatch-ql-executor.port.ts";
+import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import {
   KEY_MAP_COLUMNS,
   LangWatchQLAccessModelService,

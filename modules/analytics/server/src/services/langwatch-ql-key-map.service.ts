@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 
-import type { LangWatchQLConnection } from "../ports/langwatch-ql-executor.port.ts";
+import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import {
   LangWatchQLProductionProvisioningService,
   type LwqlKeyMapRow,
