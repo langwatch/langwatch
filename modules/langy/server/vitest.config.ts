@@ -1,12 +1,7 @@
-import { configDefaults, defineConfig } from "vitest/config";
-import { moduleVitestTestOptions } from "../../../packages/test-harness/src/vitest-config.ts";
+import { configDefaults } from "vitest/config";
 
-export default defineConfig({
-  test: moduleVitestTestOptions({
-    kind: "node",
-    isolate: true,
-    test: {
-      exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
-    },
-  }),
-});
+export default {
+  test: {
+    exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
+  },
+};

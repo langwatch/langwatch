@@ -111,6 +111,10 @@
       "measured": "2026-09-07"
     },
     {
+      "measured": "2026-09-10",
+      "key": "modules/langy/server|LangyAnalyticsEventMemoryRepository"
+    },
+    {
       "key": "modules/log/server|LogRequestCollectionService",
       "measured": "2026-09-07"
     },
