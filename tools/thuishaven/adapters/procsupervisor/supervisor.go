@@ -458,28 +458,34 @@ const streamReadBuffer = 64 << 10
 // stream captures one output stream line by line for the life of the pipe. It
 // returns only at EOF, or when the pipe cannot be read at all, never on a
 // single bad line.
+//
+// A raw window is local to this call: stdout and stderr are read by separate
+// goroutines, each with its own window, so a structured line on one stream
+// can never cut short a raw run still building on the other.
 func (c proc) stream(r io.Reader) {
 	br := bufio.NewReaderSize(r, streamReadBuffer)
 	var line []byte
+	var w rawWindow
 	for {
 		chunk, err := br.ReadSlice('\n')
 		line = append(line, chunk...)
 		switch {
 		case err == nil:
-			c.logln(string(line))
+			c.captureLine(&w, string(line))
 			line = line[:0]
 		case errors.Is(err, bufio.ErrBufferFull):
 			// No newline yet. Emit a segment once the line is over the cap and
 			// keep reading the rest of it, so memory stays bounded and the pipe
 			// stays drained.
 			if len(line) >= streamMaxLine {
-				c.logln(string(line))
+				c.captureLine(&w, string(line))
 				line = line[:0]
 			}
 		default:
 			if len(line) > 0 {
-				c.logln(string(line))
+				c.captureLine(&w, string(line))
 			}
+			c.flushRaw(&w)
 			if !errors.Is(err, io.EOF) {
 				c.logln(fmt.Sprintf("log capture read error: %v", err))
 				// Keep draining: if the error was transient the child stays
@@ -491,10 +497,55 @@ func (c proc) stream(r io.Reader) {
 	}
 }
 
-// logln captures one line and echoes it live. The capture keeps the child's
-// payload byte for byte — it is what `haven logs --raw` replays, and what a
-// later renderer change must still be able to read. Only the echo is rendered,
-// through the same domain/logfmt every other viewer uses.
+// rawWindow batches consecutive lines that are not the shared structured
+// format, so a Node ESM link failure — the whole stack dumped straight to
+// stderr, before any handler exists to catch and log it — renders as one
+// line rather than one per frame.
+type rawWindow struct {
+	lines []string
+}
+
+// captureLine keeps full fidelity in the sink, then either renders a
+// structured line at once (flushing any raw run ahead of it) or adds a raw
+// line to the window instead of rendering it immediately.
+func (c proc) captureLine(w *rawWindow, line string) {
+	line = strings.TrimRight(line, "\r\n")
+	c.sink.writeLine(line)
+	if logfmt.Muted(c.name, line) {
+		return
+	}
+	if _, ok := logfmt.Parse(line); !ok {
+		w.lines = append(w.lines, line)
+		return
+	}
+	c.flushRaw(w)
+	c.render(c.dedupeFatal(line))
+}
+
+// flushRaw renders whatever the window collected: the line unchanged when it
+// never grew past one, otherwise one collapsed line naming the first line and
+// how many more followed, with the raw run still readable in full through
+// `haven logs <lane> --raw` (the sink already has every one of them).
+func (c proc) flushRaw(w *rawWindow) {
+	switch len(w.lines) {
+	case 0:
+		return
+	case 1:
+		c.render(w.lines[0])
+	default:
+		msg := fmt.Sprintf(
+			"%s (+%d lines, stack in haven logs %s --raw)",
+			w.lines[0], len(w.lines)-1, c.name,
+		)
+		c.render(levelRecordLine("error", msg, time.Time{}))
+	}
+	w.lines = nil
+}
+
+// logln captures one line and echoes it live. Used for the supervisor's own
+// synthetic lines (a restart notice, a start failure) — never for a child's
+// raw stream, which goes through captureLine/flushRaw instead so a burst of
+// unstructured output collapses to one line rather than one per frame.
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\r\n")
 	c.sink.writeLine(line)
@@ -505,7 +556,13 @@ func (c proc) logln(line string) {
 	if logfmt.Muted(c.name, line) {
 		return
 	}
-	line = c.dedupeFatal(line)
+	c.render(c.dedupeFatal(line))
+}
+
+// render is the one place a line reaches the terminal (or the `up` preview
+// buffer), through the same domain/logfmt every other viewer uses. The
+// capture into the sink has already happened by the time anything calls this.
+func (c proc) render(line string) {
 	rendered := logfmt.Render(line, logfmt.Options{
 		Lane:      c.name,
 		LaneColor: c.color,

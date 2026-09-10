@@ -429,11 +429,14 @@ export function classifyMissingPackage(text) {
  */
 export function classifyBootException(text) {
   const lines = text.split("\n");
-  const bannerIndex = lines.findIndex((line) => /^\s*[A-Za-z_$][\w$.]*Error(?:\s*\[[A-Z_]+\])?:\s/.test(line));
+  // The prefix before "Error" is optional: Node's own ERR_MODULE_NOT_FOUND and
+  // ERR_UNSUPPORTED_DIR_IMPORT throw the bare built-in `Error` class, not a
+  // subclass, so "Error [ERR_MODULE_NOT_FOUND]: ..." must match too.
+  const bannerIndex = lines.findIndex((line) => /^\s*(?:[A-Za-z_$][\w$.]*)?Error(?:\s*\[[A-Z_]+\])?:\s/.test(line));
   if (bannerIndex === -1) return null;
   const banner = lines[bannerIndex]
     .trim()
-    .match(/^([A-Za-z_$][\w$.]*Error(?:\s*\[[A-Z_]+\])?):\s*(.*)$/);
+    .match(/^((?:[A-Za-z_$][\w$.]*)?Error(?:\s*\[[A-Z_]+\])?):\s*(.*)$/);
   if (!banner) return null;
   const [, errorType, message] = banner;
   return { kind: "boot-exception", errorType, message, frame: firstAppFrame(lines.slice(bannerIndex).join("\n")) };

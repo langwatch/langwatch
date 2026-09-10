@@ -47,4 +47,5 @@ export {
   scriptFailureRecord,
   writeScriptWarning,
 } from "./run-script.ts";
+export { bootNodeExecutable, installBootGuard } from "./boot-guard.ts";
 export { createWarnThrottle, type WarnThrottle } from "./warn-throttle.ts";

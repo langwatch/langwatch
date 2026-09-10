@@ -1,22 +1,16 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
 
-import process from "node:process";
-import { startStandaloneWorker } from "./app/worker-standalone.executable.ts";
+import { bootNodeExecutable } from "@langwatch/observability";
 
 /**
  * The runnable worker process — `pnpm --filter @langwatch/worker start`.
  *
- * Everything it does lives in `startStandaloneWorker`, which is the table of
- * what the process is made of. This module exists only so the start command
- * has one file to execute, and so the executable itself stays importable
- * without booting.
- *
- * A boot failure has already been written to the error stream by the time this
- * catch runs; what is left to decide here is the exit status, and it is
- * non-zero. Nothing is re-reported: a failure printed twice reads as two
- * failures.
+ * The guard installs its fatal handlers before the real entry loads, because
+ * a missing module deep in that entry's import graph fails at ESM link time,
+ * before any code in it runs. The dynamic import below is a boot seam, the
+ * one sanctioned inline `import()`.
  */
-void startStandaloneWorker().catch(() => {
-  process.exitCode = 1;
-});
+void bootNodeExecutable("langwatch-worker", () =>
+  import("./worker.entrypoint.main.ts").then((m) => m.bootWorkerEntry()),
+);
