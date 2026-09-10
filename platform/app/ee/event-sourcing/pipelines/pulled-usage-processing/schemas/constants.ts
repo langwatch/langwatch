@@ -36,10 +36,20 @@ export type PulledUsageProcessingEventType =
 
 export const PULLED_USAGE_COMMAND_TYPES = {
   RECORD: "lw.obs.pulled_usage.record",
+  /**
+   * Withdraws the version of a charge that a later pull superseded.
+   *
+   * Separate from RECORD rather than a flag on it because the two carry
+   * different addresses: RECORD names the cell the charge is landing in, and
+   * this names the cell it is leaving. One command that meant both would have
+   * to guess which of its dimensions were the address.
+   */
+  RETRACT: "lw.obs.pulled_usage.retract",
 } as const;
 
 export const PULLED_USAGE_PROCESSING_COMMAND_TYPES = [
   PULLED_USAGE_COMMAND_TYPES.RECORD,
+  PULLED_USAGE_COMMAND_TYPES.RETRACT,
 ] as const;
 
 export type PulledUsageProcessingCommandType =
