@@ -1,18 +1,33 @@
 /**
  * `POST /api/experiment/init`, driven through the real Hono app the API process mounts.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import type { Experiment } from "@langwatch/experiment-contract";
+import { createRestRuntime } from "@langwatch/api/rest";
 import {
-  ExperimentFindOrCreateService,
-  type ExperimentService,
-} from "@langwatch/experiment-server";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+  EvaluationApp,
+  type EvaluationInfrastructure,
+  evaluationsLegacyRest,
+} from "@langwatch/evaluation-server";
+import type { Experiment } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "@langwatch/experiment-server";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { ResourceScope } from "@langwatch/runtime-composition";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { mountExperimentInitRest } from "../experiment-init-rest.mount.ts";
-import { mountEvaluationsLegacyRest } from "../../evaluation/evaluations-legacy-rest.mount.ts";
+import {
+  composeApiExperimentFindOrCreate,
+  mountExperimentInitRest,
+} from "../experiment-init-rest.mount.ts";
 import type { HandlerManagedCredential } from "../../../app/api-handler-managed-credential.ts";
+import {
+  experimentApiRestRuntime,
+  experimentApp,
+  renderExperimentRestError,
+  successfulCredential,
+} from "./experiment-rest.fixture.ts";
 
 const initInit = (body: unknown) => ({
   method: "POST",
@@ -62,7 +77,7 @@ describe("given the SDK's experiment create-or-take door", () => {
         "/api/experiment/init",
         initInit({ experiment_slug: "nightly_sweep", experiment_type: "BATCH_EVALUATION_V2" }),
       );
-      const { slug } = (await created.json()) as { slug: string };
+      expect(created.status).toBe(200);
 
       const logged = await api.fetch(
         "/api/evaluations/batch/log_results",
@@ -76,11 +91,12 @@ describe("given the SDK's experiment create-or-take door", () => {
       );
 
       expect(logged.status).toBe(200);
-      // ONE creation, and the run history is addressed by the experiment the
-      // init door already minted rather than by a second one.
       expect(save).toHaveBeenCalledTimes(1);
       expect(startExperimentRun).toHaveBeenCalledWith(
-        expect.objectContaining({ experimentId: stored.get(slug)?.id, runId: "run-1" }),
+        expect.objectContaining({
+          experimentId: stored.get("nightly-sweep")?.id,
+          runId: "run-1",
+        }),
       );
     });
   });
@@ -147,55 +163,80 @@ describe("given the SDK's experiment create-or-take door", () => {
 // ---------------------------------------------------------------------------
 
 function mount(options: {
-  experiments: Partial<Record<string, unknown>>;
+  experiments: Partial<ExperimentService>;
   credential?: HandlerManagedCredential;
 }) {
-  const credential: HandlerManagedCredential = options.credential ?? {
-    ok: true,
-    project: { id: "project-1", slug: "acme", teamId: "team-1" } as never,
-    resolved: { type: "project" } as never,
-    markUsed: () => {},
-  };
+  const credential = options.credential ?? successfulCredential();
   const authenticate = async () => credential;
-
-  const experiments = {
-    getById: async () => {
-      throw new Error("getById is not part of this scenario");
-    },
+  const { app, experiments } = experimentApp({
     findBySlug: async () => null,
-    save: async () => {
-      throw new Error("save is not part of this scenario");
-    },
     startExperimentRun: async () => {},
     recordTargetResult: async () => {},
     recordEvaluatorResult: async () => {},
     completeExperimentRun: async () => {},
     ...options.experiments,
-  } as unknown as ExperimentService;
+  });
 
   // The SAME construction handed to both doors — which is the fact under test.
-  const findOrCreate = ExperimentFindOrCreateService.create(experiments);
-  const security = passThroughSecurity();
+  const findOrCreate = composeApiExperimentFindOrCreate(experiments);
+  const runtime = experimentApiRestRuntime();
+  const evaluationRuntime = createRestRuntime({
+    identity: {
+      authenticate: () => ({
+        actor: { type: "user", id: "user-1" },
+        scope: { tier: "project", id: "project-1" },
+      }),
+    },
+  });
+  const infrastructure = createApiFixture<EvaluationInfrastructure>({
+    experiments: {
+      findOrCreate: (input) =>
+        findOrCreate.resolve({
+          projectId: input.projectId,
+          experimentId: input.experimentId,
+          experimentSlug: input.experimentSlug,
+          experimentType: input.experimentType,
+          experimentName: input.experimentName,
+          workflowId: input.workflowId,
+        }),
+      findBySlug: (input) => experiments.findBySlug(input),
+    },
+    experimentRuns: {
+      startRun: ({ tenantId, ...input }) =>
+        experiments.startExperimentRun({ projectId: tenantId, ...input }),
+      recordTargetResult: ({ tenantId, ...input }) =>
+        experiments.recordTargetResult({ projectId: tenantId, ...input }),
+      recordEvaluatorResult: ({ tenantId, ...input }) =>
+        experiments.recordEvaluatorResult({ projectId: tenantId, ...input }),
+      completeRun: ({ tenantId, ...input }) =>
+        experiments.completeExperimentRun({ projectId: tenantId, ...input }),
+    },
+    report: { reportEvaluation: async () => {} },
+  });
+  const evaluations = EvaluationApp.create({
+    infrastructure,
+    dependencies: {
+      workflows: createApiFixture<WorkflowApi>(),
+      traces: createApiFixture<TraceApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+    },
+    config: void 0,
+    resources: new ResourceScope(),
+    repositories: createApiFixture(),
+  });
 
   const hono = new Hono()
     .route(
       "/",
-      mountExperimentInitRest({
-        security,
+      mountExperimentInitRest(runtime, {
+        experiments: () => app,
         collaborators: { credential: authenticate, findOrCreate },
+        errors: renderExperimentRestError,
       }),
     )
     .route(
       "/",
-      mountEvaluationsLegacyRest({
-        security,
-        credential: authenticate,
-        batch: {
-          findOrCreate,
-          experiments: () => experiments,
-          reportEvaluation: async () => {},
-        },
-      }),
+      evaluationRuntime.mount(evaluationsLegacyRest.router(), { app: () => evaluations }),
     );
 
   return {
@@ -220,36 +261,3 @@ function experimentRow(overrides: Partial<Experiment> = {}): Experiment {
     ...overrides,
   };
 }
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
-
-const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json({ error: handled.code ?? "error" }, handled.httpStatus as never);
-  }
-  return c.json({ error: String(error) }, 500);
-};
