@@ -11,6 +11,7 @@
 export {
   API_VERSION_HEADER,
   assertVersionLabel,
+  basePathOf,
   canonicalV1Path,
   isDateVersion,
   MANAGEMENT_API_VERSION,
@@ -37,6 +38,7 @@ export {
 // a route states its sources, its answers and its door with.
 export {
   defineRestRouter,
+  permissionOf,
   projectRestFacts,
   type FeatureApiWitness,
   type RestDeprecation,
@@ -139,11 +141,17 @@ export {
 // principal a second permission question is asked with, the scope a handler
 // reads back, and who is behind a personal-workspace key.
 export {
+  browserCallerOfRequest,
   credentialPrincipalOf,
   credentialPrincipalOfToken,
+  organizationCredentialOfRequest,
   organizationCredentialPrincipalOf,
   organizationCredentialPrincipalOfToken,
   organizationOf,
+  projectCredentialOfRequest,
+  recordBrowserCaller,
+  recordOrganizationCredential,
+  recordProjectCredential,
   PersonalProjectKeyRequiredError,
   PersonalUsageKeyMismatchError,
   PersonalUsageServiceKeyUnsupportedError,
@@ -153,6 +161,7 @@ export {
   type AppRestProjectVariables,
   type OrganizationScopedContext,
   type ProjectScopedContext,
+  type RestBrowserCaller,
   type RestCredentialPrincipal,
   type RestErrorHandler,
   type RestOrganizationCredentialPrincipal,
@@ -222,6 +231,7 @@ export {
 // schema wrapper are re-exported here: a transport file never reaches for
 // hono-openapi itself, and a peer-resolved copy has a different metadata symbol.
 export {
+  CREDENTIAL_CLASS_BY_DOOR,
   deprecatedAlias,
   deprecationNotice,
   documentedPathOf,

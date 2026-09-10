@@ -25,6 +25,7 @@ export {
   type FeatureTrpcMountOptions,
   type MountableTransport,
   type MountedTransports,
+  type TransportFactBinding,
 } from "./transport-mounting.ts";
 export {
   DependencyCycleError,
@@ -78,6 +79,8 @@ export {
   type InstallableServerFeature,
   type InstalledFeatureState,
   type ModuleContributions,
+  type ModuleTransportFacts,
+  type ModuleTransportFactSetup,
   serverFeature,
   ServerFeatureAssembly,
   ServerFeatureBuilder,

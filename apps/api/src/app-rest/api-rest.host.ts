@@ -14,6 +14,9 @@ import {
   bindRestMiddleware,
   createRestRuntime,
   projectRestFacts,
+  recordBrowserCaller,
+  recordOrganizationCredential,
+  recordProjectCredential,
   type MountableRestApp,
   type RestCaller,
   type RestDoorCredential,
@@ -221,6 +224,9 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   /** What the project door answers with, and where its credential is kept. */
   private projectCaller(request: Request, credential: ApiProjectCredential): RestCaller {
     this.projectCredentials.set(request, credential.resolved);
+    // The same answer, where a MODULE's own fact binding reads it. The door
+    // resolves once; nothing downstream asks the key store a second time.
+    recordProjectCredential(request, credential.resolved);
 
     return {
       actor: actorOf(credential.resolved),
@@ -239,10 +245,11 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
     return {
       authenticate: async ({ request, permission }): Promise<RestCaller> =>
         this.organizationCaller(
+          request,
           await this.credentials.authenticateOrganization({ request, permission }),
         ),
       identify: async ({ request }): Promise<RestCaller> =>
-        this.organizationCaller(await this.credentials.identifyOrganization({ request })),
+        this.organizationCaller(request, await this.credentials.identifyOrganization({ request })),
       authorize: ({ caller, permission, target }) => {
         if (target.tier !== "project") {
           throw new Error(
@@ -317,6 +324,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
       const caller = await resolve?.(request);
       if (!caller?.userId) throw refusalFor("browser");
       this.browserCallers.set(request, caller);
+      recordBrowserCaller(request, { userId: caller.userId });
 
       return { actor: { type: "user", id: caller.userId }, scope: null };
     };
@@ -330,6 +338,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
         const caller = await resolve?.(request);
         if (!caller?.userId) return null;
         this.browserCallers.set(request, caller);
+        recordBrowserCaller(request, { userId: caller.userId });
 
         return { actor: { type: "user", id: caller.userId }, scope: null };
       },
@@ -357,7 +366,11 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
    * What the organization door answers with, and where the credential behind a
    * second permission question is kept.
    */
-  private organizationCaller(credential: ApiOrganizationCredential): RestCaller {
+  private organizationCaller(
+    request: Request,
+    credential: ApiOrganizationCredential,
+  ): RestCaller {
+    recordOrganizationCredential(request, credential.resolved);
     const caller: RestCaller = {
       actor: credential.resolved.userId ? { type: "user", id: credential.resolved.userId } : null,
       scope: { tier: "organization", id: credential.resolved.organizationId },

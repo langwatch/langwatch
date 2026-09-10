@@ -229,6 +229,94 @@ export function organizationCredentialPrincipalOf(c: Context): RestOrganizationC
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// What the process's own doors resolved for one request, as a MODULE reads it
+// back when it binds a fact of its own.
+//
+// A module's route names a fact the request does not carry - the organization
+// behind the key, the workspace the key is pinned to, the person behind the
+// cookie - and the module binds the value itself, because the process must
+// never re-declare a route to supply one. The answer, though, is the DOOR's:
+// resolving it twice would ask the key store a second question per request and
+// could answer differently from the door that let the request in. So the door
+// records what it resolved here, once, and a module's binding reads it.
+//
+// Keyed by the request rather than written into the context on purpose: a door
+// is handed the request and nothing else, which is what keeps it unable to
+// touch the handler's own variables.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Who a browser cookie was verified as, for a family that binds it as a fact. */
+export type RestBrowserCaller = Readonly<{ userId: string | null }>;
+
+const projectCredentials = new WeakMap<Request, RestResolvedProjectCredential>();
+const organizationCredentials = new WeakMap<Request, RestResolvedOrganizationCredential>();
+const browserCallers = new WeakMap<Request, RestBrowserCaller>();
+
+/** The project door states what it resolved, once per request. */
+export function recordProjectCredential(
+  request: Request,
+  credential: RestResolvedProjectCredential,
+): void {
+  projectCredentials.set(request, credential);
+}
+
+/** The organization door states what it resolved, once per request. */
+export function recordOrganizationCredential(
+  request: Request,
+  credential: RestResolvedOrganizationCredential,
+): void {
+  organizationCredentials.set(request, credential);
+}
+
+/** The byte door states who it verified, once per request. */
+export function recordBrowserCaller(request: Request, caller: RestBrowserCaller): void {
+  browserCallers.set(request, caller);
+}
+
+/**
+ * What the project door resolved for this request.
+ *
+ * Raises rather than guessing: a fact bound on a family whose door resolves no
+ * project credential is a wiring bug, and a blank credential would widen every
+ * answer built from it. A plain `Error` on purpose - it degrades to the
+ * generic unknown response (ADR-045) and logs loudly, because no caller can
+ * act on it.
+ */
+export function projectCredentialOfRequest(request: Request): RestResolvedProjectCredential {
+  const credential = projectCredentials.get(request);
+  if (!credential) {
+    throw new Error(
+      "A module bound a fact from the project credential, and this request's door resolved none",
+    );
+  }
+
+  return credential;
+}
+
+/** The same, for the organization door. */
+export function organizationCredentialOfRequest(
+  request: Request,
+): RestResolvedOrganizationCredential {
+  const credential = organizationCredentials.get(request);
+  if (!credential) {
+    throw new Error(
+      "A module bound a fact from the organization credential, and this request's door resolved none",
+    );
+  }
+
+  return credential;
+}
+
+/**
+ * Who the byte door verified, or nobody. Answers `null` rather than raising:
+ * every family that binds this one declares its own 401, and an optional door
+ * that admitted an anonymous caller is not a wiring bug.
+ */
+export function browserCallerOfRequest(request: Request): RestBrowserCaller | null {
+  return browserCallers.get(request) ?? null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // The scope a request arrived on, read off a handler's own context — typed
 // once, instead of `c.get("project") as ProjectIdentity` in every family.
 // ─────────────────────────────────────────────────────────────────────────────

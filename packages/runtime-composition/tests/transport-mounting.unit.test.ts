@@ -133,6 +133,65 @@ describe("given a feature whose server declares transports", () => {
     });
   });
 
+  describe("when the module binds the facts its own declarations name", () => {
+    it("mounts the family with what the module bound", async () => {
+      const rest = recordingRestHost();
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest)
+        .withTransportFacts(({ app }) => [{ fact: "catalogueSize", read: () => app.read() }])
+        .build();
+
+      await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ rest })
+        .withModules([server])
+        .boot();
+
+      const bound = rest.mounted[0]?.options?.facts ?? [];
+
+      expect(bound).toHaveLength(1);
+    });
+
+    it("reads the value off the module's own App, not off the process", async () => {
+      const rest = recordingRestHost();
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest)
+        .withTransportFacts(({ app }) => [{ fact: "catalogueSize", read: () => app.read() }])
+        .build();
+
+      await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ rest })
+        .withModules([server])
+        .boot();
+
+      const [binding] = (rest.mounted[0]?.options?.facts ?? []) as readonly {
+        read(): string;
+      }[];
+
+      expect(binding?.read()).toBe("one dataset");
+    });
+
+    it("binds nothing in a role that serves no doors", async () => {
+      let bound = 0;
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest)
+        .withTransportFacts(() => {
+          bound += 1;
+
+          return [];
+        })
+        .build();
+
+      await createApp({ role: "worker", members: memberSourceOf({}) })
+        .withModules([server])
+        .boot();
+
+      expect(bound).toBe(0);
+    });
+  });
+
   describe("when the process opened no door for a declared protocol", () => {
     it("refuses at boot, naming the feature and the protocol", async () => {
       const server = defineServerModule("dataset")

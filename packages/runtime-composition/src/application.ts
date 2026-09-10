@@ -174,7 +174,6 @@ interface DeclaredFeature {
   /** The one-shot work this module declared, exposed by the tasks role. */
   readonly tasks: readonly unknown[];
   readonly transports: readonly FeatureTransportDescriptor[];
-  readonly facts: readonly unknown[];
   readonly repositories?: FeatureRepositories;
   readonly repositoryRegistry?: AnyRepositoryRegistry;
   readonly apiContract?: FeatureApiIdentity;
@@ -296,7 +295,6 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
     this.state.features.push({
       name: declaration.name,
       transports: declaration.transports ?? [],
-      facts: [],
       repositories: snapshotRepositories(declaration.repositories),
       repositoryRegistry: declaration.repositoryRegistry,
       apiContract: declaration.apiContract,
@@ -693,7 +691,10 @@ function declaredTransportsOf(
       feature: declaration.name,
       transports: declaration.transports,
       provided: () => state.provided,
-      facts: declaration.facts,
+      // What the MODULE bound for the facts its own routes name, built by its
+      // install in this role. The process binds only its own doors' facts and
+      // never re-declares a route to supply a module's.
+      facts: state.facts ?? [],
     },
   ];
 }

@@ -8,16 +8,23 @@ import type { FeatureTransportDescriptor } from "./feature-installer.ts";
 /** One declared family or namespace, as a host reads it back. */
 export type MountableTransport = object;
 
+/**
+ * One value a module bound for a fact its own routes declare, as the doors
+ * carry it. The shape is erased here on purpose: what a fact is and how it
+ * resolves belongs to the transport toolkit, and this package knows neither.
+ */
+export type TransportFactBinding = object;
+
 /** What one install states beyond the declaration, as a REST host reads it. */
 export type FeatureRestMountOptions = Readonly<{
   /** One binding per module-specific fact the declaration's routes name. */
-  facts?: readonly unknown[];
+  facts?: readonly TransportFactBinding[];
 }>;
 
 /** What one install states beyond the declaration, as a tRPC host reads it. */
 export type FeatureTrpcMountOptions = Readonly<{
   /** One binding per module-specific fact the declaration's procedures name. */
-  facts?: readonly unknown[];
+  facts?: readonly TransportFactBinding[];
 }>;
 
 /** A process's REST door, as the installer calls it. */
@@ -86,7 +93,8 @@ export type DeclaredTransports = Readonly<{
   feature: string;
   transports: readonly FeatureTransportDescriptor[];
   provided: () => unknown;
-  facts: readonly unknown[];
+  /** What the module itself bound for the facts its declarations name. */
+  facts: readonly TransportFactBinding[];
 }>;
 
 /**

@@ -20,6 +20,7 @@ import {
   type RepositorySelection,
 } from "./repository-registry.ts";
 import type { Tier } from "./tiers.ts";
+import type { TransportFactBinding } from "./transport-mounting.ts";
 
 /** Which process is booting. A role hosts only the work that role owns. */
 export type ServerRole = "api" | "worker" | "tasks";
@@ -81,6 +82,30 @@ export type AppDefinitionWithoutConfig<
       setup: FeatureSetup<NoInfer<Dependencies>, Members, undefined>,
     ) => NoInfer<App>;
   }>;
+
+/**
+ * What one module binds for the facts its own declarations name.
+ *
+ * A route names a fact the request does not carry — the organization behind
+ * the credential, the deep link into the product, the media type it arrived
+ * as. The value is the MODULE's to state, because stating it reads the
+ * module's own App and the peers the module declared; the process holds
+ * neither, and the alternative to this seam is the process re-declaring the
+ * route, which it must never do.
+ */
+export interface ModuleTransportFactSetup<Dependencies extends TokenMap, Members, App> {
+  /** This module's own App, already constructed by the same boot. */
+  readonly app: App;
+  /** The peer Apps this module declared as dependencies, resolved. */
+  readonly dependencies: ResolvedTokens<Dependencies>;
+  /** Exactly the members this module's App declared it reads. */
+  readonly members: Members;
+}
+
+/** The binder itself, run once at install in a role that serves doors. */
+export type ModuleTransportFacts<Dependencies extends TokenMap, Members, App> = (
+  setup: ModuleTransportFactSetup<Dependencies, Members, App>,
+) => readonly TransportFactBinding[];
 
 /** An inert API descriptor retained for the process root to mount later. */
 export type FeatureTransportDescriptor = Readonly<{
@@ -159,6 +184,12 @@ export interface InstalledFeatureState {
   readonly provided: unknown;
   /** The instantiated repositories, for a module that declared a registry. */
   readonly repositories?: unknown;
+  /**
+   * What this module bound for the facts its own declarations name, built in
+   * a role that serves doors. The process mounts these with the family; a
+   * fact left unbound is refused by the door at mount, naming fact and route.
+   */
+  readonly facts?: readonly TransportFactBinding[];
   /** Bound contribution readers; absent where the feature declared none. */
   readonly rest: (() => unknown) | undefined;
   readonly trpc: (() => unknown) | undefined;
@@ -358,6 +389,7 @@ export class ServerFeatureBuilder<
       trpc: undefined,
       worker: undefined,
       close: undefined,
+      transportFacts: undefined,
     });
   }
 }
@@ -418,6 +450,18 @@ interface FeatureAssemblyState<
       ) => Worker)
     | undefined;
   readonly close: ((provided: Provided) => void | Promise<void>) | undefined;
+  readonly transportFacts:
+    | ((
+        args: FeatureTransportArguments<
+          Config,
+          Members,
+          ResolvedTokens<Dependencies>,
+          ResolvedTokens<TransportDependencies>,
+          Provided,
+          Transport
+        >,
+      ) => readonly TransportFactBinding[])
+    | undefined;
 }
 
 /** One door's contribution, or nothing where the feature declared no such door. */
@@ -526,6 +570,7 @@ export class ServerFeatureAssembly<
       transport: create,
       rest: undefined,
       trpc: undefined,
+      transportFacts: undefined,
     });
   }
 
@@ -553,6 +598,41 @@ export class ServerFeatureAssembly<
     Worker
   > {
     return new ServerFeatureAssembly({ ...this.state, rest: create });
+  }
+
+  /**
+   * What this feature binds for the facts its own declarations name.
+   *
+   * A route names a fact the request does not carry - the organization behind
+   * the credential, the deep link into the product, the media type it arrived
+   * as - and the value for it is the MODULE's to state: it reads the module's
+   * own App and the peers the module declared, which the process holds none of
+   * and must never re-declare a route to supply. Runs once, at install, in a
+   * role that serves doors, and the doors mount what it returned.
+   */
+  withTransportFacts(
+    bind: (
+      args: FeatureTransportArguments<
+        Config,
+        Members,
+        ResolvedTokens<Dependencies>,
+        ResolvedTokens<TransportDependencies>,
+        Provided,
+        Transport
+      >,
+    ) => readonly TransportFactBinding[],
+  ): ServerFeatureAssembly<
+    Config,
+    Members,
+    Dependencies,
+    TransportDependencies,
+    Provided,
+    Transport,
+    Rest,
+    Trpc,
+    Worker
+  > {
+    return new ServerFeatureAssembly({ ...this.state, transportFacts: bind });
   }
 
   /** What this feature contributes to the process's tRPC surface. */
@@ -664,9 +744,10 @@ export class ServerFeatureAssembly<
         const doors =
           args.role === "api"
             ? this.bindTransports(setupArguments, provided, args)
-            : { rest: void 0, trpc: void 0 };
+            : { rest: void 0, trpc: void 0, facts: void 0 };
         return {
           provided,
+          ...(doors.facts ? { facts: doors.facts } : {}),
           rest: doors.rest,
           trpc: doors.trpc,
           worker: args.role === "worker" && worker ? () => workerResult : undefined,
@@ -680,7 +761,11 @@ export class ServerFeatureAssembly<
     setupArguments: FeatureSetupArguments<Config, Members, ResolvedTokens<Dependencies>>,
     provided: Provided,
     args: FeatureInstallArguments<Members>,
-  ): { rest: (() => unknown) | undefined; trpc: (() => unknown) | undefined } {
+  ): {
+    rest: (() => unknown) | undefined;
+    trpc: (() => unknown) | undefined;
+    facts: readonly TransportFactBinding[] | undefined;
+  } {
     const state = this.state;
     const { rest, trpc } = state;
     const transportDependencies = resolveTokens(
@@ -702,6 +787,7 @@ export class ServerFeatureAssembly<
     return {
       rest: rest ? () => restResult : undefined,
       trpc: trpc ? () => trpcResult : undefined,
+      facts: state.transportFacts ? state.transportFacts(doorArguments) : undefined,
     };
   }
 }
@@ -899,14 +985,18 @@ class RepositoryAppBuilder<
       RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App>["build"]
     > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> },
     ModuleRepositories<Live, Memory>,
-    App
+    App,
+    Dependencies,
+    Members
   > {
     return withContributions<
       ReturnType<
         RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App>["build"]
       > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> },
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Dependencies,
+      Members
     >({ ...this.build(), transports, namespace: publicNamespace(this.name) }, [], []);
   }
 
@@ -1190,6 +1280,29 @@ class ConfiguredAppWithTransportsBuilder<
     private readonly transports: Transports,
   ) {}
 
+  /**
+   * What this module binds for the facts its own declarations name. Answers a
+   * declaration that is already installable, so there is no half-declared
+   * module and no build step to forget.
+   */
+  withTransportFacts(
+    bind: ModuleTransportFacts<Dependencies, Members, App>,
+  ): ModuleContributions<
+    ReturnType<ConfiguredAppWithTransportsBuilder<Name, Dependencies, Members, Config, App, Transports>["build"]>,
+    unknown,
+    App,
+    Dependencies,
+    Members
+  > {
+    return withContributions<
+      ReturnType<ConfiguredAppWithTransportsBuilder<Name, Dependencies, Members, Config, App, Transports>["build"]>,
+      unknown,
+      App,
+      Dependencies,
+      Members
+    >(bindingTransportFacts(this.build(), bind as ModuleTransportFacts<TokenMap, never, never>), [], []);
+  }
+
   /** Background work this module contributes to the worker role. */
   withWorkers(...workers: readonly unknown[]) {
     return withContributions(this.build(), workers, []);
@@ -1238,6 +1351,29 @@ class UnconfiguredAppWithTransportsBuilder<
     private readonly transports: Transports,
   ) {}
 
+  /**
+   * What this module binds for the facts its own declarations name. Answers a
+   * declaration that is already installable, so there is no half-declared
+   * module and no build step to forget.
+   */
+  withTransportFacts(
+    bind: ModuleTransportFacts<Dependencies, Members, App>,
+  ): ModuleContributions<
+    ReturnType<UnconfiguredAppWithTransportsBuilder<Name, Dependencies, Members, App, Transports>["build"]>,
+    unknown,
+    App,
+    Dependencies,
+    Members
+  > {
+    return withContributions<
+      ReturnType<UnconfiguredAppWithTransportsBuilder<Name, Dependencies, Members, App, Transports>["build"]>,
+      unknown,
+      App,
+      Dependencies,
+      Members
+    >(bindingTransportFacts(this.build(), bind as ModuleTransportFacts<TokenMap, never, never>), [], []);
+  }
+
   /** Background work this module contributes to the worker role. */
   withWorkers(...workers: readonly unknown[]) {
     return withContributions(this.build(), workers, []);
@@ -1278,18 +1414,30 @@ class UnconfiguredAppWithTransportsBuilder<
  * other than the api owns. Every call answers a declaration, so a module can
  * never be left half-declared (ADR-144 s1).
  */
-export type ModuleContributions<Declaration, Repositories = unknown, App = unknown> = Declaration &
+export type ModuleContributions<
+  Declaration,
+  Repositories = unknown,
+  App = unknown,
+  Dependencies extends TokenMap = TokenMap,
+  Members = unknown,
+> = Declaration &
   Readonly<{
     readonly workers: readonly unknown[];
     readonly tasks: readonly unknown[];
     readonly eventing: FeatureEventing | undefined;
     withWorkers(
       ...workers: readonly unknown[]
-    ): ModuleContributions<Declaration, Repositories, App>;
-    withTasks(...tasks: readonly unknown[]): ModuleContributions<Declaration, Repositories, App>;
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
+    withTasks(
+      ...tasks: readonly unknown[]
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
+    /** What this module binds for the facts its own declarations name. */
+    withTransportFacts(
+      bind: ModuleTransportFacts<Dependencies, Members, App>,
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
     withEventing<Definition>(
       eventing: FeatureEventing<Repositories, App, unknown, Definition>,
-    ): ModuleContributions<Declaration, Repositories, App>;
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
     build(): Declaration &
       Readonly<{
         workers: readonly unknown[];
@@ -1298,13 +1446,56 @@ export type ModuleContributions<Declaration, Repositories = unknown, App = unkno
       }>;
   }>;
 
-/** Adds the worker, task and eventing halves to a built declaration. */
-function withContributions<Declaration extends object, Repositories = unknown, App = unknown>(
+/** A built declaration, as the facts wrapper reads the two fields it needs. */
+interface InstallableDeclaration {
+  readonly dependencies: TokenMap;
+  readonly install: (args: FeatureInstallArguments<never>) => InstalledFeatureState;
+}
+
+/**
+ * The same declaration, with its own transport facts bound at install.
+ *
+ * Nothing runs outside the api role: a worker installs the same module and
+ * builds no doors, so binding facts there would construct a request-time
+ * closure over an App nothing ever calls it with.
+ */
+function bindingTransportFacts<Declaration extends object>(
+  declaration: Declaration,
+  bind: ModuleTransportFacts<TokenMap, never, never>,
+): Declaration {
+  const installable = declaration as Declaration & InstallableDeclaration;
+
+  return {
+    ...declaration,
+    install: (args: FeatureInstallArguments<never>): InstalledFeatureState => {
+      const state = installable.install(args);
+      if (args.role !== "api") return state;
+
+      return {
+        ...state,
+        facts: bind({
+          app: state.provided as never,
+          dependencies: resolveTokens(installable.dependencies, args.resolve) as ResolvedTokens<TokenMap>,
+          members: args.members,
+        }),
+      };
+    },
+  };
+}
+
+/** Adds the worker, task, facts and eventing halves to a built declaration. */
+function withContributions<
+  Declaration extends object,
+  Repositories = unknown,
+  App = unknown,
+  Dependencies extends TokenMap = TokenMap,
+  Members = unknown,
+>(
   declaration: Declaration,
   workers: readonly unknown[],
   tasks: readonly unknown[],
   eventing?: FeatureEventing,
-): ModuleContributions<Declaration, Repositories, App> {
+): ModuleContributions<Declaration, Repositories, App, Dependencies, Members> {
   const contributed = { ...declaration, workers, tasks, eventing };
   return {
     ...contributed,
@@ -1312,9 +1503,11 @@ function withContributions<Declaration extends object, Repositories = unknown, A
       withContributions(declaration, [...workers, ...next], tasks, eventing),
     withTasks: (...next: readonly unknown[]) =>
       withContributions(declaration, workers, [...tasks, ...next], eventing),
+    withTransportFacts: (bind: ModuleTransportFacts<TokenMap, never, never>) =>
+      withContributions(bindingTransportFacts(declaration, bind), workers, tasks, eventing),
     withEventing: (next: FeatureEventing) => withContributions(declaration, workers, tasks, next),
     build: () => contributed,
-  } as ModuleContributions<Declaration, Repositories, App>;
+  } as ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
 }
 
 function parseFeatureConfig<Config>(
