@@ -1,7 +1,13 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { RETENTION_MANAGED_TABLES } from "../../data-retention/retentionPolicy.schema";
+import {
+  INDEFINITE_DEFAULT_RETENTION_TABLES,
+  PRODUCTION_STORAGE_METER_TABLES,
+  RETENTION_MANAGED_TABLES,
+  RETENTION_TABLE_CATEGORY_MAP,
+  RETENTION_TTL_MANAGED_TABLES,
+} from "../../data-retention/retentionPolicy.schema";
 import {
   buildRetentionTTLExpression,
   hasRetentionTTL,
@@ -174,26 +180,132 @@ describe("gateway_spend retention exemption", () => {
   });
 });
 
-describe("governance_cost_rollup_1d retention exemption", () => {
-  // The daily cost rollup follows `gateway_spend` for the same reason: it is
-  // a cost record, and a tenant policy a customer can shrink to weeks must
-  // never be able to hard-delete one. Fixed 13-month TTL in its own migration,
-  // absent from both reconciler maps so MODIFY TTL never rewrites the clause.
-  it("is absent from tenant retention and from the TTL reconciler config", () => {
-    expect(RETENTION_MANAGED_TABLES).not.toContain("governance_cost_rollup_1d");
-    expect(
-      TABLE_TTL_CONFIG.find((c) => c.table === "governance_cost_rollup_1d"),
-    ).toBeUndefined();
+describe("governance cost tables keep data indefinitely by default", () => {
+  // These two tables used to be exempt from retention the way `gateway_spend`
+  // still is: a fixed 13-month DELETE hardcoded in their own migration and no
+  // entry in either reconciler map. That reasoning was "a customer policy must
+  // never hard-delete a cost record" — true, and the fixed timer was a blunt
+  // way to guarantee it, because it also hard-deleted the record itself after
+  // thirteen months with no way to keep it, shorten it, or ask the question
+  // per tenant.
+  //
+  // Migration 00095 replaces the timer with the `_retention_days` column,
+  // DEFAULTING TO 0. Zero is the indefinite sentinel, so the default answer is
+  // now "keep forever" and a row is deleted only if a day count is deliberately
+  // stamped on it. The original guarantee survives by a different route: these
+  // tables stay OUT of RETENTION_TABLE_CATEGORY_MAP, so no customer-facing
+  // retention policy can reach them (and they stay out of the storage meter,
+  // which the same map drives). They are in the separate
+  // INDEFINITE_DEFAULT_RETENTION_TABLES list, and the reconciler gates on the
+  // union of the two.
+  //
+  // If the "not in RETENTION_MANAGED_TABLES" assertions below fail, someone has
+  // wired money records into the customer retention cascade, where
+  // `resolveRetention` would floor them to 49 days and start deleting.
+  const GOVERNANCE_COST_TABLES = [
+    "governance_cost_rollup_1d",
+    "governance_cost_rollup_restatement_index",
+  ] as const;
+
+  it.each(GOVERNANCE_COST_TABLES)(
+    "%s is in the TTL reconciler config",
+    (table) => {
+      expect(TABLE_TTL_CONFIG.find((c) => c.table === table)).toBeDefined();
+    },
+  );
+
+  it.each(GOVERNANCE_COST_TABLES)(
+    "%s is outside the customer retention cascade and the storage meter",
+    (table) => {
+      expect(RETENTION_MANAGED_TABLES).not.toContain(table);
+      expect(RETENTION_TABLE_CATEGORY_MAP).not.toHaveProperty(table);
+      expect(PRODUCTION_STORAGE_METER_TABLES).not.toContain(table);
+    },
+  );
+
+  it.each(GOVERNANCE_COST_TABLES)(
+    "%s is in the indefinite-default list and therefore in the reconciler's gate",
+    (table) => {
+      expect(INDEFINITE_DEFAULT_RETENTION_TABLES).toContain(table);
+      expect(RETENTION_TTL_MANAGED_TABLES).toContain(table);
+    },
+  );
+
+  // The gate must be a strict superset, not a replacement: widening it must not
+  // have dropped any customer-managed table on the way through.
+  it("the reconciler gate is the customer set plus the indefinite-default set", () => {
+    for (const table of RETENTION_MANAGED_TABLES) {
+      expect(RETENTION_TTL_MANAGED_TABLES).toContain(table);
+    }
+    expect(RETENTION_TTL_MANAGED_TABLES).toHaveLength(
+      RETENTION_MANAGED_TABLES.length +
+        INDEFINITE_DEFAULT_RETENTION_TABLES.length,
+    );
   });
 
-  it("declares its fixed 13-month delete in the migration itself", () => {
-    const migration = readFileSync(
-      migrationEndingIn("_create_governance_cost_rollup_1d.sql"),
-      "utf8",
+  it.each(GOVERNANCE_COST_TABLES)(
+    "%s anchors its retention TTL on Day, with the indefinite sentinel",
+    (table) => {
+      const config = TABLE_TTL_CONFIG.find((c) => c.table === table)!;
+      const expr = buildRetentionTTLExpression(config);
+      expect(expr).toBe(
+        "IF(_retention_days > 0, toDateTime(Day) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
+      );
+      // `hasRetentionTTL` matches on this substring, so it is what stops the
+      // reconciler re-issuing MODIFY TTL on every boot.
+      expect(hasRetentionTTL(expr!)).toBe(true);
+    },
+  );
+
+  describe("when the migration that installs the column is read", () => {
+    /**
+     * Only the statements the migration actually RUNS. Every comment line —
+     * including the house-style commented-out `down` block, which still names
+     * the old 13-month timer — starts with `--`, and so do goose's own
+     * directives, so dropping them leaves the executed SQL alone. If this
+     * filter ever emptied, the `MODIFY TTL` count below would read 0 and fail
+     * rather than pass vacuously.
+     */
+    const executedSql = (): string =>
+      readFileSync(
+        migrationEndingIn("_governance_cost_rollup_retention_days.sql"),
+        "utf8",
+      )
+        .split("\n")
+        .filter(
+          (line) => line.trim() !== "" && !line.trimStart().startsWith("--"),
+        )
+        .join("\n");
+
+    it.each(GOVERNANCE_COST_TABLES)(
+      "adds _retention_days to %s with DEFAULT 0, the keep-forever sentinel",
+      (table) => {
+        expect(executedSql()).toContain(
+          `ALTER TABLE \${CLICKHOUSE_DATABASE}.${table}\n` +
+            "  ADD COLUMN IF NOT EXISTS `_retention_days` UInt16 DEFAULT 0 CODEC(Delta(2), ZSTD(1))",
+        );
+      },
     );
-    expect(migration).toContain(
-      "TTL toDateTime(Day) + INTERVAL 13 MONTH DELETE",
+
+    it.each(GOVERNANCE_COST_TABLES)(
+      "rewrites %s's TTL to the retention expression in the same migration",
+      (table) => {
+        expect(executedSql()).toContain(
+          `ALTER TABLE \${CLICKHOUSE_DATABASE}.${table}\n` +
+            "  MODIFY TTL IF(_retention_days > 0, toDateTime(Day) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
+        );
+      },
     );
-    expect(migration).not.toContain("_retention_days");
+
+    // The point of the change: after this migration nothing the platform runs
+    // installs a fixed timer on these tables. The phrase may survive in the
+    // commented-out `down` block; it may not survive anywhere that executes.
+    it("leaves no executed statement that reinstalls the 13-month delete", () => {
+      const sql = executedSql();
+      expect(sql.match(/MODIFY TTL/g) ?? []).toHaveLength(
+        GOVERNANCE_COST_TABLES.length,
+      );
+      expect(sql).not.toContain("INTERVAL 13 MONTH");
+    });
   });
 });
