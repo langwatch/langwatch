@@ -110,8 +110,8 @@ function githubApi() {
 function sweep(client: object) {
   return composeGithubBranchMaintenance({
     repositories: {
-      installations: PrismaGithubInstallationsRepository.create(client as never),
-      pullRequests: PrismaGithubPullRequestsRepository.create(client as never),
+      installations: PrismaGithubInstallationsRepository.create(client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0]),
+      pullRequests: PrismaGithubPullRequestsRepository.create(client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0]),
     },
     config: { appId: "1234", privateKey },
     redis: null,
@@ -165,8 +165,8 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
       const paths = githubApi();
       const uncredentialed = composeGithubBranchMaintenance({
         repositories: {
-          installations: PrismaGithubInstallationsRepository.create(client as never),
-          pullRequests: PrismaGithubPullRequestsRepository.create(client as never),
+          installations: PrismaGithubInstallationsRepository.create(client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0]),
+          pullRequests: PrismaGithubPullRequestsRepository.create(client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0]),
         },
         config: { appId: "", privateKey: "" },
         redis: null,
@@ -183,8 +183,8 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
       const { client } = database();
       const uncredentialed = composeGithubBranchMaintenance({
         repositories: {
-          installations: PrismaGithubInstallationsRepository.create(client as never),
-          pullRequests: PrismaGithubPullRequestsRepository.create(client as never),
+          installations: PrismaGithubInstallationsRepository.create(client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0]),
+          pullRequests: PrismaGithubPullRequestsRepository.create(client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0]),
         },
         config: { appId: "", privateKey: "" },
         redis: null,
