@@ -38,7 +38,7 @@ const harness = vi.hoisted(() => ({
   mutated: [] as { procedure: string; input: unknown }[],
   /** What the sync mutation reports back to the page's `onSuccess`. */
   requestListingResult: { requested: 0, sources: [] as unknown[] },
-  toasts: [] as { title?: string; description?: string }[],
+  toasts: [] as { title?: string; description?: string; type?: string }[],
 }));
 
 const VIEWER = ["organization:view", "governance:view"];
@@ -83,7 +83,11 @@ vi.mock("~/utils/compat/next-router", () => ({
 
 vi.mock("~/components/ui/toaster", () => ({
   toaster: {
-    create: (toast: { title?: string; description?: string }) => {
+    create: (toast: {
+      title?: string;
+      description?: string;
+      type?: string;
+    }) => {
       harness.toasts.push(toast);
     },
   },
@@ -167,7 +171,7 @@ const listed = <T extends object>(source: T) => ({
 /** A provider that would not answer, and what a person does about it. */
 const refused = <T extends object>(
   source: T,
-  cause: "access" | "unreachable",
+  cause: "access" | "unreachable" | "incomplete",
 ) => ({ ...source, lastListing: { outcome: "refused", cause } });
 
 function renderAgents() {
@@ -279,6 +283,51 @@ describe("the agents sync control", () => {
       await userEvent.click(syncButton());
 
       expect(harness.mutated).toHaveLength(1);
+    });
+  });
+
+  describe("given a connected provider that is not scheduled to be asked", () => {
+    /**
+     * The service asks only the sources the scheduler will pull, so a press
+     * can record NOTHING while a provider is plainly connected. That is not
+     * a request, and the page must not remember it as one: latching
+     * `hasAsked` here would disable the control with "already asked" over a
+     * press that asked nobody, and "Asked 0 providers" is a sentence that
+     * reads as the page counting wrong.
+     */
+    beforeEach(() => {
+      harness.queryResults["governanceAgents.syncSources"] = { data: [GENIE] };
+      harness.requestListingResult = { requested: 0, sources: [] };
+    });
+
+    /** @scenario "Sync with nothing scheduled says so and stays pressable" */
+    it("says no provider is scheduled rather than that zero were asked", async () => {
+      renderAgents();
+
+      await userEvent.click(syncButton());
+
+      expect(harness.toasts).toHaveLength(1);
+      const [toast] = harness.toasts;
+      expect(toast?.description).toBe(
+        "No connected provider is scheduled to be asked right now.",
+      );
+      expect(toast?.type).toBe("info");
+      expect(toast?.title).not.toBe("Sync requested");
+      expect(toast?.description).not.toMatch(/Asked 0/);
+    });
+
+    /** @scenario "Sync with nothing scheduled says so and stays pressable" */
+    it("stays pressable and dispatches again on a second press", async () => {
+      renderAgents();
+
+      await userEvent.click(syncButton());
+
+      expect(syncButton()).toBeEnabled();
+      expect(syncButton()).toHaveAttribute("data-state", "ready");
+
+      await userEvent.click(syncButton());
+
+      expect(harness.mutated).toHaveLength(2);
     });
   });
 
@@ -539,6 +588,80 @@ describe("the agents page's empty table, once a provider has answered", () => {
 
       expect(screen.getByTestId("agents-empty-refused")).toBeVisible();
       expect(screen.queryByTestId("agents-empty-listed")).toBeNull();
+    });
+  });
+
+  describe("given a provider that refused, for each cause the server can name", () => {
+    /**
+     * One row per value of `AgentsListingRefusalCause`, because each cause
+     * asks something different of the reader and a page that maps two of
+     * them to one sentence sends somebody to do the wrong thing. The third
+     * row is the one that was missing: `incomplete` used to fall into the
+     * unreachable arm and tell the reader to ask again, which that cause's
+     * own contract says is the one thing not worth doing.
+     */
+    /** @scenario "Every reason a provider refuses is named on the agents page" */
+    it.each([
+      {
+        cause: "access" as const,
+        advice: "Check that connection's credentials and permissions",
+        never: "Ask again in a moment",
+      },
+      {
+        cause: "unreachable" as const,
+        advice: "Ask again in a moment",
+        never: "credentials and permissions",
+      },
+      {
+        cause: "incomplete" as const,
+        advice: "asking again will not help",
+        never: "Ask again in a moment",
+      },
+    ])("gives the $cause advice and not another cause's", ({
+      cause,
+      advice,
+      never,
+    }) => {
+      sourcesAre([refused(GENIE, cause)]);
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-refused");
+      expect(empty).toHaveTextContent(advice);
+      expect(empty).not.toHaveTextContent(never);
+    });
+  });
+
+  describe("given two providers refusing for different causes", () => {
+    /**
+     * One pane, so one instruction, and it has to be the one worth acting on:
+     * a fix outranks a wait, and a wait outranks a limit nobody can change.
+     * Each pair below lists the LOWER-ranked cause first, which is the order
+     * a first-match reading would get wrong.
+     */
+    /** @scenario "Two refusing providers show the advice that matters most" */
+    it("puts a fix ahead of a wait", () => {
+      sourcesAre([refused(GENIE, "unreachable"), refused(COPILOT, "access")]);
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-refused");
+      expect(empty).toHaveTextContent("credentials and permissions");
+      expect(empty).not.toHaveTextContent("Ask again in a moment");
+      // Both refused, so both are named.
+      expect(empty).toHaveTextContent("Prod Genie");
+      expect(empty).toHaveTextContent("Copilot tenant");
+    });
+
+    /** @scenario "Two refusing providers show the advice that matters most" */
+    it("puts a wait ahead of a limit that asking again cannot move", () => {
+      sourcesAre([
+        refused(GENIE, "incomplete"),
+        refused(COPILOT, "unreachable"),
+      ]);
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-refused");
+      expect(empty).toHaveTextContent("Ask again in a moment");
+      expect(empty).not.toHaveTextContent("asking again will not help");
     });
   });
 

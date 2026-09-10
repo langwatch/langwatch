@@ -288,6 +288,19 @@ Feature: The AI Governance Agents page
     And a second press dispatches nothing
 
   @integration
+  Scenario: Sync with nothing scheduled says so and stays pressable
+    Given an administrator on the Agents page with a provider connected
+    And that provider is not scheduled to be asked
+    When they press the sync control
+    Then it says no connected provider is scheduled to be asked right now
+    And it does not say that zero providers were asked
+    And the control stays pressable
+    # Nothing was requested, so nothing is remembered as requested: the
+    # "already asked, reload to see" state is for a press that recorded an
+    # ask, and going quiet over one that recorded none would leave the reader
+    # waiting on an answer nobody was sent to fetch.
+
+  @integration
   Scenario: An organization with no listing provider is told so
     Given an organization with no provider that can list agents
     When an administrator opens the Agents page
@@ -380,6 +393,33 @@ Feature: The AI Governance Agents page
     Given an organization with a provider that could not be reached
     When an administrator opens the Agents page
     Then the empty state says to ask again rather than to check a permission
+
+  # The server narrows every refusal to one of three things a person does
+  # differently, and the page must speak for all three. A cause the page has
+  # no words for used to fall into the "ask again" arm, which for a listing cut
+  # short by our own page limit is the one thing not worth doing.
+  @integration
+  Scenario Outline: Every reason a provider refuses is named on the agents page
+    Given an organization with a provider that refused because of <cause>
+    When an administrator opens the Agents page
+    Then the empty state says <advice>
+    And it does not give another cause's advice
+
+    Examples:
+      | cause                          | advice                                        |
+      | a credential or permission     | to check that connection's credentials        |
+      | the provider not answering     | to ask again in a moment                      |
+      | the list being cut short by us | that asking again will not help               |
+
+  @integration
+  Scenario: Two refusing providers show the advice that matters most
+    Given two providers refused for different reasons
+    When an administrator opens the Agents page
+    Then the empty state names both providers
+    And its advice is the one for the reason that most needs acting on
+    # A fix outranks a wait, and a wait outranks a limit nobody here can
+    # change. One pane carries one instruction, so it has to be the one the
+    # reader would regret not seeing.
 
   @integration
   Scenario: A refusal never shows the HTTP status behind it
