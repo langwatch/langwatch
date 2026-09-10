@@ -190,11 +190,12 @@ function SourceTableRow({
     completeness: runCompleteness(source.lastRunCompleteness),
   });
   const StatusIcon = status.icon;
-  // Own-property test: see sourceHealthDisplay. An inherited name would hand
-  // back a Function here and render as one instead of falling back to the raw
-  // type string.
+  // Own-property test: see sourceHealthDisplay. `sourceType` is cast from a
+  // free-form column one line above, so the union it claims to be is a promise
+  // the database never made. An inherited name would resolve up the prototype
+  // chain and render as a Function instead of falling back to the raw string.
   const typeLabel = Object.hasOwn(SOURCE_TYPE_LABEL, sourceType)
-    ? SOURCE_TYPE_LABEL[sourceType]!
+    ? SOURCE_TYPE_LABEL[sourceType]
     : source.sourceType;
   const mode = modeForSourceType({ sourceType });
   const delivery = deliveryFor(source);
