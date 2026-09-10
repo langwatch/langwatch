@@ -1318,10 +1318,12 @@ function CostTotalPanel({
   // same rows, same fold — and both panels say so in the same words. A bar
   // drawn at the sum of the days that held a figure reads as a cheap period
   // unless something says the figure is not whole; the bar is drawn short
-  // (see `CostStackedBars`) and this line says who left it short.
+  // (see `CostStackedBars`) and this line says who left it short. Read off
+  // the buckets the chart draws, so the note names exactly the providers
+  // whose bars are marked.
   const partialProviders = useMemo(
-    () => (providerDays === null ? [] : partialProviderNotes(providerDays)),
-    [providerDays],
+    () => (measured === null ? [] : partialProviderNotes(measured)),
+    [measured],
   );
   return (
     <CostPanel title="Cost over time" sample={showSample}>

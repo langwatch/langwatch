@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
-import { type ReactNode, useMemo } from "react";
+import { type ReactElement, type ReactNode, useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -11,6 +11,8 @@ import {
   Legend,
   Pie,
   PieChart,
+  Rectangle,
+  type RectangleProps,
   ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
@@ -430,37 +432,132 @@ function seriesKeysOf(buckets: DailyBucket[]): Array<{
  */
 export type StackedBucket = DailyBucket & { withheld?: boolean };
 
+/**
+ * The slate ink for a quantity that is NOT a measurement of what happened.
+ *
+ * Two marks on this screen mean that, and they share it on purpose: the
+ * forecast's projected span, and the edge of a bar whose period holds a figure
+ * we do not have. A hex rather than a token because the chart palette has no
+ * hue for "not a measurement" — every palette hue carries a figure, and a
+ * figure is the one thing neither of these marks is — and no Chakra semantic
+ * token names the idea either; `fg.muted` is an ink for text, which the
+ * mark-colour guard rightly refuses on a drawn shape. `CHART_SEAT_CONTRACT_FILL`
+ * in `chartTheme` is the same slate for the same reason.
+ */
+const PROJECTION_INK = "#94a3b8";
 /** Stroke on a bar whose period holds a figure we do not have. */
-const WITHHELD_STROKE = "#94a3b8";
+const WITHHELD_STROKE = PROJECTION_INK;
 /** How much of the series colour a short bar keeps. */
 const WITHHELD_FILL = 0.45;
+/**
+ * The dash a short bar's edge is drawn in. The cue that is not a colour: a
+ * faded fill alone disappears under greyscale and under most colour-blindness,
+ * and a mark that means "not the whole figure" cannot be one only some readers
+ * can see.
+ */
+const WITHHELD_DASH = "3 2";
+/**
+ * The height, in pixels, of the mark drawn where a bar would be when the period
+ * has NO figure at all — every day withheld, nothing to add up. Tall enough to
+ * carry the dash, short enough not to read as a small amount.
+ */
+const WITHHELD_EMPTY_HEIGHT = 6;
 
 /** The words a short bar's tooltip adds after the period's name. */
 export const WITHHELD_TOOLTIP_NOTE = "part of this period has no dollar figure";
+/** What a screen reader says on a bar that is short. */
+export const WITHHELD_BAR_LABEL =
+  "Amount withheld: part of this period has no dollar figure";
+/** What a screen reader says where a bar would be, when the whole period is withheld. */
+export const WITHHELD_EMPTY_BAR_LABEL =
+  "Amount withheld: no dollar figure for this period";
 
 /**
- * One cell per bar, fading and dash-edging the bars whose period is short, so
- * a short bar reads as "not the whole figure" before the tooltip or the note
- * under the chart is. Nothing at all when no bucket is short: recharts draws
- * each bar from its own cell list, and a full list of plain cells on every
- * chart is work for nothing.
+ * Which periods the chart must draw as short, and which of those it must draw
+ * a stand-in for because there is no bar to mark.
  */
-function withheldCells(
-  rows: Array<Record<string, number | string>>,
-  withheldDays: ReadonlySet<string>,
-): ReactNode {
-  if (withheldDays.size === 0) return null;
-  return rows.map((row) => {
-    const short = withheldDays.has(String(row.day));
+export type WithheldMarks = {
+  /** Periods holding some figure we do not have: the bar is drawn short. */
+  withheldDays: ReadonlySet<string>;
+  /**
+   * Periods holding NO figure at all: recharts draws nothing for a bar of
+   * height zero, so a mark stands in for the bar. A single-provider tenant
+   * with one unanswered bill used to get an empty slot here, indistinguishable
+   * from a period nobody spent anything in — the exact reading a withheld
+   * figure exists to prevent.
+   */
+  emptyDays: ReadonlySet<string>;
+  /**
+   * Whether this series draws the stand-in. Exactly one series per chart
+   * does: every series in a stack is handed the same zero-height rectangle at
+   * the same spot, and N of them drawing N marks on top of one another is one
+   * mark to the eye and N to a screen reader.
+   */
+  drawsEmptyMark: boolean;
+};
+
+/**
+ * The geometry recharts hands a bar's shape, and the row the bar was drawn
+ * from. Narrower than recharts' own `BarShapeProps` so a test can build one
+ * by hand for the zero-height case that jsdom cannot lay out.
+ */
+export type WithheldBarShapeProps = RectangleProps & {
+  payload?: { day?: unknown };
+};
+
+/**
+ * One bar, drawn as recharts would unless its period is short.
+ *
+ * A short bar keeps recharts' own rectangle — so it still answers to
+ * `.recharts-rectangle` and to the click that opens a period — faded and
+ * dash-edged, wrapped in a group that says why to a screen reader. A period
+ * with nothing to draw gets the stand-in instead. Handed to `<Bar shape>`
+ * rather than done with `<Cell>`s because a cell can only restyle a
+ * rectangle recharts decided to draw, and for a height of zero it decides
+ * not to; a custom shape is called for every bar, zero-height ones included.
+ */
+export function withheldBarShape(
+  props: WithheldBarShapeProps,
+  marks: WithheldMarks,
+): ReactElement | null {
+  const day = typeof props.payload?.day === "string" ? props.payload.day : null;
+  if (day === null || !marks.withheldDays.has(day)) {
+    return <Rectangle {...props} />;
+  }
+  if (marks.emptyDays.has(day)) {
+    if (!marks.drawsEmptyMark) return null;
+    const { x = 0, y = 0, width = 0 } = props;
     return (
-      <Cell
-        key={String(row.day)}
-        fillOpacity={short ? WITHHELD_FILL : 1}
-        stroke={short ? WITHHELD_STROKE : undefined}
-        strokeDasharray={short ? "3 2" : undefined}
-      />
+      <g role="img" aria-label={WITHHELD_EMPTY_BAR_LABEL} data-withheld="empty">
+        <title>{WITHHELD_EMPTY_BAR_LABEL}</title>
+        <rect
+          x={x}
+          // Up from the baseline, where the bar would have started.
+          y={y - WITHHELD_EMPTY_HEIGHT}
+          width={width}
+          height={WITHHELD_EMPTY_HEIGHT}
+          fill="none"
+          stroke={WITHHELD_STROKE}
+          strokeDasharray={WITHHELD_DASH}
+        />
+      </g>
     );
-  });
+  }
+  // A series with nothing in this period, stacked on one that has: recharts
+  // would draw nothing for it, and a labelled group around nothing is a
+  // second "withheld" a screen reader would read out for one bar.
+  if (!props.height || !props.width) return null;
+  return (
+    <g role="img" aria-label={WITHHELD_BAR_LABEL} data-withheld="short">
+      <title>{WITHHELD_BAR_LABEL}</title>
+      <Rectangle
+        {...props}
+        fillOpacity={WITHHELD_FILL}
+        stroke={WITHHELD_STROKE}
+        strokeDasharray={WITHHELD_DASH}
+      />
+    </g>
+  );
 }
 
 function widenBuckets(
@@ -523,7 +620,9 @@ export function CostStackedBars({
    * Null while unanswered. A bucket flagged `withheld` is drawn faded with a
    * dashed edge and its tooltip says why: its bar is the sum of the days that
    * held a figure, which is short by however much was left out, and a short
-   * bar drawn like a whole one reads as a cheap period.
+   * bar drawn like a whole one reads as a cheap period. A withheld bucket
+   * with no figure at all gets a dashed stand-in where its bar would be, so
+   * it is never an empty slot. See `withheldBarShape`.
    */
   buckets: StackedBucket[] | null;
   height?: string;
@@ -569,6 +668,17 @@ export function CostStackedBars({
     () => new Set((buckets ?? []).filter((b) => b.withheld).map((b) => b.day)),
     [buckets],
   );
+  // A withheld period with nothing in it at all: no series holds a figure,
+  // so there is no bar for the dash to sit on, and a mark stands in for one.
+  const emptyDays = useMemo(
+    () =>
+      new Set(
+        (buckets ?? [])
+          .filter((b) => b.withheld && b.points.every((p) => p.value === 0))
+          .map((b) => b.day),
+      ),
+    [buckets],
+  );
 
   if (buckets === null)
     return <EmptyPanel height={height} unanswered empty={empty} />;
@@ -610,7 +720,7 @@ export function CostStackedBars({
             cursor={CHART_TOOLTIP_CURSOR}
           />
           {showLegend && ChartLegend({ keys })}
-          {keys.map((k) => (
+          {keys.map((k, index) => (
             <Bar
               key={k.key}
               dataKey={k.key}
@@ -620,6 +730,19 @@ export function CostStackedBars({
               stackId={grouped ? undefined : "cost"}
               fill={colorFor?.(k.key) ?? getHexColorForString(k.label)}
               isAnimationActive={false}
+              // Only when some period is short: a custom shape makes recharts
+              // hand over zero-height bars it would otherwise skip, and a
+              // chart with nothing to mark has no use for them.
+              shape={
+                withheldDays.size > 0
+                  ? (shapeProps: WithheldBarShapeProps) =>
+                      withheldBarShape(shapeProps, {
+                        withheldDays,
+                        emptyDays,
+                        drawsEmptyMark: index === 0,
+                      })
+                  : undefined
+              }
               cursor={onSelectSeries ? "pointer" : undefined}
               onClick={
                 onSelectSeries
@@ -637,9 +760,7 @@ export function CostStackedBars({
                     }
                   : undefined
               }
-            >
-              {withheldCells(rows, withheldDays)}
-            </Bar>
+            />
           ))}
         </BarChart>
       </ResponsiveContainer>
@@ -651,8 +772,6 @@ export function CostStackedBars({
 const MEASURED_FILL = 0.42;
 /** Opacity of the same series over the months still to come. */
 const PROJECTED_FILL = 0.07;
-/** The projected span's own wash, over the top of the faded series. */
-const PROJECTION_INK = "#94a3b8";
 
 /**
  * Where the projection begins: the LAST MEASURED bucket, and its position as a

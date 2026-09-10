@@ -943,6 +943,45 @@ Feature: One cost screen, three honest lanes
     # A chart draws nothing under a test renderer with no layout, so the
     # note under it is the part of this scenario the screen test can see.
 
+  @integration
+  Scenario: A period whose every day is withheld still shows a withheld mark
+    Given a window in which a provider's only days hold no dollar figure
+    When a permitted viewer reads the cost over time
+    Then a dashed mark stands where that period's bar would be
+    And the mark says the amount is withheld, in words a screen reader reads out
+    # The rule above says a short period is drawn faded and dash-edged. For a
+    # period with SOME figure that is enough, because there is a bar to fade.
+    # A period with no figure at all has no bar: the chart draws nothing for a
+    # height of zero, so a single-provider tenant with one unanswered bill got
+    # an empty slot, indistinguishable from a period nobody spent anything
+    # in — the exact reading a withheld figure exists to prevent. The mark is
+    # a dash and a label, not a colour, so it survives greyscale and a screen
+    # reader alike.
+
+  @integration
+  Scenario: The provider split marks a short period the same way the total chart does
+    Given a window in which one provider has a day we hold no dollar figure for
+    When a permitted viewer reads the cost over time by provider
+    Then the period holding that day is drawn as short there too
+    # One fold, two charts. Both panels are built from the same rows, and for
+    # a while only the total chart carried the mark: the split was folded
+    # straight from the day buckets, which know nothing of withheld days, so
+    # the same period was faded on the left and plain on the right.
+
+  @unit
+  Scenario: A day billed partly in a currency with no dollar figure leaves its period short
+    Given a day at one provider holding a dollar figure and a bill in a currency we hold no dollar figure for
+    When the cost over time is folded
+    Then the period holding that day is marked as short
+    And the note under the chart names that provider and the currency
+    And the period a reader would open is marked as partial
+    # ONE DEFINITION OF SHORT. There are two ways a day gets short: a cell with
+    # no amount at all, and a cell billed in a currency we could not convert,
+    # which leaves a real but incomplete dollar figure. Each fold used to spell
+    # the rule out for itself and two of them spelled out only the first half,
+    # so a day billed in dollars and euros drew a whole bar over a note saying
+    # part of its spend had no dollar figure. Every fold asks one predicate now.
+
   @unit
   Scenario: The period a reader opens is the span its bar was drawn from
     Given a provider billed on several days inside one period
