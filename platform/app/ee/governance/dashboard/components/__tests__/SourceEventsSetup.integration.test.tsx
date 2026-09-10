@@ -114,7 +114,12 @@ describe("given the setup instructions behind the heading's (i)", () => {
       await user.click(screen.getByTestId("events-setup-info"));
 
       expect(await screen.findByText(/Push an OTLP body to/)).toBeVisible();
-      expect(screen.getByText(ingestEndpointFor(OTEL_SOURCE))).toBeVisible();
+      // Narrowed rather than coerced: `ingestEndpointFor` returns null for a
+      // source with no push route, and an OTLP source with no endpoint would
+      // make the assertion below pass against an empty string.
+      const endpoint = ingestEndpointFor(OTEL_SOURCE);
+      if (endpoint === null) throw new Error("an OTLP source has an endpoint");
+      expect(screen.getByText(endpoint)).toBeVisible();
       expect(
         screen.getByText(/Spans land in the LangWatch trace store/),
       ).toBeVisible();

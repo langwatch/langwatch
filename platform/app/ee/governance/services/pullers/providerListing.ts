@@ -67,7 +67,29 @@ export type ListingRefusalReason =
    * the field carries the status of a provider answer that FAILED, and here
    * none did.
    */
-  | "too_many_pages";
+  | "too_many_pages"
+  /**
+   * The provider stopped advancing through a collection before the total it
+   * had stated. The second member describing OUR reading rather than the
+   * provider's answer, and it is a different stop from `too_many_pages`.
+   *
+   * `too_many_pages` is a bound WE chose: every page was served, and we
+   * stopped asking. This one is the provider declining to move -- it serves a
+   * page that names nobody, or re-serves rows already read, while claiming a
+   * larger total. Each request was answered with a success status, so no
+   * status-derived reason fits, and `malformed_response` would be wrong twice:
+   * the page parsed, and its cause tells the reader to try again.
+   *
+   * Asking again does not help. The next walk sends the same pagination
+   * parameters and is answered the same way, which is what makes this
+   * incomplete rather than transient. Reporting it as a listing instead would
+   * put a fraction of the directory on a screen as the whole of it, and every
+   * retry would confirm the same wrong number.
+   *
+   * `status` is null against this reason: the field carries the status of a
+   * provider answer that FAILED, and here every answer succeeded.
+   */
+  | "pagination_stalled";
 
 export interface ListingRefusal {
   reason: ListingRefusalReason;

@@ -3,6 +3,14 @@ import { deriveSourceHealth } from "@ee/governance/services/pullers/sourceHealth
 import { describe, expect, it } from "vitest";
 
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
+import {
+  bootConfigured,
+  evolve,
+  listingKey,
+  requestedFor,
+} from "../../process-manager/__tests__/listingProcess.fixture";
+import { INGESTION_PULL_STALE_LISTING_MS } from "../../process-manager/ingestionPull.process";
+import { INGESTION_PULL_EVENT_TYPES } from "../../schemas/constants";
 import type { IngestionPullProcessingEvent } from "../../schemas/events";
 import {
   type IngestionPullRunStatusData,
@@ -1000,6 +1008,200 @@ describe("IngestionPullRunStatusFoldProjection", () => {
         expect(pullFields(refused)).toEqual(pullFields(pulled));
         expect(refused.LastRunScheduledFor).toBe(2_000);
       });
+    });
+  });
+});
+
+/**
+ * The interleaving the listing fence exists for, driven end to end.
+ *
+ * The process manager and this projection consume the same log, and the
+ * process manager's slot guard governs only what gets DISPATCHED: the effect
+ * records its outcome whatever happened while it was away. So an ask the
+ * process manager has already abandoned still commits an answer, and it
+ * commits it LAST -- which is why the fold cannot order these by the instant
+ * they were recorded.
+ *
+ * The abandonment here is the real one rather than a stipulated one. The
+ * process manager is driven with its own constant to establish that the second
+ * ask is genuinely accepted while the first is still outstanding; the fold
+ * then sees the two answers in the order the log would hold them.
+ */
+describe("given a listing outcome that arrives after a later ask was accepted", () => {
+  const requestPeople = requestedFor(
+    INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REQUESTED,
+  );
+  const FIRST_ASKED_AT = Date.parse("2026-09-09T10:03:00Z");
+  const SECOND_ASKED_AT = FIRST_ASKED_AT + INGESTION_PULL_STALE_LISTING_MS + 1;
+
+  const PEOPLE_COLUMNS = [
+    "LastPeopleListingAt",
+    "LastPeopleListingOutcome",
+    "LastPeopleDirectoryCount",
+    "LastPeopleWithheldCount",
+    "LastPeopleListingReason",
+    "LastPeopleListingStatus",
+  ] as const;
+
+  const peopleColumns = (state: IngestionPullRunStatusData) =>
+    Object.fromEntries(PEOPLE_COLUMNS.map((key) => [key, state[key]]));
+
+  const peopleListed = ({
+    state,
+    requestId,
+    requestedAt,
+    directoryPersonCount,
+    occurredAt,
+  }: {
+    state: IngestionPullRunStatusData;
+    requestId: string;
+    requestedAt: number;
+    directoryPersonCount: number;
+    occurredAt: number;
+  }) =>
+    projection.apply(
+      state,
+      event(
+        "lw.obs.ingestion_pull.people_listed",
+        {
+          sourceId: "source-1",
+          requestId,
+          requestedAt,
+          directoryPersonCount,
+          withheldPersonCount: 0,
+        },
+        occurredAt,
+      ),
+    );
+
+  it("is accepted by the process manager, because the first ask outlived the stale window", () => {
+    // Without this the fold test below would be arguing with a situation the
+    // product never reaches. It reaches it.
+    const booted = bootConfigured();
+    const first = evolve({
+      previousState: booted.state,
+      ...requestPeople({ requestId: "req-a", at: FIRST_ASKED_AT }),
+    });
+    const second = evolve({
+      previousState: first.state,
+      ...requestPeople({ requestId: "req-b", at: SECOND_ASKED_AT }),
+    });
+
+    expect(first.state.currentPeopleListing?.requestId).toBe("req-a");
+    expect(second.intents.map((intent) => intent.messageKey)).toEqual([
+      listingKey("people", "req-b"),
+    ]);
+    expect(second.state.currentPeopleListing?.requestId).toBe("req-b");
+  });
+
+  describe("when the abandoned ask records its answer last", () => {
+    it("leaves the accepted ask's directory count standing", () => {
+      const accepted = peopleListed({
+        state: projection.init(),
+        requestId: "req-b",
+        requestedAt: SECOND_ASKED_AT,
+        directoryPersonCount: 900,
+        occurredAt: SECOND_ASKED_AT + 30_000,
+      });
+      const superseded = peopleListed({
+        state: accepted,
+        requestId: "req-a",
+        requestedAt: FIRST_ASKED_AT,
+        directoryPersonCount: 12,
+        // Recorded after the answer that overtook it, which is exactly why
+        // ordering these by `occurredAt` would keep the wrong one.
+        occurredAt: SECOND_ASKED_AT + 60_000,
+      });
+
+      expect(superseded.LastPeopleDirectoryCount).toBe(900);
+      expect(superseded.LastPeopleListingAt).toBe(SECOND_ASKED_AT);
+      // Every people column, not just the count: a fence that kept the number
+      // and let the outcome, reason or status through would be no fence. The
+      // envelope timestamps are excluded because `apply` stamps those on every
+      // event it is handed, superseded or not.
+      expect(peopleColumns(superseded)).toEqual(peopleColumns(accepted));
+    });
+
+    it("cannot bury it under a refusal either", () => {
+      const accepted = peopleListed({
+        state: projection.init(),
+        requestId: "req-b",
+        requestedAt: SECOND_ASKED_AT,
+        directoryPersonCount: 900,
+        occurredAt: SECOND_ASKED_AT + 30_000,
+      });
+      const superseded = projection.apply(
+        accepted,
+        event(
+          "lw.obs.ingestion_pull.people_listing_refused",
+          {
+            sourceId: "source-1",
+            requestId: "req-a",
+            requestedAt: FIRST_ASKED_AT,
+            reason: "listing_failed",
+            status: null,
+          },
+          SECOND_ASKED_AT + 60_000,
+        ),
+      );
+
+      // A refusal landing here would tell an administrator to go and audit a
+      // credential that had just answered.
+      expect(superseded.LastPeopleListingOutcome).toBe("listed");
+      expect(superseded.LastPeopleDirectoryCount).toBe(900);
+    });
+  });
+
+  describe("when the same ask reports twice", () => {
+    it("still folds the second report, so replay stays deterministic", () => {
+      // One ask can legitimately record twice: a listed from one attempt, then
+      // a refusal from a redelivery that ran out of attempts. Equal
+      // `requestedAt` is not supersession.
+      const listed = peopleListed({
+        state: projection.init(),
+        requestId: "req-a",
+        requestedAt: FIRST_ASKED_AT,
+        directoryPersonCount: 12,
+        occurredAt: FIRST_ASKED_AT + 30_000,
+      });
+      const refused = projection.apply(
+        listed,
+        event(
+          "lw.obs.ingestion_pull.people_listing_refused",
+          {
+            sourceId: "source-1",
+            requestId: "req-a",
+            requestedAt: FIRST_ASKED_AT,
+            reason: "listing_failed",
+            status: null,
+          },
+          FIRST_ASKED_AT + 60_000,
+        ),
+      );
+
+      expect(refused.LastPeopleListingOutcome).toBe("refused");
+      expect(refused.LastPeopleDirectoryCount).toBeNull();
+    });
+  });
+
+  describe("when a later ask answers after an earlier one already recorded", () => {
+    it("replaces it, because that is an ordinary second sync", () => {
+      const first = peopleListed({
+        state: projection.init(),
+        requestId: "req-a",
+        requestedAt: FIRST_ASKED_AT,
+        directoryPersonCount: 12,
+        occurredAt: FIRST_ASKED_AT + 30_000,
+      });
+      const second = peopleListed({
+        state: first,
+        requestId: "req-b",
+        requestedAt: SECOND_ASKED_AT,
+        directoryPersonCount: 900,
+        occurredAt: SECOND_ASKED_AT + 30_000,
+      });
+
+      expect(second.LastPeopleDirectoryCount).toBe(900);
     });
   });
 });

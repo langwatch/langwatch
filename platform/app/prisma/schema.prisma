@@ -4892,6 +4892,12 @@ model IngestionPullRunProjection {
   /// never a foreign key, because the log outlives the vocabulary. Status is
   /// nullable even when refused, because a refusal we generated ourselves has
   /// no HTTP status, and it is never rendered to a customer.
+  ///
+  /// The two `...ListingAt` columns hold the instant the ASK was accepted, not
+  /// the instant its answer was recorded, and the fold orders outcomes by them
+  /// so a superseded listing cannot overwrite the one that replaced it. The
+  /// name predates that job and is kept because renaming a column is a
+  /// migration; the fold's own field docs are the statement of record.
   LastAgentsListingAt      Float?  @map("lastAgentsListingAt")
   LastAgentsListingOutcome String? @map("lastAgentsListingOutcome")
   LastAgentsListingCount   Int?    @map("lastAgentsListingCount")

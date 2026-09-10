@@ -303,7 +303,7 @@ describe("the Anthropic and OpenAI admin lists", () => {
    * `mockResolvedValue`, not `mockResolvedValueOnce`: the point is that the
    * same reply stays available for every request the walk chooses to make.
    */
-  it("records each person once rather than once per repeated page", async () => {
+  it("refuses a workspace that re-serves the same page short of its stated total", async () => {
     fetchMock.mockResolvedValue(
       reply({
         body: {
@@ -323,11 +323,13 @@ describe("the Anthropic and OpenAI admin lists", () => {
       token: "token",
     });
 
-    if (listing.outcome !== "listed") throw new Error("expected a listing");
-    expect(listing.items.map((person) => person.rawActorId)).toEqual([
-      "ada@example.com",
-      "grace@example.com",
-    ]);
+    // The OUTCOME is the assertion, not the deduplicated count. Two people
+    // reported as a listing against a stated total of a thousand is a claim
+    // that this workspace employs two, and every retry would repeat it.
+    expect(listing).toEqual({
+      outcome: "refused",
+      refusal: { reason: "pagination_stalled", status: null },
+    });
   });
 
   /**
@@ -538,9 +540,11 @@ describe("the Databricks SCIM list", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("stops on a page that named nobody, whatever total it claims", async () => {
-    // Otherwise a workspace overstating its total would be asked from the same
-    // index until the page budget ran out.
+  it("refuses a page that named nobody while the stated total says people remain", async () => {
+    // Stopping is right -- the index cannot advance past a page that served
+    // nothing, so asking again gets the same answer until the page budget runs
+    // out. Reporting it as an empty directory is not: five hundred people the
+    // workspace says it has would be shown to their own administrator as none.
     fetchMock.mockResolvedValue(
       reply({ body: { Resources: [], totalResults: 500 } }),
     );
@@ -550,7 +554,10 @@ describe("the Databricks SCIM list", () => {
       token: "workspace-token",
     });
 
-    expect(listing).toEqual({ outcome: "empty", items: [] });
+    expect(listing).toEqual({
+      outcome: "refused",
+      refusal: { reason: "pagination_stalled", status: null },
+    });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -611,6 +618,110 @@ describe("the Databricks SCIM list", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * `readScimPage` promises to skip an individual row it cannot read rather
+   * than lose the list. A page where every row happens to fail that parse is
+   * still a page the workspace served, and the index advances past it, so
+   * ending the walk there would break the promise one page at a time and hide
+   * whatever the next page holds.
+   */
+  it("reads past a page whose rows all failed to parse", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        reply({
+          body: {
+            Resources: [{ userName: "no-id@example.com" }],
+            totalResults: 2,
+            startIndex: 1,
+            itemsPerPage: 1,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        reply({
+          body: {
+            Resources: [{ id: "u-2", userName: "grace@example.com" }],
+            totalResults: 2,
+            startIndex: 2,
+            itemsPerPage: 1,
+          },
+        }),
+      );
+
+    const listing = await listDatabricksPeople({
+      workspaceUrl: "https://dbc-1.cloud.databricks.com",
+      token: "workspace-token",
+    });
+
+    expect(listing).toEqual({
+      outcome: "listed",
+      items: [
+        {
+          rawActorId: "grace@example.com",
+          displayName: "",
+          email: "grace@example.com",
+          department: "",
+        },
+      ],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses when every row the workspace served failed to parse", async () => {
+    fetchMock.mockResolvedValueOnce(
+      reply({ body: { Resources: [{ userName: "no-id@example.com" }] } }),
+    );
+
+    const listing = await listDatabricksPeople({
+      workspaceUrl: "https://dbc-1.cloud.databricks.com",
+      token: "workspace-token",
+    });
+
+    // "This workspace employs nobody" for "nobody could be read" is a false
+    // fact about the tenant, the same one `listMicrosoftPeople` refuses.
+    expect(listing).toEqual({
+      outcome: "refused",
+      refusal: { reason: "malformed_response", status: null },
+    });
+  });
+
+  /**
+   * The bound is ours, not the workspace's: every page was asked for and
+   * answered. What the walk holds at that point is a prefix of the directory,
+   * and a screen cannot show a prefix as the whole staff -- the next press
+   * reads the same pages and stops in the same place.
+   */
+  it("refuses once the walk runs out of page budget", async () => {
+    let issued = 0;
+    fetchMock.mockImplementation(() => {
+      const first = issued * 100 + 1;
+      issued += 1;
+      return Promise.resolve(
+        reply({
+          body: {
+            Resources: Array.from({ length: 100 }, (_unused, index) => ({
+              id: `u-${first + index}`,
+              userName: `user-${first + index}@example.com`,
+            })),
+            totalResults: 1_000_000,
+            startIndex: first,
+            itemsPerPage: 100,
+          },
+        }),
+      );
+    });
+
+    const listing = await listDatabricksPeople({
+      workspaceUrl: "https://dbc-1.cloud.databricks.com",
+      token: "workspace-token",
+    });
+
+    expect(listing).toEqual({
+      outcome: "refused",
+      refusal: { reason: "too_many_pages", status: null },
+    });
   });
 
   it("never carries the workspace token into a refusal", async () => {

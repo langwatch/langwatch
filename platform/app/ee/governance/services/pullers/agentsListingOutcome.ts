@@ -102,6 +102,11 @@ const REFUSAL_CAUSE: Record<ListingRefusalReason, AgentsListingRefusalCause> = {
   unreachable: "unreachable",
   malformed_response: "unreachable",
   too_many_pages: "incomplete",
+  // Incomplete rather than unreachable, and the distinction is the advice: the
+  // provider answered every request, so nothing about the credential is in
+  // question, and the next walk stalls in the same place, so "try again" would
+  // send this reader round a loop.
+  pagination_stalled: "incomplete",
 };
 
 export function agentsListingOutcome(

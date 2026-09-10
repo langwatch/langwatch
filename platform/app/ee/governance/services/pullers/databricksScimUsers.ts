@@ -19,14 +19,22 @@
  * against a workspace that was never going to say yes.
  *
  * The reads it does are deliberately timid: a page cap, a strictly advancing
- * index, and a stop the moment a page names nobody. A pagination parameter
- * this endpoint ignores would otherwise re-serve page one forever.
+ * index, and a stop the moment the walk stops learning anything. A pagination
+ * parameter this endpoint ignores would otherwise re-serve page one forever.
  *
  * The end of the collection is decided by the workspace's own `totalResults`
  * where it states one. A short page is only the fallback signal, because SCIM
  * treats `count` as a maximum rather than a promise, and a workspace serving
  * fewer rows than asked while holding more would otherwise have the rest
  * dropped without a trace.
+ *
+ * STOPPING IS NOT FINISHING, and every way this walk stops early is a refusal
+ * rather than a short list. A walk that gives up at the page cap, or against a
+ * workspace that stops advancing before the total it stated, has read a
+ * FRACTION of the directory, and reporting that fraction as a listing puts it
+ * on a screen as the whole staff. The number would look ordinary, every retry
+ * would reproduce it, and nobody would have any way to tell. `walkStep` below
+ * keeps the three endings apart; only the arithmetic one is a directory.
  */
 
 import { z } from "zod";
@@ -192,36 +200,103 @@ function appendUnseen({
 }
 
 /**
- * Whether this walk has learned everything the workspace is going to tell it.
+ * What this page told the walk to do next.
  *
- * Three ways to be done, and only the last is the one SCIM documents:
+ * Three answers rather than one boolean, because the three situations that
+ * used to end the walk are not the same fact and must not reach a customer as
+ * the same fact. Reaching the collection's end is a complete directory. A
+ * workspace that stops advancing before the total it stated is an INCOMPLETE
+ * one, and reporting that as complete hides however many users are behind the
+ * wall while every retry repeats the same partial answer.
  *
- * A page that named NOBODY ends it whatever the total claims, because the next
- * request asks from the same index and is answered the same way.
+ * `exhausted` is asked FIRST, so a final page that happens to repeat rows on a
+ * collection already walked to its end reads as the end rather than a stall.
  *
- * A page that named only people already recorded ends it for the same reason,
- * one step later. `startIndex` is a request and not a guarantee: a workspace
- * that ignores it serves the same first users forever while reporting a total
- * far larger, and the documented check below believes the total — it sees a
- * full page and an index short of the end, so it asks again, to the end of the
- * page budget. Deduplicating alone would keep the count honest and still spend
- * every one of those requests learning nothing.
+ * `returned === 0` before the stated total is a STALL, not an end. The index
+ * cannot advance past a page that served nothing, so the next request asks the
+ * same question and is answered the same way. Where the workspace states no
+ * total at all, `isCollectionExhausted` has already read a short page as the
+ * end, which is the best signal available there.
  *
- * Otherwise, the collection's own arithmetic.
+ * A page whose rows ALL failed to parse continues. `returned` counts the rows
+ * the workspace served and the index advances by it, so a later page can still
+ * be readable -- and `readScimPage` promises to skip individual bad rows
+ * rather than let one unreadable service principal cost the rest of the list.
+ * Ending here would break that promise one page at a time.
+ *
+ * Only a page that parsed rows and added NOBODY is a stall: every row it named
+ * was already recorded, which is what a workspace ignoring `startIndex` looks
+ * like. It re-serves the same first users forever while reporting a far larger
+ * total, and the arithmetic below believes the total.
  */
-function walkIsFinished({
+type ScimWalkStep = "continue" | "exhausted" | "stalled";
+
+function walkStep({
   returned,
+  parsed,
   addedThisPage,
   totalResults,
   nextIndex,
 }: {
   returned: number;
+  parsed: number;
   addedThisPage: number;
   totalResults: number | null;
   nextIndex: number;
-}): boolean {
-  if (returned === 0 || addedThisPage === 0) return true;
-  return isCollectionExhausted({ returned, totalResults, nextIndex });
+}): ScimWalkStep {
+  if (isCollectionExhausted({ returned, totalResults, nextIndex })) {
+    return "exhausted";
+  }
+  if (returned === 0) return "stalled";
+  if (parsed === 0) return "continue";
+  return addedThisPage === 0 ? "stalled" : "continue";
+}
+
+/**
+ * What a walk that has stopped should report, or null while it is still going.
+ *
+ * The three endings in one place, so no caller can add a fourth way out of the
+ * loop that reports a partial read as a directory. Only `exhausted` produces a
+ * listing at all.
+ *
+ * An exhausted walk that parsed NOBODY out of rows the workspace did serve is
+ * a refusal too. "This workspace employs nobody" and "nobody here could be
+ * read" are different facts, and only the first belongs on a screen;
+ * `listMicrosoftPeople` refuses the same case with the same reason. A walk
+ * that was served no rows at all is a genuinely empty directory and stays one.
+ */
+function walkOutcome({
+  step,
+  people,
+  rowsServed,
+}: {
+  step: ScimWalkStep;
+  people: DiscoveredPersonRecord[];
+  /** Rows the workspace served across the whole walk, readable or not. */
+  rowsServed: number;
+}): PeopleListing | null {
+  if (step === "continue") return null;
+  if (step === "stalled") {
+    return peopleRefused({ reason: "pagination_stalled", status: null });
+  }
+  return rowsServed > 0 && people.length === 0
+    ? peopleRefused({ reason: "malformed_response", status: null })
+    : peopleListed(people);
+}
+
+/**
+ * A thrown page read as the refusal it should reach an admin as.
+ *
+ * The status is the whole point of the first arm: a workspace that refuses
+ * bulk SCIM answers 403, and that has to read as "your token may not
+ * enumerate" rather than as a fault on our side.
+ */
+function refusalFromPageRead(error: unknown): PeopleListing {
+  return peopleRefused(
+    error instanceof GenieHttpError
+      ? refusalFromStatus(error.status)
+      : refusalFromThrown(error),
+  );
 }
 
 /**
@@ -250,6 +325,11 @@ export async function listDatabricksPeople(params: {
   // repetitions rather than of the workspace's staff.
   const seenActorIds = new Set<string>();
   let startIndex = 1;
+  // Rows the workspace served, readable or not. Counted rather than parsed,
+  // because it answers a question the people list cannot: a walk that ends
+  // holding nobody out of rows that WERE served has not found an empty
+  // directory, it has failed to read one.
+  let rowsServed = 0;
 
   try {
     for (let page = 0; page < MAX_PAGES; page += 1) {
@@ -266,6 +346,7 @@ export async function listDatabricksPeople(params: {
       if (read.isMalformed) {
         return peopleRefused({ reason: "malformed_response", status: null });
       }
+      rowsServed += read.returned;
       const addedThisPage = appendUnseen({
         people,
         seenActorIds,
@@ -274,28 +355,28 @@ export async function listDatabricksPeople(params: {
 
       startIndex += read.returned;
 
-      if (
-        walkIsFinished({
+      const finished = walkOutcome({
+        step: walkStep({
           returned: read.returned,
+          parsed: read.users.length,
           addedThisPage,
           totalResults: read.totalResults,
           nextIndex: startIndex,
-        })
-      ) {
-        return peopleListed(people);
-      }
+        }),
+        people,
+        rowsServed,
+      });
+      if (finished) return finished;
     }
   } catch (error) {
-    if (error instanceof GenieHttpError) {
-      // The status is the whole point here. A workspace that refuses bulk SCIM
-      // answers 403, and that has to read as "your token may not enumerate"
-      // rather than as a fault on our side.
-      return peopleRefused(refusalFromStatus(error.status));
-    }
-    return peopleRefused(refusalFromThrown(error));
+    return refusalFromPageRead(error);
   }
 
-  // Out of page budget. Reported rather than refused: these are users the
-  // workspace named, and the writes downstream widen rather than replace.
-  return peopleListed(people);
+  // Out of page budget: the collection is longer than this walk will follow,
+  // so the users it did read are a subset of the directory and cannot be shown
+  // as the whole of it. Refused rather than reported for the reason
+  // `listGenieAgents` refuses the same bound against the same workspace --
+  // pressing Sync again reads the same pages and stops in the same place, so a
+  // screen that claimed completeness here would go on claiming it.
+  return peopleRefused({ reason: "too_many_pages", status: null });
 }

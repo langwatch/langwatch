@@ -77,6 +77,22 @@ describe("given a source's last agents listing", () => {
     });
 
     /**
+     * A provider that stops advancing before the total it stated answered
+     * every request it was sent, and will answer the next walk the same way.
+     * That is the same advice as our own page bound and neither of the other
+     * two: nothing about the credential is in question, and "ask again" would
+     * send this reader round a loop.
+     */
+    it("treats a provider that stopped paginating as incomplete, not as one that went quiet", () => {
+      expect(
+        agentsListingOutcome(row("refused", "pagination_stalled")),
+      ).toEqual({
+        outcome: "refused",
+        cause: "incomplete",
+      });
+    });
+
+    /**
      * Stated against the specific wrong answer this change exists to end,
      * rather than left implied by the assertion above. `too_many_pages` was
      * added to the vocabulary and mapped nowhere, so it fell through to

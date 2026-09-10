@@ -103,6 +103,14 @@ export interface IngestionPullRunStatusData {
    * and stays a plain string, never an enum, because the log outlives the
    * vocabulary. `LastAgentsListingStatus` is null when the refusal was
    * generated on our own side and never reached the provider.
+   *
+   * `LastAgentsListingAt` is the instant the ASK was accepted -- the outcome
+   * event's `requestedAt` -- and not the instant its answer was recorded. It
+   * is the fence the four listing handlers order outcomes by, and the ask
+   * instant is the only one that orders them correctly: a superseded listing
+   * records LAST, so its answer instant is the newer of the two. Read it as
+   * "the listing this row describes was asked for then", never as "we learned
+   * this then"; the two differ by however long the provider took.
    */
   LastAgentsListingAt: number | null;
   LastAgentsListingOutcome: string | null;
@@ -139,6 +147,9 @@ export interface IngestionPullRunStatusData {
    * moment says an erasure happened then, which on a small tenant identifies
    * the person as surely as a name would. No trend line, no history drawer, and
    * never beside a per-person list.
+   *
+   * `LastPeopleListingAt` carries the ask instant and fences late outcomes,
+   * exactly as `LastAgentsListingAt` above does. The same reading applies.
    */
   LastPeopleListingAt: number | null;
   LastPeopleListingOutcome: string | null;
@@ -277,6 +288,32 @@ export class IngestionPullRunStatusFoldProjection
     );
   }
 
+  /**
+   * Whether a listing outcome belongs to an ask this row has already moved
+   * past.
+   *
+   * The stored value is the `requestedAt` of the ask the row's listing columns
+   * describe, so this compares ASK against ASK. Comparing against the outcome
+   * instant instead would read backwards: a late outcome is recorded after the
+   * one that overtook it, so it carries the newer `occurredAt` of the two.
+   *
+   * Equal is accepted, for the reason `isSuperseded` accepts an equal
+   * `scheduledFor`: it is the same ask reporting, and replay must fold it
+   * identically.
+   *
+   * Null means no listing of that kind has been recorded, so nothing can have
+   * superseded this one.
+   */
+  private isListingSuperseded({
+    recorded,
+    requestedAt,
+  }: {
+    recorded: number | null;
+    requestedAt: number;
+  }): boolean {
+    return recorded !== null && requestedAt < recorded;
+  }
+
   handleIngestionPullConfigured(
     event: IngestionPullConfiguredEvent,
     state: IngestionPullRunStatusData,
@@ -386,53 +423,63 @@ export class IngestionPullRunStatusFoldProjection
    * syncing people would erase an agents refusal and a broken source would
    * read as fine because a DIFFERENT sync had succeeded.
    *
-   * IF YOU ARE ABOUT TO EMIT A LISTING OUTCOME FROM ANYWHERE OTHER THAN THE
-   * EXISTING PROCESS MANAGER -- a backfill, an admin repair tool, a second
-   * pipeline, a migration script -- THEN YOU MUST GUARANTEE TWO THINGS, and
-   * this fold cannot check either of them for you:
+   * These four handlers FENCE on the ask each outcome belongs to. An outcome
+   * whose `requestedAt` is older than the one this row already reflects is
+   * dropped, because it describes a listing something has since superseded.
    *
-   *   1. SINGLE IN FLIGHT. At most one listing of each kind outstanding per
-   *      source at a time.
-   *   2. ACCEPT ONCE, IN ORDER. An outcome is appended once, and outcomes for
-   *      one source reach the log in the order they were accepted.
+   * The fence is here because the producer's guard does not cover this case.
+   * `listingRequestedHandler` refuses to DISPATCH a second listing while one is
+   * in flight, and `listingSettledHandler` refuses to free a slot a different
+   * request owns -- both govern the process manager's slot, not what reaches the
+   * log. The effect in `process-manager/ingestionPullEffects.ts` records its
+   * outcome unconditionally, so a listing that was dispatched always commits
+   * one, whatever happened while it was away. Two ordinary things free the slot
+   * out from under a listing that is still running: the source being disabled,
+   * which clears both slots outright, and the ask outliving
+   * `INGESTION_PULL_STALE_LISTING_MS`. Either one lets a second ask be accepted,
+   * dispatched and finished, and then be overwritten by the first one's late
+   * answer -- a refusal buried under a stale listed, or a page telling a
+   * customer their directory synced fine while the credential that reads it is
+   * dead. There is no error and no log line; the wrong number simply sits there
+   * looking like a number.
    *
-   * Break either and this projection keeps the OLDER answer without complaint:
-   * a refusal buried under a stale listed, a page telling a customer their
-   * directory synced fine while the credential that reads it is dead. There is
-   * no error, no log line and no failing test -- the wrong number simply sits
-   * there looking like a number.
+   * `requestedAt` is the key and `occurredAt` is not, which is the whole reason
+   * this fence works. The stale outcome is the one recorded LAST, so its
+   * `occurredAt` is the NEWER of the two and a monotonic fence on it would keep
+   * precisely the wrong answer. `requestedAt` is the instant the ask was
+   * accepted, carried from the request event through the intent to the outcome,
+   * so it orders the two ASKS rather than their answers.
    *
-   * That is because these four handlers have no fence of their own. They
-   * overwrite their columns with whatever arrives last, and nothing below
-   * inspects a timestamp to notice that "last" was not "newest". The absence of
-   * a fence here is a DEPENDENCY on the producer, not a property of this fold.
+   * Equal `requestedAt` is accepted, matching `isSuperseded` above: it is the
+   * same ask reporting, which replay must fold identically, and one ask can
+   * legitimately record twice -- a `listed` from one attempt, then a
+   * `listing_failed` refusal from a redelivery that ran out of attempts.
    *
-   * Today the only producer is the process manager in
-   * `process-manager/ingestionPull.process.ts`, and it holds both guarantees:
-   * `listingRequestedHandler` drops a second ask while `currentAgentsListing` /
-   * `currentPeopleListing` is set, and `listingSettledHandler` ignores an
-   * outcome whose `requestId` is not the one being tracked. Replay inherits the
-   * order because the log holds only what was accepted. Read those two
-   * functions before writing a third producer; matching them is the bar.
+   * The repair path is to ASK AGAIN, never to replay a corrected outcome. A new
+   * ask carries a newer `requestedAt` and wins; a hand-written replay of an old
+   * outcome carries an old one and is dropped, which is the point of the fence
+   * rather than a limitation of it.
    *
-   * Do not respond to this by adding a fence here. It was considered and
-   * rejected: the only signal available is the timestamp, and an admin
-   * replaying a corrected outcome is precisely an older timestamp arriving
-   * later, so a monotonic fence would drop the legitimate repair to guard
-   * against a producer that does not exist. One authoritative mechanism beats
-   * two weak ones -- keep the guarantee where the ordering is actually known.
+   * A producer other than the process manager still owes one guarantee this fold
+   * cannot check: ACCEPT ONCE PER ASK. The fence orders distinct asks. It cannot
+   * tell two disagreeing answers to the SAME ask apart, and will fold both.
    */
   handleIngestionPullAgentsListed(
     event: IngestionPullAgentsListedEvent,
     state: IngestionPullRunStatusData,
   ): IngestionPullRunStatusData {
+    if (
+      this.isListingSuperseded({
+        recorded: state.LastAgentsListingAt,
+        requestedAt: event.data.requestedAt,
+      })
+    ) {
+      return state;
+    }
     return {
       ...state,
       SourceId: event.data.sourceId,
-      // When we learned the answer, not `requestedAt`, which is when we asked.
-      // A reader wants the age of the knowledge, and the same choice is made
-      // for `LastRunAt` above.
-      LastAgentsListingAt: event.occurredAt,
+      LastAgentsListingAt: event.data.requestedAt,
       LastAgentsListingOutcome: INGESTION_PULL_LISTING_OUTCOME.LISTED,
       LastAgentsListingCount: event.data.agentCount,
       // Cleared rather than left: a reason left over from an earlier refusal
@@ -447,10 +494,18 @@ export class IngestionPullRunStatusFoldProjection
     event: IngestionPullAgentsListingRefusedEvent,
     state: IngestionPullRunStatusData,
   ): IngestionPullRunStatusData {
+    if (
+      this.isListingSuperseded({
+        recorded: state.LastAgentsListingAt,
+        requestedAt: event.data.requestedAt,
+      })
+    ) {
+      return state;
+    }
     return {
       ...state,
       SourceId: event.data.sourceId,
-      LastAgentsListingAt: event.occurredAt,
+      LastAgentsListingAt: event.data.requestedAt,
       LastAgentsListingOutcome: INGESTION_PULL_LISTING_OUTCOME.REFUSED,
       // Nulled, never carried over from the last successful listing. A refusal
       // has no count at all, and zero is already taken: it means the provider
@@ -466,10 +521,18 @@ export class IngestionPullRunStatusFoldProjection
     event: IngestionPullPeopleListedEvent,
     state: IngestionPullRunStatusData,
   ): IngestionPullRunStatusData {
+    if (
+      this.isListingSuperseded({
+        recorded: state.LastPeopleListingAt,
+        requestedAt: event.data.requestedAt,
+      })
+    ) {
+      return state;
+    }
     return {
       ...state,
       SourceId: event.data.sourceId,
-      LastPeopleListingAt: event.occurredAt,
+      LastPeopleListingAt: event.data.requestedAt,
       LastPeopleListingOutcome: INGESTION_PULL_LISTING_OUTCOME.LISTED,
       // Both numbers, because the surviving total alone is lossy. The withheld
       // count is a SUBSET of the directory count, never an addition to it:
@@ -486,10 +549,18 @@ export class IngestionPullRunStatusFoldProjection
     event: IngestionPullPeopleListingRefusedEvent,
     state: IngestionPullRunStatusData,
   ): IngestionPullRunStatusData {
+    if (
+      this.isListingSuperseded({
+        recorded: state.LastPeopleListingAt,
+        requestedAt: event.data.requestedAt,
+      })
+    ) {
+      return state;
+    }
     return {
       ...state,
       SourceId: event.data.sourceId,
-      LastPeopleListingAt: event.occurredAt,
+      LastPeopleListingAt: event.data.requestedAt,
       LastPeopleListingOutcome: INGESTION_PULL_LISTING_OUTCOME.REFUSED,
       // Both counts nulled for the reason the agents refusal gives, and the
       // withheld count doubly so: a refusal carries no directory to have
