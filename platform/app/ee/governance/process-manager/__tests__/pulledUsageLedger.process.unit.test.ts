@@ -276,14 +276,25 @@ describe("recognising a reissued charge", () => {
    */
   describe("given a period that holds more than one model", () => {
     const OMITS_MODEL_SOURCE = "example_cost_source";
+    /**
+     * The block's own key, so the two observations still land on ONE instance
+     * without borrowing the file's Azure-prefixed one — the source here is not
+     * Azure.
+     */
+    const OMITS_MODEL_KEY = `example:${ns}:sub-1:2026-08-01`;
 
     /** @scenario A reissue is recognised from the currency, the agent and the spender only */
     it("withdraws nothing when only the model differs", async () => {
       await observe(
-        observation({ source: OMITS_MODEL_SOURCE, model: "example/meter-a" }),
+        observation({
+          restatementKey: OMITS_MODEL_KEY,
+          source: OMITS_MODEL_SOURCE,
+          model: "example/meter-a",
+        }),
       );
       await observe(
         observation({
+          restatementKey: OMITS_MODEL_KEY,
           source: OMITS_MODEL_SOURCE,
           model: "example/meter-b",
           observedAtMs: T0 + 3_600_000,
@@ -299,10 +310,15 @@ describe("recognising a reissued charge", () => {
 
     it("still addresses the superseded model when the currency moves too", async () => {
       await observe(
-        observation({ source: OMITS_MODEL_SOURCE, model: "example/meter-a" }),
+        observation({
+          restatementKey: OMITS_MODEL_KEY,
+          source: OMITS_MODEL_SOURCE,
+          model: "example/meter-a",
+        }),
       );
       await observe(
         observation({
+          restatementKey: OMITS_MODEL_KEY,
           source: OMITS_MODEL_SOURCE,
           model: "example/meter-b",
           currencyCode: "EUR",
