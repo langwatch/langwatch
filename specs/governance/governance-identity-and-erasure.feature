@@ -255,8 +255,11 @@ Feature: Erasing a person from the governance data, and making it stick
     # cleared the totals and stopped there. At several providers the
     # identifier a bill arrives under is the person's email address, and one
     # note is written for every pulled charge rather than only for corrected
-    # ones, so what stayed behind was every day the person spent on — for the
-    # thirteen months the note is kept.
+    # ones, so what stayed behind was every day the person spent on — for as
+    # long as the note is kept, which is now indefinitely: the fixed thirteen
+    # month timer these tables were created with has been replaced by a
+    # per-row retention that defaults to keep-forever, so overwriting the
+    # identifier is the only thing that ever removes it.
     #
     # Both halves are asserted together because either alone is satisfied by a
     # wrong fix. Removing the note clears the identifier and is the obvious
