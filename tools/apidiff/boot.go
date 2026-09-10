@@ -1295,7 +1295,7 @@ func (state *bootState) dropDatabases(ctx context.Context) {
 // allowedCommands are the only executables the boot orchestration runs; every
 // commandSpec in this package is built from these constants, and the
 // allowlist proves subprocess names are never tainted input.
-var allowedCommands = map[string]bool{"git": true, "docker": true, "pnpm": true, "psql": true, havenCommand: true}
+var allowedCommands = map[string]bool{"git": true, "docker": true, "pnpm": true, "psql": true, "node": true, "env": true, havenCommand: true}
 
 // execRunner runs one command, streaming output to log.
 func execRunner(ctx context.Context, spec commandSpec, log io.Writer) error {
