@@ -1,7 +1,7 @@
 import { mintStoredObjectUri, ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import {
   PrometheusStoredObjectsTelemetryAdapter,
-  StoredObjectsClickHousePort,
+  StoredObjectsClickHouse,
   StoredObjectsService,
   type StoredObjectsClickHouseClient,
 } from "@langwatch/stored-object-server";
@@ -158,7 +158,7 @@ function createWorkerStoredObjects(options: {
   });
 }
 
-class WorkerStoredObjectsClickHouse extends StoredObjectsClickHousePort {
+class WorkerStoredObjectsClickHouse extends StoredObjectsClickHouse {
   static create(
     resolveClient: (tenantId: string) => Promise<ClickHouseClient>,
   ): WorkerStoredObjectsClickHouse {

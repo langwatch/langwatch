@@ -7,7 +7,7 @@ import {
   ObjectStorageMigrateTask,
   ObjectStorageMigrationInventoryPort,
   parseMigrationTaskConfig,
-  StoredObjectsClickHousePort,
+  StoredObjectsClickHouse,
   type MigrationDataset,
   type MigrationPageRequest,
   type MigrationProject,
@@ -21,7 +21,7 @@ import type { TasksHost } from "./tasks-host.composition.ts";
  * This process has no per-project ClickHouse routing — a single `CLICKHOUSE_URL` answers every
  * project, the same simplification `ClickHouseMigrateTask` and `LwqlProvisionTask` make.
  */
-class TasksStoredObjectsClickHouse extends StoredObjectsClickHousePort {
+class TasksStoredObjectsClickHouse extends StoredObjectsClickHouse {
   constructor(private readonly client: () => unknown) {
     super();
   }

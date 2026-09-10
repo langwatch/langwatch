@@ -85,17 +85,17 @@ export {
   type StoredObjectOwnerClickHouseInstance,
 } from "./repositories/stored-object-owner-instance-directory.repository.ts";
 export {
-  type StoredObjectOwnerLookupTelemetry as StoredObjectOwnerLookupTelemetryPort,
+  type StoredObjectOwnerLookupTelemetry,
   type StoredObjectOwnerLookupSpan,
 } from "./app/stored-object.infrastructure.ts";
 /**
  * The CONTENT-ADDRESSED store, moved here whole from the platform application.
  */
 export {
-  type StoredObjectsClickHouse as StoredObjectsClickHousePort,
+  type StoredObjectsClickHouse,
   type StoredObjectsClickHouseClient,
 } from "./app/stored-object.infrastructure.ts";
-export { type StoredObjectsTelemetry as StoredObjectsTelemetryPort } from "./app/stored-object.infrastructure.ts";
+export { type StoredObjectsTelemetry } from "./app/stored-object.infrastructure.ts";
 export {
   type StoredObjectS3TargetPort,
   type StoredObjectS3Credentials,

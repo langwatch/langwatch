@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   StoredObjectOwnerLookupRuntimeAdapter,
   StoredObjectOwnerInstanceDirectoryPort,
-  StoredObjectOwnerLookupTelemetryPort,
+  StoredObjectOwnerLookupTelemetry,
   type StoredObjectOwnerLookupSpan,
 } from "../index.ts";
 import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
 
 const resolveInstances = vi.fn();
 
-class RecordingTelemetry implements StoredObjectOwnerLookupTelemetryPort {
+class RecordingTelemetry implements StoredObjectOwnerLookupTelemetry {
   readonly attributes = new Map<string, string | number | boolean>();
   readonly inputIds: string[] = [];
 

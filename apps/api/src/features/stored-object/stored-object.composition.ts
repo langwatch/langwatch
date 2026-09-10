@@ -29,14 +29,14 @@ import {
   StoredObjectDestinationPolicyAdapter,
   StoredObjectOwnerInstanceDirectoryPort,
   StoredObjectOwnerLookupRuntimeAdapter,
-  StoredObjectOwnerLookupTelemetryPort,
+  StoredObjectOwnerLookupTelemetry,
   StoredObjectProjectS3ConfigPort,
   StoredObjectS3TargetPort,
   StoredObjectStoragePortAdapter,
   StoredObjectStorageRegistryAdapter,
   StoredObjectStorageRuntimeAdapter,
   StoredObjectUploadTokenPort,
-  StoredObjectsClickHousePort,
+  StoredObjectsClickHouse,
   StoredObjectsService,
   deriveStoredObjectId,
   storedObjectServer,
@@ -337,7 +337,7 @@ class ApiStoredObjectOwnerInstanceDirectory extends StoredObjectOwnerInstanceDir
  * The lookup's own span attributes, which this process does not collect: the REST door
  * already records the delivery, and a second span per read would double-count it.
  */
-class ApiStoredObjectOwnerLookupTelemetry extends StoredObjectOwnerLookupTelemetryPort {
+class ApiStoredObjectOwnerLookupTelemetry extends StoredObjectOwnerLookupTelemetry {
   static create(): ApiStoredObjectOwnerLookupTelemetry {
     return new ApiStoredObjectOwnerLookupTelemetry();
   }
@@ -496,7 +496,7 @@ class ApiStoredObjectProjectBuckets extends StoredObjectProjectS3ConfigPort {
 }
 
 /** This process's routed connection, as the object repository asks for it. */
-class ApiStoredObjectsClickHouse extends StoredObjectsClickHousePort {
+class ApiStoredObjectsClickHouse extends StoredObjectsClickHouse {
   static create(
     resolveClient: ((projectId: string) => Promise<unknown>) | null,
   ): ApiStoredObjectsClickHouse {
