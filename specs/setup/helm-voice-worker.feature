@@ -8,7 +8,7 @@ Feature: The voice worker is opt-in and cannot render half-configured
 
   # Cross-references:
   #   charts/langwatch/templates/voice/deployment.yaml: the single-replica
-  #     Deployment, gated on voice.enabled, and the two `fail` guards this
+  #     Deployment, gated on voice.enabled, and the `fail` guard this
   #     feature describes.
   #   charts/langwatch/templates/voice/service.yaml,
   #   charts/langwatch/templates/voice/ingress.yaml: the Service and the
@@ -16,8 +16,9 @@ Feature: The voice worker is opt-in and cannot render half-configured
   #   charts/langwatch/tests/voice-worker.sh: the suite that renders the
   #     chart and asserts what this feature describes.
   #   langwatch/langwatch#8015 and the env contract on #8014
-  #     (voice-env-contract comment): VOICE_WORKER_ONLY, VOICE_WS_PORT,
-  #     VOICE_PUBLIC_BASE_URL and the three TWILIO_* variables.
+  #     (voice-env-contract comment): VOICE_WORKER_ONLY, VOICE_WS_PORT and
+  #     VOICE_PUBLIC_BASE_URL. Call-provider credentials are per-project
+  #     data configured inside LangWatch, not chart values or operator env.
   #
   # These scenarios are verified by rendering the chart. The gating
   # condition, the required-value checks, and the env/secretKeyRef wiring
@@ -40,12 +41,11 @@ Feature: The voice worker is opt-in and cannot render half-configured
   Rule: Enabling the voice worker renders a correctly wired Deployment, Service and Ingress
 
     @e2e
-    Scenario: Turning on the voice worker brings up a single call handler wired to Twilio
-      Given the voice worker is turned on with its public address and Twilio credentials configured
+    Scenario: Turning on the voice worker brings up a single call handler
+      Given the voice worker is turned on with its public address configured
       When the chart renders
       Then exactly one voice worker instance comes up
       And it runs in voice-only mode
-      And it reads its Twilio credentials from the configured secret rather than holding them itself
 
     @e2e
     Scenario: The voice worker's shutdown timing is its own, not borrowed from the background workers
@@ -77,12 +77,6 @@ Feature: The voice worker is opt-in and cannot render half-configured
 
     @e2e
     Scenario: The voice worker refuses to start without knowing its own public address
-      Given the voice worker is turned on with Twilio credentials configured but no public address set
+      Given the voice worker is turned on with no public address set
       When the chart renders
       Then the install is refused, naming the missing public address
-
-    @e2e
-    Scenario: The voice worker refuses to start without Twilio credentials configured
-      Given the voice worker is turned on with its public address set but no Twilio credentials configured
-      When the chart renders
-      Then the install is refused, naming the missing Twilio credentials

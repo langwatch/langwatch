@@ -60166,21 +60166,19 @@ Three things to know before flipping it on:
 
 ### Voice worker (phone targets)
 
-Off by default. Set `voice.enabled: true` to deploy a single-replica worker that lets scenario/agent runs place and receive phone calls via Twilio.
+Off by default. Set `voice.enabled: true` to deploy a single-replica worker that lets scenario/agent runs place and receive phone calls.
 
-**Twilio Media Streams connects inbound to you.** Without a publicly-reachable `voice.publicBaseUrl`, there are no phone targets, no matter what else is configured: Twilio dials that URL back to reach the worker's WebSocket listener.
+**Media Streams connects inbound to you.** Without a publicly-reachable `voice.publicBaseUrl`, there are no phone targets, no matter what else is configured: the call provider dials that URL back to reach the worker's WebSocket listener.
 
 Minimum viable opt-in:
 
 ```yaml
 voice:
   enabled: true
-  publicBaseUrl: "https://voice.your-corp.com" # must be inbound-reachable from Twilio
-  twilio:
-    existingSecret: "twilio-credentials" # Secret with TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM_NUMBER
+  publicBaseUrl: "https://voice.your-corp.com" # must be inbound-reachable from the call provider
 ```
 
-Terminate TLS at your own edge, either `voice.ingress.enabled: true` with your own hostname/annotations, or an external load balancer pointed at the `voice.service`, and bring your own Twilio account; the chart never carries phone numbers or call-routing rules.
+Terminate TLS at your own edge, either `voice.ingress.enabled: true` with your own hostname/annotations, or an external load balancer pointed at the `voice.service`. Call-provider credentials (account SID, auth token, from-number) are configured per project inside LangWatch, not chart values.
 
 ## Upgrade
 

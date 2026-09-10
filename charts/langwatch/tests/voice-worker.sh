@@ -88,9 +88,9 @@ render_component() {
   '
 }
 
-readonly ENABLED_FLAGS="--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com --set voice.twilio.existingSecret=twilio"
+readonly ENABLED_FLAGS="--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com"
 
-# @scenario "Turning on the voice worker brings up a single call handler wired to Twilio"
+# @scenario "Turning on the voice worker brings up a single call handler"
 test_enabled_renders_deployment() {
   local block
   block=$(render_component "deployment.yaml" "$ENABLED_FLAGS")
@@ -106,23 +106,7 @@ test_enabled_renders_deployment() {
     fail "voice deployment VOICE_WORKER_ONLY" "expected VOICE_WORKER_ONLY=true"
     return
   fi
-  if ! printf '%s' "$block" | grep -A3 "name: TWILIO_ACCOUNT_SID" | grep -q "name: twilio"; then
-    fail "voice deployment TWILIO_ACCOUNT_SID" "expected secretKeyRef to Secret 'twilio'"
-    return
-  fi
-  if ! printf '%s' "$block" | grep -A4 "name: TWILIO_ACCOUNT_SID" | grep -q "key: TWILIO_ACCOUNT_SID"; then
-    fail "voice deployment TWILIO_ACCOUNT_SID key" "expected secretKeyRef key TWILIO_ACCOUNT_SID"
-    return
-  fi
-  if ! printf '%s' "$block" | grep -A3 "name: TWILIO_AUTH_TOKEN" | grep -q "name: twilio"; then
-    fail "voice deployment TWILIO_AUTH_TOKEN" "expected secretKeyRef to Secret 'twilio'"
-    return
-  fi
-  if ! printf '%s' "$block" | grep -A3 "name: TWILIO_FROM_NUMBER" | grep -q "name: twilio"; then
-    fail "voice deployment TWILIO_FROM_NUMBER" "expected secretKeyRef to Secret 'twilio'"
-    return
-  fi
-  echo "ok   [voice deployment] replicas=1, VOICE_WORKER_ONLY=true, Twilio secretKeyRefs present"
+  echo "ok   [voice deployment] replicas=1, VOICE_WORKER_ONLY=true"
 }
 
 # @scenario "The voice worker's shutdown timing is its own, not borrowed from the background workers"
@@ -199,7 +183,7 @@ test_ingress_host_mismatch_refuses() {
 # @scenario "The voice worker refuses to start without knowing its own public address"
 test_enabled_without_public_base_url_refuses() {
   local out
-  if out=$(render "--set voice.enabled=true --set voice.twilio.existingSecret=twilio"); then
+  if out=$(render "--set voice.enabled=true"); then
     fail "missing publicBaseUrl" "chart rendered when voice.publicBaseUrl was not set"
     return
   fi
@@ -211,21 +195,6 @@ test_enabled_without_public_base_url_refuses() {
   esac
 }
 
-# @scenario "The voice worker refuses to start without Twilio credentials configured"
-test_enabled_without_twilio_secret_refuses() {
-  local out
-  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com"); then
-    fail "missing twilio secret" "chart rendered when voice.twilio.existingSecret was not set"
-    return
-  fi
-  case "$out" in
-    *"voice.twilio.existingSecret is required"*)
-      echo "ok   [missing twilio secret] refused with the expected message" ;;
-    *)
-      fail "missing twilio secret" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
-  esac
-}
-
 test_default_has_no_voice_resources
 test_explicit_false_matches_default
 test_enabled_renders_deployment
@@ -234,7 +203,6 @@ test_enabled_renders_service_no_ingress
 test_ingress_enabled_renders
 test_ingress_host_mismatch_refuses
 test_enabled_without_public_base_url_refuses
-test_enabled_without_twilio_secret_refuses
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures assertion(s) failed"

@@ -704,39 +704,31 @@ Off by default (`voice.enabled: false`); the default install renders no voice
 resources at all.
 
 Turning it on deploys a **single-replica** worker Deployment (same app image,
-`VOICE_WORKER_ONLY=true`) that terminates Twilio Media Streams calls, plus a
-Service and — optionally — an Ingress for its WebSocket port. Replicas are
+`VOICE_WORKER_ONLY=true`) that terminates inbound Media Streams calls, plus a
+Service and, optionally, an Ingress for its WebSocket port. Replicas are
 fixed at 1: the WebSocket routes an in-flight call by nonce inside one
 process, so a second replica would split a call's frames across two processes
 with no shared state.
 
-**Twilio Media Streams connects INBOUND to you.** Without a
-publicly-reachable `voice.publicBaseUrl`, there are no phone targets — no
+**Media Streams connects INBOUND to you.** Without a
+publicly-reachable `voice.publicBaseUrl`, there are no phone targets, no
 matter what else is configured. Terminate TLS at your own edge (the
 `voice.ingress` block, or an external load balancer pointed at the
 `voice.service`) and set `voice.publicBaseUrl` to that public `https://`
 origin; the worker derives `wss://<host>/twilio/<nonce>` from it.
 
-Bring your own Twilio account: `voice.twilio.existingSecret` names a Secret
-you create with the Account SID, auth token, and outbound caller id (key
-names configurable under `voice.twilio.keys`). The chart never carries phone
-numbers or call-routing rules — `allowed_callees` and the call-duration cap
-are project configuration, not environment (see
-[langwatch/langwatch#8014](https://github.com/langwatch/langwatch/issues/8014)).
+Call-provider credentials (account SID, auth token, from-number) are
+configured per project inside LangWatch, not as chart values.
 
-The chart refuses to render when `voice.enabled` is true and either
-`voice.publicBaseUrl` or `voice.twilio.existingSecret` is empty.
+The chart refuses to render when `voice.enabled` is true and
+`voice.publicBaseUrl` is empty.
 
 | Name                          | Description                                                                                                              | Value              |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | -------------------- |
 | `voice.otel.serviceName`       | Service name reported in traces and logs.                                                                                  | `langwatch-voice`    |
 | `voice.enabled`                | Deploy the voice worker Deployment, Service (and Ingress if `voice.ingress.enabled`). Off by default.                      | `false`              |
-| `voice.publicBaseUrl`          | Public `https://` origin Twilio connects to (e.g. `https://voice.example.com`). Required when `voice.enabled` is true.     | `""`                 |
-| `voice.wsPort`                 | Container port of the Twilio Media Streams WebSocket listener.                                                             | `3300`               |
-| `voice.twilio.existingSecret`  | Name of an existing Secret carrying the Twilio credential keys below. Required when `voice.enabled` is true.               | `""`                 |
-| `voice.twilio.keys.accountSid` | Key in the existing Secret for the Twilio Account SID.                                                                     | `TWILIO_ACCOUNT_SID` |
-| `voice.twilio.keys.authToken`  | Key in the existing Secret for the Twilio auth token.                                                                      | `TWILIO_AUTH_TOKEN`  |
-| `voice.twilio.keys.fromNumber` | Key in the existing Secret for the outbound caller id (E.164).                                                             | `TWILIO_FROM_NUMBER` |
+| `voice.publicBaseUrl`          | Public `https://` origin the call provider connects to (e.g. `https://voice.example.com`). Required when `voice.enabled` is true. | `""`          |
+| `voice.wsPort`                 | Container port of the Media Streams WebSocket listener.                                                                    | `3300`               |
 | `voice.resources`              | Resource requests and limits for the voice worker.                                                                         |                      |
 | `voice.nodeSelector`           | Node selector overrides.                                                                                                   | `{}`                 |
 | `voice.tolerations`            | Tolerations overrides.                                                                                                     | `[]`                 |
