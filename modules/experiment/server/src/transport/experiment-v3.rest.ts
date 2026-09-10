@@ -140,14 +140,14 @@ export interface ExperimentV3RestApi {
   reportError?: ((error: unknown, context: Record<string, unknown>) => void) | undefined;
 }
 
-export const ExperimentV3RestApi = moduleApi<ExperimentV3RestApi>("experiment-v3");
+export const ExperimentV3RestApi = moduleApi<ExperimentV3RestApi>("experiment");
 
 /** The `/api/evaluations/v3` alias: the one thing it does is forward. */
 export interface ExperimentV3AliasApi {
   forward(request: Request): Promise<Response>;
 }
 
-export const ExperimentV3AliasApi = moduleApi<ExperimentV3AliasApi>("experiment-v3-alias");
+export const ExperimentV3AliasApi = moduleApi<ExperimentV3AliasApi>("experiment");
 
 /** The refusal a run door answers where this process composed no run loop. */
 export class ExperimentRunLoopUnavailableError extends HandledError {
