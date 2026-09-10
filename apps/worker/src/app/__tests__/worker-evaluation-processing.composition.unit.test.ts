@@ -1,3 +1,4 @@
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import {
@@ -16,7 +17,7 @@ import {
 } from "@langwatch/evaluation-server";
 import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { Trace } from "@langwatch/trace-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import { describe, expect, it, vi } from "vitest";
 import {
   createWorkerEvaluationProcessing,

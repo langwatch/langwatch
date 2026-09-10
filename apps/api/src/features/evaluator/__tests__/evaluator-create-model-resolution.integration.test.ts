@@ -36,13 +36,13 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
-import type { WorkflowApp } from "@langwatch/workflow-server";
+import type { WorkflowApp, WorkflowService,} from "@langwatch/workflow-server";
 import { ProjectCredentialsAdapter } from "@langwatch/project-server";
 import { createPrismaProjectApi } from "../../../app/__tests__/support/prisma-project-api.ts";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { WorkflowNlpRuntimePort } from "@langwatch/workflow-server";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

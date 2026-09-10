@@ -1,6 +1,6 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { WorkflowApp } from "@langwatch/workflow-server";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+import type { WorkflowApp, WorkflowService } from "@langwatch/workflow-server";
+
 
 /** The `ctx.app.workflows` application. The two tRPC namespaces are not here:
  * their transports are unconverted. */

@@ -1,7 +1,6 @@
 /**
  * The wizard, the workbench and the runs behind both, composed as their own feature.
  */
-import type { WorkflowService } from "@langwatch/workflow-server";
 import { TupleParam } from "@clickhouse/client";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AgentApi } from "@langwatch/agent-contract";
@@ -32,7 +31,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { WorkflowVersionRequiredError } from "@langwatch/workflow-contract";
 
-import type { WorkflowApp } from "@langwatch/workflow-server";
+import type { WorkflowApp, WorkflowService,} from "@langwatch/workflow-server";
 import { EventEmitter } from "node:events";
 import { nanoid } from "nanoid";
 

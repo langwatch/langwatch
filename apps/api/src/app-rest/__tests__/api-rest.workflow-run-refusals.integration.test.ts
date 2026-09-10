@@ -3,8 +3,9 @@
  * Driven through the mounted family, so the status and body are the real ones.
  * @see specs/run-via-api/run-workflow-typed-errors.feature
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import { WorkflowNotFoundError, WorkflowNotPublishedError } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

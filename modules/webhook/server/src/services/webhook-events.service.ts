@@ -1,5 +1,4 @@
 import {
-  WebhookEventsService as WebhookEventsServiceContract,
   type ListWebhookEventsQuery,
   type ListWebhookEventsResult,
   type WebhookEnvelope,
@@ -45,11 +44,10 @@ class StructuralWebhookTenantsRepository extends WebhookTenantsRepository {
   }
 }
 
-export class WebhookEventsService extends WebhookEventsServiceContract {
+export class WebhookEventsService {
   private readonly options: WebhookEventsServiceOptions;
 
   private constructor(options: WebhookEventsServiceOptions | LegacyWebhookEventsServiceOptions) {
-    super();
     this.options =
       "prisma" in options
         ? {

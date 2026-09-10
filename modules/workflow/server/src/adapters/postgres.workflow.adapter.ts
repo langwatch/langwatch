@@ -1,6 +1,5 @@
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { WorkflowService as WorkflowServiceContract } from "@langwatch/workflow-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { nanoid } from "nanoid";
 import { WorkflowIdPort } from "../ports/workflow.port.ts";
 import type {
@@ -21,7 +20,7 @@ export type PostgresWorkflowAdapterOptions = {
   /** Generated Prisma client supplied by the application composition root. */
   database: WorkflowDatabase;
   datasets: DatasetApi;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   nlpRuntime: WorkflowNlpRuntimePort;
   projectEnvironment: WorkflowProjectEnvironmentPort;
   llmParameters: WorkflowLlmParametersPort;
@@ -44,7 +43,7 @@ class NanoidWorkflowIdPort extends WorkflowIdPort {
 
 /** Binds the private Workflow repositories to one process-owned service. */
 export class PostgresWorkflowAdapter {
-  static create(options: PostgresWorkflowAdapterOptions): WorkflowServiceContract {
+  static create(options: PostgresWorkflowAdapterOptions): WorkflowService {
     const ids = NanoidWorkflowIdPort.create();
     const studioEvents = StudioEventPreparerService.create({
       datasets: options.datasets,

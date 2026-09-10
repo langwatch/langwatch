@@ -35,13 +35,13 @@ import {
   type WorkflowReference,
   type WorkflowRelatedEntities,
   type WorkflowRunAnswer,
-  type WorkflowService,
   type WorkflowSourceRow,
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
   type WorkflowVersionHistoryMode,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
+import type { WorkflowService } from "../services/workflow.service.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nanoid } from "nanoid";
 import type {
@@ -302,6 +302,19 @@ export class WorkflowApp implements WorkflowApi {
     projectId: string;
   }): Promise<StudioClientEvent> {
     return this.#infrastructure.workflows.prepareStudioEvent(input);
+  }
+
+  /** A peer's inbound Studio event, prepared the same way before it re-enters the graph. */
+  enrichStudioEvent(input: {
+    event: StudioClientEvent;
+    projectId: string;
+  }): Promise<StudioClientEvent> {
+    return this.#infrastructure.workflows.enrichStudioEvent(input);
+  }
+
+  /** The evaluator-fields shape a peer's guard and run read off this workflow. */
+  getFields(input: { workflowId: string; projectId: string }) {
+    return this.#infrastructure.workflows.getFields(input);
   }
 
   /**

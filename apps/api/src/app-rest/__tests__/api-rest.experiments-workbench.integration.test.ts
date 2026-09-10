@@ -3,6 +3,7 @@
  * Every step hands the next one what the previous one produced: slug, version.
  * @see specs/experiments-v3/workbench-versioning.feature
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
@@ -24,7 +25,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PromptService } from "@langwatch/prompt-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import { nanoid } from "nanoid";
 import { EventEmitter } from "node:events";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

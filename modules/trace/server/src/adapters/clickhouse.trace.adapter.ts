@@ -3,7 +3,6 @@ import {
   type TraceByIdInput,
   type TraceDerivedEventsInput,
   type TraceFullReadInput,
-  type TraceService as TraceServiceContract,
 } from "@langwatch/trace-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
@@ -43,7 +42,7 @@ export class ClickHouseTraceAdapter {
   }
 
   /** Default API and test composition use this when ClickHouse is disabled. */
-  static createNull(modelProviders: ModelProviderApi): TraceServiceContract {
+  static createNull(modelProviders: ModelProviderApi): TraceService {
     return TraceService.create({
       repository: new NullTraceRepository(),
       modelProviders,
@@ -56,7 +55,7 @@ export class ClickHouseTraceAdapter {
     });
   }
 
-  build(): TraceServiceContract {
+  build(): TraceService {
     const clickhouse = ResolverTraceClickHousePort.create(this.options.resolveClient);
     return TraceService.create({
       repository: ClickHouseTraceSpanRepository.create(clickhouse),

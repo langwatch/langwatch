@@ -48,7 +48,6 @@ import type {
   TraceLegacyListInput,
   TraceListFacetCounts,
   TraceListPage,
-  TraceService,
   TraceContentReadService,
   TraceViewerService,
   TraceApi,
@@ -57,11 +56,22 @@ import type {
   TraceSuggestionTarget,
   TraceSummaryData,
   TracesForProjectResult,
+  TraceByIdInput,
+  TraceRecord,
+  TraceFullReadInput,
+  TraceFullRecord,
+  TraceFullThreadReadInput,
+  TraceDerivedEventsInput,
+  TraceQueryFieldCatalogueInput,
+  TraceQueryClassification,
+  TraceQueryClassificationInput,
+  TraceSummaryLookupInput,
 } from "@langwatch/trace-contract";
 import type { TraceLegacyReadPort } from "../ports/trace-legacy-read.port.ts";
 import type { TraceExistencePort } from "../ports/trace-existence.port.ts";
 import { TraceContentReadServiceImpl } from "../services/trace-content-read.service.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
+import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
 import { nowInstant } from "@langwatch/time";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { traceDependencies, type TraceInfrastructure } from "./trace-composition.types.ts";
@@ -323,7 +333,7 @@ export interface TraceAppDependencies {
     sessionGroups: TracesV2SessionGroupsReader;
     spans: TracesV2SpanReader;
     summary: TraceSummaryReader;
-    tree: TraceService;
+    tree: TraceTreeService;
     logRecords: TraceLogRecordReader;
     canonicalisation: TraceCanonicalisationService;
     /** Reviewer corrections applied over a captured trace at read time. */
@@ -947,6 +957,37 @@ export class TraceApp implements TraceApi {
   /** The tree nodes of a live trace whose row version is newer than a mark. */
   readSpanTreeDelta(input: SpanTreeDeltaInput): Promise<SpanTreeNode[]> {
     return this.#dependencies.traces.tree.getSpanTreeDelta(input);
+  }
+
+  /** The canonical trace record, closed under payload-parity review. */
+  getById(input: TraceByIdInput): Promise<TraceRecord> {
+    return this.#dependencies.traces.tree.getById(input);
+  }
+
+  getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord> {
+    return this.#dependencies.traces.tree.getFullRecord(input);
+  }
+
+  getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
+    return this.#dependencies.traces.tree.getFullThread(input);
+  }
+
+  deriveEvents(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]> {
+    return this.#dependencies.traces.tree.deriveEvents(input);
+  }
+
+  /** The query-language field catalogue an AI composer's prompt is grounded on. */
+  buildQueryFieldCatalogue(input: TraceQueryFieldCatalogueInput): Promise<string> {
+    return this.#dependencies.traces.tree.buildQueryFieldCatalogue(input);
+  }
+
+  classifyQuery(input: TraceQueryClassificationInput): TraceQueryClassification {
+    return this.#dependencies.traces.tree.classifyQuery(input);
+  }
+
+  /** A polling read: absent summaries and disabled projections both read as null. */
+  findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null> {
+    return this.#dependencies.traces.tree.tryGetSummary(input);
   }
 
   readModelUsageStats(input: {

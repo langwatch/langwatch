@@ -1,6 +1,6 @@
 import type { Protections } from "@langwatch/trace-contract";
 import { TraceEvaluationMappingService } from "./trace-evaluation-mapping.service.ts";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
@@ -103,7 +103,7 @@ export class TraceService {
     private readonly clickHouseService: TraceLegacyReadRepository,
     // Required, so it comes before the optional tail: every single-trace read
     // resolves the evaluations behind it.
-    private readonly evaluationService: EvaluationService,
+    private readonly evaluationService: EvaluationApi,
   ) {}
 
   static create({
@@ -120,7 +120,7 @@ export class TraceService {
     editOverlay: TraceEditOverlayService;
     logRecordStorage?: TraceLogRecordReader;
     /** Required: every single-trace read resolves the evaluations behind it. */
-    evaluationService: EvaluationService;
+    evaluationService: EvaluationApi;
   }): TraceService {
     return new TraceService(
       TraceReadEnrichmentService.create({ traceCanonicalisation, editOverlay, logRecordStorage }),

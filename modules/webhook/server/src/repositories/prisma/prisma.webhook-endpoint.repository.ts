@@ -5,7 +5,6 @@ import { randomBytes } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import {
   WebhookEndpointNotFoundError,
-  WebhookEndpointService as WebhookEndpointServiceContract,
   WebhookEndpointValidationError,
   isValidEventSelector,
   type SqsDestinationInput,
@@ -133,14 +132,13 @@ export interface WebhookEndpointDeps {
  * exactly once, at create or roll), reversible enable/disable, and the
  * failure-streak bookkeeping behind the 72-hour auto-disable.
  */
-export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContract {
+export class PrismaWebhookEndpointRepository {
   static readonly tables = prismaTables("WebhookEndpoint", "WebhookEndpointDelivery");
   private readonly configuration: WebhookEndpointConfiguration;
   private readonly policy = WebhookEndpointPolicyService.create();
   private readonly prisma: WebhookEndpointDatabase;
 
   private constructor(private readonly deps: WebhookEndpointDeps) {
-    super();
     this.prisma = deps.prisma;
     this.configuration = deps.configuration ?? WebhookEndpointConfiguration.create();
   }

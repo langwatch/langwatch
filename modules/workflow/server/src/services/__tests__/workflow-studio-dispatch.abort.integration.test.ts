@@ -3,7 +3,8 @@
  * abort flag, and cancelling the reader disconnects the engine.
  * @see specs/experiments-v3/execution-backend.feature
  */
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -29,9 +30,9 @@ class FixedStream extends WorkflowStudioStreamPort {
 const dispatch = (reader: ReadableStreamDefaultReader<Uint8Array>) =>
   WorkflowStudioDispatchService.create({
     stream: new FixedStream(reader),
-    modelProviders: {
+    modelProviders: createApiFixture<ModelProviderApi>({
       getForProject: async () => ({}),
-    } as unknown as ModelProviderService,
+    }),
   });
 
 describe("given a studio run streaming from a slow model", () => {

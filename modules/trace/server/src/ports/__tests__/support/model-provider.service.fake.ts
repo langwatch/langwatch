@@ -1,15 +1,13 @@
 import {
-  ModelProviderService,
+  type ModelProviderApi,
   type ModelCostEstimateInput,
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 
-export class TestModelProviderService extends ModelProviderService {
+export class TestModelProviderService implements ModelProviderApi {
   readonly costInputs: ModelCostEstimateInput[] = [];
 
-  constructor(private readonly cost = 0) {
-    super();
-  }
+  constructor(private readonly cost = 0) {}
 
   estimateCost(input: ModelCostEstimateInput): number {
     this.costInputs.push(input);
@@ -133,6 +131,38 @@ export class TestModelProviderService extends ModelProviderService {
   }
 
   translate(): Promise<never> {
+    throw new Error("Not used by Trace tests.");
+  }
+
+  upsertUnattributed(): Promise<never> {
+    throw new Error("Not used by Trace tests.");
+  }
+
+  validateStoredKey(): Promise<ModelProviderCredentialVerdict> {
+    return Promise.resolve({
+      outcome: "unchecked",
+      valid: true,
+      reason: "provider_not_probeable",
+    });
+  }
+
+  startCodexDeviceSignIn(): Promise<never> {
+    throw new Error("Not used by Trace tests.");
+  }
+
+  pollCodexDeviceSignIn(): Promise<never> {
+    throw new Error("Not used by Trace tests.");
+  }
+
+  getDefaultSnapshotUnattributed(): Promise<never> {
+    throw new Error("Not used by Trace tests.");
+  }
+
+  findModelLimits(): null {
+    return null;
+  }
+
+  previewCostRuleMatchingSpans(): Promise<never> {
     throw new Error("Not used by Trace tests.");
   }
 }

@@ -9,7 +9,7 @@ import {
   SORT_COLUMN_MAP,
 } from "../rules/trace-list-row.rules.ts";
 import type { TopicApi } from "@langwatch/topic-contract";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
@@ -84,7 +84,7 @@ export class TraceListService {
     topicService,
   }: {
     repository: TraceListReadPort;
-    evaluations: EvaluationService;
+    evaluations: EvaluationApi;
     topicService: TopicApi;
   }): TraceListService {
     const topicNaming = TraceTopicNamingService.create({ topicService });
@@ -99,7 +99,7 @@ export class TraceListService {
 
   private constructor(
     private readonly repository: TraceListReadPort,
-    private readonly evaluations: EvaluationService,
+    private readonly evaluations: EvaluationApi,
     private readonly discover: TraceDiscoverService,
     private readonly facetValues: TraceFacetValuesService,
   ) {}

@@ -5,7 +5,7 @@ import {
   filterUnsupportedSamplingParams,
   resolveSupportedParameters,
   type ModelProviderSummary,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import {
   getEntryInputs,
@@ -31,7 +31,7 @@ const logger = createLogger("langwatch:workflows:execution");
 
 type WorkflowNlpExecutionServiceOptions = {
   ids: WorkflowIdPort;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   nlpRuntime: WorkflowNlpRuntimePort;
   studioEvents: StudioEventPreparer;
 };

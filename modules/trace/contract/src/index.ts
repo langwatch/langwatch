@@ -20,7 +20,6 @@ export * from "./trace-query-mutations.ts";
 export * from "./trace-query-parser.ts";
 export * from "./trace-query.contract.ts";
 export * from "./trace.queries.ts";
-export * from "./trace.service.ts";
 export * from "./trace-viewer.service.ts";
 export * from "./trace-content-read.service.ts";
 export {

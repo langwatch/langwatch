@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { Protections, Trace, TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 const { mockGetTracesWithSpans, mockResolveTraceIdByPrefix } = vi.hoisted(() => ({
@@ -37,7 +37,7 @@ const protections: Protections = {
   canSeeCapturedOutput: true,
 } as Protections;
 
-function refusingEvaluations(): EvaluationService {
+function refusingEvaluations(): EvaluationApi {
   return new Proxy(
     {},
     {
@@ -45,7 +45,7 @@ function refusingEvaluations(): EvaluationService {
         throw new Error("this test reads no evaluation behind a trace");
       },
     },
-  ) as EvaluationService;
+  ) as EvaluationApi;
 }
 
 function trace(traceId: string): Trace {

@@ -6,11 +6,8 @@
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type {
-  StudioWorkflow,
-  Workflow,
-  WorkflowService,
-} from "@langwatch/workflow-contract";
+import type { StudioWorkflow, Workflow } from "@langwatch/workflow-contract";
+import type { WorkflowService } from "../../services/workflow.service.ts";
 
 import type {
   WorkflowCodeCompletions,

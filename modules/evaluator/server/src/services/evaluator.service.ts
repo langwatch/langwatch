@@ -1,3 +1,4 @@
+import type { WorkflowService } from "@langwatch/workflow-server";
 import {
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
@@ -27,7 +28,7 @@ import {
   type SingleEvaluationResult,
   type NativeEvaluatorExecutionInput,
 } from "@langwatch/evaluator-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import type { EvaluatorRepository } from "../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "./evaluator-code-execution.service.ts";
 import type { EvaluatorHistoryService } from "./evaluator-history.service.ts";

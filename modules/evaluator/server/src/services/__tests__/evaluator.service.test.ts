@@ -1,3 +1,4 @@
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 import {
   EvaluatorInvalidConfigError,
@@ -8,7 +9,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import type { EvaluatorRepository } from "../../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
 import { EvaluatorHistoryService } from "../evaluator-history.service.ts";

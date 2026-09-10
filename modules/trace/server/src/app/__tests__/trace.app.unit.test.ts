@@ -27,12 +27,12 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type {
   Evaluation,
   TraceCanonicalisationService,
-  TraceService,
   TraceSummaryData,
   TraceWithGuardrail,
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -141,7 +141,7 @@ function harness(
       summary,
       list: {} as TracesV2ListReader,
       sessionGroups: {} as TracesV2SessionGroupsReader,
-      tree: {} as TraceService,
+      tree: {} as TraceTreeService,
       logRecords: { getLogsByTraceId: async () => [] },
       canonicalisation: {} as TraceCanonicalisationService,
       editOverlay: {} as TraceEditOverlayStore,
@@ -154,7 +154,7 @@ function harness(
       },
       cleanupTenantEmitter: () => undefined,
     },
-    evaluations: {} as EvaluationService,
+    evaluations: {} as EvaluationApi,
     codingAgents: {} as CodingAgentApi,
     share: {} as ShareApi,
     projects: {} as ProjectApi,

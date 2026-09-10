@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  */
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { describe, expect, it } from "vitest";
 
 import { WorkflowEvaluationAdapter } from "../workflow-evaluation.adapter.ts";

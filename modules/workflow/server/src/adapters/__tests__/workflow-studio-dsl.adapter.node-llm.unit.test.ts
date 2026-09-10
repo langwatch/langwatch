@@ -1,5 +1,6 @@
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import { ModelNotConfiguredError, type ModelProviderService } from "@langwatch/model-provider-contract";
+import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { ModelProviderWorkflowStudioDslAdapter } from "../workflow-studio-dsl.adapter.ts";
 
@@ -33,7 +34,7 @@ function buildDsl(overrides: Record<string, unknown> = {}): StudioWorkflow {
 }
 
 function buildAdapter(resolveModelForFeature: ReturnType<typeof vi.fn>) {
-  const modelProviders = { resolveModelForFeature } as unknown as ModelProviderService;
+  const modelProviders = createApiFixture<ModelProviderApi>({ resolveModelForFeature });
   return ModelProviderWorkflowStudioDslAdapter.create({ modelProviders });
 }
 

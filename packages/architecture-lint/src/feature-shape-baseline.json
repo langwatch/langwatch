@@ -7,14 +7,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "agent|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "agent|testing-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "analytics|contract-service",
       "measured": "2026-09-08"
     },
@@ -515,10 +507,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "trace|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "trace|legacy-transport-runtime",
       "measured": "2026-09-08"
     },
@@ -551,10 +539,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "webhook|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "webhook|installer-not-booted",
       "measured": "2026-09-08"
     },
@@ -572,10 +556,6 @@
     },
     {
       "key": "webhook|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "workflow|contract-service",
       "measured": "2026-09-08"
     },
     {

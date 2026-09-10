@@ -9,6 +9,7 @@
  * answers with is the one that resource's own REST door hands out as
  * `platformUrl`. A miss is `null`, and the fallback drops the navigate.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -17,7 +18,7 @@ import { type LangyNavigateResourceKind, LangyNavigateResourcePort } from "@lang
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 
 import { agentDrawerPath } from "../agent/agent-platform-url.ts";
 

@@ -2,7 +2,7 @@
  * One studio run, dispatched to the engine and streamed back event by event.
  */
 import { createLogger } from "@langwatch/observability";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type {
   StudioClientEvent,
   StudioServerEvent,
@@ -44,7 +44,7 @@ export type WorkflowStudioDispatchInput = Readonly<{
 export class WorkflowStudioDispatchService {
   static create(options: {
     stream: WorkflowStudioStreamPort;
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
   }): WorkflowStudioDispatchService {
     return new WorkflowStudioDispatchService(options);
   }
@@ -52,7 +52,7 @@ export class WorkflowStudioDispatchService {
   private constructor(
     private readonly options: {
       stream: WorkflowStudioStreamPort;
-      modelProviders: ModelProviderService;
+      modelProviders: ModelProviderApi;
     },
   ) {}
 

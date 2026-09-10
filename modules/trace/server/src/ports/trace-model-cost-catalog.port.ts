@@ -13,7 +13,7 @@ import type { ModelCost } from "@langwatch/model-provider-contract";
  * nothing to show that it happened. So the precedent does not transfer, and
  * this port states the read it really is.
  *
- * `ModelProviderService` satisfies it structurally; nothing narrower exists
+ * `ModelProviderApi` satisfies it structurally; nothing narrower exists
  * upstream, which is the reason for declaring it here rather than importing the
  * fourteen-method service.
  */

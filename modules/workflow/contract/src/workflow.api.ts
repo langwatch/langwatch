@@ -14,6 +14,7 @@ import type { ExecutionState, Field, StudioWorkflow } from "./studio-workflow.ts
 import type { ExecuteWorkflowComponentInput } from "./workflow-component.commands.ts";
 import type {
   Workflow,
+  WorkflowEvaluatorFields,
   WorkflowRunAnswer,
   WorkflowVersion,
   WorkflowVersionHistoryEntry,
@@ -189,6 +190,13 @@ export interface WorkflowApi {
     event: StudioClientEvent;
     projectId: string;
   }): Promise<StudioClientEvent>;
+  /** A peer's inbound Studio event, prepared the same way before it re-enters the graph. */
+  enrichStudioEvent(input: {
+    event: StudioClientEvent;
+    projectId: string;
+  }): Promise<StudioClientEvent>;
+  /** The evaluator-fields shape a peer's guard and run read off this workflow. */
+  getFields(input: { workflowId: string; projectId: string }): Promise<WorkflowEvaluatorFields>;
   prepareStudioDsl(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow>;
   saveStudioVersion(
     input: {

@@ -7,7 +7,6 @@ import type {
 } from "@langwatch/eventing";
 import {
   WebhookEndpointNotFoundError,
-  WebhookHealthService as WebhookHealthServiceContract,
   type WebhookEndpointHealth,
 } from "@langwatch/webhook-contract";
 import {
@@ -64,9 +63,8 @@ interface EndpointStreamRead {
  * and the process stream (buffered lag, outbox retries, DLQ). The stream
  * is the endpoint's own, at organization scope, so this is one read.
  */
-export class WebhookHealthService extends WebhookHealthServiceContract {
+export class WebhookHealthService {
   private constructor(private readonly deps: WebhookHealthDeps) {
-    super();
   }
 
   static create(deps: WebhookHealthDeps): WebhookHealthService {

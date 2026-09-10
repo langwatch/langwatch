@@ -14,7 +14,6 @@ export * from "./workflow.trpc.ts";
 export * from "./workflow-optimization.trpc.ts";
 export * from "./workflow.commands.ts";
 export * from "./workflow.errors.ts";
-export * from "./workflow.service.ts";
 export * from "./workflow.api.ts";
 export * from "./workflow-node-error.ts";
 export * from "./llm-signature-node-factory.ts";

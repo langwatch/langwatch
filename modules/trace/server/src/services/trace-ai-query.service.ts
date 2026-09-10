@@ -6,7 +6,7 @@ import {
   type AiActionErrorDetails,
   type AiActionResult,
   type AiQueryResult,
-  type TraceService,
+  type TraceApi,
   validateAst,
 } from "@langwatch/trace-contract";
 import { generateObject, generateText, type LanguageModel, type ModelMessage } from "ai";
@@ -50,7 +50,7 @@ export interface AiQueryInput {
   prompt: string;
   timeRange: { from: number; to: number };
   resolveModel: AiQueryModelResolver;
-  traces: TraceService;
+  traces: Pick<TraceApi, "buildQueryFieldCatalogue">;
 }
 
 /**

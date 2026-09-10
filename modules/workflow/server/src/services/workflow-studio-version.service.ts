@@ -16,12 +16,9 @@
  * Spec: modules/workflow/specs/workflow-service.feature.
  */
 import { createLogger } from "@langwatch/observability";
-import type {
-  StudioWorkflow,
-  WorkflowService,
-  WorkflowVersion,
-} from "@langwatch/workflow-contract";
+import type { StudioWorkflow, WorkflowVersion } from "@langwatch/workflow-contract";
 import type { WorkflowAgentMappingPort, WorkflowStudioDslPort } from "../ports/workflow.port.ts";
+import type { WorkflowService } from "./workflow.service.ts";
 
 const logger = createLogger("langwatch:workflows:auto-compute");
 

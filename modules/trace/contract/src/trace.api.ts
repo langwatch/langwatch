@@ -21,6 +21,23 @@ import type {
   EvaluationTraceSpan,
   EvaluationTraceEvent,
 } from "./trace-evaluation.contract.ts";
+import type {
+  TraceByIdInput,
+  TraceDerivedEventsInput,
+  TraceSummaryLookupInput,
+} from "./trace.queries.ts";
+import type { TraceRecord } from "./trace-record.ts";
+import type { TraceSummaryData } from "./trace-projection.ts";
+import type {
+  TraceFullReadInput,
+  TraceFullRecord,
+  TraceFullThreadReadInput,
+} from "./trace-full-read.contract.ts";
+import type {
+  TraceQueryClassification,
+  TraceQueryClassificationInput,
+  TraceQueryFieldCatalogueInput,
+} from "./trace-query.contract.ts";
 
 /** A reviewer correction target owned by Trace, shared structurally with Annotation. */
 export type TraceSuggestionTarget =
@@ -46,6 +63,16 @@ export interface TraceApi {
   resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
   getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
   getEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;
+  /** The canonical trace record, closed under payload-parity review. */
+  getById(input: TraceByIdInput): Promise<TraceRecord>;
+  getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord>;
+  getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]>;
+  deriveEvents(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]>;
+  /** The query-language field catalogue an AI composer's prompt is grounded on. */
+  buildQueryFieldCatalogue(input: TraceQueryFieldCatalogueInput): Promise<string>;
+  classifyQuery(input: TraceQueryClassificationInput): TraceQueryClassification;
+  /** A polling read: absent summaries and disabled projections both read as null. */
+  findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null>;
   listTraces(input: {
     query: TraceLegacyListInput;
     protections: unknown;

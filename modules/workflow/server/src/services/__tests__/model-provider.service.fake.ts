@@ -1,13 +1,11 @@
 import {
-  ModelProviderService,
+  type ModelProviderApi,
   type ModelProviderCredentialVerdict,
   type ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
 
-export class TestModelProviderService extends ModelProviderService {
-  constructor(private readonly providers: Record<string, ModelProviderSummary> = {}) {
-    super();
-  }
+export class TestModelProviderService implements ModelProviderApi {
+  constructor(private readonly providers: Record<string, ModelProviderSummary> = {}) {}
 
   listForProject(): Promise<ModelProviderSummary[]> {
     return Promise.resolve(Object.values(this.providers));
@@ -127,5 +125,41 @@ export class TestModelProviderService extends ModelProviderService {
 
   estimateCost(): number {
     return 0;
+  }
+
+  upsertUnattributed(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
+  validateStoredKey(): Promise<ModelProviderCredentialVerdict> {
+    return Promise.resolve({
+      outcome: "unchecked",
+      valid: true,
+      reason: "provider_not_probeable",
+    });
+  }
+
+  startCodexDeviceSignIn(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
+  pollCodexDeviceSignIn(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
+  getDefaultSnapshotUnattributed(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
+  findModelLimits(): null {
+    return null;
+  }
+
+  previewCostRuleMatchingSpans(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
+  applyCodexCodingDefaults(): Promise<void> {
+    return Promise.resolve();
   }
 }

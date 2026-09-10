@@ -15,7 +15,7 @@
 import {
   ModelNotConfiguredError,
   getLatestOpenAIChatFlagship,
-  type ModelProviderService,
+  type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import {
   mergeLocalConfigsIntoDsl,
@@ -48,12 +48,12 @@ const hasModel = (value: unknown): boolean =>
 /** Folds local node configuration in, then materialises every missing model. */
 export class ModelProviderWorkflowStudioDslAdapter extends WorkflowStudioDslPort {
   static create(options: {
-    modelProviders: ModelProviderService;
+    modelProviders: ModelProviderApi;
   }): ModelProviderWorkflowStudioDslAdapter {
     return new ModelProviderWorkflowStudioDslAdapter(options);
   }
 
-  private constructor(private readonly options: { modelProviders: ModelProviderService }) {
+  private constructor(private readonly options: { modelProviders: ModelProviderApi }) {
     super();
   }
 

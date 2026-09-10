@@ -23,15 +23,17 @@ import {
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { sharedFiltersInputSchema } from "@langwatch/analytics-server";
 import { ContentDropPolicyService } from "@langwatch/data-privacy-server";
-import { EvaluationPreconditionService } from "@langwatch/evaluation-server";
+import {
+  EvaluationPreconditionService,
+  type EvaluationService,
+} from "@langwatch/evaluation-server";
 import { evaluatorTypesSchema, getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
@@ -41,7 +43,6 @@ import {
   TraceNotFoundError,
   type Span,
   type Trace,
-  type TraceService as TraceTreeService,
 } from "@langwatch/trace-contract";
 import {
   findPromptReferenceInAncestors,
@@ -89,6 +90,9 @@ import {
 import type { TracesV2TrpcPorts } from "@langwatch/trace-server/api-trpc/traces-v2";
 import type { TracesTrpcPorts } from "@langwatch/trace-server/api-trpc/traces";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
+
+/** The trace-tree read the ClickHouse adapter composes, as `composeTree` hands it around. */
+type TraceTreeService = ReturnType<typeof ClickHouseTraceAdapter.createNull>;
 import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port.ts";
@@ -116,7 +120,7 @@ export type ApiTraceReadStackOptions = Readonly<{
   /** The topic tree the grid labels its rows with. */
   topics: TopicApi;
   /** The gateway the AI composer resolves its model through. */
-  modelProviders: ModelProviderService | undefined;
+  modelProviders: ModelProviderApi | undefined;
   /** Where a resolved model executes: nlpgo's OpenAI-compatible proxy. */
   executionProxyBaseUrl: string;
   /** The evaluation summaries the grid labels its rows with, if composed. */

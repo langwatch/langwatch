@@ -9,7 +9,6 @@ import {
   WorkflowDslValidationError,
   WorkflowNotFoundError,
   WorkflowNotPublishedError,
-  WorkflowService as WorkflowServiceContract,
   WorkflowVersionNotFoundError,
   WorkflowVersionRequiredError,
   type Workflow,
@@ -48,7 +47,7 @@ export type WorkflowServiceOptions = {
 };
 
 /** Canonical Workflow lifecycle. Persistence and cross-feature capabilities are injected. */
-export class WorkflowService extends WorkflowServiceContract {
+export class WorkflowService {
   async listFields(input: { projectId: string; workflowIds: string[] }) {
     const sources = await this.options.repository.listFieldSources(input);
 
@@ -72,7 +71,6 @@ export class WorkflowService extends WorkflowServiceContract {
   }
 
   private constructor(private readonly options: WorkflowServiceOptions) {
-    super();
     this.datasetCopies = WorkflowDatasetCopyService.create(options.datasets);
   }
 

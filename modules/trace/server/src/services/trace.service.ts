@@ -18,7 +18,6 @@ import {
   traceQueryFieldCatalogueInputSchema,
   traceQueryFieldCatalogueOutputSchema,
   traceSummaryLookupInputSchema,
-  TraceService as TraceServiceContract,
   type SpanTreeNode,
   type SpanTreeDeltaInput,
   type SpanTreePage,
@@ -77,12 +76,11 @@ function gateCosts(nodes: SpanTreeNode[], canSeeCosts: boolean): SpanTreeNode[] 
   return nodes.map((node) => ({ ...node, cost: null }));
 }
 
-export class TraceService extends TraceServiceContract {
+export class TraceService {
   private readonly queryFieldCatalogue: TraceQueryFieldCatalogueService;
   private readonly ingestWaitCache = new Map<string, { timeoutMs: number; expiresAt: number }>();
 
   private constructor(private readonly composition: TraceComposition) {
-    super();
     this.queryFieldCatalogue = TraceQueryFieldCatalogueService.create(composition.queryFieldValues);
   }
 

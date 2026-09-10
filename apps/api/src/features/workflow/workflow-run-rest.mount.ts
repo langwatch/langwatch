@@ -13,8 +13,8 @@
  */
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { createWorkflowRunRestApp } from "@langwatch/workflow-server";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+import { createWorkflowRunRestApp, type WorkflowService,} from "@langwatch/workflow-server";
+
 
 import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential.ts";
 

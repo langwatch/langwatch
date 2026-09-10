@@ -8,7 +8,7 @@ import type { Protections } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceLogRecordReader } from "../claude-code-log-enrichment.service.ts";
 import type { Span, Trace } from "@langwatch/trace-contract";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 
 const {
   mockGetTracesWithSpans,
@@ -132,7 +132,7 @@ const CLAUDE_LOG_ROWS = [
   ),
 ];
 
-function refusingEvaluations(): EvaluationService {
+function refusingEvaluations(): EvaluationApi {
   return new Proxy(
     {},
     {
@@ -140,7 +140,7 @@ function refusingEvaluations(): EvaluationService {
         throw new Error("this test reads no evaluation behind a trace");
       },
     },
-  ) as EvaluationService;
+  ) as EvaluationApi;
 }
 
 function makeService(getLogsByTraceId: TraceLogRecordReader["getLogsByTraceId"]): TraceService {
