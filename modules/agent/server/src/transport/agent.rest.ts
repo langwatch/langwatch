@@ -39,7 +39,8 @@ import { z } from "zod";
 
 export { relayCallBodySchema, relayCallResponseSchema } from "@langwatch/agent-contract";
 
-const traceparent = defineRestMiddleware("traceparent", z.string().nullable());
+/** The W3C trace context header a call carries, bound by the process from the request. */
+export const agentTraceparent = defineRestMiddleware("traceparent", z.string().nullable());
 
 function response(agent: AgentOverview, app: AgentApi, projectSlug: string) {
   return {
@@ -198,7 +199,7 @@ export function createAgentRest(
     onExceeded: () =>
       new AgentPayloadTooLargeError({ what: "envelope", limitBytes: relayMaxBytes }),
   })
-  .withMiddleware(projectRestFacts, traceparent)
+  .withMiddleware(projectRestFacts, agentTraceparent)
   .handle(({ app, input, scope, signal }, facts, header) =>
     app.call(
       { ...input, projectId: scope.id },

@@ -10,8 +10,14 @@ import {
   agentRestErrorHandler,
   createAgentConnectRest,
   createAgentRest,
+  agentTraceparent,
 } from "@langwatch/agent-server";
-import { bindRestMiddleware, type MountableRestApp, type RestErrorHandler } from "@langwatch/api/rest";
+import {
+  bindRestHeader,
+  bindRestMiddleware,
+  type MountableRestApp,
+  type RestErrorHandler,
+} from "@langwatch/api/rest";
 
 import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 
@@ -25,7 +31,10 @@ export function mountAgentRest(
   const relayMaxPayloadMb = options.agents().relayMaxPayloadMb();
 
   return [
-    runtime.mount(createAgentRest(relayMaxPayloadMb).router(), options.agents, { onError }),
+    runtime.mount(createAgentRest(relayMaxPayloadMb).router(), options.agents, {
+      onError,
+      facts: [bindRestHeader(agentTraceparent, "traceparent")],
+    }),
     runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), options.agents, {
       onError,
       facts: [
