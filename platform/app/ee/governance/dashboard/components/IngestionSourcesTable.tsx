@@ -190,7 +190,12 @@ function SourceTableRow({
     completeness: runCompleteness(source.lastRunCompleteness),
   });
   const StatusIcon = status.icon;
-  const typeLabel = SOURCE_TYPE_LABEL[sourceType] ?? source.sourceType;
+  // Own-property test: see sourceHealthDisplay. An inherited name would hand
+  // back a Function here and render as one instead of falling back to the raw
+  // type string.
+  const typeLabel = Object.hasOwn(SOURCE_TYPE_LABEL, sourceType)
+    ? SOURCE_TYPE_LABEL[sourceType]!
+    : source.sourceType;
   const mode = modeForSourceType({ sourceType });
   const delivery = deliveryFor(source);
   const cadence = shortPullCadence(source.pullSchedule);

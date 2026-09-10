@@ -120,7 +120,16 @@ export function sourceBadge({
     return SOURCE_UNHEALTHY_META;
   }
   if (completeness === "truncated") return SOURCE_PARTIAL_META;
-  return SOURCE_STATUS_META[status] ?? SOURCE_STATUS_META.awaiting_first_event!;
+  // Own-property test, not a bare lookup. `status` is a free-form column, and
+  // an object literal answers "toString" or "constructor" with an inherited
+  // Function, which `??` does not treat as missing -- the badge would come back
+  // as a Function, `.icon` would be undefined, and rendering an undefined
+  // component throws. Every genuinely unknown word already falls through here
+  // correctly; only the handful of inherited names misbehave, which is exactly
+  // why a test picking a well-behaved word cannot see it.
+  return Object.hasOwn(SOURCE_STATUS_META, status)
+    ? SOURCE_STATUS_META[status]!
+    : SOURCE_STATUS_META.awaiting_first_event!;
 }
 
 /**

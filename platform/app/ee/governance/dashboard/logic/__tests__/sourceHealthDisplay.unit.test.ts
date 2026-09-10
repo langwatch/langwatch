@@ -293,3 +293,37 @@ describe("given a source whose runs keep stopping at the same point", () => {
     });
   });
 });
+
+/**
+ * A status that names something on Object's prototype.
+ *
+ * `status` is a free-form column, so the badge table gets indexed by a string
+ * this build never chose. Every unknown word falls back correctly except the
+ * handful naming an inherited member: those come back as a Function, and `??`
+ * does not treat a Function as missing. The badge then carries no icon, and
+ * rendering an undefined component throws — so the page dies rather than
+ * degrading to "Awaiting first event".
+ *
+ * The control case below is the point of the whole block. A test that reaches
+ * for a plausible unknown word passes against the broken lookup, because
+ * ordinary words are not inherited. Only naming the inherited ones finds it.
+ */
+describe("a status naming an inherited property", () => {
+  const INHERITED = ["toString", "constructor", "valueOf", "hasOwnProperty"];
+
+  it.each(
+    INHERITED,
+  )("falls back to the awaiting badge for %s instead of yielding a function", (status) => {
+    const badge = sourceBadge({ status, errorCount: 0 });
+
+    expect(typeof badge).toBe("object");
+    expect(badge).toBe(SOURCE_STATUS_META.awaiting_first_event);
+    expect(badge.icon).toBeDefined();
+  });
+
+  it("control: an ordinary unknown word already fell back before the fix", () => {
+    expect(sourceBadge({ status: "quota_exhausted_v2", errorCount: 0 })).toBe(
+      SOURCE_STATUS_META.awaiting_first_event,
+    );
+  });
+});

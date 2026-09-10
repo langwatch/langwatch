@@ -20,7 +20,13 @@ const PROVIDER_NAMES: Record<string, string> = {
  * two different things.
  */
 export const providerName = (provider: string) =>
-  PROVIDER_NAMES[provider] ?? (provider || "Unknown provider");
+  // Own-property test, not a bare lookup: `provider` arrives from stored rows,
+  // and an object literal answers an inherited name like "toString" with a
+  // Function, which `??` does not treat as missing. That Function would reach
+  // the label. See sourceHealthDisplay for the same guard.
+  Object.hasOwn(PROVIDER_NAMES, provider)
+    ? PROVIDER_NAMES[provider]!
+    : provider || "Unknown provider";
 
 /** Provider reporting needs no person attribution. Missing USD stays unknown. */
 export function CostProviderBreakdown({
