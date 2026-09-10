@@ -328,10 +328,11 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
 
   # AC15
   @integration
-  Scenario: The recording proxy refuses a conversation with no run in the project
+  Scenario: The recording proxy refuses a conversation that is neither a run nor a saved voice agent's call in the project
     Given a recording is requested for a conversation with no run in the authorised project
+    And the provider record's agent does not match any saved voice agent in the project
     When the proxy is handled
-    Then it answers "Recording unavailable" and never fetches the provider
+    Then it answers "Recording unavailable" without streaming the audio
 
   # AC13
   @integration
