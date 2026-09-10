@@ -110,23 +110,35 @@ describe("given a source's last agents listing", () => {
 
     /**
      * The cause table is an object literal, and indexing one with a string
-     * reaches its prototype. `toString` and friends come back as inherited
-     * functions rather than `undefined`, so a `?? "unreachable"` fallback
-     * never fires and a Function lands where a cause belongs. `REFUSAL_VOICE`
-     * has no entry for it and reading a headline off `undefined` throws, so
-     * the screen crashes instead of drawing the refusal it was handed.
+     * reaches its prototype. These names resolve to inherited members rather
+     * than `undefined`, so a `?? "unreachable"` fallback never fires and the
+     * inherited member lands where a cause belongs. `REFUSAL_VOICE` has no
+     * entry for it and reading a headline off `undefined` throws, so the
+     * screen crashes instead of drawing the refusal it was handed.
      *
      * That is strictly worse than the wrong-advice bug the fallback exists to
      * prevent, and it shipped in this file once already.
      *
-     * These names are tested one at a time rather than as a loop so a failure
-     * names the word that broke it.
+     * NOT ALL OF THEM ARE FUNCTIONS. `__proto__` resolves to `Object.prototype`
+     * itself, which is an object, and the other five are methods. So an
+     * assertion about the SHAPE of the wrong value — `typeof` anything, or
+     * "it is callable" — is satisfied by part of this list against the broken
+     * lookup and misses the rest. Every case below asserts the whole returned
+     * outcome equals the fallback, which no inherited member can satisfy
+     * whatever its type. Keep it that way: the reason to reach for a hostile
+     * input is that the model of what it does may be wrong, and asserting on
+     * that model gives the mistake somewhere to hide.
+     *
+     * Listed one per case rather than looped so a failure names the word.
      */
     it.each([
       "toString",
       "constructor",
       "valueOf",
       "hasOwnProperty",
+      "isPrototypeOf",
+      "propertyIsEnumerable",
+      "__proto__",
     ])("falls to asking again for %s, which is also a property name", (inherited) => {
       expect(agentsListingOutcome(row("refused", inherited))).toEqual({
         outcome: "refused",

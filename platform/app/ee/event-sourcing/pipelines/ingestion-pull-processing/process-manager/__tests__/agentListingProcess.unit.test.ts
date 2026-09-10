@@ -1,121 +1,20 @@
-import { ingestionPullPM } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/pipeline";
 import { INGESTION_PULL_EVENT_TYPES } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
-import type { IngestionPullProcessingEvent } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { describe, expect, it } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import type {
-  ProcessDefinition,
-  ProcessEventEnvelope,
-  ProcessInput,
-} from "~/server/event-sourcing/process-manager";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 
 import { INGESTION_PULL_STALE_LISTING_MS } from "../ingestionPull.process";
 import {
-  INGESTION_PULL_PROCESS_NAME,
-  type IngestionPullProcessState,
-} from "../ingestionPullProcess.types";
+  bootConfigured,
+  envelope,
+  evolve,
+  listingKey as listingKeyFor,
+  requestedFor,
+} from "./listingProcess.fixture";
 
-/** Built through the pipeline's own applier, like the pull tests. */
-const definition = buildProcessDefinition(
-  buildProcessManager<IngestionPullProcessingEvent>({
-    name: INGESTION_PULL_PROCESS_NAME,
-    applier: ingestionPullPM({
-      runPort: { run: () => Promise.reject(new Error("unused")) },
-      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
-      peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
-      commands: () => {
-        throw new Error("unused in evolve tests");
-      },
-    }),
-  }).config,
-) as ProcessDefinition<IngestionPullProcessState>;
+const listingKey = (requestId: string) => listingKeyFor("agents", requestId);
 
-const ref = {
-  processName: INGESTION_PULL_PROCESS_NAME,
-  projectId: "gov-project",
-  processKey: "source-1",
-};
-
-const listingKey = (requestId: string) =>
-  `process:${encodeURIComponent("source-1")}:agents:${requestId}`;
-
-const CONFIGURED_AT = Date.parse("2026-09-09T10:00:00Z");
-
-/**
- * Evolve is handed the content-boundary view, not the raw event data, so
- * these payloads are shaped like `buildProcessEventView` output: the fields a
- * given event does not carry arrive as null.
- */
-function envelope({
-  eventType,
-  occurredAt,
-  payload,
-}: {
-  eventType: string;
-  occurredAt: number;
-  payload: Record<string, unknown>;
-}): ProcessEventEnvelope {
-  return {
-    eventId: `event-${eventType}-${occurredAt}`,
-    eventType,
-    occurredAt,
-    tenantId: "gov-project",
-    projectId: "gov-project",
-    processKey: "source-1",
-    payload: { cron: null, cursor: null, runId: null, ...payload },
-  };
-}
-
-function evolve({
-  previousState,
-  event,
-  now,
-}: {
-  previousState: IngestionPullProcessState;
-  event: ProcessEventEnvelope;
-  now: number;
-}) {
-  const input: ProcessInput = { kind: "event", event, now };
-  return definition.evolve({ previousState, input, ref });
-}
-
-/** A configured, cron-scheduled source — the state every listing starts from. */
-function bootConfigured() {
-  return evolve({
-    previousState: definition.initialState,
-    event: envelope({
-      eventType: INGESTION_PULL_EVENT_TYPES.CONFIGURED,
-      occurredAt: CONFIGURED_AT,
-      payload: {
-        sourceId: "source-1",
-        cron: "*/15 * * * *",
-        cursor: "cursor-1",
-        runId: null,
-      },
-    }),
-    now: CONFIGURED_AT,
-  });
-}
-
-function requested({
-  requestId,
-  at,
-  now,
-}: {
-  requestId: string;
-  at: number;
-  now?: number;
-}) {
-  return {
-    event: envelope({
-      eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
-      occurredAt: at,
-      payload: { sourceId: "source-1", requestId },
-    }),
-    now: now ?? at,
-  };
-}
+const requested = requestedFor(
+  INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
+);
 
 describe("agent listing on the ingestion pull process manager", () => {
   describe("when a listing is requested", () => {

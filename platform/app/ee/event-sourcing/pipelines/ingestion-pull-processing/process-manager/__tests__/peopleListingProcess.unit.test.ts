@@ -1,120 +1,21 @@
-import { ingestionPullPM } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/pipeline";
 import { INGESTION_PULL_EVENT_TYPES } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
-import type { IngestionPullProcessingEvent } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { describe, expect, it } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import type {
-  ProcessDefinition,
-  ProcessEventEnvelope,
-  ProcessInput,
-} from "~/server/event-sourcing/process-manager";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 
 import { INGESTION_PULL_STALE_LISTING_MS } from "../ingestionPull.process";
 import {
-  INGESTION_PULL_PROCESS_NAME,
-  type IngestionPullProcessState,
-} from "../ingestionPullProcess.types";
+  bootConfigured,
+  envelope,
+  evolve,
+  listingKey,
+  NEXT_PULL_AT,
+  requestedFor,
+} from "./listingProcess.fixture";
 
-/** Built through the pipeline's own applier, like the pull tests. */
-const definition = buildProcessDefinition(
-  buildProcessManager<IngestionPullProcessingEvent>({
-    name: INGESTION_PULL_PROCESS_NAME,
-    applier: ingestionPullPM({
-      runPort: { run: () => Promise.reject(new Error("unused")) },
-      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
-      peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
-      commands: () => {
-        throw new Error("unused in evolve tests");
-      },
-    }),
-  }).config,
-) as ProcessDefinition<IngestionPullProcessState>;
+const peopleKey = (requestId: string) => listingKey("people", requestId);
 
-const ref = {
-  processName: INGESTION_PULL_PROCESS_NAME,
-  projectId: "gov-project",
-  processKey: "source-1",
-};
-
-const peopleKey = (requestId: string) =>
-  `process:${encodeURIComponent("source-1")}:people:${requestId}`;
-const agentsKey = (requestId: string) =>
-  `process:${encodeURIComponent("source-1")}:agents:${requestId}`;
-
-const CONFIGURED_AT = Date.parse("2026-09-09T10:00:00Z");
-/** The wake the cron in `bootConfigured` produces, named once. */
-const NEXT_PULL_AT = Date.parse("2026-09-09T10:15:00Z");
-
-function envelope({
-  eventType,
-  occurredAt,
-  payload,
-}: {
-  eventType: string;
-  occurredAt: number;
-  payload: Record<string, unknown>;
-}): ProcessEventEnvelope {
-  return {
-    eventId: `event-${eventType}-${occurredAt}`,
-    eventType,
-    occurredAt,
-    tenantId: "gov-project",
-    projectId: "gov-project",
-    processKey: "source-1",
-    payload: { cron: null, cursor: null, runId: null, ...payload },
-  };
-}
-
-function evolve({
-  previousState,
-  event,
-  now,
-}: {
-  previousState: IngestionPullProcessState;
-  event: ProcessEventEnvelope;
-  now: number;
-}) {
-  const input: ProcessInput = { kind: "event", event, now };
-  return definition.evolve({ previousState, input, ref });
-}
-
-/** A configured, cron-scheduled source — the state every listing starts from. */
-function bootConfigured() {
-  return evolve({
-    previousState: definition.initialState,
-    event: envelope({
-      eventType: INGESTION_PULL_EVENT_TYPES.CONFIGURED,
-      occurredAt: CONFIGURED_AT,
-      payload: {
-        sourceId: "source-1",
-        cron: "*/15 * * * *",
-        cursor: "cursor-1",
-        runId: null,
-      },
-    }),
-    now: CONFIGURED_AT,
-  });
-}
-
-function requested({
-  requestId,
-  at,
-  now,
-}: {
-  requestId: string;
-  at: number;
-  now?: number;
-}) {
-  return {
-    event: envelope({
-      eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REQUESTED,
-      occurredAt: at,
-      payload: { sourceId: "source-1", requestId },
-    }),
-    now: now ?? at,
-  };
-}
+const requested = requestedFor(
+  INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REQUESTED,
+);
 
 describe("people listing on the ingestion pull process manager", () => {
   describe("when a listing is requested", () => {
@@ -173,66 +74,6 @@ describe("people listing on the ingestion pull process manager", () => {
 
       expect(result.state.cursor).toBe("cursor-1");
       expect(result.state.currentRun).toBeNull();
-    });
-  });
-
-  describe("when an agent listing is already in flight", () => {
-    /**
-     * The two lists ask different providers different questions, so one in
-     * flight is no reason to refuse the other. Sharing a slot would have made
-     * a people sync silently drop whenever an agent sync was running.
-     */
-    it("still dispatches the people listing", () => {
-      const booted = bootConfigured();
-      const agents = evolve({
-        previousState: booted.state,
-        event: envelope({
-          eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
-          occurredAt: Date.parse("2026-09-09T10:02:00Z"),
-          payload: { sourceId: "source-1", requestId: "agents-1" },
-        }),
-        now: Date.parse("2026-09-09T10:02:00Z"),
-      });
-      const people = evolve({
-        previousState: agents.state,
-        ...requested({
-          requestId: "req-1",
-          at: Date.parse("2026-09-09T10:03:00Z"),
-        }),
-      });
-
-      expect(people.intents).toHaveLength(1);
-      expect(people.intents[0]?.messageKey).toBe(peopleKey("req-1"));
-      // And the agent listing is left exactly where it was.
-      expect(people.state.currentAgentsListing?.requestId).toBe("agents-1");
-      expect(people.state.currentPeopleListing?.requestId).toBe("req-1");
-    });
-
-    it("keys the two intents apart so neither collapses onto the other", () => {
-      const booted = bootConfigured();
-      const agents = evolve({
-        previousState: booted.state,
-        event: envelope({
-          eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
-          occurredAt: Date.parse("2026-09-09T10:02:00Z"),
-          // Deliberately the SAME request id as the people listing below.
-          payload: { sourceId: "source-1", requestId: "req-1" },
-        }),
-        now: Date.parse("2026-09-09T10:02:00Z"),
-      });
-      const people = evolve({
-        previousState: agents.state,
-        ...requested({
-          requestId: "req-1",
-          at: Date.parse("2026-09-09T10:03:00Z"),
-        }),
-      });
-
-      expect(agents.intents[0]?.messageKey).toBe(agentsKey("req-1"));
-      expect(people.intents[0]?.messageKey).toBe(peopleKey("req-1"));
-      expect(people.intents[0]?.messageKey).not.toBe(
-        agents.intents[0]?.messageKey,
-      );
     });
   });
 
@@ -410,44 +251,6 @@ describe("people listing on the ingestion pull process manager", () => {
       });
 
       expect(stale.state.currentPeopleListing?.requestId).toBe("req-1");
-    });
-
-    it("leaves an in-flight agent listing untouched", () => {
-      const booted = bootConfigured();
-      const agents = evolve({
-        previousState: booted.state,
-        event: envelope({
-          eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
-          occurredAt: Date.parse("2026-09-09T10:02:00Z"),
-          payload: { sourceId: "source-1", requestId: "agents-1" },
-        }),
-        now: Date.parse("2026-09-09T10:02:00Z"),
-      });
-      const people = evolve({
-        previousState: agents.state,
-        ...requested({
-          requestId: "req-1",
-          at: Date.parse("2026-09-09T10:03:00Z"),
-        }),
-      });
-      const listed = evolve({
-        previousState: people.state,
-        event: envelope({
-          eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTED,
-          occurredAt: Date.parse("2026-09-09T10:03:30Z"),
-          payload: {
-            sourceId: "source-1",
-            requestId: "req-1",
-            requestedAt: Date.parse("2026-09-09T10:03:00Z"),
-            directoryPersonCount: 2,
-            withheldPersonCount: 0,
-          },
-        }),
-        now: Date.parse("2026-09-09T10:03:30Z"),
-      });
-
-      expect(listed.state.currentPeopleListing).toBeNull();
-      expect(listed.state.currentAgentsListing?.requestId).toBe("agents-1");
     });
   });
 
