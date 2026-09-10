@@ -152,7 +152,18 @@ const ELEVENLABS_KEYED_PROVIDER = {
 const TWILIO_KEYED_PROVIDER = {
   provider: "twilio",
   enabled: true,
-  customKeys: { TWILIO_AUTH_TOKEN: "***" },
+  customKeys: {
+    TWILIO_ACCOUNT_SID: "AC123",
+    TWILIO_AUTH_TOKEN: "***",
+    TWILIO_FROM_NUMBER: "+14155550000",
+  },
+};
+
+const TWILIO_SYSTEM_ROW_MISSING_KEYS = {
+  provider: "twilio",
+  enabled: true,
+  isSystem: true,
+  customKeys: null,
 };
 
 // -- Tests --
@@ -207,6 +218,16 @@ describe("AgentVoiceEditorDrawer", () => {
       expect(
         screen.queryByTestId("voice-agent-phone-hint"),
       ).not.toBeInTheDocument();
+    });
+
+    it("keeps the option hidden when the only Twilio row is an env-fed system row missing the other two keys", async () => {
+      mockProviders = [TWILIO_SYSTEM_ROW_MISSING_KEYS];
+      renderVoiceDrawer();
+      await screen.findByTestId("voice-agent-transport-select");
+      expect(
+        screen.queryByRole("option", { name: "Phone number" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("voice-agent-phone-hint")).toBeInTheDocument();
     });
 
     it("still renders an existing phone target's fields when no Twilio provider", async () => {

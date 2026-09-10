@@ -209,23 +209,24 @@ function hasElevenLabsKeyIn(
 
 /**
  * Whether the project has a Twilio provider that can dial a phone target.
- * Mirrors {@link hasElevenLabsKeyIn}: the Phone number transport option is
- * offered only when this is true, the same way the drawer derives ElevenLabs
- * availability. A row with no auth token cannot dial, so it does not count.
+ * Unlike {@link hasElevenLabsKeyIn}, `isSystem` alone cannot satisfy this: a
+ * system row's `enabled` flag only reflects `TWILIO_AUTH_TOKEN`, and the
+ * server never fills in a system row's customKeys, so it carries no signal
+ * for the other two fields. All three are required to place a call, so the
+ * option is offered only when a row's own customKeys carry all three.
  */
 function hasTwilioKeyIn(
   providers: readonly Record<string, unknown>[],
 ): boolean {
-  return providers.some(
-    (row) =>
-      row.provider === "twilio" &&
-      row.enabled &&
-      (row.isSystem ||
-        Boolean(
-          (row.customKeys as Record<string, unknown> | null | undefined)
-            ?.TWILIO_AUTH_TOKEN,
-        )),
-  );
+  return providers.some((row) => {
+    if (row.provider !== "twilio" || !row.enabled) return false;
+    const keys = row.customKeys as Record<string, unknown> | null | undefined;
+    return (
+      Boolean(keys?.TWILIO_ACCOUNT_SID) &&
+      Boolean(keys?.TWILIO_AUTH_TOKEN) &&
+      Boolean(keys?.TWILIO_FROM_NUMBER)
+    );
+  });
 }
 
 /**

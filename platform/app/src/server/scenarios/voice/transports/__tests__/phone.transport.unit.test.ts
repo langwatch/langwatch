@@ -154,6 +154,7 @@ describe("phoneTransport", () => {
     });
 
     describe("when the a-leg dial is refused", () => {
+      /** @scenario "A phone run fails clearly when Twilio refuses the call" */
       it("surfaces the refusal as the run's error and releases the socket", async () => {
         const adapter = fakeAdapter({
           placeCallRejects: new Error("callee not allowed"),
@@ -172,7 +173,6 @@ describe("phoneTransport", () => {
     });
 
     describe("when the connect handshake fails", () => {
-      /** @scenario "A phone run fails clearly when Twilio refuses the call" */
       it("surfaces the failure as the run's error, never dials, and disconnects the adapter", async () => {
         const adapter = fakeAdapter({
           connectRejects: new Error("edge not reachable"),
