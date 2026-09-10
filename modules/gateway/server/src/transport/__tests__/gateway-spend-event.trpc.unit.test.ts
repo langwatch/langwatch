@@ -71,7 +71,10 @@ function gatewayAppStub({ clickHouse = true } = {}): GatewayApp {
   };
   return GatewayApp.create({
     dependencies: {},
-    infrastructure: dependencies as GatewayAppDependencies,
+    // `virtualKeys` is the discriminant GatewayApp uses to tell a full core
+    // dependency bag from REST-only infrastructure; a stub exercising the
+    // core app must carry the key even when this suite never reads it.
+    infrastructure: { virtualKeys: {}, ...dependencies } as GatewayAppDependencies,
     config: undefined,
     resources: new ResourceScope(),
   });
