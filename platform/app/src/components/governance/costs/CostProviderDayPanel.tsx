@@ -29,7 +29,7 @@ import type { DailyBucket } from "./sampleSeries";
  * correct and the panel was unreadable.
  *
  * It is a chart and its legend and nothing else, sized and placed exactly like
- * `Cost over time · by team` beside it: one panel of the breakdown grid. The
+ * `Cost over time` beside it: one panel of the breakdown grid. The
  * wall's replacement was briefly a shorter wall — a row of period buttons
  * under the bars — and a row of controls under a chart is a shape nothing else
  * on this screen has. What those buttons did instead belongs on the bars, which
@@ -138,6 +138,47 @@ export type ProviderPeriod = {
   /** Whether some day inside this period held no dollar figure at all. */
   partial: boolean;
 };
+
+/**
+ * The key every day's total is filed under.
+ *
+ * A chart of one series still needs a name for it, and "Spend" is what the
+ * axis is already measuring — so the legend that would repeat it is turned
+ * off at the call site rather than drawn saying nothing.
+ */
+export const TOTAL_SPEND_KEY = "total";
+
+/**
+ * The same rows with the provider dimension collapsed: what was spent, period
+ * by period, and nothing about who charged it.
+ *
+ * Its own panel rather than a reading of the stacked one beside it. A stack
+ * answers "which provider caused this period" and a reader has to add its
+ * segments by eye to get the total; this answers "is the bill going up",
+ * which is the first question anybody asks of a cost screen and the one the
+ * stack makes hardest.
+ *
+ * NO SECOND READ. Both panels are folded from the rows `dailyByProvider`
+ * already returned for the screen, so the total here and the stack beside it
+ * can never disagree about a period — they are the same numbers added up two
+ * ways.
+ */
+export function costTotalBuckets(
+  rows: readonly GovernanceCostProviderDayRowDto[],
+): DailyBucket[] {
+  const byDay = new Map<string, number>();
+  for (const row of rows) {
+    // A withheld day adds nothing rather than being guessed at, exactly as it
+    // does in the stack. The line under that chart says the height is short.
+    byDay.set(row.day, (byDay.get(row.day) ?? 0) + (row.amountUsd ?? 0));
+  }
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, value]) => ({
+      day,
+      points: [{ key: TOTAL_SPEND_KEY, label: "Spend", value }],
+    }));
+}
 
 /** The rows as one stackable bucket per day, one series per provider. */
 export function providerDayBuckets(

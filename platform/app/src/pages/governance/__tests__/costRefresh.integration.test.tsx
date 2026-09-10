@@ -217,7 +217,6 @@ const renderScreen = () =>
 const READS_ON_THE_SCREEN = [
   "activityMonitor.spendByDepartment",
   "activityMonitor.spendByUser",
-  "activityMonitor.spendOverTime",
   "activityMonitor.summary",
   "governanceCost.dailyByProvider",
   "governanceCost.spendByModel",

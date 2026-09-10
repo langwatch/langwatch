@@ -348,12 +348,31 @@ describe("the cost breakdown panels", () => {
     it("says so rather than printing a zero nobody measured", () => {
       renderScreen();
 
-      // The adoption card and every real panel are unanswered here, so the
-      // screen may not show "0" or claim the window held nothing.
+      // The adoption card and every read-backed panel are unanswered here, so
+      // the screen may not show "0" or claim the window held nothing.
       expect(screen.queryByText("0")).not.toBeInTheDocument();
-      expect(
-        screen.queryByText("Nothing in this window yet."),
-      ).not.toBeInTheDocument();
+      // SCOPED TO THE PANELS THAT HAVE A READ. The agent breakdowns and the
+      // two count panels have none yet — they are drawn in both modes so the
+      // screen keeps its shape when a reader turns samples off, and outside
+      // sample mode they carry a stated placeholder. A page-wide search for
+      // the sentence now finds theirs and says nothing about the panels this
+      // is actually about.
+      for (const title of [
+        "Cost over time",
+        "Cost by department",
+        "Cost by model",
+        "Metered spend by person",
+      ]) {
+        const panel = screen
+          .getByText(title)
+          .closest('[data-testid="cost-panel"]');
+        expect(panel).not.toBeNull();
+        expect(
+          within(panel as HTMLElement).queryByText(
+            "Nothing in this window yet.",
+          ),
+        ).not.toBeInTheDocument();
+      }
     });
 
     /** @scenario "An empty panel says what it holds and what would fill it" */
@@ -368,7 +387,9 @@ describe("the cost breakdown panels", () => {
         screen.getByText("Spend per model, largest first."),
       ).toBeInTheDocument();
       expect(
-        screen.getByText("Fills from the bills a connected source reports."),
+        screen.getAllByText(
+          "Fills from the bills a connected source reports.",
+        )[0],
       ).toBeInTheDocument();
       expect(
         screen.getAllByRole("link", { name: /Add a source/ }).length,
@@ -543,10 +564,19 @@ describe("the cost breakdown panels", () => {
 
   describe("given the window answers with days but nothing spent on any of them", () => {
     it("says the window is empty rather than drawing bare axes", () => {
-      // The read answered, and it answered with a full window — one bucket per
-      // day, no spend on any. There is a row per day and no series to plot, so
-      // a length check on the rows alone lets this through and the panel draws
-      // an axis with nothing above it, which reads as a chart that broke.
+      // The read answered and the window holds nothing. That is a FINDING and
+      // the panel is allowed to say so — but it must say it in words, because
+      // a time chart handed an answer with no series to plot draws an axis
+      // with nothing above it, which reads as a chart that broke rather than
+      // as a quarter nobody spent in.
+      //
+      // The panel under this name used to chart spend by team off the metered
+      // trace store, and the case was a window of 365 empty buckets from a
+      // read that answers a row per day whether or not anything was spent.
+      // That read is gone. The billed rollup this now folds only ever answers
+      // days it holds cells for, so the same case arrives as no rows at all —
+      // and the assertion below is unchanged, which is the point of moving it
+      // rather than deleting it.
       harness.activity.summary = {
         activeUsersThisWindow: 4,
         newUsersThisWindow: 1,
@@ -562,12 +592,7 @@ describe("the cost breakdown panels", () => {
       harness.activity.spendByUser = [
         { actor: "ada@acme.test", spendUsd: "200.00", requests: 90 },
       ];
-      harness.activity.spendOverTime = {
-        buckets: [
-          { bucketIso: "2026-08-01", points: [] },
-          { bucketIso: "2026-08-02", points: [] },
-        ],
-      };
+      harness.dailyByProvider = { rows: [] };
 
       renderScreen();
 
@@ -575,7 +600,7 @@ describe("the cost breakdown panels", () => {
       // reasons and print the same sentence, so a page-wide search for it
       // passes whether or not this panel drew bare axes.
       const panel = screen
-        .getByText("Cost over time · by team")
+        .getByText("Cost over time")
         .closest('[data-testid="cost-panel"]');
 
       expect(panel).not.toBeNull();

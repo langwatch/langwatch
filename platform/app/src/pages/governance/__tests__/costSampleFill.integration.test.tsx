@@ -286,7 +286,7 @@ describe("the cost screen in sample mode", () => {
         "Adoption",
         "Metered spend forecast · by agent",
         "Seats · bought against assigned",
-        "Cost over time · by team",
+        "Cost over time",
         "Cost by department",
         "Cost by model",
         "Metered spend by person",
@@ -388,7 +388,7 @@ describe("the cost screen in sample mode", () => {
    * anything was spent, so an empty window arrives as hundreds of buckets of
    * nothing. Every emptiness test on the page is a length check, so this read
    * alone looked answered-and-full while its neighbours looked empty — and
-   * "Cost over time · by team" sat saying it had nothing in the middle of a
+   * "Cost over time" sat saying it had nothing in the middle of a
    * screen of invented figures.
    */
   describe("given the over-time read answered days but no figures", () => {
@@ -403,7 +403,7 @@ describe("the cost screen in sample mode", () => {
       // The empty state, not the chart: recharts draws nothing under jsdom, so
       // the assertion that can be made honestly is that the panel is NOT
       // reporting the window as measured and empty.
-      const panel = panelFor("Cost over time · by team");
+      const panel = panelFor("Cost over time");
       expect(
         within(panel).queryByTestId("cost-panel-empty"),
       ).not.toBeInTheDocument();

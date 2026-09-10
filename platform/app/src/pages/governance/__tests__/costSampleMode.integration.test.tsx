@@ -98,8 +98,17 @@ vi.mock("~/utils/api", () => ({
 
 import CostsPage from "../costs";
 
-/** One of the seven invented panels. If this is on screen, samples are on. */
-const A_SAMPLE_PANEL = "Tokens over time";
+/**
+ * An invented FIGURE. If this is on screen, samples are on.
+ *
+ * It used to be a panel title — "Tokens over time" — which worked only while
+ * the invented panels were the only ones bearing those titles. They are drawn
+ * in both modes now, empty outside sample mode, so a title says nothing about
+ * which mode the screen is in. What still does is the invented content: no
+ * real organization has an agent by this name, so it appears when and only
+ * when the screen is showing made-up money.
+ */
+const A_SAMPLE_FIGURE = "support-copilot";
 
 const screenTree = () => (
   <ChakraProvider value={defaultSystem}>
@@ -192,7 +201,7 @@ describe("the sample panels on the cost screen", () => {
     it("keeps the invented panels off the screen", () => {
       renderScreen();
 
-      expect(screen.queryByText(A_SAMPLE_PANEL)).not.toBeInTheDocument();
+      expect(screen.queryAllByText(A_SAMPLE_FIGURE)).toHaveLength(0);
     });
 
     it("still shows the real breakdowns", () => {
@@ -214,7 +223,7 @@ describe("the sample panels on the cost screen", () => {
 
       withReadsBackInFlight(rerender);
 
-      expect(screen.queryByText(A_SAMPLE_PANEL)).not.toBeInTheDocument();
+      expect(screen.queryAllByText(A_SAMPLE_FIGURE)).toHaveLength(0);
     });
   });
 
@@ -227,7 +236,7 @@ describe("the sample panels on the cost screen", () => {
     it("keeps the invented panels off — a real bill is real data", () => {
       renderScreen();
 
-      expect(screen.queryByText(A_SAMPLE_PANEL)).not.toBeInTheDocument();
+      expect(screen.queryAllByText(A_SAMPLE_FIGURE)).toHaveLength(0);
     });
   });
 
@@ -240,7 +249,7 @@ describe("the sample panels on the cost screen", () => {
     it("fills the empty screen with the sample panels", () => {
       renderScreen();
 
-      expect(screen.getByText(A_SAMPLE_PANEL)).toBeInTheDocument();
+      expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
     });
 
     it("says on the screen that the figures are not real", () => {
@@ -256,7 +265,7 @@ describe("the sample panels on the cost screen", () => {
 
       withReadsBackInFlight(rerender);
 
-      expect(screen.getByText(A_SAMPLE_PANEL)).toBeInTheDocument();
+      expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
     });
   });
 
@@ -264,7 +273,7 @@ describe("the sample panels on the cost screen", () => {
     it("shows no sample panels rather than flashing them up and pulling them away", () => {
       renderScreen();
 
-      expect(screen.queryByText(A_SAMPLE_PANEL)).not.toBeInTheDocument();
+      expect(screen.queryAllByText(A_SAMPLE_FIGURE)).toHaveLength(0);
     });
   });
 
@@ -276,7 +285,7 @@ describe("the sample panels on the cost screen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
 
-      expect(screen.getByText(A_SAMPLE_PANEL)).toBeInTheDocument();
+      expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
       expect(screen.getByText("Engineering")).toBeInTheDocument();
     });
 
@@ -286,7 +295,7 @@ describe("the sample panels on the cost screen", () => {
       fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
       fireEvent.click(screen.getByRole("button", { name: "Hide sample data" }));
 
-      expect(screen.queryByText(A_SAMPLE_PANEL)).not.toBeInTheDocument();
+      expect(screen.queryAllByText(A_SAMPLE_FIGURE)).toHaveLength(0);
     });
   });
 
@@ -301,7 +310,7 @@ describe("the sample panels on the cost screen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Hide sample data" }));
 
-      expect(screen.queryByText(A_SAMPLE_PANEL)).not.toBeInTheDocument();
+      expect(screen.queryAllByText(A_SAMPLE_FIGURE)).toHaveLength(0);
     });
   });
 });

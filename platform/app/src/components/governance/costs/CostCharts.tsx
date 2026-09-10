@@ -312,14 +312,26 @@ export function CostRankList({
  * Donut with the breakdown listed beside it. The list carries the figures, so
  * the ring itself needs no labels.
  */
-export function CostDonut({ rows }: { rows: RankRow[] }) {
+export function CostDonut({
+  rows,
+  empty,
+}: {
+  rows: RankRow[] | null;
+  /** This panel's own empty state. See `costPanelEmpty`. */
+  empty?: (unanswered: boolean) => ReactNode;
+}) {
   const shown = useMemo(
-    () => [...rows].sort((a, b) => b.value - a.value).slice(0, 8),
+    () => [...(rows ?? [])].sort((a, b) => b.value - a.value).slice(0, 8),
     [rows],
   );
   const total = shown.reduce((sum, row) => sum + row.value, 0);
 
-  if (total === 0) return <EmptyPanel height="220px" unanswered={false} />;
+  if (rows === null)
+    return <EmptyPanel height="220px" unanswered empty={empty} />;
+  // A ring of nothing is not a ring. Zero total covers both no rows at all
+  // and rows that all came to zero, and neither draws.
+  if (total === 0)
+    return <EmptyPanel height="220px" unanswered={false} empty={empty} />;
 
   return (
     <HStack align="center" gap={4}>
@@ -728,30 +740,61 @@ function ForecastDefs({
  * a category axis spaces its points evenly, so the split sits at a known
  * fraction of the plot's width whatever the interval folds the months into.
  */
+/**
+ * One stacked area per series, each painted from the gradients `ForecastDefs`
+ * laid down for it.
+ *
+ * Returns the ARRAY rather than a fragment, and is called as a plain function
+ * rather than rendered as `<ForecastAreas />`. Recharts inspects the type of
+ * each child of a chart to decide what it is; an array it walks through, but
+ * a fragment or a wrapper component is not an `Area` as far as that
+ * inspection is concerned, and the series silently vanish.
+ */
+function forecastAreas(keys: Array<{ key: string; label: string }>) {
+  return keys.map((k) => (
+    <Area
+      key={k.key}
+      type="monotone"
+      dataKey={k.key}
+      stackId="cost"
+      stroke={`url(#${defsId("cost-forecast-line", k.key)})`}
+      strokeWidth={1.5}
+      fill={`url(#${defsId("cost-forecast-fill", k.key)})`}
+      fillOpacity={1}
+      isAnimationActive={false}
+    />
+  ));
+}
+
 export function CostForecastArea({
   buckets,
   projectedFromDay,
   height = "220px",
   interval,
+  empty,
 }: {
-  buckets: DailyBucket[];
+  /** Null is a read that never answered; empty is one that found nothing. */
+  buckets: DailyBucket[] | null;
   projectedFromDay: string | null;
   height?: string;
   /** The bucket width in view, which the time axis is ticked by. */
   interval?: TimeInterval;
+  /** This panel's own empty state. See `costPanelEmpty`. */
+  empty?: (unanswered: boolean) => ReactNode;
 }) {
-  const keys = useMemo(() => seriesKeysOf(buckets), [buckets]);
-  const rows = useMemo(() => widenBuckets(buckets, keys), [buckets, keys]);
-  const lastDay = rows[rows.length - 1]?.day;
-
+  const drawn = buckets ?? [];
+  const keys = useMemo(() => seriesKeysOf(drawn), [drawn]);
+  const rows = useMemo(() => widenBuckets(drawn, keys), [drawn, keys]);
   const projection = useMemo(
     () => projectionSpan(rows, projectedFromDay),
     [projectedFromDay, rows],
   );
+  const lastDay = rows[rows.length - 1]?.day;
   const splitAt = projection?.at ?? null;
-
-  if (rows.length === 0 || keys.length === 0)
-    return <EmptyPanel height={height} unanswered={false} />;
+  if (buckets === null || rows.length === 0 || keys.length === 0)
+    return (
+      <EmptyPanel height={height} unanswered={buckets === null} empty={empty} />
+    );
 
   return (
     <Box height={height}>
@@ -801,19 +844,7 @@ export function CostForecastArea({
               }}
             />
           )}
-          {keys.map((k) => (
-            <Area
-              key={k.key}
-              type="monotone"
-              dataKey={k.key}
-              stackId="cost"
-              stroke={`url(#${defsId("cost-forecast-line", k.key)})`}
-              strokeWidth={1.5}
-              fill={`url(#${defsId("cost-forecast-fill", k.key)})`}
-              fillOpacity={1}
-              isAnimationActive={false}
-            />
-          ))}
+          {forecastAreas(keys)}
         </AreaChart>
       </ResponsiveContainer>
     </Box>

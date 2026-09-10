@@ -49,7 +49,10 @@ import {
   costPanelEmpty,
 } from "~/components/governance/costs/CostPanelEmpty";
 import { CostProviderBreakdown } from "~/components/governance/costs/CostProviderBreakdown";
-import { CostProviderDayPanel } from "~/components/governance/costs/CostProviderDayPanel";
+import {
+  CostProviderDayPanel,
+  costTotalBuckets,
+} from "~/components/governance/costs/CostProviderDayPanel";
 import {
   CostSpenderError,
   CostSpenderList,
@@ -336,7 +339,7 @@ function CostsPage() {
             spenders={spenders}
             sourcesConnected={holdsFigures}
             organizationId={organizationId}
-            providerDays={providerDays.data?.rows ?? []}
+            providerDays={providerDays.data?.rows ?? null}
             hasProviderDaysFailure={providerDays.isError}
           />
         </SampleSaidOnce>
@@ -859,7 +862,6 @@ interface Breakdowns {
     requests: number;
   }> | null;
   activeUsers: number | null;
-  overTime: DailyBucket[] | null;
   /**
    * Model spend from the PULLED rollup, not from metered traces.
    *
@@ -886,7 +888,6 @@ interface Breakdowns {
   failed: {
     byDepartment: boolean;
     byUser: boolean;
-    byTeam: boolean;
     byModel: boolean;
   };
   /** Whether any of them is currently in flight, for the refresh control. */
@@ -895,33 +896,16 @@ interface Breakdowns {
   refetchAll: () => void;
 }
 
-/** Wire buckets carry money as strings; the charts want numbers. */
-function toDailyBuckets(
-  buckets:
-    | Array<{
-        bucketIso: string;
-        points: Array<{ key: string; label: string; spendUsd: string }>;
-      }>
-    | undefined,
-): DailyBucket[] {
-  if (!buckets) return [];
-  return buckets.map((bucket) => ({
-    day: bucket.bucketIso,
-    points: bucket.points.map((point) => ({
-      key: point.key,
-      label: point.label,
-      value: Number(point.spendUsd),
-    })),
-  }));
-}
-
 /**
  * The reads under the breakdown panels.
  *
- * The over-time read is grouped by team and nothing chooses otherwise any
- * more. Group By was a chip that renamed one chart's series while every panel
- * around it ignored it; the chart says "by team" in its own title instead,
- * where the reader looking at it will see it.
+ * THE BY-TEAM CHART IS GONE and its read with it. `activityMonitor
+ * .spendOverTime` grouped by team was the last caller of the metered trace
+ * store on this screen's time axis, and it drew a chart nobody could act on:
+ * a team is not a thing this product's cost rows carry, so every bar it ever
+ * drew outside sample mode was one unattributed block. The panel was removed
+ * at the product owner's direction and the read went with it rather than
+ * staying to be paid for on every page load.
  */
 function useBreakdownQueries({
   organizationId,
@@ -942,10 +926,6 @@ function useBreakdownQueries({
   );
   const byUser = api.activityMonitor.spendByUser.useQuery(
     { ...args, limit: 8 },
-    options,
-  );
-  const overTime = api.activityMonitor.spendOverTime.useQuery(
-    { ...args, groupBy: "team" as const },
     options,
   );
   // The PULLED rollup, not the metered trace store the panels around it read.
@@ -978,14 +958,12 @@ function useBreakdownQueries({
     failed: {
       byDepartment: byDepartment.isError,
       byUser: byUser.isError,
-      byTeam: overTime.isError,
       byModel: byModel.isError,
     },
     isFetching:
       summary.isFetching ||
       byDepartment.isFetching ||
       byUser.isFetching ||
-      overTime.isFetching ||
       byModel.isFetching,
     refetchAll: () => {
       // Every read, including the model one that now comes from a different
@@ -995,13 +973,8 @@ function useBreakdownQueries({
       void summary.refetch();
       void byDepartment.refetch();
       void byUser.refetch();
-      void overTime.refetch();
       void byModel.refetch();
     },
-    // `.buckets`, not the result object: the read answers a wrapper, and
-    // handing the wrapper to a function that maps over an array throws the
-    // moment a real answer arrives.
-    overTime: overTime.data ? toDailyBuckets(overTime.data.buckets) : null,
     // `.rows`, and only once the read has answered: an unanswered read stays
     // null so the panel draws its empty state rather than a measured zero.
     modelRows: byModel.data?.rows ?? null,
@@ -1121,6 +1094,29 @@ const MANAGE_DEPARTMENTS = {
 } as const;
 
 /**
+ * The panels below that HAVE NO READ BEHIND THEM YET.
+ *
+ * Four panels existed only under sample mode — the two agent breakdowns, the
+ * agent forecast, and the conversation and token counts — so a reader who
+ * turned the sample off watched half the screen disappear and had no way to
+ * tell a panel that is coming from a panel that was never there. They are
+ * drawn in both modes now, and outside sample mode they draw their empty
+ * state.
+ *
+ * AN EMPTY ARRAY, NOT NULL, AND THAT IS A DELIBERATE OVERSTATEMENT. Null on
+ * this screen means "no read has answered" and an empty array means "a read
+ * answered and found nothing", and these panels are in the first state while
+ * saying the second. It is the wording the product owner asked for, and it is
+ * true of the store as it stands — the cost rollup carries an agent column
+ * that is blank on every row it holds, and the metered lane these counts
+ * would come from holds no rows at all — so "nothing in this window yet" is
+ * not a lie about the money today. It WILL become one the day either of those
+ * fills, because nothing here is measuring anything. Whoever wires the read
+ * takes this constant out with it.
+ */
+const AWAITING_A_READ: [] = [];
+
+/**
  * The same user-grouped panel for real data, samples, empty and failed reads.
  * Provider-reported cost stays separate from costs recorded on traces.
  */
@@ -1175,12 +1171,14 @@ function SpenderPanelBody({
  * a real counterpart to stand aside for — they are simply absent when sample
  * mode is off, rather than rendering empty.
  */
-function SampleHeadlinePanels({
+function HeadlinePanels({
   sample,
   interval,
+  showSample,
 }: {
   sample: SampleSeries;
   interval: TimeInterval;
+  showSample: boolean;
 }) {
   return (
     <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4}>
@@ -1190,11 +1188,17 @@ function SampleHeadlinePanels({
         throughout. A screen that names the same money two ways teaches the
         reader they are two things.
       */}
-      <CostPanel title="Metered spend forecast · by agent" sample>
+      <CostPanel title="Metered spend forecast · by agent" sample={showSample}>
         <CostForecastArea
-          buckets={sample.forecast.buckets}
-          projectedFromDay={sample.forecast.projectedFromDay}
+          buckets={showSample ? sample.forecast.buckets : AWAITING_A_READ}
+          projectedFromDay={
+            showSample ? sample.forecast.projectedFromDay : null
+          }
           interval={interval}
+          empty={costPanelEmpty({
+            what: "Where metered spend per agent is heading, period by period.",
+            ...AGENTS_ARE_UNATTRIBUTED,
+          })}
         />
       </CostPanel>
       {/*
@@ -1211,7 +1215,7 @@ function SampleHeadlinePanels({
         the only thing that could attribute a seat to a department — are named
         in §16 as wave 2.
       */}
-      <CostPanel title="Seats · bought against assigned" sample>
+      <CostPanel title="Seats · bought against assigned" sample={showSample}>
         {/* Whole numbers, like the conversations panel: a seat is a thing
             somebody was given, and "1.2k seats" is not how a licence count is
             ever discussed.
@@ -1222,14 +1226,221 @@ function SampleHeadlinePanels({
             them. Bought is the outline of what is paid for and assigned is
             what is used, so the used half carries the stronger colour. */}
         <CostStackedBars
-          buckets={sample.seats}
+          buckets={showSample ? sample.seats : AWAITING_A_READ}
           format={fmtWhole}
           interval={interval}
           colorFor={(key) => SEAT_SERIES_COLORS[key]}
           grouped
+          empty={costPanelEmpty({
+            what: "Seats bought against seats assigned, period by period.",
+            source: "Fills once seat licences are collected from a source.",
+            action: ADD_A_SOURCE,
+          })}
         />
       </CostPanel>
     </SimpleGrid>
+  );
+}
+
+/**
+ * Spend per person as the gateway measured it.
+ *
+ * "Metered", not "Cost", because the panel beside it also ranks people by
+ * money and the two figures are different money — this one is what the
+ * traffic measured as it was served, that one is what the provider put on the
+ * invoice. They disagree routinely, so each title has to name its lane or the
+ * pair reads as the same list rendered twice.
+ */
+function MeteredPersonPanel({
+  rows,
+  sample,
+  showSample,
+  unrefreshed,
+}: {
+  rows: RankRow[] | null;
+  sample: SampleSeries;
+  showSample: boolean;
+  unrefreshed: boolean;
+}) {
+  return (
+    <CostPanel title="Metered spend by person" sample={showSample}>
+      {unrefreshed ? (
+        <CostPanelUnrefreshed />
+      ) : (
+        <CostRankList
+          rows={showSample ? sample.users : rows}
+          empty={costPanelEmpty({
+            what: "Spend recorded against each person as their traffic was served.",
+            source:
+              "Fills from gateway traffic and from usage rows that name an actor.",
+            action: ADD_A_SOURCE,
+          })}
+        />
+      )}
+    </CostPanel>
+  );
+}
+
+/**
+ * What the organization spent, period by period, with nothing split out.
+ *
+ * The panel that used to sit here charted spend by TEAM, and a team is not a
+ * dimension this product's cost rows carry — so outside sample mode every bar
+ * it ever drew was one unattributed block, and the read behind it went to the
+ * metered trace store for the privilege. It was removed with its read.
+ *
+ * This replaces it from the rows the screen already has. `dailyByProvider`
+ * answers a figure per (day, provider); adding the providers up per period is
+ * the whole of this chart, so it costs no query and cannot disagree with the
+ * stacked panel beside it about any period.
+ */
+function CostTotalPanel({
+  providerDays,
+  hasFailure,
+  interval,
+  sample,
+  showSample,
+}: {
+  providerDays: readonly GovernanceCostProviderDayRowDto[] | null;
+  hasFailure: boolean;
+  interval: TimeInterval;
+  sample: SampleSeries;
+  showSample: boolean;
+}) {
+  return (
+    <CostPanel title="Cost over time" sample={showSample}>
+      {!showSample && hasFailure ? (
+        <CostPanelUnrefreshed />
+      ) : (
+        <CostStackedBars
+          buckets={
+            showSample
+              ? sample.overTime
+              : providerDays === null
+                ? null
+                : costTotalBuckets(providerDays)
+          }
+          interval={interval}
+          // The measured chart is ONE series and the axis already says it
+          // is money, so a legend there spends a line repeating the panel's
+          // own title. The invented one still carries several, and those do
+          // need naming.
+          showLegend={showSample}
+          empty={costPanelEmpty({
+            what: "What was spent, period by period.",
+            source: "Fills from the bills a connected source reports.",
+            action: ADD_A_SOURCE,
+          })}
+        />
+      )}
+    </CostPanel>
+  );
+}
+
+/**
+ * The provider split, or the marker that says its read did not answer.
+ *
+ * Beside `Cost over time · by team` on purpose: the two are the same chart
+ * over the same axis, one split by who spent and one by who billed, and
+ * reading them as a pair is how a period that stood out gets attributed.
+ *
+ * In sample mode it stands down entirely, unlike the panels around it. There
+ * is no invented provider series to draw — the sample set has agents, teams
+ * and departments and no providers — and an empty panel sitting between two
+ * full ones reads as a provider nobody used rather than as a gap in what was
+ * invented.
+ */
+function ProviderPanelSlot({
+  organizationId,
+  providerDays,
+  hasFailure,
+  interval,
+  showSample,
+}: {
+  organizationId: string;
+  providerDays: readonly GovernanceCostProviderDayRowDto[] | null;
+  hasFailure: boolean;
+  interval: TimeInterval;
+  showSample: boolean;
+}) {
+  if (showSample) return null;
+  if (hasFailure) {
+    return (
+      <CostPanel title="Cost over time · by provider">
+        <CostPanelUnrefreshed />
+      </CostPanel>
+    );
+  }
+  if (providerDays === null || providerDays.length === 0) return null;
+  return (
+    <CostPanel title="Cost over time · by provider">
+      <CostProviderDayPanel
+        organizationId={organizationId}
+        rows={providerDays}
+        interval={interval}
+      />
+    </CostPanel>
+  );
+}
+
+/**
+ * What the agent panels say while nothing attributes spend to an agent.
+ *
+ * One sentence, three panels. Each of them is blank for the same reason and
+ * fills on the same event, and three copies of that sentence is three places
+ * for it to drift out of agreement with the other two.
+ */
+const AGENTS_ARE_UNATTRIBUTED = {
+  source: "Fills once a source reports which agent spent the money.",
+  action: ADD_A_SOURCE,
+} as const;
+
+/**
+ * The two agent breakdowns, which have no read behind them yet.
+ *
+ * Extracted from the grid rather than inlined for the reason the file splits
+ * `SpenderPanelSlot` out: each is a panel plus five lines of empty copy, and
+ * the two of them inlined pushed the grid past the length the linter allows
+ * and buried the shape of the grid under the wording of its cells. See
+ * `AWAITING_A_READ` for what their empty state is claiming and what it is not.
+ */
+function AgentSharePanel({
+  sample,
+  showSample,
+}: {
+  sample: SampleSeries;
+  showSample: boolean;
+}) {
+  return (
+    <CostPanel title="Share of cost by agent" sample={showSample}>
+      <CostDonut
+        rows={showSample ? sample.agents : AWAITING_A_READ}
+        empty={costPanelEmpty({
+          what: "How the spend splits across the agents that ran it.",
+          ...AGENTS_ARE_UNATTRIBUTED,
+        })}
+      />
+    </CostPanel>
+  );
+}
+
+function AgentRankPanel({
+  sample,
+  showSample,
+}: {
+  sample: SampleSeries;
+  showSample: boolean;
+}) {
+  return (
+    <CostPanel title="Cost by agent" sample={showSample}>
+      <CostRankList
+        rows={showSample ? sample.agents : AWAITING_A_READ}
+        empty={costPanelEmpty({
+          what: "Spend per agent, largest first.",
+          ...AGENTS_ARE_UNATTRIBUTED,
+        })}
+      />
+    </CostPanel>
   );
 }
 
@@ -1259,8 +1470,14 @@ function BreakdownGrid({
   showSample: boolean;
   spenders: SpenderReadState;
   organizationId: string;
-  /** One figure per (day, provider) of the billed lane. */
-  providerDays: readonly GovernanceCostProviderDayRowDto[];
+  /**
+   * One figure per (day, provider) of the billed lane. NULL UNTIL THE READ
+   * ANSWERS, which an empty list cannot say on its own: the panels below
+   * draw an unanswered read and a measured-empty window in different
+   * words, and collapsing the two here would have them state a finding
+   * nobody measured.
+   */
+  providerDays: readonly GovernanceCostProviderDayRowDto[] | null;
   /**
    * Whether that read FAILED, which an empty row list cannot say on its own.
    * Without it a failed read is an empty list, an empty list hides the panel,
@@ -1279,47 +1496,21 @@ function BreakdownGrid({
 
   return (
     <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
-      {showSample && (
-        <CostPanel title="Share of cost by agent" sample>
-          <CostDonut rows={sample.agents} />
-        </CostPanel>
-      )}
-      <CostPanel title="Cost over time · by team" sample={showSample}>
-        {unrefreshed("byTeam") ? (
-          <CostPanelUnrefreshed />
-        ) : (
-          <CostStackedBars
-            buckets={orSample(rows.byTeam, sample.overTime)}
-            interval={interval}
-            empty={costPanelEmpty({
-              what: "Spend per team, one bar per period.",
-              source:
-                "Fills from gateway traffic and from usage a connected source reports.",
-              action: ADD_A_SOURCE,
-            })}
-          />
-        )}
-      </CostPanel>
-      {/* Beside `Cost over time · by team` on purpose: the two are the same
-          chart over the same axis, one split by who spent and one by who
-          billed, and reading them as a pair is how a period that stood out
-          gets attributed. In sample mode it stands down entirely — there is
-          no invented provider series to draw, and an empty panel between two
-          full ones reads as a provider nobody used. */}
-      {!showSample && hasProviderDaysFailure && (
-        <CostPanel title="Cost over time · by provider">
-          <CostPanelUnrefreshed />
-        </CostPanel>
-      )}
-      {!showSample && !hasProviderDaysFailure && providerDays.length > 0 && (
-        <CostPanel title="Cost over time · by provider">
-          <CostProviderDayPanel
-            organizationId={organizationId}
-            rows={providerDays}
-            interval={interval}
-          />
-        </CostPanel>
-      )}
+      <AgentSharePanel sample={sample} showSample={showSample} />
+      <CostTotalPanel
+        providerDays={providerDays}
+        hasFailure={hasProviderDaysFailure}
+        interval={interval}
+        sample={sample}
+        showSample={showSample}
+      />
+      <ProviderPanelSlot
+        organizationId={organizationId}
+        providerDays={providerDays}
+        hasFailure={hasProviderDaysFailure}
+        interval={interval}
+        showSample={showSample}
+      />
       <CostPanel title="Cost by department" sample={showSample}>
         {unrefreshed("byDepartment") ? (
           <CostPanelUnrefreshed />
@@ -1336,11 +1527,7 @@ function BreakdownGrid({
         )}
       </CostPanel>
 
-      {showSample && (
-        <CostPanel title="Cost by agent" sample>
-          <CostRankList rows={sample.agents} />
-        </CostPanel>
-      )}
+      <AgentRankPanel sample={sample} showSample={showSample} />
       <CostPanel title="Cost by model" sample={showSample}>
         {unrefreshed("byModel") ? (
           <CostPanelUnrefreshed />
@@ -1359,35 +1546,25 @@ function BreakdownGrid({
           />
         )}
       </CostPanel>
-      {/* "Metered", not "Cost", because the panel below it also ranks people
-          by money and the two figures are different money — this one is what
-          the traffic measured as it was served, that one is what the provider
-          put on the invoice. They disagree routinely, so each title has to
-          name its lane or the pair reads as the same list rendered twice. */}
-      <CostPanel title="Metered spend by person" sample={showSample}>
-        {unrefreshed("byUser") ? (
-          <CostPanelUnrefreshed />
-        ) : (
-          <CostRankList
-            rows={orSample(rows.byUser, sample.users)}
-            empty={costPanelEmpty({
-              what: "Spend recorded against each person as their traffic was served.",
-              source:
-                "Fills from gateway traffic and from usage rows that name an actor.",
-              action: ADD_A_SOURCE,
-            })}
-          />
-        )}
-      </CostPanel>
+      <MeteredPersonPanel
+        rows={rows.byUser}
+        sample={sample}
+        showSample={showSample}
+        unrefreshed={unrefreshed("byUser")}
+      />
       <SpenderPanelSlot spenders={spenders} showSample={showSample} />
 
-      {showSample && <SampleTailPanels sample={sample} interval={interval} />}
+      <CountPanels
+        sample={sample}
+        interval={interval}
+        showSample={showSample}
+      />
     </SimpleGrid>
   );
 }
 
 /**
- * The two count panels that close the grid, both invented.
+ * The two count panels that close the grid.
  *
  * "Conversations", not "Genie questions". Genie is one of eight ingestion
  * sources (docs/ai-governance/overview.mdx) and no metric in the ADR or the
@@ -1402,25 +1579,40 @@ function BreakdownGrid({
  * "4.6k" beside the token axis reading "3.4B", which made a few thousand
  * support chats look like a unit of machine consumption.
  */
-function SampleTailPanels({
+function CountPanels({
   sample,
   interval,
+  showSample,
 }: {
   sample: SampleSeries;
   interval: TimeInterval;
+  showSample: boolean;
 }) {
   return (
     <>
-      <CostPanel title="Conversations over time" sample>
+      <CostPanel title="Conversations over time" sample={showSample}>
         <CostStackedBars
-          buckets={sample.conversations}
+          buckets={showSample ? sample.conversations : AWAITING_A_READ}
           format={fmtWhole}
           interval={interval}
           showLegend={false}
+          empty={costPanelEmpty({
+            what: "How many conversations were held, period by period.",
+            source: "Fills from traffic the gateway serves.",
+            action: ADD_A_SOURCE,
+          })}
         />
       </CostPanel>
-      <CostPanel title="Tokens over time" sample>
-        <CostLine points={sample.tokens} interval={interval} />
+      <CostPanel title="Tokens over time" sample={showSample}>
+        <CostLine
+          points={showSample ? sample.tokens : AWAITING_A_READ}
+          interval={interval}
+          empty={costPanelEmpty({
+            what: "How many tokens were spent, period by period.",
+            source: "Fills from traffic the gateway serves.",
+            action: ADD_A_SOURCE,
+          })}
+        />
       </CostPanel>
     </>
   );
@@ -1455,8 +1647,14 @@ function CostBreakdowns({
   /** See `sourcesConnected`: the Adoption count cannot state its own absence. */
   sourcesConnected: boolean;
   organizationId: string;
-  /** One figure per (day, provider) of the billed lane. */
-  providerDays: readonly GovernanceCostProviderDayRowDto[];
+  /**
+   * One figure per (day, provider) of the billed lane. NULL UNTIL THE READ
+   * ANSWERS, which an empty list cannot say on its own: the panels below
+   * draw an unanswered read and a measured-empty window in different
+   * words, and collapsing the two here would have them state a finding
+   * nobody measured.
+   */
+  providerDays: readonly GovernanceCostProviderDayRowDto[] | null;
   /**
    * Whether that read FAILED, which an empty row list cannot say on its own.
    * Without it a failed read is an empty list, an empty list hides the panel,
@@ -1475,9 +1673,11 @@ function CostBreakdowns({
         showSample={showSample}
         sourcesConnected={connected}
       />
-      {showSample && (
-        <SampleHeadlinePanels sample={sample} interval={filters.interval} />
-      )}
+      <HeadlinePanels
+        sample={sample}
+        interval={filters.interval}
+        showSample={showSample}
+      />
       <BreakdownGrid
         interval={filters.interval}
         rows={rows}
@@ -1506,37 +1706,9 @@ const UNNAMED_MODEL_KEY = "__no_model__";
 
 /** The four measured series the grid draws. Null is an unanswered read. */
 interface MeasuredRows {
-  byTeam: DailyBucket[] | null;
   byDepartment: RankRow[] | null;
   byModel: RankRow[] | null;
   byUser: RankRow[] | null;
-}
-
-/**
- * A bucket series holding no figures at all, as the empty list it is.
- *
- * THE OVER-TIME READ ANSWERS A ROW PER DAY WHETHER OR NOT ANYTHING WAS SPENT.
- * A window with nothing in it therefore comes back as three hundred and
- * sixty-five buckets of nothing, and every emptiness test on this page is a
- * length check — so that read alone looked full while its neighbours looked
- * empty. The consequence was visible: with sample mode on, every panel around
- * "Cost over time · by team" filled with invented figures and that one panel
- * sat there saying "Nothing in this window yet", because a list of 365 empty
- * days is not an empty list.
- *
- * The ranked panels never had the bug — they total their series first, and a
- * total of nothing is genuinely nothing. This puts the bucket series on the
- * same footing rather than teaching every caller to ask a different question.
- *
- * Null in, null out: an unanswered read is not a measurement of an empty
- * window, and that distinction is the one thing the empty states turn on.
- */
-function withoutEmptyBuckets(
-  buckets: DailyBucket[] | null,
-): DailyBucket[] | null {
-  if (buckets === null) return null;
-  const holdsAFigure = buckets.some((bucket) => bucket.points.length > 0);
-  return holdsAFigure ? buckets : [];
 }
 
 /**
@@ -1554,12 +1726,6 @@ function measuredRows({
   filters: CostFilters;
 }): MeasuredRows {
   return {
-    byTeam:
-      breakdowns.overTime === null
-        ? null
-        : withoutEmptyBuckets(
-            aggregateBuckets(breakdowns.overTime, filters.interval),
-          ),
     byDepartment:
       breakdowns.departmentRows === null
         ? null
