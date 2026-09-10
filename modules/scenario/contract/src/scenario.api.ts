@@ -16,12 +16,8 @@ import type {
   ScenarioTestSuiteUpdateInput,
   ScenarioRunConfig,
 } from "./scenario.ts";
-import type {
-  ResolveScenarioRunParametersInput,
-  ResolvedScenarioRunParameters,
-  ResolvedScenarioRunParametersForScenario,
-} from "./scenario.service.ts";
 import type { RunParameterValues } from "./scenario.parameters.ts";
+import type { RunSecretCiphertext } from "./run-secret-ciphertext.ts";
 import type { SimulationExternalSetSummary } from "./simulation.ts";
 import type { SimulationProjectDateRangeInput } from "./simulation.service.ts";
 
@@ -35,6 +31,37 @@ export interface TestAgentTurnInput extends TestAgentRunInput {
   message: string;
   params?: Record<string, string | number | boolean>;
 }
+
+/** Folded in from the deleted `scenario.service.ts` contract-service: this capability's own vocabulary. */
+export interface CancelScenarioRunInput {
+  projectId: string;
+  scenarioSetId: string;
+  batchRunId: string;
+  scenarioRunId: string;
+  scenarioId: string;
+}
+
+export interface CancelScenarioBatchInput {
+  projectId: string;
+  scenarioSetId: string;
+  batchRunId: string;
+}
+
+export type ResolveScenarioRunParametersInput = {
+  projectId: string;
+  scenarioId: string;
+  values?: RunParameterValues;
+};
+
+export type ResolvedScenarioRunParameters = {
+  parameters: RunParameterValues;
+  secretParameters: RunSecretCiphertext;
+  scenarioVersion: number;
+};
+
+export type ResolvedScenarioRunParametersForScenario = ResolvedScenarioRunParameters & {
+  scenarioId: string;
+};
 
 /** Callable scenario capability used by peer features such as Suite. */
 export interface ScenarioApi {

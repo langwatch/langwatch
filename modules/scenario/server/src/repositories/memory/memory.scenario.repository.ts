@@ -1,6 +1,9 @@
 /**
- * In-memory `ScenarioRepository` double, shared across the package's own
- * tests that need a working `ScenarioService` without a real database.
+ * The Scenario aggregate's memory twin: the same `ScenarioRepository` port the
+ * Prisma repository answers, held in a map. Selected by `scenarioRepositories`
+ * (`defineRepositories`) when a process boots over memory persistence, and
+ * reused directly by the package's own tests that need a working
+ * `ScenarioService` without a real database.
  */
 import {
   ScenarioNotFoundError,
@@ -23,8 +26,8 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
-import { DEFAULT_SUITE_NAME } from "../../../rules/default-suite.rules.ts";
-import { ScenarioRepository, type ScenarioPlanRecord } from "../../scenario.repository.ts";
+import { DEFAULT_SUITE_NAME } from "../../rules/default-suite.rules.ts";
+import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository.ts";
 
 export class MemoryScenarioRepository extends ScenarioRepository {
   static create(): MemoryScenarioRepository {

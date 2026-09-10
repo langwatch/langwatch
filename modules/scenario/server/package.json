@@ -20,10 +20,6 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
-    },
     "./composition/scenario-failure-handler": {
       "types": "./dist/services/scenario-failure-handler.service.d.ts",
       "default": "./src/services/scenario-failure-handler.service.ts"

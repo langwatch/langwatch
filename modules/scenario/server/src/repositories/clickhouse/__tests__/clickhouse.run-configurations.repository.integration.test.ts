@@ -6,7 +6,8 @@
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
-import type { RunParameterValues, ScenarioService } from "@langwatch/scenario-contract";
+import type { RunParameterValues } from "@langwatch/scenario-contract";
+import type { ScenarioService } from "../../../services/scenario.service.ts";
 import { getSuiteSetId, type SuiteTarget } from "@langwatch/suite-contract";
 import {
   SuiteExecutionService,

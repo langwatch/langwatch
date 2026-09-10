@@ -2,15 +2,15 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import type {
   RunSecretCiphertext,
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
   ScenarioExecutionPreparation,
-  ScenarioService,
 } from "@langwatch/scenario-contract";
-import type { SecretService } from "@langwatch/secret-contract";
+import type { ScenarioService } from "./scenario.service.ts";
+import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
@@ -45,12 +45,12 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   config: ScenarioExecutionPrefetchConfig;
   scenarios: ScenarioService;
   suites: SuiteApi;
-  prompts: PromptService;
+  prompts: PromptApi;
   agents: AgentApi;
   workflows: WorkflowService;
   projects: ProjectApi;
   modelProviders: ModelProviderService;
-  secrets: SecretService;
+  secrets: SecretApi;
   traces: TraceApi;
 };
 

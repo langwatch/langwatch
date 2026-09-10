@@ -15,12 +15,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import {
-  SimulationService,
-  type Scenario,
-  type ScenarioApi,
-  type ScenarioService,
-} from "@langwatch/scenario-contract";
+import { SimulationService, type Scenario, type ScenarioApi } from "@langwatch/scenario-contract";
 import type { SuiteApi, StartSuiteRunCommandData } from "@langwatch/suite-contract";
 import {
   PostgresSuiteRepositories,
@@ -34,7 +29,8 @@ import { cleanupTestRows } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { PrismaScenarioAdapter } from "../index.ts";
+import { ScenarioService } from "../services/scenario.service.ts";
+import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository.ts";
 import { ScenarioClockPort } from "../ports/scenario-clock.port.ts";
 import { ScenarioIdPort, ScenarioTestSuiteIdPort } from "../ports/scenario-id.port.ts";
 import { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port.ts";
@@ -233,8 +229,8 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
 
     agents = new Map();
     commands = new CapturingCommands();
-    scenarios = PrismaScenarioAdapter.create({
-      prisma: db,
+    scenarios = ScenarioService.create({
+      repository: PrismaScenarioRepository.create(db),
       simulations: Object.create(SimulationService.prototype) as SimulationService,
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),

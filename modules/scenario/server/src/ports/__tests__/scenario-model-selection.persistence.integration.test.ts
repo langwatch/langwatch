@@ -3,8 +3,9 @@
  * @see specs/scenarios/simulation-run-model-resolution.feature
  * @see specs/suites/suite-model-selection.feature
  */
-import type { Scenario, ScenarioService } from "@langwatch/scenario-contract";
+import type { Scenario } from "@langwatch/scenario-contract";
 import { SimulationService } from "@langwatch/scenario-contract";
+import { PrismaScenarioRepository } from "../../repositories/prisma/scenario.repository.ts";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -16,7 +17,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { PrismaScenarioAdapter } from "../../index.ts";
+import { ScenarioService } from "../../services/scenario.service.ts";
 import { ScenarioClockPort } from "../scenario-clock.port.ts";
 import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../scenario-id.port.ts";
 import { ScenarioSecretCipherPort } from "../scenario-secret-cipher.port.ts";
@@ -110,8 +111,8 @@ describe.skipIf(!databaseUrl)("Scenario and run-plan model persistence", () => {
     });
     projectId = project.id;
 
-    scenarios = PrismaScenarioAdapter.create({
-      prisma: db,
+    scenarios = ScenarioService.create({
+      repository: PrismaScenarioRepository.create(db),
       simulations: Object.create(SimulationService.prototype) as SimulationService,
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),

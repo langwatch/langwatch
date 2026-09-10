@@ -1,11 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { ScenarioApp } from "@langwatch/scenario-server";
+import type { ScenarioApp, ScenarioService } from "@langwatch/scenario-server";
 import type { SuiteApi } from "@langwatch/suite-contract";
-import type {
-  ScenarioService,
-  ScenarioTabRegistry,
-  SimulationService,
-} from "@langwatch/scenario-contract";
+import type { ScenarioTabRegistry, SimulationService } from "@langwatch/scenario-contract";
 
 /** The two `ctx.app` slices and the services the doors take. `scenarios.*`,
  * `suites.*` and `setupSkills.*` are not here: their transports are

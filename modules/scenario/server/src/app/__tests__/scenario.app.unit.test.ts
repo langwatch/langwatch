@@ -5,11 +5,11 @@
  */
 import type {
   ScenarioExecutionService,
-  ScenarioService,
   ScenarioTabRegistry,
   SimulationQueueRun,
   SimulationService,
 } from "@langwatch/scenario-contract";
+import type { ResourceOwnership } from "@langwatch/runtime-composition";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -17,6 +17,10 @@ import type { AgentTestService } from "../../services/agent-test.service.ts";
 
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
+import type { ScenarioRepository } from "../../repositories/scenario.repository.ts";
+import type { ScenarioIdPort, ScenarioTestSuiteIdPort } from "../../ports/scenario-id.port.ts";
+import type { ScenarioClockPort } from "../../ports/scenario-clock.port.ts";
+import type { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port.ts";
 import { ScenarioApp, type QueueSimulationRunInput } from "../scenario.app.ts";
 
 function harness() {
@@ -30,20 +34,28 @@ function harness() {
   };
 
   const app = ScenarioApp.create({
-    agentTesting: createApiFixture<AgentTestService>(),
-    simulations: simulations as SimulationService,
+    repositories: { scenarios: {} as ScenarioRepository },
+    dependencies: { users: {} as UserApi },
+    config: undefined,
+    resources: {} as ResourceOwnership,
     // Nothing below is reached: assembling the envelope reads only its
     // argument and the run capability. A reach for any of them throws on the
     // missing property, which is the loud failure we want.
-    scenarios: {} as ScenarioService,
-    scenarioExecution: {} as ScenarioExecutionService,
-    scenarioTabs: {} as ScenarioTabRegistry,
-    users: {} as UserApi,
-    resultAtoms: {} as ResultAtomsService,
-    runConfigurations: {} as RunConfigurationsService,
-    broadcast: {
-      getTenantEmitter: () => {
-        throw new Error("the queue path subscribes to nothing");
+    infrastructure: {
+      agentTesting: createApiFixture<AgentTestService>(),
+      simulations: simulations as SimulationService,
+      scenarioExecution: {} as ScenarioExecutionService,
+      scenarioTabs: {} as ScenarioTabRegistry,
+      resultAtoms: {} as ResultAtomsService,
+      runConfigurations: {} as RunConfigurationsService,
+      ids: {} as ScenarioIdPort,
+      testSuiteIds: {} as ScenarioTestSuiteIdPort,
+      clock: {} as ScenarioClockPort,
+      secretCipher: {} as ScenarioSecretCipherPort,
+      broadcast: {
+        getTenantEmitter: () => {
+          throw new Error("the queue path subscribes to nothing");
+        },
       },
     },
   });

@@ -1,7 +1,6 @@
 import {
   isCancellableStatus,
   ScenarioNotFoundError,
-  ScenarioService as ScenarioServiceContract,
   scenarioCreateInputSchema,
   scenarioDuplicateInputSchema,
   scenarioTestSuiteCreateInputSchema,
@@ -70,7 +69,12 @@ export type ScenarioServiceOptions = {
   secretCipher: ScenarioSecretCipherPort;
 };
 
-export class ScenarioService extends ScenarioServiceContract {
+/**
+ * The scenario CRUD capability. Not implementing a contract abstract class: this was the
+ * feature's contract-service (ADR-133 legacy shape), folded so the portable contract carries
+ * only `ScenarioApi`; this class is now the sole, private definition of the shape.
+ */
+export class ScenarioService {
   static create(options: ScenarioServiceOptions): ScenarioService {
     return new ScenarioService(options);
   }
@@ -78,7 +82,6 @@ export class ScenarioService extends ScenarioServiceContract {
   private readonly runSecrets: ScenarioRunSecretsService;
 
   private constructor(private readonly options: ScenarioServiceOptions) {
-    super();
     this.runSecrets = ScenarioRunSecretsService.create(options.secretCipher);
   }
 

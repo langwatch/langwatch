@@ -6,9 +6,9 @@ import {
   partitionParameterDefinitions,
   renderScenarioContent,
   type RunParameterValues,
-  type ScenarioService,
   withoutParameterNames,
 } from "@langwatch/scenario-contract";
+import type { ScenarioService } from "./scenario.service.ts";
 import { tryExtractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 
 import type { ScenarioConfig } from "@langwatch/scenario-contract";

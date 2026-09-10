@@ -7,7 +7,7 @@
  */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import type { ScenarioService } from "@langwatch/scenario-contract";
+import type { ScenarioService } from "../../../services/scenario.service.ts";
 import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
 import {
   SuiteExecutionService,

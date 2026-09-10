@@ -19,7 +19,7 @@ import type {
   ExecuteRunIntent,
   FinishRunIntent,
 } from "../../processes/simulation-run-execution-data.process.ts";
-import { TestSimulationService } from "../../testing.ts";
+import { TestSimulationService } from "../../__tests__/support/test-simulation.service.ts";
 
 const RUN_ID = "run-1";
 const PROJECT_ID = "project-1";

@@ -2,7 +2,6 @@ import {
   ScenarioStaleVersionError,
   ScenarioVersionNotFoundError,
   type Scenario,
-  type ScenarioService,
 } from "@langwatch/scenario-contract";
 import {
   PrismaConfigService,
@@ -16,7 +15,8 @@ import { cleanupTestRows } from "@langwatch/test-harness";
 import { SimulationService } from "@langwatch/scenario-contract";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { PrismaScenarioAdapter } from "../../index.ts";
+import { ScenarioService } from "../../services/scenario.service.ts";
+import { PrismaScenarioRepository } from "../../repositories/prisma/scenario.repository.ts";
 import { ScenarioClockPort } from "../scenario-clock.port.ts";
 import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../scenario-id.port.ts";
 import { ScenarioSecretCipherPort } from "../scenario-secret-cipher.port.ts";
@@ -141,8 +141,8 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
 
     projectId = project.id;
     otherProjectId = otherProject.id;
-    scenarios = PrismaScenarioAdapter.create({
-      prisma: db,
+    scenarios = ScenarioService.create({
+      repository: PrismaScenarioRepository.create(db),
       simulations: Object.create(SimulationService.prototype) as SimulationService,
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),

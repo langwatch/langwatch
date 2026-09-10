@@ -1,4 +1,3 @@
-export { PrismaScenarioAdapter } from "./adapters/prisma.scenario.adapter.ts";
 export * from "./ports/cancellation-channel.port.ts";
 export * from "./ports/scenario-clock.port.ts";
 export * from "./ports/scenario-child-bootstrap.port.ts";
@@ -108,12 +107,26 @@ export {
 } from "./tasks/stalled-runs-backfill.task.ts";
 export {
   ScenarioApp,
+  scenarioAppDependencyTokens,
   type QueueSimulationRunInput,
   type ScenarioAppDependencies,
+  type ScenarioAppInfrastructure,
   type ScenarioBroadcast,
   type ScenarioCaller,
 } from "./app/scenario.app.ts";
+export type { ScenarioRepositories } from "./repositories/scenario.repositories.ts";
+export { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
+export { scenarioServer } from "./scenario.server.ts";
+/**
+ * The two repository bundles themselves, for the two compositions that still
+ * build a `ScenarioService` by hand (`apps/api/src/features/scenario` and
+ * `apps/worker`'s scenario-execution composition) rather than through
+ * `installApiScenario`. `PrismaScenarioRepository` itself stays private.
+ */
+export { PostgresScenarioRepositories } from "./repositories/prisma/prisma.scenario.repositories.ts";
+export { MemoryScenarioRepositories } from "./repositories/memory/memory.scenario.repositories.ts";
 export { ResultAtomsService } from "./services/result-atoms.service.ts";
+export { ScenarioService, type ScenarioServiceOptions } from "./services/scenario.service.ts";
 export {
   RunConfigurationsService,
   type RunConfiguration,

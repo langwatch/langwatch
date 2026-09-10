@@ -20,9 +20,6 @@ import {
   type SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
 
-export type { SimulationRunMetricsProjectionRecord } from "./projections/simulation-run-metrics.projection.ts";
-export type { SimulationRunState } from "./projections/simulation-run-state.projection.ts";
-
 export type TestSimulationServiceOptions = {
   run?: SimulationRunData;
   finishRun?: (input: SimulationFinishRun) => Promise<void>;

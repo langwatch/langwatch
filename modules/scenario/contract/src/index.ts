@@ -10,7 +10,6 @@ export * from "./scenario-dev-tunnel-error.ts";
 export * from "./scenario-failure-results.ts";
 export * from "./scenario-infra-error.ts";
 export * from "./scenario.parameters.ts";
-export * from "./scenario.service.ts";
 export * from "./scenario.api.ts";
 export * from "./scenario.version.ts";
 export * from "./scenario-execution-data.ts";

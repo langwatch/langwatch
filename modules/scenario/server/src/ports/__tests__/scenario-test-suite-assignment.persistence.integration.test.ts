@@ -10,11 +10,11 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { PrismaScenarioAdapter } from "../../index.ts";
+import { ScenarioService } from "../../services/scenario.service.ts";
+import { PrismaScenarioRepository } from "../../repositories/prisma/scenario.repository.ts";
 import { ScenarioClockPort } from "../scenario-clock.port.ts";
 import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../scenario-id.port.ts";
 import { ScenarioSecretCipherPort } from "../scenario-secret-cipher.port.ts";
-import type { ScenarioService } from "@langwatch/scenario-contract";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -105,15 +105,15 @@ describe.skipIf(!databaseUrl)("Moving a scenario between test suites", () => {
     otherProjectId = otherProject.id;
 
     const options = {
-      prisma: db,
+      repository: PrismaScenarioRepository.create(db),
       simulations: Object.create(SimulationService.prototype) as SimulationService,
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),
       secretCipher: new TestSecretCipher(),
     };
-    scenarios = PrismaScenarioAdapter.create(options);
-    otherScenarios = PrismaScenarioAdapter.create(options);
+    scenarios = ScenarioService.create(options);
+    otherScenarios = ScenarioService.create(options);
   });
 
   beforeEach(async () => {

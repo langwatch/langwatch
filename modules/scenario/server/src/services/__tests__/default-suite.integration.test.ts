@@ -3,8 +3,9 @@
  * Every scenario belongs to exactly one suite: clearing a scenario's suite
  * files it back into Default rather than leaving it loose.
  */
-import type { ScenarioService as ScenarioServiceContract } from "@langwatch/scenario-contract";
 import { SimulationService } from "@langwatch/scenario-contract";
+import { ScenarioService as ScenarioServiceContract } from "../scenario.service.ts";
+import { PrismaScenarioRepository } from "../../repositories/prisma/scenario.repository.ts";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -17,7 +18,6 @@ import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { PrismaScenarioAdapter } from "../../index.ts";
 import { ScenarioClockPort } from "../../ports/scenario-clock.port.ts";
 import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../../ports/scenario-id.port.ts";
 import { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port.ts";
@@ -76,8 +76,8 @@ let projectId = "";
 
 function service(): ScenarioServiceContract {
   const simulations = Object.create(SimulationService.prototype) as SimulationService;
-  return PrismaScenarioAdapter.create({
-    prisma: database(),
+  return ScenarioServiceContract.create({
+    repository: PrismaScenarioRepository.create(database()),
     simulations,
     ids: new ScenarioIds(),
     testSuiteIds: new TestSuiteIds(),

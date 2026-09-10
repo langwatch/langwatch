@@ -12,14 +12,16 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { LocalFeatureApis, type ResourceScope } from "@langwatch/runtime-composition";
+import { createApp, LocalFeatureApis, type ResourceScope } from "@langwatch/runtime-composition";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import {
   AgentTestService,
-  PrismaScenarioAdapter,
+  PostgresScenarioRepositories,
   ResultAtomsClickHouseAdapter,
   RunConfigurationsClickHouseAdapter,
   ScenarioApp,
+  scenarioServer,
+  type ScenarioAppInfrastructure,
   ScenarioClockPort,
   ScenarioExecutionPrefetcherService,
   ScenarioExecutionService,
@@ -58,12 +60,9 @@ import {
 } from "@langwatch/suite-server";
 
 import { installApiSuite } from "../suite/suite.composition.ts";
-import type {
-  ScenarioService,
-  ScenarioTabRegistry,
-  SimulationService,
-} from "@langwatch/scenario-contract";
-import type { UserApi } from "@langwatch/user-contract";
+import type { ScenarioTabRegistry, SimulationService } from "@langwatch/scenario-contract";
+import { ScenarioService } from "@langwatch/scenario-server";
+import { UserApi } from "@langwatch/user-contract";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import type { ApiAgentPipelines } from "../../app/api-agent-pipelines.composition.ts";
@@ -197,8 +196,8 @@ export async function composeScenarioFeature(
   if (!options.redis) options.report?.absent("live-buffer");
 
   const simulations = composeSimulations(options, pipelines);
-  const scenarios = PrismaScenarioAdapter.create({
-    prisma: options.prisma,
+  const scenarios = ScenarioService.create({
+    repository: PostgresScenarioRepositories.create({ prisma: options.prisma }).scenarios,
     simulations,
     ids: new KsuidScenarioId(),
     testSuiteIds: new NanoidScenarioTestSuiteId(),
@@ -506,5 +505,41 @@ function composeScenarioExecution(
     }),
     simulations: composed.simulations,
   });
+}
+
+// ---------------------------------------------------------------------------
+// The annotated installer (ADR-133)
+// ---------------------------------------------------------------------------
+
+/**
+ * `scenarios.*`, booted through `defineModule`/`withRepositories`/`withApp`
+ * rather than hand-built. Persistence is selected once (postgres or memory);
+ * the rest of the feature's technical collaborators still arrive as a single
+ * `infrastructure` bag, because `ScenarioApp` has not yet absorbed the
+ * construction of agent testing, the run executor, the ClickHouse-backed
+ * reads and the Suite peer the way `composeScenarioFeature` above does by
+ * hand - that move is the module's next step, tracked in its handover.
+ * `composeScenarioFeature`/`refusingScenarioFeature` remain what
+ * `api-production.composition.ts` actually calls; this installer is not
+ * wired into it yet.
+ */
+export async function installApiScenario(options: {
+  persistence: { backend: "postgres"; prisma: PrismaClient } | { backend: "memory" };
+  users: UserApi;
+  infrastructure: ScenarioAppInfrastructure;
+}): Promise<ScenarioApp> {
+  const app = createApp({ name: "langwatch-api" });
+  const withPersistence =
+    options.persistence.backend === "postgres"
+      ? app.withPersistence("postgres", { prisma: options.persistence.prisma })
+      : app.withPersistence("memory", {});
+
+  const runtime = await withPersistence
+    .withInfrastructure({})
+    .withProvided(UserApi, options.users)
+    .withModule(scenarioServer, { infrastructure: options.infrastructure })
+    .boot({ role: "api" });
+
+  return runtime.module(scenarioServer).provided;
 }
 

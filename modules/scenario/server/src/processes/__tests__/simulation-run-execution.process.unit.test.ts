@@ -28,7 +28,7 @@ import {
   finishRunIntentSchema,
   simulationRunProcessEventViewSchema,
 } from "../simulation-run-execution-data.process.ts";
-import { TestSimulationService } from "../../testing.ts";
+import { TestSimulationService } from "../../__tests__/support/test-simulation.service.ts";
 
 const PROJECT_ID = "project-1";
 const RUN_ID = "run-1";

@@ -15,7 +15,7 @@ import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../../../ports/scenario
 import { ScenarioClockPort } from "../../../ports/scenario-clock.port.ts";
 import { ScenarioSecretCipherPort } from "../../../ports/scenario-secret-cipher.port.ts";
 import { ScenarioService } from "../../../services/scenario.service.ts";
-import { MemoryScenarioRepository } from "../../../repositories/__tests__/fixtures/memory-scenario.repository.ts";
+import { MemoryScenarioRepository } from "../../../repositories/memory/memory.scenario.repository.ts";
 import { createScenariosRestApp } from "../scenario.api.ts";
 
 const PROJECT_ID = "project_scenarios";

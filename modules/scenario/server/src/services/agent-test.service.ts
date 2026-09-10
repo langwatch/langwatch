@@ -19,7 +19,7 @@ import type {
 } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import {
   AGENT_TEST_SCENARIO_ID,
@@ -35,7 +35,7 @@ import {
   type TestAgentRunInput,
   type TestAgentTurnInput,
 } from "@langwatch/scenario-contract";
-import type { SecretService } from "@langwatch/secret-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
 import type { AgentAdapterFactoryPort } from "../ports/agent-adapter-factory.port.ts";
@@ -54,8 +54,8 @@ export type AgentTestServiceOptions = {
   agents: AgentApi;
   projects: ProjectApi;
   workflows: WorkflowService;
-  prompts: PromptService;
-  secrets: SecretService;
+  prompts: PromptApi;
+  secrets: SecretApi;
   modelProviders: ModelProviderService;
   simulations: SimulationService;
   config: ScenarioExecutionPrefetchConfig;

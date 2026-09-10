@@ -25,7 +25,6 @@ import {
   type ScenarioIdInput,
   type ScenarioMoveInput,
   type ScenarioRunConfig,
-  type ScenarioService,
   type ScenarioTestSuite,
   type ScenarioTestSuiteCreateInput,
   type ScenarioTestSuiteIdInput,
@@ -65,15 +64,21 @@ import {
   withNote,
   withResolvedModels,
 } from "@langwatch/scenario-contract";
-import type { UserApi, UserFullProfile, UserProfilesInput } from "@langwatch/user-contract";
+import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import type { EventEmitter } from "node:events";
 import type { TestAgentRunInput, TestAgentTurnInput } from "@langwatch/scenario-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { AgentTestService } from "../services/agent-test.service.ts";
 import type {
   RunConfigurationEntry,
   RunConfigurationsService,
 } from "../services/run-configurations.service.ts";
 import type { ResultAtomsService } from "../services/result-atoms.service.ts";
+import { ScenarioService } from "../services/scenario.service.ts";
+import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
+import type { ScenarioIdPort, ScenarioTestSuiteIdPort } from "../ports/scenario-id.port.ts";
+import type { ScenarioClockPort } from "../ports/scenario-clock.port.ts";
+import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port.ts";
 
 /**
  * The process's per-tenant fan-out, as this feature uses it: one emitter per project that relays
@@ -104,6 +109,33 @@ export interface ScenarioAppDependencies {
   runConfigurations: RunConfigurationsService;
 }
 
+/**
+ * The technical collaborators `installApiScenario` still assembles outside the
+ * repository seam: the private services this feature builds over several
+ * other verticals (agent testing, the run executor, the live buffer, the
+ * ClickHouse-backed reads) and the four small ports the scenario CRUD service
+ * itself is built over. None of these are peer APIs - moving their
+ * construction fully inside this factory (agent testing over Suite/Prompt/
+ * model providers, the executor over Suite's prefetch) is unfinished; see the
+ * scenario module handover.
+ */
+export interface ScenarioAppInfrastructure {
+  agentTesting: AgentTestService;
+  simulations: SimulationService;
+  scenarioExecution: ScenarioExecutionService;
+  scenarioTabs: ScenarioTabRegistry;
+  broadcast: ScenarioBroadcast;
+  resultAtoms: ResultAtomsService;
+  runConfigurations: RunConfigurationsService;
+  ids: ScenarioIdPort;
+  testSuiteIds: ScenarioTestSuiteIdPort;
+  clock: ScenarioClockPort;
+  secretCipher: ScenarioSecretCipherPort;
+}
+
+/** The one peer API this feature reads directly. */
+export const scenarioAppDependencyTokens = { users: UserApi };
+
 /** What one queued run needs to know about itself. */
 export interface QueueSimulationRunInput {
   projectId: string;
@@ -129,8 +161,37 @@ export interface QueueSimulationRunInput {
 }
 
 export class ScenarioApp implements ScenarioApi {
-  static create(dependencies: ScenarioAppDependencies): ScenarioApp {
-    return new ScenarioApp(dependencies);
+  static readonly contract = ScenarioApi;
+  static readonly dependencies = scenarioAppDependencyTokens;
+
+  static create(
+    setup: FeatureSetup<
+      typeof scenarioAppDependencyTokens,
+      ScenarioAppInfrastructure,
+      undefined,
+      ScenarioRepositories
+    >,
+  ): ScenarioApp {
+    const scenarios = ScenarioService.create({
+      repository: setup.repositories.scenarios,
+      simulations: setup.infrastructure.simulations,
+      ids: setup.infrastructure.ids,
+      testSuiteIds: setup.infrastructure.testSuiteIds,
+      clock: setup.infrastructure.clock,
+      secretCipher: setup.infrastructure.secretCipher,
+    });
+
+    return new ScenarioApp({
+      agentTesting: setup.infrastructure.agentTesting,
+      scenarios,
+      simulations: setup.infrastructure.simulations,
+      scenarioExecution: setup.infrastructure.scenarioExecution,
+      scenarioTabs: setup.infrastructure.scenarioTabs,
+      users: setup.dependencies.users,
+      broadcast: setup.infrastructure.broadcast,
+      resultAtoms: setup.infrastructure.resultAtoms,
+      runConfigurations: setup.infrastructure.runConfigurations,
+    });
   }
 
   #dependencies: ScenarioAppDependencies;
