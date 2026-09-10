@@ -215,7 +215,7 @@ export function composeApiPackagedRest(
       // The SAME application both user namespaces answer from: one answer to
       // who somebody is, whichever door asked.
       users: () => options.users,
-      scenarios: () => options.scenario.scenarioService,
+      scenarios: () => options.scenario.scenarios,
       scenarioTabs: () => options.scenario.scenarioTabs,
       simulations: () => options.scenario.simulations,
       // Both tracked-event URLs, over the SAME span collection the OTLP

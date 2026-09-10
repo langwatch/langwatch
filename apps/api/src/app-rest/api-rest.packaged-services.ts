@@ -30,11 +30,14 @@ import type {
 } from "@langwatch/organization-contract";
 import type { OrganizationProvisioningPort } from "@langwatch/organization-server";
 import type { ProjectManagementDirectory } from "@langwatch/project-server";
-import type { ScenarioTabRegistry, SimulationService } from "@langwatch/scenario-contract";
+import type {
+  ScenarioApi,
+  ScenarioTabRegistry,
+  SimulationService,
+} from "@langwatch/scenario-contract";
 import type {
   InlineMediaExtraction,
   ScenarioRunPlatformUrlBuilder,
-  ScenarioService,
 } from "@langwatch/scenario-server";
 import type {
   FilesProjectPermissionCheck,
@@ -44,7 +47,7 @@ import type {
 import type { TrackedEventPorts } from "@langwatch/trace-server";
 import type { UserApi } from "@langwatch/user-contract";
 
-import type { WorkflowEvaluationTrigger, WorkflowService,} from "@langwatch/workflow-server";
+import type { WorkflowEvaluationTrigger, WorkflowService } from "@langwatch/workflow-server";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ApiErrorBody } from "@langwatch/api/rest";
@@ -96,7 +99,7 @@ export type ApiPackagedRestServices = Readonly<{
   /** Reading effective permissions and the bindings that confer them. */
   permissions?: (() => AuthzService) | undefined;
   projects?: (() => ProjectManagementDirectory) | undefined;
-  scenarios?: (() => ScenarioService) | undefined;
+  scenarios?: (() => ScenarioApi) | undefined;
   scenarioTabs?: (() => ScenarioTabRegistry) | undefined;
   /** The SCIM provisioning tokens an identity provider authenticates with. */
   scim?: (() => ScimApi) | undefined;
