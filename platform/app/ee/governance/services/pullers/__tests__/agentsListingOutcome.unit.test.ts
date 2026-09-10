@@ -64,6 +64,38 @@ describe("given a source's last agents listing", () => {
     });
 
     /**
+     * The bound that stopped the walk is ours, and every page the provider was
+     * asked for came back. Both other causes lie about that: `access` sends
+     * somebody to audit a credential that is working, and `unreachable` tells
+     * a reader that a provider which answered every request did not answer.
+     */
+    it("treats our own page bound as neither a fault to fix nor a provider that went quiet", () => {
+      expect(agentsListingOutcome(row("refused", "too_many_pages"))).toEqual({
+        outcome: "refused",
+        cause: "incomplete",
+      });
+    });
+
+    /**
+     * Stated against the specific wrong answer this change exists to end,
+     * rather than left implied by the assertion above. `too_many_pages` was
+     * added to the vocabulary and mapped nowhere, so it fell through to
+     * `unreachable` and rendered "did not answer" with the remedy "Ask again
+     * in a moment" — advice that provably cannot work, since the next walk
+     * reads the same pages and stops at the same bound. An edit that drops
+     * this reason from the table restores exactly that, and would pass every
+     * other test in this file.
+     */
+    it("does not tell a reader to ask again when asking again reads the same pages", () => {
+      const outcome = agentsListingOutcome(row("refused", "too_many_pages"));
+
+      expect(outcome).not.toEqual({
+        outcome: "refused",
+        cause: "unreachable",
+      });
+    });
+
+    /**
      * The reason column is a plain string because the log outlives the
      * vocabulary, so this build will eventually read words written by a later
      * one. Falling to `unreachable` is the safe half of the pair: its advice is

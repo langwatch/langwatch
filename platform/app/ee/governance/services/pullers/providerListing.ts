@@ -46,7 +46,15 @@ export type ListingRefusalReason =
   /** A 2xx that was not the documented shape. A proxy or a captive portal. */
   | "malformed_response"
   /** The source holds no credential this provider can sign in with. */
-  | "not_configured";
+  | "not_configured"
+  /**
+   * The walk stopped at our own page bound with pages still unread. Every
+   * request answered; the limit is ours, not the provider's. Distinct from
+   * `unavailable` because nothing upstream misbehaved, and distinct from the
+   * transient reasons because asking again starts at the same first page and
+   * stops in the same place.
+   */
+  | "too_many_pages";
 
 export interface ListingRefusal {
   reason: ListingRefusalReason;

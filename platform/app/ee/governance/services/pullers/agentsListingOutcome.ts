@@ -33,24 +33,30 @@
 
 import { INGESTION_PULL_LISTING_OUTCOME } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
 import type { IngestionPullRunProjection } from "~/generated/prisma/client";
+import type { ListingRefusalReason } from "./providerListing";
 
 /**
  * What a person has to DO about a refusal, which is the only reason a screen
  * branches on one at all.
  *
- * Two values rather than the seven the refusal vocabulary carries, because
- * there are two different actions and no more:
+ * Three values rather than the eight the refusal vocabulary carries, because
+ * there are three different actions and no more:
  *   `access`      — somebody has to fix a credential, a permission or a
  *                   connection's configuration. Asking again changes nothing
  *                   until they do.
  *   `unreachable` — the provider did not answer, or answered badly. Asking
  *                   again later is the action and there is nothing to fix.
+ *   `incomplete`  — the provider answered everything it was asked and we
+ *                   stopped first. There is no action: nothing is broken, and
+ *                   asking again walks the same pages to the same bound.
  *
  * Telling a reader whose provider was rate-limited to go check their
  * credentials sends them to audit a permission that was never the problem,
- * which is why this is not one generic refusal sentence.
+ * which is why this is not one generic refusal sentence. `incomplete` exists
+ * for the same reason in the other direction: it is the only cause whose
+ * honest advice is that pressing the button again is not worth doing.
  */
-export type AgentsListingRefusalCause = "access" | "unreachable";
+export type AgentsListingRefusalCause = "access" | "unreachable" | "incomplete";
 
 /**
  * The last agents listing, or `null` when none has been recorded.
@@ -70,25 +76,33 @@ export type AgentsListingSummary = Pick<
 >;
 
 /**
- * Refusal reasons that mean somebody must change something before another ask
- * can work.
+ * Every refusal reason, and the one thing its reader should do about it.
  *
- * `not_found` sits here rather than with the transient ones: a 404 on a
- * listing endpoint is an address that names no such collection, which is
- * configuration, and telling that reader to try again later would leave them
- * pressing a button forever.
+ * EXHAUSTIVE ON PURPOSE, and typed rather than a set of the interesting ones.
+ * A safe-list of `access` reasons with everything else falling through reads
+ * fine until somebody adds a reason: the new one lands on the fallback in
+ * silence and ships whatever advice that fallback happens to give. That is not
+ * hypothetical. `too_many_pages` was added with exactly that shape, and until
+ * this table existed it told a customer that a provider which had answered
+ * every single request had not answered, and to ask again. Written this way,
+ * the next reason added to the vocabulary fails the typecheck here until
+ * somebody decides what its reader should do, which is the only moment anyone
+ * is in a position to decide it.
  *
- * Everything else — including a reason this build has never heard of — falls
- * to `unreachable`, whose advice is "ask again". That is the safe default of
- * the two: it sends nobody to audit a permission that was never at fault, and
- * an unmapped reason is by definition a provider that did not behave the way
- * it documents.
+ * `not_found` is `access` rather than transient: a 404 on a listing endpoint
+ * is an address naming no such collection, which is configuration, and telling
+ * that reader to try again later leaves them pressing a button forever.
  */
-const ACCESS_REFUSAL_REASONS = new Set([
-  "unauthorized",
-  "not_found",
-  "not_configured",
-]);
+const REFUSAL_CAUSE: Record<ListingRefusalReason, AgentsListingRefusalCause> = {
+  unauthorized: "access",
+  not_found: "access",
+  not_configured: "access",
+  rate_limited: "unreachable",
+  unavailable: "unreachable",
+  unreachable: "unreachable",
+  malformed_response: "unreachable",
+  too_many_pages: "incomplete",
+};
 
 export function agentsListingOutcome(
   row: AgentsListingSummary | null | undefined,
@@ -103,10 +117,15 @@ export function agentsListingOutcome(
     // know says so rather than picking the friendlier of the two claims.
     return null;
   }
+  // A reason written by a release this build cannot read stays `unreachable`.
+  // It is the only cause that claims nothing: `access` would send somebody to
+  // audit a credential that may be fine, and `incomplete` asserts both that
+  // nothing is broken and that asking again is pointless, neither of which is
+  // knowable about a word we cannot read. The cost of being wrong here is one
+  // wasted press, which is the cheapest of the three.
+  const reason = row?.LastAgentsListingReason ?? "";
   return {
     outcome: "refused",
-    cause: ACCESS_REFUSAL_REASONS.has(row?.LastAgentsListingReason ?? "")
-      ? "access"
-      : "unreachable",
+    cause: REFUSAL_CAUSE[reason as ListingRefusalReason] ?? "unreachable",
   };
 }

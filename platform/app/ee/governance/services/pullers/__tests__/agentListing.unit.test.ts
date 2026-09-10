@@ -349,9 +349,13 @@ describe("listCopilotAgents paging", () => {
 
       const listing = await listCopilotAgents({ environmentUrl, token: "t" });
 
+      // `too_many_pages` rather than `unavailable`: every request in that walk
+      // came back 200, so nothing upstream misbehaved and the bound that
+      // stopped it is ours. The distinction is what stops the screen telling
+      // this reader to ask again.
       expect(listing).toEqual({
         outcome: "refused",
-        refusal: { reason: "unavailable", status: null },
+        refusal: { reason: "too_many_pages", status: null },
       });
       expect(fetchMock).toHaveBeenCalledTimes(MAX_BOT_PAGES);
     });
@@ -393,9 +397,11 @@ describe("listGenieAgents", () => {
 
       const listing = await listGenieAgents({ workspaceUrl, token: "t" });
 
+      // Same reasoning as the Copilot bound above: the workspace answered
+      // every page it was asked for, so this is our limit and not its fault.
       expect(listing).toEqual({
         outcome: "refused",
-        refusal: { reason: "unavailable", status: null },
+        refusal: { reason: "too_many_pages", status: null },
       });
     });
   });

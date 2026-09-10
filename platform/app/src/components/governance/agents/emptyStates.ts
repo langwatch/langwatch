@@ -263,6 +263,25 @@ const REFUSAL_VOICE: Record<
         ? "Ask again in a moment."
         : "Only an administrator can ask again.",
   },
+  incomplete: {
+    headlineOne: "A provider had more agents than we could read",
+    headlineMany: "Providers had more agents than we could read",
+    // Count-neutral, like the other two verbs: one `verb` serves both the
+    // singular and plural sentences, so "holds" would misagree the moment two
+    // providers hit the bound in the same run.
+    verb: "still had agents to list when we stopped reading",
+    // The only remedy that does not depend on `canAsk`, and deliberately so:
+    // the limit is ours, so holding the grant that makes Sync pressable buys
+    // this reader nothing. Offering the button to one reader and withholding
+    // it from another would imply the press does something. It does not: the
+    // next walk reads the same pages and stops in the same place.
+    //
+    // It also promises no mechanism. There is no self-serve way to raise the
+    // bound today, and inventing one here would send somebody looking through
+    // settings for a control that does not exist.
+    remedy: () =>
+      "Nothing is wrong with that connection and asking again will not help. This is a limit on our side; contact support if you need the full inventory.",
+  },
 };
 
 export function agentsRefusedCopy({
