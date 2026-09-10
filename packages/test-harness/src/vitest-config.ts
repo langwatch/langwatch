@@ -38,7 +38,6 @@ export function moduleVitestTestOptions(
     fsModuleCache: true,
     fileParallelism: true,
     watch: false,
-    experimental: { importDurations: { print: "on-warn" } },
     exclude: exclude ?? DEFAULT_EXCLUDE,
     ...(include ? { include } : {}),
     ...(setupFiles ? { setupFiles } : {}),
@@ -48,8 +47,6 @@ export function moduleVitestTestOptions(
   };
 }
 
-export function defineModuleVitestConfig(
-  options: ModuleVitestConfigOptions,
-): ViteUserConfig {
+export function defineModuleVitestConfig(options: ModuleVitestConfigOptions): ViteUserConfig {
   return defineConfig({ test: moduleVitestTestOptions(options) });
 }
