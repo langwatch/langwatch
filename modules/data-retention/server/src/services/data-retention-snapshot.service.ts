@@ -8,7 +8,7 @@ import type {
   RetentionPolicySnapshot,
   ScopeAssignment,
 } from "@langwatch/data-retention-contract";
-import type { DataRetentionDirectoryRepository } from "../repositories/data-retention-directory.repository.ts";
+import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
 import type { DataRetentionService } from "./data-retention.service.ts";
 import type {
   DataRetentionPolicyService,
@@ -18,13 +18,13 @@ import type { RetentionPermissionsService } from "./retention-permissions.servic
 
 export type DataRetentionSnapshotServiceOptions = Readonly<{
   retention: Pick<DataRetentionService, "getResolvedForProject" | "listOrganizationRules">;
-  directory: DataRetentionDirectoryRepository;
+  directory: DataRetentionDirectoryReader;
   permissions: RetentionPermissionsService;
   policy: Pick<DataRetentionPolicyService, "canConfigureRetention">;
 }>;
 
 type OrganizationDirectory = Awaited<
-  ReturnType<DataRetentionDirectoryRepository["listOrganizationDirectory"]>
+  ReturnType<DataRetentionDirectoryReader["listOrganizationDirectory"]>
 >;
 
 /** Reading a scope: whether this caller may see its row, and what the scope is called. */

@@ -35,6 +35,7 @@ func Inventory(root string, stdout, stderr io.Writer) []ModuleCounts {
 	var counts []ModuleCounts
 	for _, m := range moduleDirs {
 		c := ModuleCounts{ModuleDir: m, ByTier: map[Tier]int{}}
+		sources := CollectSources(root, filepath.Join(m, "server", "src"))
 		for _, sub := range []string{"ports", "adapters"} {
 			dir := filepath.Join(root, m, "server", "src", sub)
 			_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
@@ -48,7 +49,11 @@ func Inventory(root string, stdout, stderr io.Writer) []ModuleCounts {
 				if rerr != nil {
 					return nil
 				}
-				cl := Classify(path, string(data))
+				rel, relErr := filepath.Rel(root, path)
+				if relErr != nil {
+					return nil
+				}
+				cl := Classify(path, string(data), siblingsExcluding(sources, rel))
 				c.ByTier[cl.Tier]++
 				c.Total++
 				return nil

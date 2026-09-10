@@ -1,15 +1,13 @@
 import { Temporal, type Instant } from "@langwatch/time";
-import { TopicClusteringScheduleRepository } from "../../repositories/topic-clustering-schedule.repository.ts";
+import type { TopicClusteringScheduleReader } from "../topic.app.ts";
 
 /** A process that schedules nothing: the status panel reads "not scheduled". */
-export class UnscheduledTopicClustering extends TopicClusteringScheduleRepository {
+export class UnscheduledTopicClustering implements TopicClusteringScheduleReader {
   static create(nextWakeAt: Instant | null = null): UnscheduledTopicClustering {
     return new UnscheduledTopicClustering(nextWakeAt);
   }
 
-  private constructor(private readonly nextWakeAt: Instant | null) {
-    super();
-  }
+  private constructor(private readonly nextWakeAt: Instant | null) {}
 
   findNextWakeAt(): Promise<Instant | null> {
     return Promise.resolve(this.nextWakeAt);

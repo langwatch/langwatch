@@ -46,6 +46,7 @@ func Ports(root, moduleDir string, apply bool, runner Runner, stdout, stderr io.
 	}
 	sort.Strings(files)
 
+	sources := CollectSources(root, serverSrc)
 	var entries []Entry
 	for _, f := range files {
 		data, err := os.ReadFile(filepath.Join(root, f))
@@ -53,7 +54,7 @@ func Ports(root, moduleDir string, apply bool, runner Runner, stdout, stderr io.
 			fmt.Fprintf(stderr, "read %s: %v\n", f, err)
 			continue
 		}
-		entries = append(entries, PlanEntry(f, serverSrc, string(data)))
+		entries = append(entries, PlanEntry(f, serverSrc, string(data), siblingsExcluding(sources, f)))
 	}
 
 	printPlan(stdout, entries)

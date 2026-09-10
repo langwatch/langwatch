@@ -8,17 +8,18 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 import {
-  DataRetentionDirectoryRepository,
-  type RetentionOrganizationDirectory,
-  type RetentionProjectLineage,
-} from "../../repositories/data-retention-directory.repository.ts";
-import {
   DataRetentionPlanPort,
   type DataRetentionPlan,
 } from "../../ports/data-retention-plan.port.ts";
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
-import { DataRetentionApp, type DataRetentionInfrastructure } from "../data-retention.app.ts";
+import {
+  DataRetentionApp,
+  type DataRetentionDirectoryReader,
+  type DataRetentionInfrastructure,
+  type RetentionOrganizationDirectory,
+  type RetentionProjectLineage,
+} from "../data-retention.app.ts";
 
 /** One organization with one team and one project, which is all a gate needs. */
 export type RetentionTestDirectoryGraph = Readonly<{
@@ -38,14 +39,12 @@ export const retentionTestGraph: RetentionTestDirectoryGraph = {
 };
 
 /** The lineage the gates read, over a single seeded graph. */
-export class MemoryRetentionDirectory extends DataRetentionDirectoryRepository {
+export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
   static create(graph: RetentionTestDirectoryGraph = retentionTestGraph): MemoryRetentionDirectory {
     return new MemoryRetentionDirectory(graph);
   }
 
-  private constructor(private readonly graph: RetentionTestDirectoryGraph) {
-    super();
-  }
+  private constructor(private readonly graph: RetentionTestDirectoryGraph) {}
 
   async findProjectLineage({
     projectId,

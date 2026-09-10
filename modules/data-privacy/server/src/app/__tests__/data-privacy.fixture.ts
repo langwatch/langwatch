@@ -2,10 +2,10 @@ import type { DataPrivacyScope, ResolvedDataPrivacy } from "@langwatch/data-priv
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
-  DataPrivacyDirectoryRepository,
+  type DataPrivacyDirectoryReader,
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
-} from "../../repositories/data-privacy-directory.repository.ts";
+} from "../data-privacy.app.ts";
 import { DataPrivacyResolutionPort } from "../../ports/data-privacy.port.ts";
 import { PiiAnalysisPort } from "../../ports/pii-analysis.port.ts";
 
@@ -21,7 +21,7 @@ export class DataPrivacyResolutionFake extends DataPrivacyResolutionPort {
 }
 
 /** One organization's lineage, held in the test rather than in Postgres. */
-export class MemoryDataPrivacyDirectory extends DataPrivacyDirectoryRepository {
+export class MemoryDataPrivacyDirectory implements DataPrivacyDirectoryReader {
   static create(
     rows: {
       lineage?: DataPrivacyProjectLineage;
@@ -38,11 +38,9 @@ export class MemoryDataPrivacyDirectory extends DataPrivacyDirectoryRepository {
       directory?: DataPrivacyOrganizationDirectory;
       scopeOrganizationId?: string | null;
     },
-  ) {
-    super();
-  }
+  ) {}
 
-  async tryGetProjectLineage(): Promise<DataPrivacyProjectLineage | null> {
+  async findProjectLineage(): Promise<DataPrivacyProjectLineage | null> {
     return this.rows.lineage ?? null;
   }
 
@@ -50,7 +48,7 @@ export class MemoryDataPrivacyDirectory extends DataPrivacyDirectoryRepository {
     return this.rows.directory ?? { departments: [], teams: [], projects: [], groups: [] };
   }
 
-  async tryResolveScopeOrganizationId(input: { scope: DataPrivacyScope }): Promise<string | null> {
+  async findScopeOrganizationId(input: { scope: DataPrivacyScope }): Promise<string | null> {
     void input;
     return this.rows.scopeOrganizationId ?? null;
   }

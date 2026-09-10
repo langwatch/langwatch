@@ -1,6 +1,7 @@
 package shapemod
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -44,9 +45,11 @@ func tierPrefix(t Tier) string {
 }
 
 // PlanEntry classifies one file and computes its destination, given the
-// module's server/src directory (repository-relative).
-func PlanEntry(oldPath, serverSrc, content string) Entry {
-	c := Classify(oldPath, content)
+// module's server/src directory (repository-relative) and siblings (every
+// other .ts source under that server/src, keyed by repository-relative
+// path) so Classify can check for an in-module implementation.
+func PlanEntry(oldPath, serverSrc, content string, siblings map[string]string) Entry {
+	c := Classify(oldPath, content, siblings)
 	name := subjectName(filepath.Base(oldPath))
 	e := Entry{OldPath: oldPath, Classification: c, Name: name}
 
@@ -76,6 +79,43 @@ func PlanEntry(oldPath, serverSrc, content string) Entry {
 		e.NewSymbol = repoName
 	}
 	return e
+}
+
+// CollectSources reads every .ts file under serverSrc (repository-relative,
+// resolved against root), excluding __tests__ directories, keyed by
+// repository-relative path. Used to build the sibling set Classify checks
+// for an in-module implementation.
+func CollectSources(root, serverSrc string) map[string]string {
+	sources := map[string]string{}
+	_ = filepath.WalkDir(filepath.Join(root, serverSrc), func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".ts") {
+			return nil
+		}
+		if strings.Contains(path, string(filepath.Separator)+"__tests__"+string(filepath.Separator)) {
+			return nil
+		}
+		data, rerr := os.ReadFile(path)
+		if rerr != nil {
+			return nil
+		}
+		if rel, relErr := filepath.Rel(root, path); relErr == nil {
+			sources[rel] = string(data)
+		}
+		return nil
+	})
+	return sources
+}
+
+// siblingsExcluding returns a copy of all with exclude removed, so a file
+// is never checked against its own content as its "in-module implementation".
+func siblingsExcluding(all map[string]string, exclude string) map[string]string {
+	out := make(map[string]string, len(all))
+	for k, v := range all {
+		if k != exclude {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 var relativeImportRe = regexp.MustCompile(`(?m)from\s+["'](\.[^"']+)["']`)

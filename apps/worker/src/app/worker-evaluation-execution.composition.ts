@@ -24,7 +24,7 @@ import {
   monitorServer,
   MonitorEvaluatorPort,
   MonitorPerformancePort,
-  MonitorReplicationPort,
+  type MonitorReplicationReader,
 } from "@langwatch/monitor-server";
 import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -175,7 +175,7 @@ class UncomposedMonitorPerformance extends MonitorPerformancePort {
   }
 }
 
-class UncomposedMonitorReplication extends MonitorReplicationPort {
+class UncomposedMonitorReplication implements MonitorReplicationReader {
   copyEvaluatorToProject(): Promise<never> {
     return Promise.reject(uncomposedInWorker("evaluator replication"));
   }

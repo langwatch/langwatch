@@ -43,9 +43,9 @@ import {
   UsageService,
   UsageVolumeCounterPort,
   UsageWarningPort,
-  PlanCataloguePort,
   PlanNextStepService,
   type CataloguePlan,
+  type PlanCatalogueReader,
   type EntitlementServiceOptions,
   type ProjectUsageCounts,
   type UsageCount,
@@ -347,14 +347,12 @@ function catalogueRung(representative: PlanTypes, types: readonly PlanTypes[]): 
 }
 
 /** The self-serve ladder, as `PLAN_LIMITS` already defines it. No price is invented here. */
-class ApiPlanCatalogueAdapter extends PlanCataloguePort {
+class ApiPlanCatalogueAdapter implements PlanCatalogueReader {
   static create(): ApiPlanCatalogueAdapter {
     return new ApiPlanCatalogueAdapter();
   }
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   listSelfServePlans(input: {
     pricingModel: EntitlementPricingModel | null;

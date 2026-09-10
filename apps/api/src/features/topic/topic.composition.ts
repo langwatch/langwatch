@@ -3,7 +3,7 @@
  * process's own graph.
  */
 import { createApp } from "@langwatch/runtime-composition";
-import { TopicClusteringSchedulePort, topicServer } from "@langwatch/topic-server";
+import { type TopicClusteringScheduleReader, topicServer } from "@langwatch/topic-server";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createTopicTrpcRouter } from "./topic-trpc.mount.ts";
@@ -31,7 +31,7 @@ export async function installApiTopic(options: {
 }
 
 /** A process that never schedules clustering: the status panel reads "not scheduled". */
-class UnscheduledTopicClustering extends TopicClusteringSchedulePort {
+class UnscheduledTopicClustering implements TopicClusteringScheduleReader {
   findNextWakeAt() {
     return Promise.resolve(null);
   }

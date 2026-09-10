@@ -11,10 +11,10 @@
 import type { DataPrivacyScope } from "@langwatch/data-privacy-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
-  DataPrivacyDirectoryRepository,
+  type DataPrivacyDirectoryReader,
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
-} from "../data-privacy-directory.repository.ts";
+} from "../../app/data-privacy.app.ts";
 
 /** Only what this repository touches. */
 export type DataPrivacyDirectoryDatabase = Pick<
@@ -22,16 +22,14 @@ export type DataPrivacyDirectoryDatabase = Pick<
   "project" | "team" | "department" | "group" | "organization"
 >;
 
-export class PrismaDataPrivacyDirectoryRepository extends DataPrivacyDirectoryRepository {
+export class PrismaDataPrivacyDirectoryRepository implements DataPrivacyDirectoryReader {
   static create(database: DataPrivacyDirectoryDatabase): PrismaDataPrivacyDirectoryRepository {
     return new PrismaDataPrivacyDirectoryRepository(database);
   }
 
-  private constructor(private readonly database: DataPrivacyDirectoryDatabase) {
-    super();
-  }
+  private constructor(private readonly database: DataPrivacyDirectoryDatabase) {}
 
-  async tryGetProjectLineage({
+  async findProjectLineage({
     projectId,
   }: {
     projectId: string;
@@ -99,7 +97,7 @@ export class PrismaDataPrivacyDirectoryRepository extends DataPrivacyDirectoryRe
     };
   }
 
-  async tryResolveScopeOrganizationId({
+  async findScopeOrganizationId({
     scope,
   }: {
     scope: DataPrivacyScope;

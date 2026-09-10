@@ -46,13 +46,35 @@ import { ZodError } from "zod";
 
 import type { MonitorEvaluatorPort } from "../ports/monitor-evaluator.port.ts";
 import type { MonitorPerformancePort } from "../ports/monitor-performance.port.ts";
-import type { MonitorReplicationRepository } from "../repositories/monitor-replication.repository.ts";
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
 import { MonitorCatalogService } from "../services/monitor-catalog.service.ts";
 import { MonitorService } from "../services/monitor.service.ts";
 
 /** The window the performance strip reports, and compares to the one before it. */
 const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Copying the evaluator behind a monitor, and the workflow behind that, into
+ * another project.
+ *
+ * Owned by the Evaluator feature and supplied by the process; a monitor copy
+ * needs it because an evaluator-backed monitor would otherwise dangle a
+ * cross-project reference. The actor is named because the copied workflow's
+ * first saved version is recorded against whoever asked for the copy.
+ */
+export interface MonitorReplicationReader {
+  copyEvaluatorToProject(
+    input: Readonly<{
+      evaluatorId: string;
+      sourceProjectId: string;
+      targetProjectId: string;
+      actor: Readonly<{ id: string }>;
+    }>,
+  ): Promise<Readonly<{ id: string; workflowId: string | null }>>;
+
+  /** Removes a workflow the copy above created, when the monitor insert fails. */
+  deleteReplicatedWorkflow(input: Readonly<{ workflowId: string; projectId: string }>): Promise<void>;
+}
 
 /** Technical ports the process supplies. Peer features arrive as API tokens. */
 export interface MonitorAppInfrastructure {
@@ -61,7 +83,7 @@ export interface MonitorAppInfrastructure {
   /** The online-evaluation results the seven-day trend is folded from. */
   performance: MonitorPerformancePort;
   /** Copying an evaluator, and its workflow, into another project. */
-  replication: MonitorReplicationRepository;
+  replication: MonitorReplicationReader;
   /** Mints the id a new monitor row is written under. */
   generateId: () => string;
 }
@@ -81,7 +103,7 @@ export class MonitorApp implements MonitorApi {
   #catalogue: MonitorCatalogService;
   #permissions: AuthzApi;
   #performance: MonitorPerformancePort;
-  #replication: MonitorReplicationRepository;
+  #replication: MonitorReplicationReader;
   #evaluators: MonitorEvaluatorPort;
 
   private constructor(

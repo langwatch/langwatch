@@ -6,10 +6,10 @@
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
-  DataRetentionDirectoryRepository,
+  type DataRetentionDirectoryReader,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
-} from "../data-retention-directory.repository.ts";
+} from "../../app/data-retention.app.ts";
 
 /** Only what this repository touches. */
 export type DataRetentionDirectoryDatabase = Pick<
@@ -17,14 +17,12 @@ export type DataRetentionDirectoryDatabase = Pick<
   "project" | "team" | "organization"
 >;
 
-export class PrismaDataRetentionDirectoryRepository extends DataRetentionDirectoryRepository {
+export class PrismaDataRetentionDirectoryRepository implements DataRetentionDirectoryReader {
   static create(database: DataRetentionDirectoryDatabase): PrismaDataRetentionDirectoryRepository {
     return new PrismaDataRetentionDirectoryRepository(database);
   }
 
-  private constructor(private readonly database: DataRetentionDirectoryDatabase) {
-    super();
-  }
+  private constructor(private readonly database: DataRetentionDirectoryDatabase) {}
 
   async findProjectLineage({
     projectId,

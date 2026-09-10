@@ -1,6 +1,6 @@
 import type { Plan, PricingModel } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
-import { PlanCatalogueRepository, type CataloguePlan } from "../../repositories/plan-catalogue.repository.ts";
+import type { CataloguePlan, PlanCatalogueReader } from "../../app/entitlement.app.ts";
 import { PlanNextStepService } from "../plan-next-step.service.ts";
 
 /**
@@ -70,10 +70,8 @@ const SEAT_EVENT_LADDER: readonly CataloguePlan[] = [
   },
 ];
 
-class FixedCatalogue extends PlanCatalogueRepository {
-  constructor(private readonly bySeatEvent: boolean) {
-    super();
-  }
+class FixedCatalogue implements PlanCatalogueReader {
+  constructor(private readonly bySeatEvent: boolean) {}
 
   async listSelfServePlans(input: {
     pricingModel: PricingModel | null;

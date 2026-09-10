@@ -89,6 +89,12 @@ export interface ThingStore {
   save(thing: unknown): Promise<void>;
 }
 `)
+	writeFixture(t, root, filepath.Join(moduleDir, "server/src/repositories/prisma/prisma.thing.repository.ts"), `
+export class PrismaThing {
+  findById(id: string) { return undefined; }
+  save(thing: unknown) {}
+}
+`)
 
 	runner := &fakeRunner{}
 	var stdout, stderr bytes.Buffer
@@ -127,6 +133,11 @@ export interface ThingRepository {
   findById(id: string): Promise<unknown>;
 }
 `)
+	writeFixture(t, root, filepath.Join(moduleDir, "server/src/repositories/prisma/prisma.thing.repository.ts"), `
+export class PrismaThing implements ThingPort {
+  findById(id: string) { return undefined; }
+}
+`)
 
 	runner := &fakeRunner{}
 	var stdout, stderr bytes.Buffer
@@ -150,6 +161,11 @@ func TestPortsApplyRetriesAmbiguousRenameByLine(t *testing.T) {
 	writeFixture(t, root, filepath.Join(moduleDir, "server/src/ports/thing.port.ts"), `// wire the thing
 export interface ThingPort {
   findById(id: string): Promise<unknown>;
+}
+`)
+	writeFixture(t, root, filepath.Join(moduleDir, "server/src/repositories/prisma/prisma.thing.repository.ts"), `
+export class PrismaThing {
+  findById(id: string) { return undefined; }
 }
 `)
 

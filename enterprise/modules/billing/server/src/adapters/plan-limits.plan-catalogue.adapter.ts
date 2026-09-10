@@ -19,7 +19,7 @@ import {
   PlanTypes,
 } from "@langwatch/enterprise-billing-contract";
 import type { PricingModel } from "@langwatch/entitlement-contract";
-import { type CataloguePlan, PlanCataloguePort } from "@langwatch/entitlement-server";
+import { type CataloguePlan, type PlanCatalogueReader } from "@langwatch/entitlement-server";
 
 function catalogueRung(representative: PlanTypes, types: readonly PlanTypes[]): CataloguePlan {
   const plan = PLAN_LIMITS[representative];
@@ -51,14 +51,12 @@ const SEAT_EVENT_LADDER: readonly CataloguePlan[] = [
 ];
 
 /** The self-serve ladder, as `PLAN_LIMITS` already defines it. No price is invented here. */
-export class PlanLimitsPlanCatalogueAdapter extends PlanCataloguePort {
+export class PlanLimitsPlanCatalogueAdapter implements PlanCatalogueReader {
   static create(): PlanLimitsPlanCatalogueAdapter {
     return new PlanLimitsPlanCatalogueAdapter();
   }
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   listSelfServePlans(input: {
     pricingModel: PricingModel | null;

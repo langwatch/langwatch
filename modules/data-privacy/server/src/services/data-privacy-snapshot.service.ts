@@ -11,7 +11,7 @@ import {
   type DataPrivacyScopeType,
   type DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyDirectoryRepository } from "../repositories/data-privacy-directory.repository.ts";
+import type { DataPrivacyDirectoryReader } from "../app/data-privacy.app.ts";
 import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
 
 /**
@@ -25,7 +25,7 @@ export type DataPrivacySnapshotPolicies = Readonly<{
 }>;
 
 type DataPrivacyDirectory = Awaited<
-  ReturnType<DataPrivacyDirectoryRepository["listOrganizationDirectory"]>
+  ReturnType<DataPrivacyDirectoryReader["listOrganizationDirectory"]>
 >;
 
 /** Reading a scope: whether this user may see its rule, and what the scope is called. */
@@ -37,7 +37,7 @@ type ScopeLens = {
 export class DataPrivacySnapshotService {
   static create(options: {
     policies: DataPrivacySnapshotPolicies;
-    directory: DataPrivacyDirectoryRepository;
+    directory: DataPrivacyDirectoryReader;
     permissions: DataPrivacyPermissionsService;
   }): DataPrivacySnapshotService {
     return new DataPrivacySnapshotService(options.policies, options.directory, options.permissions);
@@ -45,7 +45,7 @@ export class DataPrivacySnapshotService {
 
   private constructor(
     private readonly policies: DataPrivacySnapshotPolicies,
-    private readonly directory: DataPrivacyDirectoryRepository,
+    private readonly directory: DataPrivacyDirectoryReader,
     private readonly permissions: DataPrivacyPermissionsService,
   ) {}
 
@@ -53,7 +53,7 @@ export class DataPrivacySnapshotService {
     const { userId, projectId } = input;
     const [effective, project] = await Promise.all([
       this.policies.getResolvedForProject({ projectId }),
-      this.directory.tryGetProjectLineage({ projectId }),
+      this.directory.findProjectLineage({ projectId }),
     ]);
 
     const organizationId = project?.organizationId ?? null;

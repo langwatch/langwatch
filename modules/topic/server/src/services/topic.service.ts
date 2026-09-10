@@ -11,12 +11,12 @@ import {
 } from "@langwatch/topic-contract";
 import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 import type { TopicRepository } from "../repositories/topic.repository.ts";
-import type { TopicClusteringScheduleRepository } from "../repositories/topic-clustering-schedule.repository.ts";
+import type { TopicClusteringScheduleReader } from "../app/topic.app.ts";
 
 export class TopicService {
   static create(options: {
     repository: TopicRepository;
-    schedule: TopicClusteringScheduleRepository;
+    schedule: TopicClusteringScheduleReader;
     now?: () => number;
   }): TopicService {
     return new TopicService(options.repository, options.schedule, options.now ?? Date.now);
@@ -24,7 +24,7 @@ export class TopicService {
 
   private constructor(
     private readonly repository: TopicRepository,
-    private readonly schedule: TopicClusteringScheduleRepository,
+    private readonly schedule: TopicClusteringScheduleReader,
     private readonly now: () => number,
   ) {}
 

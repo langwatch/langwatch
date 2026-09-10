@@ -1,16 +1,16 @@
 export { dataPrivacyServer } from "./data-privacy.server.ts";
 export { dataPrivacyTrpcTransport } from "./transport/data-privacy.trpc.ts";
-export type { DataPrivacyInfrastructure } from "./app/data-privacy.app.ts";
 /**
  * The lineage a rule is placed and named against, and the analysis capability
  * the redaction calls out to. Both read stores this feature does not own, so
  * the process that owns them supplies them.
  */
-export {
-  DataPrivacyDirectoryRepository as DataPrivacyDirectoryPort,
-  type DataPrivacyOrganizationDirectory,
-  type DataPrivacyProjectLineage,
-} from "./repositories/data-privacy-directory.repository.ts";
+export type {
+  DataPrivacyDirectoryReader,
+  DataPrivacyInfrastructure,
+  DataPrivacyOrganizationDirectory,
+  DataPrivacyProjectLineage,
+} from "./app/data-privacy.app.ts";
 export { DataPrivacyProjectPort, DataPrivacyResolutionPort } from "./ports/data-privacy.port.ts";
 export {
   PiiAnalysisMetricsPort,

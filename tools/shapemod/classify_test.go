@@ -4,10 +4,11 @@ import "testing"
 
 func TestClassify(t *testing.T) {
 	cases := []struct {
-		name    string
-		file    string
-		content string
-		want    Tier
+		name     string
+		file     string
+		content  string
+		siblings map[string]string
+		want     Tier
 	}{
 		{
 			name: "prisma repository via filename prefix",
@@ -84,6 +85,40 @@ export abstract class ThingPort {
   abstract create(thing: Thing): Promise<void>;
 }
 `,
+			siblings: map[string]string{
+				"modules/thing/server/src/repositories/prisma/prisma.thing.repository.ts": `
+export class PrismaThing {
+  findById(id: string) { return undefined; }
+}
+`,
+			},
+			want: TierInterface,
+		},
+		{
+			name: "a port with no in-module implementation stays infrastructure",
+			file: "orphan.port.ts",
+			content: `
+export interface OrphanPort {
+  findById(id: string): Promise<unknown>;
+}
+`,
+			want: TierInfrastructure,
+		},
+		{
+			name: "a port with a prisma twin implementing it by name is an interface",
+			file: "widget.port.ts",
+			content: `
+export interface WidgetPort {
+  findById(id: string): Promise<unknown>;
+}
+`,
+			siblings: map[string]string{
+				"modules/widget/server/src/repositories/prisma/prisma.widget.repository.ts": `
+export class PrismaWidgetRepository implements WidgetPort {
+  findById(id: string) { return null; }
+}
+`,
+			},
 			want: TierInterface,
 		},
 		{
@@ -107,6 +142,13 @@ export interface ThingStore {
   save(thing: Thing): Promise<void>;
 }
 `,
+			siblings: map[string]string{
+				"modules/thing/server/src/repositories/memory/memory.thing.repository.ts": `
+export class MemoryThing {
+  save(thing: unknown) {}
+}
+`,
+			},
 			want: TierInterface,
 		},
 		{
@@ -212,7 +254,7 @@ export abstract class DatasetStorageResolverPort {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := Classify(c.file, c.content)
+			got := Classify(c.file, c.content, c.siblings)
 			if got.Tier != c.want {
 				t.Errorf("Classify() tier = %q, want %q (reason: %s, symbol: %q)", got.Tier, c.want, got.Reason, got.Symbol)
 			}

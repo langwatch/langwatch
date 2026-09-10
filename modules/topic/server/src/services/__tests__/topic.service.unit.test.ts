@@ -6,7 +6,7 @@ import type {
 } from "../../repositories/topic.repository.ts";
 import { describe, expect, it } from "vitest";
 import { Temporal, type Instant } from "@langwatch/time";
-import { TopicClusteringScheduleRepository } from "../../repositories/topic-clustering-schedule.repository.ts";
+import type { TopicClusteringScheduleReader } from "../../app/topic.app.ts";
 
 class FakeTopicRepository implements TopicRepository {
   async findAll(): Promise<Topic[]> {
@@ -66,7 +66,7 @@ class FakeTopicRepository implements TopicRepository {
   }
 }
 
-class FakeTopicSchedule extends TopicClusteringScheduleRepository {
+class FakeTopicSchedule implements TopicClusteringScheduleReader {
   findNextWakeAt(): Promise<Instant | null> {
     return Promise.resolve(Temporal.Instant.fromEpochMilliseconds(200));
   }

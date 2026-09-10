@@ -11,7 +11,7 @@ import {
   type DataPrivacyScopeType,
 } from "@langwatch/data-privacy-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
-import type { DataPrivacyDirectoryRepository } from "../repositories/data-privacy-directory.repository.ts";
+import type { DataPrivacyDirectoryReader } from "../app/data-privacy.app.ts";
 import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
 
 export class DataPrivacyScopeAuthorizationService {
@@ -35,14 +35,14 @@ export class DataPrivacyScopeAuthorizationService {
   }
 
   static create(options: {
-    directory: DataPrivacyDirectoryRepository;
+    directory: DataPrivacyDirectoryReader;
     permissions: DataPrivacyPermissionsService;
   }): DataPrivacyScopeAuthorizationService {
     return new DataPrivacyScopeAuthorizationService(options.directory, options.permissions);
   }
 
   private constructor(
-    private readonly directory: DataPrivacyDirectoryRepository,
+    private readonly directory: DataPrivacyDirectoryReader,
     private readonly permissions: DataPrivacyPermissionsService,
   ) {}
 
@@ -62,8 +62,8 @@ export class DataPrivacyScopeAuthorizationService {
     scope: DataPrivacyScope;
   }): Promise<void> {
     const [scopeOrganizationId, project] = await Promise.all([
-      this.directory.tryResolveScopeOrganizationId({ scope: input.scope }),
-      this.directory.tryGetProjectLineage({ projectId: input.projectId }),
+      this.directory.findScopeOrganizationId({ scope: input.scope }),
+      this.directory.findProjectLineage({ projectId: input.projectId }),
     ]);
     if (!scopeOrganizationId) {
       throw new ScopeTargetNotFoundError();
@@ -88,7 +88,7 @@ export class DataPrivacyScopeAuthorizationService {
       const organizationId =
         scope.scopeType === "ORGANIZATION"
           ? scope.scopeId
-          : await this.directory.tryResolveScopeOrganizationId({ scope });
+          : await this.directory.findScopeOrganizationId({ scope });
       if (!organizationId) {
         return false;
       }
@@ -97,7 +97,7 @@ export class DataPrivacyScopeAuthorizationService {
     }
 
     if (scope.scopeType === "TEAM") {
-      const organizationId = await this.directory.tryResolveScopeOrganizationId({ scope });
+      const organizationId = await this.directory.findScopeOrganizationId({ scope });
       if (!organizationId) {
         return false;
       }
@@ -113,7 +113,7 @@ export class DataPrivacyScopeAuthorizationService {
 
     const decisions = await this.permissions.canUpdateProjects({
       userId,
-      organizationId: await this.directory.tryResolveScopeOrganizationId({ scope }),
+      organizationId: await this.directory.findScopeOrganizationId({ scope }),
       projectIds: [scope.scopeId],
     });
 

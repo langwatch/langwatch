@@ -16,7 +16,7 @@ import {
   monitorServer,
   MonitorEvaluatorPort,
   MonitorPerformancePort,
-  MonitorReplicationPort,
+  type MonitorReplicationReader,
 } from "@langwatch/monitor-server";
 import { createApp } from "@langwatch/runtime-composition";
 import { nanoid } from "nanoid";
@@ -110,13 +110,11 @@ class ProcessMonitorEvaluators extends MonitorEvaluatorPort {
 }
 
 /** The evaluator copy, over the process's own replication of the graph behind it. */
-class ProcessMonitorReplication extends MonitorReplicationPort {
+class ProcessMonitorReplication implements MonitorReplicationReader {
   constructor(
     private readonly evaluators: EvaluatorApi,
     private readonly workflows: MonitorWorkflowReplication,
-  ) {
-    super();
-  }
+  ) {}
 
   async copyEvaluatorToProject(input: {
     evaluatorId: string;

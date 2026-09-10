@@ -11,7 +11,7 @@ import (
 // default; only --apply writes.
 func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: shapemod <ports|dead-transports|inventory> ...")
+		fmt.Fprintln(stderr, "usage: shapemod <ports|infra|dead-transports|inventory> ...")
 		return 2
 	}
 
@@ -33,6 +33,17 @@ func Run(args []string, stdout, stderr io.Writer) int {
 			return 2
 		}
 		_, code := Ports(*root, flags.Arg(0), *apply, TslspRunner{}, stdout, stderr)
+		return code
+
+	case "infra":
+		if err := flags.Parse(rest); err != nil {
+			return 2
+		}
+		if flags.NArg() != 1 {
+			fmt.Fprintln(stderr, "usage: shapemod infra [--apply] [--root .] <module-dir>")
+			return 2
+		}
+		_, code := Infra(*root, flags.Arg(0), *apply, TslspRunner{}, stdout, stderr)
 		return code
 
 	case "dead-transports":

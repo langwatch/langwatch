@@ -93,7 +93,7 @@ export {
 } from "./ports/topic-clustering-langevals.port.ts";
 export { RequestTopicClusteringTask } from "./intents/run-topic-clustering.intent.ts";
 export { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task.ts";
-export { TopicClusteringScheduleRepository as TopicClusteringSchedulePort } from "./repositories/topic-clustering-schedule.repository.ts";
+export type { TopicClusteringScheduleReader } from "./app/topic.app.ts";
 export {
   TOPIC_CLUSTERING_PROCESS_NAME,
   TopicClusteringProcess,

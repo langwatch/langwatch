@@ -4,10 +4,10 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  DataRetentionDirectoryRepository,
+  type DataRetentionDirectoryReader,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
-} from "../../repositories/data-retention-directory.repository.ts";
+} from "../../app/data-retention.app.ts";
 import {
   DataRetentionPlanPort,
   type DataRetentionPlan,
@@ -18,10 +18,8 @@ import { RetentionPermissionsService } from "../retention-permissions.service.ts
 
 const ACTOR = { userId: "user_alice", email: "alice@example.com" };
 
-class StubDirectory extends DataRetentionDirectoryRepository {
-  constructor(private readonly organizationId: string | null) {
-    super();
-  }
+class StubDirectory implements DataRetentionDirectoryReader {
+  constructor(private readonly organizationId: string | null) {}
   async findProjectLineage(): Promise<RetentionProjectLineage | null> {
     return {
       projectId: "proj_a",

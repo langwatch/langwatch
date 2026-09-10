@@ -15,10 +15,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { MonitorEvaluatorPort } from "../../ports/monitor-evaluator.port.ts";
 import { MonitorPerformancePort } from "../../ports/monitor-performance.port.ts";
-import { MonitorReplicationRepository } from "../../repositories/monitor-replication.repository.ts";
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import type { MonitorRepositories } from "../../repositories/monitor.repositories.ts";
-import { MonitorApp } from "../monitor.app.ts";
+import { MonitorApp, type MonitorReplicationReader } from "../monitor.app.ts";
 
 /** The evaluators a project holds, named by id. */
 export class FakeMonitorEvaluators extends MonitorEvaluatorPort {
@@ -63,13 +62,11 @@ export class FakeMonitorPerformance extends MonitorPerformancePort {
 }
 
 /** The evaluator copy, recording what it was asked and what it answered. */
-export class FakeMonitorReplication extends MonitorReplicationRepository {
+export class FakeMonitorReplication implements MonitorReplicationReader {
   readonly copies: { evaluatorId: string; sourceProjectId: string; targetProjectId: string }[] = [];
   readonly deletedWorkflows: { workflowId: string; projectId: string }[] = [];
 
-  constructor(private readonly answer: { id: string; workflowId: string | null }) {
-    super();
-  }
+  constructor(private readonly answer: { id: string; workflowId: string | null }) {}
 
   async copyEvaluatorToProject(input: {
     evaluatorId: string;
@@ -102,7 +99,7 @@ export function createMonitorTestApp(
     permissions?: AuthzApi;
     evaluators?: MonitorEvaluatorPort;
     performance?: MonitorPerformancePort;
-    replication?: MonitorReplicationRepository;
+    replication?: MonitorReplicationReader;
     generateId?: () => string;
   }> = {},
 ): MonitorApp {

@@ -76,7 +76,7 @@ type decl struct {
 // exported interface or abstract class named *Port/*Store/*Repository with a
 // repository-verb member; an abstract class with a method body is Split
 // instead), then Infrastructure for everything else.
-func Classify(filename, content string) Classification {
+func Classify(filename, content string, siblings map[string]string) Classification {
 	base := filepath.Base(filename)
 	subject := subjectName(base)
 	subjectPascal := pascalCase(subject)
@@ -151,11 +151,53 @@ func Classify(filename, content string) Classification {
 					Exports: exportNames(decls),
 				}
 			}
+			if !hasInModuleImplementation(symbol, subjectPascal, siblings) {
+				return Classification{Tier: TierInfrastructure, Reason: "no in-module implementation: a port the process supplies", Symbol: symbol}
+			}
 			return Classification{Tier: TierInterface, Reason: "member " + verb + "(...) is repository-shaped", Symbol: symbol}
 		}
 	}
 
 	return Classification{Tier: TierInfrastructure, Reason: "no datastore signal, no repository-shaped member", Symbol: symbol}
+}
+
+// implementationPrefixes are the tier prefixes an in-module class name may
+// carry to count as an implementation of a repository interface.
+var implementationPrefixes = []string{"Prisma", "Memory", "Redis", "ClickHouse", "Clickhouse"}
+
+// classSignatureRe captures an exported class's name, its extends target
+// and its implements list, so hasInModuleImplementation can check both the
+// naming convention and an explicit implements/extends clause.
+var classSignatureRe = regexp.MustCompile(`(?m)^\s*export\s+(?:default\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w,\s]+))?`)
+
+// hasInModuleImplementation reports whether siblings (every other .ts file
+// under the module's server/src, keyed by path) contains a class that
+// implements the interface tier: either its name is one of
+// Prisma|Memory|Redis|ClickHouse|Clickhouse followed by the subject's
+// PascalCase name, or it implements/extends the interface's symbol by name.
+func hasInModuleImplementation(symbol, subjectPascal string, siblings map[string]string) bool {
+	for _, content := range siblings {
+		for _, m := range classSignatureRe.FindAllStringSubmatch(content, -1) {
+			name, extends, implementsClause := m[1], m[2], m[3]
+			for _, prefix := range implementationPrefixes {
+				if name == prefix+subjectPascal {
+					return true
+				}
+			}
+			if symbol == "" {
+				continue
+			}
+			if extends == symbol {
+				return true
+			}
+			for _, part := range strings.Split(implementsClause, ",") {
+				if strings.TrimSpace(part) == symbol {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func hasBasePrefix(base string, prefixes ...string) bool {

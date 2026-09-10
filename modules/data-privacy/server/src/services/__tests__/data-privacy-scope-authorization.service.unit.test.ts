@@ -6,27 +6,26 @@ import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contrac
 import type { DataPrivacyProjectLineage } from "@langwatch/data-privacy-server";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
-import { DataPrivacyDirectoryRepository } from "../../repositories/data-privacy-directory.repository.ts";
+import type { DataPrivacyDirectoryReader } from "../../app/data-privacy.app.ts";
 import { DataPrivacyPermissionsService } from "../data-privacy-permissions.service.ts";
 import { DataPrivacyScopeAuthorizationService } from "../data-privacy-scope-authorization.service.ts";
 
-class FakeDirectory extends DataPrivacyDirectoryRepository {
+class FakeDirectory implements DataPrivacyDirectoryReader {
   constructor(
     private readonly rows: {
       lineage?: DataPrivacyProjectLineage | null;
       scopeOrganizationId?: string | null;
     } = {},
   ) {
-    super();
   }
 
-  async tryGetProjectLineage() {
+  async findProjectLineage() {
     return this.rows.lineage ?? null;
   }
   async listOrganizationDirectory() {
     return { departments: [], teams: [], projects: [], groups: [] };
   }
-  async tryResolveScopeOrganizationId() {
+  async findScopeOrganizationId() {
     return this.rows.scopeOrganizationId === undefined ? "org-1" : this.rows.scopeOrganizationId;
   }
 }

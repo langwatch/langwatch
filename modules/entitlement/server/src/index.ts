@@ -46,7 +46,7 @@ export {
 } from "./services/usage-limit-message.service.ts";
 export { InProcessUsageCache, NoUsageCache, UsageCachePort } from "./ports/usage-cache.port.ts";
 export { UsageOrganizationPort, type UsageMeterReading } from "./ports/usage-organization.port.ts";
-export { PlanCatalogueRepository as PlanCataloguePort, type CataloguePlan } from "./repositories/plan-catalogue.repository.ts";
+export type { CataloguePlan, PlanCatalogueReader } from "./app/entitlement.app.ts";
 export { PlanNextStepService } from "./services/plan-next-step.service.ts";
 export {
   UsageVolumeCounterPort,

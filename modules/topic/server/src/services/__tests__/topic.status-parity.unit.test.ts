@@ -4,7 +4,7 @@ import type {
 } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 import { Temporal, type Instant } from "@langwatch/time";
-import { TopicClusteringScheduleRepository } from "../../repositories/topic-clustering-schedule.repository.ts";
+import type { TopicClusteringScheduleReader } from "../../app/topic.app.ts";
 import type {
   TopicClusteringStatusRecord,
   TopicRepository,
@@ -60,10 +60,8 @@ class FakeTopicRepository implements TopicRepository {
   }
 }
 
-class FakeSchedule extends TopicClusteringScheduleRepository {
-  constructor(private readonly nextWakeAt: Instant | null = null) {
-    super();
-  }
+class FakeSchedule implements TopicClusteringScheduleReader {
+  constructor(private readonly nextWakeAt: Instant | null = null) {}
 
   findNextWakeAt() {
     return Promise.resolve(this.nextWakeAt);

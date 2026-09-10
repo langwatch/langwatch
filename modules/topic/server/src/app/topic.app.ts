@@ -7,10 +7,15 @@ import type {
   TopicProjectInput,
 } from "@langwatch/topic-contract";
 import { TopicApi as TopicApiToken } from "@langwatch/topic-contract";
+import type { Instant } from "@langwatch/time";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { TopicClusteringScheduleRepository } from "../repositories/topic-clustering-schedule.repository.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
 import { TopicService } from "../services/topic.service.ts";
+
+/** Eventing-owned schedule read needed by the Topic status projection. */
+export interface TopicClusteringScheduleReader {
+  findNextWakeAt(input: { projectId: string }): Promise<Instant | null>;
+}
 
 /**
  * The durable schedule the status panel reads its next wake from, and the
@@ -18,7 +23,7 @@ import { TopicService } from "../services/topic.service.ts";
  * eventing owns the schedule, and a test owns time.
  */
 export type TopicInfrastructure = Readonly<{
-  schedule: TopicClusteringScheduleRepository;
+  schedule: TopicClusteringScheduleReader;
   now?: (() => number) | undefined;
 }>;
 
