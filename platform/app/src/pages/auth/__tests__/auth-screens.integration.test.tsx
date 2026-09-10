@@ -57,6 +57,13 @@ vi.mock("~/features/auth/logic/confirmSignUpAddress", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     auth: {
+      // Always the cold screen. This walk is about what the screens RENDER,
+      // and recovery from an expired session is the one journey that does not
+      // change that: `identifier-first-signin.integration.test.tsx` drives the
+      // recognised case, with a ref it can move between tests.
+      priorSession: {
+        useQuery: () => ({ data: undefined }),
+      },
       route: {
         useMutation: () => ({
           mutateAsync: routeMock,
