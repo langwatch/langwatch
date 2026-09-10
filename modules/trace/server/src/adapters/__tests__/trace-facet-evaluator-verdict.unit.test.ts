@@ -1,4 +1,4 @@
-import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter.ts";
+import { ClickHouseFacetRegistryAdapter } from "../../repositories/clickhouse/trace-facet-registry.clickhouse.adapter.ts";
 import { describe, expect, it } from "vitest";
 import { FIELD_VALUES } from "@langwatch/trace-contract";
 

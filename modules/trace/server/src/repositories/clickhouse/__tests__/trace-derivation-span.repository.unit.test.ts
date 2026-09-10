@@ -3,7 +3,6 @@ import { TraceDerivationSpanClickHouseRepository } from "../trace-derivation-spa
 import { ScenarioRoleMetricsDerivationService } from "../../../services/scenario-role-metrics-derivation.service.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../../../adapters/model-catalog.trace-model-cost.adapter.ts";
 import { SpanCostService } from "../../../services/span-cost.service.ts";
-import { ClickHouseTraceDerivationSpanReaderAdapter } from "../../../adapters/clickhouse.trace-derivation-span-reader.adapter.ts";
 
 /**
  * Spec: specs/scenarios/worker-simulation-pipeline-conversion.feature
@@ -133,7 +132,7 @@ describe("given the per-role derivation over one trace", () => {
     it("reads storage once", async () => {
       const ch = client([SPAN_ROW]);
       const service = ScenarioRoleMetricsDerivationService.create({
-        spans: ClickHouseTraceDerivationSpanReaderAdapter.create({
+        spans: TraceDerivationSpanClickHouseRepository.create({
           resolveClient: async () => ch as never,
         }),
         spanCosts: SpanCostService.create({
@@ -153,7 +152,7 @@ describe("given the per-role derivation over one trace", () => {
     it("reads again once the fold has advanced", async () => {
       const ch = client([SPAN_ROW]);
       const service = ScenarioRoleMetricsDerivationService.create({
-        spans: ClickHouseTraceDerivationSpanReaderAdapter.create({
+        spans: TraceDerivationSpanClickHouseRepository.create({
           resolveClient: async () => ch as never,
         }),
         spanCosts: SpanCostService.create({
@@ -171,7 +170,7 @@ describe("given the per-role derivation over one trace", () => {
     it("bypasses the memo when no fold version is supplied", async () => {
       const ch = client([SPAN_ROW]);
       const service = ScenarioRoleMetricsDerivationService.create({
-        spans: ClickHouseTraceDerivationSpanReaderAdapter.create({
+        spans: TraceDerivationSpanClickHouseRepository.create({
           resolveClient: async () => ch as never,
         }),
         spanCosts: SpanCostService.create({

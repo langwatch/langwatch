@@ -10,7 +10,7 @@ import type {
   FacetValuesResult,
   TraceListReadPort,
 } from "@langwatch/trace-contract";
-import { ClickHouseFacetRegistryAdapter } from "../adapters/trace-facet-registry.clickhouse.adapter.ts";
+import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/trace-facet-registry.clickhouse.adapter.ts";
 
 import {
   facetValuesCacheKey,

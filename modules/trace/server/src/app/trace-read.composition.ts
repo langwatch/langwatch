@@ -16,10 +16,10 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { ClickHouseTraceAdapter } from "../adapters/clickhouse.trace.adapter.ts";
-import { ClickHouseTraceDerivationSpanReaderAdapter } from "../adapters/clickhouse.trace-derivation-span-reader.adapter.ts";
+import { TraceDerivationSpanClickHouseRepository } from "../repositories/clickhouse/trace-derivation-span.repository.ts";
 import { ClickHouseTraceExistenceRepository } from "../repositories/clickhouse/trace-existence.repository.ts";
 import { ClickHouseTraceLegacyReadAdapter } from "../adapters/clickhouse.trace-legacy-read.adapter.ts";
-import { ClickHouseTracePayloadReaderAdapter } from "../adapters/clickhouse.trace-payload-reader.adapter.ts";
+import { ClickHouseTraceEventPayloadRepository } from "../repositories/clickhouse/trace-event-payload.repository.ts";
 import { LogRecordStorageClickHouseRepository } from "../repositories/clickhouse/log-record-storage.repository.ts";
 import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
 import { SessionGroupsClickHouseRepository } from "../repositories/clickhouse/session-groups.repository.ts";
@@ -140,9 +140,9 @@ export function composeTraceAppDependencies(
       },
     },
     eventDerivation: TraceEventDerivationService.create({
-      spans: ClickHouseTraceDerivationSpanReaderAdapter.create({ resolveClient: resolve }),
+      spans: TraceDerivationSpanClickHouseRepository.create({ resolveClient: resolve }),
     }),
-    payloads: ClickHouseTracePayloadReaderAdapter.create({ resolveClient: resolve }),
+    payloads: ClickHouseTraceEventPayloadRepository.createResolved({ resolveClient: resolve }),
     fullIo: TraceReadFullIo.create(ioExtractionService),
   }).build();
 

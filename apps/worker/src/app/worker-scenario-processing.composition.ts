@@ -40,7 +40,7 @@ import type {
 import type { TenantBroadcastPort } from "@langwatch/notification-server";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
-  ClickHouseTraceDerivationSpanReaderAdapter,
+  TraceDerivationSpanClickHouseRepository,
   ModelCatalogTraceModelCostAdapter,
   ScenarioRoleMetricsDerivationService,
   SpanCostService,
@@ -109,7 +109,7 @@ export function createWorkerScenarioProcessing(
   const execution = new WorkerSimulationExecutionAdapter();
 
   const derivation = ScenarioRoleMetricsDerivationService.create({
-    spans: ClickHouseTraceDerivationSpanReaderAdapter.create({
+    spans: TraceDerivationSpanClickHouseRepository.create({
       resolveClient: options.resolveClickHouseClient as never,
     }),
     spanCosts: SpanCostService.create({ modelCosts: ModelCatalogTraceModelCostAdapter.create() }),

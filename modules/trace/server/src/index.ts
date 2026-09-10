@@ -7,7 +7,7 @@ export { TraceCanonicalisationService } from "./services/trace-canonicalisation.
  * a trace and the evaluations behind it disagree about how far back a project's rows go.
  */
 export { TraceRetentionFloorService } from "./services/trace-retention-floor.service.ts";
-export { NullTraceListAdapter } from "./adapters/null-trace-list.adapter.ts";
+export { NullTraceListAdapter } from "./repositories/memory/null-trace-list.adapter.ts";
 export {
   EventingTracePipelineAdapter,
   type EventingTracePipelineAdapterOptions,
@@ -92,7 +92,7 @@ export { TraceEventDerivationPort } from "./ports/trace-event-derivation.port.ts
 export { TraceQueryFieldValuesPort } from "./ports/query-field-values.port.ts";
 
 export { TraceQueryClassificationAdapter } from "./adapters/trace-query-classification.adapter.ts";
-export { TraceQueryClickHouseAdapter } from "./adapters/trace-query.clickhouse.adapter.ts";
+export { TraceQueryClickHouseAdapter } from "./repositories/clickhouse/trace-query.clickhouse.adapter.ts";
 
 export {
   ClickHouseFacetRegistryAdapter,
@@ -100,8 +100,8 @@ export {
   type FacetDefinition,
   type FacetTable,
   type RangeFacetDef,
-} from "./adapters/trace-facet-registry.clickhouse.adapter.ts";
-export { ClickHouseSpanAttributeKeysFacetAdapter } from "./adapters/trace-facet-span-attribute-keys.clickhouse.adapter.ts";
+} from "./repositories/clickhouse/trace-facet-registry.clickhouse.adapter.ts";
+export { ClickHouseSpanAttributeKeysFacetAdapter } from "./repositories/clickhouse/trace-facet-span-attribute-keys.clickhouse.adapter.ts";
 export { TraceQueryEvaluationAdapter } from "./adapters/trace-query-evaluation.adapter.ts";
 export type { FieldDef } from "@langwatch/trace-contract";
 export { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port.ts";
@@ -120,10 +120,10 @@ export {
 export { TraceSpanSpoolPort, type TraceSpanSpoolIdentity } from "./ports/trace-span-spool.port.ts";
 export { TraceSpanNormalizationPort } from "./ports/trace-span-normalization.port.ts";
 export { TraceSpanStoragePort } from "./ports/trace-span-storage.port.ts";
-export { ClickHouseTraceSpanStorageAdapter } from "./adapters/clickhouse.trace-span-storage.adapter.ts";
+export { TraceSpanStorageClickHouseRepository } from "./repositories/clickhouse/trace-span-storage.repository.ts";
 export { TraceStoredSpanReaderPort } from "./ports/trace-stored-span-reader.port.ts";
 export { TraceDerivationSpanReaderPort } from "./ports/trace-derivation-span-reader.port.ts";
-export { ClickHouseTraceDerivationSpanReaderAdapter } from "./adapters/clickhouse.trace-derivation-span-reader.adapter.ts";
+export { TraceDerivationSpanClickHouseRepository } from "./repositories/clickhouse/trace-derivation-span.repository.ts";
 export { TraceEventDerivationService } from "./services/trace-event-derivation.service.ts";
 export {
   ScenarioRoleMetricsDerivationService,
@@ -262,9 +262,9 @@ export {
 } from "./services/trace-stream-buffer.service.ts";
 export { TraceSpanSpoolAdapter } from "./adapters/trace-span-spool.adapter.ts";
 export {
-  ClickHouseTracePayloadReaderAdapter,
+  ClickHouseTraceEventPayloadRepository,
   TRACE_PAYLOAD_AGGREGATE_TYPE,
-} from "./adapters/clickhouse.trace-payload-reader.adapter.ts";
+} from "./repositories/clickhouse/trace-event-payload.repository.ts";
 export { TraceTokenCounterPort } from "./ports/trace-token-counter.port.ts";
 export {
   OtlpSpanTokenEstimationService,
@@ -478,6 +478,10 @@ export {
   TrackedEventApi,
   trackedEventRest,
   trackedEventRestErrorHandler,
+  trackedEventLegacyPathRest,
+  TrackedEventLegacyPathApi,
+  TRACKED_EVENT_CANONICAL_PATH,
+  TRACKED_EVENT_LEGACY_PATH,
   type TrackedEventPorts,
 } from "./transport/tracked-event.rest.ts";
 

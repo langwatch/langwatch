@@ -1,7 +1,7 @@
 import {
   TraceWindowedReadMetricsPort,
   type TraceWindowedReadOutcome,
-} from "../ports/trace-windowed-read-metrics.port.ts";
+} from "../../ports/trace-windowed-read-metrics.port.ts";
 
 /** Discards windowed-read outcomes where the process reports no metrics. */
 export class NullTraceWindowedReadMetricsAdapter extends TraceWindowedReadMetricsPort {

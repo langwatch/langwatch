@@ -1,6 +1,6 @@
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import {
-  ClickHouseTraceSpanStorageAdapter,
+  TraceSpanStorageClickHouseRepository,
   SpanStorageStore,
   type TraceSpanStoragePort,
 } from "@langwatch/trace-server";
@@ -39,7 +39,7 @@ export function createWorkerSpanStoragePort(options: {
   resolveClickHouseClient: EventingClickHouseClientResolver;
   defaultRetentionDays: number;
 }): TraceSpanStoragePort {
-  return ClickHouseTraceSpanStorageAdapter.create({
+  return TraceSpanStorageClickHouseRepository.create({
     resolveClient: options.resolveClickHouseClient,
     defaultRetentionDays: options.defaultRetentionDays,
   });

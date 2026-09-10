@@ -2,6 +2,7 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedSpan, SpanInsertData } from "@langwatch/trace-contract";
 import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
+import { TraceSpanStoragePort } from "../../ports/trace-span-storage.port.ts";
 import {
   type FullSpanRow,
   mapChRowToNormalized,
@@ -178,13 +179,15 @@ interface ClickHouseSpanRecord {
  * same one the event store already stamps its own rows with, so producer and
  * consumer cannot disagree about it.
  */
-export class TraceSpanStorageClickHouseRepository {
+export class TraceSpanStorageClickHouseRepository extends TraceSpanStoragePort {
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
       defaultRetentionDays: number;
     },
-  ) {}
+  ) {
+    super();
+  }
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;

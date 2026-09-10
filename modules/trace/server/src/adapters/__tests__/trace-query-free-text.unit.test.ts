@@ -2,8 +2,8 @@
  * The Sessions lens forwards a query's positive free-text terms to the transcript content search (specs/traces-v2/sessions-lens.feature). Only implicit-field terms qualify: structured tags already translate to trace predicates, and negated terms must not become positive content matches.
  */
 import { describe, expect, it } from "vitest";
-import { TraceQueryClickHouseAdapter } from "../trace-query.clickhouse.adapter.ts";
-import { MAX_VALUE_LENGTH } from "../trace-query-values.clickhouse.adapter.ts";
+import { TraceQueryClickHouseAdapter } from "../../repositories/clickhouse/trace-query.clickhouse.adapter.ts";
+import { MAX_VALUE_LENGTH } from "../../repositories/clickhouse/trace-query-values.clickhouse.adapter.ts";
 
 describe("given plain free text", () => {
   describe("when extracting the content terms", () => {

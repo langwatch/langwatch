@@ -3,11 +3,11 @@
  * @integration
  * trace_summaries keeps every version of a trace's row until the merge collapses them, so a filter evaluated before version dedup reads a stale version as if it were current.
  */
-import { ClickHouseFacetRegistryAdapter } from "../../../adapters/trace-facet-registry.clickhouse.adapter.ts";
+import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter.ts";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TraceQueryClickHouseAdapter } from "../../../adapters/trace-query.clickhouse.adapter.ts";
+import { TraceQueryClickHouseAdapter } from "../trace-query.clickhouse.adapter.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   startMigratedTraceClickHouse,

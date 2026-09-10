@@ -17,7 +17,7 @@ import { TraceFullRecordPort } from "../ports/trace-full-record.port.ts";
 import { TracePayloadReaderPort } from "../ports/trace-payload-reader.port.ts";
 import { TraceFullIoPort } from "../ports/trace-full-io.port.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
-import { NullQueryFieldValuesAdapter } from "./null-query-field-values.adapter.ts";
+import { NullQueryFieldValuesAdapter } from "../repositories/memory/null-query-field-values.adapter.ts";
 import { TracePort, type TraceSpanPage, type TraceSpanSummaryRecord } from "../ports/trace.port.ts";
 import { TraceService } from "../services/trace.service.ts";
 

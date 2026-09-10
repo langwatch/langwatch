@@ -13,7 +13,7 @@ export { TraceCanonicalisationService } from "./services/trace-canonicalisation.
 export { SpanNormalizationPipelineService } from "./services/span-normalization.service.ts";
 export { storedSpanReadBack } from "./repositories/clickhouse/__tests__/stored-span-row.test-fakes.ts";
 export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matching.service.ts";
-export { ClickHouseTraceQuerySubqueryAdapter } from "./adapters/trace-query-subquery.clickhouse.adapter.ts";
+export { ClickHouseTraceQuerySubqueryAdapter } from "./repositories/clickhouse/trace-query-subquery.clickhouse.adapter.ts";
 
 export class MissingTraceRecordPort extends TraceRecordPort {
   async getById(input: TraceByIdInput): Promise<never> {

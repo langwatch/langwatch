@@ -1,5 +1,5 @@
 import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port.ts";
-import { NullTraceWindowedReadMetricsAdapter } from "../../adapters/null-trace-windowed-read-metrics.adapter.ts";
+import { NullTraceWindowedReadMetricsAdapter } from "../memory/null-trace-windowed-read-metrics.adapter.ts";
 
 export const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 

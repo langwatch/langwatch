@@ -5,7 +5,7 @@ import type {
   TraceClickHouseWriteResolver,
 } from "../../ports/clickhouse.port.ts";
 import { TraceSpanStoragePort } from "../../ports/trace-span-storage.port.ts";
-import { ClickHouseTraceSpanStorageAdapter } from "../clickhouse.trace-span-storage.adapter.ts";
+import { TraceSpanStorageClickHouseRepository } from "../../repositories/clickhouse/trace-span-storage.repository.ts";
 
 /**
  * Spec: modules/trace/specs/span-storage-write.feature
@@ -35,7 +35,7 @@ function adapter(defaultRetentionDays = 49) {
   return {
     inserts,
     resolvedTenants,
-    port: ClickHouseTraceSpanStorageAdapter.create({ resolveClient, defaultRetentionDays }),
+    port: TraceSpanStorageClickHouseRepository.create({ resolveClient, defaultRetentionDays }),
   };
 }
 
@@ -70,7 +70,7 @@ function span(spanId: string): SpanInsertData {
   };
 }
 
-describe("ClickHouseTraceSpanStorageAdapter", () => {
+describe("TraceSpanStorageClickHouseRepository", () => {
   describe("given a tenant-keyed ClickHouse client", () => {
     /** @scenario "A background process can build the whole write path from what it holds" */
     it("is the span-storage port the store consumes", () => {

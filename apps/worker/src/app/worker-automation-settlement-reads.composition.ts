@@ -34,7 +34,7 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import {
-  ClickHouseTraceDerivationSpanReaderAdapter,
+  TraceDerivationSpanClickHouseRepository,
   TraceLegacyReadClickHouseRepository,
   TraceEventDerivationService,
   TraceQueryClassificationAdapter,
@@ -69,7 +69,7 @@ export class WorkerAutomationSettlementTraceReader extends AutomationSettlementT
       options.traceSummaryStore,
       TraceQueryClassificationAdapter.create(),
       TraceEventDerivationService.create({
-        spans: ClickHouseTraceDerivationSpanReaderAdapter.create({
+        spans: TraceDerivationSpanClickHouseRepository.create({
           resolveClient: options.resolveClickHouseClient,
         }),
       }),

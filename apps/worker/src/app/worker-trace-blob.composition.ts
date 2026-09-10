@@ -2,7 +2,7 @@ import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import type { Logger } from "@langwatch/observability";
 import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
 import {
-  ClickHouseTracePayloadReaderAdapter,
+  ClickHouseTraceEventPayloadRepository,
   TraceSpanSpoolAdapter,
   TraceSpoolService,
   type TracePayloadReaderPort,
@@ -67,7 +67,7 @@ export function createWorkerTraceSpool(options: {
 export function createWorkerTracePayloadReader(options: {
   resolveClickHouseClient: TraceClickHouseResolver;
 }): TracePayloadReaderPort {
-  return ClickHouseTracePayloadReaderAdapter.create({
+  return ClickHouseTraceEventPayloadRepository.createResolved({
     resolveClient: options.resolveClickHouseClient,
   });
 }

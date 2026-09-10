@@ -1,12 +1,12 @@
-import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter.ts";
+import { ClickHouseFacetRegistryAdapter } from "../../repositories/clickhouse/trace-facet-registry.clickhouse.adapter.ts";
 import { describe, expect, it } from "vitest";
 import { FilterFieldUnknownError, type DerivedTraceEvent } from "@langwatch/trace-contract";
 import {
   type ExpressionCategoricalDef,
   type RangeFacetDef,
-} from "../trace-facet-registry.clickhouse.adapter.ts";
+} from "../../repositories/clickhouse/trace-facet-registry.clickhouse.adapter.ts";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { TraceQueryClickHouseAdapter } from "../trace-query.clickhouse.adapter.ts";
+import { TraceQueryClickHouseAdapter } from "../../repositories/clickhouse/trace-query.clickhouse.adapter.ts";
 import { TraceQueryEvaluationAdapter } from "../../adapters/trace-query-evaluation.adapter.ts";
 
 const evaluateQueryInMemory = TraceQueryEvaluationAdapter.matches;

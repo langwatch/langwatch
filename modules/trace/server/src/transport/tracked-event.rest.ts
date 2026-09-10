@@ -1,8 +1,9 @@
 /**
  * REST for the user events a trace carries. `POST /api/events/track` is the canonical
- * replacement for the legacy `POST /api/track_event`, which the mount forwards into this
- * route so the two URLs stay in lockstep. The recorder, predefined-payload check, error
- * sink and validation prose arrive as ports - neither belongs in a transport.
+ * route; `POST /api/track_event` is the same family's older name, declared beside it as
+ * an alias that forwards into the canonical app rather than redirecting (a 307 drops the
+ * body for some clients). The recorder, predefined-payload check, error sink and
+ * validation prose arrive as ports - neither belongs in a transport.
  */
 import { createLogger } from "@langwatch/observability";
 import {
@@ -19,6 +20,7 @@ import {
   resolver,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
+import { publicRoute } from "@langwatch/api/access";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
@@ -66,6 +68,11 @@ export interface TrackedEventPorts {
 }
 
 export const TrackedEventApi = moduleApi<TrackedEventPorts>("trace");
+
+/** The URL every pre-rename SDK release posts a tracked event to. */
+export const TRACKED_EVENT_LEGACY_PATH = "/api/track_event";
+/** The URL this family actually registers. */
+export const TRACKED_EVENT_CANONICAL_PATH = "/api/events/track";
 
 export const trackedEventRest = defineRestRouter(TrackedEventApi)
   .withNamespace("events")
@@ -130,6 +137,39 @@ export const trackedEventRest = defineRestRouter(TrackedEventApi)
     return { message: "Event tracked" as const };
   })
 
+  .build();
+
+/** The `/api/track_event` alias: the one thing it does is forward. */
+export interface TrackedEventLegacyPathApi {
+  forward(request: Request): Promise<Response>;
+}
+
+export const TrackedEventLegacyPathApi = moduleApi<TrackedEventLegacyPathApi>("trace");
+
+/**
+ * `POST /api/track_event` - the family's older name, re-dispatched. TERMINATES
+ * NOTHING: the canonical route authenticates the forwarded request exactly as
+ * a direct one.
+ */
+export const trackedEventLegacyPathRest = defineRestRouter(TrackedEventLegacyPathApi)
+  .withNamespace("track-event-legacy")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withAddressing("literal", { v1Twin: false })
+  .post(TRACKED_EVENT_LEGACY_PATH, "trackEventLegacyAlias")
+  .withAccess(
+    publicRoute({
+      reason:
+        "the alias forwards the request into the canonical route, which authenticates it " +
+        "exactly as it would a direct call",
+    }),
+  )
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ hide: true })
+  .handle(({ app, request }): Promise<Response> => {
+    const url = new URL(request.url);
+    url.pathname = TRACKED_EVENT_CANONICAL_PATH;
+    return app.forward(new Request(url.toString(), request));
+  })
   .build();
 
 export const trackedEventRestErrorHandler = (boundary: RestErrorHandler): RestErrorHandler =>

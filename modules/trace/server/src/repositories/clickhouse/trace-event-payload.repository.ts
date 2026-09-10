@@ -1,6 +1,31 @@
 import { Ksuid } from "@langwatch/ksuid";
 import { z } from "zod";
-import type { TraceClickHouseClient, TraceClickHousePort } from "../../ports/clickhouse.port.ts";
+import {
+  TraceClickHousePort,
+  type TraceClickHouseClient,
+  type TraceClickHouseResolver,
+} from "../../ports/clickhouse.port.ts";
+
+/**
+ * The aggregate every offloaded trace field is stored under.
+ *
+ * A literal in both graphs: `event_log` is keyed by
+ * `(TenantId, AggregateType, AggregateId, EventId)`, so a reader that asks for
+ * the wrong aggregate type matches no row and returns the 64 KB preview instead
+ * of the offloaded value — a silent degradation, not an error.
+ */
+export const TRACE_PAYLOAD_AGGREGATE_TYPE = "trace";
+
+/** The tenant-keyed resolver a composition root holds, as the port the repository names. */
+class ResolvedTraceClickHousePort extends TraceClickHousePort {
+  constructor(private readonly resolveClient: TraceClickHouseResolver) {
+    super();
+  }
+
+  resolve(tenantId: string): Promise<TraceClickHouseClient> {
+    return this.resolveClient(tenantId);
+  }
+}
 
 /**
  * Half-width (ms) of the `EventOccurredAt` window applied to event_log blob
@@ -113,7 +138,43 @@ export class ClickHouseTraceEventPayloadRepository {
     return new ClickHouseTraceEventPayloadRepository(clickhouse);
   }
 
+  /** Built from a tenant-keyed resolver directly, for a composition root that holds no port. */
+  static createResolved(options: {
+    resolveClient: TraceClickHouseResolver;
+  }): ClickHouseTraceEventPayloadRepository {
+    return new ClickHouseTraceEventPayloadRepository(
+      new ResolvedTraceClickHousePort(options.resolveClient),
+    );
+  }
+
   private constructor(private readonly clickhouse: TraceClickHousePort) {}
+
+  /**
+   * The event_log claim-check read behind the narrow port Trace declares.
+   *
+   * Absence is the contract: `tryRead` answers null for a missing row, a
+   * missing field, a corrupt payload and an unreachable cluster alike, because
+   * every one of them means the same thing to the caller — this field cannot
+   * be recalled, serve the preview.
+   */
+  async tryRead(input: {
+    tenantId: string;
+    traceId: string;
+    eventId: string;
+    field: string;
+  }): Promise<string | null> {
+    try {
+      return await this.getField({
+        eventId: input.eventId,
+        field: input.field,
+        tenantId: input.tenantId,
+        aggregateType: TRACE_PAYLOAD_AGGREGATE_TYPE,
+        aggregateId: input.traceId,
+      });
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Fetches a field value from the event_log ClickHouse table.
