@@ -1,12 +1,12 @@
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
-import { NlpLambdaFleetRepository, type NlpLambdaFunction } from "../../repositories/nlp-lambda-fleet.repository.ts";
+import type { NlpLambdaFleet, NlpLambdaFunction } from "../../app/workflow.app.ts";
 import { NlpLambdaCleanupService } from "../nlp-lambda-cleanup.service.ts";
 
 const NOW = Temporal.Instant.from("2026-09-05T00:00:00.000Z");
 const daysAgo = (days: number) => NOW.subtract({ milliseconds: days * 24 * 60 * 60 * 1000 });
 
-class FakeFleet extends NlpLambdaFleetRepository {
+class FakeFleet implements NlpLambdaFleet {
   readonly deletedFunctions: string[] = [];
   readonly deletedLogGroups: string[] = [];
 
@@ -14,9 +14,7 @@ class FakeFleet extends NlpLambdaFleetRepository {
     private readonly functions: readonly string[],
     private readonly activity: Readonly<Record<string, Instant | null>>,
     private readonly logGroups: readonly string[] = [],
-  ) {
-    super();
-  }
+  ) {}
 
   async listFunctions(): Promise<readonly NlpLambdaFunction[]> {
     return this.functions.map((name) => ({ name }));

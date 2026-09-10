@@ -11,18 +11,6 @@ export type NlpLambdaArnEntry = Readonly<{
   imageUri: string;
 }>;
 
-/**
- * A cluster-wide store with an expiry. Redis in production; a process with none
- * composes an in-memory stand-in, which is slower rather than wrong.
- */
-export abstract class NlpLambdaArnCachePort {
-  abstract tryGet(key: string): Promise<string | null>;
-
-  abstract set(input: { key: string; value: string; ttlSeconds: number }): Promise<void>;
-
-  abstract delete(key: string): Promise<void>;
-}
-
 /** The AWS flow that finds, creates or updates the project's function. */
 export abstract class NlpLambdaArnResolverPort {
   abstract resolve(input: { projectId: string; imageUri: string }): Promise<string>;

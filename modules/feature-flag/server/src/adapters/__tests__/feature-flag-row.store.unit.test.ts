@@ -1,12 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  FeatureFlagCacheRepository,
-  type FeatureFlagCacheSlot,
-} from "../../repositories/feature-flag-cache.repository.ts";
+import { type FeatureFlagCache, type FeatureFlagCacheSlot } from "../../app/feature-flag.app.ts";
 import { MemoryFeatureFlagRepository } from "../../repositories/memory/memory.feature-flag.repository.ts";
 import { CachedFeatureFlagRowAdapter } from "../cached.feature-flag-row.adapter.ts";
 
-class RecordingCache extends FeatureFlagCacheRepository {
+class RecordingCache implements FeatureFlagCache {
   readonly values = new Map<string, FeatureFlagCacheSlot>();
   readonly deleted: string[] = [];
 

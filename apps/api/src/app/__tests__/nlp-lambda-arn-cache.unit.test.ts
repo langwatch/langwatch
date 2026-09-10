@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  RedisNlpLambdaArnCacheRepository,
+  RedisNlpLambdaArnCache,
   type NlpLambdaArnRedisConnection,
-} from "../../repositories/redis/redis.nlp-lambda-arn-cache.repository.ts";
+} from "../nlp-lambda-arn-cache.ts";
 
-/** A recording double over the adapter's own minimal Redis surface. */
+/** A recording double over the cache's own minimal Redis surface. */
 function recordingRedis() {
   const store = new Map<string, string>();
   const calls: { get: string[]; setex: Array<[string, number, string]>; del: string[] } = {
@@ -31,13 +31,13 @@ function recordingRedis() {
   return { redis, calls, store };
 }
 
-describe("RedisNlpLambdaArnCacheAdapter", () => {
+describe("RedisNlpLambdaArnCache", () => {
   describe("given a project's resolved ARN was cached", () => {
     describe("when another pod asks for the same project", () => {
       /** @scenario "A resolved function is shared across every pod through Redis" */
       it("reads the value the first pod's resolution wrote, off the shared connection", async () => {
         const { redis } = recordingRedis();
-        const cache = RedisNlpLambdaArnCacheRepository.create(redis);
+        const cache = RedisNlpLambdaArnCache.create(redis);
 
         await cache.set({
           key: "project-1",
@@ -56,18 +56,18 @@ describe("RedisNlpLambdaArnCacheAdapter", () => {
     describe("when a pod asks for its ARN", () => {
       it("answers null rather than throwing", async () => {
         const { redis } = recordingRedis();
-        const cache = RedisNlpLambdaArnCacheRepository.create(redis);
+        const cache = RedisNlpLambdaArnCache.create(redis);
 
         await expect(cache.tryGet("project-unresolved")).resolves.toBeNull();
       });
     });
   });
 
-  describe("given the adapter's own key prefix", () => {
+  describe("given the cache's own key prefix", () => {
     describe("when it writes, reads and deletes a project's entry", () => {
       it("prefixes every key it touches on the shared connection", async () => {
         const { redis, calls } = recordingRedis();
-        const cache = RedisNlpLambdaArnCacheRepository.create(redis);
+        const cache = RedisNlpLambdaArnCache.create(redis);
 
         await cache.set({ key: "project-2", value: "arn:aws:lambda:x", ttlSeconds: 60 });
         await cache.tryGet("project-2");
@@ -85,7 +85,7 @@ describe("RedisNlpLambdaArnCacheAdapter", () => {
     describe("when a pod asks for it again", () => {
       it("reads null after the delete, off the same shared connection", async () => {
         const { redis } = recordingRedis();
-        const cache = RedisNlpLambdaArnCacheRepository.create(redis);
+        const cache = RedisNlpLambdaArnCache.create(redis);
 
         await cache.set({ key: "project-3", value: "arn:aws:lambda:y", ttlSeconds: 60 });
         await cache.delete("project-3");

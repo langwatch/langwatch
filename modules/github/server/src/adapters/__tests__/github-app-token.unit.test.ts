@@ -13,14 +13,14 @@ import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache.ts";
 import {
   GITHUB_READ_PULL_PERMISSIONS,
   GITHUB_WRITE_PERMISSIONS,
-  RedisGithubAppTokenRepository,
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
-  type GithubRedisPort,
-} from "../../repositories/redis/redis.github-app-token.repository.ts";
+} from "../../app/github.app.ts";
+import type { GithubRedisPort } from "../../repositories/redis/github-redis.connection.ts";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -70,18 +70,18 @@ afterEach(() => {
 
 describe("computeRepoScopeKey", () => {
   it("is stable and independent of repository id order", () => {
-    const a = RedisGithubAppTokenRepository.computeRepoScopeKey({
+    const a = RedisGithubAppTokenCache.computeRepoScopeKey({
       repositoryIds: ["1", "2", "3"],
     });
-    const b = RedisGithubAppTokenRepository.computeRepoScopeKey({
+    const b = RedisGithubAppTokenCache.computeRepoScopeKey({
       repositoryIds: ["3", "1", "2"],
     });
     expect(a).toBe(b);
   });
 
   it("differs between the full-installation scope and a single repo", () => {
-    const all = RedisGithubAppTokenRepository.computeRepoScopeKey({});
-    const one = RedisGithubAppTokenRepository.computeRepoScopeKey({ repositoryIds: ["42"] });
+    const all = RedisGithubAppTokenCache.computeRepoScopeKey({});
+    const one = RedisGithubAppTokenCache.computeRepoScopeKey({ repositoryIds: ["42"] });
     expect(all).not.toBe(one);
   });
 });
@@ -89,7 +89,7 @@ describe("computeRepoScopeKey", () => {
 describe("signAppJwt", () => {
   /** @scenario "installation tokens are ephemeral" */
   it("signs an RS256 JWT issued by the app id, backdated, ≤10 minutes", () => {
-    const svc = RedisGithubAppTokenRepository.create("app-123", privateKey, null);
+    const svc = RedisGithubAppTokenCache.create("app-123", privateKey, null);
     const now = 1_000_000;
     const token = svc.signAppJwt(now);
     const decoded = jwt.verify(token, publicKey, {
@@ -109,7 +109,7 @@ describe("mintInstallationToken", () => {
   describe("when scoped to a single repository", () => {
     it("POSTs repository_ids + minimal permissions and caches the token", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(
           JSON.stringify({
@@ -136,7 +136,7 @@ describe("mintInstallationToken", () => {
       expect(body.permissions).toEqual(GITHUB_WRITE_PERMISSIONS);
 
       // Cached under (installation, scope).
-      const scope = RedisGithubAppTokenRepository.computeRepoScopeKey({ repositoryIds: ["42"] });
+      const scope = RedisGithubAppTokenCache.computeRepoScopeKey({ repositoryIds: ["42"] });
       expect(redis.store.get(`langy:gh:insttoken:99:${scope}`)).toBe("ghs_minted");
     });
   });
@@ -144,7 +144,7 @@ describe("mintInstallationToken", () => {
   describe("when the same scope is requested twice", () => {
     it("serves the second from cache without a second mint", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(
           JSON.stringify({
@@ -167,7 +167,7 @@ describe("mintInstallationToken", () => {
   describe("when a different scope is requested", () => {
     it("mints again because the cache key differs", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(
           JSON.stringify({
@@ -193,7 +193,7 @@ describe("mintInstallationToken", () => {
   describe("when GitHub rejects the mint", () => {
     it("throws without caching", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
       vi.stubGlobal(
         "fetch",
         vi.fn<typeof fetch>(async () => new Response("nope", { status: 403 })),
@@ -206,7 +206,7 @@ describe("mintInstallationToken", () => {
   describe("when GitHub confirms the installation no longer exists (404)", () => {
     it("throws GithubInstallationNotFoundError, distinct from other failures", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
       vi.stubGlobal(
         "fetch",
         vi.fn<typeof fetch>(async () => new Response("not found", { status: 404 })),
@@ -221,8 +221,8 @@ describe("mintInstallationToken", () => {
   describe("when a token is cached but the installation was uninstalled since it was minted", () => {
     it("rejects with GithubInstallationNotFoundError instead of serving the stale cached token", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
-      const scope = RedisGithubAppTokenRepository.computeRepoScopeKey({});
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
+      const scope = RedisGithubAppTokenCache.computeRepoScopeKey({});
       // Simulate an already-warm cache entry from an earlier, successful mint —
       // the exact state a missed deletion webhook leaves behind for up to the
       // token's ~50min TTL.
@@ -241,8 +241,8 @@ describe("mintInstallationToken", () => {
   describe("when a token is cached and the liveness probe itself fails transiently", () => {
     it("still serves the cached token (fails open, not closed)", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
-      const scope = RedisGithubAppTokenRepository.computeRepoScopeKey({});
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
+      const scope = RedisGithubAppTokenCache.computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       vi.stubGlobal(
         "fetch",
@@ -258,8 +258,8 @@ describe("mintInstallationToken", () => {
   describe("when many concurrent calls hit a cached token for the same installation", () => {
     it("probes GitHub liveness only once, not once per caller", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
-      const scope = RedisGithubAppTokenRepository.computeRepoScopeKey({});
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
+      const scope = RedisGithubAppTokenCache.computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }), {
@@ -284,8 +284,8 @@ describe("mintInstallationToken", () => {
   describe("when the same installation is checked across multiple sequential turns", () => {
     it("probes GitHub once, then trusts the liveness marker for later cached calls", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
-      const scope = RedisGithubAppTokenRepository.computeRepoScopeKey({});
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
+      const scope = RedisGithubAppTokenCache.computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }), {
@@ -311,8 +311,8 @@ describe("mintInstallationToken", () => {
   describe("when the liveness marker has expired", () => {
     it("probes GitHub again on the next cached call", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
-      const scope = RedisGithubAppTokenRepository.computeRepoScopeKey({});
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
+      const scope = RedisGithubAppTokenCache.computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }), {
@@ -336,8 +336,8 @@ describe("mintInstallationToken", () => {
   describe("when a liveness probe fails transiently", () => {
     it("backs off instead of probing again on the very next cached call", async () => {
       const redis = fakeRedis();
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, redis);
-      const scope = RedisGithubAppTokenRepository.computeRepoScopeKey({});
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, redis);
+      const scope = RedisGithubAppTokenCache.computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(async () => new Response("boom", { status: 500 }));
       vi.stubGlobal("fetch", fetchMock);
@@ -359,7 +359,7 @@ describe("listPullRequestsForHead", () => {
   describe("when asking GitHub about a branch", () => {
     /** @scenario "Pull request reads mint a read-only token" */
     it("mints a repository-scoped token that can only read pull requests", async () => {
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, fakeRedis());
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
         if (String(url).includes("/access_tokens")) {
           return new Response(
@@ -393,7 +393,7 @@ describe("listPullRequestsForHead", () => {
     });
 
     it("asks for the branch's pull requests in any state", async () => {
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, fakeRedis());
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
         if (String(url).includes("/access_tokens")) {
           return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
@@ -451,7 +451,7 @@ describe("listPullRequestsForHead", () => {
 
   describe("when GitHub answers 403 with its rate-limit headers", () => {
     it("reports a rate limit, not a permission failure", async () => {
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, fakeRedis());
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
         if (String(url).includes("/access_tokens")) {
           return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
@@ -483,7 +483,7 @@ describe("listPullRequestsForHead", () => {
 
   describe("when the repository is not on the installation", () => {
     it("reports it as unreachable rather than as an unknown failure", async () => {
-      const svc = RedisGithubAppTokenRepository.create("app-1", privateKey, fakeRedis());
+      const svc = RedisGithubAppTokenCache.create("app-1", privateKey, fakeRedis());
       const fetchMock = vi.fn<typeof fetch>(async (url) => {
         if (String(url).includes("/access_tokens")) {
           return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
@@ -510,7 +510,7 @@ describe("listPullRequestsForHead", () => {
 
 describe("configured", () => {
   it("is false without a private key, true with app id + key", () => {
-    expect(RedisGithubAppTokenRepository.create("app", "", null).configured).toBe(false);
-    expect(RedisGithubAppTokenRepository.create("app", privateKey, null).configured).toBe(true);
+    expect(RedisGithubAppTokenCache.create("app", "", null).configured).toBe(false);
+    expect(RedisGithubAppTokenCache.create("app", privateKey, null).configured).toBe(true);
   });
 });

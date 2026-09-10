@@ -1,8 +1,19 @@
 import type {
   AuthzApi,
+  AuthzAttachBindingsInput,
+  AuthzAttachBindingsOutput,
+  AuthzAttachResourceGrantInput,
   AuthzCaller,
+  AuthzChangeBindingRoleInput,
+  AuthzDefineRoleInput,
+  AuthzDeleteRoleInput,
   AuthzGrantsService,
+  AuthzOffboardMemberInput,
   AuthzPermission,
+  AuthzRevokeBindingsInput,
+  AuthzRevokeBindingsWhereInput,
+  AuthzRevokeBindingsWhereOutput,
+  AuthzRevokeResourceGrantsInput,
   AuthzService,
   EffectivePermissions,
 } from "@langwatch/authz-contract";
@@ -13,6 +24,23 @@ import {
   PostgresAuthzAdapter,
   type PostgresAuthzAdapterOptions,
 } from "./postgres-authz.build.ts";
+
+/**
+ * Private server-side compatibility seam for callers whose legacy operations
+ * cannot yet be expressed by the smaller high-level grant verbs. It remains
+ * behind AuthzGrantsService and is never exported from the package root.
+ */
+export interface AuthzCompatibilityLedger {
+  attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput>;
+  attachResourceGrant(args: AuthzAttachResourceGrantInput): Promise<void>;
+  revokeResourceGrants(args: AuthzRevokeResourceGrantsInput): Promise<void>;
+  changeBindingRole(args: AuthzChangeBindingRoleInput): Promise<void>;
+  revokeBindings(args: AuthzRevokeBindingsInput): Promise<void>;
+  revokeBindingsWhere(args: AuthzRevokeBindingsWhereInput): Promise<AuthzRevokeBindingsWhereOutput>;
+  offboardMember(args: AuthzOffboardMemberInput): Promise<void>;
+  defineRole(args: AuthzDefineRoleInput): Promise<void>;
+  deleteRole(args: AuthzDeleteRoleInput): Promise<void>;
+}
 
 export type AuthzInfrastructure = Omit<PostgresAuthzAdapterOptions, "repositories">;
 export type AuthzSetup = FeatureSetup<Readonly<{}>, AuthzInfrastructure, undefined> &

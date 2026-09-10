@@ -43,6 +43,7 @@ import {
 } from "@langwatch/workflow-contract";
 import type { WorkflowService } from "../services/workflow.service.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { Instant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import type {
   WorkflowAgentMappingPort,
@@ -176,6 +177,42 @@ export interface WorkflowSignals {
     projectId: string;
   }): void;
   failed(error: unknown, context: Readonly<{ projectId?: string }>): void;
+}
+
+/** One deployed NLP Lambda function, reduced to what the cleanup policy reads. */
+export type NlpLambdaFunction = Readonly<{ name: string }>;
+
+/**
+ * The account's per-project NLP Lambda functions and their log groups. A
+ * technical need rather than a store: the cutoffs are this module's decision,
+ * the AWS account they are applied to is the deployment's.
+ */
+export interface NlpLambdaFleet {
+  /** Every function whose name starts with the studio's engine prefix. */
+  listFunctions(input: { namePrefix: string }): Promise<readonly NlpLambdaFunction[]>;
+  /**
+   * When the function last logged, or null when nothing says. Null is not
+   * "never used": a missing log group is also unknown, and the policy declines
+   * to delete on an unknown rather than guessing.
+   */
+  tryReadLastActivityAt(input: { functionName: string }): Promise<Instant | null>;
+  /** True when the function still exists in the account. */
+  functionExists(input: { functionName: string }): Promise<boolean>;
+  deleteFunction(input: { functionName: string }): Promise<void>;
+  /** Every log group under the studio's engine prefix, by function name. */
+  listLogGroups(input: { namePrefix: string }): Promise<readonly string[]>;
+  deleteLogGroup(input: { functionName: string }): Promise<void>;
+}
+
+/**
+ * A cluster-wide store with an expiry for a project's resolved NLP Lambda ARN.
+ * Redis in production; a process with none composes an in-memory stand-in,
+ * which is slower rather than wrong.
+ */
+export interface NlpLambdaArnCache {
+  tryGet(key: string): Promise<string | null>;
+  set(input: { key: string; value: string; ttlSeconds: number }): Promise<void>;
+  delete(key: string): Promise<void>;
 }
 
 /** What the process supplies this module beside its own graph. */

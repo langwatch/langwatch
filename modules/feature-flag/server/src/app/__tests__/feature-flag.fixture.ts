@@ -10,10 +10,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Instant } from "@langwatch/time";
-import {
-  FeatureFlagCacheRepository,
-  type FeatureFlagCacheSlot,
-} from "../../repositories/feature-flag-cache.repository.ts";
 import type { FeatureFlagRepositories } from "../../repositories/feature-flag.repositories.ts";
 import { MemoryFeatureFlagExperimentRepository } from "../../repositories/memory/memory.feature-flag-experiment-setting.repository.ts";
 import { MemoryFeatureFlagRepositories } from "../../repositories/memory/memory.feature-flag.repositories.ts";
@@ -21,10 +17,10 @@ import { MemoryFeatureFlagRepository } from "../../repositories/memory/memory.fe
 import { FeatureFlagService } from "../../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../../services/organization-created-at-cache.service.ts";
 import { CachedFeatureFlagRowAdapter } from "../../adapters/cached.feature-flag-row.adapter.ts";
-import { FeatureFlagApp } from "../feature-flag.app.ts";
+import { FeatureFlagApp, type FeatureFlagCache, type FeatureFlagCacheSlot } from "../feature-flag.app.ts";
 
 /** Shared cache tier held in process, for tests that need no Redis. */
-export class MemoryFeatureFlagCache extends FeatureFlagCacheRepository {
+export class MemoryFeatureFlagCache implements FeatureFlagCache {
   private readonly slots = new Map<string, FeatureFlagCacheSlot>();
 
   async findSlot(key: string): Promise<FeatureFlagCacheSlot | undefined> {
@@ -136,7 +132,7 @@ export function createFeatureFlagTestApp(
   input: Readonly<{
     repositories?: FeatureFlagRepositories;
     config?: FeatureFlagConfig;
-    cache?: FeatureFlagCacheRepository;
+    cache?: FeatureFlagCache;
     dependencies?: Partial<{
       permissions: AuthzApi;
       projects: ProjectApi;

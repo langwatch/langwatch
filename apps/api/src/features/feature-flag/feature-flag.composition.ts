@@ -6,8 +6,8 @@
 import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import type { FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import {
-  FeatureFlagCachePort,
   featureFlagServer,
+  type FeatureFlagCache,
   type FeatureFlagCacheSlot,
 } from "@langwatch/feature-flag-server";
 import {
@@ -59,7 +59,7 @@ export async function installApiFeatureFlag(options: {
  * The flag cache, absent. Every read goes to Postgres, behind the app's own
  * five-second per-process window.
  */
-class UncachedApiFeatureFlags extends FeatureFlagCachePort {
+class UncachedApiFeatureFlags implements FeatureFlagCache {
   findSlot(_key: string): Promise<FeatureFlagCacheSlot | undefined> {
     return Promise.resolve(undefined);
   }

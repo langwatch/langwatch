@@ -17,11 +17,11 @@ import {
   ListFunctionsCommand,
 } from "@aws-sdk/client-lambda";
 import type { Logger } from "@langwatch/observability";
-import { NlpLambdaFleetRepository, type NlpLambdaFunction } from "../repositories/nlp-lambda-fleet.repository.ts";
+import type { NlpLambdaFleet, NlpLambdaFunction } from "../app/workflow.app.ts";
 
 const LOG_GROUP_ROOT = "/aws/lambda/";
 
-export class AwsNlpLambdaFleetAdapter extends NlpLambdaFleetRepository {
+export class AwsNlpLambdaFleetAdapter implements NlpLambdaFleet {
   static create(options: {
     lambda: LambdaClient;
     logs: CloudWatchLogsClient;
@@ -34,9 +34,7 @@ export class AwsNlpLambdaFleetAdapter extends NlpLambdaFleetRepository {
     private readonly lambda: LambdaClient,
     private readonly logs: CloudWatchLogsClient,
     private readonly logger: Pick<Logger, "warn"> | undefined,
-  ) {
-    super();
-  }
+  ) {}
 
   async listFunctions({
     namePrefix,

@@ -1,6 +1,6 @@
 import type { FeatureFlagRules, StoredFeatureFlag } from "@langwatch/feature-flag-contract";
 import { Temporal, nowInstant, type Instant } from "@langwatch/time";
-import type { FeatureFlagRow } from "../feature-flag-cache.repository.ts";
+import type { FeatureFlagRow } from "../../app/feature-flag.app.ts";
 import type { FeatureFlagRepository } from "../feature-flag.repository.ts";
 
 type MemoryRecord = {

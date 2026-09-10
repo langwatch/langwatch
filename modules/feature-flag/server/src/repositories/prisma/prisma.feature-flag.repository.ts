@@ -6,7 +6,7 @@ import {
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
-import type { FeatureFlagRow } from "../feature-flag-cache.repository.ts";
+import type { FeatureFlagRow } from "../../app/feature-flag.app.ts";
 import type { FeatureFlagRepository } from "../feature-flag.repository.ts";
 
 const featureFlagRowSelect = { enabled: true, rules: true } as const;

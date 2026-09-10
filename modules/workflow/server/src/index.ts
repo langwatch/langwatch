@@ -55,7 +55,6 @@ export {
   type StagedNlpPayload,
 } from "./ports/workflow-nlp-lambda.port.ts";
 export {
-  NlpLambdaArnCachePort,
   NlpLambdaArnResolverPort,
   NlpLambdaFunctionPort,
   type NlpLambdaArnEntry,
@@ -91,6 +90,9 @@ export {
   type WorkflowPublicationReads,
   type WorkflowSignals,
   type WorkflowStudioRuns,
+  type NlpLambdaFleet,
+  type NlpLambdaFunction,
+  type NlpLambdaArnCache,
 } from "./app/workflow.app.ts";
 export { workflowServer } from "./workflow.server.ts";
 
@@ -147,7 +149,6 @@ export {
   WorkflowCodeCompletionAdapter,
   type WorkflowModelResolverPort,
 } from "./adapters/workflow-code-completion.adapter.ts";
-export { NlpLambdaFleetRepository as NlpLambdaFleetPort, type NlpLambdaFunction } from "./repositories/nlp-lambda-fleet.repository.ts";
 export { AwsNlpLambdaFleetAdapter } from "./adapters/aws.nlp-lambda-fleet.adapter.ts";
 export {
   NlpLambdaCleanupService,
@@ -173,11 +174,6 @@ export {
 } from "./ports/nlp-lambda-stream.port.ts";
 export { AwsNlpLambdaStreamInvokeAdapter } from "./adapters/aws.nlp-lambda-stream-invoke.adapter.ts";
 export { AwsNlpLambdaArnResolverAdapter } from "./adapters/aws.nlp-lambda-arn-resolver.adapter.ts";
-export { MemoryNlpLambdaArnCacheRepository as InMemoryNlpLambdaArnCacheAdapter } from "./repositories/memory/memory.nlp-lambda-arn-cache.repository.ts";
-export {
-  RedisNlpLambdaArnCacheRepository as RedisNlpLambdaArnCacheAdapter,
-  type NlpLambdaArnRedisConnection,
-} from "./repositories/redis/redis.nlp-lambda-arn-cache.repository.ts";
 export {
   LambdaWorkflowStudioStreamAdapter,
   type LambdaWorkflowStudioStreamOptions,

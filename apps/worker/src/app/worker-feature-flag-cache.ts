@@ -1,10 +1,8 @@
 import { KILL_SWITCH_CACHE_TTL_MS, featureFlagRulesSchema } from "@langwatch/feature-flag-contract";
-import { z } from "zod";
-import {
-  FeatureFlagCacheRepository,
-  type FeatureFlagCacheSlot,
-} from "../feature-flag-cache.repository.ts";
+import type { FeatureFlagCache, FeatureFlagCacheSlot } from "@langwatch/feature-flag-server";
 import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
+import type { WorkerFeatureFlagRedis } from "./worker-feature-flags.composition.ts";
 
 const CACHE_PREFIX = "feature_flag_store:v2:";
 const cacheSlotSchema = z.object({
@@ -21,22 +19,18 @@ type MemoryEntry = {
   expiresAt: number;
 };
 
-export interface FeatureFlagRedisConnection {
-  get(key: string): Promise<string | null>;
-  setex(key: string, ttlSeconds: number, value: string): Promise<unknown>;
-  del(key: string): Promise<unknown>;
-}
-
-export class RedisFeatureFlagCacheRepository extends FeatureFlagCacheRepository {
+/**
+ * This process's shared cache tier for operator rows, over Redis with a
+ * per-process in-memory fallback for when Redis is absent or fails.
+ */
+export class WorkerFeatureFlagCache implements FeatureFlagCache {
   private readonly memory = new Map<string, MemoryEntry>();
 
-  static create(redis: FeatureFlagRedisConnection | null): RedisFeatureFlagCacheRepository {
-    return new RedisFeatureFlagCacheRepository(redis);
+  static create(redis: WorkerFeatureFlagRedis | null): WorkerFeatureFlagCache {
+    return new WorkerFeatureFlagCache(redis);
   }
 
-  private constructor(private readonly redis: FeatureFlagRedisConnection | null) {
-    super();
-  }
+  private constructor(private readonly redis: WorkerFeatureFlagRedis | null) {}
 
   async findSlot(key: string): Promise<FeatureFlagCacheSlot | undefined> {
     if (this.redis) {

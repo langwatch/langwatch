@@ -1,6 +1,6 @@
 import { DuplicateBindingError } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthzCompatibilityLedgerRepository } from "../../repositories/authz-compatibility-ledger.repository.ts";
+import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
 import { AuthzBindingWriterService } from "../../services/authz-binding-writer.service.ts";
 import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
 
@@ -14,25 +14,25 @@ const scope = {
 
 function ledger() {
   const attachBindings = vi
-    .fn<AuthzCompatibilityLedgerRepository["attachBindings"]>()
+    .fn<AuthzCompatibilityLedger["attachBindings"]>()
     .mockResolvedValue({ attached: [], duplicates: [] });
   const changeBindingRole = vi
-    .fn<AuthzCompatibilityLedgerRepository["changeBindingRole"]>()
+    .fn<AuthzCompatibilityLedger["changeBindingRole"]>()
     .mockResolvedValue(void 0);
   const revokeBindings = vi
-    .fn<AuthzCompatibilityLedgerRepository["revokeBindings"]>()
+    .fn<AuthzCompatibilityLedger["revokeBindings"]>()
     .mockResolvedValue(void 0);
   const port = {
     attachBindings,
-    attachResourceGrant: vi.fn<AuthzCompatibilityLedgerRepository["attachResourceGrant"]>(),
-    revokeResourceGrants: vi.fn<AuthzCompatibilityLedgerRepository["revokeResourceGrants"]>(),
+    attachResourceGrant: vi.fn<AuthzCompatibilityLedger["attachResourceGrant"]>(),
+    revokeResourceGrants: vi.fn<AuthzCompatibilityLedger["revokeResourceGrants"]>(),
     changeBindingRole,
     revokeBindings,
-    revokeBindingsWhere: vi.fn<AuthzCompatibilityLedgerRepository["revokeBindingsWhere"]>(),
-    offboardMember: vi.fn<AuthzCompatibilityLedgerRepository["offboardMember"]>(),
-    defineRole: vi.fn<AuthzCompatibilityLedgerRepository["defineRole"]>(),
-    deleteRole: vi.fn<AuthzCompatibilityLedgerRepository["deleteRole"]>(),
-  } satisfies AuthzCompatibilityLedgerRepository;
+    revokeBindingsWhere: vi.fn<AuthzCompatibilityLedger["revokeBindingsWhere"]>(),
+    offboardMember: vi.fn<AuthzCompatibilityLedger["offboardMember"]>(),
+    defineRole: vi.fn<AuthzCompatibilityLedger["defineRole"]>(),
+    deleteRole: vi.fn<AuthzCompatibilityLedger["deleteRole"]>(),
+  } satisfies AuthzCompatibilityLedger;
 
   return { port, attachBindings, changeBindingRole, revokeBindings };
 }

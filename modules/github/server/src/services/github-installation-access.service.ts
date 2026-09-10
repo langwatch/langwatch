@@ -7,16 +7,31 @@ import {
 import { createLogger } from "@langwatch/observability";
 
 import {
-  type GithubAppTokenRepository,
+  type GithubAppTokenCache,
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
-} from "../repositories/github-app-token.repository.ts";
+} from "../app/github.app.ts";
 import type {
   GithubInstallationRow,
   GithubInstallationsRepository,
 } from "../repositories/github-installations.repository.ts";
 
 const logger = createLogger("langwatch:github:installation-access");
+
+/**
+ * The installation reads pull-request linkage performs, and nothing else.
+ * `GithubInstallationAccessService` satisfies it; so does anything else that
+ * can answer both without a database.
+ */
+export interface GithubInstallationLookup {
+  /** The organization a webhook's installation belongs to. */
+  findByInstallationId(installationId: string): Promise<{ organizationId: string } | null>;
+  /** The installation and repository id that can be asked about a branch. */
+  tryResolveInstallationForRepository(input: {
+    organizationId: string;
+    repositoryFullName: string;
+  }): Promise<{ installationId: string; repositoryId: string } | null>;
+}
 
 type RepositoryResolution = {
   repoId: string | null;
@@ -28,17 +43,17 @@ type MintOutcome = {
   wasDeadInstallation: boolean;
 };
 
-export class GithubInstallationAccessService {
+export class GithubInstallationAccessService implements GithubInstallationLookup {
   static create(
     repository: GithubInstallationsRepository,
-    appTokens: GithubAppTokenRepository,
+    appTokens: GithubAppTokenCache,
   ): GithubInstallationAccessService {
     return new GithubInstallationAccessService(repository, appTokens);
   }
 
   private constructor(
     private readonly repository: GithubInstallationsRepository,
-    private readonly appTokens: GithubAppTokenRepository,
+    private readonly appTokens: GithubAppTokenCache,
   ) {}
 
   // This read attributes a verified webhook and remains valid without

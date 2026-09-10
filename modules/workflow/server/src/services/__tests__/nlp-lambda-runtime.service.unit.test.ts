@@ -3,7 +3,8 @@
  * @see specs/nlp-go/studio-lambda-cache.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { NlpLambdaArnCachePort, NlpLambdaArnResolverPort } from "../../ports/nlp-lambda-arn.port.ts";
+import { NlpLambdaArnResolverPort } from "../../ports/nlp-lambda-arn.port.ts";
+import type { NlpLambdaArnCache } from "../../app/workflow.app.ts";
 import {
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
   NlpLambdaRuntimeService,
@@ -15,7 +16,7 @@ const PROJECT = "projectA";
 const ARN = "arn:aws:lambda:eu-central-1:1:function:langwatch_nlp-projectA";
 
 /** A store shared by every runtime built from it, as Redis is by every pod. */
-class SharedCache extends NlpLambdaArnCachePort {
+class SharedCache implements NlpLambdaArnCache {
   readonly entries = new Map<string, { value: string; ttlSeconds: number }>();
   readonly reads: string[] = [];
   readonly deleted: string[] = [];

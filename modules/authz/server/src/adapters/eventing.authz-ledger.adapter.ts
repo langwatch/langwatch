@@ -16,7 +16,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 import { AuthzGrantsCommandDispatcherPort } from "../ports/authz-grants-command-dispatcher.port.ts";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { AuthzCompatibilityLedgerRepository } from "../repositories/authz-compatibility-ledger.repository.ts";
+import { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import {
   BindingMissingError,
@@ -151,7 +151,7 @@ export class AuthzRoleDuplicateNameError extends HandledError {
  * epoch after its write lands (decision 19: the epoch stays until contract;
  * the projection cursor is alongside, not instead).
  */
-export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerRepository {
+export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   /**
    * Only the one sanctioned direct projection write (decision 7) — typed to
    * exactly that member so the writer cannot quietly grow a dependency on
@@ -161,9 +161,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerReposito
     return new EventingAuthzLedgerAdapter(options);
   }
 
-  private constructor(private readonly options: EventingAuthzLedgerAdapterOptions) {
-    super();
-  }
+  private constructor(private readonly options: EventingAuthzLedgerAdapterOptions) {}
 
   private now(): number {
     return this.options.now?.() ?? nowInstant().epochMilliseconds;

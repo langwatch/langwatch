@@ -14,7 +14,9 @@ import {
   type GithubTurnToken,
   type GithubServerConfig,
   githubServerConfigSchema,
+  type GithubRepository,
 } from "@langwatch/github-contract";
+import type { Instant } from "@langwatch/time";
 import {
   OrganizationApi,
   type OrganizationApi as OrganizationApiContract,
@@ -24,7 +26,7 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
 import type { GithubProjectActivityPort } from "../ports/github-project-activity.port.ts";
 import type { GithubHostPort } from "../ports/github-host.port.ts";
-import { RedisGithubAppTokenRepository } from "../repositories/redis/redis.github-app-token.repository.ts";
+import { RedisGithubAppTokenCache } from "./redis-github-app-token-cache.ts";
 import { GithubHostService } from "../services/github-host.service.ts";
 import { GithubInstallResponseRules } from "../rules/github-install-response.rules.ts";
 import { GithubInstallStateService } from "../services/github-install-state.service.ts";
@@ -46,6 +48,119 @@ import { GithubPullRequestMappingService } from "../services/github-pull-request
 import { GithubPullRequestStatusCacheRedisRepository } from "../repositories/redis/redis.github-pull-request-status-cache.repository.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
 import { GithubFeatureService } from "../services/github.service.ts";
+
+export const GITHUB_WRITE_PERMISSIONS: Record<string, string> = {
+  contents: "write",
+  pull_requests: "write",
+};
+
+export const GITHUB_READ_PULL_PERMISSIONS: Record<string, string> = {
+  pull_requests: "read",
+};
+
+export type GithubInstallationToken = {
+  token: string;
+  expiresAt: string;
+  repositorySelection?: string;
+};
+
+export type GithubInstallationDetails = {
+  installationId: string;
+  accountLogin: string;
+  accountType: string;
+  accountId: string;
+  repositorySelection: string;
+  /** When GitHub says the installation was created; null when it does not say. */
+  createdAt: string | null;
+};
+
+export type GithubPullRequestSummary = {
+  number: number;
+  htmlUrl: string;
+  title: string;
+  state: string;
+  draft: boolean;
+  mergedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  authorLogin: string | null;
+};
+
+export type MintInstallationTokenInput = {
+  installationId: string;
+  repositoryIds?: string[];
+  permissions?: Record<string, string>;
+};
+
+export class GithubInstallationNotFoundError extends Error {
+  readonly installationId: string;
+
+  constructor(installationId: string) {
+    super(`GitHub installation ${installationId} not found`);
+    this.name = "GithubInstallationNotFoundError";
+    this.installationId = installationId;
+  }
+}
+
+export class GithubRateLimitedError extends Error {
+  readonly retryAfterSec: number | null;
+  readonly resetAt: Instant | null;
+
+  constructor(input: { retryAfterSec: number | null; resetAt: Instant | null }) {
+    super("GitHub rate limit reached");
+    this.name = "GithubRateLimitedError";
+    this.retryAfterSec = input.retryAfterSec;
+    this.resetAt = input.resetAt;
+  }
+}
+
+/** The raw GitHub App HTTP client this feature needs, keyed by an App JWT. */
+export interface GithubAppClient {
+  readonly configured: boolean;
+  signAppJwt(nowSec?: number): string;
+  getInstallation(installationId: string): Promise<GithubInstallationDetails>;
+  mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken>;
+  listInstallationRepositories(token: string): Promise<GithubRepository[]>;
+  listPullRequestsForHead(input: {
+    token: string;
+    owner: string;
+    repo: string;
+    branch: string;
+  }): Promise<GithubPullRequestSummary[]>;
+  getPullRequest(input: {
+    token: string;
+    owner: string;
+    repo: string;
+    number: number;
+  }): Promise<GithubPullRequestSummary>;
+}
+
+/** The shared cache in front of the raw client's App JWT and installation tokens. */
+export interface GithubAppTokenCache {
+  readonly configured: boolean;
+  getInstallation(installationId: string): Promise<GithubInstallationDetails>;
+  mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken>;
+  listInstallationRepositories(installationId: string): Promise<GithubRepository[]>;
+  listPullRequestsForHead(input: {
+    installationId: string;
+    repositoryId: string;
+    owner: string;
+    repo: string;
+    branch: string;
+  }): Promise<GithubPullRequestSummary[]>;
+  getPullRequest(input: {
+    installationId: string;
+    repositoryId: string;
+    owner: string;
+    repo: string;
+    number: number;
+  }): Promise<GithubPullRequestSummary>;
+  computeRepoScopeKey(input: {
+    repositoryIds?: string[];
+    permissions?: Record<string, string>;
+  }): string;
+}
 
 export type GithubInfrastructure = Readonly<{
   redis: GithubRedisConnection | null;
@@ -83,7 +198,7 @@ export type GithubComposition = Readonly<{
 export function composeGithubApi(parts: GithubComposition): GithubFeatureService {
   const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-  const appTokens = RedisGithubAppTokenRepository.create(
+  const appTokens = RedisGithubAppTokenCache.create(
     parts.config.appId,
     parts.config.privateKey,
     redis,
@@ -166,7 +281,7 @@ export function composeGithubBranchMaintenance(
 ): GithubBranchMaintenancePort {
   const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-  const appTokens = RedisGithubAppTokenRepository.create(
+  const appTokens = RedisGithubAppTokenCache.create(
     parts.config.appId,
     parts.config.privateKey,
     redis,
@@ -204,7 +319,7 @@ export function composeGithubBranchDemand(
 ): GithubBranchDemandPort {
   const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-  const appTokens = RedisGithubAppTokenRepository.create(
+  const appTokens = RedisGithubAppTokenCache.create(
     parts.config.appId,
     parts.config.privateKey,
     redis,

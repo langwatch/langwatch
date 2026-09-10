@@ -8,19 +8,19 @@ import {
   AwsNlpLambdaArnResolverAdapter,
   AwsNlpLambdaStreamInvokeAdapter,
   HttpWorkflowStudioStreamAdapter,
-  InMemoryNlpLambdaArnCacheAdapter,
   LambdaWorkflowStudioStreamAdapter,
-  NlpLambdaArnCachePort,
   NlpLambdaFunctionPort,
   NlpLambdaRuntimeService,
   NlpPayloadStagingPort,
   UnconfiguredWorkflowStudioStreamAdapter,
   WorkflowStudioDispatchService,
   WorkflowStudioStreamPort,
+  type NlpLambdaArnCache,
   type StudioLambdaConfig,
 } from "@langwatch/workflow-server";
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
+import { MemoryNlpLambdaArnCache } from "./nlp-lambda-arn-cache.ts";
 
 /**
  * The ONE place this process builds a studio dispatch.
@@ -29,7 +29,7 @@ export function composeApiWorkflowStudioDispatch(options: {
   nlpServiceUrl: string | undefined;
   modelProviders: ModelProviderApi;
   payloadStaging?: NlpPayloadStagingPort | undefined;
-  arnCache?: NlpLambdaArnCachePort | undefined;
+  arnCache?: NlpLambdaArnCache | undefined;
   nlpLambdaFleet?: StudioLambdaConfig | undefined;
   nlpLambdaFleetNamed?: boolean;
 }): WorkflowStudioDispatchService {
@@ -43,7 +43,7 @@ export function composeApiWorkflowStudioDispatch(options: {
 export function composeApiWorkflowStudioStream(options: {
   nlpServiceUrl: string | undefined;
   payloadStaging?: NlpPayloadStagingPort | undefined;
-  arnCache?: NlpLambdaArnCachePort | undefined;
+  arnCache?: NlpLambdaArnCache | undefined;
   nlpLambdaFleet?: StudioLambdaConfig | undefined;
   nlpLambdaFleetNamed?: boolean;
 }): WorkflowStudioStreamPort {
@@ -65,7 +65,7 @@ export function composeApiWorkflowStudioStream(options: {
 function composeLambdaStudioStream(options: {
   fleet: StudioLambdaConfig;
   payloadStaging?: NlpPayloadStagingPort | undefined;
-  arnCache?: NlpLambdaArnCachePort | undefined;
+  arnCache?: NlpLambdaArnCache | undefined;
 }): WorkflowStudioStreamPort {
   const { fleet } = options;
   const credentials = {
@@ -78,7 +78,7 @@ function composeLambdaStudioStream(options: {
   const lambda = new LambdaClient({ region: fleet.region, credentials, maxAttempts: 6 });
   const logger = createLogger("langwatch:api:studio-lambda");
   const runtime = NlpLambdaRuntimeService.create({
-    cache: options.arnCache ?? InMemoryNlpLambdaArnCacheAdapter.create(),
+    cache: options.arnCache ?? MemoryNlpLambdaArnCache.create(),
     resolver: AwsNlpLambdaArnResolverAdapter.create({
       lambda,
       logs: new CloudWatchLogsClient({ region: fleet.region, credentials }),

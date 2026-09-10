@@ -8,14 +8,14 @@ import {
   GithubPullRequestStatusService,
   MAX_STATUS_REFS,
 } from "../github-pull-request-status.service.ts";
-import { GithubRateLimitedError } from "../../repositories/redis/redis.github-app-token.repository.ts";
+import { GithubRateLimitedError } from "../../app/github.app.ts";
 import {
-  GithubAppTokenRepository,
+  GithubAppTokenCache,
   type GithubInstallationDetails,
   type GithubInstallationToken,
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
-} from "../../repositories/github-app-token.repository.ts";
+} from "../../app/github.app.ts";
 import { GithubRedisPort } from "../../repositories/redis/github-redis.connection.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
@@ -113,16 +113,14 @@ class TestInstallationRepository extends NullGithubInstallationsRepository {
   }
 }
 
-class TestAppTokens extends GithubAppTokenRepository {
+class TestAppTokens implements GithubAppTokenCache {
   readonly configured = true;
 
   constructor(
     private readonly readPullRequest: (
       input: GetPullRequestInput,
     ) => Promise<GithubPullRequestSummary>,
-  ) {
-    super();
-  }
+  ) {}
 
   getInstallation(installationId: string): Promise<GithubInstallationDetails> {
     return Promise.resolve({

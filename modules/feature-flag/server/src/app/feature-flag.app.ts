@@ -25,18 +25,43 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
-import type { FeatureFlagCacheRepository } from "../repositories/feature-flag-cache.repository.ts";
 import type { FeatureFlagRepositories } from "../repositories/feature-flag.repositories.ts";
 import { FeatureFlagService } from "../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../services/organization-created-at-cache.service.ts";
 import { CachedFeatureFlagRowAdapter } from "../adapters/cached.feature-flag-row.adapter.ts";
+
+/** The operator row as the cache carries it. */
+export type FeatureFlagRow = { enabled: boolean; rules: FeatureFlagRules };
+
+/**
+ * One cache entry.
+ *
+ * The row is wrapped so a cached absence (`row: null`) stays distinct from
+ * a cache miss (`undefined`). Without the wrapper a hit for an absent row
+ * would shadow the registry default with `false`.
+ */
+export type FeatureFlagCacheSlot = { row: FeatureFlagRow | null };
+
+/**
+ * Cross-process cache for operator rows.
+ *
+ * The composition root owns the backing store, its key prefix and its TTL.
+ * Entries hold the row rather than a pre-evaluated boolean, so one entry
+ * serves every tenant and targeting stays a per-call computation.
+ */
+export interface FeatureFlagCache {
+  /** `undefined` is a miss; a slot holding `row: null` is a cached absence. */
+  findSlot(key: string): Promise<FeatureFlagCacheSlot | undefined>;
+  set(key: string, slot: FeatureFlagCacheSlot): Promise<void>;
+  delete(key: string): Promise<void>;
+}
 
 /**
  * What the process owns: the shared cache tier with its key prefix and TTL,
  * this deployment's environment overrides, and the clock.
  */
 export type FeatureFlagInfrastructure = Readonly<{
-  cache: FeatureFlagCacheRepository;
+  cache: FeatureFlagCache;
   config: FeatureFlagConfig;
   now?: () => number;
 }>;

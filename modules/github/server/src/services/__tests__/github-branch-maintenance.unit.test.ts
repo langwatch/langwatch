@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { RedisGithubAppTokenRepository } from "../../repositories/redis/redis.github-app-token.repository.ts";
+import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache.ts";
 import { GithubHostService } from "../github-host.service.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
@@ -46,7 +46,7 @@ class MaintenanceRepository extends NullGithubPullRequestsRepository {
  * that is the point — the sweep spans every tenant and has neither in hand.
  */
 function service(repository: MaintenanceRepository) {
-  const appTokens = RedisGithubAppTokenRepository.create("app", "test-key", null);
+  const appTokens = RedisGithubAppTokenCache.create("app", "test-key", null);
   const access = GithubInstallationAccessService.create(
     new NullGithubInstallationsRepository(),
     appTokens,

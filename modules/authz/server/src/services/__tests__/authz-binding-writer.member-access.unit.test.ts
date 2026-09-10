@@ -25,7 +25,7 @@ import {
 } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
-import type { AuthzCompatibilityLedgerRepository } from "../../repositories/authz-compatibility-ledger.repository.ts";
+import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
 import type {
   AuthzBindingRepository,
   AuthzBindingScopeRow,
@@ -142,7 +142,7 @@ class MemberAccessStore {
     } as unknown as AuthzBindingRepository;
   }
 
-  ledger(): AuthzCompatibilityLedgerRepository {
+  ledger(): AuthzCompatibilityLedger {
     return {
       attachBindings: async ({ bindings, onDuplicate }: AuthzAttachBindingsInput) => {
         const attached: string[] = [];
@@ -185,7 +185,7 @@ class MemberAccessStore {
           if (index >= 0) this.rows.splice(index, 1);
         }
       },
-    } as unknown as AuthzCompatibilityLedgerRepository;
+    } as unknown as AuthzCompatibilityLedger;
   }
 }
 

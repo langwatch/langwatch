@@ -5,10 +5,10 @@
  */
 import type { Logger } from "@langwatch/observability";
 import {
-  NlpLambdaArnCachePort,
   NlpLambdaArnResolverPort,
   type NlpLambdaArnEntry,
 } from "../ports/nlp-lambda-arn.port.ts";
+import type { NlpLambdaArnCache } from "../app/workflow.app.ts";
 
 /** The shared key one project's ARN is filed under. */
 export const NLP_LAMBDA_ARN_CACHE_PREFIX = "lambda_arn:";
@@ -21,7 +21,7 @@ export const NLP_LAMBDA_ARN_CACHE_TTL_SECONDS = 600;
 
 export class NlpLambdaRuntimeService {
   static create(options: {
-    cache: NlpLambdaArnCachePort;
+    cache: NlpLambdaArnCache;
     resolver: NlpLambdaArnResolverPort;
     /** This deployment's engine image. A change invalidates every entry. */
     imageUri: string;
@@ -35,7 +35,7 @@ export class NlpLambdaRuntimeService {
 
   private constructor(
     private readonly options: {
-      cache: NlpLambdaArnCachePort;
+      cache: NlpLambdaArnCache;
       resolver: NlpLambdaArnResolverPort;
       imageUri: string;
       ttlSeconds?: number;

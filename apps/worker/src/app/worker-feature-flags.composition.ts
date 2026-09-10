@@ -1,6 +1,6 @@
 import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { featureFlagServer, RedisFeatureFlagCacheAdapter } from "@langwatch/feature-flag-server";
+import { featureFlagServer } from "@langwatch/feature-flag-server";
 import {
   OrganizationApi,
   type OrganizationApi as OrganizationApiContract,
@@ -9,6 +9,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import { createApp } from "@langwatch/runtime-composition";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import { WorkerFeatureFlagCache } from "./worker-feature-flag-cache.ts";
 
 /**
  * How this process reaches the shared flag cache.
@@ -64,7 +65,7 @@ export async function installWorkerFeatureFlags(options: {
     .withProvided(OrganizationApi, options.peers.organizations)
     .withModule(featureFlagServer, {
       infrastructure: {
-        cache: RedisFeatureFlagCacheAdapter.create(options.redis ?? null),
+        cache: WorkerFeatureFlagCache.create(options.redis ?? null),
         config: options.config.featureFlags,
       },
     })

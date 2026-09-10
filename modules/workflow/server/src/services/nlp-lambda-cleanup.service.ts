@@ -5,7 +5,7 @@
  */
 import type { Logger } from "@langwatch/observability";
 import { Temporal, nowInstant, type Instant } from "@langwatch/time";
-import { NlpLambdaFleetRepository } from "../repositories/nlp-lambda-fleet.repository.ts";
+import type { NlpLambdaFleet } from "../app/workflow.app.ts";
 import { NLP_LAMBDA_NAME_PREFIX } from "../rules/nlp-lambda-config.rules.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -20,7 +20,7 @@ export type NlpLambdaCleanupReport = Readonly<{
 
 export class NlpLambdaCleanupService {
   static create(options: {
-    fleet: NlpLambdaFleetRepository;
+    fleet: NlpLambdaFleet;
     logger?: Pick<Logger, "info" | "warn">;
     /** Injected so the cutoffs are testable without waiting a year. */
     now?: () => Instant;
@@ -29,7 +29,7 @@ export class NlpLambdaCleanupService {
   }
 
   private constructor(
-    private readonly fleet: NlpLambdaFleetRepository,
+    private readonly fleet: NlpLambdaFleet,
     private readonly logger: Pick<Logger, "info" | "warn"> | undefined,
     private readonly now: () => Instant,
   ) {}
