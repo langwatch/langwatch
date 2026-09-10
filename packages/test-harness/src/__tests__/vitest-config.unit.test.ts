@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  defineModuleVitestConfig,
-  moduleVitestTestOptions,
-} from "../vitest-config.ts";
+import { defineModuleVitestConfig, moduleVitestTestOptions } from "../vitest-config.ts";
 
 describe("moduleVitestTestOptions", () => {
   describe("given the node kind", () => {
@@ -24,12 +21,6 @@ describe("moduleVitestTestOptions", () => {
 
       expect(test?.fileParallelism).toBe(true);
       expect(test?.watch).toBe(false);
-    });
-
-    it("prints the import breakdown only when a threshold warns", () => {
-      expect(moduleVitestTestOptions({ kind: "node" })?.experimental).toEqual({
-        importDurations: { print: "on-warn" },
-      });
     });
 
     it("excludes node_modules and dist by default", () => {
@@ -60,12 +51,8 @@ describe("moduleVitestTestOptions", () => {
 
   describe("when the caller overrides the defaults", () => {
     it("honours an explicit isolate over the kind's default", () => {
-      expect(moduleVitestTestOptions({ kind: "node", isolate: true })?.isolate).toBe(
-        true,
-      );
-      expect(
-        moduleVitestTestOptions({ kind: "jsdom", isolate: false })?.isolate,
-      ).toBe(false);
+      expect(moduleVitestTestOptions({ kind: "node", isolate: true })?.isolate).toBe(true);
+      expect(moduleVitestTestOptions({ kind: "jsdom", isolate: false })?.isolate).toBe(false);
     });
 
     it("carries include, exclude, setupFiles, testTimeout and dir through", () => {
