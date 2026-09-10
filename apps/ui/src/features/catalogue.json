@@ -215,7 +215,7 @@
       "id": "home",
       "root": "home",
       "uses": {
-        "screens": ["@langwatch/project-web/screens/home"],
+        "screens": ["@langwatch/project-web/home"],
         "surfaces": ["@langwatch/analytics-web/surfaces/analytics-host"]
       }
     },
@@ -317,7 +317,7 @@
       "id": "project-settings",
       "root": "project",
       "uses": {
-        "screens": ["@langwatch/project-web/screens/project-settings"],
+        "screens": ["@langwatch/project-web/project-settings"],
         "surfaces": []
       }
     },
