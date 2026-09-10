@@ -67,3 +67,37 @@ describe("given any source file", () => {
     });
   });
 });
+
+describe("given a file that calls a deleted composition builder", () => {
+  describe("when it calls withPersistence or the singular withModule", () => {
+    /** @scenario "A deleted builder is refused where it is called" */
+    it("reports bannedLegacyName naming what to call instead", () => {
+      const found = report(
+        "await createApp({}).withPersistence('memory', {}).withModule(x).boot();",
+        "apps/api/src/app/api-production.composition.ts",
+      );
+
+      expect(found.map((entry) => entry.data.name).sort()).toEqual(["withModule", "withPersistence"]);
+      expect(found.find((entry) => entry.data.name === "withPersistence").message).toContain(
+        "refuses at boot",
+      );
+      expect(found.find((entry) => entry.data.name === "withModule").message).toContain(
+        "withModules([...])",
+      );
+    });
+  });
+
+  describe("when it names a member record it should have declared", () => {
+    /** @scenario "A deleted builder is refused where it is called" */
+    it("reports withInfrastructure and createTestInfrastructure", () => {
+      expect(report("app.withInfrastructure(pool);", "apps/api/src/app/api-production.composition.ts").map((e) => e.data.name)).toEqual([
+        "withInfrastructure",
+      ]);
+      expect(
+        report('import { createTestInfrastructure } from "@langwatch/test-harness";', "apps/api/src/app/api-production.composition.ts").map(
+          (e) => e.data.name,
+        ),
+      ).toEqual(["createTestInfrastructure"]);
+    });
+  });
+});
