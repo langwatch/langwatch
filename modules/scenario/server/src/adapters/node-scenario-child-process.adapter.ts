@@ -19,8 +19,8 @@ import { resolveChildProcessSpawn } from "./child-process-spawn.adapter.ts";
 import { resolveChildTlsEnv } from "./child-tls-env.adapter.ts";
 import type { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
 import {
-  ScenarioChildBootstrap,
-  ScenarioChildExecutionSession,
+  type ScenarioChildBootstrap,
+  type ScenarioChildExecutionSession,
   type ScenarioChildEnvironment,
 } from "../app/scenario.app.ts";
 
