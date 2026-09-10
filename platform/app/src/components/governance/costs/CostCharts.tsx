@@ -420,6 +420,49 @@ function seriesKeysOf(buckets: DailyBucket[]): Array<{
   return [...labelByKey.entries()].map(([key, label]) => ({ key, label }));
 }
 
+/**
+ * A bucket that may say its bar is not the whole figure.
+ *
+ * `withheld` is optional so the invented series and the panels whose figures
+ * are always whole need not say so; a bucket that omits it is drawn as whole.
+ * The chart does not decide what "short" means — the fold that built the
+ * bucket does, since only it saw the rows — it only draws what it is told.
+ */
+export type StackedBucket = DailyBucket & { withheld?: boolean };
+
+/** Stroke on a bar whose period holds a figure we do not have. */
+const WITHHELD_STROKE = "#94a3b8";
+/** How much of the series colour a short bar keeps. */
+const WITHHELD_FILL = 0.45;
+
+/** The words a short bar's tooltip adds after the period's name. */
+export const WITHHELD_TOOLTIP_NOTE = "part of this period has no dollar figure";
+
+/**
+ * One cell per bar, fading and dash-edging the bars whose period is short, so
+ * a short bar reads as "not the whole figure" before the tooltip or the note
+ * under the chart is. Nothing at all when no bucket is short: recharts draws
+ * each bar from its own cell list, and a full list of plain cells on every
+ * chart is work for nothing.
+ */
+function withheldCells(
+  rows: Array<Record<string, number | string>>,
+  withheldDays: ReadonlySet<string>,
+): ReactNode {
+  if (withheldDays.size === 0) return null;
+  return rows.map((row) => {
+    const short = withheldDays.has(String(row.day));
+    return (
+      <Cell
+        key={String(row.day)}
+        fillOpacity={short ? WITHHELD_FILL : 1}
+        stroke={short ? WITHHELD_STROKE : undefined}
+        strokeDasharray={short ? "3 2" : undefined}
+      />
+    );
+  });
+}
+
 function widenBuckets(
   buckets: DailyBucket[],
   keys: Array<{ key: string; label: string }>,
@@ -476,7 +519,13 @@ export function CostStackedBars({
   empty,
   onSelectSeries,
 }: {
-  buckets: DailyBucket[] | null;
+  /**
+   * Null while unanswered. A bucket flagged `withheld` is drawn faded with a
+   * dashed edge and its tooltip says why: its bar is the sum of the days that
+   * held a figure, which is short by however much was left out, and a short
+   * bar drawn like a whole one reads as a cheap period.
+   */
+  buckets: StackedBucket[] | null;
   height?: string;
   format?: (value: number) => string;
   showLegend?: boolean;
@@ -513,6 +562,13 @@ export function CostStackedBars({
     () => widenBuckets(buckets ?? [], keys),
     [buckets, keys],
   );
+  // Kept beside the rows rather than widened into them: a row is a bag of
+  // series values and a flag in it would be one more key for recharts to try
+  // to draw as a series.
+  const withheldDays = useMemo(
+    () => new Set((buckets ?? []).filter((b) => b.withheld).map((b) => b.day)),
+    [buckets],
+  );
 
   if (buckets === null)
     return <EmptyPanel height={height} unanswered empty={empty} />;
@@ -543,7 +599,12 @@ export function CostStackedBars({
               format(Number(value)),
               keys.find((k) => k.key === String(name))?.label ?? String(name),
             ]}
-            labelFormatter={(label) => formatDayTick(label as string, interval)}
+            labelFormatter={(label) => {
+              const period = formatDayTick(label as string, interval);
+              return withheldDays.has(label as string)
+                ? `${period} · ${WITHHELD_TOOLTIP_NOTE}`
+                : period;
+            }}
             contentStyle={CHART_TOOLTIP_CONTENT}
             labelStyle={CHART_TOOLTIP_LABEL}
             cursor={CHART_TOOLTIP_CURSOR}
@@ -576,7 +637,9 @@ export function CostStackedBars({
                     }
                   : undefined
               }
-            />
+            >
+              {withheldCells(rows, withheldDays)}
+            </Bar>
           ))}
         </BarChart>
       </ResponsiveContainer>

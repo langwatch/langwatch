@@ -99,15 +99,7 @@ export function CostProviderDayPanel({
         interval={interval}
         onSelectSeries={(provider, period) => setOpened({ provider, period })}
       />
-      {partialProviders.length > 0 && (
-        <Text
-          fontSize="xs"
-          color="fg.muted"
-          aria-label="Some bars cover only part of what was spent"
-        >
-          Part of {partialProviders.join(", ")} spend has no dollar figure
-        </Text>
-      )}
+      <PartialSpendNote providers={partialProviders} />
       {openedPeriod && (
         <PeriodRecords
           organizationId={organizationId}
@@ -116,6 +108,32 @@ export function CostProviderDayPanel({
         />
       )}
     </VStack>
+  );
+}
+
+/**
+ * The line under a chart whose bars are short, naming who left them short.
+ *
+ * Shared by the total chart and the provider split beside it: they are folded
+ * from the same rows, so a period short in one is short in the other, and the
+ * two panels have to say so in the same words. Renders nothing when no bar is
+ * short, so the caller need not guard it.
+ */
+export function PartialSpendNote({
+  providers,
+}: {
+  /** From `partialProviderNotes`: one phrase per short provider. */
+  providers: readonly string[];
+}) {
+  if (providers.length === 0) return null;
+  return (
+    <Text
+      fontSize="xs"
+      color="fg.muted"
+      aria-label="Some bars cover only part of what was spent"
+    >
+      Part of {providers.join(", ")} spend has no dollar figure
+    </Text>
   );
 }
 
@@ -176,12 +194,24 @@ export const TOTAL_SPEND_KEY = "total";
 export function costTotalBuckets(
   rows: readonly GovernanceCostProviderDayRowDto[],
   interval: TimeInterval,
-): DailyBucket[] {
+): CostTotalBucket[] {
   const byDay = new Map<string, number>();
+  // Which providers left a period short, keyed by the period's first day —
+  // the same fold `aggregateBuckets` applies to the figures, so a mark and
+  // the bar it sits on can never disagree about which period they mean.
+  const withheldByPeriod = new Map<string, Set<string>>();
   for (const row of rows) {
     // A withheld day adds nothing rather than being guessed at, exactly as it
-    // does in the stack. The line under that chart says the height is short.
+    // does in the stack — and the bucket SAYS it is short. A bar quietly
+    // drawn at the sum of the days that held a figure reads as a cheap
+    // period, which is the one thing a withheld figure exists to prevent.
     byDay.set(row.day, (byDay.get(row.day) ?? 0) + (row.amountUsd ?? 0));
+    if (row.amountUsd === null) {
+      const period = bucketStartOf(row.day, interval);
+      const held = withheldByPeriod.get(period) ?? new Set<string>();
+      held.add(row.provider);
+      withheldByPeriod.set(period, held);
+    }
   }
   const daily = [...byDay.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -189,8 +219,29 @@ export function costTotalBuckets(
       day,
       points: [{ key: TOTAL_SPEND_KEY, label: "Spend", value }],
     }));
-  return aggregateBuckets(daily, interval);
+  return aggregateBuckets(daily, interval).map((bucket) => {
+    const withheldProviders = [...(withheldByPeriod.get(bucket.day) ?? [])];
+    return {
+      ...bucket,
+      withheld: withheldProviders.length > 0,
+      withheldProviders: withheldProviders.sort(),
+    };
+  });
 }
+
+/**
+ * One period of the total chart, carrying whether its bar is the whole figure.
+ *
+ * `withheld` is true when any row folded into the period holds no dollar
+ * figure at all. The bar is then the sum of the days that did, which is SHORT
+ * by however much was left out, and the chart draws it as short rather than as
+ * a period nobody spent much in. `withheldProviders` names who left it short,
+ * sorted, so the note under the chart can say which bill to go and look at.
+ */
+export type CostTotalBucket = DailyBucket & {
+  withheld: boolean;
+  withheldProviders: string[];
+};
 
 /** The rows as one stackable bucket per day, one series per provider. */
 export function providerDayBuckets(

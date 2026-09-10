@@ -163,6 +163,49 @@ describe("the provider breakdown fold", () => {
     );
   });
 
+  it("marks the period holding a withheld day as withheld, naming the provider", () => {
+    const withWithheld = [
+      {
+        day: "2026-01-15",
+        provider: "openai_admin",
+        amountUsd: 60,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
+      {
+        day: "2026-01-16",
+        provider: "anthropic_admin",
+        amountUsd: null,
+        cellsWithoutAmount: 1,
+        currenciesWithoutUsdAmount: [],
+      },
+      {
+        day: "2026-04-02",
+        provider: "anthropic_admin",
+        amountUsd: 9,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
+    ];
+
+    const folded = costTotalBuckets(withWithheld, "quarter");
+
+    // The first quarter is SHORT: one of its days holds no dollar figure, so
+    // the bar it draws is not the whole of what was spent. The bucket says
+    // so, and says who, rather than leaving the height to speak for itself.
+    expect(folded.map((bucket) => bucket.day)).toEqual([
+      "2026-01-01",
+      "2026-04-01",
+    ]);
+    expect(folded[0]).toMatchObject({
+      withheld: true,
+      withheldProviders: ["anthropic_admin"],
+    });
+    expect(seriesIn(folded[0]!)).toEqual({ total: 60 });
+    // The second quarter holds every figure and carries no mark.
+    expect(folded[1]).toMatchObject({ withheld: false, withheldProviders: [] });
+  });
+
   it("counts a withheld day as no money rather than guessing at one", () => {
     const withWithheld = [
       {

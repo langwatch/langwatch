@@ -146,12 +146,46 @@ vi.mock("~/utils/api", () => ({
           data: {
             unavailableReason: null,
             providers: harness.providers,
+            // In the DTO's own shape: the US dollar line IS the lane's dollar
+            // figure, and a lane that reported nothing has no line at all.
             billed: harness.lanesReport
-              ? { amountUsd: 123.45, cellsWithoutAmount: 0 }
-              : { amountUsd: null, cellsWithoutAmount: 0 },
+              ? {
+                  amountUsd: 123.45,
+                  cellsWithoutAmount: 0,
+                  currenciesWithoutUsdAmount: [],
+                  currencyTotals: [
+                    {
+                      currencyCode: "USD",
+                      amount: 123.45,
+                      cellsWithoutAmount: 0,
+                    },
+                  ],
+                }
+              : {
+                  amountUsd: null,
+                  cellsWithoutAmount: 0,
+                  currenciesWithoutUsdAmount: [],
+                  currencyTotals: [],
+                },
             gateway: harness.lanesReport
-              ? { amountUsd: 67.89, cellsWithoutAmount: 0 }
-              : { amountUsd: null, cellsWithoutAmount: 0 },
+              ? {
+                  amountUsd: 67.89,
+                  cellsWithoutAmount: 0,
+                  currenciesWithoutUsdAmount: [],
+                  currencyTotals: [
+                    {
+                      currencyCode: "USD",
+                      amount: 67.89,
+                      cellsWithoutAmount: 0,
+                    },
+                  ],
+                }
+              : {
+                  amountUsd: null,
+                  cellsWithoutAmount: 0,
+                  currenciesWithoutUsdAmount: [],
+                  currencyTotals: [],
+                },
             seats: { status: "awaiting_data" },
             series: harness.lanesReport
               ? [{ day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 }]
@@ -726,6 +760,48 @@ describe("the cost breakdown panels", () => {
       // them and a bare caveat leaves a reader unable to tell which bar to
       // distrust.
       expect(region.getByText(/Anthropic/)).toBeInTheDocument();
+    });
+  });
+
+  describe("given the window holds a day we have no dollar figure for", () => {
+    /** @scenario "A day with a withheld amount shows as withheld in cost over time, not as a smaller bar" */
+    it("marks the cost-over-time chart as short and names the provider that withheld", () => {
+      harness.providers = [
+        { provider: "openai_admin", amountUsd: 90, cellsWithoutAmount: 0 },
+        { provider: "anthropic_admin", amountUsd: null, cellsWithoutAmount: 1 },
+      ];
+      harness.dailyByProvider = {
+        rows: [
+          {
+            day: "2026-01-15",
+            provider: "openai_admin",
+            amountUsd: 90,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+          {
+            day: "2026-01-16",
+            provider: "anthropic_admin",
+            amountUsd: null,
+            cellsWithoutAmount: 1,
+            currenciesWithoutUsdAmount: [],
+          },
+        ],
+      };
+      renderScreen();
+
+      // Scoped to THIS panel: the provider split beside it carries the same
+      // note for the same rows, and a page-wide search would pass on that one
+      // while the total chart stayed silent — which is the bug.
+      const panel = screen
+        .getByText("Cost over time")
+        .closest('[data-testid="cost-panel"]');
+      expect(panel).not.toBeNull();
+      const region = within(panel as HTMLElement);
+      const note = region.getByLabelText(/cover only part of what was spent/i);
+      // Names WHO withheld, so a reader knows which bill to go and look at.
+      expect(note).toHaveTextContent(/Anthropic/);
+      expect(note).not.toHaveTextContent(/OpenAI/);
     });
   });
 

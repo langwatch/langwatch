@@ -52,6 +52,8 @@ import { CostProviderBreakdown } from "~/components/governance/costs/CostProvide
 import {
   CostProviderDayPanel,
   costTotalBuckets,
+  PartialSpendNote,
+  partialProviderNotes,
 } from "~/components/governance/costs/CostProviderDayPanel";
 import {
   CostSpenderError,
@@ -1307,31 +1309,42 @@ function CostTotalPanel({
   sample: SampleSeries;
   showSample: boolean;
 }) {
+  const measured = useMemo(
+    () =>
+      providerDays === null ? null : costTotalBuckets(providerDays, interval),
+    [providerDays, interval],
+  );
+  // A period short in the provider split beside this is short here too —
+  // same rows, same fold — and both panels say so in the same words. A bar
+  // drawn at the sum of the days that held a figure reads as a cheap period
+  // unless something says the figure is not whole; the bar is drawn short
+  // (see `CostStackedBars`) and this line says who left it short.
+  const partialProviders = useMemo(
+    () => (providerDays === null ? [] : partialProviderNotes(providerDays)),
+    [providerDays],
+  );
   return (
     <CostPanel title="Cost over time" sample={showSample}>
       {!showSample && hasFailure ? (
         <CostPanelUnrefreshed />
       ) : (
-        <CostStackedBars
-          buckets={
-            showSample
-              ? sample.overTime
-              : providerDays === null
-                ? null
-                : costTotalBuckets(providerDays, interval)
-          }
-          interval={interval}
-          // The measured chart is ONE series and the axis already says it
-          // is money, so a legend there spends a line repeating the panel's
-          // own title. The invented one still carries several, and those do
-          // need naming.
-          showLegend={showSample}
-          empty={costPanelEmpty({
-            what: "What was spent, period by period.",
-            source: "Fills from the bills a connected source reports.",
-            action: ADD_A_SOURCE,
-          })}
-        />
+        <VStack align="stretch" gap={2}>
+          <CostStackedBars
+            buckets={showSample ? sample.overTime : measured}
+            interval={interval}
+            // The measured chart is ONE series and the axis already says it
+            // is money, so a legend there spends a line repeating the panel's
+            // own title. The invented one still carries several, and those do
+            // need naming.
+            showLegend={showSample}
+            empty={costPanelEmpty({
+              what: "What was spent, period by period.",
+              source: "Fills from the bills a connected source reports.",
+              action: ADD_A_SOURCE,
+            })}
+          />
+          {!showSample && <PartialSpendNote providers={partialProviders} />}
+        </VStack>
       )}
     </CostPanel>
   );

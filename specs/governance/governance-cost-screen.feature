@@ -923,6 +923,26 @@ Feature: One cost screen, three honest lanes
     # up rebuilds exactly the partial sum the lane refused to show them.
     # The mark on the bars is what stops the chart from being that sum.
 
+  @integration
+  Scenario: A day with a withheld amount shows as withheld in cost over time, not as a smaller bar
+    Given a window in which one provider has a day we hold no dollar figure for
+    When a permitted viewer reads the cost over time
+    Then the period holding that day is drawn as short, not as a smaller bar
+    And a note under the chart names the provider that withheld
+    # The total chart folds the same rows as the provider split beside it,
+    # and a withheld day added nothing to either. The split said so under its
+    # bars; the total chart said nothing, so the same period read as a cheap
+    # one there and as an incomplete one a panel to the right. A figure
+    # without a bill behind it is withheld, never zero, and a bar drawn at
+    # the sum of the days that held a figure is a zero for the day that did
+    # not — quietly, at the bottom of the bar.
+    #
+    # The bar itself is checked on the fold rather than on the render: the
+    # bucket carries whether it is short and who left it so, and the chart
+    # draws a short bucket faded and dash-edged and says so in its tooltip.
+    # A chart draws nothing under a test renderer with no layout, so the
+    # note under it is the part of this scenario the screen test can see.
+
   @unit
   Scenario: The period a reader opens is the span its bar was drawn from
     Given a provider billed on several days inside one period
