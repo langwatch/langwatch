@@ -83,14 +83,6 @@
     "./composition/gateway-agent-cache-store": {
       "types": "./dist/stores/gateway-agent-cache/gateway-agent-cache.store.d.ts",
       "default": "./src/stores/gateway-agent-cache/gateway-agent-cache.store.ts"
-    },
-    "./api-rest/gateway-internal": {
-      "types": "./dist/transport/api-rest/gateway-internal.api.d.ts",
-      "default": "./src/transport/api-rest/gateway-internal.api.ts"
-    },
-    "./api-rest/gateway-spend": {
-      "types": "./dist/transport/api-rest/gateway-spend.api.d.ts",
-      "default": "./src/transport/api-rest/gateway-spend.api.ts"
     }
   },
   "scripts": {

@@ -10,7 +10,7 @@ import {
 import type {
   GatewayTraceRow,
   GatewayUsageBucket,
-  GatewayVirtualKeySpendPort,
+  GatewayVirtualKeySpend,
 } from "@langwatch/gateway-server";
 
 type TraceStub = Pick<GatewayTraceRow, "virtualKeyId" | "costUsd" | "occurredAt"> & {
@@ -40,7 +40,7 @@ function mockVirtualKeys(
   };
 }
 
-function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendPort {
+function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpend {
   const rows: GatewayTraceRow[] = traces.map((t, i) => ({
     traceId: `trace_${i}`,
     virtualKeyId: t.virtualKeyId,
@@ -91,7 +91,7 @@ function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendPort {
         .sort((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
         .slice(0, limit),
     spendByVirtualKey: async () => [],
-  } as unknown as GatewayVirtualKeySpendPort;
+  } as unknown as GatewayVirtualKeySpend;
 }
 
 function service(

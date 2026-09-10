@@ -14,7 +14,8 @@ import type {
   GatewayRealtimeSessionRepository,
   ReserveResult,
 } from "../repositories/gateway-realtime-session.repository.ts";
-import { EMPTY_SPEND_USAGE, type SpendUsage } from "../processes/gateway-spend-commands.process.ts";
+import type { SpendUsage } from "@langwatch/gateway-contract";
+import { EMPTY_SPEND_USAGE } from "../processes/gateway-spend-commands.process.ts";
 import type { GatewaySpanIngestion } from "../app/gateway.infrastructure.ts";
 import type { GatewaySpendConfirmation } from "../app/gateway.infrastructure.ts";
 import type { GatewaySpendRating } from "../app/gateway.infrastructure.ts";

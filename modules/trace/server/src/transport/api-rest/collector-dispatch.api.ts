@@ -17,7 +17,7 @@ import {
 
 import { TraceCollectorSpanService } from "#services/span/trace-collector-span.service";
 
-import type { CollectorEvaluationReport, CollectorSpanIngest } from "./collector.api.ts";
+import type { CollectorEvaluationReport, CollectorSpanIngest } from "../collector.rest.ts";
 import type { CollectorMetadata } from "./collector-body.api.ts";
 
 const logger = createLogger("langwatch.collector");

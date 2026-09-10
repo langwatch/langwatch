@@ -8,7 +8,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 
 import { GatewaySpendRating } from "../app/gateway.infrastructure.ts";
-import type { SpendUsage } from "../processes/gateway-spend-commands.process.ts";
+import type { SpendUsage } from "@langwatch/gateway-contract";
 
 /**
  * Rating for the gateway spend pipeline: quantities in, integer nano-USD out, quantized exactly once here via the same estimateCost cascade the trace pipeline prices with. float64 is exact for integers to 2^53, so a JS number carries losslessly into ClickHouse's Int64. Rating is deterministic per (model, quantities, rate_version): a replay re-rates identically unless the registry changed, which is what makes re-rating a projection rebuild rather than a correction event stream.

@@ -18,7 +18,8 @@ import {
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 import type { GatewayClickHouseResolver } from "../../app/gateway.infrastructure.ts";
 import {
-  GatewayBudgetSpend,
+  budgetSpendTargetsFor,
+  type GatewayBudgetSpend,
   type GatewayBudgetSpendRecord,
 } from "../../app/gateway.infrastructure.ts";
 
@@ -1249,7 +1250,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     const first = input[0]!;
     return "budgetId" in first
       ? (input as BudgetSpendTarget[])
-      : GatewayBudgetSpend.targetsForBudgets({
+      : budgetSpendTargetsFor({
           budgets: input as GatewayBudgetResource[],
           now,
         });

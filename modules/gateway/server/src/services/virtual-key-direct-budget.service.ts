@@ -6,7 +6,7 @@
 import { type Instant, nowInstant } from "@langwatch/time";
 import type { GatewayBudget } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
-import { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
+import { budgetSpendTargetsFor } from "../app/gateway.infrastructure.ts";
 import type { VirtualKeyDirectBudgetRepository } from "../repositories/gateway-virtual-key-direct-budget.repository.ts";
 import { GatewayWindow } from "@langwatch/gateway-contract";
 
@@ -92,7 +92,7 @@ async function loadPeriodSpend(args: {
   try {
     const spends = await chRepo.getSpendForTargetsAcrossTenants(
       projectIds,
-      GatewayBudgetSpend.targetsForBudgets({ budgets, now }),
+      budgetSpendTargetsFor({ budgets, now }),
       now,
     );
 

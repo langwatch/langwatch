@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Temporal } from "@langwatch/time";
+import { spendUsageSchema, type SpendUsage } from "@langwatch/gateway-contract";
 
 export const GATEWAY_SPEND_PIPELINE_NAME = "gateway_spend_processing" as const;
 export const GATEWAY_SPEND_AGGREGATE_TYPE = "gateway_request" as const;
@@ -74,28 +75,6 @@ const occurredAtMs = z
       .epochMilliseconds,
   );
 
-/**
- * Every quantity a provider bills by, one named integer field each — not a map, which would kill sumIf rollups, lose per-field defaults, and turn a typo into a silently unpriced quantity; every field defaults to zero. input/output_audio_tokens and input/output_image_tokens are DISJOINT from the text token counts (audio/image price several times higher; charging both would double that portion); image_count is display-only; reasoning_tokens stays a subset of output_tokens, also display-only. audio_ms is whole milliseconds; the one division by 1000 happens at the rating seam.
- */
-export const spendUsageSchema = z.object({
-  input_tokens: z.number().int().min(0).default(0),
-  output_tokens: z.number().int().min(0).default(0),
-  cache_read_input_tokens: z.number().int().min(0).default(0),
-  cache_creation_input_tokens: z.number().int().min(0).default(0),
-  cache_creation_1h_tokens: z.number().int().min(0).default(0),
-  reasoning_tokens: z.number().int().min(0).default(0),
-  input_audio_tokens: z.number().int().min(0).default(0),
-  output_audio_tokens: z.number().int().min(0).default(0),
-  /** Characters synthesized, what TTS is priced by. */
-  input_chars: z.number().int().min(0).default(0),
-  /** Audio duration in whole milliseconds. */
-  audio_ms: z.number().int().min(0).default(0),
-  input_image_tokens: z.number().int().min(0).default(0),
-  output_image_tokens: z.number().int().min(0).default(0),
-  /** Images the response carried. Observability only, never priced. */
-  image_count: z.number().int().min(0).default(0),
-});
-export type SpendUsage = z.infer<typeof spendUsageSchema>;
 
 /** Every quantity at zero: what a request that measured nothing carries. */
 export const EMPTY_SPEND_USAGE: SpendUsage = {

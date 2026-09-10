@@ -9,8 +9,8 @@ import {
   type GatewaySpendWindow,
   type GatewayTraceRow,
   type GatewayUsageBucket,
-  type GatewayVirtualKeySpend,
-  GatewayVirtualKeySpendPort,
+  type GatewayVirtualKeySpendRow,
+  GatewayVirtualKeySpend,
 } from "../../app/gateway.infrastructure.ts";
 import { usdDisplayString } from "@langwatch/gateway-contract";
 
@@ -19,7 +19,7 @@ const VK_ATTRIBUTE = "langwatch.virtual_key_id";
 
 const logger = createLogger("langwatch:gateway:virtual-key-spend-repository");
 
-export class GatewayVirtualKeySpendRepository implements GatewayVirtualKeySpendPort {
+export class GatewayVirtualKeySpendRepository implements GatewayVirtualKeySpend {
   static create(resolveClient: GatewayClickHouseResolver): GatewayVirtualKeySpendRepository {
     return new GatewayVirtualKeySpendRepository(resolveClient);
   }
@@ -34,7 +34,7 @@ export class GatewayVirtualKeySpendRepository implements GatewayVirtualKeySpendP
     tenantIds: string[];
     virtualKeyIds: string[];
     window: GatewaySpendWindow;
-  }): Promise<GatewayVirtualKeySpend[]> {
+  }): Promise<GatewayVirtualKeySpendRow[]> {
     const { tenantIds, virtualKeyIds, window } = args;
     if (tenantIds.length === 0 || virtualKeyIds.length === 0) return [];
 

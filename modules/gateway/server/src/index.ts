@@ -3,6 +3,28 @@ export { gatewayServer } from "./gateway.server.ts";
 export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 export { agentCacheRest } from "./transport/agent-cache.rest.ts";
 export { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
+export {
+  gatewaySpendBillingPlanGate,
+  gatewaySpendRest,
+  type GatewaySpendApp,
+  type GatewaySpendEnvelope,
+  type GatewaySpendWebhookDelivery,
+  type GatewaySpendWebhookEndpoint,
+  type GatewaySpendWebhookEndpoints,
+  type GatewaySpendWebhookEvents,
+} from "./transport/gateway-spend.rest.ts";
+export {
+  buildGatewayCanonicalString,
+  computeGatewaySignature,
+  gatewayInternalRest,
+  gatewayInternalSignature,
+  GATEWAY_SIGNATURE_WINDOW_SECONDS,
+  GatewayInternalApi,
+  type GatewayCodexRefresh,
+  type GatewayInternalApp,
+  type GatewayInternalSpendPipeline,
+  type GatewaySpendCommandSender,
+} from "./transport/gateway-internal.rest.ts";
 export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
@@ -17,7 +39,6 @@ export { GatewaySpendEventsService } from "./services/gateway-spend-events.servi
 export { GatewayEndUserCapsAdapter } from "./adapters/gateway-end-user-caps.adapter.ts";
 export { GatewayEndUserCapsService } from "./services/gateway-end-user-caps.service.ts";
 export * from "./services/gateway-usage.service.ts";
-export { GatewayBudgetSpend } from "./ports/gateway-budget-spend.port.ts";
 export type { GatewayBudgetSpendRecord, BudgetBucketBoundary, BudgetSpendTarget, ScopeSpend, BucketSpend, LedgerEventRow, BudgetDebitRow, PulledUsageRow, PulledUsageTotals, GatewayBudgetSpend as GatewayBudgetSpend } from "./app/gateway.infrastructure.ts";
 export type { GatewayChangeEventKind, GatewayChangeEvent, AppendGatewayChangeEventInput, GatewayPersistenceTransaction, GatewayChangeEvents as GatewayChangeEvents } from "./app/gateway.infrastructure.ts";
 export type { GatewayAuditAction, GatewayAuditTargetKind, AppendGatewayAuditInput, GatewayAuditTransaction, GatewayAudit as GatewayAudit } from "./app/gateway.infrastructure.ts";
@@ -25,7 +46,7 @@ export * from "./ports/gateway-virtual-key.port.ts";
 export type { GatewayClickHouseClient, GatewayClickHouseResolver, GatewayClickHouse as GatewayClickHouse } from "./app/gateway.infrastructure.ts";
 export type { GatewaySettlementPolicy } from "./app/gateway.infrastructure.ts";
 export * from "./ports/gateway-spend-events.port.ts";
-export type { GatewayVirtualKeySpend, GatewaySpendWindow, GatewayUsageBucket, GatewayTraceRow, GatewayVirtualKeySpendPort } from "./app/gateway.infrastructure.ts";
+export type { GatewayVirtualKeySpendRow, GatewaySpendWindow, GatewayUsageBucket, GatewayTraceRow, GatewayVirtualKeySpend } from "./app/gateway.infrastructure.ts";
 export * from "./adapters/fixed-gateway-settlement.adapter.ts";
 export * from "./adapters/gateway-virtual-key-spend.adapter.ts";
 export * from "./adapters/gateway-budget-ledger.adapter.ts";
@@ -48,6 +69,8 @@ export {
   GatewayTraceProjectRequiredError,
   GatewayTraceProjectUnknownError,
   GuardrailAttachForbiddenError,
+  spendUsageSchema,
+  type SpendUsage,
   translateExternalIdConflict,
   VirtualKeyExpiryInPastError,
   VirtualKeyNotFoundError,
@@ -70,7 +93,6 @@ export type { GatewaySpendState } from "./projections/gateway-spend.projection.t
 export * from "./adapters/gateway-wire-pagination.adapter.ts";
 export * from "./adapters/virtual-key-crypto.adapter.ts";
 export type * from "./services/gateway.service.ts";
-export type * from "./ports/gateway-budget-spend.port.ts";
 
 /**
  * The feature's application: the one thing every door is given, holding every
@@ -154,21 +176,21 @@ export type {
   RealtimeSessionPollerHandle,
   RealtimeSessionReconciliationRepository,
 } from "./services/gateway-realtime-session-reconciliation.service.ts";
-export {
+export type {
   GatewayGovernanceSignals,
-  type GatewayVirtualKeyLifecycleSignal,
-} from "./ports/gateway-governance-signals.port.ts";
-export { GatewayModelProviderCredentials } from "./ports/gateway-model-provider-credentials.port.ts";
-export {
+  GatewayVirtualKeyLifecycleSignal,
+} from "./app/gateway.infrastructure.ts";
+export type { GatewayModelProviderCredentials } from "./app/gateway.infrastructure.ts";
+export type {
   GatewayScopePermissions,
-  type GatewayPermissionScope,
-} from "./ports/gateway-scope-permissions.port.ts";
-export { GatewayConfigAssembly } from "./ports/gateway-config-assembly.port.ts";
+  GatewayPermissionScope,
+} from "./app/gateway.infrastructure.ts";
+export type { GatewayConfigAssembly } from "./app/gateway.infrastructure.ts";
 export { GatewayConfigAssemblyAdapter } from "./adapters/postgres.gateway-config-assembly.adapter.ts";
-export { GatewayVirtualKeyCrypto } from "./ports/gateway-virtual-key-crypto.port.ts";
-export { GatewaySpanIngestion } from "./ports/gateway-span-ingestion.port.ts";
-export { GatewaySpendConfirmation } from "./ports/gateway-spend-confirmation.port.ts";
-export { GatewaySpendRating } from "./ports/gateway-spend-rating.port.ts";
+export type { GatewayVirtualKeyCrypto } from "./app/gateway.infrastructure.ts";
+export type { GatewaySpanIngestion } from "./app/gateway.infrastructure.ts";
+export type { GatewaySpendConfirmation } from "./app/gateway.infrastructure.ts";
+export type { GatewaySpendRating } from "./app/gateway.infrastructure.ts";
 export {
   ModelCatalogGatewaySpendRatingAdapter,
   NANO_USD_PER_USD,

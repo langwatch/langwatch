@@ -13,7 +13,7 @@ import {
   type ApplicableBudget,
   GatewayApplicableBudgetsService,
 } from "./gateway-applicable-budgets.service.ts";
-import { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
+import { budgetSpendTargetsFor } from "../app/gateway.infrastructure.ts";
 import { scopeTargetKey, GatewayWindow } from "@langwatch/gateway-contract";
 import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
@@ -305,7 +305,7 @@ export class BudgetOverviewService {
     try {
       const spends = await this.chRepo.getSpendForTargetsAcrossTenants(
         tenantIds,
-        GatewayBudgetSpend.targetsForBudgets({ budgets: [budget], now }),
+        budgetSpendTargetsFor({ budgets: [budget], now }),
         now,
       );
 

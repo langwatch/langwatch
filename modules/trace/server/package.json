@@ -65,8 +65,8 @@
       "default": "./src/transport/api-rest/trace-legacy.api.ts"
     },
     "./api-rest/collector": {
-      "types": "./dist/transport/api-rest/collector.api.d.ts",
-      "default": "./src/transport/api-rest/collector.api.ts"
+      "types": "./dist/transport/collector.rest.d.ts",
+      "default": "./src/transport/collector.rest.ts"
     }
   },
   "scripts": {

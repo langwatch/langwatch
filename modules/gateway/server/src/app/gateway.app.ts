@@ -41,7 +41,7 @@ import type {
   VirtualKeySnakeDto,
 } from "../adapters/gateway-virtual-key-dto.adapter.ts";
 import type { GatewayBudgetSpend } from "./gateway.infrastructure.ts";
-import type { GatewayVirtualKeySpendPort } from "./gateway.infrastructure.ts";
+import type { GatewayVirtualKeySpend } from "./gateway.infrastructure.ts";
 
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import {
@@ -223,7 +223,7 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
    */
   budgetSpend: GatewayBudgetSpend | undefined;
   /** The ClickHouse per-key spend source. Absent likewise. */
-  virtualKeySpend: GatewayVirtualKeySpendPort | undefined;
+  virtualKeySpend: GatewayVirtualKeySpend | undefined;
   /** The spend-event ledger reader. Absent likewise. */
   spendEvents: GatewaySpendEventsService | undefined;
   /** Project reads: organization resolution and trace-destination facts. */
@@ -651,7 +651,7 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.virtualKeys.enable(input);
   }
 
-  getVirtualKeySpendService(): GatewayVirtualKeySpendPort | undefined {
+  getVirtualKeySpendService(): GatewayVirtualKeySpend | undefined {
     return this.#dependencies.virtualKeySpend;
   }
 

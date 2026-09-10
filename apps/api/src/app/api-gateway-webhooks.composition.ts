@@ -63,7 +63,17 @@ import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryption } from "@langwatch/secret-server";
 
-import type { ApiGatewaySpendWebhook } from "./api-gateway-spend-rest.composition.ts";
+import type { GatewaySpendWebhookDelivery } from "@langwatch/gateway-server";
+import type { WebhookApi } from "@langwatch/webhook-contract";
+
+/**
+ * The Enterprise webhook platform, as the spend family's replay route reads it.
+ */
+export type ApiGatewaySpendWebhook = Readonly<{
+  webhooks: WebhookApi;
+  eventsAvailable: boolean;
+  delivery: GatewaySpendWebhookDelivery | undefined;
+}>;
 
 /** One tenant's ClickHouse, as the emitted-envelope log reads it. */
 export type ApiWebhookClickHouseResolver = WebhookClickHouseClientResolver;

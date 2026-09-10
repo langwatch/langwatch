@@ -7,7 +7,7 @@ import { type Instant, toDate } from "@langwatch/time";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
 import type { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
-import type { GatewayVirtualKeySpendPort } from "../app/gateway.infrastructure.ts";
+import type { GatewayVirtualKeySpend } from "../app/gateway.infrastructure.ts";
 
 /**
  * The one project read these surfaces make: which tenants an org's gateway traces can land in.
@@ -85,7 +85,7 @@ export class GatewayUsageService {
     private readonly projects: GatewayUsageProjects,
     private readonly virtualKeys: GatewayUsageVirtualKeys,
     private readonly chRepo?: GatewayBudgetSpend,
-    private readonly spendRepo?: GatewayVirtualKeySpendPort,
+    private readonly spendRepo?: GatewayVirtualKeySpend,
   ) {}
 
   /**
@@ -97,7 +97,7 @@ export class GatewayUsageService {
     projects: GatewayUsageProjects;
     virtualKeys: GatewayUsageVirtualKeys;
     chRepo: GatewayBudgetSpend | undefined;
-    spendRepo: GatewayVirtualKeySpendPort | undefined;
+    spendRepo: GatewayVirtualKeySpend | undefined;
   }): GatewayUsageService {
     return new GatewayUsageService(args.projects, args.virtualKeys, args.chRepo, args.spendRepo);
   }

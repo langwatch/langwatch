@@ -6,20 +6,11 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
-import type { GatewayGuardrailDirection } from "@langwatch/gateway-contract";
+import type { GatewayGuardrailDirection, GuardrailWireDirection } from "@langwatch/gateway-contract";
 import type { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
 import type { EvaluatorTypes, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 
 const logger = createLogger("langwatch:gateway:guardrail-evaluation");
-
-/**
- * The directions the data plane sends, per contract 4.6. These are deliberately
- * not the Prisma enum values: the wire contract and the storage enum are
- * separate vocabularies and conflating them is what broke this endpoint before.
- */
-export const GUARDRAIL_WIRE_DIRECTIONS = ["request", "response", "stream_chunk"] as const;
-
-export type GuardrailWireDirection = (typeof GUARDRAIL_WIRE_DIRECTIONS)[number];
 
 export type GuardrailDecision = "allow" | "block" | "modify";
 

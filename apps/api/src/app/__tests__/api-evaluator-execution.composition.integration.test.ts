@@ -7,10 +7,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentService } from "@langwatch/experiment-server";
-import {
-  buildGatewayCanonicalString,
-  computeGatewaySignature,
-} from "@langwatch/gateway-server/api-rest/gateway-internal";
+import { buildGatewayCanonicalString, computeGatewaySignature } from "@langwatch/gateway-server";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
