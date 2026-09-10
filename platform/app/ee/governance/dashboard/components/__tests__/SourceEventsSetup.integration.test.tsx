@@ -190,5 +190,100 @@ describe("given a source's ingest endpoint", () => {
         ingestEndpointFor({ id: "src_2", sourceType: "workato" }),
       ).toContain("/api/ingest/webhook/src_2");
     });
+
+    /**
+     * `claude_code` is a push source in the catalog and was not in the pair of
+     * type names this file used to hardcode, so it rendered a URL with a
+     * literal `<mode>` in it — a 404 handed to a reader told to paste it.
+     *
+     * @scenario "Setup instructions sit behind the heading, whatever the source is doing"
+     */
+    it("routes every push type in the catalog, not just the two once listed here", () => {
+      const endpoint = ingestEndpointFor({
+        id: "src_3",
+        sourceType: "claude_code",
+      });
+
+      expect(endpoint).toContain("/api/ingest/otel/src_3");
+      expect(endpoint).not.toContain("<mode>");
+    });
+  });
+
+  describe("when the source is not pushed to at all", () => {
+    /**
+     * Only two push routes exist (`ingestionRoutes.ts:398` and `:528`), so a
+     * pull source has no endpoint to name and the placeholder that used to
+     * stand in for one could never resolve.
+     *
+     * @scenario "Setup instructions sit behind the heading, whatever the source is doing"
+     */
+    it("has no endpoint rather than a placeholder one", () => {
+      for (const sourceType of [
+        "copilot_studio_dataverse",
+        "databricks_genie",
+        "openai_admin",
+        "anthropic_admin",
+        "http_custom",
+      ]) {
+        expect(ingestEndpointFor({ id: "src_4", sourceType })).toBeNull();
+      }
+    });
+
+    /**
+     * `s3_custom` is catalog mode `"s3"` and the webhook handler accepts it
+     * anyway, in callback mode (`ingestionRoutes.ts:541-543`). Pinned because
+     * deciding this from the catalog's `mode` instead of from the handler's
+     * own guard drops a real endpoint, which is a mistake made once already.
+     *
+     * @scenario "Setup instructions sit behind the heading, whatever the source is doing"
+     */
+    it("keeps the callback endpoint an S3 source really does listen on", () => {
+      expect(
+        ingestEndpointFor({ id: "src_6", sourceType: "s3_custom" }),
+      ).toContain("/api/ingest/webhook/src_6");
+    });
+  });
+});
+
+describe("given a pull source's setup popover", () => {
+  describe("when it opens", () => {
+    /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
+    it("says the source is pulled instead of naming an endpoint to push to", async () => {
+      const user = userEvent.setup();
+      renderUi(
+        <EventsSetupPopover
+          source={{ id: "src_5", sourceType: "copilot_studio_dataverse" }}
+        />,
+      );
+
+      await user.click(screen.getByTestId("events-setup-info"));
+
+      expect(await screen.findByText(/This source is pulled/)).toBeVisible();
+      expect(screen.queryByText(/Push an OTLP body to/)).toBeNull();
+      // The rotation paragraph describes a bearer this source does not have.
+      expect(screen.queryByText(/stays valid for 24h/)).toBeNull();
+    });
+  });
+});
+
+describe("given an endpoint too long for the popover", () => {
+  describe("when it renders", () => {
+    /**
+     * The URL's only natural break is a hyphen in a subdomain, and what
+     * follows it is wider than the popover, so without an explicit break rule
+     * it painted outside the card. Asserted on the style the element actually
+     * carries, since the overflow itself has no layout in jsdom.
+     *
+     * @scenario "Setup instructions sit behind the heading, whatever the source is doing"
+     */
+    it("lets the endpoint break mid-token", async () => {
+      const user = userEvent.setup();
+      renderUi(<EventsSetupPopover source={OTEL_SOURCE} />);
+
+      await user.click(screen.getByTestId("events-setup-info"));
+
+      const endpoint = await screen.findByText(/\/api\/ingest\/otel\/src_1/);
+      expect(getComputedStyle(endpoint).wordBreak).toBe("break-all");
+    });
   });
 });
