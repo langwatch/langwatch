@@ -358,8 +358,9 @@ export class AgentRepository {
   }
 
   /**
-   * Finds a connected agent by its identity key, whatever its state, so a
-   * process that registers the same identity writes the row it already has.
+   * Finds an agent by its natural key (identity key), whatever its state, so
+   * a process that registers the same identity writes the row it already
+   * has. Used by both connected agents and voice agents.
    */
   async findByIdentityKey(input: {
     projectId: string;
