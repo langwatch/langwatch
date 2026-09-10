@@ -207,10 +207,17 @@ function titleCaseFragment(fragment: string): string {
  * without an amount" describes something that did not happen, and a reader
  * holding the provider invoice can see it did not.
  *
- * Naming the currency is what turns the note from an apology into something
- * the reader can act on: they know which invoice to go and read. When nothing
- * names one — a cell recorded in dollars that still carries no dollar figure —
- * the sentence says only what we know, rather than guessing at a currency.
+ * THE CURRENCIES ARE NO LONGER NAMED IN THIS SENTENCE, and that is the point
+ * of the change rather than a shortcut. Money billed in euros now has a euro
+ * line of its own on the card, stating the figure in the currency the invoice
+ * states it in — so a note here saying "some usage is billed in EUR" would be
+ * the second, vaguer place on one card naming the same currency, and the two
+ * would drift the first time either moved.
+ *
+ * What is left is the one thing the line above cannot say: some part of what
+ * this lane covers has no dollar figure at all, so the dollar headline is not
+ * the whole of it. The currency lines say what we DO hold; this says that
+ * something is missing. Neither states a partial figure.
  */
 export function laneWithheldTotalNote(): string {
   return "We hold no dollar figure for part of what this lane covers, so no total is shown for it.";
@@ -237,11 +244,34 @@ export function formatLaneCurrencyTotal({
   const named = currencyCode === "" ? "No currency named" : currencyCode;
   if (amount === null) return `${named} —`;
   const magnitude = Math.abs(amount);
-  const digits =
-    magnitude >= CENTS_STOP_MATTERING_AT
-      ? GROUPED_WHOLE.format(magnitude)
-      : GROUPED_CENTS.format(magnitude);
-  return `${named} ${amount < 0 ? "-" : ""}${digits}`;
+  return `${named} ${amount < 0 ? "-" : ""}${currencyDigits(magnitude)}`;
+}
+
+/**
+ * `laneDigits`' bands with the dollar sign taken off.
+ *
+ * ALL THREE, not the top two. The gateway lane's figures are the reason the
+ * sub-unit band exists at all — a per-request cost lands in the fourth decimal
+ * — and a lane billed in euros is exactly as small as the same lane billed in
+ * dollars. Rounded to cents it renders `EUR 0.00`, which reads as a currency
+ * nothing was spent in, next to a dollar figure of the same size that reads as
+ * `$0.000165`. Two totals on one card, rounding differently, is the shape of
+ * the defect this card was rebuilt against.
+ *
+ * A measured zero stays `0.00`, because a retracted amount IS a stated zero
+ * and the screen has to be able to say so.
+ *
+ * The sub-cent digits come from `formatBudgetUsd` with its symbol removed
+ * rather than from a fourth formatter, so the precision below a dollar has one
+ * definition. Naming the currency by its code is what makes that safe here:
+ * nothing downstream reads the dollar sign, so dropping it drops a claim about
+ * the currency rather than information about the amount.
+ */
+function currencyDigits(magnitude: number): string {
+  if (magnitude >= CENTS_STOP_MATTERING_AT)
+    return GROUPED_WHOLE.format(magnitude);
+  if (magnitude >= 1) return GROUPED_CENTS.format(magnitude);
+  return formatBudgetUsd(magnitude).replace("$", "");
 }
 
 /** The dollar formatters' currency-free twins — same bands, no symbol. */

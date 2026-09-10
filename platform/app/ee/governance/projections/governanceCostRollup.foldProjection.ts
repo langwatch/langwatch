@@ -742,9 +742,27 @@ export class GovernanceCostRollupFoldProjection
     const d = event.data;
     const previous = state.pulledItems[d.restatementKey];
 
-    // Re-delivery, or a retraction older than what the item already holds.
-    // Ordering is by the pull instant carried on the event, never by arrival.
-    if (previous !== undefined && previous.observedAtMs >= d.observedAtMs) {
+    // A retraction older than what the item already holds. Ordering is by the
+    // pull instant carried on the event, never by arrival.
+    //
+    // STRICTLY older, so a retraction sharing its observation's pull instant
+    // still lands. An equal instant is the one case where the two orders
+    // disagreed about money: folded observation-first the retraction was
+    // dropped here and the charge stayed live, folded retraction-first the
+    // observation behind it took the stale path -- which needs a STRICTLY
+    // earlier look to be evidence of anything -- and the cell read as empty.
+    // The comparator folds a day with no ordering at all, so that is a day
+    // reported as drifting or not depending on the order a GROUP BY happened
+    // to return, which is the one alert that says the money on screen is
+    // wrong.
+    //
+    // The retraction is the arm that wins because it is the safe one: a
+    // withdrawal we apply twice costs nothing, and a charge the provider took
+    // back left standing is money on the screen nobody spent. Re-delivering
+    // the same retraction is still a no-op in substance -- the item is
+    // already zero, so nothing MOVES the figure, the revision markers carry
+    // forward untouched and the count does not advance.
+    if (previous !== undefined && previous.observedAtMs > d.observedAtMs) {
       return state;
     }
 

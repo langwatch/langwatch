@@ -284,6 +284,30 @@ describe("given a pulled record a provider billed in its own currency", () => {
   });
 });
 
+describe("given an adapter whose extra bag names a canonical money field", () => {
+  describe("when the record is prepared for export", () => {
+    /** @scenario "An exported usage record names the currency beside its amount" */
+    it("keeps the pair the event stated rather than the one the bag names", () => {
+      // `extra` is an open record, and for the config-driven adapters its keys
+      // are whatever an administrator typed into the event mapping. A key that
+      // collides with a canonical name must not be able to re-denominate the
+      // amount beside it.
+      const money = moneyOf(
+        mapBill(
+          euroBillEvent({
+            cost_amount: "12.34",
+            cost_currency: "EUR",
+            extra: { cost_currency: "USD", cost_amount: "999.99" },
+          }),
+        ).rawOcsfJson,
+      );
+
+      expect(money.cost_amount).toBe("12.34");
+      expect(money.cost_currency).toBe("EUR");
+    });
+  });
+});
+
 describe("given a day whose cost was read once and exported", () => {
   describe("when a later read reports a different figure for that same day", () => {
     /** @scenario "A cost row read again replaces the record it already exported" */

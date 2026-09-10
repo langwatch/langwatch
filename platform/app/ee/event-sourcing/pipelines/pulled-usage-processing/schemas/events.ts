@@ -229,6 +229,16 @@ export type PulledUsageObservedEvent = z.infer<
  * `costNanoUsd` in dollars when `costNanoMinor` is absent. A retraction that
  * omitted it would therefore address the DOLLAR cell and leave the euro one
  * live.
+ *
+ * For the same reason the three address dimensions below are REQUIRED here
+ * while the observation above defaults them. That default is right there and
+ * wrong here: an observation's default reads an append-only history written
+ * before those fields existed, and this event type has no such history — it is
+ * new, so every one of them is written by a producer that knows the answer.
+ * A defaulted dimension on a retraction is not a lenient read of the past, it
+ * is a wrong address in the present: it would empty the USD or the
+ * blank-dimension cell and leave the cell it meant to withdraw still charged,
+ * which is the double-counting this event exists to prevent.
  */
 export const pulledUsageRetractedEventDataSchema = z.object({
   /** The dimension-only identity of the item being withdrawn. */
@@ -243,12 +253,20 @@ export const pulledUsageRetractedEventDataSchema = z.object({
   /** Zero, always. See the header for why it is stated rather than omitted. */
   costNanoMinor: z.number().int(),
   /** The currency of the cell being retracted — part of that cell's address. */
-  currencyCode: z.string().length(3).default("USD"),
+  currencyCode: z.string().length(3),
   costNanoUsd: z.number().int().nullable().default(null),
-  /** The spender of the cell being retracted — part of that cell's address. */
-  rawActorId: z.string().default(""),
-  /** The agent of the cell being retracted — part of that cell's address. */
-  agentId: z.string().default(""),
+  /**
+   * The spender of the cell being retracted — part of that cell's address.
+   * `""` when the cell was filed under no named spender, stated rather than
+   * defaulted.
+   */
+  rawActorId: z.string(),
+  /**
+   * The agent of the cell being retracted — part of that cell's address.
+   * `""` when the cell was filed under no named agent, stated rather than
+   * defaulted.
+   */
+  agentId: z.string(),
 
   /** The business bucket of the day this CORRECTS, epoch ms. */
   occurredAtMs: z.number().int().positive(),

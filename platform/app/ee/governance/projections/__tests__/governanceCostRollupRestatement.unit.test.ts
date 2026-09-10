@@ -148,11 +148,15 @@ function confirmedEvent({
  * The event that withdraws what one restatement key holds in the cell it is
  * currently filed under.
  *
- * Not yet implemented: `lw.obs.pulled_usage.retracted`. The puller worker
- * emits it at ingest, before the observation for the new cell, when the
- * restatement index says this key already sits somewhere else (settlement 9).
- * Built inline as a plain object because the schema does not carry the type
- * yet - the field names here are the ones the implementer must add.
+ * `lw.obs.pulled_usage.retracted` (settlement 9), whose shape is
+ * `PulledUsageRetractedEventSchema`. Nothing emits one in production yet: the
+ * detector that would compare an incoming key against the restatement index
+ * is the piece still to be written.
+ *
+ * Built inline as a plain envelope, the same way the observed fixture above
+ * is. The fold reads `type`, `tenantId` and `data` and nothing else, so
+ * satisfying the full event envelope would mean carrying three fields it
+ * never looks at and would say the fold depends on them.
  *
  * `costNanoMinor` is spelled out even though a retraction carries no money:
  * the cell a rollup event addresses is derived through `readPulledUsageMoney`,
@@ -719,6 +723,50 @@ describe("a correction that lands in a different cell", () => {
       );
       expect(reversed.revisedAt).toBe(inOrder.revisedAt);
       expect(reversed.lastObservedAt).toBe(SECOND_PULL);
+
+      // `revisionCount` is the one field that does NOT converge, and the
+      // state's own doc says why: it counts the deliveries that moved the
+      // figure, and a retraction arriving first has nothing to move. Pinned
+      // rather than left out, because the next reader to notice the omission
+      // adds an equality here and gets a red test with nothing to explain it.
+      // Nothing renders this counter; everything a customer reads is above.
+      expect(inOrder.revisionCount).toBe(1);
+      expect(reversed.revisionCount).toBe(0);
+    });
+
+    // Also deliberately unbound: the same control at the one instant where
+    // the two orders used to reach different MONEY rather than a different
+    // internal counter. The comparator's re-derivation has no ordering to
+    // give, so a provider stamping a correction with the pull instant it
+    // corrects decided whether the day read as drifting by which row the
+    // GROUP BY returned first.
+    it("empties the cell either way round when both carry one pull instant", () => {
+      const observed = observedEvent({
+        costNanoMinor: BILLED,
+        observedAtMs: SECOND_PULL,
+        id: "evt-pulled-tie",
+      });
+      const retraction = retractionEvent({ observedAtMs: SECOND_PULL });
+
+      expect(
+        governanceCostRollupTotals(fold([observed, retraction]))
+          .amountNanoMinor,
+      ).toBe(0);
+      expect(
+        governanceCostRollupTotals(fold([retraction, observed]))
+          .amountNanoMinor,
+      ).toBe(0);
+
+      // The withdrawal is what a re-delivered retraction must not undo: it is
+      // applied rather than skipped at an equal instant, so it has to stay a
+      // no-op in substance when the queue hands it over twice.
+      expect(
+        governanceCostRollupTotals(fold([observed, retraction, retraction]))
+          .amountNanoMinor,
+      ).toBe(0);
+      expect(fold([observed, retraction, retraction]).revisionCount).toBe(
+        fold([observed, retraction]).revisionCount,
+      );
     });
   });
 });

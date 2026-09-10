@@ -133,6 +133,14 @@ export function mapToOcsfRow({
     metadata: {
       product: { name: "LangWatch", vendor_name: "LangWatch" },
       extension: {
+        // The adapter's own bag goes FIRST so the canonical fields below win a
+        // name collision. `extra` is an open record — for the config-driven
+        // adapters it is whatever key an administrator typed — and spread last
+        // it could replace `cost_currency` while leaving `cost_amount`, which
+        // exports a euro figure labelled as dollars. No shipped adapter names
+        // one of these keys, so nothing here changes for them; what changes is
+        // that a future one cannot.
+        ...(event.extra ?? {}),
         uid: "langwatch.governance",
         source_type: sourceType,
         source_id: ingestionSourceId,
@@ -142,7 +150,6 @@ export function mapToOcsfRow({
         tokens_input: event.tokens_input,
         tokens_output: event.tokens_output,
         raw_event: event.raw_payload,
-        ...(event.extra ?? {}),
       },
     },
   });

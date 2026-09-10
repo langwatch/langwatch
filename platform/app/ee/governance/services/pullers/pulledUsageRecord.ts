@@ -165,6 +165,48 @@ function restatementKeyFor({
 }
 
 /**
+ * The provider's reported amount together with the currency that names it.
+ *
+ * Three homes, read in falling order of precision, and each one supplies BOTH
+ * halves or neither. Picking the amount from one home and the currency from
+ * another is how a dollar figure ends up denominated in euros: the hint's
+ * `costUsd` means dollars unless the hint's own `currency` says otherwise, and
+ * an adapter that also filled `event.cost_currency` was naming the currency of
+ * `event.cost_amount`, a different number entirely.
+ *
+ *   - The hint's own string is the exact one the adapter kept, so no digit is
+ *     lost to the float `cost_usd` had to be to fit the canonical event shape.
+ *     Its currency is `hint.currency`, and absent there means dollars.
+ *   - The event's billed amount is named by `event.cost_currency`, which
+ *     arrived beside it for exactly this purpose.
+ *   - The dollar field, which since it became optional means DOLLARS or
+ *     nothing, never a stand-in for an amount in another currency.
+ *
+ * Null when no home holds an amount.
+ */
+function reportedMoney({
+  hint,
+  event,
+}: {
+  hint: z.infer<typeof pulledUsageHintSchema>;
+  event: NormalizedPullEvent;
+}): { amount: string; currencyCode: string } | null {
+  if (hint.costUsd !== undefined) {
+    return { amount: hint.costUsd, currencyCode: hint.currency ?? "USD" };
+  }
+  if (event.cost_amount !== undefined) {
+    return {
+      amount: event.cost_amount,
+      currencyCode: event.cost_currency ?? "USD",
+    };
+  }
+  if (event.cost_usd !== undefined) {
+    return { amount: event.cost_usd, currencyCode: "USD" };
+  }
+  return null;
+}
+
+/**
  * Prices one item on the basis its hint declares, or answers that it cannot.
  *
  * Two bases and one refusal. A computed item is priced from its model and its
@@ -174,12 +216,8 @@ function restatementKeyFor({
  * one we hold no price for, and recording it at zero would put a confident
  * wrong number into a total nothing later corrects.
  *
- * The reported amount has three homes, read in falling order of precision. The
- * hint's own string is the exact one the adapter kept, so no digit is lost to
- * the float `cost_usd` had to be to fit the canonical event shape. Then the
- * event's billed amount, which arrived beside the currency that names it. Only
- * last the dollar field, which since it became optional means DOLLARS or
- * nothing, never a stand-in for an amount in another currency.
+ * Which amount that is, and the currency it is denominated in, is one decision
+ * and not two — see {@link reportedMoney}.
  */
 function priceOnDeclaredBasis({
   hint,
@@ -200,14 +238,13 @@ function priceOnDeclaredBasis({
     });
   }
 
-  const reportedAmount =
-    hint.costUsd ?? event.cost_amount ?? event.cost_usd ?? null;
-  if (reportedAmount === null) return null;
+  const reported = reportedMoney({ hint, event });
+  if (reported === null) return null;
 
   return pricePulledUsage({
     basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
-    costUsd: reportedAmount,
-    currencyCode: hint.currency ?? event.cost_currency,
+    costUsd: reported.amount,
+    currencyCode: reported.currencyCode,
     costUsdBiller: hint.costUsdBiller,
     // Present by the schema's own refinement on this branch.
     costStatus: hint.costStatus!,
