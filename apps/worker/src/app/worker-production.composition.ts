@@ -74,15 +74,14 @@ import {
   EventingBillingMeterDispatchAdapter,
   EventingBillingReportingAdapter,
   ObservabilityBillingErrorAdapter,
-  PostgresBillingReportingAdapter,
-  PostgresBillingTenantOrganizationAdapter,
   RedisBillingOrganizationCacheAdapter,
   RedisBillingTenantOrganizationCacheAdapter,
   StripeUsageReportingAdapter,
   BillingTenantOrganizationService,
-  PostgresBillingAdapter,
+  PostgresBillingRepositories,
   PlanLimitsPlanCatalogueAdapter,
-  type BillingReportingDatabase,
+  type BillingCheckpointDatabase,
+  type BillingReportOrganizationDatabase,
   type BillingTenantOrganizationDatabase,
 } from "@langwatch/enterprise-billing-server";
 import type { PricingModel as EntitlementPricingModel } from "@langwatch/entitlement-contract";
@@ -316,7 +315,8 @@ export type WorkerDatabaseCompositionOptions = PrismaApiKeyDatabase &
   AuthzGrantPipelineDatabase &
   AutomationGraphActivityDatabase &
   AutomationTraceTriggerCatalogueDatabase &
-  BillingReportingDatabase &
+  BillingCheckpointDatabase &
+  BillingReportOrganizationDatabase &
   BillingTenantOrganizationDatabase &
   CodingAgentActivityDatabase &
   DatasetContentDatabase &
@@ -591,7 +591,7 @@ export class WorkerProductionComposition {
     const plans = options.connection
       ? createWorkerPlanProvider({
           isSaas: options.config.deployment.saas,
-          subscriptions: PostgresBillingAdapter.create(options.connection.client).build()
+          subscriptions: PostgresBillingRepositories.create({ prisma: options.connection.client })
             .subscriptions,
           // The licence row a self-hosted deployment's Enterprise tier lives
           // in, on the same guarded client. Without it this process refuses
@@ -1506,9 +1506,9 @@ export class WorkerProductionComposition {
     // already holds. The roll-up is a command-only pipeline — no projections, no subscribers — so
     // on a self-hosted install nothing dispatches into it; registering it either way is what keeps
     // producer and consumer routing one key set off the shared `event-sourcing/jobs` queue.
-    const billingReportingPersistence = PostgresBillingReportingAdapter.create({
-      database: options.database,
-    }).build();
+    const billingReportingPersistence = PostgresBillingRepositories.create({
+      prisma: options.database,
+    });
     const billableEvents = BillableEventsQueryService.create(
       ClickHouseBillingAdapter.create({
         resolveClient: options.eventing.resolveClickHouseClient,
@@ -1523,7 +1523,7 @@ export class WorkerProductionComposition {
       : undefined;
     const billingReporting = BillingReportingWorkerFeatureInstaller.create({
       installer: EventingBillingReportingAdapter.create({
-        organizations: billingReportingPersistence.organizations,
+        organizations: billingReportingPersistence.reportOrganizations,
         billingCheckpoints: billingReportingPersistence.checkpoints,
         getUsageReportingService: () => usageReporting,
         queryBillableEventsTotal: (input) => billableEvents.tryQueryBillableEventsTotal(input),
@@ -2167,9 +2167,8 @@ export function saasBillableEventsMeter(options: {
   getDispatch: () => (data: ReportUsageForMonthCommandData) => Promise<void>;
 }): NonNullable<WorkerEventingProductionOptions["configureGlobalProjections"]> {
   const organizations = BillingTenantOrganizationService.create({
-    organizations: PostgresBillingTenantOrganizationAdapter.create({
-      database: options.database,
-    }).build().organizations,
+    organizations: PostgresBillingRepositories.create({ prisma: options.database })
+      .tenantOrganizations,
     cache: RedisBillingTenantOrganizationCacheAdapter.create({ redis: options.redis }),
   });
   const meter = EventingBillableEventsMeterAdapter.create({

@@ -25,7 +25,7 @@ import { PromptApi } from "@langwatch/prompt-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
-import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
+import { createApp, instantiateRepositories, type ResourceScope } from "@langwatch/runtime-composition";
 import {
   NodeScenarioChildProcessAdapter,
   OtelScenarioProcessorMetricsAdapter,
@@ -50,11 +50,15 @@ import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
   NlpPayloadStagingPort,
-  PostgresWorkflowAdapter,
-  PrismaWorkflowProjectEnvironmentAdapter,
+  StudioEventPreparerService,
+  WorkflowIdPort,
   WorkflowLlmParametersPort,
+  WorkflowNlpExecutionService,
+  WorkflowProjectEnvironmentService,
+  WorkflowService,
+  workflowRepositories,
   type WorkflowNlpRuntimePort,
-  type WorkflowLlmParameterResolution, type WorkflowService,} from "@langwatch/workflow-server";
+  type WorkflowLlmParameterResolution,} from "@langwatch/workflow-server";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 
@@ -283,17 +287,35 @@ export async function createWorkerScenarioExecutionGraph(input: {
     serviceUrl: deps.nlpServiceUrl,
     staging: deps.payloadStaging,
   });
-  const workflows = PostgresWorkflowAdapter.create({
-    database: prisma,
-    datasets,
+  const workflowRepos = instantiateRepositories(workflowRepositories, {
+    backend: "postgres",
+    infrastructure: { prisma },
+  });
+  const workflowLlmParameters = WorkerWorkflowLlmParameters.create({
     modelProviders: deps.modelProviders,
-    nlpRuntime,
-    projectEnvironment: PrismaWorkflowProjectEnvironmentAdapter.create({
-      database: prisma,
-      encryption,
+  });
+  const workflowProjectEnvironment = WorkflowProjectEnvironmentService.create({
+    repository: workflowRepos.projectEnvironment,
+    encryption,
+  });
+  const workflowStudioEvents = StudioEventPreparerService.create({
+    datasets,
+    projectEnvironment: workflowProjectEnvironment,
+    llmParameters: workflowLlmParameters,
+  });
+  const workflowIds = WorkerNanoidWorkflowIdPort.create();
+  const workflows = WorkflowService.create({
+    repository: workflowRepos.workflows,
+    datasets,
+    execution: WorkflowNlpExecutionService.create({
+      ids: workflowIds,
+      modelProviders: deps.modelProviders,
+      nlpRuntime,
+      studioEvents: workflowStudioEvents,
     }),
-    llmParameters: WorkerWorkflowLlmParameters.create({ modelProviders: deps.modelProviders }),
+    studioEvents: workflowStudioEvents,
     dslMigration: ContractWorkflowDslMigrationAdapter.create(),
+    ids: workflowIds,
   });
 
   // The SAME cipher the child processes decrypt a run's parameters with, over this
@@ -379,6 +401,17 @@ class KsuidScenarioId extends ScenarioIdPort {
 class NanoidScenarioTestSuiteId extends ScenarioTestSuiteIdPort {
   next(): string {
     return `suite_${nanoid()}`;
+  }
+}
+
+/** The worker's own workflow-id generator, over the same nanoid the module used. */
+class WorkerNanoidWorkflowIdPort extends WorkflowIdPort {
+  static create(): WorkerNanoidWorkflowIdPort {
+    return new WorkerNanoidWorkflowIdPort();
+  }
+
+  next(): string {
+    return nanoid();
   }
 }
 

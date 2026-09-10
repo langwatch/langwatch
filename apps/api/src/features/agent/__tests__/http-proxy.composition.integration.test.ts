@@ -9,7 +9,7 @@ import {
   WorkflowApp,
   WorkflowStudioDispatchService,
   type WorkflowAgentMappingPort,
-  type WorkflowRowPort,
+  type WorkflowRowRepository,
   type WorkflowStudioDslPort, type WorkflowService,} from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -42,7 +42,7 @@ function workflowApp(studioDispatch?: WorkflowStudioDispatchService): WorkflowAp
       evaluators: createApiFixture<EvaluatorApi>(),
       studioDsl: createApiFixture<WorkflowStudioDslPort>(),
       agentMappings: createApiFixture<WorkflowAgentMappingPort>(),
-      workflowRows: createApiFixture<WorkflowRowPort>(),
+      workflowRows: createApiFixture<WorkflowRowRepository>(),
     },
     dependencies: {},
     config: void 0,

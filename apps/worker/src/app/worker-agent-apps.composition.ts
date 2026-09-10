@@ -1,7 +1,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { AgentApi, MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
 import { BroadcastAdapter } from "@langwatch/presence-server";
-import { createApp, LocalFeatureApis, type ResourceScope } from "@langwatch/runtime-composition";
+import {
+  createApp,
+  instantiateRepositories,
+  LocalFeatureApis,
+  type ResourceScope,
+} from "@langwatch/runtime-composition";
 import { ScenarioApi, type SimulationService } from "@langwatch/scenario-contract";
 import {
   AgentTestService,
@@ -19,8 +24,8 @@ import { UserApi } from "@langwatch/user-contract";
 import {
   ModelProviderWorkflowStudioDslAdapter,
   WorkflowAgentMappingAdapter,
-  PrismaWorkflowRowAdapter,
   WorkflowApp,
+  workflowRepositories,
 } from "@langwatch/workflow-server";
 import { installWorkerAgent } from "./worker-agent.composition.ts";
 import { installWorkerEvaluator } from "./worker-evaluator.composition.ts";
@@ -133,7 +138,10 @@ export async function createWorkerAgentApps(options: {
         modelProviders: prerequisites.modelProviders,
       }),
       agentMappings: WorkflowAgentMappingAdapter.create({ agents }),
-      workflowRows: PrismaWorkflowRowAdapter.create({ database }),
+      workflowRows: instantiateRepositories(workflowRepositories, {
+        backend: "postgres",
+        infrastructure: { prisma: database },
+      }).workflowRows,
     },
     dependencies: {},
     config: void 0,

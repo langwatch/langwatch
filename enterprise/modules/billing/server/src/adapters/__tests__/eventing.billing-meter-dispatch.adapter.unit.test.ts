@@ -7,7 +7,7 @@ import {
   EventingBillingMeterDispatchAdapter,
 } from "../eventing.billing-meter-dispatch.adapter.ts";
 import { RedisBillingTenantOrganizationCacheAdapter } from "../redis.tenant-organization-cache.adapter.ts";
-import { PostgresBillingTenantOrganizationAdapter } from "../postgres.tenant-organization.adapter.ts";
+import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.billing.repositories.ts";
 import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 import { Temporal, type Instant } from "@langwatch/time";
 
@@ -23,9 +23,9 @@ function compose(
   );
   const subscriber = EventingBillingMeterDispatchAdapter.create({
     organizations: BillingTenantOrganizationService.create({
-      organizations: PostgresBillingTenantOrganizationAdapter.create({
-        database: { project: { findUnique } } as never,
-      }).build().organizations,
+      organizations: PostgresBillingRepositories.create({
+        prisma: { project: { findUnique } } as never,
+      }).tenantOrganizations,
       cache: RedisBillingTenantOrganizationCacheAdapter.create({
         redis: { get: vi.fn(async () => null), setex: vi.fn(async () => "OK") } as never,
       }),

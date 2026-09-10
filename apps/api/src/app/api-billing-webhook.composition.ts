@@ -30,9 +30,7 @@ import {
   LicensePurchaseService,
   NotificationService,
   NullBillingSubscriptionNotifierAdapter,
-  PostgresBillingAdapter,
-  PostgresBillingWebhookOrganizationAdapter,
-  PostgresBillingWebhookSubscriptionAdapter,
+  PostgresBillingRepositories,
   SeatEventSubscriptionService,
   SeatSyncService,
   SilentBillingWebhookHost,
@@ -203,7 +201,7 @@ function composeBillingWriteHalf(
   const catalogue = BillingPriceCatalogue.create(
     getStripeEnvironmentFromNodeEnv(process.env.NODE_ENV),
   );
-  const persistence = PostgresBillingAdapter.create(prisma).build();
+  const persistence = PostgresBillingRepositories.create({ prisma });
   const stripeErrors = StripeErrorAdapter.create();
   const itemCalculator = SubscriptionItemCalculatorService.create(catalogue.prices);
   const seatEvents = SeatEventSubscriptionService.create({
@@ -223,13 +221,8 @@ function composeBillingWriteHalf(
   return {
     stripe,
     webhooks: EEWebhookService.create({
-      subscriptionRepository: PostgresBillingWebhookSubscriptionAdapter.create({
-        subscriptions: persistence.subscriptions,
-        database: prisma,
-      }),
-      organizationRepository: PostgresBillingWebhookOrganizationAdapter.create({
-        database: prisma,
-      }),
+      subscriptionRepository: persistence.webhookSubscriptions,
+      organizationRepository: persistence.webhookOrganizations,
       stripe,
       itemCalculator,
       host: composeBillingWebhookHost({
@@ -257,7 +250,7 @@ function composeBillingWriteHalf(
     }),
     subscription: BillingSubscriptionService.create({
       repository: persistence.subscriptions,
-      organizationRepository: persistence.organization,
+      organizationRepository: persistence.organizations,
       stripe,
       itemCalculator,
       seatEventService: seatEvents,

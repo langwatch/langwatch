@@ -30,7 +30,12 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { ProjectInfrastructure } from "@langwatch/project-server";
-import { createApp, LocalFeatureApis, ResourceScope } from "@langwatch/runtime-composition";
+import {
+  createApp,
+  instantiateRepositories,
+  LocalFeatureApis,
+  ResourceScope,
+} from "@langwatch/runtime-composition";
 import type { ScenarioExecutionPrefetcherService } from "@langwatch/scenario-server";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicClusteringSchedulePort } from "@langwatch/topic-server";
@@ -38,7 +43,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import {
   WorkflowApp,
-  PrismaWorkflowRowAdapter,
+  workflowRepositories,
   type WorkflowAgentMappingPort,
   type WorkflowStudioDslPort,
 } from "@langwatch/workflow-server";
@@ -343,7 +348,10 @@ describe.skipIf(!databaseUrl)(
           evaluators: createApiFixture<EvaluatorApi>(),
           studioDsl: createApiFixture<WorkflowStudioDslPort>(),
           agentMappings: createApiFixture<WorkflowAgentMappingPort>(),
-          workflowRows: PrismaWorkflowRowAdapter.create({ database: db }),
+          workflowRows: instantiateRepositories(workflowRepositories, {
+            backend: "postgres",
+            infrastructure: { prisma: db },
+          }).workflowRows,
         },
         config: void 0,
         resources,

@@ -27,12 +27,12 @@ export type MigrationS3RegionConfiguration = {
 };
 
 /** Task-owned S3 driver backed by the executable's process-owned AWS transport. */
-export class MigrationS3StorageDriverAdapter implements StoredObjectStorageDriver {
+export class MigrationBlobS3Repository implements StoredObjectStorageDriver {
   static create(input: {
     aws: AwsClientProcessRuntime;
     config: MigrationS3Configuration;
-  }): MigrationS3StorageDriverAdapter {
-    return new MigrationS3StorageDriverAdapter(input.aws, input.config);
+  }): MigrationBlobS3Repository {
+    return new MigrationBlobS3Repository(input.aws, input.config);
   }
 
   /**
@@ -48,7 +48,7 @@ export class MigrationS3StorageDriverAdapter implements StoredObjectStorageDrive
   private readonly client: S3Client;
 
   private constructor(aws: AwsClientProcessRuntime, config: MigrationS3Configuration) {
-    const region = MigrationS3StorageDriverAdapter.resolveRegion(config);
+    const region = MigrationBlobS3Repository.resolveRegion(config);
     this.client = new S3Client({
       ...aws.build({
         region,

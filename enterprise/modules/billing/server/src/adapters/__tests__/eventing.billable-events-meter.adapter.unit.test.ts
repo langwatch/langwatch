@@ -11,7 +11,7 @@ import {
   RedisBillingTenantOrganizationCacheAdapter,
 } from "../redis.tenant-organization-cache.adapter.ts";
 import { ClickHouseBillableEventsMeterAdapter } from "../clickhouse.billable-events-meter.adapter.ts";
-import { PostgresBillingTenantOrganizationAdapter } from "../postgres.tenant-organization.adapter.ts";
+import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.billing.repositories.ts";
 import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 
 /**
@@ -59,9 +59,9 @@ function compose(options: {
   const resolveClient = options.resolveClient ?? vi.fn(async () => ({ insert }));
 
   const organizations = BillingTenantOrganizationService.create({
-    organizations: PostgresBillingTenantOrganizationAdapter.create({
-      database: { project: { findUnique } } as never,
-    }).build().organizations,
+    organizations: PostgresBillingRepositories.create({
+      prisma: { project: { findUnique } } as never,
+    }).tenantOrganizations,
     cache: RedisBillingTenantOrganizationCacheAdapter.create({ redis: redis as never }),
   });
 

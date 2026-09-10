@@ -3,7 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   auditQueuesForCutover,
   createMigrationTask,
-  MigrationS3StorageDriverAdapter,
+  MigrationBlobS3Repository,
   ObjectStorageMigrateTask,
   ObjectStorageMigrationInventoryPort,
   parseMigrationTaskConfig,
@@ -121,7 +121,7 @@ export function buildObjectStorageMigrateTask({
         }),
         publishStoredObject: (row) => repository.insert({ projectId: row.project_id, row }),
         auditQueues: () => auditQueuesForCutover({ url: host.config.redisUrl }),
-        s3Driver: MigrationS3StorageDriverAdapter.create({ aws, config: config.s3 }),
+        s3Driver: MigrationBlobS3Repository.create({ aws, config: config.s3 }),
       });
     },
   });

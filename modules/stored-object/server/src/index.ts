@@ -138,7 +138,7 @@ export {
   type QueueMigrationBlocker,
 } from "./services/object-storage-migration.service.ts";
 export {
-  MigrationS3StorageDriverAdapter,
+  MigrationBlobS3Repository,
   type MigrationS3Configuration,
   type MigrationS3RegionConfiguration,
 } from "#repositories/s3/s3.object-storage-migration-blob.repository";

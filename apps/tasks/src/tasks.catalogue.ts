@@ -12,7 +12,7 @@ import {
 import { GroupQueueReapStrandedGroupsTask } from "@langwatch/group-queue/operational";
 import {
   DuplicateSubscriptionsReportTask,
-  PostgresDuplicateSubscriptionsReportAdapter,
+  PostgresBillingRepositories,
   StripePricesSyncTask,
   TieredFreeToSeatEventMigrateTask,
 } from "@langwatch/enterprise-billing-server";
@@ -74,7 +74,8 @@ export function buildTasksCatalogue({
     }),
     DuplicateSubscriptionsReportTask.create({
       repository: () =>
-        PostgresDuplicateSubscriptionsReportAdapter.create({ database: host.requirePrisma() }),
+        PostgresBillingRepositories.create({ prisma: host.requirePrisma() })
+          .duplicateSubscriptionsReports,
     }),
     VirtualKeyConfigBackfillTask.create({
       repository: () =>

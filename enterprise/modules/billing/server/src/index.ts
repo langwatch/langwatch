@@ -40,11 +40,8 @@ export {
   BillingReportOrganizationPort,
   type BillingReportOrganization,
 } from "./ports/billing-report-organization.port.ts";
-export {
-  PostgresBillingReportingAdapter,
-  type BillingReportingDatabase,
-  type BillingReportingPersistence,
-} from "./adapters/postgres.billing-reporting.adapter.ts";
+export type { BillingCheckpointDatabase } from "./repositories/prisma/prisma.billing-checkpoint.repository.ts";
+export type { BillingReportOrganizationDatabase } from "./repositories/prisma/prisma.billing-report-organization.repository.ts";
 export {
   RedisBillingOrganizationCacheAdapter,
   type BillingOrganizationCacheRedis,
@@ -91,11 +88,7 @@ export {
   RedisBillingTenantOrganizationCacheAdapter,
   type BillingTenantOrganizationCacheRedis,
 } from "./adapters/redis.tenant-organization-cache.adapter.ts";
-export {
-  PostgresBillingTenantOrganizationAdapter,
-  type BillingTenantOrganizationDatabase,
-  type BillingTenantOrganizationPersistence,
-} from "./adapters/postgres.tenant-organization.adapter.ts";
+export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
 export { PlanLimitsPlanCatalogueAdapter } from "./adapters/plan-limits.plan-catalogue.adapter.ts";
 export { OrganizationPricingPort } from "./ports/organization-pricing.port.ts";
 export { BillingSubscriptionPort } from "./ports/subscription.port.ts";
@@ -182,8 +175,6 @@ export {
   STRIPE_API_VERSION,
 } from "./adapters/stripe.stripe-client.adapter.ts";
 export { BillingWebhookOrganizationPort } from "./repositories/billing-webhook-organization.repository.ts";
-export { PostgresBillingWebhookOrganizationAdapter } from "./adapters/postgres.billing-webhook-organization.adapter.ts";
-export { PostgresBillingWebhookSubscriptionAdapter } from "./adapters/postgres.billing-webhook-subscription.adapter.ts";
 export type { BillingWebhookOrganizationDatabase } from "./repositories/prisma/prisma.billing-webhook-organization.repository.ts";
 export type { BillingWebhookTrialLicenseDatabase } from "./repositories/prisma/prisma.billing-webhook-subscription.repository.ts";
 export {
@@ -229,7 +220,6 @@ export {
   reportDuplicateSubscriptions,
   type DuplicateSubscriptionsReport,
 } from "./tasks/duplicate-subscriptions-report.task.ts";
-export { PostgresDuplicateSubscriptionsReportAdapter } from "./adapters/postgres.duplicate-subscriptions-report.adapter.ts";
 export type {
   DuplicateSubscriptionsReportRepository,
   SubscriptionReportRow,

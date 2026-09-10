@@ -19,18 +19,18 @@ vi.mock("@aws-sdk/client-s3", async () => {
 });
 
 import { UnsupportedStorageSchemeError } from "@langwatch/stored-object-contract";
-import { MigrationS3StorageDriverAdapter } from "#repositories/s3/s3.object-storage-migration-blob.repository";
+import { MigrationBlobS3Repository } from "#repositories/s3/s3.object-storage-migration-blob.repository";
 
 const AZURE_URI = "azure-blob://account.blob.core.windows.net/container/proj-123/deadbeef";
 
 function driver() {
-  return MigrationS3StorageDriverAdapter.create({
+  return MigrationBlobS3Repository.create({
     aws: { build: () => ({}) } as never,
     config: { bucket: "test-bucket", region: "auto" },
   });
 }
 
-describe("MigrationS3StorageDriverAdapter", () => {
+describe("MigrationBlobS3Repository", () => {
   beforeEach(() => {
     sent.send = vi.fn();
   });

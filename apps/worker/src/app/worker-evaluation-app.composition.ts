@@ -22,13 +22,19 @@ import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
   NlpPayloadStagingPort,
-  PostgresWorkflowAdapter,
-  PrismaWorkflowProjectEnvironmentAdapter,
+  StudioEventPreparerService,
   UnconfiguredWorkflowNlpRuntimeAdapter,
+  WorkflowIdPort,
   WorkflowLlmParametersPort,
+  WorkflowNlpExecutionService,
+  WorkflowProjectEnvironmentService,
+  WorkflowService,
+  workflowRepositories,
   type WorkflowEnvironmentDecryptor,
   type WorkflowLlmParameterResolution,
-  type WorkflowNlpRuntimePort, type WorkflowService,} from "@langwatch/workflow-server";
+  type WorkflowNlpRuntimePort,} from "@langwatch/workflow-server";
+import { instantiateRepositories } from "@langwatch/runtime-composition";
+import { nanoid } from "nanoid";
 import type { LLMConfig, WorkflowApi } from "@langwatch/workflow-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
@@ -55,6 +61,21 @@ export type WorkerEvaluationWorkflows = Readonly<{
   nlpRuntime: WorkflowNlpRuntimePort;
 }>;
 
+/** The worker's own workflow-id generator, over the same nanoid the module used. */
+class WorkerNanoidWorkflowIdPort extends WorkflowIdPort {
+  static create(): WorkerNanoidWorkflowIdPort {
+    return new WorkerNanoidWorkflowIdPort();
+  }
+
+  private constructor() {
+    super();
+  }
+
+  next(): string {
+    return nanoid();
+  }
+}
+
 /**
  * Builds the worker's one Workflow API before Evaluation's engine is
  * constructed. The engine and the Evaluation application both receive this
@@ -69,19 +90,35 @@ export function createWorkerEvaluationWorkflows(
         staging: input.payloadStaging,
       })
     : UnconfiguredWorkflowNlpRuntimeAdapter.create();
-  const workflows = PostgresWorkflowAdapter.create({
-    database: input.database,
-    datasets: input.datasets,
+  const repositories = instantiateRepositories(workflowRepositories, {
+    backend: "postgres",
+    infrastructure: { prisma: input.database },
+  });
+  const llmParameters = WorkerEvaluationWorkflowLlmParameters.create({
     modelProviders: input.modelProviders,
-    nlpRuntime,
-    projectEnvironment: PrismaWorkflowProjectEnvironmentAdapter.create({
-      database: input.database,
-      encryption: input.secretDecryptor,
-    }),
-    llmParameters: WorkerEvaluationWorkflowLlmParameters.create({
+  });
+  const projectEnvironment = WorkflowProjectEnvironmentService.create({
+    repository: repositories.projectEnvironment,
+    encryption: input.secretDecryptor,
+  });
+  const studioEvents = StudioEventPreparerService.create({
+    datasets: input.datasets,
+    projectEnvironment,
+    llmParameters,
+  });
+  const ids = WorkerNanoidWorkflowIdPort.create();
+  const workflows = WorkflowService.create({
+    repository: repositories.workflows,
+    datasets: input.datasets,
+    execution: WorkflowNlpExecutionService.create({
+      ids,
       modelProviders: input.modelProviders,
+      nlpRuntime,
+      studioEvents,
     }),
+    studioEvents,
     dslMigration: ContractWorkflowDslMigrationAdapter.create(),
+    ids,
   });
   return { workflows, nlpRuntime };
 }
