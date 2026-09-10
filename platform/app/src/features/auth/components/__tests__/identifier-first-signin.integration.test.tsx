@@ -214,7 +214,9 @@ describe("given the identifier-first sign-in screen", () => {
       priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
       // Two answers: the instance question the screen always asks on mount,
       // then the one the recovered address asks.
-      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+      routeMock
+        .mockResolvedValueOnce(localPicker)
+        .mockResolvedValueOnce(localPicker);
 
       renderScreen();
 
@@ -231,7 +233,9 @@ describe("given the identifier-first sign-in screen", () => {
     /** @scenario "The expired notice replaces the greeting, not the error copy" */
     it("says the session ran out, and does not greet a stranger or report a fault", async () => {
       priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
-      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+      routeMock
+        .mockResolvedValueOnce(localPicker)
+        .mockResolvedValueOnce(localPicker);
 
       renderScreen();
 
@@ -239,7 +243,9 @@ describe("given the identifier-first sign-in screen", () => {
       expect(screen.getByText(/session expired/i)).toBeInTheDocument();
       // Not the first-time greeting, and not an error: nothing went wrong, and
       // an error tone sends somebody looking for a fault that does not exist.
-      expect(screen.queryByText(/log in to langwatch/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/log in to langwatch/i),
+      ).not.toBeInTheDocument();
       expect(screen.queryByText(/went wrong/i)).not.toBeInTheDocument();
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
@@ -247,7 +253,9 @@ describe("given the identifier-first sign-in screen", () => {
     /** @scenario "Recognition is not authentication" */
     it("still demands a credential, and signs nobody in on its own", async () => {
       priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
-      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+      routeMock
+        .mockResolvedValueOnce(localPicker)
+        .mockResolvedValueOnce(localPicker);
 
       renderScreen();
       await screen.findByText(/welcome back/i);

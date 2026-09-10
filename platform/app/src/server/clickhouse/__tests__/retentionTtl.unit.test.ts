@@ -214,9 +214,10 @@ describe("RETENTION_MANAGED_TABLES", () => {
         expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toContain(
           `'${aggregateType}'`,
         );
-        expect(positivelySelected, `${category} selects ${aggregateType}`).not.toContain(
-          `'${aggregateType}'`,
-        );
+        expect(
+          positivelySelected,
+          `${category} selects ${aggregateType}`,
+        ).not.toContain(`'${aggregateType}'`);
       }
     }
   });

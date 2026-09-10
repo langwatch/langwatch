@@ -41,9 +41,7 @@ let announcedUnconfiguredProxy = false;
  * that is genuinely not behind a proxy is correct as it stands, and a hard
  * failure would strand every deployment that has been fine for years.
  */
-function announceUnconfiguredProxyOnce(
-  req: NextApiRequest | undefined,
-): void {
+function announceUnconfiguredProxyOnce(req: NextApiRequest | undefined): void {
   if (announcedUnconfiguredProxy) return;
   if (trustedProxyAddresses.length > 0) return;
   if (!req?.headers?.["x-forwarded-for"]) return;

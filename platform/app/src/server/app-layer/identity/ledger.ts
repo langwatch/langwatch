@@ -69,6 +69,7 @@ import { IDENTITY_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/identi
 import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
+import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 import {
   identityCommitDurationSeconds,
   identityProjectionConvergenceTimeoutsTotal,
@@ -79,7 +80,6 @@ import {
   StagedLedgerWriter,
   type StagedSender,
 } from "./staged-ledger-writer";
-import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 
 const logger = createLogger("langwatch:identity:ledger");
 

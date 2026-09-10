@@ -227,7 +227,9 @@ const orphanUser = ({ emailVerified }: { emailVerified: boolean }) => ({
 
 const buildHarness = ({
   users = [],
-}: { users?: Record<string, unknown>[] } = {}) => {
+}: {
+  users?: Record<string, unknown>[];
+} = {}) => {
   const db: MemoryDb = {
     user: [...users],
     session: [],

@@ -166,7 +166,9 @@ export const auth = betterAuth({
   advanced: {
     ipAddress: {
       ipAddressHeaders: ["x-forwarded-for"],
-      trustedProxies: [...parseTrustedProxyAddresses(env.TRUSTED_PROXY_ADDRESSES)],
+      trustedProxies: [
+        ...parseTrustedProxyAddresses(env.TRUSTED_PROXY_ADDRESSES),
+      ],
     },
   },
 

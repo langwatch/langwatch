@@ -37,12 +37,12 @@ import {
 import type { MfaEvent } from "~/server/event-sourcing/pipelines/identity/schemas/mfaEvents";
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
+import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 import {
-  ConvergentLedgerWriter,
   type ConvergentLedgerSpec,
+  ConvergentLedgerWriter,
   type StagedSenderPort,
 } from "./staged-ledger-writer";
-import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 
 /**
  * Enrolling in two-step verification, confirming a code, spending a backup
@@ -53,26 +53,29 @@ import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window
  */
 const MFA_CONVERGENCE = INTERACTIVE_READ_YOUR_WRITES;
 
-const MFA_LEDGER_SPEC: ConvergentLedgerSpec<MfaCommand, MfaEvent, MfaFactInput> =
-  {
-    noun: "two-step verification",
-    loggerName: "langwatch:identity:mfa-ledger",
-    pipelineName: IDENTITY_PIPELINE_NAME,
-    aggregateType: USER_IDENTITY_AGGREGATE_TYPE as AggregateType,
-    senderNames: {
-      [ENROLL_MFA_COMMAND_TYPE]: "enrollMfa",
-      [CONFIRM_MFA_COMMAND_TYPE]: "confirmMfa",
-      [EXPIRE_MFA_ENROLLMENT_COMMAND_TYPE]: "expireMfaEnrollment",
-      [DISABLE_MFA_COMMAND_TYPE]: "disableMfa",
-      [CONSUME_BACKUP_CODE_COMMAND_TYPE]: "consumeBackupCode",
-      [REGENERATE_BACKUP_CODES_COMMAND_TYPE]: "regenerateBackupCodes",
-      [RECORD_MFA_VERIFICATION_FAILURE_COMMAND_TYPE]:
-        "recordMfaVerificationFailure",
-    },
-    eventsFor: mfaEventsFor,
-    aggregateIdOf: (command) => command.data.userId,
-    aggregateIdField: "userId",
-  };
+const MFA_LEDGER_SPEC: ConvergentLedgerSpec<
+  MfaCommand,
+  MfaEvent,
+  MfaFactInput
+> = {
+  noun: "two-step verification",
+  loggerName: "langwatch:identity:mfa-ledger",
+  pipelineName: IDENTITY_PIPELINE_NAME,
+  aggregateType: USER_IDENTITY_AGGREGATE_TYPE as AggregateType,
+  senderNames: {
+    [ENROLL_MFA_COMMAND_TYPE]: "enrollMfa",
+    [CONFIRM_MFA_COMMAND_TYPE]: "confirmMfa",
+    [EXPIRE_MFA_ENROLLMENT_COMMAND_TYPE]: "expireMfaEnrollment",
+    [DISABLE_MFA_COMMAND_TYPE]: "disableMfa",
+    [CONSUME_BACKUP_CODE_COMMAND_TYPE]: "consumeBackupCode",
+    [REGENERATE_BACKUP_CODES_COMMAND_TYPE]: "regenerateBackupCodes",
+    [RECORD_MFA_VERIFICATION_FAILURE_COMMAND_TYPE]:
+      "recordMfaVerificationFailure",
+  },
+  eventsFor: mfaEventsFor,
+  aggregateIdOf: (command) => command.data.userId,
+  aggregateIdField: "userId",
+};
 
 export interface MfaLedgerWriterDeps {
   projectionStore: StateProjectionStore<MfaFoldState>;

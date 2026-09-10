@@ -378,14 +378,12 @@ export interface ConvergentLedgerSpec<
  * and the rows appear when the queue drains.
  */
 export class ConvergentLedgerWriter<
-    TCommand extends StagedLedgerCommand & { data: { tenantId: string } },
-    TEvent extends Event,
-    TState,
-    TFactInput,
-    TFact,
-  >
-  extends StagedLedgerWriter<TCommand, TEvent, TState>
-{
+  TCommand extends StagedLedgerCommand & { data: { tenantId: string } },
+  TEvent extends Event,
+  TState,
+  TFactInput,
+  TFact,
+> extends StagedLedgerWriter<TCommand, TEvent, TState> {
   private readonly spec: ConvergentLedgerSpec<TCommand, TEvent, TFactInput>;
 
   constructor({

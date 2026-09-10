@@ -481,7 +481,7 @@ export class JoinRequestLifecycleDispatcher
     // transition is announced. Requiring the transition rather than merely the
     // end state is what keeps a replayed wake silent about a request that
     // expired an hour ago and was already announced then.
-    if (!before || before.state !== "PENDING") return;
+    if (before?.state !== "PENDING") return;
 
     const recorded = await this.prisma.joinRequest.findUnique({
       where: { id: joinRequestId },

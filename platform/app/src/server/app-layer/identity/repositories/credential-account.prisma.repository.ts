@@ -5,7 +5,6 @@ import {
   belongsToSomebody,
   PasskeySignUpAddressTakenError,
 } from "~/server/users/credential-user";
-import { withSerializationRetry } from "./serializable-retry";
 import type {
   CreatedCredentialUser,
   CredentialAccountRecordsPort,
@@ -14,6 +13,7 @@ import type {
   SecureAccountFacts,
   UnlinkAttempt,
 } from "../credential-account.service";
+import { withSerializationRetry } from "./serializable-retry";
 
 interface ExistingPasskeyUser {
   id: string;

@@ -32,12 +32,12 @@ import {
 import type { JoinRequestEvent } from "~/server/event-sourcing/pipelines/join-requests/schemas/events";
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
+import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 import {
-  ConvergentLedgerWriter,
   type ConvergentLedgerSpec,
+  ConvergentLedgerWriter,
   type StagedSenderPort,
 } from "./staged-ledger-writer";
-import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 
 /**
  * Submitting a request, and an administrator answering one, are both a person
