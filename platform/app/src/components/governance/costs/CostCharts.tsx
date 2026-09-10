@@ -148,20 +148,101 @@ export interface RankBar extends RankRow {
  * obvious guard against that collapses a panel of nothing but credits to
  * nothing at all.
  *
+ * A row whose figure is WITHHELD draws no bar and does not set the scale.
+ * There is no bar length that means "we do not know", and its placeholder
+ * `value` is not a measurement — letting it into the scale would size every
+ * other bar against a number nobody measured.
+ *
  * Extracted from the panel because the width lands in a generated class name
  * that jsdom cannot resolve, which leaves the arithmetic untestable through
  * the rendered output.
  */
 export function rankBarGeometry(rows: RankRow[]): RankBar[] {
   const scale = rows.reduce(
-    (max, row) => Math.max(max, Math.abs(row.value)),
+    (max, row) => (row.unpriced ? max : Math.max(max, Math.abs(row.value))),
     0,
   );
   return rows.map((row) => ({
     ...row,
-    widthPct: scale > 0 ? (Math.abs(row.value) / scale) * 100 : 0,
-    isCredit: row.value < 0,
+    widthPct:
+      row.unpriced || scale <= 0 ? 0 : (Math.abs(row.value) / scale) * 100,
+    isCredit: !row.unpriced && row.value < 0,
   }));
+}
+
+/**
+ * The bar half of a ranked row.
+ *
+ * Its own component for the reason `CostSpenderPanel` splits `SpenderBar` out:
+ * the branch on a credit touches five properties, and inlined it buries the
+ * row's shape under styling the row does not decide.
+ */
+function RankBarCell({ row }: { row: RankBar }) {
+  return (
+    <Box
+      flex="1"
+      height="14px"
+      borderRadius="sm"
+      backgroundColor="bg.muted"
+      overflow="hidden"
+    >
+      <Box
+        height="100%"
+        borderRadius="sm"
+        width={`${row.widthPct}%`}
+        // The same number, readable without resolving styling — the width
+        // above lands in a generated class name. `MeterBar` does the same for
+        // the same reason.
+        data-width-pct={row.widthPct}
+        data-credit={row.isCredit ? "true" : undefined}
+        // A credit is drawn as an outline rather than a fill, so a refund and
+        // a charge of the same size do not read alike.
+        backgroundColor={
+          row.isCredit ? "transparent" : getHexColorForString(row.label)
+        }
+        borderWidth={row.isCredit ? "2px" : undefined}
+        borderColor={row.isCredit ? getHexColorForString(row.label) : undefined}
+      />
+    </Box>
+  );
+}
+
+/**
+ * The figure half of a ranked row, or the dash that stands in for one.
+ *
+ * A WITHHELD figure prints no number. Formatting its placeholder would put
+ * "$0" where the screen means "we hold rows we cannot price", and the two
+ * readings are not close enough for a reader to tell apart.
+ */
+function RankFigure({
+  row,
+  format,
+}: {
+  row: RankBar;
+  format: (value: number) => string;
+}) {
+  return (
+    <Text
+      flex="0 0 18%"
+      textAlign="right"
+      fontVariantNumeric="tabular-nums"
+      // Readable without resolving styling, as `data-width-pct` is: an em dash
+      // alone cannot tell a test which of the two things it means, and the
+      // reason is what a reader is owed here.
+      data-unpriced={row.unpriced ? "true" : undefined}
+      color={row.unpriced ? "fg.muted" : undefined}
+      // The word the dash stands for, since the column is too narrow to print
+      // it. Same sentence the spender panel uses for the same withholding, so
+      // the two panels do not explain it differently.
+      title={
+        row.unpriced
+          ? `unpriced — ${row.unpricedCells ?? 0} of this row's cells hold no US-dollar figure, so no total is shown`
+          : undefined
+      }
+    >
+      {row.unpriced ? "—" : format(row.value)}
+    </Text>
+  );
 }
 
 /**
@@ -185,9 +266,19 @@ export function CostRankList({
   const shown = useMemo(
     // Copied before sorting: these rows can be a query cache, and sorting in
     // place would reorder what every other reader of that cache sees.
+    //
+    // WITHHELD rows sort last whatever their placeholder value says. Ranking
+    // them by it would file a row nobody could price among the figures, and
+    // its stand-in zero would land it above every credit on the panel.
     () =>
       rankBarGeometry(
-        [...(rows ?? [])].sort((a, b) => b.value - a.value).slice(0, maxRows),
+        [...(rows ?? [])]
+          .sort(
+            (a, b) =>
+              Number(a.unpriced ?? false) - Number(b.unpriced ?? false) ||
+              b.value - a.value,
+          )
+          .slice(0, maxRows),
       ),
     [rows, maxRows],
   );
@@ -209,40 +300,8 @@ export function CostRankList({
           <Text flex="0 0 50%" minWidth={0} truncate title={row.label}>
             {row.label}
           </Text>
-          <Box
-            flex="1"
-            height="14px"
-            borderRadius="sm"
-            backgroundColor="bg.muted"
-            overflow="hidden"
-          >
-            <Box
-              height="100%"
-              borderRadius="sm"
-              width={`${row.widthPct}%`}
-              // The same number, readable without resolving styling — the
-              // width above lands in a generated class name. `MeterBar` does
-              // the same for the same reason.
-              data-width-pct={row.widthPct}
-              data-credit={row.isCredit ? "true" : undefined}
-              // A credit is drawn as an outline rather than a fill, so a
-              // refund and a charge of the same size do not read alike.
-              backgroundColor={
-                row.isCredit ? "transparent" : getHexColorForString(row.label)
-              }
-              borderWidth={row.isCredit ? "2px" : undefined}
-              borderColor={
-                row.isCredit ? getHexColorForString(row.label) : undefined
-              }
-            />
-          </Box>
-          <Text
-            flex="0 0 18%"
-            textAlign="right"
-            fontVariantNumeric="tabular-nums"
-          >
-            {format(row.value)}
-          </Text>
+          <RankBarCell row={row} />
+          <RankFigure row={row} format={format} />
         </HStack>
       ))}
     </VStack>

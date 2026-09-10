@@ -304,6 +304,46 @@ describe("the cost breakdown panels", () => {
     });
   });
 
+  describe("given billed spend recorded against a priced model and an unpriced one", () => {
+    /** @scenario "A model the screen cannot price is listed without a figure" */
+    it("lists both and shows no number for the one it cannot price", () => {
+      // The panel used to drop the unpriced model. Dropping it reports a
+      // smaller bill than the provider sent, and a window whose models were
+      // all unpriced emptied the panel into a measurement claim.
+      harness.modelSpend = {
+        unavailableReason: null,
+        rows: [
+          { model: "claude-opus-5", amountUsd: 34.95, cellsWithoutAmount: 0 },
+          {
+            model: "claude-sonnet-5",
+            amountUsd: null,
+            cellsWithoutAmount: 3,
+          },
+        ],
+        windowDays: 30,
+      };
+
+      renderScreen();
+
+      const panel = screen
+        .getByText("Cost by model")
+        .closest('[data-testid="cost-panel"]');
+      expect(panel).not.toBeNull();
+      const models = within(panel as HTMLElement);
+
+      expect(models.getByText("claude-opus-5")).toBeInTheDocument();
+      expect(models.getByText("claude-sonnet-5")).toBeInTheDocument();
+
+      // No figure in its place, and the reason on hover rather than a zero
+      // that would read as "this model cost nothing".
+      const withheld = panel?.querySelector('[data-unpriced="true"]');
+      expect(withheld).not.toBeNull();
+      expect(withheld?.textContent).toBe("—");
+      expect(withheld?.getAttribute("title")).toContain("unpriced");
+      expect(withheld?.getAttribute("title")).toContain("3");
+    });
+  });
+
   describe("given an activity read has not answered", () => {
     it("says so rather than printing a zero nobody measured", () => {
       renderScreen();

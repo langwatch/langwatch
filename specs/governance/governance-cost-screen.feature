@@ -1227,6 +1227,19 @@ Feature: One cost screen, three honest lanes
       Then that model states no figure
       And it reports how many of its cells hold no amount
 
+    @integration
+    Scenario: A model the screen cannot price is listed without a figure
+      # The panel used to DROP such a model. Dropping it is the one reading
+      # that cannot be right: the money was billed, and a list that leaves it
+      # out reports a smaller bill than the provider sent. A window whose
+      # models were all unpriced then emptied the panel entirely, so the
+      # screen said it had measured nothing over rows it was holding.
+      Given billed spend recorded against a priced model and an unpriced one
+      And a reader who has turned the invented panels off
+      When the cost screen is drawn
+      Then the model panel names both models
+      And the unpriced model shows no figure in place of a number
+
   # A REFUSAL IS NOT A FAILURE.
   #
   # Reported from a first visit: an organization that had configured nothing

@@ -974,7 +974,11 @@ interface Breakdowns {
    * cell behind that model holds no USD amount — which is not the same as zero
    * and must not be summed as one.
    */
-  modelRows: Array<{ model: string; amountUsd: number | null }> | null;
+  modelRows: Array<{
+    model: string;
+    amountUsd: number | null;
+    cellsWithoutAmount: number;
+  }> | null;
   /**
    * Which of these reads FAILED, as opposed to answering nothing.
    *
@@ -1657,23 +1661,27 @@ function measuredRows({
               label: row.departmentName,
               value: Number(row.spendUsd),
             })),
-    // Already totalled and already ranked by the service. A model the
-    // provider named nothing for keeps an honest label rather than an
-    // invented one, the same choice the spender panel makes for its
-    // not-named bucket. A WITHHELD figure (null) is dropped from the ranked
-    // list: the list draws bar lengths, and there is no length that means
-    // "we do not know" — the cells-without-amount count that explains it
-    // rides on the row and belongs to a panel that can state it in words.
+    // Already totalled by the service. A model the provider named nothing
+    // for keeps an honest label rather than an invented one, the same choice
+    // the spender panel makes for its not-named bucket.
+    //
+    // A WITHHELD figure is LISTED, not dropped. The money was billed, so a
+    // list that leaves the model out reports a smaller bill than the provider
+    // sent — and a window whose models were all withheld emptied the panel
+    // into "nothing in this window yet", which claims a measurement the
+    // screen does not have. It carries a stand-in zero and the flag that says
+    // so: `CostRankList` draws no bar for it and prints no figure, and the
+    // cells-without-amount count is what its hover explains it with.
     byModel:
       breakdowns.modelRows === null
         ? null
-        : breakdowns.modelRows
-            .filter((row) => row.amountUsd !== null)
-            .map((row) => ({
-              key: row.model === "" ? UNNAMED_MODEL_KEY : row.model,
-              label: row.model === "" ? "No model named" : row.model,
-              value: row.amountUsd ?? 0,
-            })),
+        : breakdowns.modelRows.map((row) => ({
+            key: row.model === "" ? UNNAMED_MODEL_KEY : row.model,
+            label: row.model === "" ? "No model named" : row.model,
+            value: row.amountUsd ?? 0,
+            unpriced: row.amountUsd === null,
+            unpricedCells: row.cellsWithoutAmount,
+          })),
     byUser:
       breakdowns.userRows === null
         ? null
