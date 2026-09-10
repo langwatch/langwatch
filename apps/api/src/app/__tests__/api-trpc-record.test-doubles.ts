@@ -18,7 +18,7 @@ import { refusingAnalyticsFeature } from "../../features/analytics/analytics.com
 import { refusingDatasetFeature } from "../../features/dataset/dataset.composition.ts";
 import { createEvaluatorTrpcRouter } from "../../features/evaluator/evaluator-trpc.mount.ts";
 import type { ComposedEvaluatorFeature } from "../../features/evaluator/evaluator.composition.types.ts";
-import { refusingPromptFeature } from "../../features/prompt/prompt.composition.ts";
+import type { ComposedPromptFeature } from "../../features/prompt/prompt.composition.types.ts";
 import { createFeatureFlagTrpcRouter } from "../../features/feature-flag/feature-flag-trpc.mount.ts";
 import type { ComposedFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition.types.ts";
 import { createDataRetentionTrpcRouter } from "../../features/data-retention/data-retention-trpc.mount.ts";
@@ -417,7 +417,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     featureFlag: stubFeatureFlagFeature(),
     dataset: refusingDatasetFeature(),
     evaluator: stubEvaluatorFeature(),
-    prompt: refusingPromptFeature(),
+    prompt: stubPromptFeature(),
     dataRetention: stubDataRetentionFeature(),
     workflow: refusingWorkflowFeature(),
     experiment: refusingExperimentFeature(),
@@ -509,4 +509,24 @@ export function stubMount(): never {
       },
     ),
   } as never;
+}
+
+/** The prompt module absent: every read and write refuses by name, the routers throw at mount. */
+export function stubPromptFeature(): ComposedPromptFeature {
+  const refuse = <T>(capability: string): T =>
+    new Proxy(
+      {},
+      {
+        get: () => (): never => {
+          throw new Error(`${capability} is not available on this deployment`);
+        },
+        has: () => true,
+      },
+    ) as T;
+
+  return {
+    app: refuse("The prompt module"),
+    routers: () => refuse("The prompt routers"),
+    rest: () => refuse("The prompt REST family"),
+  };
 }

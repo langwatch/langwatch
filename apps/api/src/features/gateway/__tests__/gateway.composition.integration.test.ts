@@ -46,8 +46,7 @@ import {
 import { refusingLangyFeature } from "../../langy/langy.composition.ts";
 import { refusingAnalyticsFeature } from "../../analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../dataset/dataset.composition.ts";
-import { refusingPromptFeature } from "../../prompt/prompt.composition.ts";
-import { stubScenarioFeature } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
+import { stubPromptFeature, stubScenarioFeature } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingBugReportFeature } from "../../bug-report/bug-report.composition.ts";
 import { refusingIntegrationsChecksFeature } from "../../project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../annotation/annotation-absence.ts";
@@ -216,7 +215,7 @@ async function composeApplication(
       featureFlag: stubFeatureFlagFeature(),
       dataset: refusingDatasetFeature(),
       evaluator: stubEvaluatorFeature(),
-      prompt: refusingPromptFeature(),
+      prompt: stubPromptFeature(),
       dataRetention: stubDataRetentionFeature(),
       monitor: stubMonitorFeature(),
       home: refusingHomeFeature(),
@@ -370,7 +369,7 @@ describe("given an API process composed with the gateway feature", () => {
       // The application `ctx.app` and the two REST families read, and the
       // stores the spend and internal families walk directly. The six routers
       // are pinned by the record's own list, which is where they mount.
-      expect(gateway.app.spendSourceAvailable).toBe(false);
+      expect(gateway.app.isSpendSourceAvailable()).toBe(false);
       expect(gateway.composition?.app).toBe(gateway.app);
     });
   });
@@ -412,7 +411,7 @@ describe("given an API process composed with the gateway feature", () => {
     it("composes the gateway application with its spend source switched off by name", async () => {
       const { gateway } = await composeApplication();
 
-      expect(gateway.app.spendSourceAvailable).toBe(false);
+      expect(gateway.app.isSpendSourceAvailable()).toBe(false);
     });
 
     it("still answers the budget list, through the ledger this half composed", async () => {

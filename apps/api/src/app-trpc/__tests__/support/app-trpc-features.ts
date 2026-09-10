@@ -41,9 +41,8 @@ import {
 import { refusingLangyFeature } from "../../../features/langy/langy.composition.ts";
 import { refusingAnalyticsFeature } from "../../../features/analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../../features/dataset/dataset.composition.ts";
-import { refusingPromptFeature } from "../../../features/prompt/prompt.composition.ts";
 import { refusingHomeFeature } from "../../../features/project/home.composition.ts";
-import { stubScenarioFeature } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
+import { stubPromptFeature, stubScenarioFeature } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingIntegrationsChecksFeature } from "../../../features/project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../../features/annotation/annotation-absence.ts";
 import { composeHttpProxyFeature } from "../../../features/agent/http-proxy.composition.ts";
@@ -179,7 +178,7 @@ export function buildAppTrpcFeatures(
       featureFlag: stubFeatureFlagFeature(),
       dataset: refusingDatasetFeature(),
       evaluator: stubEvaluatorFeature(),
-      prompt: refusingPromptFeature(),
+      prompt: stubPromptFeature(),
       dataRetention: stubDataRetentionFeature(),
       monitor: stubMonitorFeature(),
       home: refusingHomeFeature(),
