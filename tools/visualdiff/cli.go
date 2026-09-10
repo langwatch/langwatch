@@ -18,10 +18,21 @@ const usage = `visualdiff — render every route and every flow on two refs and 
                  [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                  [-dry-run] [-keep] [-agent] [-no-haven]
 
+  visualdiff recapture -run RUNID -routes a,b,c [-root DIR]
+
 Each ref boots as a haven stack under its own run-scoped slug wherever haven
 is installed, so a run never reaches the datastores your own stack uses.
 -no-haven boots the old way instead, on -base-port and its ten-above stride,
-sharing your own Postgres, ClickHouse and Redis.
+sharing your own Postgres, ClickHouse and Redis. Every run streams one line
+per screen to <run-dir>/findings.jsonl as it decides each one, and a final
+run-complete summary line.
+
+recapture re-renders only the named routes against a run's own stacks - which
+stay up when that run was started with -keep - and appends to the same
+findings.jsonl. It never checks out a worktree, never runs haven up, and
+never tears anything down: pass -keep to run, recapture as many times as a
+triage loop needs, then tear the stacks down yourself (haven destroy, or a
+fresh run without -keep).
 
 Exit status: 0 no findings, 1 findings, 2 the run could not be completed.
 `
@@ -35,6 +46,8 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 	switch args[0] {
 	case "run":
 		return runCommand(ctx, args[1:], streams)
+	case "recapture":
+		return recaptureCommand(ctx, args[1:], streams)
 	case "-h", "--help", "help":
 		fmt.Fprint(streams.Out, usage)
 		return ExitClean
@@ -190,4 +203,53 @@ func splitList(value string) []string {
 		}
 	}
 	return out
+}
+
+// recaptureFlags is one parsed `visualdiff recapture` command line.
+type recaptureFlags struct {
+	root   string
+	runID  string
+	routes []string
+}
+
+func recaptureCommand(ctx context.Context, args []string, streams Streams) int {
+	parsed, err := parseRecaptureFlags(args, streams.Err)
+	if err != nil {
+		if !errors.Is(err, errFlagsReported) {
+			fmt.Fprintln(streams.Err, "visualdiff:", err)
+		}
+		return ExitOperational
+	}
+	result, err := Recapture(ctx, RecaptureRequest{Root: parsed.root, RunID: parsed.runID, Routes: parsed.routes}, streams)
+	if err != nil {
+		fmt.Fprintln(streams.Err, "visualdiff:", err)
+		return ExitOperational
+	}
+	if result.Findings > 0 {
+		return ExitFindings
+	}
+	return ExitClean
+}
+
+func parseRecaptureFlags(args []string, stderr io.Writer) (*recaptureFlags, error) {
+	flags := flag.NewFlagSet("recapture", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	root := flags.String("root", ".", "repository root")
+	runID := flags.String("run", "", "run id to recapture against (an earlier -keep run's .visualdiff/<runID> directory)")
+	routes := flags.String("routes", "", "comma-separated routes to recapture")
+	if err := flags.Parse(args); err != nil {
+		return nil, errFlagsReported
+	}
+	if *runID == "" {
+		return nil, errors.New("recapture: -run is required")
+	}
+	routeList := splitList(*routes)
+	if len(routeList) == 0 {
+		return nil, errors.New("recapture: -routes is required")
+	}
+	absoluteRoot, err := filepath.Abs(*root)
+	if err != nil {
+		return nil, err
+	}
+	return &recaptureFlags{root: absoluteRoot, runID: *runID, routes: routeList}, nil
 }

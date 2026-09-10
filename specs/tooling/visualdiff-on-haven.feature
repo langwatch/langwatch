@@ -137,3 +137,28 @@ Feature: visualdiff boots its stacks through haven
       Given the -no-haven flag, or a machine with no haven on PATH
       When visualdiff run is invoked
       Then it boots exactly as before, on its own ports with AllocateRedisDBs
+
+  Rule: A findings stream reports each comparison as it completes
+
+    # A run's report.html/findings.json/findings.md are still written once,
+    # after the whole capture finishes - but a person or an agent watching a
+    # long run wants to know what broke minutes before that, not only at the
+    # end. findings.jsonl is that feed: one line per screen, the instant its
+    # comparison is decided, fsynced so a `tail -f` sees it immediately.
+
+    @unit
+    Scenario: Findings stream while the run is still going
+      Given a run capturing routes and flows on both stacks
+      When a screen's comparison is decided - a failed capture, a new console error, or a computed pixel diff
+      Then one JSON line is appended to findings.jsonl straight away, with the route or flow, its kind, its guessed module, evidence image paths relative to the run root, a one-line message and an RFC 3339 capturedAt
+      And the write is flushed before the run continues, so a reader tailing the file sees it without waiting for the run to finish
+      And once the capture stream ends, a screen that only ever got a base capture is reported "missing-on-candidate", and a final line reports "run-complete" with the total and the count for each kind
+
+    @unit
+    Scenario: A triage loop recaptures only the routes it fixed
+      Given a run was started with -keep, so its two haven stacks are still up
+      When "visualdiff recapture -run RUNID -routes a,b,c" runs
+      Then it reads that run's own persisted plan for the two stacks' URLs rather than re-deriving them
+      And it captures only the named routes, against those same two stacks
+      And it never checks out a worktree, never runs haven up, and never tears anything down
+      And its findings are appended to the same run's findings.jsonl, after whatever the run itself already wrote

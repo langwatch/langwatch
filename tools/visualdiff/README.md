@@ -42,7 +42,9 @@ not be completed — the same ladder as `apidiff`.
    dataset through the **candidate's** API, so the fixtures exist in the shape
    the newer code writes.
 4. Runs `@langwatch/visual-diff-runner` (Playwright) over both stacks: every
-   route, then every flow, screenshotting as it goes and diffing each pair.
+   route, then every flow, screenshotting as it goes and diffing each pair -
+   appending one line to `findings.jsonl` as each screen's comparison is
+   decided (see "Findings stream and recapture" below), not only at the end.
 5. Writes `report.html`, `findings.md` and `findings.json` into the run
    directory.
 6. Tears both stacks down. On the haven path: `haven destroy` for exactly the
@@ -161,6 +163,66 @@ A failure rule beats a restore rule: a restored screen that throws is a
 regression, not a restoration. `regression` and `restore-gap` are the rows
 counted as findings, and they are what decides exit status 1.
 
+## Findings stream and recapture
+
+`report.html`, `findings.json` and `findings.md` are written once, after the
+whole capture finishes - fine for reading the result, useless for watching a
+long run while it is still going. Every `run` and every `recapture` also
+appends to `<run-dir>/findings.jsonl`: one JSON line the instant a screen's
+comparison is decided, fsynced before the run continues, so `tail -f
+<run-dir>/findings.jsonl` shows a finding as soon as it exists. Each line is:
+
+```json
+{"route":"/{slug}/analytics","kind":"changed","module":"analytics","evidence":{"base":"shots/base/routes/analytics.png","candidate":"shots/candidate/routes/analytics.png","diff":"shots/diff/route_%7Bslug%7D_analytics_0.png"},"message":"differs by 4.10%","capturedAt":"2026-09-10T03:05:00Z"}
+```
+
+`kind` is one of `missing-on-candidate`, `changed`, `console-error`,
+`capture-failed`, `identical` - narrower than the report's own
+`Classification` above, because this is a live triage feed rather than the
+rule-based report. A flow's lines carry `flow` and `index` instead of
+`route`. `module` is a best-effort guess at the owning module, from
+`apps/ui/src/features/catalogue.json`'s feature `root` segments (matched
+against the route's first path segment or the flow id's leading word, plural
+tried too); empty when nothing matches. `evidence` paths are relative to the
+run root. The last line of a run (or a recapture) is always
+`{"kind":"run-complete","total":N,"counts":{...},"capturedAt":"..."}`.
+
+Most kinds are decided, and written, the moment enough is known - a failed
+capture or a new console error need only one or two capture messages, a pixel
+diff needs the diff message too - all of which the runner streams off its
+stdout as it works (`RunRunner` pipes it live, not buffered until the process
+exits). `missing-on-candidate` is the one exception: nothing says "no more
+messages are coming for this route", so it can only be decided once the whole
+capture step ends, in the same pass that writes `run-complete`. One
+consequence of the runner's own two-full-passes order (base side captured
+completely, then candidate) is that today's runner still computes every pixel
+diff in one batch right before it reports "done" - so `changed`/`identical`
+lines arrive as a fast burst near the end of a run rather than spread across
+its whole duration, even though `capture-failed`/`console-error` lines do
+arrive throughout. Spreading diffs out too would mean interleaving the two
+sides' capture passes in `tools/visualdiff/runner/src/main.ts`, which is a
+bigger change to that package's execution model than this one made.
+
+A triage loop fixes one thing, then wants to know if it worked, without
+re-booting both stacks:
+
+```bash
+go run ./cmd/visualdiff run -keep -agent    # stacks stay up when the run ends
+# ...fix something in the candidate checkout...
+go run ./cmd/visualdiff recapture -run 20260910-030000 -routes /{slug}/analytics,/{slug}/settings
+# ...repeat recapture as many times as needed...
+haven destroy visualdiff-20260910-030000-base visualdiff-20260910-030000-candidate   # when done
+```
+
+`recapture` reads the run's own persisted plan
+(`<run-dir>/shots/plan.json` - written by the capture step, so it always
+carries the two stacks' actual URLs) rather than re-deriving anything, drives
+only the named routes against those same two stacks, and appends to the same
+`findings.jsonl`. It never checks out a worktree, never runs `haven up`, and
+never tears anything down - both are the `run` step's job, not
+`recapture`'s. See `specs/tooling/visualdiff-on-haven.feature`'s "A findings
+stream reports each comparison as it completes" rule for the bound scenarios.
+
 ## Adding a route
 
 Add the path to `routes:` in `visualdiff.yaml`. `{slug}` is substituted with
@@ -207,12 +269,15 @@ routes.
 ## Layout
 
 ```text
-tools/visualdiff/          the Go CLI: boot, wait, seed, classify, report, teardown
-tools/visualdiff/haven.go  the haven boot path: slugs, up, readiness, teardown
-tools/havenrun/            what visualdiff and apidiff share to boot through haven
-cmd/visualdiff/main.go     the entry point
-tools/visualdiff/runner/   @langwatch/visual-diff-runner: Playwright capture + pixel diff
-visualdiff.yaml            what gets rendered — the only file most changes touch
+tools/visualdiff/                    the Go CLI: boot, wait, seed, classify, report, teardown
+tools/visualdiff/haven.go            the haven boot path: slugs, up, readiness, teardown, worktree prepare
+tools/visualdiff/findings_stream.go  findings.jsonl: the live tracker, the file writer, run+recapture's shared capture path
+tools/visualdiff/catalogue.go        the module guess, from apps/ui/src/features/catalogue.json
+tools/visualdiff/recapture.go        `visualdiff recapture`: replays named routes against a -keep run's own stacks
+tools/havenrun/                      what visualdiff and apidiff share to boot through haven
+cmd/visualdiff/main.go               the entry point
+tools/visualdiff/runner/             @langwatch/visual-diff-runner: Playwright capture + pixel diff
+visualdiff.yaml                      what gets rendered - the only file most changes touch
 specs/tooling/visual-diff.feature
 specs/tooling/visualdiff-on-haven.feature
 ```

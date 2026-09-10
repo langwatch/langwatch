@@ -1,7 +1,6 @@
 package visualdiff
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -379,7 +378,11 @@ func (run *session) capture(ctx context.Context) (RunnerStream, error) {
 	if !options.RoutesOnly {
 		runnerPlan.Flows = config.Flows
 	}
-	stream, err := deps.Capture(ctx, runnerPlan, CaptureOptions{Root: options.Root, Stderr: run.streams.Err})
+	findingsPath := filepath.Join(options.RunDir, FindingsFile)
+	stream, err := runWithFindings(ctx, findingsRunInputs{
+		Deps: deps, Plan: runnerPlan, Options: CaptureOptions{Root: options.Root, Stderr: run.streams.Err},
+		FindingsPath: findingsPath, CatalogueRoot: options.Root,
+	})
 	if err != nil {
 		return stream, fmt.Errorf("capture: %w", err)
 	}
@@ -570,11 +573,21 @@ const RunnerPackage = "@langwatch/visual-diff-runner"
 type CaptureOptions struct {
 	Root   string
 	Stderr io.Writer
+	// OnCapture and OnDiff, when set, are called the instant the runner
+	// reports each capture or diff - streamed off its stdout as the
+	// subprocess produces the line, not batched until it exits. Either may
+	// be nil. This is what lets a caller write a findings.jsonl line per
+	// comparison while the run is still going (see findings_stream.go).
+	OnCapture func(Capture)
+	OnDiff    func(Diff)
 }
 
 // RunRunner writes the plan to a file, runs the Node capture package over it
-// and parses its JSON lines. The plan goes to a file because the flow list is
-// the whole configuration and a command line is the wrong place for it.
+// and streams its JSON lines as they arrive. The plan goes to a file because
+// the flow list is the whole configuration and a command line is the wrong
+// place for it. Reading the subprocess's stdout live (a pipe, not the whole
+// output buffered until the process exits) is what makes OnCapture/OnDiff a
+// real live callback rather than one that only fires once capture is over.
 func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (RunnerStream, error) {
 	planPath := filepath.Join(plan.OutDir, "plan.json")
 	if err := os.MkdirAll(plan.OutDir, 0o750); err != nil {
@@ -587,15 +600,20 @@ func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (Ru
 	if err := os.WriteFile(planPath, encoded, 0o600); err != nil {
 		return RunnerStream{}, err
 	}
-	output := &bytes.Buffer{}
 	// #nosec G204 -- constant executable and constant args but for the plan
 	// path, which this function just wrote inside the run directory.
 	command := exec.CommandContext(ctx, "pnpm", "--filter", RunnerPackage, "capture", "--plan", planPath)
 	command.Dir = options.Root
-	command.Stdout = output
 	command.Stderr = options.Stderr
-	runErr := command.Run()
-	stream, parseErr := ParseRunnerStream(bytes.NewReader(output.Bytes()))
+	stdout, err := command.StdoutPipe()
+	if err != nil {
+		return RunnerStream{}, err
+	}
+	if err := command.Start(); err != nil {
+		return RunnerStream{}, err
+	}
+	stream, parseErr := ParseRunnerStreamLive(stdout, options.OnCapture, options.OnDiff)
+	runErr := command.Wait()
 	if parseErr != nil {
 		return stream, parseErr
 	}
