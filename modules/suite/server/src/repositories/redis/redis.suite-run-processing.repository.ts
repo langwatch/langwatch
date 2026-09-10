@@ -5,8 +5,8 @@ import { ClickhouseSuiteEventingRepository } from "../clickhouse/clickhouse.suit
 import {
   SuiteRunProcessingPipelineAdapter,
   type SuiteRunProcessingPipeline,
-} from "../../adapters/suite-run-processing.adapter.ts";
-import type { SuiteClickHouseClient } from "../../ports/suite-clickhouse.port.ts";
+} from "../../services/suite-run-processing.service.ts";
+import type { SuiteClickHouseClient } from "../clickhouse-client.repository.ts";
 
 /**
  * The Redis keyspace the suite-run fold's read-through cache occupies. A

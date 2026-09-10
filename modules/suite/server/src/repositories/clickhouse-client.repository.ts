@@ -29,18 +29,3 @@ export type SuiteClickHouseClient = {
     clickhouse_settings: Record<string, number>;
   }): Promise<unknown>;
 };
-
-/** Nominal boundary over {@link SuiteClickHouseClient}'s query/insert shape. */
-export abstract class SuiteClickHousePort {
-  abstract query(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    format: "JSONEachRow";
-  }): Promise<SuiteClickHouseQueryResult>;
-  abstract insert(input: {
-    table: string;
-    values: readonly Record<string, unknown>[];
-    format: "JSONEachRow";
-    clickhouse_settings: Record<string, number>;
-  }): Promise<unknown>;
-}

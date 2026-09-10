@@ -1,4 +1,4 @@
-export { SuiteRuntimePort, type SuiteEventingCapabilities } from "./ports/suite-runtime.port.ts";
+export { SuiteRuntimePort, type SuiteEventingCapabilities } from "./repositories/suite-eventing.repository.ts";
 export {
   ClickhouseSuiteEventingRepository as ClickHouseSuiteEventingAdapter,
   type ClickHouseSuiteEventingAdapterOptions,
@@ -25,19 +25,19 @@ export {
   type ConnectedTargetAgent,
   type ConnectedTargetReferenceReader,
 } from "./services/connected-target.service.ts";
-export type { SuiteClickHouseClient } from "./ports/suite-clickhouse.port.ts";
+export type { SuiteClickHouseClient } from "./repositories/clickhouse-client.repository.ts";
 export {
   CompleteSuiteRunItemCommand,
   RecordSuiteRunItemStartedCommand,
   StartSuiteRunCommand,
   SuiteRunCommandsAdapter,
-} from "./adapters/suite-run-commands.adapter.ts";
+} from "./services/suite-run-commands.service.ts";
 export {
   SuiteRunProcessingPipelineAdapter,
   type SuiteRunProcessingPipeline,
   type SuiteRunProcessingPipelineDeps,
-} from "./adapters/suite-run-processing.adapter.ts";
-export { SuiteRunProcessingProducerAdapter } from "./adapters/suite-run-processing-producer.adapter.ts";
+} from "./services/suite-run-processing.service.ts";
+export { SuiteRunProcessingProducerAdapter } from "./services/suite-run-processing-producer.service.ts";
 export {
   SUITE_RUN_PROJECTION_VERSIONS,
   type CompleteSuiteRunItemCommandData,

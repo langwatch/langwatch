@@ -31,7 +31,7 @@ import {
 } from "@langwatch/suite-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { SuiteExecutionPort } from "../ports/suite-execution.port.ts";
-import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port.ts";
+import type { SuiteClickHouseClient } from "../repositories/clickhouse-client.repository.ts";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";

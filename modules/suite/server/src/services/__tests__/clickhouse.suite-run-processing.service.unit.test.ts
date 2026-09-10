@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import { RedisSuiteRunProcessingRepository } from "../../repositories/redis/redis.suite-run-processing.repository.ts";
-import type { SuiteRunProcessingPipeline } from "../suite-run-processing.adapter.ts";
+import type { SuiteRunProcessingPipeline } from "../suite-run-processing.service.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
