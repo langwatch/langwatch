@@ -250,6 +250,7 @@ describe("CredentialAccountService", () => {
       expect(openedAccounts[0]?.name).toBe("sam@acme.com");
     });
 
+    /** @scenario A sign-up states its identifier against the credential it just opened */
     it("states the credential identifier from the row it just wrote", async () => {
       const { service, attachedIdentifiers } = credentialAccountsOver();
 
