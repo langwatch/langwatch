@@ -40,11 +40,14 @@ through costs nothing and removes the cast entirely.
 | `langwatch/service-dependencies` | plugin | A service may not import a database client, another subject's repository, or the global application graph. |
 | `prisma-table-ownership` | architecture-lint | Code outside a module's own Prisma repository may not reach that module's tables. |
 | `prisma-migration-access` | architecture-lint | The raw and scoped Prisma client capabilities are for a `SystemMigration` and its owning repository only. |
+| `clickhouse-table-ownership` | architecture-lint | One module writes a ClickHouse table; every other module reads it through that module's api. |
 
 The three plugin rules are per-import and per-signature, so one file is enough
-to decide. The two policies need the Prisma schema and the whole catalogue at
+to decide. The three policies need the schema and the whole catalogue at
 once: table ownership is a question about every module, including modules that
-are never installed together.
+are never installed together. `clickhouse-table-ownership` reads its table list
+from the goose migrations instead of a schema file, because ClickHouse has
+neither a schema file nor a generated client here.
 
 `prisma-containment` is expressible as `no-restricted-imports` with an
 `overrides` allowlist, and is one of the seven class B rules ADR-135 records.

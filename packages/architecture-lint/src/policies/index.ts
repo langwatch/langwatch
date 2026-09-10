@@ -13,7 +13,10 @@ import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFeatureAppContracts, lintFeatureSetupInfrastructure } from "./feature-app.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
-import { declaredWebDependencyPairs, lintFrontendUiBoundaries } from "./frontend/frontend-ui-boundaries.ts";
+import {
+  declaredWebDependencyPairs,
+  lintFrontendUiBoundaries,
+} from "./frontend/frontend-ui-boundaries.ts";
 import { lintGlobalAppAccess } from "./global-app-access.ts";
 import { lintLegacyFeatureFragments } from "./legacy-feature-fragments.ts";
 import {
@@ -21,6 +24,7 @@ import {
   lintPrismaTableOwnership,
   prismaModelNames,
 } from "./persistence/prisma-table-ownership.ts";
+import { lintClickhouseTableOwnership } from "./persistence/clickhouse-table-ownership.ts";
 import { lintPrismaMigrationAccess } from "./persistence/prisma-migration-access.ts";
 import { lintCommentBlockRoots } from "./quality/comment-blocks.ts";
 import { lintComposedExports } from "./quality/composed-exports.ts";
@@ -113,6 +117,12 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "prisma-table-ownership",
     spec: FEATURE_PACKAGE_BOUNDARIES,
     run: lintPrismaTableOwnership,
+  }),
+  definePolicy({
+    id: "clickhouse-table-ownership",
+    spec: "specs/tooling/lint-clickhouse-table-ownership.feature",
+    baseline: "clickhouse-table-ownership-baseline.json",
+    run: lintClickhouseTableOwnership,
   }),
   definePolicy({
     id: "prisma-migration-access",

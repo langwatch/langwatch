@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "policy": "clickhouse-table-ownership",
+  "entries": [
+    {
+      "key": "analytics|evaluation_runs",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "analytics|stored_spans",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "analytics|trace_analytics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "analytics|trace_analytics_rollup",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "analytics|trace_summaries",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "automation|trace_summaries",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "billing|trace_summaries",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "evaluation|trace_summaries",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "experiment|trace_summaries",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "gateway|trace_summaries",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "governance|gateway_budget_ledger_events",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "governance|trace_summaries",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "ops|simulation_runs",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "ops|trace_summaries",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "topic|trace_summaries",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "trace|evaluation_runs",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "trace|log_records",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "trace|simulation_runs",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "unowned|automation_audit",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "unowned|event_log",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "unowned|gateway_budget_scope_totals",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "unowned|langy_messages",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "unowned|lwql_api_key_tenant_map",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "unowned|simulation_run_metrics_rollup",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "unowned|stored_log_records",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "unowned|stored_metric_records",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "webhook|gateway_spend",
+      "measured": "2026-09-10"
+    }
+  ]
+}

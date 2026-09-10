@@ -116,6 +116,28 @@ Prisma 7's `relationMode = "prisma"`; removing a relation can remove integrity
 and cascade behavior. Cross-feature transactional audit writes need a named
 transaction-preserving seam before their current implementation is replaced.
 
+## ClickHouse tables
+
+The same rule holds for ClickHouse, with a different way of establishing it.
+There is no schema file and no generated client, so the table list is replayed
+from the goose migrations in `packages/clickhouse-client/migrations`: the
+`+goose Up` half of each file in order, a table a later migration drops is
+gone, and a materialised view folds onto the table it feeds so a `*_mv` pair is
+one table with one owner. Access is the SQL a module writes - a table named
+after `FROM`, `JOIN`, `INSERT INTO`, `ALTER TABLE`, `TRUNCATE TABLE`,
+`OPTIMIZE TABLE` or `DELETE FROM`, including through a file-level constant, and
+the `table` option of a `client.insert(...)` call.
+
+Ownership is therefore derived, not declared: the owner of a table is the one
+module that writes it. A second writer, a reader outside the owner and a live
+table no module writes are each a finding, and the migrations, the ClickHouse
+client package and every test file are not module access. The messages match
+the Prisma ones word for word so that a reader of the lint output can only tell
+the two stores apart by the table name. `clickhouse-table-ownership` ratchets
+against its own baseline, because the tree carries readers that predate the
+rule; see the row in [ADR-138](./138-persistence-containment.md) and
+[the spec](../../../specs/tooling/lint-clickhouse-table-ownership.feature).
+
 ## Consequences
 
 The framework catches conflicting declarations before feature side effects.
