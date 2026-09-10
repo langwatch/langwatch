@@ -66,14 +66,25 @@ export async function createWorkerCodingAgentApp(options: {
     ...(options.github.host === undefined ? {} : { hostConfig: { host: options.github.host } }),
   });
 
+  // The worker folds sessions into ClickHouse; without one the tier is the
+  // empty memory twin and nothing is folded.
+  const persistence = options.clickHouse
+    ? {
+        backend: "clickhouse",
+        infrastructure: {
+          clickhouse: options.clickHouse,
+          defaultRetentionDays: options.defaultTraceRetentionDays,
+        },
+      }
+    : { backend: "memory", infrastructure: {} };
+
   const runtime = await createApp({ name: "langwatch-worker" })
+    .withPersistence(persistence.backend, persistence.infrastructure)
     .withInfrastructure({})
     .withProvided(ProjectApi, options.projects)
     .withProvided(GithubApi, github)
     .withModule(codingAgentServer, {
       infrastructure: {
-        clickHouse: options.clickHouse,
-        defaultTraceRetentionDays: options.defaultTraceRetentionDays,
         billing: options.billing,
         scopeDirectory: new WorkerCodingAgentScopeDirectory(options.database),
         scopePermissions: new WorkerCodingAgentScopePermissions(options.authorization),
