@@ -10,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { lazy, Suspense, useCallback, useState } from "react";
+import { isHumanCallerRun } from "~/components/agent-testing/results/caller-display";
 import { CopyButton } from "~/components/CopyButton";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
@@ -440,10 +441,7 @@ function ClassicScenarioRunDetailDrawer({
                         projectId={project?.id ?? ""}
                         // A voice "Call it myself" caller is a real person, so
                         // their turns read as "You", not "User Simulator" (#8020).
-                        isHumanCaller={
-                          scenarioState.metadata?.langwatch?.callerKind ===
-                          "human"
-                        }
+                        isHumanCaller={isHumanCallerRun(scenarioState.metadata)}
                       />
                     </ConversationExpandContext.Provider>
                   </RunDetailSection>
