@@ -12,8 +12,8 @@ import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-es
 import type { CodingAgentCostMetricsPort } from "../ports/coding-agent-cost-metrics.port.ts";
 import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port.ts";
 import type { CodingAgentPullRequestMappingPort } from "../ports/coding-agent-pull-request-mapping.port.ts";
-import type { CodingAgentSessionContextMemoPort } from "../ports/coding-agent-session-context.port.ts";
-import { RedisSessionContextMemoAdapter } from "./redis.session-context-memo.adapter.ts";
+import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
+import { RedisSessionContextMemoRepository } from "../repositories/redis/redis.session-context-memo.repository.ts";
 import { createCodingAgentCostDriftSubscriber } from "../subscribers/coding-agent-cost-drift.subscriber.ts";
 import { EventingContributeLogFactsAdapter } from "./eventing.contribute-log-facts.adapter.ts";
 import { EventingContributeMetricFactsAdapter } from "./eventing.contribute-metric-facts.adapter.ts";
@@ -53,7 +53,7 @@ export interface CodingAgentProcessingPipelineDeps {
    * fact rows from. Defaults to the Redis memo over this pipeline's own Redis,
    * which is the only shape a real process has; a test passes the in-memory one.
    */
-  sessionContextMemo?: CodingAgentSessionContextMemoPort;
+  sessionContextMemo?: CodingAgentSessionContextMemoRepository;
   /** Typed process configuration for the Redis fold-cache consistency TTL. */
   foldCacheTtlSeconds?: number;
   /**
@@ -165,7 +165,7 @@ export class EventingCodingAgentProcessingAdapter {
         "contributeLogFacts",
         EventingContributeLogFactsAdapter,
         EventingContributeLogFactsAdapter.create({
-          contextMemo: deps.sessionContextMemo ?? RedisSessionContextMemoAdapter.create(deps.redis),
+          contextMemo: deps.sessionContextMemo ?? RedisSessionContextMemoRepository.create(deps.redis),
         }),
         { coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH },
       )

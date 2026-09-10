@@ -339,7 +339,7 @@ function checkOwners(
       violations.push(
         issue(
           claim.file,
-          `Table ${table} is claimed by ${claim.feature} and ${previous.feature} (${previous.file}). Keep a single feature owner.`,
+          `Table ${table} is claimed by ${claim.feature} and ${previous.feature} (${previous.file}). Keep a single module owner.`,
           claim.line,
         ),
       );

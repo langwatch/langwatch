@@ -8,7 +8,7 @@ import {
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import Redis from "ioredis";
 import { EventingCodingAgentProcessingAdapter } from "../../eventing.coding-agent-processing.adapter.ts";
-import { InMemorySessionContextMemoAdapter } from "../../in-memory.session-context-memo.adapter.ts";
+import { MemorySessionContextMemoRepository } from "../../../repositories/memory/memory.session-context-memo.repository.ts";
 import { CodingAgentCostMetricsPort } from "../../../ports/coding-agent-cost-metrics.port.ts";
 import { TestClock, TestProjectService } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 
@@ -252,7 +252,7 @@ export function buildTestCodingAgentProcessingPipeline(
     clock: new TestClock(),
     redis,
     defaultRetentionDays: 365,
-    sessionContextMemo: new InMemorySessionContextMemoAdapter(),
+    sessionContextMemo: new MemorySessionContextMemoRepository(),
     foldCacheTtlSeconds,
     github,
   }).build();

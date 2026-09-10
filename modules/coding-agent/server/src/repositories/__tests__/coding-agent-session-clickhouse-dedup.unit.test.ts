@@ -11,8 +11,8 @@ import type {
   CodingAgentClickHouseQueryResult,
 } from "../../ports/coding-agent-clickhouse.port.ts";
 import { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
-import { parseClickHouseDateTimeMs } from "../coding-agent-clickhouse/clickhouse.mapper.ts";
-import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session/clickhouse.repository.ts";
+import { parseClickHouseDateTimeMs } from "../clickhouse/clickhouse.mapper.ts";
+import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
 
 /**
  * ClickHouse renders DateTime64 without a timezone suffix, and the

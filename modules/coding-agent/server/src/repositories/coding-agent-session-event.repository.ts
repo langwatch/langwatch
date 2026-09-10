@@ -62,22 +62,3 @@ export interface SessionModelTotalsRow {
   cacheCreationTokens: number;
   costUsd: number;
 }
-
-export class NullCodingAgentSessionEventRepository extends CodingAgentSessionEventRepository {
-  async ensure(): Promise<void> {}
-
-  async findBySessionId(): Promise<{
-    events: CodingAgentSessionEvent[];
-    nextCursor: CodingAgentSessionCursor | null;
-  }> {
-    return { events: [], nextCursor: null };
-  }
-
-  async sumTokensByModelPerSession(): Promise<SessionModelTotalsRow[]> {
-    return [];
-  }
-
-  async listSessionsByStampedBranch(): Promise<Array<{ tenantId: string; sessionId: string }>> {
-    return [];
-  }
-}

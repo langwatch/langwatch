@@ -39,7 +39,6 @@ import type {
   CodingAgentViewer,
 } from "@langwatch/coding-agent-contract";
 import type { CodingAgentScopeCaller } from "#ports/coding-agent-caller-scope.port";
-import type { CodingAgentClickHousePort } from "#ports/coding-agent-clickhouse.port";
 import type { CodingAgentSessionService } from "../services/coding-agent.service.ts";
 import type { CodingAgentBillingPolicyPort } from "#ports/coding-agent-billing.port";
 import {
@@ -48,10 +47,9 @@ import {
   gateSessionListTitles,
 } from "../rules/coding-agent-gates.rules.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
-import {
-  CodingAgentProjectionPersistenceAdapter,
-  CodingAgentRuntime,
-} from "../adapters/coding-agent.adapter.ts";
+import { SystemCodingAgentClockAdapter } from "../adapters/coding-agent-clock.adapter.ts";
+import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
+import { CodingAgentFeatureService } from "../services/coding-agent.service.ts";
 import type {
   CodingAgentCallerScopeDirectoryPort,
   CodingAgentScopePermissionsPort,
@@ -129,8 +127,6 @@ export interface CodingAgentAuditPort {
 
 /** What the process composes this feature's application from. */
 export type CodingAgentInfrastructure = Readonly<{
-  clickHouse: CodingAgentClickHousePort | null;
-  defaultTraceRetentionDays: number;
   billing: CodingAgentBillingPolicyPort;
   scopeDirectory: CodingAgentCallerScopeDirectoryPort;
   scopePermissions: CodingAgentScopePermissionsPort;
@@ -143,7 +139,12 @@ export type CodingAgentInfrastructure = Readonly<{
 }>;
 
 type CodingAgentDependencies = { projects: typeof ProjectApi; github: typeof GithubApi };
-type CodingAgentSetup = FeatureSetup<CodingAgentDependencies, CodingAgentInfrastructure, undefined>;
+type CodingAgentSetup = FeatureSetup<
+  CodingAgentDependencies,
+  CodingAgentInfrastructure,
+  undefined,
+  CodingAgentRepositories
+>;
 
 export class CodingAgentApp implements CodingAgentApi {
   static readonly contract = CodingAgentApiToken;
@@ -152,19 +153,19 @@ export class CodingAgentApp implements CodingAgentApi {
     github: GithubApi,
   };
 
-  static create({ infrastructure, dependencies }: CodingAgentSetup): CodingAgentApp {
-    const projections = CodingAgentProjectionPersistenceAdapter.create({
-      clickHouse: infrastructure.clickHouse,
-      retention: { defaultTraceRetentionDays: infrastructure.defaultTraceRetentionDays },
-    });
+  static create({ infrastructure, dependencies, repositories }: CodingAgentSetup): CodingAgentApp {
     const service =
       infrastructure.service ??
-      CodingAgentRuntime.create({
-        projections,
+      CodingAgentFeatureService.create({
+        sessions: repositories.sessions,
+        traceSessions: repositories.traceSessions,
+        metricSeries: repositories.metricSeries,
+        sessionEvents: repositories.sessionEvents,
         github: dependencies.github,
         projects: dependencies.projects,
         billing: infrastructure.billing,
-      }).service;
+        clock: SystemCodingAgentClockAdapter.create(),
+      });
     const scopeService = CodingAgentCallerScopeService.create({
       directory: infrastructure.scopeDirectory,
       permissions: infrastructure.scopePermissions,

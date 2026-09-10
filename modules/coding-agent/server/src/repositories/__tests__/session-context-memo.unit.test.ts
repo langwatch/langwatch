@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
-import { InMemorySessionContextMemoAdapter } from "../in-memory.session-context-memo.adapter.ts";
+import { MemorySessionContextMemoRepository } from "../memory/memory.session-context-memo.repository.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -21,11 +21,11 @@ const context: SessionWorkingContext = {
   branch: "feat/split",
 };
 
-describe("InMemorySessionContextMemoAdapter", () => {
+describe("MemorySessionContextMemoRepository", () => {
   describe("given a context written to the memo", () => {
     describe("when it is read back inside its lifetime", () => {
       it("answers the declared context", async () => {
-        const memo = new InMemorySessionContextMemoAdapter(() => 0);
+        const memo = new MemorySessionContextMemoRepository(() => 0);
         await memo.set({ tenantId: "p1", sessionId: "s1", context });
 
         expect(await memo.find({ tenantId: "p1", sessionId: "s1" })).toEqual(context);
@@ -36,7 +36,7 @@ describe("InMemorySessionContextMemoAdapter", () => {
       /** @scenario "A memo entry is forgotten once its lifetime passes" */
       it("answers nothing for that session", async () => {
         let now = 0;
-        const memo = new InMemorySessionContextMemoAdapter(() => now);
+        const memo = new MemorySessionContextMemoRepository(() => now);
         await memo.set({ tenantId: "p1", sessionId: "s1", context });
 
         now = 181 * DAY;
@@ -50,7 +50,7 @@ describe("InMemorySessionContextMemoAdapter", () => {
     describe("when the oldest session's context is read", () => {
       /** @scenario "The no-Redis memo stops growing at its bound" */
       it("evicts the oldest and keeps the newest", async () => {
-        const memo = new InMemorySessionContextMemoAdapter(() => 0);
+        const memo = new MemorySessionContextMemoRepository(() => 0);
         // One past the bound, so exactly the first write is evicted.
         for (let index = 0; index <= 10_000; index++) {
           await memo.set({
@@ -70,7 +70,7 @@ describe("InMemorySessionContextMemoAdapter", () => {
   describe("given two tenants that share a session id", () => {
     describe("when each tenant's context is read", () => {
       it("keeps their contexts apart", async () => {
-        const memo = new InMemorySessionContextMemoAdapter(() => 0);
+        const memo = new MemorySessionContextMemoRepository(() => 0);
         await memo.set({ tenantId: "p1", sessionId: "shared", context });
         await memo.set({
           tenantId: "p2",

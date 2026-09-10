@@ -4,7 +4,7 @@ import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
  * The durable "context the session last declared" the contribute command stamps fact rows
  * from.
  */
-export abstract class CodingAgentSessionContextMemoPort {
+export abstract class CodingAgentSessionContextMemoRepository {
   /** The one key shape both memo adapters store a session's context under. */
   static memoKey({ tenantId, sessionId }: { tenantId: string; sessionId: string }): string {
     return `coding-agent:session-context:${tenantId}:${sessionId}`;

@@ -9,11 +9,3 @@ export abstract class CodingAgentTraceSessionRepository {
     traceId: string;
   }): Promise<CodingAgentTraceSessionRecord | null>;
 }
-
-export class NullCodingAgentTraceSessionRepository extends CodingAgentTraceSessionRepository {
-  async ensure(): Promise<void> {}
-
-  async findByTraceId(): Promise<CodingAgentTraceSessionRecord | null> {
-    return null;
-  }
-}

@@ -22,11 +22,3 @@ export abstract class SessionMetricSeriesRepository {
     toMs: number;
   }): Promise<SessionMetricTotal[]>;
 }
-
-export class NullSessionMetricSeriesRepository extends SessionMetricSeriesRepository {
-  async ensure(): Promise<void> {}
-
-  async findTotalsBySessionIds(): Promise<SessionMetricTotal[]> {
-    return [];
-  }
-}

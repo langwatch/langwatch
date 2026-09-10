@@ -1,15 +1,8 @@
 import { histogram, type HistogramHandle } from "@langwatch/observability/metrics";
-
-export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
-
-/** Observes the bounded session-list storage read without coupling the feature to app metrics. */
-export abstract class CodingAgentReadMetricsPort {
-  abstract observeSessionListRead(input: {
-    table: string;
-    outcome: CodingAgentSessionListReadOutcome;
-    durationMs: number;
-  }): void;
-}
+import {
+  CodingAgentReadMetricsPort,
+  type CodingAgentSessionListReadOutcome,
+} from "../ports/coding-agent-read-metrics.port.ts";
 
 export class NoopCodingAgentReadMetricsPort extends CodingAgentReadMetricsPort {
   static create(): NoopCodingAgentReadMetricsPort {

@@ -5,7 +5,7 @@ import {
   TestClock,
   session,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import { CodingAgentSessionClickHouseRepository } from "../../repositories/coding-agent-session/clickhouse.repository.ts";
+import { CodingAgentSessionClickHouseRepository } from "../../repositories/clickhouse/clickhouse.coding-agent-session.repository.ts";
 
 const endpoints: TestClickHouseEndpoint[] = [];
 

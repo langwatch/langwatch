@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import {
-  CodingAgentProjectionPersistenceAdapter,
-  CodingAgentRuntime,
-} from "@langwatch/coding-agent-server";
+import { ClickHouseCodingAgentRepositories } from "../repositories/clickhouse/clickhouse.coding-agent.repositories.ts";
+import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
+import { CodingAgentFeatureService } from "../services/coding-agent.service.ts";
 import {
   TEST_NOW_MS,
   TestBillingPolicy,
@@ -24,20 +23,21 @@ afterEach(async () => {
 async function runtime() {
   const endpoint = await TestClickHouseEndpoint.create();
   endpoints.push(endpoint);
-  const projections = CodingAgentProjectionPersistenceAdapter.create({
-    clickHouse: endpoint,
-    retention: { defaultTraceRetentionDays: 30 },
+  const repositories = ClickHouseCodingAgentRepositories.createWith({
+    clickhouse: endpoint,
+    defaultRetentionDays: 30,
     clock: new TestClock(),
   });
   return {
     endpoint,
-    projections,
-    service: CodingAgentRuntime.create({
-      projections,
+    projections: CodingAgentProjectionPersistenceService.create(repositories),
+    service: CodingAgentFeatureService.create({
+      ...repositories,
       github: new TestGithubService(),
       projects: new TestProjectService(),
       billing: new TestBillingPolicy(),
-    }).service,
+      clock: new TestClock(),
+    }),
   };
 }
 

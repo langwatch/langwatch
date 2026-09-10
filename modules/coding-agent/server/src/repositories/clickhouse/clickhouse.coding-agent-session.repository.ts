@@ -11,10 +11,10 @@ import type {
   CodingAgentClickHousePort,
 } from "../../ports/coding-agent-clickhouse.port.ts";
 import type { CodingAgentClockPort } from "../../ports/coding-agent-clock.port.ts";
-import {
-  type CodingAgentReadMetricsPort,
-  type CodingAgentSessionListReadOutcome,
-} from "../../adapters/coding-agent-read-metrics.adapter.ts";
+import type {
+  CodingAgentReadMetricsPort,
+  CodingAgentSessionListReadOutcome,
+} from "../../ports/coding-agent-read-metrics.port.ts";
 import type { CodingAgentSessionRepository as SessionRepository } from "../coding-agent-session.repository.ts";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -24,7 +24,7 @@ import {
   asStringArray,
   parseClickHouseDateTimeMs,
   type ClickHouseMoment,
-} from "../coding-agent-clickhouse/clickhouse.mapper.ts";
+} from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
 type CodingAgentSessionRow = CodingAgentSession;

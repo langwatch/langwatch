@@ -9,14 +9,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { NoopCodingAgentReadMetricsPort } from "../../adapters/coding-agent-read-metrics.adapter.ts";
 import { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
 import { CodingAgentClockPort } from "../../ports/coding-agent-clock.port.ts";
-import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session/clickhouse.repository.ts";
-import { CodingAgentTraceSessionClickHouseRepository } from "../coding-agent-trace-session/clickhouse.repository.ts";
-import { SessionMetricSeriesClickHouseRepository } from "../session-metric-series/clickhouse.repository.ts";
+import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
+import { CodingAgentTraceSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-trace-session.repository.ts";
+import { SessionMetricSeriesClickHouseRepository } from "../clickhouse/clickhouse.session-metric-series.repository.ts";
 import { session } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../coding-agent-session-event/__tests__/support/clickhouse-endpoint.support.ts";
+} from "../clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 
 const clickHouseUrl = testClickHouseUrl();
 

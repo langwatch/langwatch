@@ -28,8 +28,8 @@ import {
 import { EventingContributeLogFactsAdapter } from "../eventing.contribute-log-facts.adapter.ts";
 import { EventingContributeMetricFactsAdapter } from "../eventing.contribute-metric-facts.adapter.ts";
 import { EventingContributeSpanFactsAdapter } from "../eventing.contribute-span-facts.adapter.ts";
-import { InMemorySessionContextMemoAdapter } from "../in-memory.session-context-memo.adapter.ts";
-import type { CodingAgentSessionContextMemoPort } from "../../ports/coding-agent-session-context.port.ts";
+import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
+import type { CodingAgentSessionContextMemoRepository } from "../../repositories/session-context-memo.repository.ts";
 
 const TENANT = "tenant-1";
 const SESSION = "8f2c9a1e-session";
@@ -178,9 +178,9 @@ describe("EventingContributeSpanFactsAdapter", () => {
   });
 });
 
-function logFactsHandler(memo?: CodingAgentSessionContextMemoPort) {
+function logFactsHandler(memo?: CodingAgentSessionContextMemoRepository) {
   return EventingContributeLogFactsAdapter.create({
-    contextMemo: memo ?? new InMemorySessionContextMemoAdapter(),
+    contextMemo: memo ?? new MemorySessionContextMemoRepository(),
   });
 }
 
@@ -339,7 +339,7 @@ describe("EventingContributeLogFactsAdapter", () => {
   describe("when the memo cannot be read", () => {
     /** @scenario "A record whose memo cannot be read is contributed unstamped" */
     it("contributes the record unstamped rather than failing it", async () => {
-      const failing: CodingAgentSessionContextMemoPort = {
+      const failing: CodingAgentSessionContextMemoRepository = {
         tryGet: async () => {
           throw new Error("redis away");
         },
@@ -360,7 +360,7 @@ describe("EventingContributeLogFactsAdapter", () => {
   describe("when the memo cannot be written", () => {
     /** @scenario "A declaration whose memo cannot be written is still contributed" */
     it("contributes the declaration itself rather than failing it", async () => {
-      const failing: CodingAgentSessionContextMemoPort = {
+      const failing: CodingAgentSessionContextMemoRepository = {
         tryGet: async () => null,
         set: async () => {
           throw new Error("redis away");

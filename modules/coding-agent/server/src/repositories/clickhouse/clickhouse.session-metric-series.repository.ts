@@ -6,7 +6,7 @@ import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickho
 import {
   clickHouseMomentOf,
   type ClickHouseMoment,
-} from "../coding-agent-clickhouse/clickhouse.mapper.ts";
+} from "./clickhouse.mapper.ts";
 import { SessionMetricSeriesRepository as MetricSeriesRepository } from "../session-metric-series.repository.ts";
 
 const TABLE_NAME = "session_metric_series" as const;

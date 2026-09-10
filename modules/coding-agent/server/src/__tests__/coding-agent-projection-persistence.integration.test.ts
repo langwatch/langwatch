@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { CodingAgentProjectionPersistenceAdapter } from "@langwatch/coding-agent-server";
+import { ClickHouseCodingAgentRepositories } from "../repositories/clickhouse/clickhouse.coding-agent.repositories.ts";
+import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
 import { z } from "zod";
 import {
   TestClickHouseEndpoint,
@@ -19,11 +20,13 @@ async function createPersistence() {
   endpoints.push(endpoint);
   return {
     endpoint,
-    persistence: CodingAgentProjectionPersistenceAdapter.create({
-      clickHouse: endpoint,
-      retention: { defaultTraceRetentionDays: 30 },
-      clock: new TestClock(),
-    }),
+    persistence: CodingAgentProjectionPersistenceService.create(
+      ClickHouseCodingAgentRepositories.createWith({
+        clickhouse: endpoint,
+        defaultRetentionDays: 30,
+        clock: new TestClock(),
+      }),
+    ),
   };
 }
 

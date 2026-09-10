@@ -59,14 +59,26 @@ export async function composeCodingAgentFeature(options: {
 }): Promise<ComposedCodingAgentFeature> {
   const { peers } = options;
 
+  // A process with no ClickHouse holds the projections in memory instead: the
+  // API folds no session, so an empty memory tier answers exactly what the
+  // absent store would, and the module composes the same way either way.
+  const persistence = peers.clickHouse
+    ? {
+        backend: "clickhouse",
+        infrastructure: {
+          clickhouse: peers.clickHouse,
+          defaultRetentionDays: options.defaultRetentionDays,
+        },
+      }
+    : { backend: "memory", infrastructure: {} };
+
   const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence(persistence.backend, persistence.infrastructure)
     .withInfrastructure({})
     .withProvided(ProjectApi, peers.projects)
     .withProvided(GithubApi, peers.github)
     .withModule(codingAgentServer, {
       infrastructure: {
-        clickHouse: peers.clickHouse,
-        defaultTraceRetentionDays: options.defaultRetentionDays,
         billing: new ApiCodingAgentBilling(),
         scopeDirectory: new ApiCodingAgentScopeDirectory(options.infrastructure.prisma),
         scopePermissions: new ApiCodingAgentScopePermissions(options.infrastructure.authz),

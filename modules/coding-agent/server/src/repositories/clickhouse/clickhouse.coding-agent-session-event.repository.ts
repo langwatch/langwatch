@@ -14,7 +14,7 @@ import {
   clickHouseMomentOf,
   groupTenantsByClient,
   type ClickHouseMoment,
-} from "../coding-agent-clickhouse/clickhouse.mapper.ts";
+} from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_session_events" as const;
 

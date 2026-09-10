@@ -1,18 +1,18 @@
 import type { Cluster, Redis } from "ioredis";
 import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
 import {
-  CodingAgentSessionContextMemoPort,
+  CodingAgentSessionContextMemoRepository,
   SESSION_CONTEXT_MEMO_TTL_SECONDS,
-} from "../ports/coding-agent-session-context.port.ts";
+} from "../session-context-memo.repository.ts";
 
 /** The session-context memo over Redis, which owns the expiry. */
-export class RedisSessionContextMemoAdapter extends CodingAgentSessionContextMemoPort {
+export class RedisSessionContextMemoRepository extends CodingAgentSessionContextMemoRepository {
   constructor(private readonly redis: Redis | Cluster) {
     super();
   }
 
-  static create(redis: Redis | Cluster): RedisSessionContextMemoAdapter {
-    return new RedisSessionContextMemoAdapter(redis);
+  static create(redis: Redis | Cluster): RedisSessionContextMemoRepository {
+    return new RedisSessionContextMemoRepository(redis);
   }
 
   async find({
@@ -23,7 +23,7 @@ export class RedisSessionContextMemoAdapter extends CodingAgentSessionContextMem
     sessionId: string;
   }): Promise<SessionWorkingContext | null> {
     const raw = await this.redis.get(
-      CodingAgentSessionContextMemoPort.memoKey({ tenantId, sessionId }),
+      CodingAgentSessionContextMemoRepository.memoKey({ tenantId, sessionId }),
     );
     if (raw === null) return null;
     try {
@@ -49,7 +49,7 @@ export class RedisSessionContextMemoAdapter extends CodingAgentSessionContextMem
     context: SessionWorkingContext;
   }): Promise<void> {
     await this.redis.set(
-      CodingAgentSessionContextMemoPort.memoKey({ tenantId, sessionId }),
+      CodingAgentSessionContextMemoRepository.memoKey({ tenantId, sessionId }),
       JSON.stringify(context),
       "EX",
       SESSION_CONTEXT_MEMO_TTL_SECONDS,

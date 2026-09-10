@@ -7,7 +7,7 @@ import {
   clickHouseMomentOf,
   parseClickHouseDateTimeMs,
   type ClickHouseMoment,
-} from "../coding-agent-clickhouse/clickhouse.mapper.ts";
+} from "./clickhouse.mapper.ts";
 import { CodingAgentTraceSessionRepository as TraceSessionRepository } from "../coding-agent-trace-session.repository.ts";
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;

@@ -64,32 +64,3 @@ export abstract class CodingAgentSessionRepository {
     startedAtFromMs: number;
   }): Promise<CodingAgentSessionBranchRecord[]>;
 }
-
-export class NullCodingAgentSessionRepository extends CodingAgentSessionRepository {
-  async upsert(): Promise<void> {}
-
-  async upsertBatch(): Promise<void> {}
-
-  async findBySessionId(): Promise<CodingAgentSession | null> {
-    return null;
-  }
-
-  async findBySessionIdWithApplied(): Promise<{
-    row: CodingAgentSession;
-    appliedEventIds: string[];
-  } | null> {
-    return null;
-  }
-
-  async findManyRecent(): Promise<CodingAgentSession[]> {
-    return [];
-  }
-
-  async listByRepositoryBranch(): Promise<CodingAgentSessionBranchRecord[]> {
-    return [];
-  }
-
-  async listBySessionIds(): Promise<CodingAgentSessionBranchRecord[]> {
-    return [];
-  }
-}

@@ -83,10 +83,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "coding-agent|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "experiment|installer-not-booted",
       "measured": "2026-09-08"
     },

@@ -17,7 +17,7 @@ import {
   type SessionWorkingContext,
   workingContextOfFacts,
 } from "@langwatch/coding-agent-contract";
-import type { CodingAgentSessionContextMemoPort } from "../ports/coding-agent-session-context.port.ts";
+import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
 import { CodingAgentSessionEventsMapProjection } from "../projections/coding-agent-session-events.projection.ts";
 
 /**
@@ -41,10 +41,10 @@ export class EventingContributeLogFactsAdapter implements CommandHandler<
   Command<ContributeLogFactsCommandData>,
   LogFactsContributedEvent
 > {
-  constructor(private readonly deps: { contextMemo: CodingAgentSessionContextMemoPort }) {}
+  constructor(private readonly deps: { contextMemo: CodingAgentSessionContextMemoRepository }) {}
 
   static create(deps: {
-    contextMemo: CodingAgentSessionContextMemoPort;
+    contextMemo: CodingAgentSessionContextMemoRepository;
   }): EventingContributeLogFactsAdapter {
     return new EventingContributeLogFactsAdapter(deps);
   }

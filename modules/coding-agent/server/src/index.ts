@@ -1,10 +1,8 @@
-export {
-  CodingAgentProjectionPersistenceAdapter,
-  CodingAgentProjectionPersistenceAdapter as CodingAgentProjectionPersistence,
-  CodingAgentRuntime,
-  type CodingAgentProjectionPersistenceOptions,
-  type CodingAgentRuntimeOptions,
-} from "./adapters/coding-agent.adapter.ts";
+export { CodingAgentProjectionPersistenceService } from "./services/coding-agent-projection-persistence.service.ts";
+export { codingAgentRepositories } from "./repositories/coding-agent-repositories.registry.ts";
+export { ClickHouseCodingAgentRepositories } from "./repositories/clickhouse/clickhouse.coding-agent.repositories.ts";
+export { MemoryCodingAgentRepositories } from "./repositories/memory/memory.coding-agent.repositories.ts";
+export type { CodingAgentRepositories } from "./repositories/coding-agent.repositories.ts";
 export { CodingAgentBillingPolicyPort } from "./ports/coding-agent-billing.port.ts";
 export { CodingAgentClickHousePort } from "./ports/coding-agent-clickhouse.port.ts";
 export { CodingAgentClockPort } from "./ports/coding-agent-clock.port.ts";
@@ -34,11 +32,11 @@ export { createCodingAgentLogFactsDispatchSubscriber } from "./subscribers/codin
 export { createCodingAgentMetricFactsDispatchSubscriber } from "./subscribers/coding-agent-metric-facts-dispatch.subscriber.ts";
 export { createCodingAgentSpanFactsDispatchSubscriber } from "./subscribers/coding-agent-span-facts-dispatch.subscriber.ts";
 export { createPullRequestMappingSubscriber } from "./subscribers/pull-request-mapping.subscriber.ts";
+export { NoopCodingAgentReadMetricsPort } from "./adapters/coding-agent-read-metrics.adapter.ts";
 export {
   CodingAgentReadMetricsPort,
-  NoopCodingAgentReadMetricsPort,
   type CodingAgentSessionListReadOutcome,
-} from "./adapters/coding-agent-read-metrics.adapter.ts";
+} from "./ports/coding-agent-read-metrics.port.ts";
 /**
  * The feature's application: the one typed thing its transports are given.
  * Both doors reach the same object, so a rule written on it is the rule both
