@@ -166,13 +166,6 @@ function isCollectionExhausted(params: {
 }
 
 /**
- * Every user a workspace token can enumerate.
- *
- * Never throws. See the note at the top of this file: this endpoint is
- * unproven for bulk use, so a workspace that will not serve it has to produce
- * a refusal an admin can read rather than an error an effect retries.
- */
-/**
  * Appends the people this walk has not already recorded, and says how many.
  *
  * The count is the return value rather than the list length because it is what
@@ -231,6 +224,13 @@ function walkIsFinished({
   return isCollectionExhausted({ returned, totalResults, nextIndex });
 }
 
+/**
+ * Every user a workspace token can enumerate.
+ *
+ * Never throws. See the note at the top of this file: this endpoint is
+ * unproven for bulk use, so a workspace that will not serve it has to produce
+ * a refusal an admin can read rather than an error an effect retries.
+ */
 export async function listDatabricksPeople(params: {
   workspaceUrl: string;
   token: string;
