@@ -16,6 +16,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type GovernanceOcsfEventInput,
   GovernanceOcsfEventsClickHouseRepository,
+  OCSF_ACTIVITY,
+  OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 
 function makeRepository() {
@@ -40,12 +42,17 @@ function rowsFor({
     traceId: `trace-${index}`,
     sourceId: "is-1",
     sourceType: "microsoft_graph",
-    activityId: 6,
-    severityId: 1,
-    eventTime: "2026-08-30 00:00:00",
+    activityId: OCSF_ACTIVITY.INVOKE,
+    severityId: OCSF_SEVERITY.INFO,
+    eventTime: new Date("2026-08-30T00:00:00.000Z"),
+    actorUserId: "",
+    actorEmail: "",
+    actorEnduserId: "",
     actionName: "invoke",
+    targetName: "",
+    anomalyAlertId: "",
     rawOcsfJson: JSON.stringify({ class_uid: 6003 }),
-  })) as GovernanceOcsfEventInput[];
+  }));
 }
 
 describe("GovernanceOcsfEventsClickHouseRepository.insertEvents", () => {
