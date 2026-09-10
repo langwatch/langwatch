@@ -333,6 +333,59 @@ export const afterUserCreate = async ({
   }
 };
 
+/** ADR-117 §3's evidence rule, as the port `beforeAccountCreate` asks it
+ *  through. A provider that asserted nothing — no ID token, or no
+ *  `email_verified` beside the address — refuses nothing. */
+type SignInLinkEvidence = {
+  refusalForLink(input: {
+    userId: string;
+    providerId: string;
+    providerAccountId: string;
+    idToken: string | undefined;
+  }): Promise<string | null>;
+};
+
+/**
+ * ADR-117 §3, asked BEFORE the ssoDomain rules in `beforeAccountCreate`,
+ * because this is not one of them: whether the identity provider's evidence
+ * supports attaching this account to this person is a question every
+ * deployment asks, licensed or not, SSO-enforced or not. Silent on every path
+ * that did not carry the evidence to judge.
+ */
+const refuseLinkOnInsufficientEvidence = async ({
+  userId,
+  account,
+  linkEvidence,
+}: {
+  userId: string;
+  account: {
+    userId: string;
+    providerId: string;
+    accountId: string;
+    idToken?: string;
+  };
+  linkEvidence?: SignInLinkEvidence;
+}): Promise<void> => {
+  const refusal = await linkEvidence?.refusalForLink({
+    userId: account.userId,
+    providerId: account.providerId,
+    providerAccountId: account.accountId,
+    idToken: account.idToken,
+  });
+  if (!refusal) return;
+
+  logger.warn(
+    { userId, providerId: account.providerId, reason: refusal },
+    "Refused a sign-in link on insufficient evidence; a proposal was recorded for an administrator",
+  );
+  // APIError so better-auth carries the code into the callback redirect, where
+  // /auth/error renders the copy registered for it.
+  throw APIError.from("FORBIDDEN", {
+    code: "LINK_NEEDS_APPROVAL",
+    message: "LINK_NEEDS_APPROVAL",
+  });
+};
+
 /**
  * Called before a new Account row is created. Ports the provider-linking and
  * pendingSsoSetup logic from the NextAuth signIn callback.
@@ -366,14 +419,7 @@ export const beforeAccountCreate = async ({
   };
   /** ADR-117 §3's evidence rule. Optional so the many tests that predate it
    *  keep exercising the SSO-domain behaviour below unchanged. */
-  linkEvidence?: {
-    refusalForLink(input: {
-      userId: string;
-      providerId: string;
-      providerAccountId: string;
-      idToken: string | undefined;
-    }): Promise<string | null>;
-  };
+  linkEvidence?: SignInLinkEvidence;
 }): Promise<void> => {
   const user = await prisma.user.findUnique({
     where: { id: account.userId },
@@ -391,34 +437,11 @@ export const beforeAccountCreate = async ({
     });
   }
 
-  // ADR-117 §3, BEFORE the ssoDomain rules below, because this is not one of
-  // them: whether the identity provider's evidence supports attaching this
-  // account to this person is a question every deployment asks, licensed or
-  // not, SSO-enforced or not. A provider that asserted nothing (no ID token,
-  // or no `email_verified` beside the address) refuses nothing, so this is
-  // silent on every path that did not carry the evidence to judge.
-  const refusal = await linkEvidence?.refusalForLink({
-    userId: account.userId,
-    providerId: account.providerId,
-    providerAccountId: account.accountId,
-    idToken: account.idToken,
+  await refuseLinkOnInsufficientEvidence({
+    userId: user.id,
+    account,
+    linkEvidence,
   });
-  if (refusal) {
-    logger.warn(
-      {
-        userId: user.id,
-        providerId: account.providerId,
-        reason: refusal,
-      },
-      "Refused a sign-in link on insufficient evidence; a proposal was recorded for an administrator",
-    );
-    // APIError so better-auth carries the code into the callback redirect,
-    // where /auth/error renders the copy registered for it.
-    throw APIError.from("FORBIDDEN", {
-      code: "LINK_NEEDS_APPROVAL",
-      message: "LINK_NEEDS_APPROVAL",
-    });
-  }
 
   // ADR-027: when the platform SSO gate denies, all ssoDomain enforcement is
   // off (site #4, mirroring `afterUserCreate`). Critically, this stops the
