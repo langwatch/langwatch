@@ -6,7 +6,7 @@
 import type { ApiKey, ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   AgentSandboxKeyMintService,
-  RedisAgentSandboxKeyShareAdapter,
+  RedisAgentSandboxKeyShareRepository,
 } from "@langwatch/api-key-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
@@ -93,7 +93,7 @@ function mintOver(options: { apiKeys: ApiKeyApi; ownerUserId?: string }) {
       findPersonalWorkspaceOwner: async () =>
         options.ownerUserId ? { ownerUserId: options.ownerUserId } : null,
     },
-    share: RedisAgentSandboxKeyShareAdapter.create({ redis: null, secret: SHARE_SECRET }),
+    share: RedisAgentSandboxKeyShareRepository.create({ redis: null, secret: SHARE_SECRET }),
   });
 }
 

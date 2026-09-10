@@ -5,7 +5,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   AbsentAgentSandboxKeyShareAdapter,
   AgentSandboxKeyMintService,
-  RedisAgentSandboxKeyShareAdapter,
+  RedisAgentSandboxKeyShareRepository,
   type AgentSandboxKeyShareRedis,
 } from "@langwatch/api-key-server";
 import type { AgentApi } from "@langwatch/agent-contract";
@@ -587,7 +587,7 @@ class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialP
   }): ApiExperimentSandboxCredentialAdapter {
     const secret = options.storedSecretEncryptionKey?.trim();
     const share = secret
-      ? RedisAgentSandboxKeyShareAdapter.create({ redis: options.redis, secret })
+      ? RedisAgentSandboxKeyShareRepository.create({ redis: options.redis, secret })
       : AbsentAgentSandboxKeyShareAdapter.create();
     const projects = options.projects;
     const mint =

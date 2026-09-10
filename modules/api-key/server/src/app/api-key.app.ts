@@ -36,7 +36,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
-import { ApiKeyTokenAdapter } from "../adapters/api-key-token.api-key-token.adapter.ts";
+import { ApiKeyTokenAdapter } from "../repositories/memory/memory.api-key-token.repository.ts";
 import type { ApiKeyBindingId } from "./api-key.app.ts";
 import type { ApiKeyDiagnostics } from "./api-key.app.ts";
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";

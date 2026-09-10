@@ -1,4 +1,4 @@
-import { AgentSandboxKeyShareRepository } from "../repositories/agent-sandbox-key-share.repository.ts";
+import { AgentSandboxKeyShareRepository } from "../agent-sandbox-key-share.repository.ts";
 
 // Named rather than an inline object so the composition root's decision — no
 // encryption key, no share — reads as a choice at the seam it was made.

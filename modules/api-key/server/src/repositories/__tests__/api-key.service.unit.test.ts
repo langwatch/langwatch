@@ -15,7 +15,7 @@ import {
   type ApiKeyUpdateRecord,
   type StoredApiKey,
 } from "../api-key.repository.ts";
-import { ApiKeyTokenAdapter } from "../../adapters/api-key-token.api-key-token.adapter.ts";
+import { ApiKeyTokenAdapter } from "../memory/memory.api-key-token.repository.ts";
 import { ApiKeyBindingId } from "../../app/api-key.app.ts";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 

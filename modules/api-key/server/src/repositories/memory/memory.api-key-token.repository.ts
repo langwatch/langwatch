@@ -5,7 +5,7 @@ import {
   LEGACY_PAT_PREFIX,
   splitApiKeyToken,
 } from "@langwatch/api-key-contract";
-import { ApiKeyTokenRepository } from "../repositories/api-key-token.repository.ts";
+import { ApiKeyTokenRepository } from "../api-key-token.repository.ts";
 
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 

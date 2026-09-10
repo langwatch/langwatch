@@ -5,7 +5,7 @@ import {
   INGEST_KEY_PREFIX,
   splitApiKeyToken,
 } from "@langwatch/api-key-contract";
-import { ApiKeyTokenAdapter } from "../api-key-token.api-key-token.adapter.ts";
+import { ApiKeyTokenAdapter } from "../memory.api-key-token.repository.ts";
 
 const PEPPER = "test-pepper";
 const generateToken = (options?: { prefix?: string }) =>
