@@ -6375,6 +6375,118 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "handled-error-outside-contract|enterprise/modules/governance/server/src/app/governance.app.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|enterprise/modules/governance/server/src/services/organization-session-policy.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/analytics/server/src/services/langwatch-ql-validation-errors.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/auth/server/src/app/auth.app.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/authz/server/src/adapters/eventing.authz-ledger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/coding-agent/server/src/app/coding-agent.app.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/evaluation/server/src/transport/evaluations-legacy.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/experiment/server/src/transport/experiment-v3.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/identity/server/src/adapters/better-auth.account-queries.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/identity/server/src/ports/identity-birth.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/model-provider/server/src/adapters/codex-oauth.model-provider-token-refresher.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/model-provider/server/src/adapters/http.model-provider-credential-probe.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/model-provider/server/src/services/ai-call-failure.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/ops/server/src/app/ops.app.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/ops/server/src/services/bug-report-intake.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/organization/server/src/app/organization.app.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/organization/server/src/services/organization-invitation-door.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/organization/server/src/services/organization-member-role.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/organization/server/src/services/organization-onboarding.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/organization/server/src/transport/api-rest/organization-provisioning.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/prompt/server/src/app/prompt.app.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/prompt/server/src/transport/prompt-execute.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/stored-object/server/src/adapters/absent.payload-staging.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/suite/server/src/app/suite.app.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/suite/server/src/transport/suites-alias.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/trace/server/src/services/trace-ai-query.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/trace/server/src/transport/api-rest/otlp-ingest.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "handled-error-outside-contract|modules/user/server/src/services/user-account.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "id-generation-origin|apps/api/src/app/api-model-provider.composition.ts",
       "measured": "2026-09-08"
     },
@@ -8669,6 +8781,218 @@
     {
       "key": "plan-literals|enterprise/modules/billing/server/src/repositories/prisma/prisma.subscription.repository.ts",
       "measured": "2026-09-07"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-rest/governance-cli.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-rest/governance.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/activity-monitor.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/ai-tools.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/anomaly-rules.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/departments.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/governance.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/ingestion-key.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/ingestion-sources.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/ingestion-templates.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/personal-dashboard.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/personal-sessions.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/personal-virtual-key.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/routing-policy.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-trpc/session-policy.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|enterprise/modules/scim/server/src/transport/scim-token.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/agent/server/src/transport/agent-connect.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/analytics/server/src/transport/analytics-legacy.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/analytics/server/src/transport/analytics.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/analytics/server/src/transport/query.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/analytics/server/src/transport/saved-workbench-chart.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/auth/server/src/transport/auth-cli-device-flow.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/coding-agent/server/src/transport/coding-agent.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/evaluation/server/src/transport/evaluations-legacy.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/evaluator/server/src/transport/evaluator.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/experiment/server/src/transport/experiment-v3.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/gateway/server/src/transport/api-rest/elevenlabs-webhook.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/gateway/server/src/transport/api-rest/gateway-internal.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/gateway/server/src/transport/api-rest/gateway-platform.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/gateway/server/src/transport/api-rest/gateway-spend.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/gateway/server/src/transport/gateway-spend.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/github/server/src/transport/github-install.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/langy/server/src/transport/api-trpc/langy.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/model-provider/server/src/transport/model-defaults.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/model-provider/server/src/transport/model-provider.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/model-provider/server/src/transport/playground.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/ops/server/src/transport/admin.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/organization/server/src/transport/api-rest/group.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/organization/server/src/transport/api-rest/organization-provisioning.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/organization/server/src/transport/api-rest/organization.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/organization/server/src/transport/api-rest/team.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/project/server/src/transport/project.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/prompt/server/src/transport/prompt.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/suite/server/src/transport/run-plans.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/suite/server/src/transport/suites-alias.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/suite/server/src/transport/test-suites.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/trace/server/src/transport/api-rest/traces-shared.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/trace/server/src/transport/api-trpc/traces-v2.api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/trace/server/src/transport/tracked-event.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/webhook/server/src/transport/webhook.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/workflow/server/src/transport/workflow-run.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/workflow/server/src/transport/workflow-studio.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "schema-outside-contract|modules/workflow/server/src/transport/workflow.rest.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "temporal-only|apps/api/src/app/api-trace-read-stack.composition.ts",

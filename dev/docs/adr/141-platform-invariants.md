@@ -9,6 +9,7 @@
 [id origin](../../../specs/tooling/lint-id-generation-origin.feature),
 [environment boundaries](../../../specs/tooling/lint-environment-boundaries.feature),
 [secrets through the source chain](../../../specs/tooling/lint-secrets-through-source.feature),
+[a service given its config](../../../specs/tooling/lint-service-loads-its-own-config.feature),
 [plan literals](../../../specs/tooling/lint-plan-literals.feature),
 [raw Hono mounts](../../../specs/tooling/lint-no-raw-hono-mount.feature),
 [API context services](../../../specs/tooling/lint-api-context-services.feature),
@@ -44,6 +45,7 @@ quotes a customer a different number on a different page.
 | `langwatch/id-generation-origin` | plugin | Ids are ksuids behind a kind prefix: no `nanoid`, no `uuid`, no `crypto.randomUUID()`. |
 | `langwatch/environment-boundaries` | plugin | Only a `platform/config/` module or a process boot file reads `process.env`. |
 | `langwatch/secrets-through-source` | plugin | A key classified in `@langwatch/secrets/keys.json` is never read straight from the environment. See ADR-132. |
+| `langwatch/service-loads-its-own-config` | plugin | A service or adapter under `server/src/{services,adapters}` does not declare its own `loadConfig`/`resolveConfig`/`readConfig` or read `process.env`; config is a named member of the argument `create` takes. See fc80f65635. |
 | `langwatch/plan-literals` | plugin | Two or more plan limit fields in one object outside `@langwatch/plans` is a second plan definition. |
 | `langwatch/no-raw-hono-mount` | plugin | Mount through `app.access(policy)`; a verb on the raw Hono app is a route the access policy never saw. |
 | `langwatch/api-context-services` | plugin | An API class does not construct services, cast its context to recover them, take per-request resolvers, or double-await one call. |

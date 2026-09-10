@@ -28,7 +28,7 @@ function isNonProductionSource(workspacePath) {
 }
 
 /** The `X` in `process.env.X` and `process.env["X"]`, when it is written statically. */
-function staticPropertyName(member) {
+export function staticPropertyName(member) {
   if (!member.computed && member.property.type === "Identifier") return member.property.name;
   if (member.property.type === "Literal" && typeof member.property.value === "string") {
     return member.property.value;
@@ -36,7 +36,7 @@ function staticPropertyName(member) {
   return void 0;
 }
 
-function isEnvironmentObject(node) {
+export function isEnvironmentObject(node) {
   if (node.type !== "MemberExpression") return false;
   const name = staticPropertyName(node);
   if (name !== "env") return false;

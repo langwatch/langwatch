@@ -31,7 +31,7 @@ export function memberName(node) {
   return void 0;
 }
 
-function unwrap(node) {
+export function unwrap(node) {
   while (
     ["TSAsExpression", "TSSatisfiesExpression", "TSNonNullExpression", "ChainExpression"].includes(
       node?.type,

@@ -14,6 +14,8 @@
 [layer classes](../../../specs/tooling/lint-layer-class.feature),
 [namespace classes](../../../specs/tooling/lint-namespace-class.feature),
 [the ast-grep delegation rule](../../../specs/tooling/lint-naming-shapes.feature),
+[schemas in the contract](../../../specs/tooling/lint-schema-outside-contract.feature),
+[HandledError in the contract](../../../specs/tooling/lint-handled-error-outside-contract.feature),
 [strict feature layout](../../../packages/architecture-lint/specs/strict-feature-layout.feature),
 [source folder shape](../../../packages/architecture-lint/specs/source-folder-shape.feature)
 
@@ -58,6 +60,8 @@ one neighbour reads is a hop too.
 | `langwatch/service-quality` | plugin | No duplicate class member or object key; a class with `static create` has a private constructor. Enabled nowhere today. |
 | `langwatch/layer-class` | plugin | A class whose public methods almost all forward under the same name to the same collaborator is a hop, not a layer. |
 | `langwatch/namespace-class` | plugin | A class with only static members is a module wearing a class. |
+| `langwatch/schema-outside-contract` | plugin | A Zod schema authored (not merely composed from an import) as a top-level const in `server/src/transport/**` belongs in the module's contract package. |
+| `langwatch/handled-error-outside-contract` | plugin | A class extending `HandledError` declared anywhere under a module's `server/src` belongs in `contract/src/<m>.errors.ts`. |
 | `feature-layout` | architecture-lint | A server file outside the folder-and-kind grammar, or a root exporting a private repository, store or projection. |
 | `feature-app-contract` | architecture-lint | A module's contract is exactly one `*.api.ts` interface of callable operations named `<Feature>Api`. |
 | `feature-setup-infrastructure` | architecture-lint | An App factory's `FeatureSetup` declares concrete technical records, never a peer API or service capability. |
