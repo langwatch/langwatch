@@ -14,14 +14,14 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import {
-  TopicHostPort,
+  TopicHostApi,
   TopicHostProvider,
   type TopicFailureNotice,
   type TopicHostProject,
   type TopicSuccessNotice,
 } from "./model/topic-host.ts";
 
-export class FakeTopicHost extends TopicHostPort {
+export class FakeTopicHost extends TopicHostApi {
   readonly successes: TopicSuccessNotice[] = [];
   readonly failures: TopicFailureNotice[] = [];
 

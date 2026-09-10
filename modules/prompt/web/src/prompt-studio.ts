@@ -39,7 +39,7 @@ export type PromptScreenName = keyof typeof promptScreens;
 
 export { promptApi } from "./behavior/prompt-api.ts";
 export {
-  PromptHostPort,
+  PromptHostApi,
   PromptHostProvider,
   type PromptCopyTarget,
   type PromptFailureNotice,

@@ -15,7 +15,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import {
-  EvaluatorHostPort,
+  EvaluatorHostApi,
   EvaluatorHostProvider,
   type EvaluatorCopyTarget,
   type EvaluatorFailureNotice,
@@ -30,7 +30,7 @@ const DEFAULT_TARGETS: EvaluatorCopyTarget[] = [
   { id: "proj-2", name: "Acme / Engineering / Batch", canCreate: false },
 ];
 
-export class FakeEvaluatorHost extends EvaluatorHostPort {
+export class FakeEvaluatorHost extends EvaluatorHostApi {
   readonly overlays: EvaluatorOverlayRequest[] = [];
   readonly queries: Record<string, string | undefined>[] = [];
   readonly successes: EvaluatorSuccessNotice[] = [];

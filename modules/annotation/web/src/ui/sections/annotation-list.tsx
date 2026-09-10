@@ -18,7 +18,7 @@ import {
   csvFileName,
   type ActiveScoreType,
 } from "../../model/annotation-export.ts";
-import type { AnnotationHostPort } from "../../model/annotation-host.ts";
+import type { AnnotationHostApi } from "../../model/annotation-host.ts";
 import {
   pageAddress,
   pageSizeAddress,
@@ -75,7 +75,7 @@ export function AnnotationList({
   onExport,
 }: {
   view: AnnotationView;
-  host: AnnotationHostPort;
+  host: AnnotationHostApi;
   queueId?: string;
   pageQueue?: PageQueue;
   /** Richer title area, for the queue view's name plus its members. */
@@ -468,7 +468,7 @@ function SelectionActions({
   onAddToDataset,
   onRemoveFromQueue,
 }: {
-  host: AnnotationHostPort;
+  host: AnnotationHostApi;
   selectedCount: number;
   /** The traces behind the picked rows, each one once. */
   selectedTraceIds: string[];

@@ -22,7 +22,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { nowInstant } from "@langwatch/time";
 import {
-  ApiKeyHostPort,
+  ApiKeyHostApi,
   ApiKeyHostProvider,
   type ApiKeyActor,
   type ApiKeyAvailableScopes,
@@ -47,7 +47,7 @@ export type RecordedDrawerOpen = {
 /** One recorded clipboard write. */
 export type RecordedCopy = { text: string; succeeded: ApiKeySuccessNotice };
 
-export class FakeApiKeyHost extends ApiKeyHostPort {
+export class FakeApiKeyHost extends ApiKeyHostApi {
   readonly queryWrites: Array<Readonly<Record<string, string | undefined>>> = [];
   readonly drawerOpens: RecordedDrawerOpen[] = [];
   readonly successes: ApiKeySuccessNotice[] = [];

@@ -6,7 +6,7 @@
  * closes: the toaster renders whatever string it is handed, so the sign-in and
  * sign-up screens were writing their own error copy where the composition's
  * code-keyed registry, its remediation tips, its docs link and its trace id
- * were already waiting behind `AuthHostPort.failed` (ADR-045).
+ * were already waiting behind `AuthHostApi.failed` (ADR-045).
  *
  * The shape is the one `@langwatch/automation-web`, `@langwatch/gateway-web`,
  * `@langwatch/ops-web` and `@langwatch/coding-agent-web` already state, so a

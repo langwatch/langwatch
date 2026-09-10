@@ -9,7 +9,7 @@
  * it by adapting the browser capabilities the application already resolves.
  *
  * THE EIGHTH DECLARATION OF THIS SHAPE, and the second in this move. See
- * `DataRetentionHostPort` for why it is still written out rather than promoted.
+ * `DataRetentionHostApi` for why it is still written out rather than promoted.
  *
  * NARROWER THAN ITS SIBLING. Data privacy has no plan gate and no
  * platform-admin capability: every scope the server hands back is writable, so
@@ -54,7 +54,7 @@ export type PrivacyFailureNotice = {
 };
 
 /** The one thing the screen is handed. */
-export abstract class DataPrivacyHostPort {
+export abstract class DataPrivacyHostApi {
   /** The organization, team and project this page is about. */
   abstract scope(): PrivacyHostScope;
 
@@ -71,7 +71,7 @@ export abstract class DataPrivacyHostPort {
   abstract failed(failure: PrivacyFailureNotice): void;
 }
 
-const DataPrivacyHostContext = createContext<DataPrivacyHostPort | undefined>(void 0);
+const DataPrivacyHostContext = createContext<DataPrivacyHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const DataPrivacyHostProvider = DataPrivacyHostContext.Provider;
@@ -83,7 +83,7 @@ export const DataPrivacyHostProvider = DataPrivacyHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useDataPrivacyHost(): DataPrivacyHostPort {
+export function useDataPrivacyHost(): DataPrivacyHostApi {
   const host = useContext(DataPrivacyHostContext);
   if (!host) {
     throw new Error(

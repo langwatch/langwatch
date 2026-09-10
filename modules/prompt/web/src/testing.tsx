@@ -21,7 +21,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import type { PromptBrowserStorage, PromptTabsCapabilities } from "./model/browser-capabilities.ts";
 import {
-  PromptHostPort,
+  PromptHostApi,
   PromptHostProvider,
   type PromptCopyTarget,
   type PromptFailureNotice,
@@ -56,7 +56,7 @@ export function createMemoryStorage(): PromptBrowserStorage {
   };
 }
 
-export class FakePromptHost extends PromptHostPort {
+export class FakePromptHost extends PromptHostApi {
   readonly queryWrites: Array<Readonly<Record<string, string | undefined>>> = [];
   readonly navigations: string[] = [];
   readonly drawerOpens: RecordedDrawerOpen[] = [];

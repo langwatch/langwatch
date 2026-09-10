@@ -13,7 +13,7 @@ import {
   type OrganizationActor,
   type OrganizationProjectReading,
   type OrganizationSuccessNotice,
-  OrganizationHostPort,
+  OrganizationHostApi,
   OrganizationHostProvider,
   type OrganizationDownload,
   type OrganizationFailureNotice,
@@ -45,7 +45,7 @@ const DEFAULT_ORGANIZATION: OrganizationReading = {
   ],
 };
 
-export class FakeOrganizationHost extends OrganizationHostPort {
+export class FakeOrganizationHost extends OrganizationHostApi {
   readonly downloads: OrganizationDownload[] = [];
   readonly successes: OrganizationSuccessNotice[] = [];
   readonly overlays: { name: string | null; props?: Record<string, unknown> }[] = [];

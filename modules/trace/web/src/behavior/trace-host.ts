@@ -95,7 +95,7 @@ export type TraceFailureNotice = {
   id?: string;
 };
 
-export abstract class TraceHostPort {
+export abstract class TraceHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): TraceHostProject | undefined;
 
@@ -132,7 +132,7 @@ export abstract class TraceHostPort {
   abstract failed(failure: TraceFailureNotice): void;
 }
 
-const TraceHostContext = createContext<TraceHostPort | undefined>(void 0);
+const TraceHostContext = createContext<TraceHostApi | undefined>(void 0);
 
 /**
  * Publishes the host, and the CANONICAL SCOPE READING alongside it.
@@ -141,7 +141,7 @@ export function TraceHostProvider({
   value,
   children,
 }: {
-  value: TraceHostPort | undefined;
+  value: TraceHostApi | undefined;
   children: ReactNode;
 }) {
   const scope = useMemo<UiScopeHost | undefined>(
@@ -166,7 +166,7 @@ export function TraceHostProvider({
 }
 
 /** The host the composing application mounted above this screen. */
-export function useTraceHost(): TraceHostPort {
+export function useTraceHost(): TraceHostApi {
   const host = useContext(TraceHostContext);
   if (!host) {
     throw new Error("The trace screens must be mounted inside a TraceHostProvider.");
@@ -175,6 +175,6 @@ export function useTraceHost(): TraceHostPort {
 }
 
 /** The host, where a surface may legitimately render without one (the shared page). */
-export function useOptionalTraceHost(): TraceHostPort | undefined {
+export function useOptionalTraceHost(): TraceHostApi | undefined {
   return useContext(TraceHostContext);
 }

@@ -3,7 +3,7 @@ import type { WireOf } from "@langwatch/api/web";
  * Default Models — every policy the caller can see, one row per policy. The
  * page-level scope filter narrows rows inclusively (parents + children),
  * the same predicate the Model Providers table above uses. "+ Add config"
- * and Edit open `defaultModelOverride` via `ModelProviderHostPort.openPlatformDrawer`.
+ * and Edit open `defaultModelOverride` via `ModelProviderHostApi.openPlatformDrawer`.
  * Contract: specs/model-providers/role-based-default-models.feature,
  *           specs/model-providers/model-default-config-cascade.feature.
  */

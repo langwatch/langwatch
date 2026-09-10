@@ -1,6 +1,6 @@
 /**
  * The five evaluator EDITOR drawers, separate from `drawers.ts` (which
- * publishes the two overlays on this package's own `EvaluatorHostPort`):
+ * publishes the two overlays on this package's own `EvaluatorHostApi`):
  * these run on the STUDIO host instead, reading `@langwatch/ui-host/*`.
  */
 

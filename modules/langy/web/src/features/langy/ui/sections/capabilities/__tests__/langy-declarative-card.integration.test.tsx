@@ -12,7 +12,7 @@ import { resolveCapability } from "../../../../model/capabilities/capability-reg
 import { LangyDeclarativeCard } from "../langy-declarative-card.tsx";
 import type { CapabilityData } from "../../../../behavior/use-capability-data.ts";
 import {
-  LangyHostPort,
+  LangyHostApi,
   LangyHostProvider,
   type LangyHostOrganization,
   type LangyHostProject,
@@ -25,7 +25,7 @@ import {
  * `useRouter`, which throws outside a `LangyHostProvider` — the component
  * moved from reading Next's router directly to reading it off the host.
  */
-class FakeLangyHost extends LangyHostPort {
+class FakeLangyHost extends LangyHostApi {
   project(): LangyHostProject | undefined {
     return { id: "project-acme", slug: "acme", name: "acme" };
   }

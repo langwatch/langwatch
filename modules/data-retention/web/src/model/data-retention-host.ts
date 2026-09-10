@@ -77,7 +77,7 @@ export type RetentionFailureNotice = {
 };
 
 /** The one thing the screen is handed. */
-export abstract class DataRetentionHostPort {
+export abstract class DataRetentionHostApi {
   /** The organization, team and project this page is about. */
   abstract scope(): RetentionHostScope;
 
@@ -112,7 +112,7 @@ export abstract class DataRetentionHostPort {
   abstract failed(failure: RetentionFailureNotice): void;
 }
 
-const DataRetentionHostContext = createContext<DataRetentionHostPort | undefined>(void 0);
+const DataRetentionHostContext = createContext<DataRetentionHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const DataRetentionHostProvider = DataRetentionHostContext.Provider;
@@ -124,7 +124,7 @@ export const DataRetentionHostProvider = DataRetentionHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useDataRetentionHost(): DataRetentionHostPort {
+export function useDataRetentionHost(): DataRetentionHostApi {
   const host = useContext(DataRetentionHostContext);
   if (!host) {
     throw new Error(

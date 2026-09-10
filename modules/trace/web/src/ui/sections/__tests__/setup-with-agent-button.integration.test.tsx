@@ -14,7 +14,7 @@ import {
   setupAgentPrompt,
 } from "../setup-with-agent-button.tsx";
 import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
-import type { TraceFailureNotice, TraceHostPort } from "../../../behavior/trace-host.ts";
+import type { TraceFailureNotice, TraceHostApi } from "../../../behavior/trace-host.ts";
 
 const canAskMock = vi.fn(() => true);
 vi.mock("../../../behavior/langy/use-can-ask-langy.ts", () => ({
@@ -247,14 +247,14 @@ describe("SetupWithAgentButton", () => {
 
     /** @scenario Copying the prompt confirms and survives a denied clipboard */
     it("reports the failure when the clipboard is denied", async () => {
-      // Failure reporting travels WHOLE to the mounted TraceHostPort rather
+      // Failure reporting travels WHOLE to the mounted TraceHostApi rather
       // than raising a toast directly (see show-error-toast.ts) — what is
       // asserted here is that the refusal was HANDED OVER, not what it was
       // made to say, mirroring use-export-traces.integration.test.ts.
       const failures: TraceFailureNotice[] = [];
       setUiFeedbackHost({
         failed: (failure: TraceFailureNotice) => failures.push(failure),
-      } as unknown as TraceHostPort);
+      } as unknown as TraceHostApi);
 
       const user = userEvent.setup();
       Object.defineProperty(navigator, "clipboard", {

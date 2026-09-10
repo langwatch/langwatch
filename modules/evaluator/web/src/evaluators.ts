@@ -23,7 +23,7 @@ export type {
   EvaluatorRelatedEntities,
 } from "./behavior/evaluator-api.ts";
 export {
-  EvaluatorHostPort,
+  EvaluatorHostApi,
   EvaluatorHostProvider,
   type EvaluatorCopyTarget,
   type EvaluatorFailureNotice,

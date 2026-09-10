@@ -15,7 +15,7 @@
  *
  * `asPath` is the whole address INCLUDING the fragment, because Deja View keeps
  * its entire workspace state there. It is the one reading the host has to
- * supply beyond params and query, and it is why `OpsHostPort.asPath` exists.
+ * supply beyond params and query, and it is why `OpsHostApi.asPath` exists.
  */
 
 import { useMemo } from "react";

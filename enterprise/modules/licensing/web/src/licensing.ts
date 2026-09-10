@@ -28,7 +28,7 @@ export type LicensingScreenName = keyof typeof licensingScreens;
 export { LICENSE_PAGE_PERMISSION } from "./ui/sections/license.screen.tsx";
 export { licensingApi, type LicensingApiMap } from "./behavior/licensing-api.ts";
 export {
-  LicensingHostPort,
+  LicensingHostApi,
   LicensingHostProvider,
   type LicensingFailureNotice,
   type LicensingSuccessNotice,

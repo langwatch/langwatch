@@ -13,7 +13,7 @@
  *
  * THE SIXTH FAMILY TO DECLARE THIS SHAPE, after `GovernanceHostPort`,
  * `GatewayHostPort`, `PersonalWorkspaceHostPort`, `AutomationHost`,
- * `OpsHostPort` and `AgentManagementHostPort`. Each of those recorded that a
+ * `OpsHostApi` and `AgentManagementHostPort`. Each of those recorded that a
  * repeat is the signal to promote the shape into one place, and each left it,
  * for the same reason: promotion changes packages a page-family move does not
  * own, and doing it inside one would hide it. Recorded again in
@@ -86,7 +86,7 @@ export type DatasetFailureNotice = {
  * the frontend feature constructs once and a test double is an obvious object
  * literal.
  */
-export abstract class DatasetHostPort {
+export abstract class DatasetHostApi {
   /** The project the address is about. Datasets are project-scoped. */
   abstract project(): DatasetHostProject | undefined;
 
@@ -123,7 +123,7 @@ export abstract class DatasetHostPort {
   abstract isReportedGlobally(error: unknown): boolean;
 }
 
-const DatasetHostContext = createContext<DatasetHostPort | undefined>(void 0);
+const DatasetHostContext = createContext<DatasetHostApi | undefined>(void 0);
 
 /** Publishes the host to the screens and everything they render. */
 export const DatasetHostProvider = DatasetHostContext.Provider;
@@ -135,7 +135,7 @@ export const DatasetHostProvider = DatasetHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useDatasetHost(): DatasetHostPort {
+export function useDatasetHost(): DatasetHostApi {
   const host = useContext(DatasetHostContext);
   if (!host) {
     throw new Error(

@@ -23,7 +23,7 @@ export const traceDrawerMount: TraceScreenLoader = () =>
 export { api as traceApi, api as traceApiHooks } from "./behavior/trace-api.ts";
 export type { RouterOutputs as TraceRouterOutputs, TraceApiMap } from "./behavior/trace-api.ts";
 export {
-  TraceHostPort,
+  TraceHostApi,
   TraceHostProvider,
   useOptionalTraceHost,
   useTraceHost,

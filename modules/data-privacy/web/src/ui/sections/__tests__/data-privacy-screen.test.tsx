@@ -20,7 +20,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  DataPrivacyHostPort,
+  DataPrivacyHostApi,
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
@@ -86,7 +86,7 @@ vi.mock("../../../behavior/data-privacy-api.ts", () => ({
   },
 }));
 
-class TestPrivacyHost extends DataPrivacyHostPort {
+class TestPrivacyHost extends DataPrivacyHostApi {
   readonly writes: Array<Readonly<Record<string, string | undefined>>> = [];
   readonly successes: PrivacySuccessNotice[] = [];
   readonly failures: PrivacyFailureNotice[] = [];

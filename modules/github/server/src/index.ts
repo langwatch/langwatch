@@ -19,7 +19,7 @@ export { EventingGithubMaintenanceAdapter } from "./services/github-maintenance.
 export { GithubBranchMaintenancePort } from "./ports/github-branch-maintenance.port.ts";
 export { GithubBranchDemandPort } from "./ports/github-branch-demand.port.ts";
 export { GithubProjectActivityPort } from "./ports/github-project-activity.port.ts";
-export { GithubHostPort } from "./ports/github-host.port.ts";
+export { GithubHostApi } from "./ports/github-host.port.ts";
 export {
   GithubBranchDemandService,
   type BranchMappingRequest,

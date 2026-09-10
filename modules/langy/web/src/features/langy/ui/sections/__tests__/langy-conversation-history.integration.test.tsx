@@ -510,7 +510,7 @@ import { LangySidecar } from "../langy-panel.tsx";
 import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
-  LangyHostPort,
+  LangyHostApi,
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
@@ -519,7 +519,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-class FakeLangyHost extends LangyHostPort {
+class FakeLangyHost extends LangyHostApi {
   project() {
     return projectRef.current
       ? { id: projectRef.current.id, slug: projectRef.current.slug, name: projectRef.current.slug }

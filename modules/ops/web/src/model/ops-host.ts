@@ -75,7 +75,7 @@ export type OpsFailureNotice = {
  * the frontend feature constructs once and a test double is an obvious object
  * literal.
  */
-export abstract class OpsHostPort {
+export abstract class OpsHostApi {
   /**
    * Whether the reader may see the Ops workspace at all.
    *
@@ -132,7 +132,7 @@ export abstract class OpsHostPort {
   abstract failed(failure: OpsFailureNotice): void;
 }
 
-const OpsHostContext = createContext<OpsHostPort | undefined>(void 0);
+const OpsHostContext = createContext<OpsHostApi | undefined>(void 0);
 
 /** Publishes the host to every Ops screen below it. */
 export const OpsHostProvider = OpsHostContext.Provider;
@@ -143,7 +143,7 @@ export const OpsHostProvider = OpsHostContext.Provider;
  * Missing means the screen was mounted outside its frontend feature, which is a
  * composition fault rather than something the screen can degrade around.
  */
-export function useOpsHost(): OpsHostPort {
+export function useOpsHost(): OpsHostApi {
   const host = useContext(OpsHostContext);
   if (!host) {
     throw new Error(

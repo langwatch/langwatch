@@ -9,7 +9,7 @@ import { downloadCsv } from "@langwatch/csv/download";
 import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
 import { allAnnotationsExport, csvFileName } from "../../model/annotation-export.ts";
 import { useAnnotationHost } from "../../model/annotation-host.ts";
-import type { AnnotationHostPort } from "../../model/annotation-host.ts";
+import type { AnnotationHostApi } from "../../model/annotation-host.ts";
 import {
   closedQueueEditorAddress,
   queueEditorAddress,
@@ -99,7 +99,7 @@ export function AnnotationsScreen({ view }: { view: AnnotationView }) {
 }
 
 /** The one list this address is, wired to what that view reads. */
-function AnnotationView({ view, host }: { view: AnnotationView; host: AnnotationHostPort }) {
+function AnnotationView({ view, host }: { view: AnnotationView; host: AnnotationHostApi }) {
   if (view === "all") return <AllAnnotationsList host={host} />;
 
   if (view === "queue") return <QueueList host={host} />;
@@ -110,7 +110,7 @@ function AnnotationView({ view, host }: { view: AnnotationView; host: Annotation
 }
 
 /** The reviewer's own queue: their items, and their name on the send picker. */
-function MyQueueList({ host }: { host: AnnotationHostPort }) {
+function MyQueueList({ host }: { host: AnnotationHostApi }) {
   const reviewer = host.currentUser();
 
   // This page is the reviewer's own queue, so moving a selection elsewhere
@@ -123,7 +123,7 @@ function MyQueueList({ host }: { host: AnnotationHostPort }) {
 }
 
 /** One named queue, read from the `:slug` the router captured. */
-function QueueList({ host }: { host: AnnotationHostPort }) {
+function QueueList({ host }: { host: AnnotationHostApi }) {
   const project = host.project();
   const slug = host.route().params.slug;
 
@@ -177,7 +177,7 @@ function QueueList({ host }: { host: AnnotationHostPort }) {
   );
 }
 
-function AllAnnotationsList({ host }: { host: AnnotationHostPort }) {
+function AllAnnotationsList({ host }: { host: AnnotationHostApi }) {
   const project = host.project();
   const { period } = useAnnotationPeriod(host.route().query);
 

@@ -22,7 +22,7 @@ export type AnnotationScoreEditorAddress = {
   scoreId?: string | undefined;
 };
 
-export abstract class AnnotationScoresHostPort {
+export abstract class AnnotationScoresHostApi {
   abstract project(): AnnotationScoresProject | undefined;
 
   abstract isLiteMember(): boolean;
@@ -38,11 +38,11 @@ export abstract class AnnotationScoresHostPort {
   abstract failed(failure: AnnotationScoresFailureNotice): void;
 }
 
-const AnnotationScoresHostContext = createContext<AnnotationScoresHostPort | undefined>(void 0);
+const AnnotationScoresHostContext = createContext<AnnotationScoresHostApi | undefined>(void 0);
 
 export const AnnotationScoresHostProvider = AnnotationScoresHostContext.Provider;
 
-export function useAnnotationScoresHost(): AnnotationScoresHostPort {
+export function useAnnotationScoresHost(): AnnotationScoresHostApi {
   const host = useContext(AnnotationScoresHostContext);
 
   if (!host) {

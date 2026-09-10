@@ -34,7 +34,7 @@ export type NotificationFailureNotice = {
   fallbackTitle: string;
 };
 
-export abstract class NotificationHostPort {
+export abstract class NotificationHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): NotificationHostProject | undefined;
 
@@ -45,7 +45,7 @@ export abstract class NotificationHostPort {
   abstract failed(failure: NotificationFailureNotice): void;
 }
 
-const NotificationHostContext = createContext<NotificationHostPort | undefined>(void 0);
+const NotificationHostContext = createContext<NotificationHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const NotificationHostProvider = NotificationHostContext.Provider;
@@ -57,7 +57,7 @@ export const NotificationHostProvider = NotificationHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useNotificationHost(): NotificationHostPort {
+export function useNotificationHost(): NotificationHostApi {
   const host = useContext(NotificationHostContext);
   if (!host) {
     throw new Error(

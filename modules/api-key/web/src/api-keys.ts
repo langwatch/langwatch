@@ -48,7 +48,7 @@ export {
 export { CLI_LEAD_SOURCE } from "./ui/sections/cli-auth-screen.tsx";
 export { apiKeyApi } from "./behavior/api-key-api.ts";
 export {
-  ApiKeyHostPort,
+  ApiKeyHostApi,
   ApiKeyHostProvider,
   type ApiKeyActor,
   type ApiKeyAvailableScopes,

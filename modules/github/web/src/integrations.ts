@@ -34,7 +34,7 @@ export {
   githubInstallAddress,
 } from "./model/github-install-address.ts";
 export {
-  GithubHostPort,
+  GithubHostApi,
   GithubHostProvider,
   type GithubFailureNotice,
   type GithubHostScope,

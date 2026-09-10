@@ -17,7 +17,7 @@ export type DataRetentionScreenName = keyof typeof dataRetentionScreens;
 export { RETENTION_SCOPE_QUERY_KEY } from "./ui/sections/data-retention.screen.tsx";
 export { dataRetentionApi, type DataRetentionApiMap } from "./behavior/data-retention-api.ts";
 export {
-  DataRetentionHostPort,
+  DataRetentionHostApi,
   DataRetentionHostProvider,
   type RetentionAvailableScopes,
   type RetentionFailureNotice,

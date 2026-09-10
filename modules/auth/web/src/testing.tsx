@@ -12,7 +12,7 @@
 import type { ReactElement, ReactNode } from "react";
 
 import {
-  AuthHostPort,
+  AuthHostApi,
   AuthHostProvider,
   type AuthFailureNotice,
   type AuthPublicEnvironment,
@@ -46,7 +46,7 @@ export type TestAuthHostOptions = {
 };
 
 /** A host that answers from values a test wrote, and nothing else. */
-export class TestAuthHost extends AuthHostPort {
+export class TestAuthHost extends AuthHostApi {
   static create(options: TestAuthHostOptions = {}): TestAuthHost {
     return new TestAuthHost(
       { ...TEST_PUBLIC_ENVIRONMENT, ...options.publicEnvironment },

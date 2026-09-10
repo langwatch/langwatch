@@ -5,7 +5,7 @@
  * `~/features/errors` — an application module a feature-web package may not
  * reach. Three of the four are answered here and one is not: the words a
  * customer reads still come from the composing application's code-keyed
- * registry through `OrganizationHostPort.failed`, which is what
+ * registry through `OrganizationHostApi.failed`, which is what
  * `organization-feedback.ts` already binds. What lives here is only the part
  * that decides WHERE a refusal lands, which is layout rather than copy.
  *

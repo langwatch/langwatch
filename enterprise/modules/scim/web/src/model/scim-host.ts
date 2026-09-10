@@ -28,7 +28,7 @@ export type ScimFailureNotice = {
   fallbackTitle: string;
 };
 
-export abstract class ScimHostPort {
+export abstract class ScimHostApi {
   /** The organization the tokens are minted against. */
   abstract organizationId(): string | undefined;
 
@@ -40,7 +40,7 @@ export abstract class ScimHostPort {
   abstract failed(failure: ScimFailureNotice): void;
 }
 
-const ScimHostContext = createContext<ScimHostPort | undefined>(void 0);
+const ScimHostContext = createContext<ScimHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const ScimHostProvider = ScimHostContext.Provider;
@@ -52,7 +52,7 @@ export const ScimHostProvider = ScimHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useScimHost(): ScimHostPort {
+export function useScimHost(): ScimHostApi {
   const host = useContext(ScimHostContext);
   if (!host) {
     throw new Error(

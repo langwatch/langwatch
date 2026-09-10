@@ -3,7 +3,7 @@ import {
   WorkflowCodeEditor,
   WorkflowCodeEditorModal,
   type WorkflowCodeEditorContractProps,
-  type WorkflowCodeEditorModalHost as WorkflowCodeEditorModalHostPort,
+  type WorkflowCodeEditorModalHost as WorkflowCodeEditorModalHostApi,
 } from "../../../elements/code/workflow-code-editor.tsx";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
@@ -47,7 +47,7 @@ function useEditorTransport() {
 }
 
 /** The app retains its render-error boundary and overlay policy around feature content. */
-export const WorkflowCodeEditorModalHost: WorkflowCodeEditorModalHostPort = ({
+export const WorkflowCodeEditorModalHost: WorkflowCodeEditorModalHostApi = ({
   open,
   onRequestClose,
   children,

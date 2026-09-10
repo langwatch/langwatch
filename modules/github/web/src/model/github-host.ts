@@ -51,7 +51,7 @@ export type GithubRouteReading = {
 };
 
 /** The one thing a screen is handed. */
-export abstract class GithubHostPort {
+export abstract class GithubHostApi {
   abstract scope(): GithubHostScope;
 
   abstract route(): GithubRouteReading;
@@ -83,7 +83,7 @@ export abstract class GithubHostPort {
   abstract failed(failure: GithubFailureNotice): void;
 }
 
-const GithubHostContext = createContext<GithubHostPort | undefined>(void 0);
+const GithubHostContext = createContext<GithubHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const GithubHostProvider = GithubHostContext.Provider;
@@ -95,7 +95,7 @@ export const GithubHostProvider = GithubHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useGithubHost(): GithubHostPort {
+export function useGithubHost(): GithubHostApi {
   const host = useContext(GithubHostContext);
   if (!host) {
     throw new Error(

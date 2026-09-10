@@ -20,7 +20,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import {
-  MonitorHostPort,
+  MonitorHostApi,
   MonitorHostProvider,
   type MonitorCopyTarget,
   type MonitorFailureNotice,
@@ -35,7 +35,7 @@ const DEFAULT_TARGETS: MonitorCopyTarget[] = [
   { id: "proj-2", name: "Acme / Engineering / Batch", canCreate: false },
 ];
 
-export class FakeMonitorHost extends MonitorHostPort {
+export class FakeMonitorHost extends MonitorHostApi {
   readonly overlays: MonitorOverlayRequest[] = [];
   readonly navigations: string[] = [];
   readonly successes: MonitorSuccessNotice[] = [];

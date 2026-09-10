@@ -47,7 +47,7 @@ export type OnboardingScreenName = keyof typeof onboardingScreens;
 
 export { onboardingApi } from "./behavior/onboarding-api.ts";
 export {
-  OnboardingHostPort,
+  OnboardingHostApi,
   OnboardingHostProvider,
   type OnboardingActor,
   type OnboardingFailureNotice,

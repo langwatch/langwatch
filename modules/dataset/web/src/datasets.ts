@@ -29,7 +29,7 @@ export type DatasetScreenName = keyof typeof datasetScreens;
 
 export { datasetApi } from "./behavior/dataset-api.ts";
 export {
-  DatasetHostPort,
+  DatasetHostApi,
   DatasetHostProvider,
   type DatasetCopyTarget,
   type DatasetFailureNotice,

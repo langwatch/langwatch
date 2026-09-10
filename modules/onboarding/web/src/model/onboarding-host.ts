@@ -99,7 +99,7 @@ export type OnboardingFailureNotice = {
   readonly description?: string;
 };
 
-export abstract class OnboardingHostPort {
+export abstract class OnboardingHostApi {
   /** The organization graph and what this page is about. */
   abstract scope(): OnboardingScope;
 
@@ -164,7 +164,7 @@ export abstract class OnboardingHostPort {
   abstract prefersReducedMotion(): boolean;
 }
 
-const OnboardingHostContext = createContext<OnboardingHostPort | undefined>(void 0);
+const OnboardingHostContext = createContext<OnboardingHostApi | undefined>(void 0);
 
 /** Publishes the host to the screens and everything they render. */
 export const OnboardingHostProvider = OnboardingHostContext.Provider;
@@ -176,7 +176,7 @@ export const OnboardingHostProvider = OnboardingHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useOnboardingHost(): OnboardingHostPort {
+export function useOnboardingHost(): OnboardingHostApi {
   const host = useContext(OnboardingHostContext);
   if (!host) {
     throw new Error(

@@ -21,7 +21,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import {
-  GithubHostPort,
+  GithubHostApi,
   GithubHostProvider,
   type GithubFailureNotice,
   type GithubHostScope,
@@ -33,7 +33,7 @@ export type QueryWrite = {
   options?: { replace?: boolean };
 };
 
-export class FakeGithubHost extends GithubHostPort {
+export class FakeGithubHost extends GithubHostApi {
   readonly departures: string[] = [];
   readonly externals: string[] = [];
   readonly queryWrites: QueryWrite[] = [];

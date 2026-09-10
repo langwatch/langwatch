@@ -47,7 +47,7 @@ export type LangyFailureNotice = {
   id?: string;
 };
 
-export abstract class LangyHostPort {
+export abstract class LangyHostApi {
   abstract project(): LangyHostProject | undefined;
 
   abstract organization(): LangyHostOrganization | undefined;
@@ -90,11 +90,11 @@ export abstract class LangyHostPort {
   abstract failed(failure: LangyFailureNotice): void;
 }
 
-const LangyHostContext = createContext<LangyHostPort | undefined>(void 0);
+const LangyHostContext = createContext<LangyHostApi | undefined>(void 0);
 
 export const LangyHostProvider = LangyHostContext.Provider;
 
-export function useLangyHost(): LangyHostPort {
+export function useLangyHost(): LangyHostApi {
   const host = useContext(LangyHostContext);
   if (!host) {
     throw new Error("The Langy surfaces must be mounted inside a LangyHostProvider.");
@@ -102,7 +102,7 @@ export function useLangyHost(): LangyHostPort {
   return host;
 }
 
-export function useOptionalLangyHost(): LangyHostPort | undefined {
+export function useOptionalLangyHost(): LangyHostApi | undefined {
   return useContext(LangyHostContext);
 }
 

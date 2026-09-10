@@ -4,7 +4,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, type RenderResult } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import {
-  AnnotationHostPort,
+  AnnotationHostApi,
   AnnotationHostProvider,
   type AnnotationFailureNotice,
   type AnnotationHostProject,
@@ -24,7 +24,7 @@ export type StubAnnotationHostOptions = {
 };
 
 /** A host that answers from fixtures and records everything it is told. */
-export class StubAnnotationHost extends AnnotationHostPort {
+export class StubAnnotationHost extends AnnotationHostApi {
   readonly successes: AnnotationSuccessNotice[] = [];
   readonly failures: AnnotationFailureNotice[] = [];
   readonly navigations: string[] = [];
@@ -95,7 +95,7 @@ export function AnnotationTestHarness({
   host,
   children,
 }: {
-  host: AnnotationHostPort;
+  host: AnnotationHostApi;
   children: ReactNode;
 }) {
   return (

@@ -101,7 +101,7 @@ export type OrganizationDownload = {
 };
 
 /** The one thing a screen is handed. */
-export abstract class OrganizationHostPort {
+export abstract class OrganizationHostApi {
   /** The organization and project this page is about. */
   abstract scope(): OrganizationScope;
 
@@ -202,7 +202,7 @@ export abstract class OrganizationHostPort {
   abstract failed(failure: OrganizationFailureNotice): void;
 }
 
-const OrganizationHostContext = createContext<OrganizationHostPort | undefined>(void 0);
+const OrganizationHostContext = createContext<OrganizationHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const OrganizationHostProvider = OrganizationHostContext.Provider;
@@ -214,7 +214,7 @@ export const OrganizationHostProvider = OrganizationHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useOrganizationHost(): OrganizationHostPort {
+export function useOrganizationHost(): OrganizationHostApi {
   const host = useContext(OrganizationHostContext);
   if (!host) {
     throw new Error(

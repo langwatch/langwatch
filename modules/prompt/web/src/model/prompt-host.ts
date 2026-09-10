@@ -110,7 +110,7 @@ export type PromptPlaygroundChatAvailability =
 export type PromptPlatformDrawer = "traceV2Details";
 
 /** The one thing the screen is handed. */
-export abstract class PromptHostPort {
+export abstract class PromptHostApi {
   /** The organization, team and project this page is about. */
   abstract scope(): PromptHostScope;
 
@@ -192,7 +192,7 @@ export abstract class PromptHostPort {
   }): void;
 }
 
-const PromptHostContext = createContext<PromptHostPort | undefined>(void 0);
+const PromptHostContext = createContext<PromptHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const PromptHostProvider = PromptHostContext.Provider;
@@ -204,7 +204,7 @@ export const PromptHostProvider = PromptHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function usePromptHost(): PromptHostPort {
+export function usePromptHost(): PromptHostApi {
   const host = useContext(PromptHostContext);
   if (!host) {
     throw new Error(

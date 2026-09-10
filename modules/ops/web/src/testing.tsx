@@ -1,7 +1,7 @@
 /**
  * The application an Ops screen is mounted in, faked.
  *
- * Every surface in this package reads the world through `OpsHostPort`: whether
+ * Every surface in this package reads the world through `OpsHostApi`: whether
  * the reader is an operator, whether they are an admin, what the address says,
  * and where a success or a failure is announced. A test that mounts one
  * therefore has to answer that port, and answering it ad hoc per file is how a
@@ -26,7 +26,7 @@ import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
 import type { OpsToast, OpsToaster } from "./behavior/ops-feedback.ts";
 import {
-  OpsHostPort,
+  OpsHostApi,
   OpsHostProvider,
   type OpsFailureNotice,
   type OpsProject,
@@ -66,7 +66,7 @@ export type FakeOpsHostOptions = {
   asPath?: string;
 };
 
-export class FakeOpsHost extends OpsHostPort {
+export class FakeOpsHost extends OpsHostApi {
   static create(options: FakeOpsHostOptions = {}): FakeOpsHost {
     return new FakeOpsHost({
       options,

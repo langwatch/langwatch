@@ -1,5 +1,5 @@
 /**
- * Every dataset in the project: find, open, manage, via `DatasetHostPort`.
+ * Every dataset in the project: find, open, manage, via `DatasetHostApi`.
  * Row type is `DatasetSummary`, not a router inference a screen closure may
  * not name. Its overlays are local state, not the shared drawer registry.
  * Spec: specs/datasets/datasets-list-page.feature, specs/rbac/lite-member-restrictions.feature.

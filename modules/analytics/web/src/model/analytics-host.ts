@@ -74,7 +74,7 @@ export type AnalyticsFailureNotice = {
   id?: string;
 };
 
-export abstract class AnalyticsHostPort {
+export abstract class AnalyticsHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): AnalyticsHostProject | undefined;
 
@@ -99,12 +99,12 @@ export abstract class AnalyticsHostPort {
   abstract failed(failure: AnalyticsFailureNotice): void;
 }
 
-const AnalyticsHostContext = createContext<AnalyticsHostPort | undefined>(void 0);
+const AnalyticsHostContext = createContext<AnalyticsHostApi | undefined>(void 0);
 
 export const AnalyticsHostProvider = AnalyticsHostContext.Provider;
 
 /** The host the composing application mounted above this screen. */
-export function useAnalyticsHost(): AnalyticsHostPort {
+export function useAnalyticsHost(): AnalyticsHostApi {
   const host = useContext(AnalyticsHostContext);
   if (!host) {
     throw new Error("The analytics screens must be mounted inside an AnalyticsHostProvider.");

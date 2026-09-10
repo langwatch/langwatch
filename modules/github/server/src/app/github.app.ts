@@ -340,7 +340,7 @@ export function composeGithubBranchDemand(
 
 /**
  * The demand service under the two names its cross-feature consumers know.
- * `GithubService` answers the host question from the same `GithubHostPort`
+ * `GithubService` answers the host question from the same `GithubHostApi`
  * this composition resolved, and routes the request into the same demand
  * service, so a consumer holding either object gets the same two answers.
  */

@@ -35,7 +35,7 @@ export {
 export { MODEL_COST_MANAGE_PERMISSION } from "./ui/sections/model-costs-screen.tsx";
 export { modelProviderApi } from "./behavior/model-provider-api.ts";
 export {
-  ModelProviderHostPort,
+  ModelProviderHostApi,
   ModelProviderHostProvider,
   type ModelProviderAvailableScopes,
   type ModelProviderFailureNotice,

@@ -17,7 +17,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  DataRetentionHostPort,
+  DataRetentionHostApi,
   DataRetentionHostProvider,
   type RetentionAvailableScopes,
   type RetentionFailureNotice,
@@ -100,7 +100,7 @@ const availableScopes: RetentionAvailableScopes = {
   projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
 };
 
-class TestRetentionHost extends DataRetentionHostPort {
+class TestRetentionHost extends DataRetentionHostApi {
   readonly writes: Array<Readonly<Record<string, string | undefined>>> = [];
   readonly successes: RetentionSuccessNotice[] = [];
   readonly failures: RetentionFailureNotice[] = [];

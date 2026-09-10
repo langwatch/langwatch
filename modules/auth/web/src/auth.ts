@@ -46,7 +46,7 @@ export type AuthScreenName = keyof typeof authScreens;
 export { authApi } from "./behavior/auth-api.ts";
 export type { AuthApiMap, AuthInviteLanding } from "./behavior/auth-api.ts";
 export {
-  AuthHostPort,
+  AuthHostApi,
   AuthHostProvider,
   type AuthErrorExplanation,
   type AuthFailureNotice,

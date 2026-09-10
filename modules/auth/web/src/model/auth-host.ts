@@ -111,7 +111,7 @@ export type AuthFailureNotice = {
 };
 
 /** The one thing a front-door screen is handed. */
-export abstract class AuthHostPort {
+export abstract class AuthHostApi {
   /** The deployment's public configuration. */
   abstract publicEnvironment(): AuthPublicEnvironment;
 
@@ -130,7 +130,7 @@ export abstract class AuthHostPort {
   abstract failed(failure: AuthFailureNotice): void;
 }
 
-const AuthHostContext = createContext<AuthHostPort | null>(null);
+const AuthHostContext = createContext<AuthHostApi | null>(null);
 
 export const AuthHostProvider = AuthHostContext.Provider;
 
@@ -138,7 +138,7 @@ export const AuthHostProvider = AuthHostContext.Provider;
 export class AuthHostUnavailableError extends Error {
   constructor() {
     super(
-      "No AuthHostPort is mounted above this screen. " +
+      "No AuthHostApi is mounted above this screen. " +
         "Wrap it in <AuthHostProvider value={host}>.",
     );
     this.name = "AuthHostUnavailableError";
@@ -146,7 +146,7 @@ export class AuthHostUnavailableError extends Error {
 }
 
 /** The host this screen is mounted in. Throws rather than guessing. */
-export function useAuthHost(): AuthHostPort {
+export function useAuthHost(): AuthHostApi {
   const host = useContext(AuthHostContext);
   if (!host) throw new AuthHostUnavailableError();
   return host;
@@ -160,6 +160,6 @@ export function useAuthHost(): AuthHostPort {
  * so a suite that renders a fragment in isolation does not have to compose a
  * whole application first.
  */
-export function useOptionalAuthHost(): AuthHostPort | null {
+export function useOptionalAuthHost(): AuthHostApi | null {
   return useContext(AuthHostContext);
 }

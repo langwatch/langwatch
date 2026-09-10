@@ -15,7 +15,7 @@ export { annotationApi } from "./behavior/annotation-api.ts";
 export { annotationViewCopy } from "./model/annotation-view.ts";
 export type { AnnotationView };
 export {
-  AnnotationHostPort,
+  AnnotationHostApi,
   AnnotationHostProvider,
   useAnnotationHost,
   type AnnotationFailureNotice,

@@ -7,7 +7,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 import { showErrorToast } from "../../../errors/index.ts";
-import type { TraceFailureNotice, TraceHostPort } from "../../../../../behavior/trace-host.ts";
+import type { TraceFailureNotice, TraceHostApi } from "../../../../../behavior/trace-host.ts";
 import { useExportTraces } from "../use-export-traces.ts";
 
 const { mockToasterCreate } = vi.hoisted(() => ({
@@ -276,7 +276,7 @@ describe("useExportTraces()", () => {
       const failures: TraceFailureNotice[] = [];
       setUiFeedbackHost({
         failed: (failure: TraceFailureNotice) => failures.push(failure),
-      } as unknown as TraceHostPort);
+      } as unknown as TraceHostApi);
 
       const { result } = renderHook(() => useExportTraces({ projectId: undefined }));
 

@@ -10,7 +10,7 @@ export {
 } from "./behavior/langy-api.ts";
 export type { LangyApiMap, RouterOutputs as LangyRouterOutputs } from "./behavior/langy-api.ts";
 export {
-  LangyHostPort,
+  LangyHostApi,
   LangyHostProvider,
   useLangyHost,
   useOptionalLangyHost,

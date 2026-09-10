@@ -24,7 +24,7 @@ export {
   type NotificationApiMap,
 } from "./behavior/notification-api.ts";
 export {
-  NotificationHostPort,
+  NotificationHostApi,
   NotificationHostProvider,
   type NotificationFailureNotice,
   type NotificationHostProject,

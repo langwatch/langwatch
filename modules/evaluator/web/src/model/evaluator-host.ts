@@ -78,7 +78,7 @@ export type EvaluatorRouteReading = {
 };
 
 /** The one thing a screen is handed. */
-export abstract class EvaluatorHostPort {
+export abstract class EvaluatorHostApi {
   /** The project this page is about. */
   abstract scope(): EvaluatorScope;
 
@@ -109,7 +109,7 @@ export abstract class EvaluatorHostPort {
   abstract failed(failure: EvaluatorFailureNotice): void;
 }
 
-const EvaluatorHostContext = createContext<EvaluatorHostPort | undefined>(void 0);
+const EvaluatorHostContext = createContext<EvaluatorHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const EvaluatorHostProvider = EvaluatorHostContext.Provider;
@@ -121,7 +121,7 @@ export const EvaluatorHostProvider = EvaluatorHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useEvaluatorHost(): EvaluatorHostPort {
+export function useEvaluatorHost(): EvaluatorHostApi {
   const host = useContext(EvaluatorHostContext);
   if (!host) {
     throw new Error(

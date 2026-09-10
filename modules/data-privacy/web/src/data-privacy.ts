@@ -24,7 +24,7 @@ export {
 } from "./ui/sections/data-privacy-screen.tsx";
 export { dataPrivacyApi } from "./behavior/data-privacy-api.ts";
 export {
-  DataPrivacyHostPort,
+  DataPrivacyHostApi,
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
   type PrivacyHostScope,

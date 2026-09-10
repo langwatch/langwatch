@@ -187,7 +187,7 @@ import { LangySidecar } from "../langy-panel.tsx";
 import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
-  LangyHostPort,
+  LangyHostApi,
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
@@ -201,7 +201,7 @@ const flagsRef = {
   current: { release_langy_ui_actions: true } as Record<string, boolean>,
 };
 
-class FakeLangyHost extends LangyHostPort {
+class FakeLangyHost extends LangyHostApi {
   project() {
     return { id: PROJECT_ID, slug: "demo", name: "demo" };
   }

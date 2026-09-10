@@ -40,7 +40,7 @@ export type TopicFailureNotice = {
   description?: string;
 };
 
-export abstract class TopicHostPort {
+export abstract class TopicHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): TopicHostProject | undefined;
 
@@ -49,7 +49,7 @@ export abstract class TopicHostPort {
   abstract failed(failure: TopicFailureNotice): void;
 }
 
-const TopicHostContext = createContext<TopicHostPort | undefined>(void 0);
+const TopicHostContext = createContext<TopicHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const TopicHostProvider = TopicHostContext.Provider;
@@ -61,7 +61,7 @@ export const TopicHostProvider = TopicHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useTopicHost(): TopicHostPort {
+export function useTopicHost(): TopicHostApi {
   const host = useContext(TopicHostContext);
   if (!host) {
     throw new Error(

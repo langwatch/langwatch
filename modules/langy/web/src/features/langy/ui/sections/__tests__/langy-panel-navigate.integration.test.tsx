@@ -163,7 +163,7 @@ import { LangySidecar } from "../langy-panel.tsx";
 import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
-  LangyHostPort,
+  LangyHostApi,
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
@@ -173,7 +173,7 @@ import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 const PROJECT_ID = "project-demo";
 const navigateMock = vi.fn();
 
-class FakeLangyHost extends LangyHostPort {
+class FakeLangyHost extends LangyHostApi {
   project() {
     return { id: PROJECT_ID, slug: "demo", name: "demo" };
   }

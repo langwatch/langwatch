@@ -69,7 +69,7 @@ export type MonitorRouteReading = {
 };
 
 /** The one thing a screen is handed. */
-export abstract class MonitorHostPort {
+export abstract class MonitorHostApi {
   abstract scope(): MonitorScope;
 
   /** Whether the reader holds a grant, answered synchronously and fail-closed. */
@@ -98,7 +98,7 @@ export abstract class MonitorHostPort {
   abstract failed(failure: MonitorFailureNotice): void;
 }
 
-const MonitorHostContext = createContext<MonitorHostPort | undefined>(void 0);
+const MonitorHostContext = createContext<MonitorHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const MonitorHostProvider = MonitorHostContext.Provider;
@@ -110,7 +110,7 @@ export const MonitorHostProvider = MonitorHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useMonitorHost(): MonitorHostPort {
+export function useMonitorHost(): MonitorHostApi {
   const host = useContext(MonitorHostContext);
   if (!host) {
     throw new Error(

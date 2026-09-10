@@ -230,7 +230,7 @@ export type CliDeviceApproval = {
 export type CliDeviceActionResult = { outcome: "ok" } | { outcome: "failed"; message: string };
 
 /** The one thing the screens are handed. */
-export abstract class ApiKeyHostPort {
+export abstract class ApiKeyHostApi {
   /** The organization, team and project these pages are about. */
   abstract scope(): ApiKeyHostScope;
 
@@ -324,7 +324,7 @@ export abstract class ApiKeyHostPort {
   abstract denyDeviceCode(userCode: string): Promise<CliDeviceActionResult>;
 }
 
-const ApiKeyHostContext = createContext<ApiKeyHostPort | undefined>(void 0);
+const ApiKeyHostContext = createContext<ApiKeyHostApi | undefined>(void 0);
 
 /** Publishes the host to the screens and everything they render. */
 export const ApiKeyHostProvider = ApiKeyHostContext.Provider;
@@ -336,7 +336,7 @@ export const ApiKeyHostProvider = ApiKeyHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useApiKeyHost(): ApiKeyHostPort {
+export function useApiKeyHost(): ApiKeyHostApi {
   const host = useContext(ApiKeyHostContext);
   if (!host) {
     throw new Error(

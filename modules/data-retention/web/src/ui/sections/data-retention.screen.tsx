@@ -60,7 +60,7 @@ import { useEffect, useState } from "react";
 import { dataRetentionApi } from "../../behavior/data-retention-api.ts";
 import {
   useDataRetentionHost,
-  type DataRetentionHostPort,
+  type DataRetentionHostApi,
 } from "../../model/data-retention-host.ts";
 import { BINDING_SCOPE_TIERS, SCOPE_ICON } from "../../model/retention-constants.ts";
 import { formatDays } from "../../model/retention-format.ts";
@@ -92,7 +92,7 @@ function DataRetentionPage({
   host,
   projectId,
 }: {
-  host: DataRetentionHostPort;
+  host: DataRetentionHostApi;
   projectId: string;
 }) {
   const { organizationId, teamId } = host.scope();

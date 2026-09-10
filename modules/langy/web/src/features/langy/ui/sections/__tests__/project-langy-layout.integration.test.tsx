@@ -50,7 +50,7 @@ vi.mock("../../../../../behavior/use-langy-conversation-deep-link.ts", () => ({
 import ProjectLangyLayout from "../project-langy-layout.tsx";
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
-  LangyHostPort,
+  LangyHostApi,
   LangyHostProvider,
   type LangyHostOrganization,
   type LangyHostProject,
@@ -73,7 +73,7 @@ function LangySidecarStub() {
   );
 }
 
-class FakeLangyHost extends LangyHostPort {
+class FakeLangyHost extends LangyHostApi {
   constructor(
     private readonly state: {
       project: LangyHostProject | undefined;

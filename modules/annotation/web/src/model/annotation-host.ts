@@ -49,7 +49,7 @@ export type AnnotationFailureNotice = {
   id?: string;
 };
 
-export abstract class AnnotationHostPort {
+export abstract class AnnotationHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): AnnotationHostProject | undefined;
 
@@ -82,13 +82,13 @@ export abstract class AnnotationHostPort {
   abstract failed(failure: AnnotationFailureNotice): void;
 }
 
-const AnnotationHostContext = createContext<AnnotationHostPort | undefined>(void 0);
+const AnnotationHostContext = createContext<AnnotationHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const AnnotationHostProvider = AnnotationHostContext.Provider;
 
 /** The host this screen is mounted in; missing is a composition fault, so it throws. */
-export function useAnnotationHost(): AnnotationHostPort {
+export function useAnnotationHost(): AnnotationHostApi {
   const host = useContext(AnnotationHostContext);
 
   if (!host) {

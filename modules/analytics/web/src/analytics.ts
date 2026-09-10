@@ -80,7 +80,7 @@ export type AnalyticsScreenName = keyof typeof analyticsScreens;
 export type { CustomGraphScreenMode };
 export { analyticsApi } from "./behavior/analytics-api.ts";
 export {
-  AnalyticsHostPort,
+  AnalyticsHostApi,
   AnalyticsHostProvider,
   useAnalyticsHost,
   type AnalyticsFailureNotice,

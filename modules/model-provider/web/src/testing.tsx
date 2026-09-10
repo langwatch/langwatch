@@ -15,7 +15,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import {
-  ModelProviderHostPort,
+  ModelProviderHostApi,
   ModelProviderHostProvider,
   type ModelProviderAvailableScopes,
   type ModelProviderFailureNotice,
@@ -31,7 +31,7 @@ export type RecordedDrawerOpen = {
   params: Readonly<Record<string, string | undefined>>;
 };
 
-export class FakeModelProviderHost extends ModelProviderHostPort {
+export class FakeModelProviderHost extends ModelProviderHostApi {
   readonly queryWrites: Array<Readonly<Record<string, string | undefined>>> = [];
   readonly drawerOpens: RecordedDrawerOpen[] = [];
   readonly successes: ModelProviderSuccessNotice[] = [];

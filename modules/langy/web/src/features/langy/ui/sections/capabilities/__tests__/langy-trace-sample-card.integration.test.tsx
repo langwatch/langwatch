@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
-  LangyHostPort,
+  LangyHostApi,
   LangyHostProvider,
   type LangyHostOrganization,
   type LangyHostProject,
@@ -34,7 +34,7 @@ const descriptor = resolveCapability("langwatch.trace.search")!;
  * A minimal host: the deep-link chip and the row links both resolve through
  * `useRouter`, which throws outside a `LangyHostProvider`.
  */
-class FakeLangyHost extends LangyHostPort {
+class FakeLangyHost extends LangyHostApi {
   project(): LangyHostProject | undefined {
     return { id: "project-acme", slug: "acme", name: "acme" };
   }

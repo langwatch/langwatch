@@ -105,7 +105,7 @@ export type ModelProviderPlatformDrawer =
   | "llmModelCost";
 
 /** The one thing the screens are handed. */
-export abstract class ModelProviderHostPort {
+export abstract class ModelProviderHostApi {
   /** The organization, team and project these pages are about. */
   abstract scope(): ModelProviderHostScope;
 
@@ -158,7 +158,7 @@ export abstract class ModelProviderHostPort {
   }): void;
 }
 
-const ModelProviderHostContext = createContext<ModelProviderHostPort | undefined>(void 0);
+const ModelProviderHostContext = createContext<ModelProviderHostApi | undefined>(void 0);
 
 /** Publishes the host to the screens and everything they render. */
 export const ModelProviderHostProvider = ModelProviderHostContext.Provider;
@@ -170,7 +170,7 @@ export const ModelProviderHostProvider = ModelProviderHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useModelProviderHost(): ModelProviderHostPort {
+export function useModelProviderHost(): ModelProviderHostApi {
   const host = useContext(ModelProviderHostContext);
   if (!host) {
     throw new Error(

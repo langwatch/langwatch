@@ -50,7 +50,7 @@ export type {
   OrganizationMemberMatch,
 } from "./behavior/organization-api.ts";
 export {
-  OrganizationHostPort,
+  OrganizationHostApi,
   OrganizationHostProvider,
   type OrganizationActor,
   type OrganizationSuccessNotice,

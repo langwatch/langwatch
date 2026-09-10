@@ -38,7 +38,7 @@ export type AuthorizeScreenName = keyof typeof authorizeScreens;
 
 export { DISALLOWED_REDIRECT_SCHEMES, isAllowedRedirectScheme } from "./model/redirect-schemes.ts";
 export {
-  AuthorizeHostPort,
+  AuthorizeHostApi,
   AuthorizeHostProvider,
   type AuthorizeFailureNotice,
   type AuthorizeRouteReading,

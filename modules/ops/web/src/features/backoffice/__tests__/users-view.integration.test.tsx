@@ -15,7 +15,7 @@ vi.mock("../behavior/admin-client.ts", () => ({
 /**
  * The refusal reaches the operator through the host, not through a module
  * singleton: `toaster.create({ type: "error" })` is a `failed` notice on
- * `OpsHostPort`, so the assertion reads the recording the fake host keeps.
+ * `OpsHostApi`, so the assertion reads the recording the fake host keeps.
  */
 let host: FakeOpsHost;
 

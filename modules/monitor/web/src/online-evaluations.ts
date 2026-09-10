@@ -48,7 +48,7 @@ export { ONLINE_EVALUATIONS_PAGE_PERMISSION } from "./ui/sections/online-evaluat
 export { monitorApi } from "./behavior/monitor-api.ts";
 export type { MonitorApiMap, MonitorExperimentRow } from "./behavior/monitor-api.ts";
 export {
-  MonitorHostPort,
+  MonitorHostApi,
   MonitorHostProvider,
   type MonitorCopyTarget,
   type MonitorFailureNotice,

@@ -15,13 +15,13 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import {
-  ScimHostPort,
+  ScimHostApi,
   ScimHostProvider,
   type ScimFailureNotice,
   type ScimSuccessNotice,
 } from "./model/scim-host.ts";
 
-export class FakeScimHost extends ScimHostPort {
+export class FakeScimHost extends ScimHostApi {
   readonly successes: ScimSuccessNotice[] = [];
   readonly failures: ScimFailureNotice[] = [];
 

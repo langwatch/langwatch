@@ -14,7 +14,7 @@ import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { isCodexModel, LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
-import { useModelProviderHost, type ModelProviderHostPort } from "../../model/model-provider-host.ts";
+import { useModelProviderHost, type ModelProviderHostApi } from "../../model/model-provider-host.ts";
 import type { ScopeAssignment } from "../../model/scope-assignment.ts";
 
 /**
@@ -110,7 +110,7 @@ async function acceptCodexCodingDefaults({
 }: {
   applyDefaults: (input: { projectId: string; scopes: ScopeAssignment[] }) => Promise<unknown>;
   utils: ReturnType<typeof modelProviderApi.useUtils>;
-  host: ModelProviderHostPort;
+  host: ModelProviderHostApi;
   projectId: string;
   scopes: ScopeAssignment[];
   onClose: () => void;

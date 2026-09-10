@@ -2,7 +2,7 @@
  * What an analytics test mounts instead of an application.
  *
  * Every screen and section in this package reads its project, the reader's
- * grants, the address and the two notices off `AnalyticsHostPort`. A test that
+ * grants, the address and the two notices off `AnalyticsHostApi`. A test that
  * renders one therefore needs a host, and building a real one means building a
  * browser application; this is the double, plus the Chakra provider the
  * components need to render at all.
@@ -23,7 +23,7 @@ import { render, type RenderResult } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 
 import {
-  AnalyticsHostPort,
+  AnalyticsHostApi,
   AnalyticsHostProvider,
   type AnalyticsFailureNotice,
   type AnalyticsHostProject,
@@ -39,7 +39,7 @@ export type StubAnalyticsHostOptions = {
 };
 
 /** A host that answers from fixtures and records everything it is told. */
-export class StubAnalyticsHost extends AnalyticsHostPort {
+export class StubAnalyticsHost extends AnalyticsHostApi {
   readonly successes: AnalyticsSuccessNotice[] = [];
   readonly failures: AnalyticsFailureNotice[] = [];
   readonly navigations: string[] = [];
@@ -101,7 +101,7 @@ export function AnalyticsTestHarness({
   host,
   children,
 }: {
-  host: AnalyticsHostPort;
+  host: AnalyticsHostApi;
   children: ReactNode;
 }) {
   return (

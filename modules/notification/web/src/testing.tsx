@@ -15,14 +15,14 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import {
-  NotificationHostPort,
+  NotificationHostApi,
   NotificationHostProvider,
   type NotificationFailureNotice,
   type NotificationHostProject,
   type NotificationSuccessNotice,
 } from "./model/notification-host.ts";
 
-export class FakeNotificationHost extends NotificationHostPort {
+export class FakeNotificationHost extends NotificationHostApi {
   readonly successes: NotificationSuccessNotice[] = [];
   readonly failures: NotificationFailureNotice[] = [];
 

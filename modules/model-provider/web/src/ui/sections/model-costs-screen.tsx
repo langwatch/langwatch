@@ -12,7 +12,7 @@
  * `llmModelCost`, a registered drawer this move does NOT take: the unmapped-cost
  * suggestion inside a trace opens the same drawer, so deleting its registry
  * entry would break a surface that has not moved. The screen names the drawer
- * and the host writes the address - see `ModelProviderHostPort.openPlatformDrawer`
+ * and the host writes the address - see `ModelProviderHostApi.openPlatformDrawer`
  * for the gap that leaves.
  *
  * Contract: specs/model-providers/model-cost-scoping.feature.

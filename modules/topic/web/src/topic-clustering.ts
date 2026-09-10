@@ -17,7 +17,7 @@ export type TopicScreenName = keyof typeof topicScreens;
 export { TOPIC_CLUSTERING_PAGE_PERMISSION } from "./ui/sections/topic-clustering.screen.tsx";
 export { topicApi, type TopicApiMap } from "./behavior/topic-api.ts";
 export {
-  TopicHostPort,
+  TopicHostApi,
   TopicHostProvider,
   type TopicFailureNotice,
   type TopicHostProject,

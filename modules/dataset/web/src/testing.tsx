@@ -2,7 +2,7 @@
  * What a Datasets test mounts instead of an application.
  *
  * Every screen and overlay in this package reads its project, its grants, its
- * replication targets, the address and the two notices off `DatasetHostPort`.
+ * replication targets, the address and the two notices off `DatasetHostApi`.
  * A test that renders one therefore needs a host, and building a real one means
  * building a browser application; this is the double, plus the Chakra provider
  * the components need to render at all.
@@ -20,7 +20,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, type RenderResult } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import {
-  DatasetHostPort,
+  DatasetHostApi,
   DatasetHostProvider,
   type DatasetCopyTarget,
   type DatasetFailureNotice,
@@ -39,7 +39,7 @@ export type StubDatasetHostOptions = {
 };
 
 /** A host that answers from fixtures and records everything it is told. */
-export class StubDatasetHost extends DatasetHostPort {
+export class StubDatasetHost extends DatasetHostApi {
   readonly successes: DatasetSuccessNotice[] = [];
   readonly failures: DatasetFailureNotice[] = [];
   readonly navigations: string[] = [];
@@ -99,7 +99,7 @@ export function DatasetTestHarness({
   host,
   children,
 }: {
-  host: DatasetHostPort;
+  host: DatasetHostApi;
   children: ReactNode;
 }) {
   return (

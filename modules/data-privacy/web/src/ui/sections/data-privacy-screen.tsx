@@ -50,7 +50,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Folder, MoreVertical, Plus, Shield, UserLock } from "lucide-react";
 import { useMemo } from "react";
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
-import { useDataPrivacyHost, type DataPrivacyHostPort } from "../../model/data-privacy-host.ts";
+import { useDataPrivacyHost, type DataPrivacyHostApi } from "../../model/data-privacy-host.ts";
 import { SCOPE_ICON } from "../../model/data-privacy-labels.ts";
 import { ruleSummary } from "../../model/data-privacy-rule-config.ts";
 import { EffectiveSummary } from "../blocks/effective-summary.tsx";
@@ -98,7 +98,7 @@ export default function DataPrivacyScreen() {
   return <DataPrivacyPage host={host} projectId={projectId} />;
 }
 
-function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostPort; projectId: string }) {
+function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projectId: string }) {
   const { organizationId, teamId } = host.scope();
   const utils = dataPrivacyApi.useUtils();
   const snapshotQuery = dataPrivacyApi.dataPrivacy.getSnapshot.useQuery({ projectId });

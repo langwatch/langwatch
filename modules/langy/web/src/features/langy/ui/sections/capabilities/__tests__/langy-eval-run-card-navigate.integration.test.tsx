@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  LangyHostPort,
+  LangyHostApi,
   LangyHostProvider,
   type LangyHostOrganization,
   type LangyHostProject,
@@ -22,7 +22,7 @@ import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 
 const navigateMock = vi.fn();
 
-class FakeLangyHost extends LangyHostPort {
+class FakeLangyHost extends LangyHostApi {
   project(): LangyHostProject | undefined {
     return { id: "project-acme", slug: "acme", name: "acme" };
   }

@@ -53,7 +53,7 @@ export type SecretFailureNotice = {
 };
 
 /** The one thing the screen is handed. */
-export abstract class SecretHostPort {
+export abstract class SecretHostApi {
   /** The project these secrets belong to. */
   abstract scope(): SecretHostScope;
 
@@ -76,7 +76,7 @@ export abstract class SecretHostPort {
   abstract projectSwitcher(): React.ReactNode | null;
 }
 
-const SecretHostContext = createContext<SecretHostPort | undefined>(void 0);
+const SecretHostContext = createContext<SecretHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const SecretHostProvider = SecretHostContext.Provider;
@@ -88,7 +88,7 @@ export const SecretHostProvider = SecretHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useSecretHost(): SecretHostPort {
+export function useSecretHost(): SecretHostApi {
   const host = useContext(SecretHostContext);
   if (!host) {
     throw new Error(

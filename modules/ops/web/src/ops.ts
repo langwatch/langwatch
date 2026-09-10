@@ -56,7 +56,7 @@ export type OpsScreenName = keyof typeof opsScreens;
 export { BACKOFFICE_RESOURCES, type BackofficeResource } from "./ui/sections/ops/ops-backoffice.screen.tsx";
 export { opsApi } from "./behavior/ops-api.ts";
 export {
-  OpsHostPort,
+  OpsHostApi,
   OpsHostProvider,
   type OpsFailureNotice,
   type OpsProject,

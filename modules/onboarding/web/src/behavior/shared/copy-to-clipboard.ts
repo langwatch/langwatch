@@ -14,7 +14,7 @@ import { toaster } from "@langwatch/design-system/toaster";
  * that can afford to: it has no code, never crosses a wire, and the sentence
  * below is the whole of what a reader can act on, so nothing the presentation
  * registry knows is being given up. The screens that ARE onboarding-only ask
- * `OnboardingHostPort.copyToClipboard` instead, which is the same thing with a
+ * `OnboardingHostApi.copyToClipboard` instead, which is the same thing with a
  * host behind it.
  */
 export async function copyToClipboard({

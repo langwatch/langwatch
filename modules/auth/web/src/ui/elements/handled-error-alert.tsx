@@ -10,7 +10,7 @@
  * presentation registry, which supplies the specific title and description. It
  * is ~3,700 lines of the whole product's error copy and belongs in a package
  * of its own; until then the HOST answers for it through
- * `AuthHostPort.explainErrorCode`, and a composition that lists no copy for a
+ * `AuthHostApi.explainErrorCode`, and a composition that lists no copy for a
  * code degrades to the action name plus the generic line — which is exactly
  * what the registry itself answers for a code it does not list (ADR-045).
  *

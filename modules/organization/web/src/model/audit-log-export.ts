@@ -1,7 +1,7 @@
 /**
  * What a downloaded audit report contains, separated from the save: what
  * the export says is pinned here, how it reaches disk is
- * `OrganizationHostPort.download`. Uses the same query as the table, so a
+ * `OrganizationHostApi.download`. Uses the same query as the table, so a
  * pre-filtered deep-link never silently widens to the whole organization.
  */
 

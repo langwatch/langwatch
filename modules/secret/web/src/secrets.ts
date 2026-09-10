@@ -23,7 +23,7 @@ export {
   type SecretRefusalCopy,
 } from "./model/secret-refusal-copy.ts";
 export {
-  SecretHostPort,
+  SecretHostApi,
   SecretHostProvider,
   type SecretFailureNotice,
   type SecretHostScope,

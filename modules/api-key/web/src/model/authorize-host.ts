@@ -92,7 +92,7 @@ export type AuthorizeSuccessNotice = {
   readonly description?: string;
 };
 
-export abstract class AuthorizeHostPort {
+export abstract class AuthorizeHostApi {
   abstract scope(): AuthorizeScope;
 
   abstract sessionStatus(): AuthorizeSessionStatus;
@@ -142,7 +142,7 @@ export abstract class AuthorizeHostPort {
   }): Promise<boolean>;
 }
 
-const AuthorizeHostContext = createContext<AuthorizeHostPort | undefined>(void 0);
+const AuthorizeHostContext = createContext<AuthorizeHostApi | undefined>(void 0);
 
 /** Publishes the host to the two handoff screens. */
 export const AuthorizeHostProvider = AuthorizeHostContext.Provider;
@@ -155,7 +155,7 @@ export const AuthorizeHostProvider = AuthorizeHostContext.Provider;
  * degrade around — and degrading around it would mean granting access without
  * being able to name what is being granted.
  */
-export function useAuthorizeHost(): AuthorizeHostPort {
+export function useAuthorizeHost(): AuthorizeHostApi {
   const host = useContext(AuthorizeHostContext);
   if (!host) {
     throw new Error(

@@ -13,14 +13,14 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import {
-  SecretHostPort,
+  SecretHostApi,
   SecretHostProvider,
   type SecretFailureNotice,
   type SecretHostScope,
   type SecretSuccessNotice,
 } from "./model/secret-host.ts";
 
-export class FakeSecretHost extends SecretHostPort {
+export class FakeSecretHost extends SecretHostApi {
   readonly successes: SecretSuccessNotice[] = [];
   readonly failures: SecretFailureNotice[] = [];
 

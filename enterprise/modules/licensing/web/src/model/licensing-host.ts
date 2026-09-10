@@ -33,7 +33,7 @@ export type LicensingFailureNotice = {
   fallbackTitle: string;
 };
 
-export abstract class LicensingHostPort {
+export abstract class LicensingHostApi {
   /** The organization the license is read and written against. */
   abstract organizationId(): string | undefined;
 
@@ -67,7 +67,7 @@ export abstract class LicensingHostPort {
   abstract failed(failure: LicensingFailureNotice): void;
 }
 
-const LicensingHostContext = createContext<LicensingHostPort | undefined>(void 0);
+const LicensingHostContext = createContext<LicensingHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const LicensingHostProvider = LicensingHostContext.Provider;
@@ -79,7 +79,7 @@ export const LicensingHostProvider = LicensingHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
-export function useLicensingHost(): LicensingHostPort {
+export function useLicensingHost(): LicensingHostApi {
   const host = useContext(LicensingHostContext);
   if (!host) {
     throw new Error(

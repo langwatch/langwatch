@@ -6,7 +6,7 @@
  * so the activation flow must tell self-hosted admins a restart is required.
  *
  * Moved from `platform/app/src/components/license/__tests__/`. The hook now
- * reads the deployment and raises its notices through `LicensingHostPort`
+ * reads the deployment and raises its notices through `LicensingHostApi`
  * instead of `usePublicEnv`, the toaster and `trpc.invalidate()`, so the fake
  * host below is where those three used to be mocked: `succeeded` is the
  * toaster, `refreshPlanDerivedState` is the invalidate. The assertions are
@@ -18,7 +18,7 @@ import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type LicensingFailureNotice,
-  LicensingHostPort,
+  LicensingHostApi,
   LicensingHostProvider,
   type LicensingSuccessNotice,
 } from "../../../model/licensing-host.ts";
@@ -69,7 +69,7 @@ vi.mock("../../../behavior/licensing-api.ts", () => ({
  * success toast, and `publicEnvData` is `usePublicEnv().data` — undefined
  * while the environment is still resolving.
  */
-class TestLicensingHost extends LicensingHostPort {
+class TestLicensingHost extends LicensingHostApi {
   organizationId(): string | undefined {
     return "org-1";
   }

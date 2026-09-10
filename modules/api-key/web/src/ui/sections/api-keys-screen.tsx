@@ -24,7 +24,7 @@ import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
-import { useApiKeyHost, type ApiKeyHostPort } from "../../model/api-key-host.ts";
+import { useApiKeyHost, type ApiKeyHostApi } from "../../model/api-key-host.ts";
 import {
   filterRowsByScope,
   scopeFilterAddressWrite,
@@ -65,7 +65,7 @@ function ProjectKeyActions({
 }: {
   apiKey: string;
   canManage: boolean;
-  host: ApiKeyHostPort;
+  host: ApiKeyHostApi;
   onRotate: () => void;
 }) {
   return (
