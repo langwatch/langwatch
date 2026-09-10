@@ -28,7 +28,7 @@ import { createApiTrackedEventPorts } from "../../features/trace/tracked-event-p
 const FAMILY_PATHS: ReadonlyArray<readonly [ApiRestFamilyName, string]> = [
   ["agent-cache", "/api/agent-cache"],
   ["agents", "/api/agents"],
-  ["agents-v1", "/api/v1/agents"],
+  ["agents", "/api/v1/agents"],
   ["coding-agent", "/api/coding-agent"],
   ["coding-agent-v1", "/api/v1/coding-agent"],
   ["dashboards", "/api/dashboards"],

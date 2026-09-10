@@ -15,6 +15,7 @@ import { secretRest, secretsAliasRest } from "@langwatch/secret-server";
 import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
 import { mountAuthCliDeviceFlowRest } from "../features/auth/auth-cli-device-flow-rest.mount.ts";
 import { mountAuthRest } from "../features/auth/auth-rest.mount.ts";
+import { mountAgentRest } from "../features/agent/agent-rest.mount.ts";
 import { mountApiKeyRest } from "../features/api-key/api-key-rest.mount.ts";
 import {
   mountCodingAgentRest,
@@ -256,8 +257,17 @@ export const API_REST_DOORS = [
     paths: ["/api/evaluations/*", "/api/v1/evaluations/*"],
   },
   { family: "agent-cache", owner: "module", paths: ["/api/agent-cache", "/api/v1/agent-cache"] },
-  { family: "agents", owner: "module", paths: ["/api/agents"] },
-  { family: "agents-v1", owner: "module", paths: ["/api/v1/agents"] },
+  {
+    family: "agents",
+    owner: "module",
+    paths: ["/api/agents", "/api/v1/agents"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const agents = packaged?.services.agents;
+      if (!agents) return null;
+
+      return mountAgentRest(runtime, { agents, errors: packaged.ports.errors });
+    },
+  },
   {
     family: "coding-agent",
     owner: "module",
