@@ -65,6 +65,23 @@ the machine report with `-json` (optionally to `-report FILE`).
   `-no-haven` boots the old way; `-env-file` is refused alongside haven,
   because pointing the instances at the servers a dotenv names is the thing
   haven exists to stop.
+- **A fresh worktree is prepared before either stack boots.** haven's own
+  automatic prep is migrate-and-seed, not install-and-build: a worktree
+  `git worktree add` just created carries none of a developer checkout's
+  generated or built artefacts (`node_modules`, the Prisma client, the
+  `langwatch` SDK's `dist`), so `haven up` there used to die in its own
+  prepare phase before it ever reached migrate (run 20260910-044221:
+  `Cannot find module '.../langwatch/dist/index.mjs'`, then
+  `migrations failed - nothing was dropped`). Before either instance's
+  `haven up`, both worktrees get the developer's own `.env*` copied in and
+  run install/generated-files/build — the identical steps visualdiff runs,
+  shared as `havenrun.CopyEnvFiles` and `havenrun.PrepareCommands`
+  (`tools/havenrun/prepare.go`) rather than a second definition. A boot that
+  never becomes ready reports progress every 30s instead of going silent for
+  the whole timeout, and its error carries the last 20 lines of the stack's
+  own haven log, read directly off disk
+  (`~/.langwatch/portless/logs/<slug>.log`) so a `haven logs` command that
+  itself fails does not blank out the failure.
 - The paths below describe `-no-haven`. Each worktree boots through a detected profile: `apps/api`
   (`@langwatch/platform-api`) is the **modular** layout (root migrate/seed
   scripts, `API_PORT` on process env — node `--env-file` never overrides it);

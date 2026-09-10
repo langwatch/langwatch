@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/havenrun"
@@ -42,6 +43,17 @@ const (
 	// havenFailureLogLines is how much of a failed stack's backend log the
 	// timeout error carries. Enough to name the failure, short enough to read.
 	havenFailureLogLines = havenrun.DefaultFailureLogLines
+
+	// havenStackLogLines is how much of a stack's own combined log
+	// (havenrun.StackLogTailOrError) the timeout error carries when read
+	// directly off disk, the fallback that stays useful even when `haven
+	// logs` itself fails.
+	havenStackLogLines = 20
+
+	// havenProgressInterval is how often the readiness loop reports that it
+	// is still waiting. A five-minute default timeout with no output at all
+	// until it fails is what run 20260910-044221 looked like from outside.
+	havenProgressInterval = 30 * time.Second
 )
 
 // HavenSlug names the haven stack one instance runs as. Run-scoped so two
@@ -176,12 +188,13 @@ func (state *bootState) bootThroughHaven(ctx context.Context, booted *Booted) er
 	return nil
 }
 
-// prepareHavenInstances detects each side's layout, for logging and for
-// naming the right lane on a failed boot's log tail (havenBackendLog). haven
-// boots a monolith checkout itself now, so neither layout is refused here -
-// a checkout this tool cannot recognize at all still fails on detectProfile's
-// own error, same as the compose path.
-func (state *bootState) prepareHavenInstances(booted *Booted) error {
+// prepareHavenInstances detects each side's layout (for logging and for
+// naming the right lane on a failed boot's log tail, havenBackendLog), then
+// runs havenPrepareInstance on it - both instances, both before either
+// instance's `haven up` runs. haven boots a monolith checkout itself now, so
+// neither layout is refused here - a checkout this tool cannot recognize at
+// all still fails on detectProfile's own error, same as the compose path.
+func (state *bootState) prepareHavenInstances(ctx context.Context, booted *Booted) error {
 	for _, instance := range []*Instance{&booted.A, &booted.B} {
 		profile, err := detectProfile(instance.Dir)
 		if err != nil {
@@ -189,8 +202,63 @@ func (state *bootState) prepareHavenInstances(booted *Booted) error {
 		}
 		instance.Profile = profile
 		state.logf("%s: %s profile as haven stack %q (%s)", instance.Name, profile.name, HavenSlug(state.runID, instance.Name), instance.Dir)
+		if err := state.havenPrepareInstance(ctx, *instance); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// havenPrepareInstance is what closes the gap a real run hit at 04:42: a
+// fresh worktree carries none of the generated or built artifacts a
+// developer checkout has (they are gitignored), so `haven up` there died in
+// its own prepare phase on ERR_MODULE_NOT_FOUND before it ever reached
+// migrate. It runs the same install / generated-files / build steps
+// visualdiff runs (havenrun.PrepareCommands) and copies the developer's own
+// .env into the worktree (havenrun.CopyEnvFiles) - the two tools share both,
+// so there is one definition of what a fresh worktree needs, not two.
+func (state *bootState) havenPrepareInstance(ctx context.Context, instance Instance) error {
+	copied, err := havenrun.CopyEnvFiles(ctx, state.cfg.BranchDir, instance.Dir)
+	if err != nil {
+		return fmt.Errorf("prepare %s: copy env: %w", instance.Name, err)
+	}
+	state.logf("prepare %s: copy .env files exit=ok (copied %d)", instance.Name, copied)
+	layout := havenrun.LayoutModular
+	if instance.Profile.name == profileMonolith {
+		layout = havenrun.LayoutMonolith
+	}
+	for _, step := range havenrun.PrepareCommands(layout) {
+		spec := commandSpec{name: step.Name, args: step.Args, dir: instance.Dir}
+		argv := step.Name + " " + strings.Join(step.Args, " ")
+		state.logf("prepare %s: %s", instance.Name, argv)
+		err := state.run(ctx, spec, state.stderr)
+		state.logf("prepare %s: %s exit=%s", instance.Name, argv, exitStatus(err))
+		if err != nil {
+			return fmt.Errorf("prepare %s (%s): %w", instance.Name, argv, err)
+		}
+	}
+	return nil
+}
+
+// havenPrepareCommandLine renders one worktree's prepare step for -dry-run:
+// the same steps havenPrepareInstance actually runs, using the modular
+// layout's list (the superset of the two) since a worktree's own layout is
+// not known before it exists.
+func havenPrepareCommandLine(dir string) string {
+	parts := []string{"copy .env"}
+	for _, step := range havenrun.PrepareCommands(havenrun.LayoutModular) {
+		parts = append(parts, step.Name+" "+strings.Join(step.Args, " "))
+	}
+	return "prepare (" + strings.Join(parts, "; ") + ") (in " + dir + ")"
+}
+
+// exitStatus renders a step's outcome for the run log - "ok" or the error,
+// never the command's own output (that already streamed to stderr as it ran).
+func exitStatus(err error) string {
+	if err == nil {
+		return "ok"
+	}
+	return err.Error()
 }
 
 // havenUp starts one instance's stack. The slug is recorded BEFORE the command
@@ -213,6 +281,7 @@ func (state *bootState) havenWaitReady(ctx context.Context, instance *Instance) 
 	timeout := state.bootTimeout()
 	deadline := time.Now().Add(timeout)
 	state.logf("haven %s: waiting for the backend lane of %q (up to %s)", instance.Name, plan.slug, timeout)
+	progress := newHavenProgress(deadline)
 	for {
 		report, err := state.havenStatus(ctx, plan)
 		if err == nil {
@@ -226,12 +295,41 @@ func (state *bootState) havenWaitReady(ctx context.Context, instance *Instance) 
 			return fmt.Errorf("haven %s: stack %q had no healthy backend lane within %s\n%s",
 				instance.Name, plan.slug, timeout, state.havenBackendLog(ctx, plan, *instance))
 		}
+		progress.reportIfDue(state, instance.Name, plan.slug)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(pollDelay(deadline)):
 		}
 	}
+}
+
+// havenProgress reports at most once per havenProgressInterval, so a five
+// minute wait with nothing ready says something before it fails instead of
+// going silent until the timeout error (run 20260910-044221 looked like a
+// hang from outside).
+type havenProgress struct {
+	deadline time.Time
+	started  time.Time
+	nextAt   time.Time
+}
+
+func newHavenProgress(deadline time.Time) *havenProgress {
+	now := time.Now()
+	return &havenProgress{deadline: deadline, started: now, nextAt: now.Add(havenProgressInterval)}
+}
+
+// reportIfDue logs a progress line and reschedules, but only once per
+// havenProgressInterval; a caller polling faster than the interval is a
+// no-op the rest of the time.
+func (progress *havenProgress) reportIfDue(state *bootState, name, slug string) {
+	now := time.Now()
+	if now.Before(progress.nextAt) {
+		return
+	}
+	progress.nextAt = now.Add(havenProgressInterval)
+	state.logf("haven %s: still waiting for %q (%s elapsed, %s left)",
+		name, slug, now.Sub(progress.started).Round(time.Second), time.Until(progress.deadline).Round(time.Second))
 }
 
 // pollDelay is the wait before the next question, never longer than what is
@@ -251,10 +349,18 @@ func (state *bootState) havenStatus(ctx context.Context, plan havenPlan) (havenS
 	return parseHavenStatus(out.Bytes())
 }
 
-// havenBackendLog is the tail of a stack's Node lane log, for the failure
-// message of a boot that never became ready: the single app lane on a
-// monolith checkout, the backend lane everywhere else (see profile.go).
+// havenBackendLog is the tail of a stack's own log, for the failure message
+// of a boot that never became ready. It reads haven's combined log file for
+// the stack straight off disk (havenrun.StackLogTailOrError) - a run at
+// 04:42 died with `haven logs` itself exiting 1, so the timeout message
+// carried "(backend log unavailable: exit status 1)" instead of the crash a
+// person needed to see. Only when the file cannot be read does this fall
+// back to `haven logs <lane>`, naming the single app lane on a monolith
+// checkout, the backend lane everywhere else (see profile.go).
 func (state *bootState) havenBackendLog(ctx context.Context, plan havenPlan, instance Instance) string {
+	if tail, err := havenrun.StackLogTailOrError(plan.slug, havenStackLogLines); err == nil {
+		return tail
+	}
 	lane := havenBackendLane
 	if instance.Profile.name == profileMonolith {
 		lane = havenrun.AppService

@@ -395,6 +395,8 @@ func PlanBoot(cfg BootConfig) (DryRunPlan, error) {
 	plan.Commands = []string{
 		"git " + strings.Join(worktreeAddArgs(mainDir, cfg.MainRef), " ") + " (in " + invoking + ")",
 		"git " + strings.Join(worktreeAddArgs(plan.BranchDir, "HEAD"), " ") + " (in " + invoking + ")",
+		havenPrepareCommandLine(mainDir),
+		havenPrepareCommandLine(plan.BranchDir),
 		havenCommand + " " + strings.Join(havenUpArgs(), " ") + " (in " + mainDir + ", stack " + plan.MainSlug + ")",
 		havenCommand + " " + strings.Join(havenUpArgs(), " ") + " (in " + plan.BranchDir + ", stack " + plan.BranchSlug + ")",
 		havenCommand + " " + strings.Join(havenDestroyArgs(plan.MainSlug), " ") + " (in " + workRoot + ")",
@@ -512,7 +514,7 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 // replaced its registration.
 func (state *bootState) bootHaven(ctx context.Context, booted *Booted) error {
 	booted.A.Dir = state.branchDir
-	if err := state.prepareHavenInstances(booted); err != nil {
+	if err := state.prepareHavenInstances(ctx, booted); err != nil {
 		return err
 	}
 	return state.bootThroughHaven(ctx, booted)

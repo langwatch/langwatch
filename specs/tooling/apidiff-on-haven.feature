@@ -50,6 +50,23 @@ Feature: apidiff boots its instances through haven
       And it never picks a Redis logical database, creates a database or runs a migration itself
       And haven's own allocation gives the stack a free Redis database and databases named for its slug
 
+  Rule: A fresh worktree is prepared before either stack boots
+
+    @unit
+    Scenario: A fresh worktree is prepared before its stack boots
+      Given a fresh worktree with none of a developer checkout's generated or built artefacts
+      When the worktree is prepared, before haven up runs
+      Then the developer's own .env is copied into the worktree
+      And pnpm install, the generated-files step, and - on the modular layout - the build step all run in the worktree
+      And every step's name and exit status are written to the run log, never a byte of .env's contents
+
+    @unit
+    Scenario: A boot that never becomes ready reports progress and a real log tail
+      Given an instance's stack has not become ready
+      When the run waits past its progress interval
+      Then it logs that it is still waiting, with the time elapsed and the time left
+      And on timeout, the failure carries the stack's own haven log read directly off disk, not "unavailable" from a haven logs command that itself failed
+
   Rule: A run only ever stops what it started
 
     @unit

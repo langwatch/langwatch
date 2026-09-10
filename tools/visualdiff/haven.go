@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -116,33 +113,14 @@ func (run *session) checkoutForHaven(ctx context.Context, stack *Stack) error {
 }
 
 // HavenPrepareCommands are the steps a fresh worktree needs before `haven up`
-// can succeed on it, in order: an install (pnpm's workspace symlinks are per
-// worktree, so a developer's own node_modules is no help here), then the
-// generated files (Prisma client, evaluator types, the langy skill/setup
-// generators), then - modular layout only - the workspace packages the api
-// and worker import a built dist from. CI is unset for the install so
-// install-check-shims and friends behave as they do for a person, not for a
-// pipeline (dev/scripts/install-check-shims.mjs stands down under CI).
-//
-// The monolith layout's own generated-files script (platform/app's
-// start:prepare:files, on origin/main) already builds the SDK and the MCP
-// server inline, so it needs no separate build step; the modular layout's
-// does not - only each application's own `predev` hook runs
-// dev/scripts/ensure-built.mjs (apps/ui, apps/api and apps/worker's
-// package.json), and nothing here can rely on a haven-supervised lane's
-// predev having already run before something else, earlier in prepare,
-// imports the same dist. Both invocations run `pnpm run start:prepare:files`
-// unchanged: the script name is the same on both refs and each ref's own
-// package.json resolves it to what that ref actually needs (root
-// package.json here, `pnpm --filter @langwatch/web start:prepare:files` on
-// origin/main) - so there is nothing to branch on for that step itself.
+// can succeed on it. apidiff needs the exact same steps, so the command list
+// itself lives in havenrun.PrepareCommands; this only renders it as this
+// package's own commandSpec.
 func HavenPrepareCommands(layout Layout) []commandSpec {
-	commands := []commandSpec{
-		{name: "env", args: []string{"-u", "CI", "pnpm", "install", "--frozen-lockfile"}},
-		{name: "pnpm", args: []string{"run", "start:prepare:files"}},
-	}
-	if layout == LayoutModular {
-		commands = append(commands, commandSpec{name: "node", args: []string{"dev/scripts/ensure-built.mjs"}})
+	steps := havenrun.PrepareCommands(havenrun.Layout(layout))
+	commands := make([]commandSpec, 0, len(steps))
+	for _, step := range steps {
+		commands = append(commands, commandSpec{name: step.Name, args: step.Args})
 	}
 	return commands
 }
@@ -179,68 +157,13 @@ func exitStatus(err error) string {
 	return err.Error()
 }
 
-// envDotfilePrefix is what a workspace's own dotenv files are named
-// (.env, .env.local, ...). CLAUDE.md: ".env lives at the workspace root...
-// there is no per-application dotenv any more", so the workspace root is the
-// only directory this copies from - unlike .githooks/post-checkout, which
-// still reaches into services/langevals, sdks/python, sdks/typescript and
-// mcp/typescript from before that consolidation.
-const envDotfilePrefix = ".env"
-
 // CopyEnvFiles copies the developer's own untracked .env* files from root
-// (the main checkout's workspace root) into dir (a fresh worktree) - the same
-// job .githooks/post-checkout does for a worktree added by hand, which this
-// run must not depend on a machine having opted into (`git config
-// core.hooksPath .githooks`; apidiff's own worktree add depends on exactly
-// the same opt-in). A tracked file (.env.example) is left alone, checked the
-// hook's own way: `git ls-files` inside the worktree. It reports how many
-// files it copied; only file NAMES ever reach the log line the caller writes
-// with that count - never a byte of a file's contents. This is Deps.CopyEnv's
-// real implementation; tests supply their own so a fake root never has to
-// exist on disk.
+// (the main checkout's workspace root) into dir (a fresh worktree). apidiff
+// needs the identical copy, so the implementation lives in
+// havenrun.CopyEnvFiles; this is Deps.CopyEnv's real implementation - tests
+// supply their own so a fake root never has to exist on disk.
 func CopyEnvFiles(ctx context.Context, root, dir string) (int, error) {
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return 0, err
-	}
-	copied := 0
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !strings.HasPrefix(name, envDotfilePrefix) {
-			continue
-		}
-		if envFileTracked(ctx, dir, name) {
-			continue
-		}
-		if err := copyEnvFile(filepath.Join(root, name), filepath.Join(dir, name)); err != nil {
-			return copied, err
-		}
-		copied++
-	}
-	return copied, nil
-}
-
-// envFileTracked reports whether name is a tracked file in the worktree at
-// dir - true for .env.example, false for every real dotenv file, which is
-// gitignored everywhere in this repository.
-func envFileTracked(ctx context.Context, dir, name string) bool {
-	// #nosec G204 -- name comes from os.ReadDir(root) above, never external
-	// input, and dir is one of this run's own worktrees.
-	return exec.CommandContext(ctx, "git", "-C", dir, "ls-files", "--error-unmatch", name).Run() == nil
-}
-
-// copyEnvFile copies one dotenv file byte-for-byte. Never logged: the
-// caller reports only the count and the file names it already decided on,
-// never a byte of what either file contains.
-func copyEnvFile(src, dest string) error {
-	data, err := os.ReadFile(src) // #nosec G304 -- src is one of the operator's own workspace-root dotenv files, named by CopyEnvFiles.
-	if err != nil {
-		return err
-	}
-	// #nosec G306 G703 -- dest is a path CopyEnvFiles built from the same
-	// worktree dir this run just created and a dotenv filename read off
-	// disk, not external input; 0o600 mirrors the source file's own mode.
-	return os.WriteFile(dest, data, 0o600)
+	return havenrun.CopyEnvFiles(ctx, root, dir)
 }
 
 // havenUp starts one stack. The slug is recorded BEFORE the command runs: an
