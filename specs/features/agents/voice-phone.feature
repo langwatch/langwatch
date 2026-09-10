@@ -53,6 +53,22 @@ Feature: Voice agents: reach an agent by phone
     When the whole-call limit elapses
     Then the runner ends the call by hanging it up
 
+  # ---------------------------------------------------------------------------
+  # Whole-call audio (#8014 — "they can listen to the whole call")
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A phone run's whole-call audio is resolved from the call's own trace
+    Given a voice run whose trace spans carry the call's Twilio call sid
+    When the whole-call audio is resolved
+    Then it returns the Twilio handle read off the run's own trace
+
+  @unit
+  Scenario: A run against a voice agent with no call handle has no whole-call audio
+    Given a voice run whose trace spans carry no call handle
+    When the whole-call audio is resolved
+    Then it returns nothing and the drawer shows no whole-call player
+
   @unit
   Scenario: VOICE_PUBLIC_BASE_URL is optional and falls back to the app's public base host
     Given VOICE_PUBLIC_BASE_URL is not set

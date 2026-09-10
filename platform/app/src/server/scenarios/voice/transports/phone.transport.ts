@@ -80,6 +80,10 @@ export interface TwilioAdapterLike {
     to: string;
     attachStream?: "a-leg" | "b-leg";
     maxCallDurationSeconds?: number;
+    /** Ask Twilio to record the call, so its whole-call audio can be played
+     *  back later in the run drawer (#8014). The vendored SDK is patched in
+     *  parallel to accept this; a build without the patch ignores it. */
+    record?: boolean;
   }): Promise<void>;
 }
 
@@ -186,6 +190,9 @@ function withOutboundDial(
         to,
         attachStream: "a-leg",
         maxCallDurationSeconds,
+        // Record the call so the whole-call audio is available for playback in
+        // the run drawer once Twilio publishes the recording (#8014).
+        record: true,
       });
     } catch (error) {
       await adapter.disconnect().catch(() => {
