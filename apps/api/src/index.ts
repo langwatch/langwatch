@@ -177,7 +177,6 @@ export {
   type ApiResponseEvaluator,
 } from "@langwatch/evaluator-server";
 export {
-  createExperimentsRestApp,
   createBlankWorkbenchState,
   workbenchActorFrom,
   createExperimentBodySchema,
