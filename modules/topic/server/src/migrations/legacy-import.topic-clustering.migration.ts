@@ -105,7 +105,7 @@ export class LegacyImportTopicClusteringMigration {
    * (boot pass racing the write path) collapse on the `seed:v1` key.
    */
   async trySeedProjectTopicModel(projectId: string): Promise<"seeded" | "skipped"> {
-    const owned = await this.repository.tryFindTopicModelCursor(projectId);
+    const owned = await this.repository.findTopicModelCursor(projectId);
     if (owned) return "skipped";
 
     const rows = await this.repository.findSeedTopicRows(projectId);

@@ -35,7 +35,7 @@ export class PrismaTopicClusteringRepository extends TopicClusteringRepository {
     return new PrismaTopicClusteringRepository(options.database);
   }
 
-  async tryFindProject(projectId: string): Promise<{ id: string } | null> {
+  async findProject(projectId: string): Promise<{ id: string } | null> {
     return this.prisma.project.findUnique({ where: { id: projectId } });
   }
 
@@ -104,7 +104,7 @@ export class PrismaTopicClusteringRepository extends TopicClusteringRepository {
     });
   }
 
-  async tryFindTopicModelCursor(projectId: string): Promise<{ id: string } | null> {
+  async findTopicModelCursor(projectId: string): Promise<{ id: string } | null> {
     return this.prisma.topicModelProjection.findUnique({
       where: { projectId },
       select: { id: true },

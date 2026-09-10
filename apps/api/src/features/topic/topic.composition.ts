@@ -12,7 +12,8 @@ import type { ComposedTopicFeature } from "./topic.composition.types.ts";
 
 /** Installs the topic read surface over this process's own connection. */
 export async function installApiTopic(options: {
-  infrastructure: ApiTrpcInfrastructure;
+  /** Only the process's own connection: the topic read surface composes nothing else. */
+  infrastructure: Pick<ApiTrpcInfrastructure, "prisma">;
 }): Promise<ComposedTopicFeature> {
   const runtime = await createApp({ name: "langwatch-api" })
     .withPersistence("postgres", { prisma: options.infrastructure.prisma })
@@ -31,7 +32,7 @@ export async function installApiTopic(options: {
 
 /** A process that never schedules clustering: the status panel reads "not scheduled". */
 class UnscheduledTopicClustering extends TopicClusteringSchedulePort {
-  tryGetNextWakeAt() {
+  findNextWakeAt() {
     return Promise.resolve(null);
   }
 }

@@ -65,7 +65,7 @@ class FakeSchedule extends TopicClusteringSchedulePort {
     super();
   }
 
-  tryGetNextWakeAt() {
+  findNextWakeAt() {
     return Promise.resolve(this.nextWakeAt);
   }
 }

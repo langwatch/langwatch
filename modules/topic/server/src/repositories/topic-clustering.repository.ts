@@ -37,7 +37,7 @@ export interface TopicClusteringSeedTopicRow {
 
 export abstract class TopicClusteringRepository {
   /** The project's existence; the runner reports a missing project itself. */
-  abstract tryFindProject(projectId: string): Promise<{ id: string } | null>;
+  abstract findProject(projectId: string): Promise<{ id: string } | null>;
 
   /** Every topic id/parent/age for the project (light index rows). */
   abstract findTopicIndexRows(projectId: string): Promise<TopicClusteringTopicIndexRow[]>;
@@ -63,7 +63,7 @@ export abstract class TopicClusteringRepository {
    * The projection cursor row, when the stream already owns this project's
    * topic model — the seed's ownership check.
    */
-  abstract tryFindTopicModelCursor(projectId: string): Promise<{ id: string } | null>;
+  abstract findTopicModelCursor(projectId: string): Promise<{ id: string } | null>;
 
   /** A project's full pre-ownership Topic rows, for the seed event. */
   abstract findSeedTopicRows(projectId: string): Promise<TopicClusteringSeedTopicRow[]>;

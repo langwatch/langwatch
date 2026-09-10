@@ -14,12 +14,12 @@ function fakeRepository(overrides: { pages: string[][]; alreadyScheduled?: strin
   const pageCalls: { afterId: string | null; take: number }[] = [];
   const scheduledLookups: string[][] = [];
   const repository: TopicClusteringRepository = {
-    tryFindProject: vi.fn(),
+    findProject: vi.fn(),
     findTopicIndexRows: vi.fn(),
     findModelTopics: vi.fn(),
     findModelSubtopics: vi.fn(),
     recordClusteringCost: vi.fn(),
-    tryFindTopicModelCursor: vi.fn(),
+    findTopicModelCursor: vi.fn(),
     findSeedTopicRows: vi.fn(),
     findProjectsWithTopicsPage: vi.fn(),
     findEligibleProjectsPage: async ({ afterId, take }) => {

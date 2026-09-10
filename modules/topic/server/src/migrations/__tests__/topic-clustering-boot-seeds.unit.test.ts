@@ -17,12 +17,12 @@ import type { TopicClusteringRepository } from "../../repositories/topic-cluster
 
 function fakeRepository() {
   const repository = {
-    tryFindProject: vi.fn(),
+    findProject: vi.fn(),
     findTopicIndexRows: vi.fn(),
     findModelTopics: vi.fn(),
     findModelSubtopics: vi.fn(),
     recordClusteringCost: vi.fn(),
-    tryFindTopicModelCursor: vi.fn(),
+    findTopicModelCursor: vi.fn(),
     findSeedTopicRows: vi.fn(),
     findProjectsWithTopicsPage: vi.fn().mockResolvedValue([]),
     findEligibleProjectsPage: vi.fn().mockResolvedValue([]),

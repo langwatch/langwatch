@@ -176,7 +176,7 @@ export const clusterTopicsForProject = async (
     runContext?: ClusteringRunContext;
   },
 ): Promise<ClusteringPageOutcome> => {
-  const project = await deps.repository.tryFindProject(projectId);
+  const project = await deps.repository.findProject(projectId);
   if (!project) {
     throw new Error("Project not found");
   }

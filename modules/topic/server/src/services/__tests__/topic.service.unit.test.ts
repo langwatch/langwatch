@@ -67,7 +67,7 @@ class FakeTopicRepository implements TopicRepository {
 }
 
 class FakeTopicSchedule extends TopicClusteringSchedulePort {
-  tryGetNextWakeAt(): Promise<Instant | null> {
+  findNextWakeAt(): Promise<Instant | null> {
     return Promise.resolve(Temporal.Instant.fromEpochMilliseconds(200));
   }
 }

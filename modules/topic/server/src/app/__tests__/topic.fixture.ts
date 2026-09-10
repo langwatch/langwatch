@@ -11,7 +11,7 @@ export class UnscheduledTopicClustering extends TopicClusteringSchedulePort {
     super();
   }
 
-  tryGetNextWakeAt(): Promise<Instant | null> {
+  findNextWakeAt(): Promise<Instant | null> {
     return Promise.resolve(this.nextWakeAt);
   }
 }

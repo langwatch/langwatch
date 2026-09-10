@@ -12,6 +12,8 @@ export {
 export { TopicClusteringProcessingProducerAdapter } from "./adapters/topic-clustering-processing-producer.adapter.ts";
 export { TopicApp, type TopicInfrastructure } from "./app/topic.app.ts";
 export { topicServer } from "./topic.server.ts";
+export { topicRepositories } from "./repositories/topic-repositories.registry.ts";
+export type { TopicRepositories } from "./repositories/topic.repositories.ts";
 export {
   TopicServerInstallerAdapter,
   type TopicClusteringExecutionDependencies,

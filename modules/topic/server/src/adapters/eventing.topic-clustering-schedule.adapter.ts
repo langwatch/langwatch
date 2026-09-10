@@ -13,7 +13,7 @@ export class EventingTopicClusteringScheduleAdapter extends TopicClusteringSched
     super();
   }
 
-  async tryGetNextWakeAt(input: { projectId: string }): Promise<Instant | null> {
+  async findNextWakeAt(input: { projectId: string }): Promise<Instant | null> {
     const instance = await this.processStore.findByRef({
       ref: {
         processName: TOPIC_CLUSTERING_PROCESS_NAME,

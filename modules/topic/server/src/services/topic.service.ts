@@ -40,7 +40,7 @@ export class TopicService {
     const parsed = topicProjectInputSchema.parse(input);
     const [result, nextWakeAt] = await Promise.all([
       this.repository.findClusteringStatus(parsed),
-      this.schedule.tryGetNextWakeAt(parsed),
+      this.schedule.findNextWakeAt(parsed),
     ]);
     const { projection } = result;
     const lastRequestedAt = projection?.lastRequestedAt ?? null;

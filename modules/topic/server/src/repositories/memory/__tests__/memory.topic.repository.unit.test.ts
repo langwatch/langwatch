@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MemoryTopicRepository, type MemoryTopicProject } from "../memory.topic.repository.ts";
+import { MemoryTopicRepository } from "../memory.topic.repository.ts";
+import { TopicMemoryStore, type MemoryTopicProject } from "../topic-memory.store.ts";
 
 const PROJECT_ID = "project-1";
 
@@ -9,7 +10,7 @@ const topics = [
 ];
 
 function repository(project: Partial<MemoryTopicProject> = {}) {
-  return MemoryTopicRepository.create(
+  const store = TopicMemoryStore.create(
     new Map([
       [
         PROJECT_ID,
@@ -21,6 +22,8 @@ function repository(project: Partial<MemoryTopicProject> = {}) {
       ],
     ]),
   );
+
+  return MemoryTopicRepository.create(store);
 }
 
 describe("MemoryTopicRepository", () => {
