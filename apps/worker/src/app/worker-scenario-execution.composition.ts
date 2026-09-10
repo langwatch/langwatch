@@ -20,7 +20,9 @@ import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
-import { ScenarioService } from "@langwatch/scenario-server";
+import { ScenarioService
+  type ScenarioAppInfrastructure,
+} from "@langwatch/scenario-server";
 import { PromptApi } from "@langwatch/prompt-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
@@ -212,6 +214,8 @@ export type WorkerScenarioPrefetcherPrerequisites = Pick<
 /** Shared services used by ScenarioApp and run execution. */
 export interface WorkerScenarioGraph {
   scenarios: ScenarioService;
+  /** The id, clock and cipher ports the scenario module boots with in this process. */
+  scenarioPorts: Pick<ScenarioAppInfrastructure, "ids" | "testSuiteIds" | "clock" | "secretCipher">;
   prompts: PromptService;
   suites: SuiteApi;
   workflows: WorkflowService;
@@ -234,13 +238,16 @@ export async function createWorkerScenarioExecutionGraph(input: {
   const encryption = AesGcmSecretEncryptionAdapter.create({ key: deps.encryptionKey });
   const secretCipher = new WorkerScenarioSecretCipher(encryption);
 
-  const scenarios = ScenarioService.create({
-    repository: PostgresScenarioRepositories.create({ prisma }).scenarios,
-    simulations,
+  const scenarioPorts = {
     ids: new KsuidScenarioId(),
     testSuiteIds: new NanoidScenarioTestSuiteId(),
     clock: new SystemScenarioClock(),
     secretCipher,
+  };
+  const scenarios = ScenarioService.create({
+    repository: PostgresScenarioRepositories.create({ prisma }).scenarios,
+    simulations,
+    ...scenarioPorts,
   });
 
   const prompts = PostgresPromptAdapter.create({
@@ -319,7 +326,17 @@ export async function createWorkerScenarioExecutionGraph(input: {
     traces: input.traces,
   });
 
-  return { scenarios, prompts, suites, workflows, datasets, nlpRuntime, secrets, prefetcher };
+  return {
+    scenarios,
+    scenarioPorts,
+    prompts,
+    suites,
+    workflows,
+    datasets,
+    nlpRuntime,
+    secrets,
+    prefetcher,
+  };
 }
 
 /**

@@ -1,20 +1,21 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { AgentApi, MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
 import { BroadcastAdapter } from "@langwatch/presence-server";
-import { LocalFeatureApis, type ResourceScope } from "@langwatch/runtime-composition";
+import { createApp, LocalFeatureApis, type ResourceScope } from "@langwatch/runtime-composition";
 import { ScenarioApi, type SimulationService } from "@langwatch/scenario-contract";
 import {
   AgentTestService,
   RedisScenarioTabStoreAdapter,
   ResultAtomsClickHouseAdapter,
   RunConfigurationsClickHouseAdapter,
-  ScenarioApp,
+  scenarioServer,
   ScenarioTabRegistryService,
   SerializedAgentRegistryAdapter,
   type ScenarioExecutionPoolService,
 } from "@langwatch/scenario-server";
 import { nowInstant, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
+import { UserApi } from "@langwatch/user-contract";
 import {
   ModelProviderWorkflowStudioDslAdapter,
   WorkflowAgentMappingAdapter,
@@ -73,37 +74,45 @@ export async function createWorkerAgentApps(options: {
     nlpServiceUrl: prerequisites.nlpServiceUrl,
     legacyDefaultModel: prerequisites.config.infrastructure.execution.defaultModel,
   };
-  const scenarios = ScenarioApp.create({
-    scenarios: graph.scenarios,
-    simulations,
-    scenarioExecution: execution.execution,
-    agentTesting: AgentTestService.create({
-      agents,
-      projects: foundation.tenancy.projects,
-      workflows: graph.workflows,
-      prompts: graph.prompts,
-      secrets: graph.secrets,
-      modelProviders: prerequisites.modelProviders,
-      simulations,
-      config,
-      agentAdapters: SerializedAgentRegistryAdapter.create(),
-      maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
-    }),
-    scenarioTabs: ScenarioTabRegistryService.create({
-      store: RedisScenarioTabStoreAdapter.create(prerequisites.redis),
-      clock: { now: () => toDate(nowInstant()) },
-    }),
-    users: foundation.users,
-    broadcast,
-    resultAtoms: ResultAtomsClickHouseAdapter.create({
-      prisma: database,
-      resolveClient: options.resolveClickHouseClient,
-    }),
-    runConfigurations: RunConfigurationsClickHouseAdapter.create({
-      prisma: database,
-      resolveClient: options.resolveClickHouseClient,
-    }),
-  });
+  const scenarioRuntime = await createApp({ name: "langwatch-worker-scenario" })
+    .withPersistence("postgres", { prisma: database })
+    .withInfrastructure({})
+    .withProvided(UserApi, foundation.users)
+    .withModule(scenarioServer, {
+      infrastructure: {
+        ...graph.scenarioPorts,
+        simulations,
+        scenarioExecution: execution.execution,
+        agentTesting: AgentTestService.create({
+          agents,
+          projects: foundation.tenancy.projects,
+          workflows: graph.workflows,
+          prompts: graph.prompts,
+          secrets: graph.secrets,
+          modelProviders: prerequisites.modelProviders,
+          simulations,
+          config,
+          agentAdapters: SerializedAgentRegistryAdapter.create(),
+          maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
+        }),
+        scenarioTabs: ScenarioTabRegistryService.create({
+          store: RedisScenarioTabStoreAdapter.create(prerequisites.redis),
+          clock: { now: () => toDate(nowInstant()) },
+        }),
+        broadcast,
+        resultAtoms: ResultAtomsClickHouseAdapter.create({
+          prisma: database,
+          resolveClient: options.resolveClickHouseClient,
+        }),
+        runConfigurations: RunConfigurationsClickHouseAdapter.create({
+          prisma: database,
+          resolveClient: options.resolveClickHouseClient,
+        }),
+      },
+    })
+    .boot({ role: "worker" });
+  resources.own("worker scenario module", () => scenarioRuntime.stop());
+  const scenarios = scenarioRuntime.module(scenarioServer).provided;
   const evaluators = await installWorkerEvaluator({
     database,
     permissions: foundation.tenancy.authorization,
