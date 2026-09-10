@@ -405,11 +405,62 @@ export async function thenTheyCanSeeTheTranscript(page: Page) {
   await expect(page.getByTestId("run-drawer-conversation-body")).toBeVisible();
 }
 
-/** Then they can listen to the whole call. */
+/** How long to keep retrying a `404` while the provider finishes publishing the recording. */
+const WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS = 120_000;
+
+/** Delay between polls of the whole-call audio endpoint. */
+const WHOLE_CALL_AUDIO_POLL_INTERVAL_MS = 5_000;
+
+/**
+ * Then they can listen to the whole call.
+ *
+ * `WholeCallAudio` renders its `<audio>` element with `preload="none"`, so
+ * the browser never requests the recording until a user presses play. That
+ * means `onError` never fires and the `run-call-audio-unavailable` fallback
+ * never appears just because the element is on the page — the previous form
+ * of this step, which only asserted visibility, passed for every run,
+ * including ones whose recording endpoint returned a 404 and had no audio
+ * at all. Visibility is still a legitimate precondition, but proving they
+ * can actually listen requires fetching the `src` the play button would
+ * hit and checking it is real, playable audio.
+ *
+ * The provider publishes whole-call audio asynchronously, only once it has
+ * finished processing the recording after the call ends. A `404` seen right
+ * after a run settles is therefore expected and transient — it is the same
+ * condition the `run-call-audio-retry` control in `WholeCallAudio.tsx` exists
+ * to handle — so this step polls the endpoint the way a user pressing retry
+ * would, bounded at `WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS`. Only a `404` is
+ * retried: any other non-200 status is a genuine failure and fails the step
+ * immediately rather than being retried until the deadline.
+ */
 export async function thenTheyCanListenToTheWholeCall(page: Page) {
-  await expect(page.getByTestId("run-call-audio")).toBeVisible({
-    timeout: CALL_VERDICT_TIMEOUT_MS,
-  });
+  const audio = page.getByTestId("run-call-audio");
+  await expect(audio).toBeVisible({ timeout: CALL_VERDICT_TIMEOUT_MS });
+
+  const src = await audio.getAttribute("src");
+  expect(src, "run-call-audio has no src").toBeTruthy();
+  const audioUrl = new URL(src!, page.url()).toString();
+
+  // `page.request.get` carries the browser's session cookies, so this hits
+  // the same authenticated endpoint the user's play button would.
+  const deadline = Date.now() + WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS;
+  let response = await page.request.get(audioUrl);
+  while (response.status() === 404 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, WHOLE_CALL_AUDIO_POLL_INTERVAL_MS));
+    response = await page.request.get(audioUrl);
+  }
+  if (response.status() === 404) {
+    throw new Error(
+      `whole-call recording never became available within ${WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS}ms (last status: 404)`,
+    );
+  }
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toMatch(/audio\//);
+
+  // Read the actual byte length rather than trusting `content-length`,
+  // which may be absent on a streamed response.
+  const body = await response.body();
+  expect(body.byteLength).toBeGreaterThanOrEqual(1000);
 }
 
 /** Then they can listen to each part of the conversation. */
@@ -432,8 +483,25 @@ export async function thenTheyCanReachThreadsAndTraces(page: Page) {
 }
 
 /**
+ * The traces explorer URL that `whenTheyFollowTheTracesLink` last settled on,
+ * including the `#all-traces?q=scenarioRun:"<id>"` hash. `reopenTheOneTrace`
+ * restores this exact URL if a later step's `Escape` pops the app back to
+ * Agent Testing, since a hand-built URL could silently drop the
+ * `scenarioRun` filter and make the one-trace assertion vacuous — only a URL
+ * the app itself produced is trustworthy here.
+ */
+let lastTracesExplorerUrl: string | undefined;
+
+/**
  * When they follow the traces link: "View in Traces Explorer" pushes
  * /<slug>/traces#all-traces?q=scenarioRun:"<id>".
+ *
+ * The URL poll only proves the address bar changed, not that the traces
+ * explorer actually rendered — the run drawer is a dialog that can still be
+ * open and covering the page at that instant. So this also waits for the
+ * trace table itself (`tbody[data-trace-id]`) to attach before recording the
+ * settled URL, matching the 60s ingestion-lag timeout used elsewhere for the
+ * same table.
  */
 export async function whenTheyFollowTheTracesLink(page: Page) {
   await page.getByRole("button", { name: /more actions/i }).click();
@@ -441,6 +509,10 @@ export async function whenTheyFollowTheTracesLink(page: Page) {
   await expect
     .poll(() => page.url(), { timeout: 15_000 })
     .toMatch(/\/traces#all-traces\?q=scenarioRun/);
+  await expect(page.locator("tbody[data-trace-id]").first()).toBeAttached({
+    timeout: 60_000,
+  });
+  lastTracesExplorerUrl = page.url();
 }
 
 /**
@@ -454,11 +526,139 @@ export async function whenTheyFollowTheTracesLink(page: Page) {
  */
 export async function thenTheCallIsOneTrace(page: Page) {
   const traceRows = page.locator("tbody[data-trace-id]");
+  // The traces explorer first renders the project's unfiltered trace list,
+  // then applies the `q=scenarioRun:"<id>"` filter from the URL hash once it
+  // round-trips to the trace store. Polling `toBeGreaterThan(0)` before
+  // asserting `toBe(1)` is racy: the unfiltered list satisfies the first poll
+  // immediately, so the hard assertion then runs against the pre-filter
+  // render. Poll straight to `toBe(1)` instead, so the assertion only passes
+  // once the filtered count actually settles. This stays non-vacuous: a call
+  // that fans out into several traces settles at 2+ and never reaches 1, and
+  // a filter that matches nothing stays at 0 — both still fail correctly.
+  // A 60s timeout gives ingestion time to lag a just-finished call.
   await expect
-    .poll(async () => traceRows.count(), { timeout: 30_000 })
-    .toBeGreaterThan(0);
-  // One trace for the whole call: exactly one tbody under the filter.
-  expect(await traceRows.count()).toBe(1);
+    .poll(async () => traceRows.count(), {
+      timeout: 60_000,
+      message: "expected exactly one trace under the scenarioRun filter",
+    })
+    .toBe(1);
+}
+
+/**
+ * Switch the open trace drawer to the "Trace" view, where the span waterfall
+ * (`data-testid="waterfall-row"`) renders. No-op if a waterfall row is
+ * already visible, since callers that arrive here after another view has
+ * already switched (audio-then-metadata in the ElevenLabs journey, metadata
+ * only in the Twilio journey) must not depend on step order. Anchored regex
+ * so the click can't accidentally match "Conversation" or the header's
+ * "Copy trace ID" / "Share trace" / "Refresh trace" buttons.
+ *
+ * Takes `page` rather than a `Locator` and derives the dialog itself, because
+ * the drawer can close or re-render between steps: the switcher-button wait
+ * uses a short timeout, and if it fails this calls `reopenTheOneTrace` once
+ * and retries the wait-and-click a single time. One recovery attempt is
+ * enough — a second failure surfaces as a real error rather than hanging
+ * behind further retries.
+ */
+async function showTraceWaterfall(page: Page) {
+  const dialog = page.getByRole("dialog");
+  const alreadyOnWaterfall = await dialog
+    .getByTestId("waterfall-row")
+    .first()
+    .isVisible()
+    .catch(() => false);
+  if (alreadyOnWaterfall) return;
+
+  const switcher = dialog.getByRole("button", { name: /^Trace\b/ });
+  try {
+    await expect(switcher).toBeVisible({ timeout: 5_000 });
+  } catch {
+    await reopenTheOneTrace(page);
+    await expect(switcher).toBeVisible({ timeout: 5_000 });
+  }
+  await switcher.click();
+}
+
+/**
+ * Switch the open trace drawer to the "Conversation" view, where the span
+ * content is walked directly by `collectMediaParts`
+ * (`src/features/traces-v2/components/TraceDrawer/transcript/parsing.ts`)
+ * and playable audio (`data-testid="media-part-audio"`) renders. No-op if
+ * the media strip is already visible — for this view, that element is
+ * exactly what callers assert on next, so "already visible" is a legitimate
+ * fast path rather than a claim about anything else. Anchored regex so the
+ * click can't accidentally match "Conversation" prefixes elsewhere or other
+ * buttons.
+ *
+ * Takes `page` rather than a `Locator` and derives the dialog itself, for the
+ * same reason as `showTraceWaterfall`: the drawer can vanish or re-render
+ * mid-interaction, so the switcher-button wait gets one `reopenTheOneTrace`
+ * recovery attempt before a second failure is allowed to surface as a real
+ * error.
+ */
+async function showTraceConversation(page: Page) {
+  const dialog = page.getByRole("dialog");
+  const alreadyOnConversation = await dialog
+    .getByTestId("media-part-audio")
+    .first()
+    .isVisible()
+    .catch(() => false);
+  if (alreadyOnConversation) return;
+
+  const switcher = dialog.getByRole("button", { name: /^Conversation\b/ });
+  try {
+    await expect(switcher).toBeVisible({ timeout: 5_000 });
+  } catch {
+    await reopenTheOneTrace(page);
+    await expect(switcher).toBeVisible({ timeout: 5_000 });
+  }
+  await switcher.click();
+}
+
+/**
+ * Dismiss whatever drawer a previous step left behind, if any, and open the
+ * single filtered trace fresh. The two journeys visit these steps in
+ * different orders, and a drawer a prior assertion opened is not reliable
+ * state to inherit — it can already be gone by the time the next step runs.
+ * So this never trusts leftover drawer state: it closes whatever dialog is
+ * currently open (tolerating the case where nothing is), then clicks the
+ * trace row to open a fresh one.
+ */
+async function reopenTheOneTrace(page: Page) {
+  const dialog = page.getByRole("dialog");
+  if (await dialog.isVisible().catch(() => false)) {
+    await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+  }
+
+  // The run drawer is route-driven, not a plain overlay: closing it with
+  // `Escape` above pops the app back to the Agent Testing route (the
+  // scenarios list), discarding the traces explorer URL entirely. Check the
+  // route AFTER the `Escape`, since the `Escape` is what can cause the
+  // navigation, and restore the URL `whenTheyFollowTheTracesLink` recorded if
+  // the app has left the traces explorer. Restoring at most once keeps this
+  // from masking a genuinely broken navigation loop.
+  if (!/\/traces#all-traces\?q=scenarioRun/.test(page.url())) {
+    if (!lastTracesExplorerUrl) {
+      throw new Error(
+        "reopenTheOneTrace: left the traces explorer and no traces URL was recorded to return to"
+      );
+    }
+    await page.goto(lastTracesExplorerUrl);
+  }
+
+  // The traces explorer first renders the project's unfiltered trace list,
+  // then applies the `q=scenarioRun:"<id>"` filter from the URL hash once it
+  // round-trips to the trace store (see `thenTheCallIsOneTrace`). The
+  // ElevenLabs journey reaches this step without a prior `toBe(1)` settling
+  // assertion, so this helper cannot assume the filtered row is already on
+  // screen — it must wait for the row itself, not just find it. A 60s
+  // timeout matches the ingestion-lag rationale on `thenTheCallIsOneTrace`.
+  const traceRow = page.locator("tbody[data-trace-id]").first();
+  await expect(traceRow).toBeVisible({ timeout: 60_000 });
+  await traceRow.click();
+
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
 }
 
 /**
@@ -467,21 +667,31 @@ export async function thenTheCallIsOneTrace(page: Page) {
  * openDrawer("traceV2Details", ...) (TraceLensBody.tsx:242,
  * useOpenTraceDrawer.ts:227), which writes drawer.open/drawer.traceId into
  * the URL query rather than pushing a route, so the observable effect is the
- * drawer (Chakra Drawer.Content, role="dialog") appearing with its default
- * "waterfall" tab (drawerStore.ts:352) already showing span rows. Idempotent:
- * a no-op if the drawer is already open.
+ * drawer (Chakra Drawer.Content, role="dialog") appearing. It opens on the
+ * "Summary" view (drawerStore.ts:352), not the waterfall — the waterfall
+ * span rows live behind the "Trace" view-switcher button inside the dialog.
+ * The dialog-open check short-circuits on repeat calls, but the view switch
+ * must run every time regardless: step order differs between the phone and
+ * ElevenLabs journeys, so a prior step (e.g. the audio step, which needs
+ * Summary) may have left the drawer on a different view than this call
+ * needs.
  */
 async function openTheOneTrace(page: Page) {
   const dialog = page.getByRole("dialog");
-  if (await dialog.isVisible().catch(() => false)) return;
+  if (!(await dialog.isVisible().catch(() => false))) {
+    const traceRow = page.locator("tbody[data-trace-id]").first();
+    await expect(traceRow).toBeVisible({ timeout: 30_000 });
+    await traceRow.click();
 
-  const traceRow = page.locator("tbody[data-trace-id]").first();
-  await expect(traceRow).toBeVisible({ timeout: 30_000 });
-  await traceRow.click();
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
+  }
 
-  await expect(dialog).toBeVisible({ timeout: 15_000 });
+  await showTraceWaterfall(page);
+
+  // Longer timeout than the dialog wait above: the span tree fetches after
+  // the view switch.
   await expect(dialog.getByTestId("waterfall-row").first()).toBeVisible({
-    timeout: 15_000,
+    timeout: 30_000,
   });
 }
 
@@ -513,11 +723,20 @@ async function ensureAttributesSectionOpen(dialog: Locator) {
  * every row — the row's visible name is not guaranteed to expose the span
  * kind, so a name match is a fast path, not the only path. Returns whether a
  * row exposing the attribute was found and left selected/open.
+ *
+ * Switches to the "Trace" view itself rather than trusting the drawer's
+ * current state: callers run after other steps whose order varies by
+ * journey (the ElevenLabs journey checks audio, which needs "Summary",
+ * before metadata, which needs this), so the waterfall may not be showing.
+ * Uses the resilient `showTraceWaterfall(page)` so a drawer that vanished or
+ * re-rendered between steps gets re-established before the rows are waited
+ * on, rather than timing out against a dialog that is no longer there.
  */
 async function selectSpanExposingAttribute(
   page: Page,
   { nameMatch, attributeText }: { nameMatch: RegExp; attributeText: string | RegExp },
 ): Promise<boolean> {
+  await showTraceWaterfall(page);
   const dialog = page.getByRole("dialog");
   const rows = dialog.getByTestId("waterfall-row");
   await expect(rows.first()).toBeVisible({ timeout: 15_000 });
@@ -544,16 +763,39 @@ async function selectSpanExposingAttribute(
 }
 
 /**
- * Then the traces carry the audio and they can listen to it there: opening
- * the trace's summary accordion renders SummaryMediaStrip → TraceMediaPart →
- * MediaPart, which emits `<audio data-testid="media-part-audio">`
- * (TraceSummaryAccordions.tsx:336) — the same testid the run drawer uses, so
- * the locator is scoped to the trace drawer to avoid matching the run drawer
- * behind it.
+ * Then the traces carry the audio and they can listen to it there. The call
+ * audio really is present in the span data, as chat-message file parts
+ * shaped `{"type":"file","mediaType":"audio/pcm16","data":"<base64>"}`
+ * inside `langwatch.input` / `langwatch.output`, and `audio/pcm16` is
+ * WAV-wrapped for real playback (`pcmToWav.ts:129-161`), so it is genuinely
+ * listenable.
+ *
+ * This asserts against the "Conversation" view rather than "Summary". The
+ * Summary strip is fed from a compact ingest-time reference cache, and
+ * `collectMediaRefs` (`src/shared/traces/media-refs.ts:103-131`) keeps a
+ * part only when its resolved source is a stored-object URL — inline base64
+ * audio is dropped by design there, to avoid re-bloating summary rows. That
+ * is deliberate product policy, not a bug to work around from this test. The
+ * "Conversation" view instead walks the span content directly via
+ * `collectMediaParts`
+ * (`src/features/traces-v2/components/TraceDrawer/transcript/parsing.ts`)
+ * and genuinely renders the playable audio, so it is the honest surface for
+ * this contract.
+ *
+ * This step must not depend on the drawer's previous state at all: a
+ * Playwright snapshot taken the moment this step once failed showed no
+ * dialog anywhere on the page, because a drawer a prior assertion had left
+ * open was already gone by the time this step ran. So this calls
+ * `reopenTheOneTrace` to establish a known-good drawer fresh, rather than
+ * trusting whatever `openTheOneTrace` or an earlier step left behind, then
+ * switches to "Conversation" before asserting on the audio element.
  */
 export async function thenTheTracesCarryTheAudio(page: Page) {
-  await openTheOneTrace(page);
-  const audio = page.getByRole("dialog").getByTestId("media-part-audio");
+  await reopenTheOneTrace(page);
+  await showTraceConversation(page);
+
+  const dialog = page.getByRole("dialog");
+  const audio = dialog.getByTestId("media-part-audio");
   await expect(audio.first()).toBeVisible({ timeout: 30_000 });
 }
 
