@@ -46,7 +46,13 @@ beforeEach(() => {
   vi.doMock("~/server/app-layer/app", () => ({
     getApp: () => ({
       governance: {
-        ocsfEvents: { insertEvent: async (row: unknown) => ocsfInsert(row) },
+        ocsfEvents: {
+          // The worker writes a page as one insert; the spy sees each row so
+          // the per-row assertions below stay about rows, not batching.
+          insertEvents: async (rows: unknown[]) => {
+            for (const row of rows) ocsfInsert(row);
+          },
+        },
       },
     }),
   }));

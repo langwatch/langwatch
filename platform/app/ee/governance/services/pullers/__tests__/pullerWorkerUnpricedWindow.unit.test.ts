@@ -38,7 +38,11 @@ vi.mock("~/server/db", () => ({
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     governance: {
-      ocsfEvents: { insertEvent: (...a: unknown[]) => insertEvent(...a) },
+      ocsfEvents: {
+        insertEvents: (rows: unknown[]) => {
+          for (const row of rows) insertEvent(row);
+        },
+      },
     },
   }),
 }));
