@@ -12,7 +12,7 @@ export type WorkflowPrismaDatabase = WorkflowDatabase &
   WorkflowProjectEnvironmentDatabase;
 
 /**
- * The "postgres" tier: the graph, the copy row and the project environment,
+ * The live tier: the graph, the copy row and the project environment,
  * all through the process's one Prisma client.
  */
 export class PostgresWorkflowRepositories {

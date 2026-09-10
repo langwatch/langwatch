@@ -4,6 +4,6 @@ import { MemoryEvaluationRepositories } from "./memory/memory.evaluation.reposit
 import { PostgresEvaluationRepositories } from "./prisma/prisma.evaluation.repositories.ts";
 
 export const evaluationRepositories = defineRepositories({
-  postgres: PostgresEvaluationRepositories,
+  live: PostgresEvaluationRepositories,
   memory: MemoryEvaluationRepositories,
 });

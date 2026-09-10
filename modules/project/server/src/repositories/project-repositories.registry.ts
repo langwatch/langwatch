@@ -3,6 +3,6 @@ import { MemoryProjectRepositories } from "./memory/memory.project.repositories.
 import { PostgresProjectRepositories } from "./prisma/prisma.project.repositories.ts";
 
 export const projectRepositories = defineRepositories({
-  postgres: PostgresProjectRepositories,
+  live: PostgresProjectRepositories,
   memory: MemoryProjectRepositories,
 });

@@ -3,6 +3,6 @@ import { MemoryDataPrivacyRepositories } from "./memory/memory.data-privacy.repo
 import { PostgresDataPrivacyRepositories } from "./prisma/prisma.data-privacy.repositories.ts";
 
 export const dataPrivacyRepositories = defineRepositories({
-  postgres: PostgresDataPrivacyRepositories,
+  live: PostgresDataPrivacyRepositories,
   memory: MemoryDataPrivacyRepositories,
 });

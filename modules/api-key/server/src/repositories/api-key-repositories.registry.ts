@@ -4,6 +4,6 @@ import { PostgresApiKeyRepositories } from "./prisma/prisma.api-key.repositories
 
 /** Which backing the API-key aggregate is read through, chosen once at boot. */
 export const apiKeyRepositories = defineRepositories({
-  postgres: PostgresApiKeyRepositories,
+  live: PostgresApiKeyRepositories,
   memory: MemoryApiKeyRepositories,
 });

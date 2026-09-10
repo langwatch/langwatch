@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { AdminWorkspaceViewAuditRepository } from "./audit/admin-workspace-view-audit.repository.ts";
-import type { AnomalyRulePort } from "./policy/anomaly-rule.repository.ts";
-import type { DepartmentPort } from "./directory/department.repository.ts";
+import type { AnomalyRuleRepository } from "./policy/anomaly-rule.repository.ts";
+import type { DepartmentRepository } from "./directory/department.repository.ts";
 import type { GovernanceDirectory } from "./directory/governance-directory.repository.ts";
 import type { GovernanceOcsfExportRepository } from "./audit/governance-setup-state.repository.ts";
 import type { GovernanceSetupStateRepository } from "./audit/governance-setup-state.repository.ts";
-import type { OrganizationSessionPolicyPort } from "./policy/session-policy.repository.ts";
+import type { OrganizationSessionPolicyRepository } from "./policy/session-policy.repository.ts";
 import type { PersonalVirtualKeyRepository } from "./directory/personal-virtual-key.repository.ts";
-import type { RoutingPolicyPort } from "./policy/routing-policy.repository.ts";
+import type { RoutingPolicyRepository } from "./policy/routing-policy.repository.ts";
 import type { SpendSpikeAnomalyRepository } from "./policy/spend-spike-anomaly.repository.ts";
 import type { OrganizationSupportContactRepository } from "./directory/organization-support-contact.repository.ts";
 
@@ -23,13 +23,13 @@ import type { OrganizationSupportContactRepository } from "./directory/organizat
  */
 export interface GovernanceRepositories {
   readonly adminWorkspaceViewAudit: AdminWorkspaceViewAuditRepository;
-  readonly anomalyRules: AnomalyRulePort;
-  readonly departments: DepartmentPort;
+  readonly anomalyRules: AnomalyRuleRepository;
+  readonly departments: DepartmentRepository;
   readonly directory: GovernanceDirectory;
   readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly personalVirtualKeys: PersonalVirtualKeyRepository;
-  readonly routingPolicies: RoutingPolicyPort;
-  readonly sessionPolicies: OrganizationSessionPolicyPort;
+  readonly routingPolicies: RoutingPolicyRepository;
+  readonly sessionPolicies: OrganizationSessionPolicyRepository;
   readonly setupState: GovernanceSetupStateRepository;
   readonly spendSpikeAnomalies: SpendSpikeAnomalyRepository;
   readonly supportContacts: OrganizationSupportContactRepository;

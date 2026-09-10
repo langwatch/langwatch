@@ -109,7 +109,7 @@ describe("given the memory-backed trace repositories", () => {
   describe("when the postgres tier is selected without its stores", () => {
     it("refuses the selection by naming the infrastructure it needs", () => {
       expect(() =>
-        instantiateRepositories(traceRepositories, { backend: "postgres", infrastructure: {} }),
+        instantiateRepositories(traceRepositories, { backend: "live", infrastructure: {} }),
       ).toThrow(/clickhouse|prisma/);
     });
   });

@@ -8,6 +8,6 @@ import { PostgresModelProviderRepositories } from "./prisma/prisma.model-provide
  * deployment's own cipher, and the row format is shared between processes.
  */
 export const modelProviderRepositories = defineRepositories({
-  postgres: PostgresModelProviderRepositories,
+  live: PostgresModelProviderRepositories,
   memory: MemoryModelProviderRepositories,
 });

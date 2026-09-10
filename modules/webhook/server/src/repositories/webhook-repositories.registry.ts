@@ -3,6 +3,6 @@ import { MemoryWebhookRepositories } from "./memory/memory.webhook.repositories.
 import { PostgresWebhookRepositories } from "./prisma/prisma.webhook.repositories.ts";
 
 export const webhookRepositories = defineRepositories({
-  postgres: PostgresWebhookRepositories,
+  live: PostgresWebhookRepositories,
   memory: MemoryWebhookRepositories,
 });

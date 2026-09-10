@@ -17,7 +17,7 @@ import { TraceListClickHouseRepository } from "../clickhouse/trace-list.reposito
 import { ClickHouseTraceEventPayloadRepository } from "../clickhouse/trace-event-payload.repository.ts";
 
 /**
- * The "postgres" tier. The tier is named for the store every row the module
+ * The live tier. The tier is named for the store every row the module
  * keeps outside ClickHouse lives in; the three projections need the
  * tenant-keyed ClickHouse connection as well, so both are required inputs of
  * the one tier.

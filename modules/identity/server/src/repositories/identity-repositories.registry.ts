@@ -3,6 +3,6 @@ import { MemoryIdentityRepositories } from "./memory/memory.identity.repositorie
 import { PostgresIdentityRepositories } from "./prisma/prisma.identity.repositories.ts";
 
 export const identityRepositories = defineRepositories({
-  postgres: PostgresIdentityRepositories,
+  live: PostgresIdentityRepositories,
   memory: MemoryIdentityRepositories,
 });

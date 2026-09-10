@@ -9,7 +9,7 @@ import { LangyTurnAccessRedisRepository } from "../redis/redis.langy-turn-access
 import { LangyTurnHandoffRedisRepository } from "../redis/redis.langy-turn-handoff.repository.ts";
 
 /**
- * The "postgres" tier. Langy keeps no row of its own in Postgres outside the
+ * The live tier. Langy keeps no row of its own in Postgres outside the
  * event log its fold already owns, so the tier is named for the deployment
  * rather than the store: every row here lives in the process's Redis, and the
  * connection is the tier's one required input.

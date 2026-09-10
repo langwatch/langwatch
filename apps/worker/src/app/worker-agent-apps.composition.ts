@@ -142,7 +142,7 @@ export async function createWorkerAgentApps(options: {
       }),
       agentMappings: WorkflowAgentMappingAdapter.create({ agents }),
       workflowRows: instantiateRepositories(workflowRepositories, {
-        backend: "postgres",
+        backend: "live",
         infrastructure: { prisma: database },
       }).workflowRows,
     },

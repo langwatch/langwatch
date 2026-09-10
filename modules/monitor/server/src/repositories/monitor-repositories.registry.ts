@@ -3,6 +3,6 @@ import { PostgresMonitorRepositories } from "./prisma/prisma.monitor.repositorie
 import { MemoryMonitorRepositories } from "./memory/memory.monitor.repositories.ts";
 
 export const monitorRepositories = defineRepositories({
-  postgres: PostgresMonitorRepositories,
+  live: PostgresMonitorRepositories,
   memory: MemoryMonitorRepositories,
 });

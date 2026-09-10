@@ -3,6 +3,6 @@ import { MemoryNotificationRepositories } from "./memory/memory.notification.rep
 import { PostgresNotificationRepositories } from "./prisma/prisma.notification.repositories.ts";
 
 export const notificationRepositories = defineRepositories({
-  postgres: PostgresNotificationRepositories,
+  live: PostgresNotificationRepositories,
   memory: MemoryNotificationRepositories,
 });

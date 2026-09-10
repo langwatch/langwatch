@@ -3,6 +3,6 @@ import { MemoryEntitlementRepositories } from "./memory/memory.entitlement.repos
 import { PostgresEntitlementRepositories } from "./prisma/prisma.entitlement.repositories.ts";
 
 export const entitlementRepositories = defineRepositories({
-  postgres: PostgresEntitlementRepositories,
+  live: PostgresEntitlementRepositories,
   memory: MemoryEntitlementRepositories,
 });

@@ -21,6 +21,24 @@ export interface MemberSource<Members> {
   close(): Promise<void>;
 }
 
+/**
+ * A process that opens no client.
+ *
+ * Absence of a member is a refusal only when a module actually reads one, and
+ * the eager build already refuses by name. A test that installs modules
+ * reading nothing therefore needs no source at all, and saying so here keeps
+ * `createApp` free of a dependency on the package that builds real clients.
+ */
+export function noMembers<Members>(): MemberSource<Members> {
+  return {
+    order: [],
+    read(name) {
+      throw new Error(`This process opened no clients, so it cannot read the "${name}" member.`);
+    },
+    async close() {},
+  };
+}
+
 /** A member a module declared that this process cannot supply. */
 export class MissingMemberError extends Error {
   constructor(

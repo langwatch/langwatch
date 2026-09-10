@@ -18,7 +18,7 @@ import {
   PrismaSsoConnectionStrandingRepository,
 } from "./prisma.sso-connection-reads.repository.ts";
 
-/** The "postgres" tier: every identity row over the one Prisma client. */
+/** The live tier: every identity row over the one Prisma client. */
 export class PostgresIdentityRepositories {
   static readonly requires = ["prisma"] as const;
 

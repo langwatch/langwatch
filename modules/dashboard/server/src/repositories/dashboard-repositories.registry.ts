@@ -3,6 +3,6 @@ import { MemoryDashboardRepositories } from "./memory/memory.dashboard.repositor
 import { PostgresDashboardRepositories } from "./prisma/prisma.dashboard.repositories.ts";
 
 export const dashboardRepositories = defineRepositories({
-  postgres: PostgresDashboardRepositories,
+  live: PostgresDashboardRepositories,
   memory: MemoryDashboardRepositories,
 });

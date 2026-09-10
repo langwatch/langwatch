@@ -35,6 +35,7 @@ import {
 import {
   buildClaimedMembers,
   membersFor,
+  noMembers,
   type MemberClaim,
   type MemberSource,
 } from "./module-members.ts";
@@ -222,8 +223,13 @@ export interface ApplicationOptions<Members> {
   readonly role: ServerRole;
   /** One slice per module name, for the modules that declared a config. */
   readonly config?: Readonly<Record<string, unknown>>;
-  /** Where the members come from, built by `@langwatch/infrastructure`. */
-  readonly members: MemberSource<Members>;
+  /**
+   * Where the members come from, built by `@langwatch/infrastructure`.
+   *
+   * Omitted, the process opens no client. That is not a quiet downgrade: a
+   * module that reads a member still refuses by name at boot.
+   */
+  readonly members?: MemberSource<Members>;
 }
 
 /** An application with its members named, collecting declarations. */
@@ -237,7 +243,7 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
   constructor(options: ApplicationOptions<Members>, state?: BuilderState<Rest, Trpc>) {
     this.role = options.role;
     this.config = options.config ?? {};
-    this.source = options.members;
+    this.source = options.members ?? noMembers<Members>();
     this.name = options.role;
     this.state = state ?? { features: [], services: [], provisions: [], hosts: {} };
   }

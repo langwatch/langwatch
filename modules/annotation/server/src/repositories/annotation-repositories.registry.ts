@@ -3,6 +3,6 @@ import { PostgresAnnotationRepositories } from "./prisma/prisma.annotation.repos
 import { MemoryAnnotationRepositories } from "./memory/memory.annotation.repositories.ts";
 
 export const annotationRepositories = defineRepositories({
-  postgres: PostgresAnnotationRepositories,
+  live: PostgresAnnotationRepositories,
   memory: MemoryAnnotationRepositories,
 });

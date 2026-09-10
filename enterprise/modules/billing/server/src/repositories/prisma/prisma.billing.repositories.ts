@@ -14,7 +14,7 @@ import { PrismaOrganizationPricingRepository } from "./prisma.organization-prici
 import { PrismaSubscriptionRepository } from "./prisma.subscription.repository.ts";
 
 /**
- * The "postgres" tier: every billing row this module owns, read and written
+ * The live tier: every billing row this module owns, read and written
  * through the one tenant-keyed Prisma client the process holds.
  */
 export class PostgresBillingRepositories {

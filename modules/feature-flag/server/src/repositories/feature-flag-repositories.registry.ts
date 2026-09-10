@@ -3,6 +3,6 @@ import { MemoryFeatureFlagRepositories } from "./memory/memory.feature-flag.repo
 import { PostgresFeatureFlagRepositories } from "./prisma/prisma.feature-flag.repositories.ts";
 
 export const featureFlagRepositories = defineRepositories({
-  postgres: PostgresFeatureFlagRepositories,
+  live: PostgresFeatureFlagRepositories,
   memory: MemoryFeatureFlagRepositories,
 });

@@ -3,6 +3,6 @@ import { PostgresAuditLogRepositories } from "./prisma/prisma.audit-log.reposito
 import { MemoryAuditLogRepositories } from "./memory/memory.audit-log.repositories.ts";
 
 export const auditLogRepositories = defineRepositories({
-  postgres: PostgresAuditLogRepositories,
+  live: PostgresAuditLogRepositories,
   memory: MemoryAuditLogRepositories,
 });

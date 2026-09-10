@@ -3,6 +3,6 @@ import { MemoryOrganizationRepositories } from "./memory/memory.organization.rep
 import { PostgresOrganizationRepositories } from "./prisma/prisma.organization.repositories.ts";
 
 export const organizationRepositories = defineRepositories({
-  postgres: PostgresOrganizationRepositories,
+  live: PostgresOrganizationRepositories,
   memory: MemoryOrganizationRepositories,
 });

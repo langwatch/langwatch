@@ -2,8 +2,8 @@ import { defineRepositories } from "@langwatch/runtime-composition";
 import type {
   LangyFrameDedupRepository,
   LangyResourceLinksRepository,
-  LangyTurnAccessPort,
-  LangyTurnHandoffPort,
+  LangyTurnAccessRepository,
+  LangyTurnHandoffRepository,
 } from "./langy-live-turn.repository.ts";
 import type { LangyLocalPresence } from "./langy-local-presence.repository.ts";
 import type {
@@ -21,8 +21,8 @@ import { PostgresLangyRepositories } from "./prisma/prisma.langy.repositories.ts
  * Redis; the memory tier holds them in a process that does not.
  */
 export interface LangyRepositories {
-  readonly turnAccess: LangyTurnAccessPort;
-  readonly turnHandoff: LangyTurnHandoffPort;
+  readonly turnAccess: LangyTurnAccessRepository;
+  readonly turnHandoff: LangyTurnHandoffRepository;
   readonly frameDedup: LangyFrameDedupRepository;
   readonly resourceLinks: LangyResourceLinksRepository;
   readonly localPresence: LangyLocalPresence;
@@ -35,6 +35,6 @@ export interface LangyRepositories {
 }
 
 export const langyRepositories = defineRepositories({
-  postgres: PostgresLangyRepositories,
+  live: PostgresLangyRepositories,
   memory: MemoryLangyRepositories,
 });

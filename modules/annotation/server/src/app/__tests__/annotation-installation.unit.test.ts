@@ -6,7 +6,7 @@ import {
 import { AuthzApi } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -37,18 +37,13 @@ import {
  * whatever it ends up called.
  */
 function process() {
-  return createApp({
-    role: "api",
-    config: {},
-    repositories: "memory",
-    channels: "memory",
-  })
+  return createApp({ role: "api", config: {} })
     .withProvided(ProjectApi, createAnnotationTestProjects())
     .withProvided(OrganizationApi, createAnnotationTestOrganizations())
     .withProvided(TraceApi, createAnnotationTestTraces())
     .withProvided(UserApi, createAnnotationTestUsers())
     .withProvided(AuthzApi, createAnnotationTestAuthz())
-    .withModules([annotationServer]);
+    .withModules([withMemoryRepositories(annotationServer)]);
 }
 
 const input = {

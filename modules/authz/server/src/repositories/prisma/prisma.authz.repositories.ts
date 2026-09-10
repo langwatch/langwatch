@@ -4,7 +4,7 @@ import { PrismaAuthzBindingRepository } from "./prisma.authz-binding.repository.
 import { PrismaAuthzCutoverRepository } from "./prisma.authz-cutover.repository.ts";
 
 /**
- * The "postgres" tier: the binding facts and the engine cutover state, both
+ * The live tier: the binding facts and the engine cutover state, both
  * read from the process's own client. The grant ledger, its projections and
  * the listing reads are not here yet - they are built by the module's graph
  * builder from the structural database it is handed.

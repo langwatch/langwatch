@@ -4,6 +4,6 @@ import { PostgresScenarioRepositories } from "./prisma/prisma.scenario.repositor
 
 /** Which backing the Scenario aggregate is read through, chosen once at boot. */
 export const scenarioRepositories = defineRepositories({
-  postgres: PostgresScenarioRepositories,
+  live: PostgresScenarioRepositories,
   memory: MemoryScenarioRepositories,
 });

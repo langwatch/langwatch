@@ -6,7 +6,7 @@ import {
 import { PrismaTopicRepository } from "./prisma.topic.repository.ts";
 
 /**
- * The "postgres" tier. Both rows live in the process's Prisma connection, and
+ * The live tier. Both rows live in the process's Prisma connection, and
  * the tier names the delegates it reads rather than the whole client, so the
  * worker's narrowed database satisfies it as the api's full client does.
  */

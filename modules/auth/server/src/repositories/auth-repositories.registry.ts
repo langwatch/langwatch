@@ -8,6 +8,6 @@ import { PostgresAuthRepositories } from "./prisma/prisma.auth.repositories.ts";
  * database, which is how the module's own installation test runs.
  */
 export const authRepositories = defineRepositories({
-  postgres: PostgresAuthRepositories,
+  live: PostgresAuthRepositories,
   memory: MemoryAuthRepositories,
 });

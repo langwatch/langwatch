@@ -1,5 +1,5 @@
 /**
- * The "postgres" tier. Hand-written rather than `prismaRepositories(...)`
+ * The live tier. Hand-written rather than `prismaRepositories(...)`
  * because it spans two stores that coexist rather than compete: Postgres
  * holds the endpoint registry and the retention rows, ClickHouse holds the
  * emitted event envelopes. The tier name is Postgres's because that is the

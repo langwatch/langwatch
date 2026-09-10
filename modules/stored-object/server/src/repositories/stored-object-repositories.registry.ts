@@ -3,6 +3,6 @@ import { MemoryStoredObjectRepositories } from "./memory/memory.stored-object.re
 import { PostgresStoredObjectRepositories } from "./prisma/prisma.stored-object.repositories.ts";
 
 export const storedObjectRepositories = defineRepositories({
-  postgres: PostgresStoredObjectRepositories,
+  live: PostgresStoredObjectRepositories,
   memory: MemoryStoredObjectRepositories,
 });

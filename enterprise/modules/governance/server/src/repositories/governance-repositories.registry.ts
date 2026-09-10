@@ -5,6 +5,6 @@ import { MemoryGovernanceRepositories } from "./memory/memory.governance.reposit
 import { PostgresGovernanceRepositories } from "./prisma/prisma.governance.repositories.ts";
 
 export const governanceRepositories = defineRepositories({
-  postgres: PostgresGovernanceRepositories,
+  live: PostgresGovernanceRepositories,
   memory: MemoryGovernanceRepositories,
 });

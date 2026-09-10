@@ -4,6 +4,6 @@ import { PrismaAgentRepository } from "./prisma/prisma.agent.repository.ts";
 import { MemoryAgentRepositories } from "./memory/memory.agent.repositories.ts";
 
 export const agentRepositories = defineRepositories({
-  postgres: prismaRepositories({ agents: PrismaAgentRepository }),
+  live: prismaRepositories({ agents: PrismaAgentRepository }),
   memory: MemoryAgentRepositories,
 });

@@ -3,6 +3,6 @@ import { MemoryAutomationRepositories } from "./memory/memory.automation.reposit
 import { PostgresAutomationRepositories } from "./prisma/prisma.automation.repositories.ts";
 
 export const automationRepositories = defineRepositories({
-  postgres: PostgresAutomationRepositories,
+  live: PostgresAutomationRepositories,
   memory: MemoryAutomationRepositories,
 });

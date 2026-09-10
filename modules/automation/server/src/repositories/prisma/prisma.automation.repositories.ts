@@ -13,7 +13,7 @@ import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";
 import { PrismaWebhookDeliveryRepository } from "./prisma.webhook-delivery.repository.ts";
 
 /**
- * The "postgres" tier. Every automation row lives in one database, and the
+ * The live tier. Every automation row lives in one database, and the
  * trigger row stamps `lastRunAt` from the process's clock, so the clock is a
  * required input of the tier beside the client.
  */

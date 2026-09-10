@@ -18,6 +18,6 @@ export interface WorkflowRepositories {
 }
 
 export const workflowRepositories = defineRepositories({
-  postgres: PostgresWorkflowRepositories,
+  live: PostgresWorkflowRepositories,
   memory: MemoryWorkflowRepositories,
 });

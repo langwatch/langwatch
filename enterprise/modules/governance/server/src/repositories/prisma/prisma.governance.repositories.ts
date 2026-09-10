@@ -15,7 +15,7 @@ import { PrismaRoutingPolicyRepository } from "./prisma.governance-routing.repos
 import { PrismaSpendSpikeAnomalyRepository } from "./prisma.spend-spike-anomaly.repository.ts";
 
 /**
- * The "postgres" tier: every governance row this module owns, read and
+ * The live tier: every governance row this module owns, read and
  * written through the one tenant-keyed Prisma client the process holds.
  */
 export class PostgresGovernanceRepositories {

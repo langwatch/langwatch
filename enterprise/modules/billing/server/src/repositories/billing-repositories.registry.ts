@@ -5,6 +5,6 @@ import { MemoryBillingRepositories } from "./memory/memory.billing.repositories.
 import { PostgresBillingRepositories } from "./prisma/prisma.billing.repositories.ts";
 
 export const billingRepositories = defineRepositories({
-  postgres: PostgresBillingRepositories,
+  live: PostgresBillingRepositories,
   memory: MemoryBillingRepositories,
 });

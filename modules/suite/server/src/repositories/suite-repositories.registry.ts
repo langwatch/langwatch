@@ -3,6 +3,6 @@ import { MemorySuiteRepositories } from "./memory/memory.suite.repositories.ts";
 import { PostgresSuiteRepositories } from "./prisma/prisma.suite.repositories.ts";
 
 export const suiteRepositories = defineRepositories({
-  postgres: PostgresSuiteRepositories,
+  live: PostgresSuiteRepositories,
   memory: MemorySuiteRepositories,
 });

@@ -3,6 +3,6 @@ import { MemoryDataRetentionRepositories } from "./memory/memory.data-retention.
 import { PostgresDataRetentionRepositories } from "./prisma/prisma.data-retention.repositories.ts";
 
 export const dataRetentionRepositories = defineRepositories({
-  postgres: PostgresDataRetentionRepositories,
+  live: PostgresDataRetentionRepositories,
   memory: MemoryDataRetentionRepositories,
 });

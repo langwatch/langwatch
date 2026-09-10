@@ -133,7 +133,7 @@ describe("given the memory-backed governance repositories", () => {
     it("refuses the selection by naming the infrastructure it needs", () => {
       expect(() =>
         instantiateRepositories(governanceRepositories, {
-          backend: "postgres",
+          backend: "live",
           infrastructure: {},
         }),
       ).toThrow(/prisma/);
