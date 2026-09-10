@@ -57,13 +57,22 @@ type VoiceAgentDraft = {
   phoneNumber: string;
 };
 
+/**
+ * What actually reaches sessionStorage. The phone number is deliberately absent:
+ * it is a personal identifier and CodeQL flags storing it in clear text, so the
+ * draft never persists it. A saved phone target still shows its number on reopen
+ * (that comes from the agent record), so only an unsaved, in-progress number is
+ * lost across the detour to add a key.
+ */
+type PersistedVoiceAgentDraft = Omit<VoiceAgentDraft, "phoneNumber">;
+
 const draftKey = (projectId: string) => `voice-agent-draft:${projectId}`;
 
 function readDraft(projectId: string): VoiceAgentDraft | null {
   try {
     const raw = sessionStorage.getItem(draftKey(projectId));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<VoiceAgentDraft>;
+    const parsed = JSON.parse(raw) as Partial<PersistedVoiceAgentDraft>;
     if (typeof parsed.agentId !== "string" || typeof parsed.name !== "string") {
       return null;
     }
@@ -76,17 +85,23 @@ function readDraft(projectId: string): VoiceAgentDraft | null {
       name: parsed.name,
       transport,
       agentId: parsed.agentId,
-      phoneNumber:
-        typeof parsed.phoneNumber === "string" ? parsed.phoneNumber : "",
+      // Never read from storage: the phone number is not persisted.
+      phoneNumber: "",
     };
   } catch {
     return null;
   }
 }
 
-function writeDraft(projectId: string, draft: VoiceAgentDraft): void {
+function writeDraft(projectId: string, draft: PersistedVoiceAgentDraft): void {
   try {
-    sessionStorage.setItem(draftKey(projectId), JSON.stringify(draft));
+    // Only the non-sensitive fields are stored; phoneNumber is never persisted.
+    const persisted: PersistedVoiceAgentDraft = {
+      name: draft.name,
+      transport: draft.transport,
+      agentId: draft.agentId,
+    };
+    sessionStorage.setItem(draftKey(projectId), JSON.stringify(persisted));
   } catch {
     // sessionStorage may be unavailable (private mode, quota); the draft is a
     // convenience, so a failure to persist is silent.
@@ -335,17 +350,8 @@ function useVoiceFormState({
       name,
       transport,
       agentId: voiceAgentId,
-      phoneNumber,
     });
-  }, [
-    isCreating,
-    isOpen,
-    projectId,
-    name,
-    transport,
-    voiceAgentId,
-    phoneNumber,
-  ]);
+  }, [isCreating, isOpen, projectId, name, transport, voiceAgentId]);
 
   return {
     name,

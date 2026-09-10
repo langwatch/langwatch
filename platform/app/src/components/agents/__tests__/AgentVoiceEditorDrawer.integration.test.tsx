@@ -222,6 +222,38 @@ describe("AgentVoiceEditorDrawer", () => {
         screen.getByRole("option", { name: "Phone number" }),
       ).toBeInTheDocument();
     });
+
+    it("never persists the typed phone number in the sessionStorage draft", async () => {
+      mockPhoneTargetsEnabled = true;
+      const user = userEvent.setup();
+      renderVoiceDrawer();
+      await user.type(
+        await screen.findByTestId("voice-agent-name-input"),
+        "Hotline draft",
+      );
+      await user.selectOptions(
+        screen.getByTestId("voice-agent-transport-select"),
+        "phone",
+      );
+      await user.type(
+        await screen.findByTestId("voice-agent-phone-input"),
+        "+14155550123",
+      );
+
+      await waitFor(() => {
+        expect(
+          sessionStorage.getItem("voice-agent-draft:test-project"),
+        ).not.toBeNull();
+      });
+      const stored = JSON.parse(
+        sessionStorage.getItem("voice-agent-draft:test-project") ?? "{}",
+      ) as Record<string, unknown>;
+      // The sensitive field is stripped; the rest of the draft still persists.
+      expect(stored).not.toHaveProperty("phoneNumber");
+      expect(JSON.stringify(stored)).not.toContain("+14155550123");
+      expect(stored.name).toBe("Hotline draft");
+      expect(stored.transport).toBe("phone");
+    });
   });
 
   describe("when a new voice agent drawer is drawn", () => {
