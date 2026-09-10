@@ -758,7 +758,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
 
   # #8020 AC2
   @unit @regression
-  Scenario: Call it myself still writes and judges a run after 8020
+  Scenario: Call it myself still writes a run under its scenario after 8020
     Given a "Call it myself" finish naming a resolvable scenario id
     When the call is finished
     Then writeCallRun is called with that scenario and its set

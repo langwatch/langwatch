@@ -230,7 +230,6 @@ describe("mintVoiceSession", () => {
   });
 });
 
-
 describe("finishVoiceSession", () => {
   describe("given the voice session ports", () => {
     // A "Call it myself" call names a scenario, so it is written as a run and
@@ -682,7 +681,7 @@ describe("finishVoiceSession", () => {
 
     describe("when the call is scored under a scenario", () => {
       /** @scenario "Call it myself against a scenario and be scored on its criteria" */
-      /** @scenario "Call it myself still writes and judges a run after 8020" */
+      /** @scenario "Call it myself still writes a run under its scenario after 8020" */
       it("writes the run under the scenario and its set so the scenario grades it", async () => {
         const runner = fakeRunner();
         const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(

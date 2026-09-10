@@ -12,7 +12,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { voiceAgentIdentityKey } from "~/server/agents/voice/voice-agent.config";
-import { AgentRepository, type TypedAgent } from "../agent.repository";
+import type { AgentRepository, TypedAgent } from "../agent.repository";
 import { AgentService } from "../agent.service";
 
 const IDENTITY_KEY = voiceAgentIdentityKey({

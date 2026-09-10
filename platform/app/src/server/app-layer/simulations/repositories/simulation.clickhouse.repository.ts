@@ -1,6 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { VOICE_CALL_SCENARIO_SET_ID } from "~/server/agents/voice/voice-agent.config";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { AGENT_TEST_SET_SUFFIX } from "~/server/scenarios/agent-test-scenario";
 import {
   DEFAULT_SET_ID,
@@ -1436,7 +1436,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const wherePredicate =
       filter === "external"
-        ? "AND NOT startsWith(ScenarioSetId, '__internal__')"
+        ? `AND NOT startsWith(ScenarioSetId, '__internal__') ${AGENT_TEST_SET_EXCLUSION}`
         : "AND startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite')";
 
     // External sets normalize empty ScenarioSetId to 'default'
@@ -1650,6 +1650,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId IN ({projectIds:Array(String)})
            AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
+           ${AGENT_TEST_SET_EXCLUSION}
          GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE latestIsActive`,

@@ -175,7 +175,9 @@ export function TraceDrawerContent({
                 // A voice call's caller is a real person: their side reads as
                 // "You", not the "User Simulator" the scenario swap would
                 // otherwise apply (#8020). Stamped by the voice trace writer.
-                isHumanCaller={trace.attributes["voice.call.caller"] === "human"}
+                isHumanCaller={
+                  trace.attributes["voice.call.caller"] === "human"
+                }
               >
                 {/* Conversation view is suppressed for read-only share
                     viewers: it is backed by `tracesV2.list` (disabled without
