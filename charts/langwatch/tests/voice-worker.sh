@@ -30,7 +30,7 @@ fail() {
 }
 
 # autogen generates fresh random Secret values on every render, independent of
-# voice — so a byte-identical comparison must normalise those out first, or
+# voice, so a byte-identical comparison must normalise those out first, or
 # every render pair would "differ" for a reason that has nothing to do with
 # voice. Every such value is a long quoted base64 string; blank them all,
 # consistently, on both sides being compared.

@@ -1093,7 +1093,7 @@ workers:
 # not chart values.
 ## @section Voice worker (opt-in)
 voice:
-  # See workers.otel — named separately so voice worker telemetry is distinguishable.
+  # See workers.otel: named separately so voice worker telemetry is distinguishable.
   ## @extra voice.otel OpenTelemetry identity for the voice worker.
   ## @param voice.otel.serviceName [string, default: langwatch-voice] Service name reported in traces and logs.
   otel:
@@ -1151,11 +1151,11 @@ voice:
   #
   # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must
   # cover the drain plus 5s for App.close, 15s for process teardown and 10s
-  # of kubelet slack — so at least shutdownDrainSeconds + 30. Because it is
+  # of kubelet slack, so at least shutdownDrainSeconds + 30. Because it is
   # set here, raising shutdownDrainSeconds alone always fails the render:
   # raise both together. The chart refuses rather than installing a release
   # the kubelet kills mid-drain. Both must be whole numbers of seconds
-  # greater than zero — a quoted or fractional value is rejected, because
+  # greater than zero: a quoted or fractional value is rejected, because
   # Helm's `int` would silently turn it into a zero budget.
   # See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
   ## @param voice.shutdownDrainSeconds [default: 25] Seconds the voice worker may spend draining in-flight jobs on shutdown.
@@ -1187,7 +1187,7 @@ voice:
 
   # Optional Ingress fronting the WebSocket port. TLS termination and any
   # WebSocket-upgrade timeout annotations your controller needs are left to
-  # you — add them under voice.ingress.annotations.
+  # you: add them under voice.ingress.annotations.
   ## @extra voice.ingress Ingress configuration for the voice worker.
   ## @param voice.ingress.enabled [default: false] Create an Ingress for the voice worker.
   ## @param voice.ingress.className [string] IngressClassName for the voice Ingress.

@@ -1,6 +1,6 @@
 {{- if and .Values.voice.enabled .Values.voice.ingress.enabled }}
 {{- if not .Values.voice.ingress.host }}
-{{- fail "voice.ingress.host is required when voice.ingress.enabled is true — it must match the hostname in voice.publicBaseUrl." }}
+{{- fail "voice.ingress.host is required when voice.ingress.enabled is true: it must match the hostname in voice.publicBaseUrl." }}
 {{- end }}
 {{/* voice.publicBaseUrl is what Twilio actually dials; an Ingress routing a
      different host would never see the WebSocket upgrade at all, and the
@@ -11,7 +11,7 @@
 {{- if .Values.voice.publicBaseUrl }}
 {{- $publicHost := (urlParse .Values.voice.publicBaseUrl).hostname }}
 {{- if ne $publicHost .Values.voice.ingress.host }}
-{{- fail (printf "voice.ingress.host (%q) does not match the hostname in voice.publicBaseUrl (%q) — Twilio dials voice.publicBaseUrl, so the Ingress must route the same host or the call never reaches it." .Values.voice.ingress.host $publicHost) }}
+{{- fail (printf "voice.ingress.host (%q) does not match the hostname in voice.publicBaseUrl (%q). Twilio dials voice.publicBaseUrl, so the Ingress must route the same host or the call never reaches it." .Values.voice.ingress.host $publicHost) }}
 {{- end }}
 {{- end }}
 # Fronts the voice worker's WebSocket port. Twilio Media Streams needs a
