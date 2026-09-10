@@ -263,6 +263,7 @@ function useSpenderRows({
     // A decline is not an outage. Carried apart from `isError` so the panel can
     // show what it holds instead of accusing the read of breaking.
     refused: isRefusedRead(spenders.error),
+    isFetching: spenders.isFetching,
     retry: () => void spenders.refetch(),
   };
 }
@@ -339,7 +340,7 @@ function CostsPage() {
             sourcesConnected={holdsFigures}
             organizationId={organizationId}
             providerDays={providerDays.data?.rows ?? []}
-            providerDaysFailed={providerDays.isError}
+            hasProviderDaysFailure={providerDays.isError}
           />
         </SampleSaidOnce>
       </VStack>
@@ -388,8 +389,16 @@ function useCostScreenReads({
     providerDays,
     breakdowns,
     spenders,
+    // EVERY read the refresh runs, not most of them. `refresh` re-runs the
+    // spender read too, so leaving it out drops `aria-busy` while that one is
+    // still in flight — and a reader who sees the control go quiet with the
+    // panel unchanged clicks it again, which is the thing the busy state is on
+    // the page to prevent.
     busy:
-      summary.isFetching || providerDays.isFetching || breakdowns.isFetching,
+      summary.isFetching ||
+      providerDays.isFetching ||
+      breakdowns.isFetching ||
+      spenders.isFetching,
     refresh: () =>
       refreshEveryRead({ summary, providerDays, spenders, breakdowns }),
   };
@@ -1168,6 +1177,8 @@ interface SpenderReadState {
   isError: boolean;
   /** Declined by the plan gate or a missing grant, rather than broken. */
   refused: boolean;
+  /** Whether it is in flight, for the refresh control. Same reason as the rest. */
+  isFetching: boolean;
   retry: () => void;
 }
 
@@ -1482,7 +1493,7 @@ function CostBreakdowns({
   sourcesConnected: connected,
   organizationId,
   providerDays,
-  providerDaysFailed,
+  hasProviderDaysFailure,
 }: {
   filters: CostFilters;
   breakdowns: Breakdowns;
@@ -1501,7 +1512,7 @@ function CostBreakdowns({
    * and a hidden panel beside filled neighbours reads as no spend — the same
    * confusion `CostPanelUnrefreshed` exists to prevent.
    */
-  providerDaysFailed: boolean;
+  hasProviderDaysFailure: boolean;
 }) {
   const sample = useSampleSeries(periods, filters.interval, filters.department);
   const rows = measuredRows({ breakdowns, filters });
@@ -1521,12 +1532,12 @@ function CostBreakdowns({
           provider axis, and squeezing it into a third of a row would put the
           window's days behind a scrollbar — which is exactly where they were
           before this panel existed. */}
-      {!showSample && providerDaysFailed && (
+      {!showSample && hasProviderDaysFailure && (
         <CostPanel title="Cost by provider and day">
           <CostPanelUnrefreshed />
         </CostPanel>
       )}
-      {!showSample && !providerDaysFailed && providerDays.length > 0 && (
+      {!showSample && !hasProviderDaysFailure && providerDays.length > 0 && (
         <CostPanel title="Cost by provider and day">
           <CostProviderDayPanel
             organizationId={organizationId}

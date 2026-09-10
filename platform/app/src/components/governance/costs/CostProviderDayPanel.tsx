@@ -106,6 +106,17 @@ export function CostProviderDayPanel({
  * A withheld figure renders as an em dash and is still openable: the records
  * are exactly what a reader needs when the total will not state itself, and
  * closing that door would leave them with a blank and no way to look.
+ *
+ * The accessible name carries the provider, the day and what the control does,
+ * because the visible text is the amount alone. A row is a wall of these, two
+ * days at one provider routinely cost the same, and a screen-reader user
+ * moving through them by control would otherwise hear the same name several
+ * times over with nothing saying which day each one opens. `title` cannot fill
+ * that gap: a button with text content takes its name from the content, and
+ * the title becomes a description a reader may never be given.
+ *
+ * A withheld figure says so in words rather than sending an em dash through a
+ * speech synthesiser, which reads it as anything from silence to "dash".
  */
 function ProviderDayFigure({
   day,
@@ -118,11 +129,14 @@ function ProviderDayFigure({
   amountUsd: number | null;
   onOpen: () => void;
 }) {
+  const spoken =
+    amountUsd === null ? "no dollar figure" : formatLaneUsd(amountUsd);
   return (
     <chakra.button
       type="button"
       onClick={onOpen}
       data-testid={`cost-provider-day-${provider}-${day}`}
+      aria-label={`${providerName(provider)}, ${day}, ${spoken}. Show the records behind this day.`}
       title={day}
       borderWidth="1px"
       borderColor="border.subtle"

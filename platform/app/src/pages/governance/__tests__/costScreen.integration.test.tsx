@@ -611,12 +611,20 @@ describe("the governance cost screen", () => {
       expect(readableStrings(euros).join(" ")).toMatch(/40/);
 
       // Nothing on the screen adds the two. 140 is what a rate of exactly one
-      // would produce, and every other rate produces some other single figure
-      // — so the check is that no combined figure of ANY size stands in for
-      // the two lines: the dollar line still reads exactly the dollars.
-      expect(billed.queryByText(/140/)).not.toBeInTheDocument();
-      expect(billed.queryByText("$140.00")).not.toBeInTheDocument();
-      expect(billed.queryByText("$100.00")).toBeInTheDocument();
+      // would produce — but rejecting 140 alone only rules out that one rate,
+      // and a conversion at 1.08 renders $143.20 through the same assertion
+      // untouched. So the lane is read for EVERY money figure standing in it
+      // and the whole list is pinned: one dollar figure, which is the dollars,
+      // and one named-currency figure, which is the euros. A third of any size
+      // fails, whatever rate produced it.
+      const lane = screen.getByTestId("cost-lane-billed");
+      const spoken = lane.textContent ?? "";
+      expect(spoken.match(/-?\$[\d,]+(?:\.\d+)?/g) ?? []).toEqual(["$100.00"]);
+      // No word boundary before the code: the card's text runs together as
+      // `$100.00EUR 40.00`, and a `\b` there never matches.
+      expect(spoken.match(/[A-Z]{3} -?[\d,]+(?:\.\d+)?/g) ?? []).toEqual([
+        "EUR 40.00",
+      ]);
     });
   });
 

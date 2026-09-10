@@ -221,6 +221,42 @@ describe("the cost by provider and day panel", () => {
     });
   });
 
+  describe("given two days at one provider cost exactly the same", () => {
+    beforeEach(() => {
+      harness.providerDays = {
+        data: {
+          rows: PROVIDER_DAY_ROWS.map((row) => ({ ...row, amountUsd: 60 })),
+        },
+        isError: false,
+      };
+    });
+
+    it("still names each day's control apart, rather than repeating one name", () => {
+      renderScreen();
+
+      const region = within(screen.getByLabelText("Cost by provider and day"));
+      const names = region
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label") ?? "");
+
+      // The visible text on both is "$60.00". Reached by control rather than
+      // by eye, identical names leave a reader no way to tell which day they
+      // are about to open.
+      expect(names).toHaveLength(2);
+      expect(new Set(names).size).toBe(2);
+      // The day is the thing that tells them apart, so each name has to carry
+      // its own — a set of two that differ by a stray index would pass the
+      // check above and help nobody.
+      expect(names[0]).toContain("2026-01-15");
+      expect(names[1]).toContain("2026-01-16");
+      // And each still says whose spend it is and what the control does.
+      for (const name of names) {
+        expect(name).toMatch(/records/i);
+        expect(name).toContain("$60.00");
+      }
+    });
+  });
+
   describe("given its read failed while still holding the rows it last returned", () => {
     beforeEach(() => {
       harness.providerDays = {

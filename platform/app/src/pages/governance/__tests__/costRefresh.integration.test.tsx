@@ -41,7 +41,7 @@ const harness = vi.hoisted(() => ({
    */
   reissued: [] as string[],
   /** Whether the reads are currently in flight, for the control's busy state. */
-  fetching: false,
+  isFetching: false,
   /** Procedure paths whose read has failed. */
   failed: [] as string[],
   /** When the summary read's answer arrived, epoch ms. */
@@ -85,7 +85,7 @@ vi.mock("~/utils/api", () => {
         data: isError ? undefined : data,
         isLoading: false,
         isError,
-        isFetching: harness.fetching,
+        isFetching: harness.isFetching,
         dataUpdatedAt: path.endsWith("summary") ? harness.summaryUpdatedAt : 0,
         refetch: () => {
           harness.reissued.push(path);
@@ -147,10 +147,15 @@ vi.mock("~/utils/api", () => {
           unpricedWindow: null,
         }),
         spenders: read("governanceCost.spenders", { rows: [] }),
-        // Not yet implemented: the per-(day, provider) read and the records
-        // behind one of its figures. Declared here so a refresh that forgets
-        // them is caught by the named set below rather than passing.
         dailyByProvider: read("governanceCost.dailyByProvider", { rows: [] }),
+        // `dayRecords` is deliberately NOT in `READS_ON_THE_SCREEN`, and this
+        // mock is what makes that absence enforceable rather than decorative.
+        // The read is issued only once a reader opens a day, so a refresh
+        // re-running it would be work for a panel nobody has opened — and were
+        // the refresh to start doing so, the recorded call would land in
+        // `reissued` and fail the equality below by naming a read the set does
+        // not hold. The direction of the guard is that way round: it catches a
+        // refresh that wrongly INCLUDES this read, not one that omits it.
         dayRecords: read("governanceCost.dayRecords", { records: [] }),
       },
       activityMonitor: {
@@ -215,7 +220,7 @@ const refreshControl = () => screen.getByRole("button", { name: /refresh/i });
 beforeEach(() => {
   harness.reads = [];
   harness.reissued = [];
-  harness.fetching = false;
+  harness.isFetching = false;
   harness.failed = [];
   harness.summaryUpdatedAt = Date.parse("2026-01-15T09:05:00.000Z");
 });
@@ -243,12 +248,12 @@ describe("bringing the cost screen up to date", () => {
 
       // While the reads are in flight the control has to say so, or a reader
       // who sees nothing move clicks it again.
-      harness.fetching = true;
+      harness.isFetching = true;
       cleanup();
       renderScreen();
       expect(refreshControl()).toHaveAttribute("aria-busy", "true");
 
-      harness.fetching = false;
+      harness.isFetching = false;
       cleanup();
       renderScreen();
       expect(refreshControl()).not.toHaveAttribute("aria-busy", "true");
