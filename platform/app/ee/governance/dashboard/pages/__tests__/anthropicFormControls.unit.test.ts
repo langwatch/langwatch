@@ -211,6 +211,44 @@ describe("Anthropic composer controls", () => {
       ).toBeNull();
     });
 
+    // @scenario "Clearing the report to re-pick it does not cost the source its width"
+    it("keeps the width while the report field sits empty between picks", () => {
+      // The report picker keeps an empty entry on purpose, so clearing it is a
+      // state the admin passes through rather than an answer. Reconcile runs on
+      // every keystroke, so a picker that read "not usage" as "retire the
+      // width" would take `1h` away the moment the field went blank — and
+      // choosing usage again would not bring it back.
+      const cleared = reconcileParserValues({
+        sourceType: "anthropic_admin",
+        values: { report: "", bucketWidth: "1h" },
+      });
+
+      expect(cleared.bucketWidth).toBe("1h");
+      expect(
+        selectOptionsFor("bucketWidth", cleared).map((o) => o.value),
+      ).toEqual(["", "1h"]);
+
+      // And it survives the round trip back to usage.
+      expect(
+        reconcileParserValues({
+          sourceType: "anthropic_admin",
+          values: { ...cleared, report: "usage" },
+        }).bucketWidth,
+      ).toBe("1h");
+    });
+
+    // @scenario "Clearing the report to re-pick it does not cost the source its width"
+    it("still refuses to save from the state it is holding the width through", () => {
+      // Retaining the width is a form concern only. An empty report is not a
+      // configuration, and the builder turns it down before it reads a width,
+      // so nothing can reach the adapter from here.
+      expect(
+        buildAnthropicAdminPullConfig(
+          composerWith({ report: "", bucketWidth: "1h" }),
+        ),
+      ).toBeNull();
+    });
+
     // @scenario "The bucket width is daily whichever report is chosen"
     it("refuses a width no version of the form ever offered", () => {
       // Retention reaches only as far as the schema does. A `2h` that arrived

@@ -52,6 +52,21 @@ Feature: Choose Anthropic adapter settings instead of typing them
       # that does nothing, and the builder refuses it anyway.
 
     @unit
+    Scenario: Clearing the report to re-pick it does not cost the source its width
+      Given a usage source was saved with an hourly bucket width
+      When the admin clears the report field before choosing one again
+      Then the hourly width is still offered alongside the daily one
+      And the field still holds hourly
+      # The report picker keeps an empty entry so a cleared field is
+      # refused rather than quietly refilled, which makes "no report yet"
+      # a state the admin passes through on the way to re-picking one.
+      # Only the cost report retires the finer widths; an empty report
+      # has not retired anything, and treating it as if it had would drop
+      # the width mid-gesture -- the same silent migration, by a second
+      # route. The save is refused meanwhile because the report is
+      # required, so nothing can reach the adapter from this state.
+
+    @unit
     Scenario: The report opens on the one almost every organization wants
       When the admin opens the form without touching the report field
       Then the report field holds the cost report

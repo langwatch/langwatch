@@ -2623,9 +2623,13 @@ export type ParserConfigMode = "create" | "edit";
 /**
  * The bucket widths Anthropic's usage report accepts, newest-grained first.
  *
- * Two readers now: `validBucketWidth`, and the picker — which offers daily to
- * everyone and additionally whichever of these a source is already being read
+ * `validBucketWidth` reads it directly. The picker reads it through the type of
+ * `ANTHROPIC_BUCKET_WIDTH_LABELS`, which is keyed off this list: it offers daily
+ * to everyone and additionally whichever of these a source is already being read
  * at, so opening an old source to edit it does not silently move it to daily.
+ * Adding a width here without labelling it there is a build error, which is what
+ * keeps the two from parting company.
+ *
  * The adapter's own `anthropicAdminPullConfigSchema` declares the same domain
  * server-side and `anthropicFormControls.unit.test.ts` asserts the two still
  * agree, which is what keeps this a projection of the schema rather than a
@@ -2633,11 +2637,22 @@ export type ParserConfigMode = "create" | "edit";
  */
 export const ANTHROPIC_BUCKET_WIDTHS = ["1m", "1h", "1d"] as const;
 
-/** What each width in `ANTHROPIC_BUCKET_WIDTHS` is called on the form. */
-const ANTHROPIC_BUCKET_WIDTH_LABELS: Record<string, string> = {
+/**
+ * What each width in `ANTHROPIC_BUCKET_WIDTHS` is called on the form.
+ *
+ * Keyed off that list rather than `string`, so adding a width there without a
+ * label here is a build error instead of a picker entry reading `2h`.
+ *
+ * Daily is deliberately absent: `ANTHROPIC_DAILY_BUCKET_OPTION` owns that
+ * wording, and the only reader of this map has already returned for a held
+ * `1d` before it gets here. A second copy could only drift from the first.
+ */
+const ANTHROPIC_BUCKET_WIDTH_LABELS: Record<
+  Exclude<(typeof ANTHROPIC_BUCKET_WIDTHS)[number], "1d">,
+  string
+> = {
   "1m": "1m — per minute",
   "1h": "1h — hourly",
-  "1d": "1d — daily",
 };
 
 /**
@@ -2670,25 +2685,40 @@ const ANTHROPIC_DAILY_BUCKET_OPTION: FieldOption = {
  * new sources; they are not taken away from the sources already using them.
  *
  * The retained entry is the held value verbatim, so choosing daily is still how
- * you move off it. Nothing is retained on a cost source: the puller pins
- * `COST_REPORT_BUCKET_WIDTH` and ignores the setting, so a width stored there
- * was never in effect and `validBucketWidth` refuses it anyway. `1d` is not
- * retained either — the daily entry already means daily, and two entries saying
- * so is a choice between identical answers.
+ * you move off it. `1d` is not retained — the daily entry already means daily,
+ * and two entries saying so is a choice between identical answers.
+ *
+ * Exactly two things retire a held width, and both are stated positively here
+ * rather than deferred to `validBucketWidth`. That function answers a different
+ * question — what the builder may store — and its "anything but `usage`"
+ * includes the empty report, which on this side of the form is not a verdict
+ * but a state the admin passes through: the report picker keeps an empty entry
+ * so a cleared field is refused rather than refilled, so clearing it to re-pick
+ * it is an ordinary gesture. Reading a drop out of that would take the width
+ * away mid-gesture and not give it back — the silent migration this function
+ * exists to prevent, arriving by a second route. Nothing can be saved from that
+ * state regardless: the builder refuses an empty report before it reads a width.
  */
 function anthropicBucketWidthOptions(
   values: Record<string, string>,
 ): readonly FieldOption[] {
   const held = (values.bucketWidth ?? "").trim();
-  const report = (values.report ?? "").trim().toLowerCase();
   if (held === "" || held === "1d") return [ANTHROPIC_DAILY_BUCKET_OPTION];
-  if (validBucketWidth(held, report) === null) {
-    return [ANTHROPIC_DAILY_BUCKET_OPTION];
-  }
-  return [
-    ANTHROPIC_DAILY_BUCKET_OPTION,
-    { value: held, label: ANTHROPIC_BUCKET_WIDTH_LABELS[held] ?? held },
-  ];
+
+  // Positively cost: the puller pins `COST_REPORT_BUCKET_WIDTH` and ignores the
+  // setting, so a width stored here was never in effect.
+  const report = (values.report ?? "").trim().toLowerCase();
+  if (report === "cost") return [ANTHROPIC_DAILY_BUCKET_OPTION];
+
+  // Not a width the adapter knows — a hand-edited config, or one saved before
+  // the domain changed. There is nothing to offer and nothing to keep.
+  const label =
+    ANTHROPIC_BUCKET_WIDTH_LABELS[
+      held as keyof typeof ANTHROPIC_BUCKET_WIDTH_LABELS
+    ];
+  if (!label) return [ANTHROPIC_DAILY_BUCKET_OPTION];
+
+  return [ANTHROPIC_DAILY_BUCKET_OPTION, { value: held, label }];
 }
 
 /**
