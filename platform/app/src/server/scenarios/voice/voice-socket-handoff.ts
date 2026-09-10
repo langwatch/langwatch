@@ -32,28 +32,28 @@ export const VOICE_MEDIA_SOCKET_MESSAGE = "voice:twilio-media-socket" as const;
  * JSON cannot carry a Buffer intact).
  */
 export interface VoiceMediaSocketMessage {
-	type: typeof VOICE_MEDIA_SOCKET_MESSAGE;
-	/** The nonce the upgrade authenticated with, for the child's own logging. */
-	nonce: string;
-	/** The upgrade request path, e.g. `/twilio/<nonce>`. */
-	url: string;
-	/** The upgrade request method (always GET for a WebSocket upgrade). */
-	method: string;
-	/** The upgrade request headers, needed to compute the Sec-WebSocket-Accept. */
-	headers: Record<string, string | string[] | undefined>;
-	/** Base64 of the bytes read off the socket during the upgrade (the head). */
-	headBase64: string;
+  type: typeof VOICE_MEDIA_SOCKET_MESSAGE;
+  /** The nonce the upgrade authenticated with, for the child's own logging. */
+  nonce: string;
+  /** The upgrade request path, e.g. `/twilio/<nonce>`. */
+  url: string;
+  /** The upgrade request method (always GET for a WebSocket upgrade). */
+  method: string;
+  /** The upgrade request headers, needed to compute the Sec-WebSocket-Accept. */
+  headers: Record<string, string | string[] | undefined>;
+  /** Base64 of the bytes read off the socket during the upgrade (the head). */
+  headBase64: string;
 }
 
 /** Narrows an arbitrary IPC message to the voice handoff message. */
 export function isVoiceMediaSocketMessage(
-	message: unknown,
+  message: unknown,
 ): message is VoiceMediaSocketMessage {
-	return (
-		typeof message === "object" &&
-		message !== null &&
-		(message as { type?: unknown }).type === VOICE_MEDIA_SOCKET_MESSAGE
-	);
+  return (
+    typeof message === "object" &&
+    message !== null &&
+    (message as { type?: unknown }).type === VOICE_MEDIA_SOCKET_MESSAGE
+  );
 }
 
 /**
@@ -62,40 +62,40 @@ export function isVoiceMediaSocketMessage(
  * (a dead child, or a process with no IPC channel).
  */
 export function handOffVoiceSocket(params: {
-	child: ChildProcess;
-	socket: Socket;
-	nonce: string;
-	url: string;
-	method: string;
-	headers: Record<string, string | string[] | undefined>;
-	head: Buffer;
+  child: ChildProcess;
+  socket: Socket;
+  nonce: string;
+  url: string;
+  method: string;
+  headers: Record<string, string | string[] | undefined>;
+  head: Buffer;
 }): Promise<void> {
-	const message: VoiceMediaSocketMessage = {
-		type: VOICE_MEDIA_SOCKET_MESSAGE,
-		nonce: params.nonce,
-		url: params.url,
-		method: params.method,
-		headers: params.headers,
-		headBase64: params.head.toString("base64"),
-	};
-	return new Promise<void>((resolve, reject) => {
-		if (typeof params.child.send !== "function") {
-			reject(new Error("child has no IPC channel; cannot hand off the socket"));
-			return;
-		}
-		params.child.send(message, params.socket, (error) => {
-			if (error) reject(error);
-			else resolve();
-		});
-	});
+  const message: VoiceMediaSocketMessage = {
+    type: VOICE_MEDIA_SOCKET_MESSAGE,
+    nonce: params.nonce,
+    url: params.url,
+    method: params.method,
+    headers: params.headers,
+    headBase64: params.head.toString("base64"),
+  };
+  return new Promise<void>((resolve, reject) => {
+    if (typeof params.child.send !== "function") {
+      reject(new Error("child has no IPC channel; cannot hand off the socket"));
+      return;
+    }
+    params.child.send(message, params.socket, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
 }
 
 /** What a receiver hands its caller for one arrived socket. */
 export interface ReceivedVoiceSocket {
-	message: VoiceMediaSocketMessage;
-	socket: Socket;
-	/** The upgrade head bytes, decoded from {@link VoiceMediaSocketMessage.headBase64}. */
-	head: Buffer;
+  message: VoiceMediaSocketMessage;
+  socket: Socket;
+  /** The upgrade head bytes, decoded from {@link VoiceMediaSocketMessage.headBase64}. */
+  head: Buffer;
 }
 
 /**
@@ -108,19 +108,19 @@ export interface ReceivedVoiceSocket {
  * internals.
  */
 export interface VoiceSocketReceiver {
-	onVoiceSocket(handler: (received: ReceivedVoiceSocket) => void): () => void;
+  onVoiceSocket(handler: (received: ReceivedVoiceSocket) => void): () => void;
 }
 
 /** IPC-bearing subset of `process` the receiver needs; eases testing. */
 export interface VoiceSocketProcess {
-	on(
-		event: "message",
-		listener: (message: unknown, handle: unknown) => void,
-	): unknown;
-	off(
-		event: "message",
-		listener: (message: unknown, handle: unknown) => void,
-	): unknown;
+  on(
+    event: "message",
+    listener: (message: unknown, handle: unknown) => void,
+  ): unknown;
+  off(
+    event: "message",
+    listener: (message: unknown, handle: unknown) => void,
+  ): unknown;
 }
 
 /**
@@ -129,23 +129,23 @@ export interface VoiceSocketProcess {
  * when a socket handle actually arrived.
  */
 export function createVoiceSocketReceiver(
-	proc: VoiceSocketProcess = process,
+  proc: VoiceSocketProcess = process,
 ): VoiceSocketReceiver {
-	return {
-		onVoiceSocket(handler) {
-			const listener = (message: unknown, handle: unknown): void => {
-				if (!isVoiceMediaSocketMessage(message)) return;
-				if (handle == null) return;
-				handler({
-					message,
-					socket: handle as Socket,
-					head: Buffer.from(message.headBase64, "base64"),
-				});
-			};
-			proc.on("message", listener);
-			return () => {
-				proc.off("message", listener);
-			};
-		},
-	};
+  return {
+    onVoiceSocket(handler) {
+      const listener = (message: unknown, handle: unknown): void => {
+        if (!isVoiceMediaSocketMessage(message)) return;
+        if (handle == null) return;
+        handler({
+          message,
+          socket: handle as Socket,
+          head: Buffer.from(message.headBase64, "base64"),
+        });
+      };
+      proc.on("message", listener);
+      return () => {
+        proc.off("message", listener);
+      };
+    },
+  };
 }

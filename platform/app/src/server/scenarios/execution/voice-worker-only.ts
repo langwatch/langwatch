@@ -17,5 +17,5 @@ import type { ExecutionJobData } from "./execution-pool";
 
 /** True when the run dials a voice target. */
 export function isVoiceJob(jobData: ExecutionJobData): boolean {
-	return jobData.target.type === "voice";
+  return jobData.target.type === "voice";
 }

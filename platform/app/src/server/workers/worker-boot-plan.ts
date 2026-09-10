@@ -14,15 +14,15 @@
 
 /** Every boot stage `startWorkers` knows how to run. */
 export type WorkerStageName =
-	| "storage-stats"
-	| "scenario-processor"
-	| "nlp-fetch-teardown"
-	| "anomaly"
-	| "spend-spike-anomaly"
-	| "usage-stats"
-	| "realtime-session-poller"
-	| "voice-ws-listener"
-	| "metrics";
+  | "storage-stats"
+  | "scenario-processor"
+  | "nlp-fetch-teardown"
+  | "anomaly"
+  | "spend-spike-anomaly"
+  | "usage-stats"
+  | "realtime-session-poller"
+  | "voice-ws-listener"
+  | "metrics";
 
 /**
  * The ordered stages to boot. Order matters: later stages may depend on earlier
@@ -30,30 +30,30 @@ export type WorkerStageName =
  * teardown runs newest-first.
  */
 export function resolveWorkerBootPlan(params: {
-	voiceWorkerOnly: boolean;
-	shouldStartMetricsServer: boolean;
+  voiceWorkerOnly: boolean;
+  shouldStartMetricsServer: boolean;
 }): WorkerStageName[] {
-	const metrics: WorkerStageName[] = params.shouldStartMetricsServer
-		? ["metrics"]
-		: [];
+  const metrics: WorkerStageName[] = params.shouldStartMetricsServer
+    ? ["metrics"]
+    : [];
 
-	if (params.voiceWorkerOnly) {
-		return [
-			"scenario-processor",
-			"nlp-fetch-teardown",
-			"voice-ws-listener",
-			...metrics,
-		];
-	}
+  if (params.voiceWorkerOnly) {
+    return [
+      "scenario-processor",
+      "nlp-fetch-teardown",
+      "voice-ws-listener",
+      ...metrics,
+    ];
+  }
 
-	return [
-		"storage-stats",
-		"scenario-processor",
-		"nlp-fetch-teardown",
-		"anomaly",
-		"spend-spike-anomaly",
-		"usage-stats",
-		"realtime-session-poller",
-		...metrics,
-	];
+  return [
+    "storage-stats",
+    "scenario-processor",
+    "nlp-fetch-teardown",
+    "anomaly",
+    "spend-spike-anomaly",
+    "usage-stats",
+    "realtime-session-poller",
+    ...metrics,
+  ];
 }
