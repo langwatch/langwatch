@@ -219,7 +219,6 @@ class FakeWorkflowDslMigration implements WorkflowDslMigration {
 
 class FakeWorkflowId implements WorkflowId {
   constructor(private readonly value = "id") {
-    super();
   }
 
   next(): string {

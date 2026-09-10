@@ -85,7 +85,6 @@ class KeyLedger {
 
 class LedgerRepository implements IngestionKeyRepository {
   constructor(private readonly ledger: KeyLedger) {
-    super();
   }
 
   tryFindIngestKey(): Promise<StoredIngestionKey | null> {
@@ -103,7 +102,6 @@ class LedgerRepository implements IngestionKeyRepository {
 
 class LedgerIssuer implements IngestionKeyIssuer {
   constructor(private readonly ledger: KeyLedger) {
-    super();
   }
 
   create(input: { ingestSourceType: string }): Promise<{ token: string; apiKey: { id: string } }> {

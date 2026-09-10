@@ -27,7 +27,6 @@ class TestWorkflowNlpRuntime implements WorkflowNlpRuntime {
       input: WorkflowNlpDispatchInput,
     ) => Promise<WorkflowNlpDispatchResponse>,
   ) {
-    super();
   }
 
   dispatch(input: WorkflowNlpDispatchInput): Promise<WorkflowNlpDispatchResponse> {

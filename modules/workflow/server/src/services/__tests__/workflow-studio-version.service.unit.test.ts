@@ -35,7 +35,6 @@ class RecordingAgentMapping implements WorkflowAgentMapping {
   readonly recomputed: { projectId: string; workflowId: string; dsl: StudioWorkflow }[] = [];
 
   constructor(private readonly outcome: Promise<void> = Promise.resolve()) {
-    super();
   }
 
   recompute(input: { projectId: string; workflowId: string; dsl: StudioWorkflow }): Promise<void> {

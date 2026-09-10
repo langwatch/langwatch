@@ -120,7 +120,6 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
       stagingConfig?: NlpInvokeStagingConfig | undefined;
     },
   ) {
-    super();
     this.transport = NlpInvokeTransportAdapter.create({
       target: options.serviceUrl,
       // A deployment that named no staging policy still gets the built-in
@@ -203,7 +202,6 @@ export class UnconfiguredWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime
   }
 
   private constructor() {
-    super();
   }
 
   dispatch(_input: WorkflowNlpDispatchInput): Promise<WorkflowNlpDispatchResponse> {

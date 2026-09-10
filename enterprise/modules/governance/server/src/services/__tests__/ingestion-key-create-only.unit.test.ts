@@ -48,7 +48,6 @@ class KeyLedger {
 
 class LedgerRepository implements IngestionKeyRepository {
   constructor(private readonly ledger: KeyLedger) {
-    super();
   }
 
   tryFindIngestKey(input: {
@@ -80,7 +79,6 @@ class LedgerRepository implements IngestionKeyRepository {
 
 class LedgerIssuer implements IngestionKeyIssuer {
   constructor(private readonly ledger: KeyLedger) {
-    super();
   }
 
   create(input: {

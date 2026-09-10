@@ -77,7 +77,6 @@ let clickhouse: ClickHouseClient;
  *  gateway's ClickHouse repository. */
 class LedgerOverGatewayBudgets implements PulledUsageLedgerRepository {
   constructor(private readonly repository: GatewayBudgetSpend) {
-    super();
   }
 
   insert(rows: PulledUsageLedgerRow[]): Promise<void> {

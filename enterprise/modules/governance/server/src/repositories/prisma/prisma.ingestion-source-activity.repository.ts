@@ -341,7 +341,6 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     private readonly prisma: ActivityMonitorDatabase,
     private readonly clickhouse: GovernanceClickHouseResolver,
   ) {
-    super();
   }
 
   static create(options: {

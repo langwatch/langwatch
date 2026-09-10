@@ -58,7 +58,6 @@ class FakeGovernanceSignal implements GovernanceSignalChannel {
   private readonly resolveError: Error | null;
 
   constructor(resolvedRows: GovernanceResolvedBudgetCrossing[], resolveError: Error | null = null) {
-    super();
     this.resolvedRows = resolvedRows;
     this.resolveError = resolveError;
   }

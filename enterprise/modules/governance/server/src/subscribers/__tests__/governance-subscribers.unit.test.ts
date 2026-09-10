@@ -48,7 +48,6 @@ class RecordingDiagnostics implements GovernanceSubscriberDiagnosticsSink {
 
 class FixedTriggers implements TraceAlertTriggerReader {
   constructor(private readonly triggers: TraceAlertTrigger[]) {
-    super();
   }
   activeForProject(): Promise<TraceAlertTrigger[]> {
     return Promise.resolve(this.triggers);

@@ -22,7 +22,6 @@ class RecordedClickHouseClient implements GovernanceClickHouseClient {
   readonly queries: ClickHouseQuery[] = [];
 
   constructor(private readonly rowsForQuery: (query: ClickHouseQuery) => unknown) {
-    super();
   }
 
   async query(input: ClickHouseQuery): Promise<GovernanceClickHouseResult> {
@@ -35,7 +34,6 @@ class RecordedClickHouseResolver implements GovernanceClickHouseResolver {
   readonly organizationIds: string[] = [];
 
   constructor(private readonly client: GovernanceClickHouseClient | null) {
-    super();
   }
 
   async tryResolve(organizationId: string): Promise<GovernanceClickHouseClient | null> {

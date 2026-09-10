@@ -34,7 +34,6 @@ export class OtelTraceAlertMetricsAdapter implements TraceAlertMetricsSink {
   }
 
   private constructor(private readonly records: CounterHandle) {
-    super();
   }
 
   /**
