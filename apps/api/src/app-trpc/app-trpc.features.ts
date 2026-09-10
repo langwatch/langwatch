@@ -47,6 +47,8 @@ export function createAppTrpcFeatures(options: {
   const dashboardRouters = composed.dashboard.routers(mount);
   const datasetRouters = composed.dataset.routers(mount);
   const entitlementRouters = composed.entitlement.routers(mount);
+  const gatewayRouters = composed.gateway.routers(mount);
+  const promptRouters = composed.prompt.routers(mount);
   const evaluationRouters = composed.evaluation.routers(mount);
   const monitorRouters = composed.monitor.routers(mount);
   const organizationRouters = composed.organization.routers(mount);
@@ -101,6 +103,12 @@ export function createAppTrpcFeatures(options: {
     // Every group an organization grants access through. Behind
     // `organization:manage` throughout: a group IS an access grant.
     group: organizationRouters.group,
+    // What an organization caps its gateway spend with, the cache-control
+    // rules it serves repeat traffic from, and the project-scoped guardrails a
+    // virtual key opts into, all three over the one gateway application.
+    gatewayBudgets: gatewayRouters.gatewayBudgets,
+    gatewayCacheRules: gatewayRouters.gatewayCacheRules,
+    gatewayGuardrails: gatewayRouters.gatewayGuardrails,
     // The GitHub App an organization connected, and the pull requests its
     // coding agents opened.
     github: composeGithubTrpcRouter({ mount, infrastructure }),
@@ -142,6 +150,9 @@ export function createAppTrpcFeatures(options: {
     // subscriptions: a namespace mounted outside the record would be callable
     // over `/api/trpc` and un-watchable over `/api/sse`.
     presence: composed.presence.router(mount),
+    // The prompt library and its tag catalogue, both over the installed prompt module.
+    prompts: promptRouters.prompts,
+    promptTags: promptRouters.promptTags,
     project: composed.project.router(mount),
     // Custom role definitions, and the bindings that hand them out: who holds
     // a role and what that role grants are one question asked from two ends.

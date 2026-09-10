@@ -14,10 +14,10 @@ import {
   scopeTargetKey,
   type GatewayBudgetResolutionTarget,
   type GatewayResolvedBudget,
-  type GatewayService,
 } from "@langwatch/gateway-contract";
 import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import { type ScopeInput } from "../ports/gateway-virtual-key.port.ts";
+import type { GatewayService } from "./gateway.service.ts";
 
 export type DraftVirtualKey = {
   organizationId: string;

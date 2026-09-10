@@ -6,6 +6,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AgentPlatformUrlBuilder } from "@langwatch/agent-server";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import type {
   AppRestBroadcast,
   AppRestManagementAuditPort,
@@ -29,13 +30,10 @@ import type {
 } from "@langwatch/organization-contract";
 import type { OrganizationProvisioningPort } from "@langwatch/organization-server";
 import type { ProjectManagementDirectory } from "@langwatch/project-server";
-import type {
-  ScenarioService,
-  ScenarioTabRegistry,
-  SimulationService,
-} from "@langwatch/scenario-contract";
+import type { ScenarioTabRegistry, SimulationService } from "@langwatch/scenario-contract";
 import type { InlineMediaExtraction } from "@langwatch/scenario-server/api-rest/scenario-event";
 import type { ScenarioRunPlatformUrlBuilder } from "@langwatch/scenario-server/api-rest/simulation-run";
+import type { ScenarioService } from "@langwatch/scenario-server";
 import type {
   FilesProjectPermissionCheck,
   FilesRateLimiter,
@@ -73,6 +71,8 @@ export type ApiPackagedRestServices = Readonly<{
       })
     | undefined;
   apiKeys?: (() => ApiKeyApi) | undefined;
+  /** The prompt library `/api/prompts` reads and writes. */
+  prompts?: (() => PromptApi) | undefined;
   automation?: (() => AutomationApp) | undefined;
   /** Fan-out to every browser watching one tenant. */
   broadcast?: (() => AppRestBroadcast) | undefined;

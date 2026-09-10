@@ -1,5 +1,6 @@
-export type { PromptService } from "@langwatch/prompt-contract";
+export type { PromptService } from "./services/prompt.service.ts";
 export { PostgresPromptAdapter } from "./adapters/postgres.prompt.adapter.ts";
+export { promptServer } from "./prompt.server.ts";
 export {
   PromptApp,
   PromptHasNoCopiesError,
@@ -9,7 +10,6 @@ export {
   PromptTagMissingError,
   PromptTagProtectedRefusalError,
   PromptTagTakenError,
-  type PromptAppDependencies,
   type PromptCaller,
   type PromptInfrastructure,
   type PromptTagCatalogPrincipal,
@@ -40,4 +40,4 @@ export {
   CrossOriginRefusedError,
   type PromptExecuteRestPorts,
   type PromptExecuteRestSession,
-} from "./transport/api-rest/prompt-execute.api.ts";
+} from "./transport/prompt-execute.api.ts";

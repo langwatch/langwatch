@@ -1,5 +1,8 @@
 export { GatewayService } from "./services/gateway.service.ts";
 export { gatewayServer } from "./gateway.server.ts";
+export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
+export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
+export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 export {
   PrismaGatewayAdapter,
   type GatewayPersistence,
@@ -54,6 +57,7 @@ export * from "./adapters/eventing.gateway-spend.adapter.ts";
 export { GatewaySpendProducerAdapter } from "./adapters/gateway-spend-producer.adapter.ts";
 export {
   PostgresGatewayBudgetResolutionAdapter,
+  type GatewayBudgetResolutionApi,
   type GatewayBudgetResolutionDatabase,
 } from "./adapters/postgres.gateway-budget-resolution.adapter.ts";
 export type { GatewaySpendState } from "./projections/gateway-spend.projection.ts";

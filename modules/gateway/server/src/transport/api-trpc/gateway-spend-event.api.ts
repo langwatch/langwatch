@@ -98,7 +98,7 @@ export class GatewaySpendEventTrpcApi {
             // The ids come from this project's own tenant-filtered spend rows,
             // and the Project service resolves the owning-organization fence
             // without exposing Project persistence to this transport.
-            const organizationId = await ctx.app.gateway.tryGetProjectOrganization(input.projectId);
+            const organizationId = await ctx.app.gateway.findProjectOrganization(input.projectId);
             const vks =
               vkIds.length && organizationId
                 ? await ctx.app.gateway.resolveVirtualKeyNames({

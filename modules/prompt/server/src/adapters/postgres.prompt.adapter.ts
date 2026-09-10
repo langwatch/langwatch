@@ -1,4 +1,3 @@
-import type { PromptService as PromptServiceContract } from "@langwatch/prompt-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { PromptService } from "../services/prompt.service.ts";
 import { PromptTagService } from "../services/prompt-tag.service.ts";
@@ -42,7 +41,7 @@ export class PostgresPromptAdapter {
     return new PostgresPromptAdapter(options);
   }
 
-  build(): PromptServiceContract {
+  build(): PromptService {
     const repository = PrismaLlmConfigRepository.create({
       prisma: this.options.database,
       modelProvider: this.options.modelProvider,

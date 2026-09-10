@@ -11,7 +11,6 @@ import type {
   OrganizationRestService,
 } from "@langwatch/organization-server";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { PromptRestService } from "@langwatch/prompt-server";
 import type { ShareApi } from "@langwatch/share-contract";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
@@ -76,44 +75,6 @@ describe("given the analytics timeseries door this process composes", () => {
       const response = await api.fetch("/api/analytics/timeseries", { method: "POST" });
 
       expect(response.status).toBe(404);
-    });
-  });
-});
-
-describe("given the prompt library door this process composes", () => {
-  describe("when a project credential lists the prompts", () => {
-    it("reads them for the credential's project and the organization the process resolved", async () => {
-      const getAllPrompts = vi.fn(async () => []);
-      const api = mount({
-        prompts: { getAllPrompts } as unknown as PromptRestService,
-      });
-
-      const response = await api.fetch("/api/prompts");
-
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual([]);
-      expect(getAllPrompts).toHaveBeenCalledWith({
-        projectId: "project-1",
-        organizationId: "organization-1",
-        version: "latest",
-      });
-    });
-  });
-
-  describe("when the credential's project belongs to no organization this process can resolve", () => {
-    it("answers the wiring failure rather than reading another tenant's prompts", async () => {
-      const api = mount({
-        prompts: { getAllPrompts: vi.fn() } as unknown as PromptRestService,
-        organizationsFail: true,
-      });
-
-      const response = await api.fetch("/api/prompts");
-
-      expect(response.status).toBe(500);
-      await expect(response.json()).resolves.toEqual({
-        error: "Internal Server Error",
-        message: "Organization not found",
-      });
     });
   });
 });
@@ -226,7 +187,6 @@ describe("given the organization management door this process composes", () => {
 
 type MountOptions = {
   analytics?: AnalyticsApp;
-  prompts?: PromptRestService;
   organizationsFail?: boolean;
   organizationManagement?: {
     organizations: OrganizationRestService;
@@ -242,15 +202,6 @@ function mount(options: MountOptions) {
   for (const app of openTestRestDoors({
     services: {
       ...(options.analytics ? { analytics: () => options.analytics! } : {}),
-      ...(options.prompts
-        ? {
-            prompts: {
-              service: () => options.prompts!,
-              tagCatalog: () => ({ assertMayManageTagCatalog: async () => undefined }),
-              permissions: () => ({}) as AuthzService,
-            },
-          }
-        : {}),
       organizations: () => ({
         getTeamById: async () => {
           if (options.organizationsFail) {

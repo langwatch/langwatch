@@ -14,7 +14,7 @@ import {
   type CreateGatewayCacheRuleInput,
   type CreateGatewayGuardrailInput,
   type GatewayApplicableBudget,
-  type GatewayService,
+  type GatewayBudgetResolutionTarget,
   type GatewayVirtualKeyDirectBudget,
   type GuardrailAttachment,
   type VirtualKeyConfig,
@@ -24,6 +24,7 @@ import {
   type UpdateGatewayGuardrailInput,
 } from "@langwatch/gateway-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { GatewayService } from "../services/gateway.service.ts";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { z } from "zod";
@@ -380,7 +381,7 @@ export interface GatewayAppDependencies {
     virtualKeys: readonly VirtualKeyWithScopes[];
   }): Promise<VirtualKeySnakeDto[]>;
   /** Every budget that would constrain a draft or existing key. */
-  resolveApplicableBudgets(input: {
+  listApplicableBudgets(input: {
     target: GatewayApplicableBudgetTarget;
   }): Promise<GatewayApplicableBudget[]>;
   /** The budget each named key carries of its own, with this period's spend. */
@@ -449,7 +450,7 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.budgetDecisions.resolveScopeTargets(budgets, organizationId);
   }
 
-  tryGetBudgetDetail(input: { id: string; organizationId: string }) {
+  findBudgetDetail(input: { id: string; organizationId: string }) {
     return this.#dependencies.budgetDecisions.tryGetDetail(input);
   }
 
@@ -473,7 +474,7 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.budgetDecisions.guardrailList(projectId);
   }
 
-  tryGetGuardrail(input: { id: string; projectId: string }) {
+  findGuardrail(input: { id: string; projectId: string }) {
     return this.#dependencies.budgetDecisions.tryGuardrailGet(input);
   }
 
@@ -493,7 +494,7 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.budgetDecisions.cacheRuleList(organizationId);
   }
 
-  tryGetCacheRule(input: { id: string; organizationId: string }) {
+  findCacheRule(input: { id: string; organizationId: string }) {
     return this.#dependencies.budgetDecisions.tryCacheRuleGet(input);
   }
 
@@ -509,8 +510,10 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.budgetDecisions.cacheRuleArchive(input);
   }
 
-  tryGetProjectOrganization(projectId: string) {
-    return this.#dependencies.projects.tryGetOrganizationId(projectId);
+  async findProjectOrganization(projectId: string): Promise<string | null> {
+    // The directory answers `undefined` for a project it does not hold; the
+    // gateway's own vocabulary for "no such row" is null throughout.
+    return (await this.#dependencies.projects.tryGetOrganizationId(projectId)) ?? null;
   }
 
   usageSummary(input: { organizationId: string; virtualKeyIds: string[]; window: UsageWindow }) {
@@ -703,10 +706,14 @@ export class GatewayApp implements GatewayApi {
     return dto;
   }
 
-  resolveApplicableBudgets(input: {
+  listApplicableBudgets(input: {
     target: GatewayApplicableBudgetTarget;
   }): Promise<GatewayApplicableBudget[]> {
-    return this.#dependencies.resolveApplicableBudgets(input);
+    return this.#dependencies.listApplicableBudgets(input);
+  }
+
+  resolveApplicableBudgets(input: GatewayBudgetResolutionTarget) {
+    return this.#dependencies.budgetDecisions.resolveApplicableBudgets(input);
   }
 
   loadDirectBudgetsForKeys(input: {

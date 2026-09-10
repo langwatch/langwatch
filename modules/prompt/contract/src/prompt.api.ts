@@ -196,6 +196,12 @@ export interface PromptApi {
     newName: string;
   }): Promise<PromptTag>;
   deleteTagForProject(input: { projectId: string; name: string }): Promise<PromptTag>;
+  /**
+   * Seeds a new organization's tag catalogue with the built-in tags. Called
+   * once by the organization module's own onboarding ceremony, which is why
+   * this is the one operation on the interface no project scopes.
+   */
+  seedTagsForOrganization(input: { organizationId: string }): Promise<void>;
 }
 
 export const PromptApi = moduleApi<PromptApi>("prompt");

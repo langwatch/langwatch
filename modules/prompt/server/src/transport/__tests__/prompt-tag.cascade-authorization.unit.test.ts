@@ -5,11 +5,11 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { PromptApp } from "#app/prompt.app";
+import type { PromptService } from "../../services/prompt.service.ts";
 import { promptTagTrpcTransport } from "../prompt-tag.trpc.ts";
 import { promptTrpcCaller } from "./prompt-trpc.fixture.ts";
 
@@ -25,16 +25,22 @@ function buildCaller(options: { manageable: readonly string[] }) {
   );
 
   const prompts = PromptApp.create({
-    prompts: {} as unknown as PromptService,
-    projects: {
-      getOrganizationId: async () => "organization_1",
-      listIdsByOrganization: async () => ORGANIZATION_PROJECTS,
-    } as unknown as ProjectApi,
-    permissions: {
-      hasPermission,
-      getApiKeyProjectDecision: async () => ({ outcome: "denied" }),
-    } as unknown as Pick<AuthzApi, "hasPermission" | "getApiKeyProjectDecision">,
-    infrastructure: { afterPromptCreated: () => undefined },
+    dependencies: {
+      projects: {
+        getOrganizationId: async () => "organization_1",
+        listIdsByOrganization: async () => ORGANIZATION_PROJECTS,
+      } as unknown as ProjectApi,
+      permissions: {
+        hasPermission,
+        getApiKeyProjectDecision: async () => ({ outcome: "denied" }),
+      } as unknown as AuthzApi,
+    },
+    infrastructure: {
+      prompts: {} as unknown as PromptService,
+      afterPromptCreated: () => undefined,
+    },
+    config: undefined,
+    resources: { own: () => {}, ownService: () => {} },
   });
 
   const renameTagForProject = vi.spyOn(prompts, "renameTagForProject").mockResolvedValue({

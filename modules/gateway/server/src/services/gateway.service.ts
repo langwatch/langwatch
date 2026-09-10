@@ -1,7 +1,6 @@
 import {
   GatewayBudgetScopeUnreachableError,
   GatewayScopeOrgMismatchError,
-  GatewayService as GatewayServiceContract,
   gatewayBudgetCheckInputSchema,
   createGatewayBudgetInputSchema,
   resetGatewayBudgetInputSchema,
@@ -50,7 +49,7 @@ import { nowInstant } from "@langwatch/time";
 export type { GatewayBudgetScopeReachInput } from "@langwatch/gateway-contract";
 
 /** The singular process-owned Gateway service for the full budget lifecycle. */
-export class GatewayService extends GatewayServiceContract {
+export class GatewayService {
   private readonly reachPolicy = GatewayBudgetScopeReachService.create();
 
   private constructor(
@@ -58,9 +57,7 @@ export class GatewayService extends GatewayServiceContract {
     private readonly projects: ProjectApi,
     private readonly cacheRules: GatewayCacheRuleService,
     private readonly guardrails: GatewayGuardrailService,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(input: {
     repository: GatewayBudgetRepository;

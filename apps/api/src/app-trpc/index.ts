@@ -12,10 +12,7 @@ export { createHttpProxyTrpcRouter } from "../features/agent/http-proxy-trpc.mou
 export { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount.ts";
 export { createTranslateTrpcRouter } from "../features/model-provider/translate-trpc.mount.ts";
 export { listCustomEvaluators } from "../platform/infrastructure/postgres.custom-evaluators.adapter.ts";
-export {
-  createPromptTagTrpcRouter,
-  createPromptTrpcRouter,
-} from "../features/prompt/prompt-trpc.mount.ts";
+export { createPromptTrpcRouters } from "../features/prompt/prompt-trpc.mount.ts";
 export { createScenarioTrpcRouter } from "../features/scenario/scenario-trpc.mount.ts";
 export {
   createPinnedTraceTrpcRouter,
@@ -92,6 +89,5 @@ export {
 export { createOpsTrpcRouter, type OpsTrpcContext } from "../features/ops/ops-trpc.mount.ts";
 export {
   createGatewayTrpcRouters,
-  type GatewayTrpcContext,
-  type GatewayTrpcPorts,
+  type GatewayHostContext,
 } from "../features/gateway/gateway-trpc.mount.ts";

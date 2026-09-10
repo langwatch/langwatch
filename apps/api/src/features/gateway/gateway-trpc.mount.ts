@@ -1,75 +1,36 @@
 /**
- * The six routers share one policy chain and one `GatewayTrpcPorts` seam.
- * Personal keys/routing/webhooks answer from `@langwatch/enterprise-api`.
+ * Binds the gateway module's converted namespaces to this process's execution
+ * path: the budgets an organization caps its spend with, the cache-control
+ * rules it serves repeat traffic from, and the project-scoped guardrails a
+ * virtual key opts into.
+ *
+ * The three declarations come off the installed module, so the procedure
+ * names, parsers and answers a client reads are the contract's own. The other
+ * three gateway namespaces - virtual keys, usage and spend events - are still
+ * on the legacy builders and stay on the absence list until they convert.
  */
-import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import {
-  GatewayBudgetTrpcApi,
-  type GatewayBudgetTrpcContext,
-} from "@langwatch/gateway-server/api-trpc/gateway-budget";
-import {
-  GatewayCacheRuleTrpcApi,
-  type GatewayCacheRuleTrpcContext,
-} from "@langwatch/gateway-server/api-trpc/gateway-cache-rule";
-import {
-  GatewayGuardrailTrpcApi,
-  type GatewayGuardrailTrpcContext,
-} from "@langwatch/gateway-server/api-trpc/gateway-guardrail";
-import {
-  GatewaySpendEventTrpcApi,
-  type GatewaySpendEventTrpcContext,
-} from "@langwatch/gateway-server/api-trpc/gateway-spend-event";
-import {
-  GatewayUsageTrpcApi,
-  type GatewayUsageTrpcContext,
-} from "@langwatch/gateway-server/api-trpc/gateway-usage";
-import {
-  VirtualKeyTrpcApi,
-  type VirtualKeyTrpcContext,
-  type VirtualKeyTrpcSchemas,
-} from "@langwatch/gateway-server/api-trpc/virtual-key";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+  gatewayBudgetTrpcTransport,
+  gatewayCacheRuleTrpcTransport,
+  gatewayGuardrailTrpcTransport,
+} from "@langwatch/gateway-server";
 
-/** Every context requirement the six surfaces place on the process. */
-export type GatewayTrpcContext = GatewayBudgetTrpcContext &
-  GatewayCacheRuleTrpcContext &
-  GatewayGuardrailTrpcContext &
-  GatewaySpendEventTrpcContext &
-  GatewayUsageTrpcContext &
-  VirtualKeyTrpcContext;
+/** The one slice of the process context these three namespaces read. */
+export interface GatewayHostContext {
+  app: Readonly<{ gateway: GatewayApi }>;
+}
 
-/**
- * A tRPC input parser is fixed when the router is built, and the application
- * is a per-request value, so the virtual-key schemas can't come off it.
- * Everything else this seam carried now lives on `GatewayApp`.
- */
-export type GatewayTrpcPorts = Readonly<{
-  virtualKeys: VirtualKeyTrpcSchemas;
-}>;
-
-/**
- * Mounts the six gateway namespaces under the keys clients already call. Two
- * of the six authorize in their resolver rather than from the input.
- */
-export function createGatewayTrpcRouters<
-  TContext extends GatewayTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TPorts extends GatewayTrpcPorts,
->(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<TPorts>) {
-  const service = createTrpcApiService(mount);
-  const resolverAuthorized = {
-    protected: service.protected,
-    resolverAuthorizedPolicy: service.serviceAuthorized,
-    validateOutput: service.validateOutput,
-  };
+/** Mounts the three converted namespaces on the app process's tRPC runtime. */
+export function createGatewayTrpcRouters<TContext extends GatewayHostContext>(
+  runtime: TrpcRuntime<TContext>,
+) {
+  const gateway = (ctx: TContext) => ctx.app.gateway;
 
   return {
-    virtualKeys: VirtualKeyTrpcApi.create(mount.root, resolverAuthorized, mount.ports.virtualKeys),
-    gatewayUsage: GatewayUsageTrpcApi.create(mount.root, resolverAuthorized),
-    gatewayBudgets: GatewayBudgetTrpcApi.create(mount.root, service),
-    gatewayCacheRules: GatewayCacheRuleTrpcApi.create(mount.root, service),
-    gatewayGuardrails: GatewayGuardrailTrpcApi.create(mount.root, service),
-    gatewaySpendEvents: GatewaySpendEventTrpcApi.create(mount.root, service),
+    gatewayBudgets: runtime.mount(gatewayBudgetTrpcTransport, gateway),
+    gatewayCacheRules: runtime.mount(gatewayCacheRuleTrpcTransport, gateway),
+    gatewayGuardrails: runtime.mount(gatewayGuardrailTrpcTransport, gateway),
   };
 }

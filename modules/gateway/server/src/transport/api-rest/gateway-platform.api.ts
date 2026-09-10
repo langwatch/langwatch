@@ -1955,7 +1955,7 @@ export function createGatewayPlatformRestApp(options: {
         const project = projectOf(c);
         const id = input.id;
         const organizationId = await app.organizationIdForProject(project.id);
-        const row = await app.tryGetCacheRule({ id, organizationId });
+        const row = await app.findCacheRule({ id, organizationId });
         if (!row) {
           return errorResponse(c, {
             status: 404,

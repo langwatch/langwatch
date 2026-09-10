@@ -16,17 +16,18 @@ import {
   type PromptDeleteResult,
   type PromptModifyPermission,
   type PromptReference,
-  type PromptService,
   type PromptTag,
   type PromptTagAssignment,
   type UpdatePromptCommand,
   type UpdatePromptHandleCommand,
   type VersionedPrompt,
 } from "@langwatch/prompt-contract";
-import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
+import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { PromptCopyChoice, PromptPushToCopiesResult } from "@langwatch/prompt-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { PromptService } from "../services/prompt.service.ts";
 
 /**
  * The credential a tag write arrived on. A tag definition is one organization
@@ -60,15 +61,25 @@ export interface PromptInfrastructure {
    * written, copied or duplicated. Fire-and-forget: it may not fail a create.
    */
   afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
+  /**
+   * The read/write engine this application forwards to. A bridge, not a
+   * design choice: the four repositories behind it have not moved onto
+   * `defineRepositories` yet (ADR-133's persistence half), so the installer
+   * still builds this from `PostgresPromptAdapter` and hands it down here
+   * rather than the app building it from a framework-supplied repository
+   * bundle. Move it to a declared `repositories` bundle once the memory twins
+   * exist.
+   */
+  prompts: PromptService;
 }
 
-/** What the process composes this feature's application from. */
-export interface PromptAppDependencies {
-  prompts: PromptService;
-  projects: Pick<ProjectApi, "getOrganizationId" | "listIdsByOrganization">;
-  permissions: Pick<AuthzApi, "hasPermission" | "getApiKeyProjectDecision">;
-  infrastructure: PromptInfrastructure;
-}
+/** The peer APIs this application reads. */
+type PromptDependencies = Readonly<{
+  projects: typeof ProjectApi;
+  permissions: typeof AuthzApi;
+}>;
+
+type PromptSetup = FeatureSetup<PromptDependencies, PromptInfrastructure, undefined>;
 
 /** A tag name the organization's catalog does not accept. */
 export class PromptTagInvalidError extends HandledError {
@@ -162,10 +173,28 @@ function asHandledTagError(error: unknown): never {
   throw error;
 }
 
+/** What every method below reads: the engine, the two peers and the infrastructure. */
+type PromptAppDependencies = Readonly<{
+  prompts: PromptService;
+  projects: ProjectApi;
+  permissions: AuthzApi;
+  infrastructure: PromptInfrastructure;
+}>;
+
 export class PromptApp implements PromptApi {
   static readonly contract = PromptApi;
-  static create(dependencies: PromptAppDependencies): PromptApp {
-    return new PromptApp(dependencies);
+  static readonly dependencies: PromptDependencies = {
+    projects: ProjectApi,
+    permissions: AuthzApi,
+  };
+
+  static create({ dependencies, infrastructure }: PromptSetup): PromptApp {
+    return new PromptApp({
+      prompts: infrastructure.prompts,
+      projects: dependencies.projects,
+      permissions: dependencies.permissions,
+      infrastructure,
+    });
   }
 
   #dependencies: PromptAppDependencies;
@@ -211,6 +240,11 @@ export class PromptApp implements PromptApi {
 
   listTags(input: { organizationId: string }) {
     return this.#dependencies.prompts.listTags(input);
+  }
+
+  /** Seeds a new organization's tag catalogue with the built-in tags. */
+  seedTagsForOrganization(input: { organizationId: string }): Promise<void> {
+    return this.#dependencies.prompts.seedTagsForOrganization(input);
   }
 
   createTag(input: { organizationId: string; name: string; createdById?: string }) {

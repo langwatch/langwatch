@@ -1,33 +1,25 @@
 /**
- * App-process transport mounts for the prompt vertical.
- *
- * Behaviour is package-owned (`@langwatch/prompt-server`); this supplies the
- * process's root, authenticated procedure, policy chain and the nurturing
- * side effect a new prompt triggers.
+ * Binds the prompt module's two declared namespaces - `prompts.*` and
+ * `promptTags.*` - to this process's tRPC root. Both read off the same
+ * installed application; the behaviour lives in `@langwatch/prompt-server`.
  */
-import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
-import {
-  PromptTagTrpcApi,
-  PromptTrpcApi,
-  type PromptTrpcContext,
-  type PromptTrpcPorts,
-} from "@langwatch/prompt-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import { promptTagTrpcTransport, promptTrpcTransport } from "@langwatch/prompt-server";
 
-/** Mounts `prompts.*` on the app process's tRPC root. */
-export function createPromptTrpcRouter<
-  TContext extends PromptTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<PromptTrpcPorts>) {
-  return PromptTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
+/** The one slice of the process context these two namespaces read. */
+export interface PromptHostContext {
+  app: Readonly<{ prompts: PromptApi }>;
 }
 
-/** Mounts `promptTags.*` on the app process's tRPC root. */
-export function createPromptTagTrpcRouter<
-  TContext extends PromptTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
-  return PromptTagTrpcApi.create(mount.root, createTrpcApiService(mount));
+/** Mounts both namespaces on the app process's declared tRPC runtime. */
+export function createPromptTrpcRouters<TContext extends PromptHostContext>(
+  runtime: TrpcRuntime<TContext>,
+) {
+  const prompts = (ctx: TContext) => ctx.app.prompts;
+
+  return {
+    prompts: runtime.mount(promptTrpcTransport, prompts),
+    promptTags: runtime.mount(promptTagTrpcTransport, prompts),
+  };
 }

@@ -12,9 +12,9 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": [
-    "./src/screens/gateway/index.ts",
-    "./src/screens/drawers.ts",
-    "./src/surfaces/budget-overview/index.ts"
+    "./src/gateway.ts",
+    "./src/drawers.ts",
+    "./src/ui/sections/budget-overview/index.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

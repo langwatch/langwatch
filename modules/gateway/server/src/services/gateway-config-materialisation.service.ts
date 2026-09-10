@@ -14,7 +14,6 @@ import {
   budgetPeriodFloorMs,
   parseVirtualKeyConfig,
   type GatewayResolvedBudget,
-  type GatewayService,
 } from "@langwatch/gateway-contract";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import { type VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
@@ -32,6 +31,7 @@ import {
   type GatewayConfigPayload,
   type ProviderExclusionWire,
 } from "../rules/gateway-config-wire.rules.ts";
+import type { GatewayService } from "./gateway.service.ts";
 
 export class GatewayConfigMaterialiserService {
   private constructor(

@@ -1,6 +1,8 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
+import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiGatewayComposition } from "../../app/api-gateway.composition.ts";
+import type { createGatewayTrpcRouters } from "./gateway-trpc.mount.ts";
 
 /** What the gateway's three kinds of door are given. */
 export type ComposedGatewayFeature = Readonly<{
@@ -12,4 +14,8 @@ export type ComposedGatewayFeature = Readonly<{
    * the Go data plane materialises a key's warm-cache bundle against the decision store.
    */
   composition: ApiGatewayComposition | undefined;
+  /** The three converted namespaces, mounted on this process's runtime. */
+  routers(
+    mount: ApiTrpcFeatureMount,
+  ): ReturnType<typeof createGatewayTrpcRouters<ApiTrpcContext>>;
 }>;

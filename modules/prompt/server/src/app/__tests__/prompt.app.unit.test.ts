@@ -1,14 +1,13 @@
 /**
  * @vitest-environment node
  */
-import type {
-  PromptService,
-  UpdatePromptCommand,
-  VersionedPrompt,
-} from "@langwatch/prompt-contract";
+import type { UpdatePromptCommand, VersionedPrompt } from "@langwatch/prompt-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { PromptApp } from "../prompt.app.ts";
+import type { PromptService } from "../../services/prompt.service.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -53,11 +52,19 @@ function harness() {
   const prompts: Partial<PromptService> = { updatePrompt };
 
   const app = PromptApp.create({
-    prompts: prompts as PromptService,
-    projects: {
-      getOrganizationId: async () => "org-1",
-      listIdsByOrganization: async () => ["project-copy"],
+    dependencies: {
+      projects: {
+        getOrganizationId: async () => "org-1",
+        listIdsByOrganization: async () => ["project-copy"],
+      } as unknown as ProjectApi,
+      permissions: {} as unknown as AuthzApi,
     },
+    infrastructure: {
+      prompts: prompts as PromptService,
+      afterPromptCreated: () => {},
+    },
+    config: undefined,
+    resources: { own: () => {}, ownService: () => {} },
   });
 
   const apply = (source: VersionedPrompt) =>

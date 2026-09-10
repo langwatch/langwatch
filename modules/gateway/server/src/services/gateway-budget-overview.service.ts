@@ -14,9 +14,10 @@ import {
   GatewayApplicableBudgetsService,
 } from "./gateway-applicable-budgets.service.ts";
 import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
-import { scopeTargetKey, type GatewayService, GatewayWindow } from "@langwatch/gateway-contract";
+import { scopeTargetKey, GatewayWindow } from "@langwatch/gateway-contract";
 import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import type { GatewayService } from "./gateway.service.ts";
 
 /**
  * How binding a scope is to the reader, most binding first, which is the truncation order for

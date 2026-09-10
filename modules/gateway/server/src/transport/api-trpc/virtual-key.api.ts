@@ -229,7 +229,7 @@ export class VirtualKeyTrpcApi {
                   id: input.virtualKeyId,
                   userId: ctx.actor().id,
                 });
-                return ctx.app.gateway.resolveApplicableBudgets({
+                return ctx.app.gateway.listApplicableBudgets({
                   target: {
                     organizationId: input.organizationId,
                     virtualKeyId: vk.id,
@@ -267,7 +267,7 @@ export class VirtualKeyTrpcApi {
                   });
                 }
               }
-              return ctx.app.gateway.resolveApplicableBudgets({
+              return ctx.app.gateway.listApplicableBudgets({
                 target: {
                   organizationId: input.organizationId,
                   virtualKeyId: null,

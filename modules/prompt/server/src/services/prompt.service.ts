@@ -1,5 +1,4 @@
 import {
-  PromptService as PromptServiceContract,
   deriveResponseFormatFromOutputs,
   normalizeReasoningFromProviderFields,
   type LatestConfigVersionSchema,
@@ -95,7 +94,7 @@ export type VersionedPrompt = Pick<
  * Service layer for managing LLM prompt configurations. The public contract lives here; the
  * work is done by the read, write, copy, sync and tag-lookup collaborators it composes.
  */
-export class PromptService extends PromptServiceContract {
+export class PromptService {
   readonly repository: LlmConfigRepository;
   readonly versionService: PromptVersionService;
   readonly tagRepository: PromptTagAssignmentRepository;
@@ -124,7 +123,6 @@ export class PromptService extends PromptServiceContract {
     promptTagRepository: PromptTagRepository;
     tagService: PromptTagService;
   }) {
-    super();
     this.repository = options.repository;
     this.versionService = options.versionService;
     this.tagRepository = options.tagRepository;

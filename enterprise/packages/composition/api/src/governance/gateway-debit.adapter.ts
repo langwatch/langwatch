@@ -8,12 +8,15 @@ import {
   type GatewayResolvedBudget,
   type GovernanceResolvedBudgetCrossing,
 } from "@langwatch/enterprise-governance-server";
-import { type BudgetSpendTarget, type GatewayChangeEventsPort } from "@langwatch/gateway-server";
+import {
+  type BudgetSpendTarget,
+  type GatewayBudgetResolutionApi,
+  type GatewayChangeEventsPort,
+} from "@langwatch/gateway-server";
 import {
   budgetAppliesToProvider,
   budgetPeriodFloorMs,
   currentPeriodStart,
-  type GatewayService,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
@@ -83,7 +86,7 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
   private constructor(
     private readonly database: PrismaClient,
     private readonly budgets: GatewayGovernanceBudgetStore,
-    private readonly budgetDecisions: GatewayService,
+    private readonly budgetDecisions: GatewayBudgetResolutionApi,
     private readonly gatewayChanges: GatewayChangeEventsPort,
     private readonly changeEvents: GatewayBudgetChangeEventDedupe | undefined,
   ) {
@@ -93,7 +96,7 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
   static create(
     database: PrismaClient,
     budgets: GatewayGovernanceBudgetStore,
-    budgetDecisions: GatewayService,
+    budgetDecisions: GatewayBudgetResolutionApi,
     gatewayChanges: GatewayChangeEventsPort,
     changeEvents?: GatewayBudgetChangeEventDedupe,
   ): AppGatewayGovernancePort {

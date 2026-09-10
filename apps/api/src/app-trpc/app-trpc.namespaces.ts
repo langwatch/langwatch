@@ -47,17 +47,6 @@ export const ABSENT_API_TRPC_NAMESPACES = [
     module: "gateway",
     consequence: "no gateway key is listed or minted",
   },
-  { namespace: "gatewayBudgets", module: "gateway", consequence: "no gateway budget is readable" },
-  {
-    namespace: "gatewayCacheRules",
-    module: "gateway",
-    consequence: "no gateway cache rule is readable",
-  },
-  {
-    namespace: "gatewayGuardrails",
-    module: "gateway",
-    consequence: "no gateway guardrail is readable",
-  },
   {
     namespace: "gatewaySpendEvents",
     module: "gateway",
@@ -148,8 +137,6 @@ export const ABSENT_API_TRPC_NAMESPACES = [
     module: "ops",
     consequence: "the support inbox lists no filed report",
   },
-  { namespace: "prompts", module: "prompt", consequence: "the prompt library lists nothing" },
-  { namespace: "promptTags", module: "prompt", consequence: "no prompt tag is listed" },
   { namespace: "scenarios", module: "scenario", consequence: "no simulation is listed or watched" },
   { namespace: "setupSkills", module: "scenario", consequence: "no setup skill is listed" },
   {

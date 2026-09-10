@@ -195,10 +195,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "gateway|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "gateway|installer-not-booted",
       "measured": "2026-09-08"
     },
@@ -471,23 +467,11 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "prompt|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "prompt|legacy-transport-runtime",
       "measured": "2026-09-08"
     },
     {
-      "key": "prompt|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "prompt|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "prompt|no-installer",
       "measured": "2026-09-08"
     },
     {
@@ -499,10 +483,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "prompt|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "prompt|unregistered-repositories",
       "measured": "2026-09-08"
     },
@@ -511,15 +491,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "scenario|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "scenario|legacy-transport-runtime",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "scenario|memory-twin-untested",
       "measured": "2026-09-08"
     },
     {
@@ -531,23 +503,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "scenario|no-installer",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "scenario|persistence-adapter",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "scenario|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "scenario|testing-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "scenario|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {

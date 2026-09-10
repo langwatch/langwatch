@@ -1,6 +1,9 @@
 import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
 import { z } from "zod";
 
+import type { GatewayCacheRuleResource } from "./gateway-cache-rule.ts";
+import type { GatewayGuardrailBundleEntry } from "./gateway-guardrail.ts";
+
 /**
  * What a process needs to terminate virtual-key traffic and settle its spend.
  *
@@ -126,3 +129,16 @@ export const gatewayWebConfigSchema = z.strictObject({
 });
 
 export type GatewayWebConfig = z.infer<typeof gatewayWebConfigSchema>;
+
+/** One direction's guardrail references, as a key's configuration names them. */
+export type GatewayConfigGuardrailAttachment = {
+  direction: "pre" | "post" | "stream_chunk";
+  guardrailIds: string[];
+};
+
+/** The persisted half of a configuration bundle, before the wire shape is built. */
+export type GatewayConfigBundlePersistence = {
+  cacheRules: GatewayCacheRuleResource[];
+  guardrails: GatewayGuardrailBundleEntry[];
+  attachments: GatewayConfigGuardrailAttachment[];
+};

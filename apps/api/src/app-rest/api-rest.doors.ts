@@ -17,6 +17,7 @@ import { mountAuthCliDeviceFlowRest } from "../features/auth/auth-cli-device-flo
 import { mountAuthRest } from "../features/auth/auth-rest.mount.ts";
 import { mountAgentRest } from "../features/agent/agent-rest.mount.ts";
 import { mountApiKeyRest } from "../features/api-key/api-key-rest.mount.ts";
+import { mountPromptsRest } from "../features/prompt/prompt-rest.mount.ts";
 import {
   mountCodingAgentRest,
   mountCodingAgentRollupRest,
@@ -147,7 +148,17 @@ export const API_REST_DOORS = [
     paths: ["/api/v1/projects/:projectId/analytics/*"],
   },
   { family: "query", owner: "process", paths: ["/api/v1/query"] },
-  { family: "prompts", owner: "process", paths: ["/api/prompts", "/api/v1/prompts"] },
+  {
+    family: "prompts",
+    owner: "module",
+    paths: ["/api/prompts", "/api/v1/prompts"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const prompts = packaged?.services.prompts;
+      if (!prompts) return null;
+
+      return [mountPromptsRest(runtime, { prompts })];
+    },
+  },
   {
     family: "organization-management",
     owner: "process",

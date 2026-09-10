@@ -2,7 +2,6 @@ export * from "./prompt.ts";
 export * from "./prompt.commands.ts";
 export * from "./prompt.trpc-schemas.ts";
 export * from "./prompt.errors.ts";
-export * from "./prompt.service.ts";
 export * from "./prompt.api.ts";
 export * from "./prompt.trpc.ts";
 export * from "./prompt-tag.trpc.ts";

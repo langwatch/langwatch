@@ -69,10 +69,7 @@ import type { AgentInfrastructure } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router.ts";
 import { installApiDataset } from "../features/dataset/dataset.composition.ts";
 import { installApiEvaluator } from "../features/evaluator/evaluator.composition.ts";
-import {
-  composePromptFeature,
-  refusingPromptFeature,
-} from "../features/prompt/prompt.composition.ts";
+import { installApiPrompt } from "../features/prompt/prompt.composition.ts";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { installApiFeatureFlag } from "../features/feature-flag/feature-flag.composition.ts";
@@ -1227,18 +1224,20 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // the projects a scheduled job is scoped to. It used to ride inside the agent half, which
     // cost every operator surface whenever a scenario collaborator was missing. A project's
     // datasets, its evaluators and its prompt library.
-    this.composedPrompt =
-      infrastructure && directory
-        ? composePromptFeature({
-            infrastructure,
-            peers: {
-              projects: directory.projects,
-              ...(this.composedModelProviders
-                ? { modelProviders: this.composedModelProviders }
-                : {}),
-            },
-          })
-        : refusingPromptFeature();
+    const promptPermissions = this.composedAuthz?.app;
+    if (!infrastructure || !directory || !promptPermissions) {
+      throw new Error(
+        "api prompt composition needs infrastructure, a directory and authorization: this process installed none",
+      );
+    }
+    this.composedPrompt = await installApiPrompt({
+      infrastructure,
+      peers: {
+        projects: directory.projects,
+        permissions: promptPermissions,
+        ...(this.composedModelProviders ? { modelProviders: this.composedModelProviders } : {}),
+      },
+    });
     this.composedOps = await this.composeOps(options, infrastructure, directory);
     // The setup checklist. Its provider step is answered by the model-provider feature's OWN
     // persistence rather than by a `prisma.modelProvider` read written in the checklist: the
@@ -2385,15 +2384,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           ...this.composedStoredObject.restServices,
           analytics: () => analytics,
           ...(langWatchQL ? { langWatchQL } : {}),
-          ...(promptApp
-            ? {
-                prompts: {
-                  service: () => promptApp.promptService,
-                  tagCatalog: () => promptApp,
-                  permissions: () => authz,
-                },
-              }
-            : {}),
           ...(organizationManagement ? { organizationManagement } : {}),
           ...(traceExport ? { traceExport } : {}),
           ...(scenarioRunExport ? { scenarioRunExport } : {}),
@@ -3038,6 +3028,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ...(this.composedCodingAgent.service
         ? { codingAgents: this.composedCodingAgent.service }
         : {}),
+      prompts: () => this.composedPrompt.app,
     });
   }
 
@@ -3822,7 +3813,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // than captured here: Langy is composed before most of them exist, and a
       // navigate only ever runs once a turn is in flight.
       navigateResources: ApiLangyNavigateResourceAdapter.create(() => ({
-        prompts: this.composedPrompt.app.promptService,
+        prompts: this.composedPrompt.app,
         datasets: this.composedDatasets,
         workflows: this.composedWorkflow.service,
         experiments: this.composedExperiment.experiments,

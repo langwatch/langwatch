@@ -213,7 +213,7 @@ export type GatewayBudgetScopeTarget = {
 };
 
 /**
- * The key format of the map `GatewayService.resolveScopeTargets` answers.
+ * The key format of the map the budget-decision scope-target read answers.
  *
  * It lives beside that map's value type because every caller of the method
  * has to build the same key to read it back, and a second spelling of

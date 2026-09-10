@@ -27,7 +27,6 @@ import type { CronRestPorts } from "../features/cron/cron-rest.ts";
 
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { PromptRestService, PromptTagCatalogAuthorization } from "@langwatch/prompt-server";
 
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -92,19 +91,6 @@ export type ApiRestServices = Readonly<{
     | Readonly<{
         collaborators: ApiLangWatchQLRestCollaborators;
         dashboard: () => DashboardApi;
-      }>
-    | undefined;
-  /**
-   * The prompt library `/api/prompts` reads and writes, plus the two things its
-   * tag doors need beyond the service: the application's organization-wide tag
-   * guard, and the engine that answers whether the CREDENTIAL a request arrived
-   * on may act in a sibling project.
-   */
-  prompts?:
-    | Readonly<{
-        service: () => PromptRestService;
-        tagCatalog: () => PromptTagCatalogAuthorization;
-        permissions: () => AuthzService;
       }>
     | undefined;
   /**

@@ -4,7 +4,7 @@
  * composition rather than a per-door port bag.
  */
 import { HandledError } from "@langwatch/handled-error";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-server";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -36,7 +36,7 @@ export type GatewayPeers = Readonly<{
   /** The project directory a virtual key's scope is resolved against. */
   projects: ProjectApi;
   /** The evaluators a guardrail rule runs, as the decision store reads them. */
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   /** The monitors a guardrail attachment names. */
   monitors: MonitorService;
 }>;
@@ -58,6 +58,7 @@ export type GatewayFeatureOptions = Readonly<{
   idempotency?: ApiGatewayIdempotencyPort | undefined;
 }>;
 
+import { createGatewayTrpcRouters } from "./gateway-trpc.mount.ts";
 import type { ComposedGatewayFeature } from "./gateway.composition.types.ts";
 
 /** Composes the gateway over this process's graph, or over its refusals. */
@@ -76,7 +77,11 @@ export function composeGatewayFeature(options: GatewayFeatureOptions): ComposedG
     ...(options.idempotency ? { idempotency: options.idempotency } : {}),
   });
 
-  return { app: composition.app, composition };
+  return {
+    app: composition.app,
+    composition,
+    routers: (mount) => createGatewayTrpcRouters(mount.runtime),
+  };
 }
 
 const logger: Pick<Logger, "info"> = createLogger("langwatch:api:gateway");
@@ -104,7 +109,14 @@ function refusingGateway(): ComposedGatewayFeature {
     has: () => true,
   });
 
-  return { app, composition: undefined };
+  // The three converted namespaces mount either way, so a client's inferred
+  // types never depend on the deployment shape; every call then refuses by
+  // name instead of showing a tenant with no budgets in it.
+  return {
+    app,
+    composition: undefined,
+    routers: (mount) => createGatewayTrpcRouters(mount.runtime),
+  };
 }
 
 /**
