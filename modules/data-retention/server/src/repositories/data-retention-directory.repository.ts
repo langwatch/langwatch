@@ -26,7 +26,7 @@ export type RetentionOrganizationDirectory = Readonly<{
   projects: ReadonlyArray<{ id: string; name: string; teamId: string; archived: boolean }>;
 }>;
 
-export abstract class DataRetentionDirectoryPort {
+export abstract class DataRetentionDirectoryRepository {
   /** The project the settings page was opened from, or null when there is none. */
   abstract findProjectLineage(input: {
     projectId: string;

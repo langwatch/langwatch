@@ -11,10 +11,10 @@
 import type { DataPrivacyScope } from "@langwatch/data-privacy-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
-  DataPrivacyDirectoryPort,
+  DataPrivacyDirectoryRepository,
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
-} from "../../ports/data-privacy-directory.port.ts";
+} from "../data-privacy-directory.repository.ts";
 
 /** Only what this repository touches. */
 export type DataPrivacyDirectoryDatabase = Pick<
@@ -22,7 +22,7 @@ export type DataPrivacyDirectoryDatabase = Pick<
   "project" | "team" | "department" | "group" | "organization"
 >;
 
-export class PrismaDataPrivacyDirectoryRepository extends DataPrivacyDirectoryPort {
+export class PrismaDataPrivacyDirectoryRepository extends DataPrivacyDirectoryRepository {
   static create(database: DataPrivacyDirectoryDatabase): PrismaDataPrivacyDirectoryRepository {
     return new PrismaDataPrivacyDirectoryRepository(database);
   }

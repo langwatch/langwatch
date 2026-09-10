@@ -65,7 +65,7 @@ func Ports(root, moduleDir string, apply bool, runner Runner, stdout, stderr io.
 	moduleServerDir := filepath.Join(root, moduleDir, "server")
 	for i := range entries {
 		e := &entries[i]
-		if e.Tier == TierInfrastructure {
+		if e.Tier == TierInfrastructure || e.Tier == TierSplit {
 			continue
 		}
 
@@ -133,7 +133,7 @@ func printPlan(w io.Writer, entries []Entry) {
 		fmt.Fprintln(w, "no ports/adapters files found")
 		return
 	}
-	fmt.Fprintf(w, "%-70s %-14s %-70s %s\n", "OLD PATH", "TIER", "NEW PATH", "SYMBOL")
+	fmt.Fprintf(w, "%-70s %-14s %-70s %-40s %s\n", "OLD PATH", "TIER", "NEW PATH", "SYMBOL", "REASON")
 	for _, e := range entries {
 		newPath := e.NewPath
 		if newPath == "" {
@@ -143,6 +143,9 @@ func printPlan(w io.Writer, entries []Entry) {
 		if e.NewSymbol != "" && e.NewSymbol != e.Symbol {
 			symbol = e.Symbol + " -> " + e.NewSymbol
 		}
-		fmt.Fprintf(w, "%-70s %-14s %-70s %s\n", e.OldPath, e.Tier, newPath, symbol)
+		if e.Tier == TierSplit {
+			symbol = "SPLIT: " + strings.Join(e.Exports, ", ")
+		}
+		fmt.Fprintf(w, "%-70s %-14s %-70s %-40s %s\n", e.OldPath, e.Tier, newPath, symbol, e.Reason)
 	}
 }

@@ -37,7 +37,7 @@ export {
   WebhookEventsClickHouseRepository,
   type WebhookClickHouseClientResolver,
 } from "./repositories/clickhouse/clickhouse.webhook-events.repository.ts";
-export { WebhookEventsRepositoryPort } from "./ports/webhook-events.port.ts";
+export { WebhookEventsRepository as WebhookEventsRepositoryPort } from "./repositories/webhook-events.repository.ts";
 export { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
 export type { WebhookRepositories } from "./repositories/webhook.repositories.ts";
 export {

@@ -1,7 +1,7 @@
 import {
-  WebhookEventsRepositoryPort,
+  WebhookEventsRepository,
   type WebhookEventsPage,
-} from "../../ports/webhook-events.port.ts";
+} from "../webhook-events.repository.ts";
 import type { WebhookSpendEventRow } from "../../services/webhook-envelope.service.ts";
 
 function idSuffixFor(status: WebhookSpendEventRow["status"]): string {
@@ -12,7 +12,7 @@ function idSuffixFor(status: WebhookSpendEventRow["status"]): string {
  *  driven without ClickHouse. Seeded through {@link put}: nothing in this
  *  package writes an event row itself, since projecting a gateway spend
  *  event is a ClickHouse concern the delivery worker owns. */
-export class MemoryWebhookEventsRepository extends WebhookEventsRepositoryPort {
+export class MemoryWebhookEventsRepository extends WebhookEventsRepository {
   readonly #rows: WebhookSpendEventRow[] = [];
 
   private constructor() {

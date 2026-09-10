@@ -26,7 +26,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
-import type { DataRetentionDirectoryPort } from "../ports/data-retention-directory.port.ts";
+import type { DataRetentionDirectoryRepository } from "../repositories/data-retention-directory.repository.ts";
 import type { DataRetentionPlanPort } from "../ports/data-retention-plan.port.ts";
 import type { StorageMeterClickHouseClient } from "../ports/storage-meter-clickhouse.port.ts";
 import {
@@ -56,7 +56,7 @@ export type TenantClickHouseClientResolver = (tenantId: string) => Promise<Click
 
 export type DataRetentionInfrastructure = Readonly<{
   /** Which organization owns a scope, what it is called, what it resolves to. */
-  directory: DataRetentionDirectoryPort;
+  directory: DataRetentionDirectoryRepository;
   /** What an organization's plan permits of its retention. */
   plans: DataRetentionPlanPort;
   redis: (DataRetentionRedis & StorageMeterRedis) | null;

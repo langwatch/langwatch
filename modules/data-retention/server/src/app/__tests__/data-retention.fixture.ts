@@ -8,10 +8,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 import {
-  DataRetentionDirectoryPort,
+  DataRetentionDirectoryRepository,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
-} from "../../ports/data-retention-directory.port.ts";
+} from "../../repositories/data-retention-directory.repository.ts";
 import {
   DataRetentionPlanPort,
   type DataRetentionPlan,
@@ -38,7 +38,7 @@ export const retentionTestGraph: RetentionTestDirectoryGraph = {
 };
 
 /** The lineage the gates read, over a single seeded graph. */
-export class MemoryRetentionDirectory extends DataRetentionDirectoryPort {
+export class MemoryRetentionDirectory extends DataRetentionDirectoryRepository {
   static create(graph: RetentionTestDirectoryGraph = retentionTestGraph): MemoryRetentionDirectory {
     return new MemoryRetentionDirectory(graph);
   }

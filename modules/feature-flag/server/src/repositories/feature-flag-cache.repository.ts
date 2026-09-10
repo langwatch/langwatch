@@ -19,7 +19,7 @@ export type FeatureFlagCacheSlot = { row: FeatureFlagRow | null };
  * Entries hold the row rather than a pre-evaluated boolean, so one entry
  * serves every tenant and targeting stays a per-call computation.
  */
-export abstract class FeatureFlagCachePort {
+export abstract class FeatureFlagCacheRepository {
   /** `undefined` is a miss; a slot holding `row: null` is a cached absence. */
   abstract findSlot(key: string): Promise<FeatureFlagCacheSlot | undefined>;
   abstract set(key: string, slot: FeatureFlagCacheSlot): Promise<void>;

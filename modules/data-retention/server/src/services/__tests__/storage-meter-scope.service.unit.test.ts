@@ -8,16 +8,16 @@ import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import {
-  DataRetentionDirectoryPort,
+  DataRetentionDirectoryRepository,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
-} from "../../ports/data-retention-directory.port.ts";
+} from "../../repositories/data-retention-directory.repository.ts";
 import { RetentionPermissionsService } from "../retention-permissions.service.ts";
 import { StorageMeterScopeService } from "../storage-meter-scope.service.ts";
 
 const ACTOR = { userId: "user_alice", email: "alice@example.com" };
 
-class StubDirectory extends DataRetentionDirectoryPort {
+class StubDirectory extends DataRetentionDirectoryRepository {
   constructor(
     private readonly lineage: RetentionProjectLineage | null,
     private readonly scopeProjects: ReadonlyArray<{ id: string; teamId: string }>,

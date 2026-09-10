@@ -48,7 +48,7 @@ func Inventory(root string, stdout, stderr io.Writer) []ModuleCounts {
 				if rerr != nil {
 					return nil
 				}
-				cl := Classify(string(data))
+				cl := Classify(path, string(data))
 				c.ByTier[cl.Tier]++
 				c.Total++
 				return nil

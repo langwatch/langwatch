@@ -6,11 +6,11 @@ import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contrac
 import type { DataPrivacyProjectLineage } from "@langwatch/data-privacy-server";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
-import { DataPrivacyDirectoryPort } from "../../ports/data-privacy-directory.port.ts";
+import { DataPrivacyDirectoryRepository } from "../../repositories/data-privacy-directory.repository.ts";
 import { DataPrivacyPermissionsService } from "../data-privacy-permissions.service.ts";
 import { DataPrivacyScopeAuthorizationService } from "../data-privacy-scope-authorization.service.ts";
 
-class FakeDirectory extends DataPrivacyDirectoryPort {
+class FakeDirectory extends DataPrivacyDirectoryRepository {
   constructor(
     private readonly rows: {
       lineage?: DataPrivacyProjectLineage | null;

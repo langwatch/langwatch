@@ -28,7 +28,7 @@ export type DataPrivacyOrganizationDirectory = Readonly<{
  * verticals' services: this package must not gain a write graph, an authz
  * service and three identity ports to print a team's name beside a rule.
  */
-export abstract class DataPrivacyDirectoryPort {
+export abstract class DataPrivacyDirectoryRepository {
   /** The project the settings page was opened from, or null when there is none. */
   abstract tryGetProjectLineage(input: {
     projectId: string;

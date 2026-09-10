@@ -1,7 +1,7 @@
 import {
-  WebhookEventsRepositoryPort,
+  WebhookEventsRepository,
   type WebhookEventsPage,
-} from "../../ports/webhook-events.port.ts";
+} from "../webhook-events.repository.ts";
 import type {
   WebhookSpendEventRow,
   WebhookSpendEventStatus,
@@ -112,7 +112,7 @@ function parseEventId(id: string): { gatewayRequestId: string; statuses: string[
   return null;
 }
 
-export class WebhookEventsClickHouseRepository extends WebhookEventsRepositoryPort {
+export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
   private constructor(private readonly resolveClient: WebhookClickHouseClientResolver) {
     super();
   }

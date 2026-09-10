@@ -17,7 +17,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.port.ts";
+import type { DataPrivacyDirectoryRepository } from "../repositories/data-privacy-directory.repository.ts";
 import type { PiiAnalysisPort } from "../ports/pii-analysis.port.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
@@ -29,7 +29,7 @@ import { OtlpSpanPiiRedactionService } from "../services/otlp-span-pii-redaction
 
 export type DataPrivacyInfrastructure = Readonly<{
   /** Which organization owns a scope target, and what each scope is called. */
-  directory: DataPrivacyDirectoryPort;
+  directory: DataPrivacyDirectoryRepository;
   ttlMs?: number;
   now?: () => number;
 }> &

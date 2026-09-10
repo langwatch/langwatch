@@ -11,9 +11,9 @@ export type {
  * feature deliberately does not own.
  */
 export {
-  DataRetentionDirectoryPort,
+  DataRetentionDirectoryRepository as DataRetentionDirectoryPort,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
-} from "./ports/data-retention-directory.port.ts";
+} from "./repositories/data-retention-directory.repository.ts";
 export { DataRetentionPlanPort, type DataRetentionPlan } from "./ports/data-retention-plan.port.ts";
 export { PrismaDataRetentionDirectoryRepository } from "./repositories/prisma/prisma.data-retention-directory.repository.ts";

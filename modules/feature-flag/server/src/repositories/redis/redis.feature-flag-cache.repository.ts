@@ -1,9 +1,9 @@
 import { KILL_SWITCH_CACHE_TTL_MS, featureFlagRulesSchema } from "@langwatch/feature-flag-contract";
 import { z } from "zod";
 import {
-  FeatureFlagCachePort,
+  FeatureFlagCacheRepository,
   type FeatureFlagCacheSlot,
-} from "../ports/feature-flag-cache.port.ts";
+} from "../feature-flag-cache.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
 const CACHE_PREFIX = "feature_flag_store:v2:";
@@ -27,11 +27,11 @@ export interface FeatureFlagRedisConnection {
   del(key: string): Promise<unknown>;
 }
 
-export class RedisFeatureFlagCacheAdapter extends FeatureFlagCachePort {
+export class RedisFeatureFlagCacheRepository extends FeatureFlagCacheRepository {
   private readonly memory = new Map<string, MemoryEntry>();
 
-  static create(redis: FeatureFlagRedisConnection | null): RedisFeatureFlagCacheAdapter {
-    return new RedisFeatureFlagCacheAdapter(redis);
+  static create(redis: FeatureFlagRedisConnection | null): RedisFeatureFlagCacheRepository {
+    return new RedisFeatureFlagCacheRepository(redis);
   }
 
   private constructor(private readonly redis: FeatureFlagRedisConnection | null) {

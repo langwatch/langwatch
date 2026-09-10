@@ -17,7 +17,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
-import type { DataRetentionDirectoryPort } from "../ports/data-retention-directory.port.ts";
+import type { DataRetentionDirectoryRepository } from "../repositories/data-retention-directory.repository.ts";
 import type {
   DataRetentionPlan,
   DataRetentionPlanPort,
@@ -28,7 +28,7 @@ import type { RetentionPermissionsService } from "./retention-permissions.servic
 export type RetentionActor = Readonly<{ userId: string; email: string | null }>;
 
 export type DataRetentionPolicyServiceOptions = Readonly<{
-  directory: DataRetentionDirectoryPort;
+  directory: DataRetentionDirectoryRepository;
   permissions: RetentionPermissionsService;
   plans: DataRetentionPlanPort;
   /** The platform-operator allow-list, which is an address list rather than a grant. */

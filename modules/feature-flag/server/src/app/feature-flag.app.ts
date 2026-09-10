@@ -25,7 +25,7 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
-import type { FeatureFlagCachePort } from "../ports/feature-flag-cache.port.ts";
+import type { FeatureFlagCacheRepository } from "../repositories/feature-flag-cache.repository.ts";
 import type { FeatureFlagRepositories } from "../repositories/feature-flag.repositories.ts";
 import { FeatureFlagService } from "../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../services/organization-created-at-cache.service.ts";
@@ -36,7 +36,7 @@ import { CachedFeatureFlagRowAdapter } from "../adapters/cached.feature-flag-row
  * this deployment's environment overrides, and the clock.
  */
 export type FeatureFlagInfrastructure = Readonly<{
-  cache: FeatureFlagCachePort;
+  cache: FeatureFlagCacheRepository;
   config: FeatureFlagConfig;
   now?: () => number;
 }>;

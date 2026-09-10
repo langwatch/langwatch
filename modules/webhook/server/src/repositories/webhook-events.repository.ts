@@ -5,7 +5,7 @@ export type WebhookEventsPage = {
   nextCursor: string | null;
 };
 
-export abstract class WebhookEventsRepositoryPort {
+export abstract class WebhookEventsRepository {
   abstract readEmittedEventsPage(input: {
     tenantIds: string[];
     fromMs?: number;

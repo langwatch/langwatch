@@ -1,5 +1,5 @@
 import type { FeatureFlagRules, StoredFeatureFlag } from "@langwatch/feature-flag-contract";
-import type { FeatureFlagRow } from "../ports/feature-flag-cache.port.ts";
+import type { FeatureFlagRow } from "./feature-flag-cache.repository.ts";
 
 /**
  * The operator rows. The FeatureFlag table is cluster-wide and carries no

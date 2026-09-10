@@ -43,42 +43,14 @@ func tierPrefix(t Tier) string {
 	}
 }
 
-var kindSuffixes = map[string]bool{"port": true, "adapter": true, "store": true}
-
-// subjectName derives the repository subject from a ports/adapters filename:
-// drop the .ts extension, drop the trailing port/adapter/store qualifier, and
-// keep the last remaining dot-segment (a leading "redis."/"absent." prefix is
-// a tier or variant hint, not part of the subject).
-func subjectName(filename string) string {
-	base := strings.TrimSuffix(filename, filepath.Ext(filename))
-	parts := strings.Split(base, ".")
-	if len(parts) > 1 && kindSuffixes[strings.ToLower(parts[len(parts)-1])] {
-		parts = parts[:len(parts)-1]
-	}
-	return parts[len(parts)-1]
-}
-
-func pascalCase(kebab string) string {
-	parts := strings.FieldsFunc(kebab, func(r rune) bool { return r == '-' || r == '_' })
-	var b strings.Builder
-	for _, p := range parts {
-		if p == "" {
-			continue
-		}
-		b.WriteString(strings.ToUpper(p[:1]))
-		b.WriteString(p[1:])
-	}
-	return b.String()
-}
-
 // PlanEntry classifies one file and computes its destination, given the
 // module's server/src directory (repository-relative).
 func PlanEntry(oldPath, serverSrc, content string) Entry {
-	c := Classify(content)
+	c := Classify(oldPath, content)
 	name := subjectName(filepath.Base(oldPath))
 	e := Entry{OldPath: oldPath, Classification: c, Name: name}
 
-	if c.Tier == TierInfrastructure {
+	if c.Tier == TierInfrastructure || c.Tier == TierSplit {
 		return e
 	}
 

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { KILL_SWITCH_CACHE_TTL_MS } from "@langwatch/feature-flag-contract";
 import {
-  RedisFeatureFlagCacheAdapter,
+  RedisFeatureFlagCacheRepository,
   type FeatureFlagRedisConnection,
-} from "../redis.feature-flag-cache.adapter.ts";
+} from "../../repositories/redis/redis.feature-flag-cache.repository.ts";
 
 function redisReturning(value: string | null): FeatureFlagRedisConnection {
   return {
@@ -19,7 +19,7 @@ afterEach(() => {
 
 describe("RedisFeatureFlagCacheAdapter", () => {
   it("falls back to the bounded memory entry when Redis returns malformed JSON", async () => {
-    const cache = RedisFeatureFlagCacheAdapter.create(redisReturning("not-json"));
+    const cache = RedisFeatureFlagCacheRepository.create(redisReturning("not-json"));
     await cache.set("flag", { row: { enabled: true, rules: [] } });
 
     await expect(cache.findSlot("flag")).resolves.toEqual({
@@ -28,7 +28,7 @@ describe("RedisFeatureFlagCacheAdapter", () => {
   });
 
   it("treats malformed Redis data as a miss when no memory fallback exists", async () => {
-    const cache = RedisFeatureFlagCacheAdapter.create(
+    const cache = RedisFeatureFlagCacheRepository.create(
       redisReturning(JSON.stringify({ row: { enabled: "yes", rules: [] } })),
     );
 
@@ -37,7 +37,7 @@ describe("RedisFeatureFlagCacheAdapter", () => {
 
   it("expires the memory fallback at the configured cache TTL", async () => {
     vi.useFakeTimers();
-    const cache = RedisFeatureFlagCacheAdapter.create(null);
+    const cache = RedisFeatureFlagCacheRepository.create(null);
     await cache.set("flag", { row: null });
 
     await expect(cache.findSlot("flag")).resolves.toEqual({ row: null });

@@ -11,7 +11,7 @@ import {
   type DataPrivacyScopeType,
 } from "@langwatch/data-privacy-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
-import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.port.ts";
+import type { DataPrivacyDirectoryRepository } from "../repositories/data-privacy-directory.repository.ts";
 import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
 
 export class DataPrivacyScopeAuthorizationService {
@@ -35,14 +35,14 @@ export class DataPrivacyScopeAuthorizationService {
   }
 
   static create(options: {
-    directory: DataPrivacyDirectoryPort;
+    directory: DataPrivacyDirectoryRepository;
     permissions: DataPrivacyPermissionsService;
   }): DataPrivacyScopeAuthorizationService {
     return new DataPrivacyScopeAuthorizationService(options.directory, options.permissions);
   }
 
   private constructor(
-    private readonly directory: DataPrivacyDirectoryPort,
+    private readonly directory: DataPrivacyDirectoryRepository,
     private readonly permissions: DataPrivacyPermissionsService,
   ) {}
 

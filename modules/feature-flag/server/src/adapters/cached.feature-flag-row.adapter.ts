@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { FeatureFlagCachePort, FeatureFlagRow } from "../ports/feature-flag-cache.port.ts";
+import type { FeatureFlagCacheRepository, FeatureFlagRow } from "../repositories/feature-flag-cache.repository.ts";
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
 import { FeatureFlagRowStore } from "../stores/feature-flag-row.store.ts";
 
@@ -25,7 +25,7 @@ export class CachedFeatureFlagRowAdapter extends FeatureFlagRowStore {
 
   private constructor(
     private readonly repository: FeatureFlagRepository,
-    private readonly cache: FeatureFlagCachePort,
+    private readonly cache: FeatureFlagCacheRepository,
     private readonly now: () => number,
   ) {
     super();
@@ -33,7 +33,7 @@ export class CachedFeatureFlagRowAdapter extends FeatureFlagRowStore {
 
   static create(options: {
     repository: FeatureFlagRepository;
-    cache: FeatureFlagCachePort;
+    cache: FeatureFlagCacheRepository;
     now: () => number;
   }): CachedFeatureFlagRowAdapter {
     return new CachedFeatureFlagRowAdapter(options.repository, options.cache, options.now);

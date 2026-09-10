@@ -11,7 +11,7 @@ import {
   type DataPrivacyScopeType,
   type DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.port.ts";
+import type { DataPrivacyDirectoryRepository } from "../repositories/data-privacy-directory.repository.ts";
 import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
 
 /**
@@ -25,7 +25,7 @@ export type DataPrivacySnapshotPolicies = Readonly<{
 }>;
 
 type DataPrivacyDirectory = Awaited<
-  ReturnType<DataPrivacyDirectoryPort["listOrganizationDirectory"]>
+  ReturnType<DataPrivacyDirectoryRepository["listOrganizationDirectory"]>
 >;
 
 /** Reading a scope: whether this user may see its rule, and what the scope is called. */
@@ -37,7 +37,7 @@ type ScopeLens = {
 export class DataPrivacySnapshotService {
   static create(options: {
     policies: DataPrivacySnapshotPolicies;
-    directory: DataPrivacyDirectoryPort;
+    directory: DataPrivacyDirectoryRepository;
     permissions: DataPrivacyPermissionsService;
   }): DataPrivacySnapshotService {
     return new DataPrivacySnapshotService(options.policies, options.directory, options.permissions);
@@ -45,7 +45,7 @@ export class DataPrivacySnapshotService {
 
   private constructor(
     private readonly policies: DataPrivacySnapshotPolicies,
-    private readonly directory: DataPrivacyDirectoryPort,
+    private readonly directory: DataPrivacyDirectoryRepository,
     private readonly permissions: DataPrivacyPermissionsService,
   ) {}
 

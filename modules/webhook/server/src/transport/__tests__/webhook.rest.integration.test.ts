@@ -14,9 +14,9 @@ import { describe, expect, it } from "vitest";
 
 import type { WebhookAppDependencies } from "../../app/webhook.app.ts";
 import {
-  WebhookEventsRepositoryPort,
+  WebhookEventsRepository,
   type WebhookEventsPage,
-} from "../../ports/webhook-events.port.ts";
+} from "../../repositories/webhook-events.repository.ts";
 import { WebhookTenantsRepository } from "../../repositories/webhook-tenants.repository.ts";
 import {
   WebhookEnvelopeService,
@@ -54,7 +54,7 @@ function statusesForSuffix(suffix: string): string[] {
  * events), and an unrecognised `type` yields an empty page rather than an
  * error.
  */
-class FakeWebhookEventsRepository extends WebhookEventsRepositoryPort {
+class FakeWebhookEventsRepository extends WebhookEventsRepository {
   constructor(private readonly rows: WebhookSpendEventRow[]) {
     super();
   }

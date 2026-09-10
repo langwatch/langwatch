@@ -6,10 +6,10 @@
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
-  DataRetentionDirectoryPort,
+  DataRetentionDirectoryRepository,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
-} from "../../ports/data-retention-directory.port.ts";
+} from "../data-retention-directory.repository.ts";
 
 /** Only what this repository touches. */
 export type DataRetentionDirectoryDatabase = Pick<
@@ -17,7 +17,7 @@ export type DataRetentionDirectoryDatabase = Pick<
   "project" | "team" | "organization"
 >;
 
-export class PrismaDataRetentionDirectoryRepository extends DataRetentionDirectoryPort {
+export class PrismaDataRetentionDirectoryRepository extends DataRetentionDirectoryRepository {
   static create(database: DataRetentionDirectoryDatabase): PrismaDataRetentionDirectoryRepository {
     return new PrismaDataRetentionDirectoryRepository(database);
   }

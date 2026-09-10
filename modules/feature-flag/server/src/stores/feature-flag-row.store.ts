@@ -1,4 +1,4 @@
-import type { FeatureFlagRow } from "../ports/feature-flag-cache.port.ts";
+import type { FeatureFlagRow } from "../repositories/feature-flag-cache.repository.ts";
 
 /**
  * One operator row as the resolver reads it, with the caching tiers behind

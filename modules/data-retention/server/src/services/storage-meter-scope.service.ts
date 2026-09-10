@@ -4,14 +4,14 @@
  * (organization / team / project) instead of only ever showing the project on the top nav.
  */
 import type { RetentionStorageUsage, ScopeAssignment } from "@langwatch/data-retention-contract";
-import type { DataRetentionDirectoryPort } from "../ports/data-retention-directory.port.ts";
+import type { DataRetentionDirectoryRepository } from "../repositories/data-retention-directory.repository.ts";
 import type { RetentionActor } from "./data-retention-policy.service.ts";
 import type { RetentionPermissionsService } from "./retention-permissions.service.ts";
 import type { StorageMeterService } from "./storage-meter.service.ts";
 
 export type StorageMeterScopeServiceOptions = Readonly<{
   meter: Pick<StorageMeterService, "getTotalStorageBytes" | "getTotalStorageBytesForTenants">;
-  directory: DataRetentionDirectoryPort;
+  directory: DataRetentionDirectoryRepository;
   permissions: RetentionPermissionsService;
 }>;
 

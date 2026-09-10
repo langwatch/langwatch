@@ -3,13 +3,13 @@ import {
   type ListWebhookEventsResult,
   type WebhookEnvelope,
 } from "@langwatch/webhook-contract";
-import type { WebhookEventsRepositoryPort } from "../ports/webhook-events.port.ts";
+import type { WebhookEventsRepository } from "../repositories/webhook-events.repository.ts";
 import { WebhookTenantsRepository } from "../repositories/webhook-tenants.repository.ts";
 import { WebhookEnvelopeService } from "./webhook-envelope.service.ts";
 
 export type WebhookEventsServiceOptions = {
   tenants: WebhookTenantsRepository;
-  events: WebhookEventsRepositoryPort;
+  events: WebhookEventsRepository;
   envelopes: WebhookEnvelopeService;
 };
 
@@ -25,7 +25,7 @@ export type WebhookProjectReader = {
 
 export type LegacyWebhookEventsServiceOptions = {
   prisma: WebhookProjectReader;
-  repository: WebhookEventsRepositoryPort;
+  repository: WebhookEventsRepository;
 };
 
 class StructuralWebhookTenantsRepository extends WebhookTenantsRepository {

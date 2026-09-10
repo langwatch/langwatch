@@ -7,10 +7,10 @@ export type { DataPrivacyInfrastructure } from "./app/data-privacy.app.ts";
  * the process that owns them supplies them.
  */
 export {
-  DataPrivacyDirectoryPort,
+  DataPrivacyDirectoryRepository as DataPrivacyDirectoryPort,
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
-} from "./ports/data-privacy-directory.port.ts";
+} from "./repositories/data-privacy-directory.repository.ts";
 export { DataPrivacyProjectPort, DataPrivacyResolutionPort } from "./ports/data-privacy.port.ts";
 export {
   PiiAnalysisMetricsPort,

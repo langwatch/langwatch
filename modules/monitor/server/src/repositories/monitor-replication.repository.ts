@@ -7,7 +7,7 @@
  * cross-project reference. The actor is named because the copied workflow's
  * first saved version is recorded against whoever asked for the copy.
  */
-export abstract class MonitorReplicationPort {
+export abstract class MonitorReplicationRepository {
   abstract copyEvaluatorToProject(
     input: Readonly<{
       evaluatorId: string;

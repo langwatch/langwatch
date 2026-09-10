@@ -46,7 +46,7 @@ import { ZodError } from "zod";
 
 import type { MonitorEvaluatorPort } from "../ports/monitor-evaluator.port.ts";
 import type { MonitorPerformancePort } from "../ports/monitor-performance.port.ts";
-import type { MonitorReplicationPort } from "../ports/monitor-replication.port.ts";
+import type { MonitorReplicationRepository } from "../repositories/monitor-replication.repository.ts";
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
 import { MonitorCatalogService } from "../services/monitor-catalog.service.ts";
 import { MonitorService } from "../services/monitor.service.ts";
@@ -61,7 +61,7 @@ export interface MonitorAppInfrastructure {
   /** The online-evaluation results the seven-day trend is folded from. */
   performance: MonitorPerformancePort;
   /** Copying an evaluator, and its workflow, into another project. */
-  replication: MonitorReplicationPort;
+  replication: MonitorReplicationRepository;
   /** Mints the id a new monitor row is written under. */
   generateId: () => string;
 }
@@ -81,7 +81,7 @@ export class MonitorApp implements MonitorApi {
   #catalogue: MonitorCatalogService;
   #permissions: AuthzApi;
   #performance: MonitorPerformancePort;
-  #replication: MonitorReplicationPort;
+  #replication: MonitorReplicationRepository;
   #evaluators: MonitorEvaluatorPort;
 
   private constructor(

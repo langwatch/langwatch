@@ -4,10 +4,10 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  DataRetentionDirectoryPort,
+  DataRetentionDirectoryRepository,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
-} from "../../ports/data-retention-directory.port.ts";
+} from "../../repositories/data-retention-directory.repository.ts";
 import {
   DataRetentionPlanPort,
   type DataRetentionPlan,
@@ -18,7 +18,7 @@ import { RetentionPermissionsService } from "../retention-permissions.service.ts
 
 const ACTOR = { userId: "user_alice", email: "alice@example.com" };
 
-class StubDirectory extends DataRetentionDirectoryPort {
+class StubDirectory extends DataRetentionDirectoryRepository {
   constructor(private readonly organizationId: string | null) {
     super();
   }

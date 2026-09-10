@@ -2,10 +2,10 @@ import type { DataPrivacyScope, ResolvedDataPrivacy } from "@langwatch/data-priv
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
-  DataPrivacyDirectoryPort,
+  DataPrivacyDirectoryRepository,
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
-} from "../../ports/data-privacy-directory.port.ts";
+} from "../../repositories/data-privacy-directory.repository.ts";
 import { DataPrivacyResolutionPort } from "../../ports/data-privacy.port.ts";
 import { PiiAnalysisPort } from "../../ports/pii-analysis.port.ts";
 
@@ -21,7 +21,7 @@ export class DataPrivacyResolutionFake extends DataPrivacyResolutionPort {
 }
 
 /** One organization's lineage, held in the test rather than in Postgres. */
-export class MemoryDataPrivacyDirectory extends DataPrivacyDirectoryPort {
+export class MemoryDataPrivacyDirectory extends DataPrivacyDirectoryRepository {
   static create(
     rows: {
       lineage?: DataPrivacyProjectLineage;
