@@ -104,9 +104,8 @@ export interface TraceExportRestPorts<
   exportFailedError(cause: unknown): Error;
 }
 
-export const TraceExportApi = moduleApi<
-  TraceExportRestPorts<TraceExportRequestFields, unknown, unknown>
->("trace");
+export const TraceExportApi =
+  moduleApi<TraceExportRestPorts<TraceExportRequestFields, unknown, unknown>>("trace");
 
 /** A JSON answer this door writes itself. */
 const jsonAnswer = (body: unknown, status: number): Response =>
@@ -201,7 +200,7 @@ export const traceExportRest = defineRestRouter(TraceExportApi)
   .withAccess(deferredScope({ reason: SESSION_REASON }))
   .withRawResponse({ produces: "application/octet-stream" })
   .withDocs({ hide: true })
-  .handle(async ({ app, raw, request }): Promise<RestRawResult> => {
+  .handle(async ({ app, raw, request: httpRequest }): Promise<RestRawResult> => {
     let parsedBody: unknown;
     try {
       parsedBody = JSON.parse(raw as string);
@@ -215,10 +214,14 @@ export const traceExportRest = defineRestRouter(TraceExportApi)
     }
     const request = parsed.data;
 
-    const session = await app.resolveSession(request);
+    const session = await app.resolveSession(httpRequest);
     if (!session) throw app.unauthenticatedError();
 
-    const hasPermission = await app.probeProjectPermission(session, request.projectId, "traces:view");
+    const hasPermission = await app.probeProjectPermission(
+      session,
+      request.projectId,
+      "traces:view",
+    );
     if (!hasPermission) {
       return jsonAnswer({ error: "You do not have permission to access this endpoint." }, 403);
     }
