@@ -90,6 +90,16 @@ no `as never`, no `ctx: unknown`, no non-null `!`, no inline `import()`, no
 files, no file under twenty lines, `it("does x")`, nested describe given/when,
 assert on `code` not message prose, every `@scenario` annotation kept bound.
 
+Identifier work goes through tslsp-cli, not grep or sed: from the package
+directory (the one holding the tsconfig.json), `npx --no-install
+@0xdeafcafe/tslsp-cli references --symbol Name --summary` for consumers,
+`rename --symbol Old --new-name New --dry-run` then without `--dry-run` for a
+rename, `rename-file OLD NEW` for a move (it rewrites every import),
+`diagnostics --file F` after an edit. A package's program sees its own files
+and its workspace dependencies, so consumers in apps/ are found by running the
+same command from apps/api or apps/worker. Every pnpm, vitest, git and grep
+command is prefixed with `rtk ` (the token filter on this machine).
+
 ## Cache window
 
 A lane's prompt cache lives five minutes. One tool call or wait longer than
