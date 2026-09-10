@@ -31,6 +31,9 @@ export {
 } from "./trace.api.ts";
 export * from "./trace-record.ts";
 export * from "./trace.errors.ts";
+export * from "./traces.trpc.ts";
+export * from "./spans.trpc.ts";
+export * from "./trace-edit-overlay.trpc.ts";
 export * from "./trace-projection.ts";
 export * from "./trace-processing.commands.ts";
 export * from "./trace-topic-assignment.ts";

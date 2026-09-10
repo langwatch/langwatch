@@ -189,6 +189,7 @@ export function composeTraceAppDependencies(
     codingAgents: options.codingAgents,
     share: options.share,
     broadcast: options.broadcast,
+    protections,
   };
 }
 

@@ -1,4 +1,4 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import {
   TraceIngestionUnavailableError,
   recordCapturedSpanInputSchema,
@@ -69,6 +69,7 @@ import type {
 } from "@langwatch/trace-contract";
 import type { TraceLegacyReadPort } from "../ports/trace-legacy-read.port.ts";
 import type { TraceExistencePort } from "../ports/trace-existence.port.ts";
+import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
 import { TraceContentReadServiceImpl } from "../services/trace-content-read.service.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
 import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
@@ -324,6 +325,7 @@ export type TraceProjectReader = Readonly<{
 export interface TraceAppDependencies {
   spanIngest?: TraceSpanIngestPort;
   viewer?: TraceViewerService;
+  protections?: TraceViewerProtectionService;
   annotationCommands?: TraceAnnotationCommands;
   traces: Readonly<{
     existence: TraceExistencePort;
@@ -456,6 +458,15 @@ export class TraceApp implements TraceApi {
   readForViewer(input: Parameters<TraceViewerService["readForViewer"]>[0]) {
     if (!this.#dependencies.viewer) throw new Error("Trace viewer service is unavailable");
     return this.#dependencies.viewer.readForViewer(input);
+  }
+
+  resolveViewerProtections(input: { projectId: string; userId: string | null }): Promise<Protections> {
+    if (!this.#dependencies.protections) throw new Error("Trace protections service is unavailable");
+    return this.#dependencies.protections.resolve({
+      projectId: input.projectId,
+      userId: input.userId ?? void 0,
+      publiclyShared: false,
+    });
   }
 
   findExistingTraceIds(input: {
@@ -1072,7 +1083,7 @@ export class TraceApp implements TraceApi {
    * Saves the correction, attributed to the caller who asked for it. The door used to stamp the reviewer twice — once on a trace's first correction, once on every replacement — two chances to stamp it differently or not at all.
    */
   saveTraceEditOverlay(
-    input: { projectId: string; traceId: string; patch: unknown },
+    input: { projectId: string; traceId: string; patch: TraceEditOverlayPatch },
     by: TraceCaller,
   ): Promise<TraceEditOverlayDto> {
     return this.#dependencies.traces.editOverlay.upsert({

@@ -1,4 +1,6 @@
 import type { Trace } from "./trace-format.schemas.ts";
+import type { Protections } from "./trace-viewer-protections.contract.ts";
+import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "./trace-edit-overlay.contract.ts";
 import type { RecordCapturedSpanInput } from "./trace-captured-span.commands.ts";
 import type { Span } from "./trace-format.schemas.ts";
 import type {
@@ -128,6 +130,8 @@ export interface TraceApi {
     userId: string;
     traceIds: readonly string[];
   }): Promise<Trace[]>;
+  /** The caller's read-time redactions for one project, resolved from who they are. */
+  resolveViewerProtections(input: { projectId: string; userId: string | null }): Promise<Protections>;
   findExistingTraceIds(input: {
     projectId: string;
     traceIds: readonly string[];
@@ -315,11 +319,14 @@ export interface TraceApi {
     input: { projectId: string; traceId: string; newName: string; occurredAt?: number },
     by: { id: string },
   ): Promise<unknown>;
-  readTraceEditOverlay(input: { projectId: string; traceId: string }): Promise<unknown>;
+  readTraceEditOverlay(input: {
+    projectId: string;
+    traceId: string;
+  }): Promise<TraceEditOverlayDto | null>;
   saveTraceEditOverlay(
-    input: { projectId: string; traceId: string; patch: unknown },
+    input: { projectId: string; traceId: string; patch: TraceEditOverlayPatch },
     by: { id: string },
-  ): Promise<unknown>;
+  ): Promise<TraceEditOverlayDto>;
   deleteTraceEditOverlay(input: { projectId: string; traceId: string }): Promise<void>;
   readEvaluationRuns(input: { tenantId: string; traceId: string }): Promise<unknown>;
   readCodingAgentSession(input: { projectId: string; traceId: string }): Promise<unknown>;
