@@ -6,6 +6,7 @@
  * the run dialog's configuration history.
  */
 
+import { simulationTargetSchema } from "./simulation-target.ts";
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
@@ -89,14 +90,6 @@ export const scenarioTrpcUpdateSchema = projectSchema.extend({
   // the newer save. Absent = save over whatever is there.
   expectedVersion: z.number().int().min(1).optional(),
 });
-
-/** Target for scenario simulation, extensible by type. */
-export const simulationTargetSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow"]),
-  referenceId: z.string(),
-});
-
-export type SimulationTarget = z.infer<typeof simulationTargetSchema>;
 
 export const scenarioTrpcRunSchema = projectSchema.extend({
   scenarioId: z.string(),
