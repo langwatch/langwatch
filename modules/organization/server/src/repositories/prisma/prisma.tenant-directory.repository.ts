@@ -1,4 +1,6 @@
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { TenantDirectory } from "@langwatch/clickhouse-client";
+import { TenantDirectoryService, type TenantOwnershipReader } from "../../services/tenant-directory.service.ts";
 
 export type TenantDirectoryClient = PrismaClient | Prisma.TransactionClient;
 
@@ -58,4 +60,27 @@ export class PrismaTenantDirectoryRepository {
 
     return user !== null;
   }
+}
+
+/**
+ * Binds this deployment's Postgres to the routing directory, for a process
+ * that wants the {@link TenantDirectory} shape without booting the whole
+ * organization module (the worker's tenancy lane). Replaces the deleted
+ * `PostgresTenantDirectoryAdapter` class.
+ */
+export function bindTenantDirectoryReader(
+  database: PrismaClient,
+): TenantDirectory & TenantOwnershipReader {
+  const tenants = PrismaTenantDirectoryRepository.create();
+  const reader: TenantOwnershipReader = {
+    tryFindProjectOrganizationId: (tenantId) =>
+      tenants.tryFindProjectOrganizationId({ client: database, tenantId }),
+    organizationExists: (tenantId) => tenants.organizationExists({ client: database, tenantId }),
+    userExists: (tenantId) => tenants.userExists({ client: database, tenantId }),
+  };
+  const directory = TenantDirectoryService.create(reader);
+  return {
+    ...reader,
+    organizationForTenant: (tenantId) => directory.tryFindOrganizationForTenant(tenantId),
+  };
 }

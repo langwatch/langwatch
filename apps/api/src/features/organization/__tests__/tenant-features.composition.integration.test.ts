@@ -10,7 +10,7 @@ import type {
 } from "@langwatch/authz-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { GithubService } from "@langwatch/github-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -216,7 +216,7 @@ async function composeApplication() {
     defaultRetentionDays: 90,
     peers: {
       projects,
-      github: {} as unknown as GithubService,
+      github: {} as unknown as GithubApi,
       // No ClickHouse: a coding-agent session is a projection there, so the
       // package's own null repositories answer emptily.
       clickHouse: null,

@@ -141,7 +141,10 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     this.memory.organizationUsers.push({
       userId: input.workspace.userId,
       organizationId: input.workspace.organizationId,
+      role: "MEMBER",
       disabledAt: null,
+      createdAt: now,
+      updatedAt: now,
     });
 
     const created = this.findWorkspace(input.workspace);

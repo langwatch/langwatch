@@ -12,6 +12,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { organizationRepositories } from "@langwatch/organization-server";
 import { instantiateRepositories } from "@langwatch/runtime-composition";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -264,5 +265,36 @@ describe("given the memory-backed organization repositories", () => {
     await expect(
       repositories.team.get({ teamId: created.id, organizationId: ORGANIZATION_ID }),
     ).resolves.toMatchObject({ id: "team-mem-1", name: "Memory Team", slug: "memory-team" });
+  });
+
+  /**
+   * `membership` shares the SAME in-memory database `organization` and `team`
+   * do (`MemoryOrganizationDatabase`): a sign-up written through `membership`
+   * is what the caller's own membership read answers back, the way a real
+   * Postgres transaction and the next `SELECT` on the same connection would.
+   */
+  it("reads back the admin seat a sign-up just wrote", async () => {
+    const repositories = instantiateRepositories(organizationRepositories, {
+      backend: "memory",
+      infrastructure: {},
+    });
+
+    const membership = repositories.membership(createApiFixture<AuthzGrantsService>());
+    const created = await membership.createAndAssign({
+      userId: "user-mem-1",
+      orgId: "org-mem-1",
+      orgName: "Memory Org",
+      orgSlug: "memory-org",
+      teamId: "team-mem-2",
+      teamSlug: "memory-org-team",
+      pricingModel: "SEAT_EVENT",
+    });
+
+    await expect(
+      membership.tryGetUserOrgRole({
+        userId: "user-mem-1",
+        organizationId: created.organization.id,
+      }),
+    ).resolves.toBe("ADMIN");
   });
 });

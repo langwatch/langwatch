@@ -1,4 +1,9 @@
-import type { OrganizationIntent, PersonalFeatures } from "@langwatch/organization-contract";
+import type {
+  OrganizationIntent,
+  OrganizationUserRole,
+  PersonalFeatures,
+  TeamUserRole,
+} from "@langwatch/organization-contract";
 
 /** One organization row, the fields the organization repository owns. */
 export interface MemoryOrganizationRow {
@@ -35,7 +40,56 @@ export interface MemoryTeamRow {
 export interface MemoryOrganizationUserRow {
   userId: string;
   organizationId: string;
+  role: OrganizationUserRole;
   disabledAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** One person, the fields the membership repository joins against. */
+export interface MemoryUserRow {
+  id: string;
+  name: string | null;
+  email: string | null;
+  deactivatedAt: Date | null;
+}
+
+/** One team-scoped membership row (the `TeamUser` join table). */
+export interface MemoryTeamUserRow {
+  teamId: string;
+  userId: string;
+  role: TeamUserRole;
+  customRoleId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** One custom role, the fields a seat's assignability check reads. */
+export interface MemoryCustomRoleRow {
+  id: string;
+  organizationId: string;
+  name: string;
+  kind: string;
+  permissions: unknown;
+}
+
+/** One audit-trail entry, platform or gateway shaped (ADR consolidated). */
+export interface MemoryAuditLogRow {
+  id: string;
+  createdAt: Date;
+  userId: string | null;
+  organizationId: string | null;
+  projectId: string | null;
+  action: string;
+  payload: unknown;
+  ipAddress: string | null;
+  userAgent: string | null;
+  error: string | null;
+  args: unknown;
+  targetKind: string | null;
+  targetId: string | null;
+  before: unknown;
+  after: unknown;
 }
 
 /** One project row, only the columns the personal workspace needs. */
@@ -77,6 +131,10 @@ export class MemoryOrganizationDatabase {
   readonly organizationUsers: MemoryOrganizationUserRow[] = [];
   readonly projects = new Map<string, MemoryProjectRow>();
   readonly groups = new Map<string, MemoryGroupRow>();
+  readonly users = new Map<string, MemoryUserRow>();
+  readonly teamUsers: MemoryTeamUserRow[] = [];
+  readonly customRoles = new Map<string, MemoryCustomRoleRow>();
+  readonly auditLogs: MemoryAuditLogRow[] = [];
 
   static create(): MemoryOrganizationDatabase {
     return new MemoryOrganizationDatabase();

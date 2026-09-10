@@ -408,7 +408,6 @@ async function composeMembershipHalf(options: {
     .withProvided(UserApi, users as UserApi)
     .withModule(organizationServer, {
       infrastructure: {
-        database: prisma,
         identities: PersonalWorkspaceIdentityAdapter.create(),
         teamIdentities: TeamIdentityAdapter.create(),
         groupIdentities: GroupIdentityAdapter.create(),

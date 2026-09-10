@@ -5,10 +5,6 @@ export {
 } from "./adapters/resource-identifiers.adapter.ts";
 export { PersonalWorkspaceDiagnosticsAdapter } from "./adapters/personal-workspace-diagnostics.adapter.ts";
 export {
-  PostgresOrganizationMembershipAdapter,
-  type PostgresOrganizationMembershipAdapterOptions,
-} from "./adapters/postgres.organization-membership.adapter.ts";
-export {
   OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
   OrganizationSeatLicensePort,
@@ -46,12 +42,12 @@ export {
   type PersonalTeamScopeReader,
   type RoleBindingScope,
 } from "./services/personal-team-scope.service.ts";
-export { PostgresPersonalTeamScopeAdapter } from "./adapters/postgres.personal-team-scope.adapter.ts";
+export { bindPersonalTeamScopeReader } from "./repositories/prisma/prisma.personal-team-scope.repository.ts";
 export {
   TenantDirectoryService,
   type TenantOwnershipReader,
 } from "./services/tenant-directory.service.ts";
-export { PostgresTenantDirectoryAdapter } from "./adapters/postgres.tenant-directory.adapter.ts";
+export { bindTenantDirectoryReader } from "./repositories/prisma/prisma.tenant-directory.repository.ts";
 export type {
   AuditLogFilters,
   CreateAndAssignInput,

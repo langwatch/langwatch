@@ -11,7 +11,6 @@
  *
  * @see specs/features/enterprise-feature-guards.feature
  */
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -30,13 +29,6 @@ class CapabilityUnavailableError extends HandledError {
     super("permission_denied", message, { httpStatus: 403, fault: "customer" });
     this.name = "CapabilityUnavailableError";
   }
-}
-
-/** No personal workspace is in scope, which is what the role change checks first. */
-function testPrisma() {
-  return {
-    team: { findFirst: vi.fn(async () => null), findMany: vi.fn(async () => []) },
-  } as unknown as PrismaClient;
 }
 
 function application(options: { enterprise: boolean }) {
@@ -78,7 +70,7 @@ function application(options: { enterprise: boolean }) {
       projects: {} as unknown as ServerOrganizationAppDependencies["projects"],
       permissions: { hasPermission: vi.fn(async () => true) } as unknown as AuthzApi,
     },
-    infrastructure: { plans, database: testPrisma() },
+    infrastructure: { plans },
   });
 
   return { app, plans, ...writes };

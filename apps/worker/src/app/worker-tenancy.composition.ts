@@ -88,7 +88,6 @@ export function installWorkerTenancy<Infrastructure>(
     })
     .withModule(organizationServer, {
       infrastructure: {
-        database,
         identities: PersonalWorkspaceIdentityAdapter.create(),
         teamIdentities: TeamIdentityAdapter.create(),
         groupIdentities: GroupIdentityAdapter.create(),

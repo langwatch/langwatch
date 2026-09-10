@@ -1,5 +1,5 @@
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
-import { PostgresTenantDirectoryAdapter } from "@langwatch/organization-server";
+import { bindTenantDirectoryReader } from "@langwatch/organization-server";
 import { startWorkerMetricsServer } from "../platform/liveness/worker-metrics.server.ts";
 import { WorkerClickHouseInfrastructure } from "../platform/infrastructure/worker-clickhouse.infrastructure.ts";
 import { WorkerDatabaseInfrastructure } from "../platform/infrastructure/worker-database.infrastructure.ts";
@@ -49,9 +49,7 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
       // implementation the API process composes, read through the same client
       // every repository uses, so a project that moves organizations routes to
       // its new endpoint on the next resolution.
-      directory: PostgresTenantDirectoryAdapter.create({
-        database: database.connection.client,
-      }),
+      directory: bindTenantDirectoryReader(database.connection.client),
     });
 
     // The BYOC lookup the Group Queue's blob offload and the stored-object

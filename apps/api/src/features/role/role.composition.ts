@@ -15,8 +15,8 @@ import {
   type OrganizationApi as OrganizationApiContract,
 } from "@langwatch/organization-contract";
 import {
+  bindPersonalTeamScopeReader,
   PersonalTeamScopeService,
-  PostgresPersonalTeamScopeAdapter,
 } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RoleBindingScopeType } from "@langwatch/role-contract";
@@ -85,16 +85,17 @@ export async function installApiRole(options: {
  * owner, so nothing may be bound into it.
  */
 class ApiRoleScope extends RoleScopePort {
-  constructor(private readonly prisma: PrismaClient) {
+  private readonly scope: PersonalTeamScopeService;
+
+  constructor(prisma: PrismaClient) {
     super();
+    this.scope = PersonalTeamScopeService.create(bindPersonalTeamScopeReader(prisma));
   }
 
   async assertNoPersonalTeamScope(input: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<void> {
-    await PersonalTeamScopeService.create(
-      PostgresPersonalTeamScopeAdapter.create({ database: this.prisma }),
-    ).assertNoPersonalTeamScope({ scopes: input.scopes });
+    await this.scope.assertNoPersonalTeamScope({ scopes: input.scopes });
   }
 }
 

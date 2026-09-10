@@ -1,5 +1,6 @@
 import { RoleBindingScopeType } from "@langwatch/organization-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PersonalTeamScopeReader } from "../../services/personal-team-scope.service.ts";
 
 export type PersonalTeamScopeClient = PrismaClient | Prisma.TransactionClient;
 
@@ -126,4 +127,19 @@ export class PrismaPersonalTeamScopeRepository {
       ? { OR: [{ ownerUserId: null }, { ownerUserId: { not: ownerUserId } }] }
       : {};
   }
+}
+
+/**
+ * Binds this deployment's Postgres to the two personal-workspace reads, for a
+ * process that wants the narrow {@link PersonalTeamScopeReader} shape without
+ * booting the whole organization module (`role.*`, the worker's tenancy
+ * lane). Replaces the deleted `PostgresPersonalTeamScopeAdapter` class.
+ */
+export function bindPersonalTeamScopeReader(database: PrismaClient): PersonalTeamScopeReader {
+  const scopes = PrismaPersonalTeamScopeRepository.create();
+  return {
+    tryFindPersonalTeamInScopes: (input) => scopes.tryFindPersonalTeamInScopes({ client: database, ...input }),
+    tryFindForeignPersonalTeamInScopes: (input) =>
+      scopes.tryFindForeignPersonalTeamInScopes({ client: database, ...input }),
+  };
 }

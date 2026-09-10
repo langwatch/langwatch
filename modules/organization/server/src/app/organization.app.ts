@@ -16,7 +16,6 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { UserApi } from "@langwatch/user-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { HandledError } from "@langwatch/handled-error";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   AddOrganizationGroupBindingInput,
   AddOrganizationTeamMemberInput,
@@ -65,7 +64,6 @@ import type {
 } from "@langwatch/organization-contract";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
-import { PostgresOrganizationMembershipAdapter } from "../adapters/postgres.organization-membership.adapter.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import type {
   GroupIdentityPort,
@@ -104,8 +102,10 @@ import { OrganizationInvitationDoorService } from "../services/organization-invi
 import { OrganizationJoinDoorService } from "../services/organization-join-door.service.ts";
 import { OrganizationOnboardingService } from "../services/organization-onboarding.service.ts";
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
-import { PersonalTeamScopeService } from "../services/personal-team-scope.service.ts";
-import { PostgresPersonalTeamScopeAdapter } from "../adapters/postgres.personal-team-scope.adapter.ts";
+import {
+  PersonalTeamScopeService,
+  type PersonalTeamScopeReader,
+} from "../services/personal-team-scope.service.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
 import type {
   OrganizationCeremony,
@@ -187,14 +187,6 @@ type OrganizationSetup = FeatureSetup<
 >;
 
 export type OrganizationInfrastructure = Readonly<{
-  /**
-   * TEMPORARY: only `PostgresOrganizationMembershipAdapter` and
-   * `PostgresPersonalTeamScopeAdapter` still build from this. Membership's
-   * repository conversion is unfinished (tracked in the lane's handover)  - 
-   * every other repository this application builds now comes from
-   * `setup.repositories` instead.
-   */
-  database: PrismaClient;
   identities: PersonalWorkspaceIdentityPort;
   teamIdentities: TeamIdentityPort;
   groupIdentities: GroupIdentityPort;
@@ -278,14 +270,13 @@ export class ServerOrganizationApp implements OrganizationApi {
       settingsSecrets: setup.infrastructure.settingsSecrets,
       diagnostics: setup.infrastructure.diagnostics,
     });
-    const membership = PostgresOrganizationMembershipAdapter.create({
-      database: setup.infrastructure.database,
-      grants: setup.dependencies.permissions,
+    const membership = OrganizationMembershipService.create({
+      repository: setup.repositories.membership(setup.dependencies.permissions),
       prompts: setup.infrastructure.prompts,
       seats: setup.infrastructure.seats,
       sessions: UserApiOrganizationSessionRevocation.create(setup.dependencies.users),
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
-    }).build();
+    });
     const groups = OrganizationGroupScopeService.create({
       organizations,
       projects: setup.dependencies.projects,
@@ -310,7 +301,7 @@ export class ServerOrganizationApp implements OrganizationApi {
       demoProject: setup.infrastructure.demoProject,
     });
     application.#personalTeamScope = PersonalTeamScopeService.create(
-      PostgresPersonalTeamScopeAdapter.create({ database: setup.infrastructure.database }),
+      setup.repositories.personalTeamScope,
     );
     application.#invitationDoor = setup.infrastructure.invitations
       ? OrganizationInvitationDoorService.create({
@@ -350,6 +341,8 @@ export class ServerOrganizationApp implements OrganizationApi {
       groups?: OrganizationGroupService;
     };
     infrastructure?: Partial<OrganizationInfrastructure>;
+    /** Defaults to a reader that finds no personal team in any scope. */
+    personalTeamScope?: PersonalTeamScopeReader;
   }): ServerOrganizationApp {
     const { groups, ...dependencies } = setup.dependencies;
     const application = new ServerOrganizationApp({
@@ -386,7 +379,10 @@ export class ServerOrganizationApp implements OrganizationApi {
       demoProject: infrastructure.demoProject,
     });
     application.#personalTeamScope = PersonalTeamScopeService.create(
-      PostgresPersonalTeamScopeAdapter.create({ database: infrastructure.database }),
+      setup.personalTeamScope ?? {
+        tryFindPersonalTeamInScopes: async () => null,
+        tryFindForeignPersonalTeamInScopes: async () => null,
+      },
     );
     application.#invitationDoor = infrastructure.invitations
       ? OrganizationInvitationDoorService.create({

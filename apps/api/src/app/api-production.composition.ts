@@ -17,7 +17,7 @@ import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwat
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { PostgresTenantDirectoryAdapter } from "@langwatch/organization-server";
+import { bindTenantDirectoryReader } from "@langwatch/organization-server";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { Hono } from "hono";
@@ -3179,7 +3179,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // a user is platform-level. The SAME implementation the worker process
       // composes — a project-only directory here answered an organization- or
       // user-tenanted read with a refusal the worker never gave.
-      directory: PostgresTenantDirectoryAdapter.create({ database: database.client }),
+      directory: bindTenantDirectoryReader(database.client),
       report: LoggedApiClickHouseAbsence.create(createLogger(options.config.serviceName)),
     });
     return this.composedClickHouse;
