@@ -74,8 +74,8 @@ describe("createSource, given the provider cannot be asked which account an admi
     /** @scenario "A connection whose account the provider will not confirm is not saved" */
     it("fails the save and says the account could not be confirmed", async () => {
       const { client } = fakePrisma();
-      // Not yet implemented: the save-time account lookup, injected so the
-      // service's dependency on the provider is visible at its seam.
+      // The save-time account lookup is injected here so the service's
+      // dependency on the provider stays visible at its seam.
       const service = IngestionSourceService.create(client, {
         lookUpProviderAccount: vi
           .fn()

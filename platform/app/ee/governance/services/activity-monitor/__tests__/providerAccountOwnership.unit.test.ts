@@ -52,10 +52,15 @@ const existingReader = (
   ...overrides,
 });
 
-const configCarrying = (apiKey: string, report: "usage" | "cost") => ({
+const configCarrying = (token: string, report: "usage" | "cost") => ({
   adapter: "anthropic_admin",
   report,
-  credentials: { apiKey },
+  // `credentials.token` is the shape the composer writes and the pullers read,
+  // so the fixture says `token` too. It is inert here — the lookup below is a
+  // stand-in and never opens the envelope — and that is exactly why it has to
+  // be right: a fixture naming a key nothing writes reads as evidence that
+  // production uses it.
+  credentials: { token },
 });
 
 /**
@@ -66,8 +71,8 @@ const configCarrying = (apiKey: string, report: "usage" | "cost") => ({
  */
 const providerSaying = (byKey: Record<string, string>) =>
   vi.fn(async ({ parserConfig }: { parserConfig: Record<string, unknown> }) => {
-    const credentials = parserConfig.credentials as { apiKey: string };
-    const account = byKey[credentials.apiKey];
+    const credentials = parserConfig.credentials as { token: string };
+    const account = byKey[credentials.token];
     if (!account) throw new Error("unknown key in this fixture");
     return account;
   });

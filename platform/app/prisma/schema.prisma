@@ -4038,6 +4038,21 @@ model IngestionSource {
   createdById String?
   createdBy   User?    @relation("IngestionSourceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
+  // One live connection per provider account and report is held by
+  // "IngestionSource_provider_account_report_live_idx", a UNIQUE index from
+  // migration 20260907120012_ingestion_source_one_connection_per_account. It is
+  // both PARTIAL (`WHERE "providerAccountId" IS NOT NULL AND "archivedAt" IS
+  // NULL` - a connection that names no account claims none, and only archiving
+  // gives an account up) and over an EXPRESSION (the report normalised out of
+  // parserConfig the way the service normalises it). Prisma can express
+  // neither, so - exactly as Grant's partial indexes above are - it is NOT
+  // declared here: an `@@unique` would make the next `prisma migrate dev` drop
+  // the WHERE and the expression and rebuild a constraint that means something
+  // else entirely.
+  //
+  // The service refuses a duplicate before the write and says which connection
+  // holds the account; the index is what holds when two saves race the
+  // provider round trip that sits between that read and the write.
   @@unique([organizationId, name])
   @@index([organizationId])
   @@index([teamId])

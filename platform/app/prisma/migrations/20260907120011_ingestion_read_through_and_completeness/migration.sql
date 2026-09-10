@@ -21,3 +21,26 @@ ALTER TABLE "IngestionPullRunProjection" ADD COLUMN "lastRunCompleteness" TEXT;
 
 ALTER TABLE "IngestionSource" ADD COLUMN "lastReadThroughAt" TIMESTAMP(3);
 ALTER TABLE "IngestionSource" ADD COLUMN "lastRunCompleteness" TEXT;
+
+-- Down
+--
+-- The up step is purely additive: four nullable columns across two tables, no
+-- backfill, no constraint, no index. So the reversal is the drops below and
+-- nothing else, and it loses only how far the last run read and whether it
+-- reached the end.
+--
+-- Nothing is lost that cannot be rebuilt. The projection columns are folded
+-- from the event log, so replaying it after a re-apply restores them, and the
+-- two IngestionSource columns mirror that projection rather than holding
+-- anything of their own. Until then source health reads "unknown", which is
+-- exactly what every row held before this migration.
+--
+-- Left commented, like the sibling migrations that carry a Down block. Prisma
+-- runs no down step, so an executable one here would be a statement nobody
+-- calls; this is the script an operator runs by hand, kept next to the up it
+-- undoes.
+--
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastReadThroughAt";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastRunCompleteness";
+-- ALTER TABLE "IngestionSource" DROP COLUMN "lastReadThroughAt";
+-- ALTER TABLE "IngestionSource" DROP COLUMN "lastRunCompleteness";
