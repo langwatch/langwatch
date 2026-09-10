@@ -196,7 +196,7 @@ export function composeApiPackagedRest(
       ...(options.dashboard ? { dashboard: options.dashboard.restServices.dashboard } : {}),
       ...(options.dataset ? { datasets: () => options.dataset!.app } : {}),
       ...(options.evaluator ? { evaluators: options.evaluator.restServices.evaluators } : {}),
-      ...(evaluations ? { evaluations: () => evaluations.app } : {}),
+      ...(options.evaluations ? { evaluations: () => options.evaluations!.app } : {}),
       permissions: () => options.authz,
       ...(options.experiment.experiments ? { experiments: () => options.experiment.app } : {}),
       governance: () => options.enterpriseGovernance.governanceApp,
