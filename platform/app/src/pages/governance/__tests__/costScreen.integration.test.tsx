@@ -432,11 +432,13 @@ describe("the governance cost screen", () => {
             amountUsd: null,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
           },
           gateway: {
             amountUsd: null,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
           },
           series: [],
         }),
@@ -460,6 +462,9 @@ describe("the governance cost screen", () => {
             amountUsd: -42.5,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: -42.5, cellsWithoutAmount: 0 },
+            ],
           },
           series: [
             {
@@ -504,11 +509,17 @@ describe("the governance cost screen", () => {
             amountUsd: 365_000,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 365_000, cellsWithoutAmount: 0 },
+            ],
           },
           gateway: {
             amountUsd: 182_500,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 182_500, cellsWithoutAmount: 0 },
+            ],
           },
           series,
           windowDays: 365,
@@ -637,6 +648,52 @@ describe("the governance cost screen", () => {
     });
   });
 
+  describe("given a window billed only in a currency nobody converted", () => {
+    /** @scenario "A currency nobody converted still totals in the currency it was billed in" */
+    it("shows the euro total on its own and leaves the dollar figure withheld", () => {
+      harness.query = {
+        data: summaryFixture({
+          billed: {
+            // Every cell holds an amount, in euros, and none was converted:
+            // no dollar figure, and NOTHING unpriced. The lane still
+            // reported — the money totals in the currency it was billed in.
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "EUR", amount: 40, cellsWithoutAmount: 0 },
+            ],
+          },
+          // The other lane is empty too, so this passes only if the euro
+          // total alone is enough to count the bill as reported. With a
+          // dollar figure beside it the screen would show the lanes anyway
+          // and the regression — a euro-only bill reading as no bill at all
+          // — would slip through.
+          gateway: {
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      // The lanes render: this is a real bill, not an account with nothing
+      // recorded against it.
+      const lane = screen.getByTestId("cost-lane-billed");
+      const spoken = lane.textContent ?? "";
+      // The euros total in euros, and the dollar figure is untouched by
+      // them: no dollar amount is shown at all, and no rate produced one.
+      expect(spoken.match(/[A-Z]{3} -?[\d,]+(?:\.\d+)?/g) ?? []).toEqual([
+        "EUR 40.00",
+      ]);
+      expect(spoken.match(/-?\$[\d,]+(?:\.\d+)?/g) ?? []).toEqual([]);
+    });
+  });
+
   describe("given the read side sent an Azure billing note", () => {
     // These render the actual wiring — DTO field to page to panel — which the
     // note's decision and sentence unit tests cannot see: deleting the
@@ -650,6 +707,7 @@ describe("the governance cost screen", () => {
             amountUsd: null,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
           },
         }),
         isLoading: false,

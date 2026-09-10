@@ -91,8 +91,22 @@ vi.mock("~/utils/api", () => {
                     amountUsd: harness.realFigures ? 987654 : null,
                     cellsWithoutAmount: 0,
                     currenciesWithoutUsdAmount: [],
+                    currencyTotals: harness.realFigures
+                      ? [
+                          {
+                            currencyCode: "USD",
+                            amount: 987654,
+                            cellsWithoutAmount: 0,
+                          },
+                        ]
+                      : [],
                   },
-                  gateway: { amountUsd: null, cellsWithoutAmount: 0 },
+                  gateway: {
+                    amountUsd: null,
+                    cellsWithoutAmount: 0,
+                    currenciesWithoutUsdAmount: [],
+                    currencyTotals: [],
+                  },
                   seats: { status: "awaiting_data" },
                   series: [],
                   staleSources: null,

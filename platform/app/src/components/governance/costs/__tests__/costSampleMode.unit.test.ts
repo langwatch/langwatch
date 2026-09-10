@@ -80,6 +80,28 @@ describe("reading the headline summary as a real-data read", () => {
     });
   });
 
+  describe("given a bill billed only in a currency nobody converted", () => {
+    it("counts the euro total as real data even with no dollar figure and no unpriced cells", () => {
+      // Every cell holds an amount, in euros, and none was ever converted:
+      // the dollar figure is null and NOTHING is unpriced. The lane reported
+      // — the money has a total of its own — so the screen must not fall
+      // back to invented figures over the top of a real bill.
+      const read = summaryAsRead(
+        summary({
+          billed: {
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "EUR", amount: 40, cellsWithoutAmount: 0 },
+            ],
+          },
+        }),
+      );
+      expect(read?.length).toBeGreaterThan(0);
+    });
+  });
+
   describe("given seat pools and no money", () => {
     it("counts as real data", () => {
       const read = summaryAsRead(

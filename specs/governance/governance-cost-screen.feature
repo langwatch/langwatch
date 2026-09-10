@@ -953,15 +953,24 @@ Feature: One cost screen, three honest lanes
     And no figure on the screen combines the two
     And no exchange rate is applied to produce either
 
-  @unit
+  @integration
   Scenario: A currency nobody converted still totals in the currency it was billed in
     Given spend billed in a currency the provider published no dollar figure for
-    When the window totals are read
+    And nothing else was billed in the window
+    When a permitted viewer opens the cost screen
     Then that currency has a total of its own
     And the dollar total is unchanged by it
+    And the screen shows the bill rather than treating the window as unbilled
     # The amount in the provider's own currency has been stored on every row
     # since the summary was built and has never been read by any total. The
     # dollar column being empty is not the same as there being no money.
+    #
+    # The last line is the regression this scenario now guards. A lane billed
+    # only in euros has no dollar figure and no unpriced cell — every cell
+    # holds an amount, in euros — and the check that decides whether a bill
+    # was reported asked only those two questions. A real euro bill read as
+    # no bill, and the screen fell back to invented figures over the top of
+    # it.
 
   @unit
   Scenario: A currency total is withheld when part of what it covers holds no amount
