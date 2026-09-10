@@ -31,10 +31,10 @@ export function createTestLogger(): { logger: PinoLogger; lines: TestLogLines } 
   const backing: TestLogLine[] = [];
   const findByLevelAndMessage = (levelName: string, msgIncludes: string): TestLogLine | undefined => {
     const wanted = LEVEL_NUMBERS[levelName];
-    return backing.find((line) => {
+    return Array.prototype.find.call(backing, (line: TestLogLine) => {
       if (wanted !== undefined && line.level !== wanted) return false;
       return typeof line.msg === "string" && line.msg.includes(msgIncludes);
-    });
+    }) as TestLogLine | undefined;
   };
   const lines = Object.assign(backing, {
     find: findByLevelAndMessage,

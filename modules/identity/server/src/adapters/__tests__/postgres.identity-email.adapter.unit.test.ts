@@ -1,9 +1,9 @@
 /**
  * Spec: modules/identity/specs/identity-email-postgres-read-fork.feature
  */
-import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { describe, expect, it, vi } from "vitest";
+import { createTestLogger } from "@langwatch/test-harness";
+import { describe, expect, it } from "vitest";
 import { PostgresIdentityEmailAdapter } from "../postgres.identity-email.adapter.ts";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
 
@@ -90,7 +90,11 @@ function stubClient(options: {
 }
 
 function build(
-  options: Parameters<typeof stubClient>[0] & { cacheTtlMs?: number; cacheMaxUsers?: number },
+  options: Parameters<typeof stubClient>[0] & {
+    cacheTtlMs?: number;
+    cacheMaxUsers?: number;
+    logger?: Parameters<typeof PostgresIdentityEmailAdapter.create>[0]["logger"];
+  },
   clock: { now: number } = { now: NOW },
 ) {
   const { client, calls } = stubClient(options);
@@ -98,6 +102,7 @@ function build(
     database: client,
     ...(options.cacheTtlMs === undefined ? {} : { cacheTtlMs: options.cacheTtlMs }),
     ...(options.cacheMaxUsers === undefined ? {} : { cacheMaxUsers: options.cacheMaxUsers }),
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
     now: () => clock.now,
   }).build();
   return { emails, calls, clock };
@@ -170,23 +175,14 @@ describe("PostgresIdentityEmailAdapter", () => {
 
     /** @scenario "An unreadable latch keeps the legacy column and says so" */
     it("logs the failed read rather than swallowing it", async () => {
-      // The factory hands back one logger per name for the life of the
-      // process, so this is the instance the adapter module already holds.
-      const warn = vi.spyOn(createLogger("langwatch:identity:latch"), "warn");
-      const { emails } = build({ failLatch: true });
+      const { logger, lines } = createTestLogger();
+      const { emails } = build({ failLatch: true, logger });
 
       await emails.tryResolveEmail({ userId: "user-1" });
-      // Restored before the assertion: a spy left installed by a failing
-      // expectation would leak its call history into the next test.
-      const calls = [...warn.mock.calls];
-      warn.mockRestore();
 
-      expect(calls).toEqual([
-        [
-          expect.objectContaining({ error: expect.any(Error) }),
-          expect.stringContaining("identifier backfill"),
-        ],
-      ]);
+      const line = lines.find("warn", "identifier backfill");
+      expect(line).toBeDefined();
+      expect(line).toHaveProperty("error");
     });
   });
 

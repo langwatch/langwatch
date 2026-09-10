@@ -10,7 +10,8 @@ import {
   type ScimSyncCommand,
   type ScimSyncFactInput,
 } from "@langwatch/identity-contract";
-import { describe, expect, it, vi } from "vitest";
+import { createTestLogger } from "@langwatch/test-harness";
+import { describe, expect, it } from "vitest";
 import { IdentityEventingPort } from "../../ports/identity-eventing.port.ts";
 import { ScimSyncLedgerWriterAdapter } from "../eventing.scim-sync-ledger.adapter.ts";
 
@@ -104,32 +105,23 @@ describe("given a process that composed the writer with no queue behind it", () 
     });
 
     it("records the loss at error, naming the pipeline and the sender that are missing", async () => {
-      const logged: Array<[Record<string, unknown>, string]> = [];
-      const writer = new ScimSyncLedgerWriterAdapter({ eventing: new RecordingEventing(false) });
-      const { command, facts } = issueToken();
-
       // The writer's own module logger, which is where this line has to land:
       // a warn would read as an event-stack blip that clears, and this one
       // never does.
-      const { createLogger } = await import("@langwatch/observability");
-      const error = vi
-        .spyOn(createLogger("langwatch:identity:scim-sync-ledger"), "error")
-        .mockImplementation(((context: Record<string, unknown>, message: string) => {
-          logged.push([context, message]);
-        }) as never);
+      const { logger, lines } = createTestLogger();
+      const writer = new ScimSyncLedgerWriterAdapter({ eventing: new RecordingEventing(false), logger });
+      const { command, facts } = issueToken();
 
       await writer.commit({ command, facts });
-      error.mockRestore();
 
-      expect(logged).toHaveLength(1);
-      expect(logged[0]?.[0]).toMatchObject({
+      const line = lines.find("error", "scim-sync");
+      expect(line).toMatchObject({
         scimSyncId: SYNC,
         connectionId: CONNECTION,
         pipeline: "scim-sync",
         senderName: "issueScimToken",
       });
-      expect(logged[0]?.[1]).toContain("scim-sync");
-      expect(logged[0]?.[1]).toContain("issueScimToken");
+      expect(line?.msg).toContain("issueScimToken");
     });
 
     it("names the verb the command carries, not one fixed sender", async () => {

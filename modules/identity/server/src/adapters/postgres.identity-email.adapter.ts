@@ -1,11 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { IdentityEmailService } from "../services/identity-email.service.ts";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 import { PrismaIdentityHeadsRepository } from "../repositories/prisma/prisma.identity-heads.repository.ts";
 import { PrismaIdentityLatchRepository } from "../repositories/prisma/prisma.identity-latch.repository.ts";
-
-const logger = createLogger("langwatch:identity:latch");
 
 /**
  * How long one latch answer is held, in both directions.
@@ -30,6 +28,8 @@ export type PostgresIdentityEmailAdapterOptions = {
   cacheMaxUsers?: number;
   /** Overridden only by tests; production reads the process clock. */
   now?: () => number;
+  /** Defaults to the module's own logger; a test injects a captured one. */
+  logger?: Logger;
 };
 
 /**
@@ -52,6 +52,7 @@ export class PostgresIdentityEmailAdapter {
         ttlMs: this.options.cacheTtlMs ?? IDENTITY_LATCH_CACHE_TTL_MS,
         maxUsers: this.options.cacheMaxUsers ?? IDENTITY_LATCH_CACHE_MAX_USERS,
         now: this.options.now ?? Date.now,
+        logger: this.options.logger ?? createLogger("langwatch:identity:latch"),
       }).gate(),
     );
     return this.service;
@@ -69,6 +70,7 @@ class CachedIdentityLatch {
     ttlMs: number;
     maxUsers: number;
     now: () => number;
+    logger: Logger;
   }): CachedIdentityLatch {
     return new CachedIdentityLatch(options);
   }
@@ -84,6 +86,7 @@ class CachedIdentityLatch {
       ttlMs: number;
       maxUsers: number;
       now: () => number;
+      logger: Logger;
     },
   ) {}
 
@@ -156,7 +159,7 @@ class CachedIdentityLatch {
       // leave a stale address in place, but a closed latch nobody can
       // distinguish from "not rolled out yet" is how a real outage reads as
       // routine.
-      logger.warn({ ...context, error, ttlMs: this.options.ttlMs }, message);
+      this.options.logger.warn({ ...context, error, ttlMs: this.options.ttlMs }, message);
       return false;
     }
   }

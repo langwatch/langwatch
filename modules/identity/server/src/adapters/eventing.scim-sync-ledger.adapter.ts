@@ -15,10 +15,8 @@ import {
 } from "@langwatch/identity-contract";
 import type { ScimSyncLedger } from "../rules/scim-sync-ledger.rules.ts";
 import type { IdentityEventingPort } from "../ports/identity-eventing.port.ts";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
-
-const logger = createLogger("langwatch:identity:scim-sync-ledger");
 
 export type ScimSyncStagedSender = {
   send(data: unknown): Promise<unknown>;
@@ -39,10 +37,13 @@ export interface ScimSyncLedgerWriterDeps {
    * says so rather than refusing the directory's push.
    */
   eventing: IdentityEventingPort;
+  /** Defaults to the module's own logger; a test injects a captured one. */
+  logger?: Logger;
 }
 
 export class ScimSyncLedgerWriterAdapter implements ScimSyncLedger {
   private readonly eventing: IdentityEventingPort;
+  private readonly logger: Logger;
 
   static create(deps: ScimSyncLedgerWriterDeps): ScimSyncLedgerWriterAdapter {
     return new ScimSyncLedgerWriterAdapter(deps);
@@ -50,6 +51,7 @@ export class ScimSyncLedgerWriterAdapter implements ScimSyncLedger {
 
   constructor(deps: ScimSyncLedgerWriterDeps) {
     this.eventing = deps.eventing;
+    this.logger = deps.logger ?? createLogger("langwatch:identity:scim-sync-ledger");
   }
 
   private stagedSender(name: string): Promise<ScimSyncStagedSender | null> {
@@ -79,7 +81,7 @@ export class ScimSyncLedgerWriterAdapter implements ScimSyncLedger {
       // the bookkeeping for has already landed through the grants ledger; the
       // fact that this history is behind is an operational problem for us,
       // never a reason to refuse the identity provider's push.
-      logger.error(
+      this.logger.error(
         { scimSyncId, connectionId, commandType: command.type, error },
         "could not record a directory sync fact; the push itself is unaffected",
       );
@@ -101,7 +103,7 @@ export class ScimSyncLedgerWriterAdapter implements ScimSyncLedger {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
     const sender = await this.stagedSender(senderName);
     if (!sender) {
-      logger.error(
+      this.logger.error(
         {
           scimSyncId,
           connectionId,
