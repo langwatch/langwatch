@@ -6,7 +6,7 @@ This directory contains vendored dependencies that are not published to npm.
 
 ### @langwatch/scenario
 
-**File:** `langwatch-scenario-1.7.0-dev.voice2.tgz`
+**File:** `langwatch-scenario-1.7.0-dev.voice3.tgz`
 
 The scenario testing SDK for LangWatch, vendored as a tarball so the app pins
 known bits and can also carry unreleased builds when needed.
@@ -17,7 +17,7 @@ known bits and can also carry unreleased builds when needed.
 29dea33, carrying the voice work from scenario PR #982. It is stamped as the
 prerelease `1.7.0-dev.29dea33`. Swap it for the real npm 1.7.0 artifact once
 that is published, so we do not vendor the same code twice. Its sha256 is
-`b5bb239b3ec6cd0860a97851359e6f7048dd1b6a479ff991d1457cfc92bdcfd5`.
+`098de998391dc9a55b74c7edffb324e4f1eb27a97fe2ae0c05d0a354875e2651`.
 
 ## Updating Vendored Packages
 

@@ -115,18 +115,26 @@ type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
   }): Promise<void>;
 };
 
+/**
+ * Must return the SDK's own adapter instance, never a fresh wrapper object.
+ * `withOutboundDial` below mutates a method on the instance in place for the
+ * same reason: the run's role validation and the executor's voice-adapter
+ * selection (`pickVoiceAdapters` / `startVoiceAdapters`) both read off THIS
+ * instance's identity and its `role` property. A wrapper that copies only
+ * connect/disconnect/placeCall onto a plain object silently strips `role` and
+ * everything else the SDK adapter carries.
+ */
 const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
   const sdk = ScenarioRunner.voice.twilioAgent(
     options,
   ) as unknown as SdkTwilioAdapter;
-  return {
-    connect: () => sdk.connect(),
-    disconnect: () => sdk.disconnect(),
-    // Translate our `shouldRecord` to the SDK's published `record` option; this
-    // one line is the only place the vendor option name appears.
-    placeCall: ({ shouldRecord, ...rest }) =>
-      sdk.placeCall({ ...rest, record: shouldRecord }),
-  };
+  const originalPlaceCall = sdk.placeCall.bind(sdk);
+  const adapter = sdk as unknown as TwilioAdapterLike;
+  // Translate our `shouldRecord` to the SDK's published `record` option; this
+  // one line is the only place the vendor option name appears.
+  adapter.placeCall = ({ shouldRecord, ...rest }) =>
+    originalPlaceCall({ ...rest, record: shouldRecord });
+  return adapter;
 };
 
 /**

@@ -18,6 +18,19 @@ import {
   VoicePhoneTransportUnavailableError,
 } from "../phone.transport";
 
+const twilioAgentMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@langwatch/scenario", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/scenario")>();
+  return {
+    ...actual,
+    voice: {
+      ...actual.voice,
+      twilioAgent: twilioAgentMock,
+    },
+  };
+});
+
 const TWILIO_CREDENTIAL: VoiceTransportCredential = {
   kind: "twilio",
   accountSid: "AC123",
@@ -318,6 +331,106 @@ describe("phoneTransport", () => {
           maxCallSeconds: 120,
         });
         expect(factoryOptions[0]?.httpPort).toBe(5564);
+      });
+    });
+  });
+
+  describe("given the default Twilio agent factory (no injected fake)", () => {
+    describe("when it builds the adapter for an agent target", () => {
+      /** @scenario "The default phone factory returns the SDK's own adapter instance" */
+      it("returns the exact SDK adapter instance the SDK constructor produced", () => {
+        const sdkAdapter = {
+          role: AgentRole.AGENT,
+          connect: vi.fn(async () => {}),
+          disconnect: vi.fn(async () => {}),
+          placeCall: vi.fn(async () => {}),
+        };
+        twilioAgentMock.mockReturnValue(sdkAdapter);
+
+        const transport = createPhoneTransport();
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+
+        expect(built).toBe(sdkAdapter);
+      });
+
+      /** @scenario "The default phone factory preserves the SDK adapter's role" */
+      it("keeps the SDK adapter's role readable on the returned adapter", () => {
+        const sdkAdapter = {
+          role: AgentRole.AGENT,
+          connect: vi.fn(async () => {}),
+          disconnect: vi.fn(async () => {}),
+          placeCall: vi.fn(async () => {}),
+        };
+        twilioAgentMock.mockReturnValue(sdkAdapter);
+
+        const transport = createPhoneTransport();
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+
+        expect((built as unknown as { role: AgentRole }).role).toBe(
+          AgentRole.AGENT,
+        );
+      });
+
+      /** @scenario "The default phone factory translates shouldRecord to the SDK's record option" */
+      it("translates shouldRecord to the SDK's record option on placeCall, without leaking shouldRecord through", async () => {
+        const placeCall = vi.fn(async () => {});
+        const sdkAdapter = {
+          role: AgentRole.AGENT,
+          connect: vi.fn(async () => {}),
+          disconnect: vi.fn(async () => {}),
+          placeCall,
+        };
+        twilioAgentMock.mockReturnValue(sdkAdapter);
+
+        const transport = createPhoneTransport();
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+        await (built as unknown as Connectable).connect();
+
+        expect(placeCall).toHaveBeenCalledTimes(1);
+        const call = placeCall.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(call).toMatchObject({
+          to: TARGET,
+          attachStream: "a-leg",
+          record: true,
+        });
+        expect(call).not.toHaveProperty("shouldRecord");
+      });
+
+      /** @scenario "The default phone factory still delegates connect and disconnect to the SDK adapter" */
+      it("still delegates connect and disconnect to the SDK adapter", async () => {
+        const connect = vi.fn(async () => {});
+        const disconnect = vi.fn(async () => {});
+        const sdkAdapter = {
+          role: AgentRole.AGENT,
+          connect,
+          disconnect,
+          placeCall: vi.fn(async () => {}),
+        };
+        twilioAgentMock.mockReturnValue(sdkAdapter);
+
+        const transport = createPhoneTransport();
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+        await (built as unknown as Connectable).connect();
+        expect(connect).toHaveBeenCalledTimes(1);
+
+        await transport.endCall(built);
+        expect(disconnect).toHaveBeenCalledTimes(1);
       });
     });
   });
