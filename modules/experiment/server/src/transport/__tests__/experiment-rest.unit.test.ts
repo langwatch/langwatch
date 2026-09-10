@@ -1,5 +1,5 @@
 /**
- * `/api/experiments` — the behaviours the family answered before it was
+ * `/api/experiments` - the behaviours the family answered before it was
  * rewritten against the declaration builder, ported by behaviour from the
  * transport test that stood beside the deleted imperative one.
  *

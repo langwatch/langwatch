@@ -1,5 +1,5 @@
 /**
- * `POST /api/experiment/init` — the four refusals and the one success this
+ * `POST /api/experiment/init` - the four refusals and the one success this
  * door owns. Each body is a shape an SDK parses, so the assertions are on the
  * body as well as the status.
  *
