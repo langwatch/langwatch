@@ -66,7 +66,7 @@ export class RedisExperimentRunAbortAdapter extends ExperimentRunAbortPort {
     );
   }
 
-  async tryGetRunningProjectId(runId: string): Promise<string | null> {
+  async findRunningProjectId(runId: string): Promise<string | null> {
     const value = await this.redis.get(`${RUNNING_KEY_PREFIX}${runId}`);
     if (!value) return null;
     try {

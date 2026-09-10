@@ -18,7 +18,7 @@ describe("ClickHouseExperimentRunRepository", () => {
     const repository = ClickHouseExperimentRunRepository.create(options);
 
     await expect(
-      repository.tryGet({
+      repository.findRun({
         projectId: "project_1",
         experimentId: "experiment_1",
         runId: "run_1",
@@ -35,7 +35,7 @@ describe("ClickHouseExperimentRunRepository", () => {
     });
 
     await expect(
-      repository.tryGet({
+      repository.findRun({
         projectId: "project_1",
         experimentId: "experiment_1",
         runId: "run_1",

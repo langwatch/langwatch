@@ -12,13 +12,13 @@ import { disambiguateNames } from "./batch-results/presentation.tsx";
 const jsonRecordSchema = z.record(z.string(), z.unknown());
 const comparisonCandidateSchema = z.object({ id: z.string().optional() }).passthrough();
 
-const tryJsonRecord = (value: unknown): Record<string, unknown> | null => {
+const jsonRecordOf = (value: unknown): Record<string, unknown> | null => {
   const parsed = jsonRecordSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 };
 
 const isJsonRecord = (value: unknown): value is Record<string, unknown> =>
-  tryJsonRecord(value) !== null;
+  jsonRecordOf(value) !== null;
 
 /**
  * Run data with color assignment for comparison mode
@@ -533,7 +533,7 @@ export const extractOutputText = (raw: unknown): string | null => {
   // pathological shapes.
   let cursor: unknown = raw;
   for (let i = 0; i < 3; i++) {
-    const record = tryJsonRecord(cursor);
+    const record = jsonRecordOf(cursor);
     if (!record) break;
 
     const candidate = record.output ?? record.answer;
@@ -922,7 +922,7 @@ const detectPredictedColumns = (
     for (const entry of dataset) {
       if (!entry.predicted) continue;
       for (const [node, value] of Object.entries(entry.predicted)) {
-        const nodeOutput = tryJsonRecord(value);
+        const nodeOutput = jsonRecordOf(value);
         if (!nodeOutput) continue;
 
         if (!columns[node]) columns[node] = new Set();

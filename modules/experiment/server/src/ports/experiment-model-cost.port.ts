@@ -7,7 +7,7 @@
  * takes `undefined` for "no known rate", which is what it already did.
  */
 export abstract class ExperimentModelCostPort {
-  abstract tryPriceTokens(input: {
+  abstract findTokenPrice(input: {
     projectId: string;
     model: string;
     inputTokens: number;

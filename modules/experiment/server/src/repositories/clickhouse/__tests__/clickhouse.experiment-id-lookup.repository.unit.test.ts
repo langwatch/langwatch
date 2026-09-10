@@ -21,7 +21,7 @@ describe("ClickHouseExperimentIdLookupRepository", () => {
           clickhouse: ExperimentClickHouseAdapter.create(resolveClient),
         });
 
-        const result = await repository.tryFindExperimentId({
+        const result = await repository.findExperimentId({
           tenantId: "tenant-1",
           runId: "run-1",
         });
@@ -47,7 +47,7 @@ describe("ClickHouseExperimentIdLookupRepository", () => {
           clickhouse: ExperimentClickHouseAdapter.create(resolveClient),
         });
 
-        const result = await repository.tryFindExperimentId({
+        const result = await repository.findExperimentId({
           tenantId: "tenant-1",
           runId: "run-1",
         });

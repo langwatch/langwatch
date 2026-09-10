@@ -81,7 +81,7 @@ export class ExperimentCarriedBoardService {
       return null;
     }
 
-    const dispatch = this.dispatches.tryBuildTargetResultDispatch({
+    const dispatch = this.dispatches.findTargetResultDispatch({
       tenantId,
       runId,
       experimentId,

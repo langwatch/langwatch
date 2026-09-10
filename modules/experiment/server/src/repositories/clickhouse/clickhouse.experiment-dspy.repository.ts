@@ -233,7 +233,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     }
   }
 
-  async tryGet(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep | null> {
+  async findStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep | null> {
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return null;

@@ -1,5 +1,5 @@
 /**
- * The experiment wire, pinned. Twenty tRPC procedures and five REST routes,
+ * The experiment wire, pinned. Twenty tRPC procedures and sixteen REST routes,
  * each with the name, the kind and the permission it answered on `origin/main`
  * before the transports were rewritten against the declaration builders. A
  * rename here is a cache-key change in every browser that calls it and a
@@ -16,6 +16,7 @@ import { experimentDspyStepsRest } from "../experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "../experiment-init.rest.ts";
 import { experimentRest } from "../experiment.rest.ts";
 import { experimentTrpcTransport } from "../experiment.trpc.ts";
+import { experimentV3AliasRest, experimentV3Rest } from "../experiment-v3.rest.ts";
 
 /** Records the access each declared procedure asked for, building nothing. */
 function accessDeclaredBy(declaration: {
@@ -109,19 +110,70 @@ describe("given the experiment REST families", () => {
       expect(
         experimentRest
           .router()
-          .routes.map(({ method, path, operation }) => [method, path, operation]),
+          .routes.map(({ method, path, operation, permission }) => [
+            method,
+            path,
+            operation,
+            permission,
+          ]),
       ).toEqual([
-        ["get", "/", "listExperiments"],
-        ["get", "/:slug", "getExperiment"],
-        ["post", "/", "createExperiment"],
+        ["get", "/", "listExperiments", "experiments:view"],
+        ["get", "/:slug", "getExperiment", "experiments:view"],
+        ["post", "/", "createExperiment", "experiments:create"],
       ]);
     });
 
     it("keeps the two SDK doors on the one literal path each has always answered at", () => {
       expect([
-        ...experimentInitRest.router().routes.map(({ method, path }) => `${method} /api/experiment${path}`),
-        ...experimentDspyStepsRest.router().routes.map(({ method, path }) => `${method} /api/dspy${path}`),
+        ...experimentInitRest
+          .router()
+          .routes.map(({ method, path }) => `${method} /api/experiment${path}`),
+        ...experimentDspyStepsRest
+          .router()
+          .routes.map(({ method, path }) => `${method} /api/dspy${path}`),
       ]).toEqual(["post /api/experiment/init", "post /api/dspy/log_steps"]);
+    });
+
+    it("keeps every workbench route self-authenticated with its pinned permission named", () => {
+      const routes = experimentV3Rest.router().routes;
+
+      expect(
+        routes.map(({ method, path, operation, access }) => [
+          method,
+          path,
+          operation,
+          access?.kind,
+        ]),
+      ).toEqual([
+        ["post", "/execute", "executeExperiment", "public"],
+        ["post", "/abort", "abortExperimentRun", "public"],
+        ["post", "/:slug/run", "runExperiment", "public"],
+        ["get", "/runs", "listExperimentRuns", "public"],
+        ["get", "/runs/:runId", "getExperimentRunStatus", "public"],
+        ["get", "/runs/:runId/results", "getExperimentRunResults", "public"],
+        ["get", "/:slug/workbench-state", "getExperimentWorkbenchState", "public"],
+        ["put", "/:slug/workbench-state", "saveExperimentWorkbenchState", "public"],
+        ["get", "/:slug/versions", "listExperimentWorkbenchVersions", "public"],
+        ["post", "/:slug/versions/:version/restore", "restoreExperimentWorkbenchVersion", "public"],
+      ]);
+
+      const reasons = routes.map(({ access }) => access?.reason ?? "");
+      expect(reasons.filter((reason) => reason.includes("evaluations:manage"))).toHaveLength(2);
+      expect(reasons.filter((reason) => reason.includes("evaluations:create"))).toHaveLength(1);
+      expect(reasons.filter((reason) => reason.includes("evaluations:view"))).toHaveLength(3);
+      expect(reasons.filter((reason) => reason.includes("experiments:view"))).toHaveLength(2);
+      expect(reasons.filter((reason) => reason.includes("experiments:update"))).toHaveLength(2);
+    });
+
+    it("keeps the legacy evaluations-v3 alias public and literal", () => {
+      const [alias] = experimentV3AliasRest.router().routes;
+
+      expect(alias).toMatchObject({
+        method: "get",
+        path: "/api/evaluations/v3/*",
+        operation: "evaluationsV3Alias",
+        access: { kind: "public" },
+      });
     });
   });
 });

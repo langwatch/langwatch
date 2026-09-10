@@ -64,7 +64,7 @@ export class ExperimentSavedStateExecutionService {
   /**
    * The saved outputs a scoped run may reuse instead of producing again.
    */
-  static tryPlanSavedRunSeeding({
+  static findSavedRunSeeding({
     prepared,
     scope,
   }: {

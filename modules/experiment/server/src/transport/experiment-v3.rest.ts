@@ -1,22 +1,12 @@
 /**
- * The experiment WORKBENCH's ten REST doors: the run it starts, the run it
- * stops, the three ways a run is read back, and the four the saved setup is
- * read and written through - plus the `/api/evaluations/v3` alias that
- * re-dispatches into them.
- *
- * This family mixes two credential kinds under one path (a browser session
- * for `execute`/`abort`, a project API key for the other eight), which
- * `defineRestRouter`'s one-door-per-namespace model cannot express. Every
- * route therefore declares public access and resolves its own caller through
- * `app`, exactly as `experiment-init.rest.ts` does through its bound fact.
- * `app` is this family's OWN token, not `ExperimentApi`: it has no installed
- * module (like `AuthDoorApi`), so the process composes an object satisfying
- * it directly. Spec: modules/experiment/specs/experiment-service.feature.
+ * This workbench family mixes session and project-key credentials under one namespace.
+ * It declares public framework access while each handler resolves and authorises its caller.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  requestValidationErrorFrom,
   type RestRawResult,
 } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -183,6 +173,22 @@ const EXPERIMENTS_UPDATE_REASON =
   "the process's credential port resolves the project this key may act in and enforces " +
   "experiments:update as its ceiling before the handler runs";
 
+const SESSION_ACCESS = publicRoute({
+  reason: SESSION_REASON,
+});
+const RUN_ACCESS = publicRoute({
+  reason: RUN_REASON,
+});
+const EVALUATION_READ_ACCESS = publicRoute({
+  reason: READ_REASON,
+});
+const EXPERIMENT_VIEW_ACCESS = publicRoute({
+  reason: EXPERIMENTS_VIEW_REASON,
+});
+const EXPERIMENT_UPDATE_ACCESS = publicRoute({
+  reason: EXPERIMENTS_UPDATE_REASON,
+});
+
 /** A JSON answer this door writes itself. */
 const jsonAnswer = (body: unknown, status: number): Response =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -275,11 +281,23 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // no way to reach it; publishing it would document an endpoint that
   // answers 401 to everyone reading the reference.
   .post("/execute", "executeExperiment")
-  .withInput(executionRequestSchema)
-  .withAccess(publicRoute({ reason: SESSION_REASON }))
+  .withRawBody("text", { mediaType: "application/json" })
+  .withAccess(SESSION_ACCESS)
   .withRawResponse({ produces: "text/event-stream" })
   .withDocs({ hide: true })
-  .handle(async ({ app, input, request }): Promise<RestRawResult> => {
+  .handle(async ({ app, raw, request }): Promise<RestRawResult> => {
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return jsonAnswer({ error: "Bad Request" }, 400);
+    }
+
+    const parsed = executionRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw requestValidationErrorFrom({ target: "json", error: parsed.error, input: body });
+    }
+    const input = parsed.data;
     const { projectId } = input;
 
     logger.info({ projectId, scope: input.scope }, "Starting experiment execution");
@@ -340,7 +358,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
     // The page saves these cells too, and it is the faster of the two. The
     // server writes them so the board does not depend on the tab surviving.
-    const resultsWriter = ExperimentRunResultsWriterService.tryWriterFor({
+    const resultsWriter = ExperimentRunResultsWriterService.findWriterFor({
       persistence: {
         experiments: app.experiments().experimentService,
         actor: { userId: session.user.id, label: "user" },
@@ -382,7 +400,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── POST /abort ────────────────────────────────────────────────────────
   .post("/abort", "abortExperimentRun")
   .withRawBody("text", { mediaType: "application/json" })
-  .withAccess(publicRoute({ reason: SESSION_REASON }))
+  .withAccess(SESSION_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request }): Promise<RestRawResult> => {
@@ -409,8 +427,8 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     // The runId is attacker-controlled: verify it is owned by the authenticated project before
     // signaling an abort, or a caller could abort another tenant's run by guessing its id.
     const ownerProjectId =
-      (await runPorts.abort.tryGetRunningProjectId(runId)) ??
-      (await progress.tryGetRunState(runId))?.projectId;
+      (await runPorts.abort.findRunningProjectId(runId)) ??
+      (await progress.findRunState(runId))?.projectId;
     if (!ownerProjectId || ownerProjectId !== projectId) {
       throw new RunNotFoundError(runId);
     }
@@ -428,7 +446,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // a 400 in this family's own words, and `runInputsBodySchema` parses what
   // is left.
   .withRawBody("text", { mediaType: "application/json" })
-  .withAccess(publicRoute({ reason: RUN_REASON }))
+  .withAccess(RUN_ACCESS)
   .withRawResponse({ produces: ["application/json", "text/event-stream"] })
   .withDocs({
     summary: "Run an experiment",
@@ -602,7 +620,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── GET /runs?experimentSlug=... (list runs for an experiment) ────────
   .get("/runs", "listExperimentRuns")
   .withQuery(listRunsQuerySchema)
-  .withAccess(publicRoute({ reason: READ_REASON }))
+  .withAccess(EVALUATION_READ_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "List runs of an experiment",
@@ -616,7 +634,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     },
   })
   .handle(async ({ app, input, request }) => {
-    const credential = await app.authenticateCredential({ request, permission: "evaluations:view" });
+    const credential = await app.authenticateCredential({
+      request,
+      permission: "evaluations:view",
+    });
     if (!credential.ok) return jsonAnswer(credential.body, credential.status);
     const { project } = credential;
 
@@ -662,7 +683,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── GET /runs/:runId (poll run status) ─────────────────────────────────
   .get("/runs/:runId", "getExperimentRunStatus")
   .withParams(runIdParamsSchema)
-  .withAccess(publicRoute({ reason: READ_REASON }))
+  .withAccess(EVALUATION_READ_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Poll a run",
@@ -677,12 +698,15 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .handle(async ({ app, input, request }) => {
     const { runId } = input;
 
-    const credential = await app.authenticateCredential({ request, permission: "evaluations:view" });
+    const credential = await app.authenticateCredential({
+      request,
+      permission: "evaluations:view",
+    });
     if (!credential.ok) return jsonAnswer(credential.body, credential.status);
     const { project, markUsed } = credential;
     const { progress } = requireRunLoop(app.run);
 
-    const runState = await progress.tryGetRunState(runId);
+    const runState = await progress.findRunState(runId);
 
     // All three not-found branches raise the SAME code: from outside they
     // are one answer - this run is not yours to read.
@@ -766,7 +790,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/runs/:runId/results", "getExperimentRunResults")
   .withParams(runIdParamsSchema)
   .withQuery(runResultsQuerySchema)
-  .withAccess(publicRoute({ reason: READ_REASON }))
+  .withAccess(EVALUATION_READ_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Read run results",
@@ -781,13 +805,16 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .handle(async ({ app, input, request }) => {
     const { runId } = input;
 
-    const credential = await app.authenticateCredential({ request, permission: "evaluations:view" });
+    const credential = await app.authenticateCredential({
+      request,
+      permission: "evaluations:view",
+    });
     if (!credential.ok) return jsonAnswer(credential.body, credential.status);
     const { project, markUsed } = credential;
     const { progress } = requireRunLoop(app.run);
     const experiments = app.experiments();
 
-    const runState = await progress.tryGetRunState(runId);
+    const runState = await progress.findRunState(runId);
     const slugFromState =
       runState && runState.projectId === project.id ? runState.experimentSlug : undefined;
     const experimentIdFromState =
@@ -797,7 +824,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     let experimentId = experimentIdFromState;
 
     if (!experimentId && experimentSlug) {
-      const experiment = await experiments.findIdBySlug({ projectId: project.id, slug: experimentSlug });
+      const experiment = await experiments.findIdBySlug({
+        projectId: project.id,
+        slug: experimentSlug,
+      });
       experimentId = experiment?.id;
     } else if (experimentId) {
       const stillLive = await experiments.isActive({ projectId: project.id, id: experimentId });
@@ -826,7 +856,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/:slug/workbench-state", "getExperimentWorkbenchState")
   .withParams(slugParamsSchema)
   .withQuery(workbenchStateQuerySchema)
-  .withAccess(publicRoute({ reason: EXPERIMENTS_VIEW_REASON }))
+  .withAccess(EXPERIMENT_VIEW_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Read an experiment's setup",
@@ -834,7 +864,9 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       "The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask for `fields=version` to check for changes without transferring the setup.",
     tags: ["Experiments"],
     responses: {
-      400: { description: "The experiment is not an evaluations workbench (experiment_type_mismatch)" },
+      400: {
+        description: "The experiment is not an evaluations workbench (experiment_type_mismatch)",
+      },
       401: { description: "Missing or invalid API key, or the key lacks the permission" },
       404: { description: "No such experiment in this project" },
     },
@@ -842,7 +874,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .handle(async ({ app, input, request }) => {
     const { slug } = input;
 
-    const credential = await app.authenticateCredential({ request, permission: "experiments:view" });
+    const credential = await app.authenticateCredential({
+      request,
+      permission: "experiments:view",
+    });
     if (!credential.ok) return jsonAnswer(credential.body, credential.status);
     const { project, markUsed } = credential;
 
@@ -865,7 +900,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .put("/:slug/workbench-state", "saveExperimentWorkbenchState")
   .withParams(slugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
-  .withAccess(publicRoute({ reason: EXPERIMENTS_UPDATE_REASON }))
+  .withAccess(EXPERIMENT_UPDATE_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Save an experiment's setup",
@@ -888,7 +923,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .handle(async ({ app, input, request }) => {
     const { slug } = input;
 
-    const credential = await app.authenticateCredential({ request, permission: "experiments:update" });
+    const credential = await app.authenticateCredential({
+      request,
+      permission: "experiments:update",
+    });
     if (!credential.ok) return jsonAnswer(credential.body, credential.status);
     const { project, credential: principal, markUsed } = credential;
 
@@ -911,7 +949,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/:slug/versions", "listExperimentWorkbenchVersions")
   .withParams(slugParamsSchema)
   .withQuery(listVersionsQuerySchema)
-  .withAccess(publicRoute({ reason: EXPERIMENTS_VIEW_REASON }))
+  .withAccess(EXPERIMENT_VIEW_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "List an experiment's versions",
@@ -919,7 +957,9 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       "Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore each add a numbered version. Ordinary typing rewrites one autosave row, which is the entry with `autoSaved` true. Page through them with `limit` and `cursor`.",
     tags: ["Experiments"],
     responses: {
-      400: { description: "The experiment is not an evaluations workbench (experiment_type_mismatch)" },
+      400: {
+        description: "The experiment is not an evaluations workbench (experiment_type_mismatch)",
+      },
       401: { description: "Missing or invalid API key, or the key lacks the permission" },
       404: { description: "No such experiment in this project" },
     },
@@ -927,7 +967,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .handle(async ({ app, input, request }) => {
     const { slug } = input;
 
-    const credential = await app.authenticateCredential({ request, permission: "experiments:view" });
+    const credential = await app.authenticateCredential({
+      request,
+      permission: "experiments:view",
+    });
     if (!credential.ok) return jsonAnswer(credential.body, credential.status);
     const { project, markUsed } = credential;
 
@@ -970,7 +1013,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── POST /:slug/versions/:version/restore ────────────────────────────
   .post("/:slug/versions/:version/restore", "restoreExperimentWorkbenchVersion")
   .withParams(slugVersionParamsSchema)
-  .withAccess(publicRoute({ reason: EXPERIMENTS_UPDATE_REASON }))
+  .withAccess(EXPERIMENT_UPDATE_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Restore an experiment version",
@@ -989,7 +1032,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .handle(async ({ app, input, request }) => {
     const { slug, version } = input;
 
-    const credential = await app.authenticateCredential({ request, permission: "experiments:update" });
+    const credential = await app.authenticateCredential({
+      request,
+      permission: "experiments:update",
+    });
     if (!credential.ok) return jsonAnswer(credential.body, credential.status);
     const { project, credential: principal, markUsed } = credential;
 
@@ -1001,7 +1047,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     // had. `version: 0` because no experiment version is ever 0.
     const parsedVersion = parseOptionalPositiveInt(version);
     if (parsedVersion === undefined) {
-      throw new ExperimentVersionNotFoundError({ experimentId: workbench.experimentId, version: 0 });
+      throw new ExperimentVersionNotFoundError({
+        experimentId: workbench.experimentId,
+        version: 0,
+      });
     }
 
     const restored = await experiments.restoreWorkbenchVersion(
@@ -1064,7 +1113,7 @@ function executeEventStream(options: {
   loadedWorkflows: unknown;
   runPorts: ExperimentRunPorts;
   mirror: ReturnType<typeof ExperimentRunStateMirrorService.create>;
-  resultsWriter: ReturnType<typeof ExperimentRunResultsWriterService.tryWriterFor>;
+  resultsWriter: ReturnType<typeof ExperimentRunResultsWriterService.findWriterFor>;
   userId: string;
 }): ReadableStream {
   const { app, projectId, input, mirror, resultsWriter, userId } = options;

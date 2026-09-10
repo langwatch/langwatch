@@ -2,15 +2,21 @@
  * The experiment workbench's REST doors, driven through the real Hono app the API process
  * mounts.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import type { ExperimentApp } from "@langwatch/experiment-server";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import type { WorkbenchStateView } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "@langwatch/experiment-server";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { mountExperimentV3Rest } from "../experiment-v3-rest.mount.ts";
-import type { ApiExperimentRun } from "../../../app/api-experiment-run.composition.ts";
 import type { ApiHandlerManagedSessionPort } from "../../../app/api-handler-managed-session.ts";
 import type { HandlerManagedCredential } from "../../../app/api-handler-managed-credential.ts";
+import {
+  experimentApiRestRuntime,
+  experimentApp,
+  experimentRun,
+  renderExperimentRestError,
+  successfulCredential,
+} from "./experiment-rest.fixture.ts";
 
 describe("given the workbench's saved-setup doors", () => {
   describe("when a project key that may view experiments reads a setup", () => {
@@ -108,7 +114,7 @@ describe("given the workbench's run doors", () => {
     it("answers not-found rather than confirming the run exists elsewhere", async () => {
       const requestAbort = vi.fn(async () => {});
       const api = mount({
-        abort: { tryGetRunningProjectId: async () => "project-2", requestAbort },
+        abort: { findRunningProjectId: async () => "project-2", requestAbort },
       });
 
       const response = await api.fetch("/api/experiments/abort", {
@@ -127,7 +133,7 @@ describe("given the workbench's run doors", () => {
     it("signals the stop through the composed abort port", async () => {
       const requestAbort = vi.fn(async () => {});
       const api = mount({
-        abort: { tryGetRunningProjectId: async () => "project-1", requestAbort },
+        abort: { findRunningProjectId: async () => "project-1", requestAbort },
       });
 
       const response = await api.fetch("/api/experiments/abort", {
@@ -144,8 +150,8 @@ describe("given the workbench's run doors", () => {
 
   describe("when nobody is signed in", () => {
     it("refuses the abort at 401 before any run is looked up", async () => {
-      const tryGetRunningProjectId = vi.fn();
-      const api = mount({ session: null, abort: { tryGetRunningProjectId } });
+      const findRunningProjectId = vi.fn();
+      const api = mount({ session: null, abort: { findRunningProjectId } });
 
       const response = await api.fetch("/api/experiments/abort", {
         method: "POST",
@@ -154,7 +160,7 @@ describe("given the workbench's run doors", () => {
       });
 
       expect(response.status).toBe(401);
-      expect(tryGetRunningProjectId).not.toHaveBeenCalled();
+      expect(findRunningProjectId).not.toHaveBeenCalled();
     });
   });
 
@@ -185,7 +191,7 @@ describe("given the family's older name", () => {
 
 // ---------------------------------------------------------------------------
 
-function workbench() {
+function workbench(): WorkbenchStateView {
   return {
     experimentId: "experiment-1",
     slug: "acme",
@@ -193,17 +199,17 @@ function workbench() {
     version: 3,
     updatedAt: new Date(0),
     state: { datasets: [], targets: [], evaluators: [] },
-  } as never;
+  };
 }
 
 type MountOptions = {
-  experiments?: Record<string, unknown>;
+  experiments?: Partial<ExperimentService>;
   credential?: HandlerManagedCredential;
   markUsed?: () => void;
   session?: { user: { id: string } } | null;
   runLoop?: boolean;
   abort?: {
-    tryGetRunningProjectId: (...args: never[]) => unknown;
+    findRunningProjectId: (runId: string) => Promise<string | null>;
     requestAbort?: () => Promise<void>;
   };
 };
@@ -215,44 +221,25 @@ function mount(options: MountOptions = {}) {
     permitted: async () => true,
   };
 
-  const credential: HandlerManagedCredential = options.credential ?? {
-    ok: true,
-    project: { id: "project-1", slug: "acme", teamId: "team-1" } as never,
-    resolved: { type: "project" } as never,
-    markUsed: options.markUsed ?? (() => {}),
-  };
-
-  const hasRunLoop = options.runLoop ?? true;
-  const run = {
-    ports: hasRunLoop
-      ? {
-          abort: {
-            tryGetRunningProjectId: options.abort?.tryGetRunningProjectId ?? (async () => null),
-            requestAbort: options.abort?.requestAbort ?? (async () => {}),
-          },
-        }
-      : null,
-    progress: hasRunLoop ? { tryGetRunState: async () => null } : null,
-    services: {},
-    workflows: {},
-    baseUrl: "https://app.langwatch.test",
-    defaultConcurrency: 10,
-    startRun: async () => ({ runId: "run-1", runUrl: "u", total: 0 }),
-    evaluateWorkflow: async () => ({}),
-    resolveTargetNames: async () => ({}),
-  } as unknown as ApiExperimentRun;
+  const credential = options.credential ?? successfulCredential(options.markUsed);
+  const { app } = experimentApp(options.experiments);
+  const run = experimentRun({
+    available: options.runLoop,
+    findRunningProjectId: options.abort?.findRunningProjectId,
+    requestAbort: options.abort?.requestAbort,
+  });
 
   const hono = new Hono();
-  for (const app of mountExperimentV3Rest({
-    security: passThroughSecurity(),
+  for (const mounted of mountExperimentV3Rest(experimentApiRestRuntime(), {
     collaborators: {
       session,
       credential: async () => credential,
-      experiments: () => (options.experiments ?? {}) as unknown as ExperimentApp,
+      experiments: () => app,
       run,
     },
+    errors: renderExperimentRestError,
   })) {
-    hono.route("/", app);
+    hono.route("/", mounted);
   }
 
   return {
@@ -260,41 +247,3 @@ function mount(options: MountOptions = {}) {
       hono.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
-
-const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as {
-    httpStatus?: number;
-    code?: string;
-    message?: string;
-    meta?: Record<string, unknown>;
-  };
-  if (typeof handled.httpStatus === "number") {
-    return c.json({ error: handled.code ?? "error", ...handled.meta }, handled.httpStatus as never);
-  }
-  return c.json({ error: String(error) }, 500);
-};

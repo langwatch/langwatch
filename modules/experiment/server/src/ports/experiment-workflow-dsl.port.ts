@@ -8,12 +8,12 @@
  */
 export abstract class ExperimentWorkflowDslPort {
   /** The workflow, or null when the project has none by that id. */
-  abstract tryFindWorkflow(input: {
+  abstract findWorkflow(input: {
     projectId: string;
     workflowId: string;
   }): Promise<{ id: string; name: string; publishedId: string | null } | null>;
   /** The version's raw DSL, or null when the project has no such version. */
-  abstract tryFindVersionDsl(input: {
+  abstract findVersionDsl(input: {
     projectId: string;
     workflowId: string;
     versionId: string;
@@ -23,7 +23,7 @@ export abstract class ExperimentWorkflowDslPort {
    * ones — a run of a workflow the customer has archived is a run of something
    * that is not there any more.
    */
-  abstract tryFindEvaluableWorkflow(input: {
+  abstract findEvaluableWorkflow(input: {
     projectId: string;
     workflowId: string;
   }): Promise<{ id: string; name: string } | null>;
@@ -32,7 +32,7 @@ export abstract class ExperimentWorkflowDslPort {
    * manual commit, else the latest autosave — so a workflow that was only ever
    * autosaved is still evaluable.
    */
-  abstract tryFindEvaluableVersion(input: {
+  abstract findEvaluableVersion(input: {
     projectId: string;
     workflowId: string;
     versionId?: string;

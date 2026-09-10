@@ -286,7 +286,7 @@ class MemoryExperimentRunRepository extends ExperimentRunRepository {
     const runs = this.values[input.experimentId] ?? [];
     return { runs, totalHits: runs.length };
   }
-  async tryGet() {
+  async findRun() {
     return null;
   }
   async getWorkflowVersions() {
@@ -338,7 +338,7 @@ class MemoryExperimentDspyRepository extends ExperimentDspyRepository {
       }));
   }
 
-  async tryGet(input: {
+  async findStep(input: {
     tenantId: string;
     experimentId: string;
     runId: string;

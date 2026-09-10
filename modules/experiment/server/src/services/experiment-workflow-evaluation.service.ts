@@ -151,7 +151,7 @@ export class WorkflowEvaluationService {
     workflowVersionId: string;
     version: string;
   }> {
-    const workflow = await this.dependencies.workflowSource.tryFindEvaluableWorkflow({
+    const workflow = await this.dependencies.workflowSource.findEvaluableWorkflow({
       projectId,
       workflowId,
     });
@@ -159,7 +159,7 @@ export class WorkflowEvaluationService {
       throw new WorkflowNotFoundError(workflowId);
     }
 
-    const version = await this.dependencies.workflowSource.tryFindEvaluableVersion({
+    const version = await this.dependencies.workflowSource.findEvaluableVersion({
       projectId,
       workflowId,
       ...(versionId ? { versionId } : {}),

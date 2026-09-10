@@ -67,27 +67,27 @@ type FakeVersion = { id: string; version: string; dsl: unknown };
 type FakeWorkflow = { id: string; name: string; archived?: boolean; versions: FakeVersion[] };
 
 /**
- * In-memory ExperimentWorkflowDslPort. `tryFindEvaluableVersion` returns the last-pushed version when no versionId is named — a stand-in for the real
+ * In-memory ExperimentWorkflowDslPort. `findEvaluableVersion` returns the last-pushed version when no versionId is named - a stand-in for the real
  * Postgres adapter's createdAt ordering (@langwatch/api-experiment-run's PostgresExperimentWorkflowDslAdapter), which needs a live database to prove.
  * This fake only proves the SERVICE delegates the "which version" decision to the port rather than deciding it itself.
  */
 function buildWorkflowSource(workflows: Record<string, FakeWorkflow>): ExperimentWorkflowDslPort {
   return {
-    async tryFindWorkflow(input) {
+    async findWorkflow(input) {
       const wf = workflows[input.workflowId];
       if (!wf || wf.archived) return null;
       return { id: wf.id, name: wf.name, publishedId: wf.versions.at(-1)?.id ?? null };
     },
-    async tryFindVersionDsl(input) {
+    async findVersionDsl(input) {
       const wf = workflows[input.workflowId];
       return wf?.versions.find((v) => v.id === input.versionId)?.dsl ?? null;
     },
-    async tryFindEvaluableWorkflow(input) {
+    async findEvaluableWorkflow(input) {
       const wf = workflows[input.workflowId];
       if (!wf || wf.archived) return null;
       return { id: wf.id, name: wf.name };
     },
-    async tryFindEvaluableVersion(input) {
+    async findEvaluableVersion(input) {
       const wf = workflows[input.workflowId];
       if (!wf) return null;
       if (input.versionId) {
@@ -129,7 +129,7 @@ function buildDeps(
     completeRun: vi.fn(),
     failRun: vi.fn(),
     stopRun: vi.fn(),
-    tryGetRunState: vi.fn(),
+    findRunState: vi.fn(),
     deleteRun: vi.fn(),
   } as unknown as ExperimentRunProgressPort;
 

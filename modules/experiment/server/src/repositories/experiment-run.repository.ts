@@ -18,7 +18,7 @@ export abstract class ExperimentRunRepository {
     input: ExperimentRunPageInput,
   ): Promise<{ runs: ExperimentRun[]; totalHits: number }>;
   /** Polling semantics: absence and an unavailable analytical store are null. */
-  abstract tryGet(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null>;
+  abstract findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null>;
   abstract getWorkflowVersions(
     projectId: string,
     versionIds: string[],

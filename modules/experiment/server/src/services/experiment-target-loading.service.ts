@@ -255,7 +255,7 @@ export class ExperimentTargetLoadingService {
     workflowId: string;
     workflowVersionId?: string;
   }): Promise<LoadedWorkflow | LoadFailure> {
-    const workflow = await services.workflows.tryFindWorkflow({ projectId, workflowId });
+    const workflow = await services.workflows.findWorkflow({ projectId, workflowId });
     if (!workflow) {
       return { error: `Workflow "${workflowId}" not found`, status: 404 };
     }
@@ -268,7 +268,7 @@ export class ExperimentTargetLoadingService {
       };
     }
 
-    const dsl = await services.workflows.tryFindVersionDsl({ projectId, workflowId, versionId });
+    const dsl = await services.workflows.findVersionDsl({ projectId, workflowId, versionId });
     if (!dsl) {
       return { error: `Workflow version "${versionId}" not found`, status: 404 };
     }

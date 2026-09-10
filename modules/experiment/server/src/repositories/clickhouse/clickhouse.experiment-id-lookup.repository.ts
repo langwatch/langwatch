@@ -19,7 +19,7 @@ export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRe
     return new ClickHouseExperimentIdLookupRepository(options.clickhouse);
   }
 
-  async tryFindExperimentId({
+  async findExperimentId({
     tenantId,
     runId,
   }: {

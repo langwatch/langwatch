@@ -86,7 +86,7 @@ export class ExperimentComparisonVariantService {
   }
 
   /** The column a chip-style comparison's verdict hangs under: its first live variant. */
-  tryAnchorVariantId({
+  findAnchorVariantId({
     state,
     cfg,
   }: {

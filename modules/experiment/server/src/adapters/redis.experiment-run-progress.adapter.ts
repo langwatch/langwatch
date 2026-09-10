@@ -62,7 +62,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
   }
 
   async updateProgress(runId: string, progress: number): Promise<void> {
-    const state = await this.tryGetRunState(runId);
+    const state = await this.findRunState(runId);
     if (!state) return;
 
     state.progress = progress;
@@ -70,7 +70,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
   }
 
   async addEvent(runId: string, event: EvaluationV3Event): Promise<void> {
-    const state = await this.tryGetRunState(runId);
+    const state = await this.findRunState(runId);
     if (!state) return;
 
     // Keep last 50 events
@@ -92,7 +92,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
     runId: string,
     summary: ExperimentRunProgressSummary | undefined,
   ): Promise<void> {
-    const state = await this.tryGetRunState(runId);
+    const state = await this.findRunState(runId);
     if (!state) return;
 
     state.status = "completed";
@@ -112,7 +112,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
    * run API) is what the customer is allowed to read.
    */
   async failRun(runId: string, failure: ExperimentRunProgressFailure): Promise<void> {
-    const state = await this.tryGetRunState(runId);
+    const state = await this.findRunState(runId);
     if (!state) return;
 
     state.status = "failed";
@@ -126,7 +126,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
   }
 
   async stopRun(runId: string): Promise<void> {
-    const state = await this.tryGetRunState(runId);
+    const state = await this.findRunState(runId);
     if (!state) return;
 
     state.status = "stopped";
@@ -136,7 +136,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
     logger.info({ runId }, "Run stopped");
   }
 
-  async tryGetRunState(runId: string): Promise<ExperimentRunProgressState | null> {
+  async findRunState(runId: string): Promise<ExperimentRunProgressState | null> {
     const value = await this.redis.get(`${RUN_STATE_KEY_PREFIX}${runId}`);
     if (!value) return null;
 

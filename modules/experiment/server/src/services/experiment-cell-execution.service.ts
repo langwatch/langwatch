@@ -6,7 +6,11 @@
 
 import type { WorkflowService } from "@langwatch/workflow-server";
 import type { ExecutionCell, EvaluationV3Event } from "@langwatch/experiment-contract";
-import type { ExecutionState, StudioServerEvent, StudioWorkflow } from "@langwatch/workflow-contract";
+import type {
+  ExecutionState,
+  StudioServerEvent,
+  StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { createLogger } from "@langwatch/observability";
@@ -69,7 +73,7 @@ export class ExperimentCellExecutionService {
   ) {}
 
   /** Prices an LLM node's token usage at the project's canonical model rate. */
-  async tryPriceMetrics({
+  async findPriceMetrics({
     projectId,
     metrics,
   }: {
@@ -86,7 +90,7 @@ export class ExperimentCellExecutionService {
       return undefined;
     }
 
-    return this.ports.cost.tryPriceTokens({
+    return this.ports.cost.findTokenPrice({
       projectId,
       model: metrics.model,
       inputTokens,
@@ -336,7 +340,7 @@ export class ExperimentCellExecutionService {
         mappedEvent.cost == null &&
         event.type === "component_state_change"
       ) {
-        const cost = await this.tryPriceMetrics({
+        const cost = await this.findPriceMetrics({
           projectId,
           metrics: event.payload.execution_state?.metrics,
         });

@@ -21,7 +21,10 @@ import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
-import { ExperimentCellPlanService, type SeededTargetOutput } from "./experiment-cell-plan.service.ts";
+import {
+  ExperimentCellPlanService,
+  type SeededTargetOutput,
+} from "./experiment-cell-plan.service.ts";
 import {
   ExperimentComparisonPlanService,
   type VariantEvaluatorScore,
@@ -129,7 +132,7 @@ export class ExperimentRunOrchestratorService {
   ): { detail: string; errorType: string } => processComparisonSkipMessage(reason);
 
   /** Back-fill event for one REUSED candidate output, or null when this entry needs none. */
-  static tryBuildSeededTargetResultEvent(
+  static findSeededTargetResultEvent(
     key: string,
     seeded: SeededTargetOutput,
     options: {
@@ -220,7 +223,7 @@ export class ExperimentRunOrchestratorService {
       return undefined;
     }
 
-    return cost.tryPriceTokens({ projectId, model: metrics.model, inputTokens, outputTokens });
+    return cost.findTokenPrice({ projectId, model: metrics.model, inputTokens, outputTokens });
   };
 
   /** Executes a single cell and yields events. See {@link ExperimentCellExecutionService}. */
@@ -349,8 +352,8 @@ export class ExperimentRunOrchestratorService {
 
   /** Build the recordTargetResult dispatch payload. See {@link ExperimentResultDispatchService}. */
   static buildTargetResultDispatch = (
-    input: Parameters<ExperimentResultDispatchService["tryBuildTargetResultDispatch"]>[0],
-  ): RecordTargetResultCommandData | null => resultDispatches.tryBuildTargetResultDispatch(input);
+    input: Parameters<ExperimentResultDispatchService["findTargetResultDispatch"]>[0],
+  ): RecordTargetResultCommandData | null => resultDispatches.findTargetResultDispatch(input);
 
   /** The recordEvaluatorResult dispatch payload. See {@link ExperimentResultDispatchService}. */
   static buildEvaluatorResultDispatch = (

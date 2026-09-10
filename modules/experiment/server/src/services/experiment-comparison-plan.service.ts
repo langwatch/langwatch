@@ -79,7 +79,7 @@ export class ExperimentComparisonPlanService {
 
       const resolution = this.variants.resolveVariants({ state, cfg, ownerId: evaluator.id });
       if (resolution.skip) {
-        const anchorId = this.variants.tryAnchorVariantId({ state, cfg });
+        const anchorId = this.variants.findAnchorVariantId({ state, cfg });
         if (anchorId) {
           this.variants.pushSetupSkips({
             kind: resolution.skip,

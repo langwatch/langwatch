@@ -148,7 +148,7 @@ export class ExperimentResultDispatchService {
    * cell-level `error` event. Exported for unit testing: falsy outputs
    * must persist as a value, and the raw thrown message is never stored.
    */
-  tryBuildTargetResultDispatch({
+  findTargetResultDispatch({
     tenantId,
     runId,
     experimentId,

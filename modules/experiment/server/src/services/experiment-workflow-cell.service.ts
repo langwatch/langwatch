@@ -5,7 +5,11 @@
  */
 
 import type { WorkflowService } from "@langwatch/workflow-server";
-import { nodeErrorToDomainError, type StudioServerEvent, type StudioWorkflow } from "@langwatch/workflow-contract";
+import {
+  nodeErrorToDomainError,
+  type StudioServerEvent,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import {
   UNNAMED_FAILURE,
   type EvaluationV3Event,
@@ -178,7 +182,7 @@ export class ExperimentWorkflowCellService {
       state.totalCost += execution.cost;
       state.sawCost = true;
     } else {
-      const cost = await this.cells.tryPriceMetrics({ projectId, metrics: execution.metrics });
+      const cost = await this.cells.findPriceMetrics({ projectId, metrics: execution.metrics });
       if (cost != null) {
         state.totalCost += cost;
         state.sawCost = true;

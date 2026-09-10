@@ -6,7 +6,10 @@ import type { WorkflowService } from "@langwatch/workflow-server";
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { Experiment } from "@langwatch/experiment-contract";
+import type { Experiment, ExperimentPublishedMonitor } from "@langwatch/experiment-contract";
+import { readFile } from "node:fs/promises";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
@@ -15,7 +18,7 @@ import { ExperimentApp, type ExperimentAppDependencies } from "../experiment.app
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
-const experiment = {
+const experiment: Experiment = {
   id: "experiment-1",
   projectId: "project-1",
   slug: "support-email-classifier",
@@ -24,7 +27,30 @@ const experiment = {
   workflowId: null,
   createdAt: NOW,
   updatedAt: NOW,
-} as unknown as Experiment;
+  archivedAt: null,
+  workbenchState: null,
+  workbenchVersion: 0,
+};
+
+const monitor: ExperimentPublishedMonitor = {
+  id: "monitor-1",
+  projectId: "project-1",
+  experimentId: "experiment-1",
+  evaluatorId: null,
+  checkType: "langevals/llm_boolean",
+  name: "Support email classifier",
+  slug: "support-email-classifier",
+  executionMode: "ON_MESSAGE",
+  enabled: true,
+  preconditions: [],
+  parameters: {},
+  mappings: null,
+  sample: 1,
+  level: "trace",
+  threadIdleTimeout: null,
+  createdAt: NOW,
+  updatedAt: NOW,
+};
 
 const workflowBacked = { ...experiment, id: "experiment-2", workflowId: "workflow-1" };
 
@@ -58,10 +84,10 @@ function harness({
   experiments = {},
   workflows = {},
 }: {
-  experiments?: Record<string, unknown>;
-  workflows?: Record<string, unknown>;
+  experiments?: Partial<ExperimentService>;
+  workflows?: Partial<WorkflowService>;
 } = {}) {
-  const experimentService = {
+  const experimentService = createApiFixture<ExperimentService>({
     findById: vi.fn(async () => experiment),
     archive: vi.fn(async () => ({ success: true as const })),
     getRunAggregates: vi.fn(async () => ({})),
@@ -86,24 +112,27 @@ function harness({
       version: 3,
     })),
     ...experiments,
-  } as unknown as ExperimentService;
+  });
 
-  const workflowService = {
+  const workflowService = createApiFixture<WorkflowService>({
     getById: vi.fn(async () => ({ id: "workflow-1" })),
     archive: vi.fn(async () => undefined),
     ...workflows,
-  } as unknown as WorkflowService;
+  });
 
   const monitors = {
     deleteForExperiment: vi.fn(async () => undefined),
-    upsertForExperiment: vi.fn(async () => undefined),
+    upsertForExperiment: vi.fn(async () => monitor),
   };
   const workflowAuthoring = {
     create: vi.fn(async () => ({ id: "workflow-1" })),
     saveVersion: vi.fn(async () => undefined),
-    copyWithDatasets: vi.fn(async () => ({ workflowId: "workflow-2", dsl: {} as never })),
+    copyWithDatasets: vi.fn(async () => ({
+      workflowId: "workflow-2",
+      dsl: { version: "1", name: "Copied workflow", nodes: [], edges: [] },
+    })),
   };
-  const runLookup = { resolve: vi.fn(async () => experiment) };
+  const runLookup = ExperimentFindOrCreateService.create(experimentService);
   const permissions = { mayManageEvaluations: vi.fn(async () => true) };
   const people = { namesOf: vi.fn(async () => []) };
   const modelCosts = { listFor: vi.fn(async () => []) };
@@ -120,10 +149,10 @@ function harness({
       dependencies: {},
       infrastructure: {
         experiments: experimentService,
-        runLookup: runLookup as unknown as ExperimentAppDependencies["runLookup"],
+        runLookup,
         workflows: workflowService,
         workflowAuthoring,
-        dataset: {} as DatasetApi,
+        dataset: createApiFixture<DatasetApi>(),
         monitors,
         broadcast,
         permissions,
@@ -381,17 +410,16 @@ describe("ExperimentApp", () => {
         },
       });
 
-      await expect(
-        app.findWorkflow({ id: "workflow-1", projectId: "project-1" }),
-      ).rejects.toThrow("the workflow store is unreachable");
+      await expect(app.findWorkflow({ id: "workflow-1", projectId: "project-1" })).rejects.toThrow(
+        "the workflow store is unreachable",
+      );
     });
   });
 
   describe("when checking the archive path's source", () => {
     /** @scenario The delete-experiment code path does NOT contact ClickHouse */
     it("does not import getClickHouseClientForTenant", async () => {
-      const fs = await import("node:fs/promises");
-      const src = await fs.readFile(new URL("../experiment.app.ts", import.meta.url), "utf8");
+      const src = await readFile(new URL("../experiment.app.ts", import.meta.url), "utf8");
       expect(src).not.toMatch(/getClickHouseClientForTenant/);
     });
   });

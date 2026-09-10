@@ -140,7 +140,7 @@ export class ExperimentRunDriverService {
       // One agent cache credential for this whole run, minted only when a
       // target actually runs Python. Undefined when nothing does, or when the
       // mint failed, and the engine then injects nothing.
-      sandboxApiKey: await sandboxKey.tryMintRunSandboxApiKey({
+      sandboxApiKey: await sandboxKey.findRunSandboxApiKey({
         sandboxCredentials: ports.sandboxCredentials,
         projectId,
         loadedAgents: input.loadedAgents,
@@ -355,7 +355,7 @@ export class ExperimentRunDriverService {
 
     return Object.entries(seeded)
       .map(([key, value]) =>
-        ExperimentRunOrchestratorService.tryBuildSeededTargetResultEvent(key, value, {
+        ExperimentRunOrchestratorService.findSeededTargetResultEvent(key, value, {
           storage: run.storage,
           rowsThisRunOwns,
           datasetRows: input.datasetRows,

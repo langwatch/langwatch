@@ -59,7 +59,7 @@ describe("ClickHouseExperimentDspyRepository", () => {
       repository.list({ tenantId: "project_1", experimentId: "experiment_1" }),
     ).resolves.toEqual([]);
     await expect(
-      repository.tryGet({
+      repository.findStep({
         tenantId: "project_1",
         experimentId: "experiment_1",
         runId: "run_1",

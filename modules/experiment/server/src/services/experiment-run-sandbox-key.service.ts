@@ -43,7 +43,7 @@ export class ExperimentRunSandboxKeyService {
    * The credential every code node of this run authenticates with, or
    * undefined. A run that cannot get one still runs.
    */
-  async tryMintRunSandboxApiKey({
+  async findRunSandboxApiKey({
     sandboxCredentials,
     projectId,
     loadedAgents,
@@ -61,7 +61,7 @@ export class ExperimentRunSandboxKeyService {
     // Minting here has no signed-in member to authorize — a run mints for itself
     // — so the port answers with the key or with nothing, and the caller injects
     // nothing when it gets nothing.
-    return sandboxCredentials.tryMintRunKey({ projectId });
+    return sandboxCredentials.findRunKey({ projectId });
   }
 
   /** Sets the run's sandbox credential on a studio event's workflow, so its code nodes authenticate as this run. */

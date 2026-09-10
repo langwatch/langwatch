@@ -87,6 +87,6 @@ export abstract class ExperimentRunProgressPort {
   ): Promise<void>;
   abstract failRun(runId: string, failure: ExperimentRunProgressFailure): Promise<void>;
   abstract stopRun(runId: string): Promise<void>;
-  abstract tryGetRunState(runId: string): Promise<ExperimentRunProgressState | null>;
+  abstract findRunState(runId: string): Promise<ExperimentRunProgressState | null>;
   abstract deleteRun(runId: string): Promise<void>;
 }

@@ -11,5 +11,5 @@
  * way to the caller, which simply omits the credential.
  */
 export abstract class ExperimentSandboxCredentialPort {
-  abstract tryMintRunKey(input: { projectId: string }): Promise<string | undefined>;
+  abstract findRunKey(input: { projectId: string }): Promise<string | undefined>;
 }

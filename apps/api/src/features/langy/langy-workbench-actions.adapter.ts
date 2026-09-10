@@ -195,7 +195,7 @@ export class ApiWorkbenchUiActionBackend extends LangyUiActionBackendPort {
     }
 
     const scope: ExecutionScope = scopeFromRunPayload(parsed);
-    const seedTargetOutputs = ExperimentSavedStateExecutionService.tryPlanSavedRunSeeding({
+    const seedTargetOutputs = ExperimentSavedStateExecutionService.findSavedRunSeeding({
       prepared,
       scope,
     });

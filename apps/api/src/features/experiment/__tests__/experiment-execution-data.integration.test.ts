@@ -87,23 +87,23 @@ class FakeEvaluatorApi implements Pick<EvaluatorApi, "findById"> {
 /** Real-Postgres-backed `ExperimentWorkflowDslPort`, scoped to this suite's own rows. */
 function createWorkflowDslPort(prisma: PrismaClient): ExperimentWorkflowDslPort {
   return {
-    async tryFindWorkflow(input) {
+    async findWorkflow(input) {
       const workflow = await prisma.workflow.findFirst({
         where: { id: input.workflowId, projectId: input.projectId },
       });
       if (!workflow) return null;
       return { id: workflow.id, name: workflow.name, publishedId: workflow.publishedId };
     },
-    async tryFindVersionDsl(input) {
+    async findVersionDsl(input) {
       const version = await prisma.workflowVersion.findFirst({
         where: { id: input.versionId, workflowId: input.workflowId, projectId: input.projectId },
       });
       return version?.dsl ?? null;
     },
-    async tryFindEvaluableWorkflow() {
+    async findEvaluableWorkflow() {
       throw new Error("not implemented — unused by this suite");
     },
-    async tryFindEvaluableVersion() {
+    async findEvaluableVersion() {
       throw new Error("not implemented — unused by this suite");
     },
   } satisfies ExperimentWorkflowDslPort as ExperimentWorkflowDslPort;

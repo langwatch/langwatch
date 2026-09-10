@@ -212,7 +212,7 @@ describe("given a run that carries one column and runs another", () => {
   describe("when both columns are scored by the same evaluator on the same row", () => {
     /** @scenario A snapshot run keeps both columns' verdicts */
     it("reads both columns' verdicts back from the run", async () => {
-      const run = await repository.tryGet({ projectId: tenantId, experimentId, runId });
+      const run = await repository.findRun({ projectId: tenantId, experimentId, runId });
 
       const verdicts = run?.evaluations.filter((evaluation) => evaluation.evaluator === EVALUATOR);
 
@@ -221,7 +221,7 @@ describe("given a run that carries one column and runs another", () => {
 
     /** @scenario A snapshot run keeps both columns' verdicts */
     it("keeps each column's own score", async () => {
-      const run = await repository.tryGet({ projectId: tenantId, experimentId, runId });
+      const run = await repository.findRun({ projectId: tenantId, experimentId, runId });
 
       const scoreFor = (targetId: string) =>
         run?.evaluations.find(
@@ -263,7 +263,7 @@ describe("given a run that carries one column and runs another", () => {
       // The results page renders only the targets a run holds data for. This is
       // the whole point of carrying the board in: before it, the run declared
       // this column and held nothing for it.
-      const run = await repository.tryGet({ projectId: tenantId, experimentId, runId });
+      const run = await repository.findRun({ projectId: tenantId, experimentId, runId });
 
       expect(run?.dataset.map((entry) => entry.targetId).sort()).toEqual([CARRIED, RAN]);
     });

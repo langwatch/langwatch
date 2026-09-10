@@ -317,7 +317,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     );
   }
 
-  async tryGet(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
+  async findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
     return this.options.telemetry.trace(
       {
         name: "ExperimentRunService.getRun",

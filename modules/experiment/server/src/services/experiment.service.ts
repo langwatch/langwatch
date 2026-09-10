@@ -373,7 +373,7 @@ export class ExperimentService {
 
   async getDspyStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep> {
     const lookup = experimentDspyStepLookupSchema.parse(input);
-    const value = await this.options.dspyRepository.tryGet(lookup);
+    const value = await this.options.dspyRepository.findStep(lookup);
     if (!value) {
       throw new ExperimentDspyStepNotFoundError(
         `${lookup.tenantId}/${lookup.experimentId}/${lookup.runId}/${lookup.stepIndex}`,
@@ -426,7 +426,7 @@ export class ExperimentService {
   }
 
   findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
-    return this.options.runRepository.tryGet(experimentRunLookupSchema.parse(input));
+    return this.options.runRepository.findRun(experimentRunLookupSchema.parse(input));
   }
 
   async getRunsPageBySlug(input: ExperimentRunSlugPageInput): Promise<{

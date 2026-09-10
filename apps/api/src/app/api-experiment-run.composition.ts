@@ -49,11 +49,17 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { StudioClientEvent, StudioServerEvent, WorkflowRunOrigin } from "@langwatch/workflow-contract";
+import type {
+  StudioClientEvent,
+  StudioServerEvent,
+  WorkflowRunOrigin,
+} from "@langwatch/workflow-contract";
 import {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
-  WorkflowStudioDispatchService, type WorkflowService,} from "@langwatch/workflow-server";
+  WorkflowStudioDispatchService,
+  type WorkflowService,
+} from "@langwatch/workflow-server";
 import { ConnectedTargetService } from "@langwatch/suite-server";
 import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
@@ -477,7 +483,7 @@ class ApiExperimentModelCostAdapter extends ExperimentModelCostPort {
     super();
   }
 
-  async tryPriceTokens(input: {
+  async findTokenPrice(input: {
     projectId: string;
     model: string;
     inputTokens: number;
@@ -598,7 +604,7 @@ class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialP
     super();
   }
 
-  async tryMintRunKey(input: { projectId: string }): Promise<string | undefined> {
+  async findRunKey(input: { projectId: string }): Promise<string | undefined> {
     const mint = this.mint;
     if (!mint) return undefined;
 
@@ -625,7 +631,7 @@ class PostgresExperimentWorkflowDslAdapter extends ExperimentWorkflowDslPort {
     super();
   }
 
-  async tryFindWorkflow(input: {
+  async findWorkflow(input: {
     projectId: string;
     workflowId: string;
   }): Promise<{ id: string; name: string; publishedId: string | null } | null> {
@@ -636,7 +642,7 @@ class PostgresExperimentWorkflowDslAdapter extends ExperimentWorkflowDslPort {
     return workflow ?? null;
   }
 
-  async tryFindVersionDsl(input: {
+  async findVersionDsl(input: {
     projectId: string;
     workflowId: string;
     versionId: string;
@@ -652,7 +658,7 @@ class PostgresExperimentWorkflowDslAdapter extends ExperimentWorkflowDslPort {
     return version?.dsl ?? null;
   }
 
-  async tryFindEvaluableWorkflow(input: {
+  async findEvaluableWorkflow(input: {
     projectId: string;
     workflowId: string;
   }): Promise<{ id: string; name: string } | null> {
@@ -663,7 +669,7 @@ class PostgresExperimentWorkflowDslAdapter extends ExperimentWorkflowDslPort {
     return workflow ?? null;
   }
 
-  async tryFindEvaluableVersion(input: {
+  async findEvaluableVersion(input: {
     projectId: string;
     workflowId: string;
     versionId?: string;

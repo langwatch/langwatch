@@ -310,7 +310,7 @@ export class ExperimentRunStorageService {
   }): Promise<void> {
     const targetResultDispatch =
       event.type === "target_result" || event.type === "error"
-        ? this.dispatches.tryBuildTargetResultDispatch({
+        ? this.dispatches.findTargetResultDispatch({
             tenantId: projectId,
             runId,
             experimentId,

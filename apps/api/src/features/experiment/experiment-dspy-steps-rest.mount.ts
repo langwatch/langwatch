@@ -4,21 +4,18 @@ import {
   type MountableRestApp,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import { dspyStepsCaller, experimentDspyStepsRest } from "@langwatch/experiment-server";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential.ts";
-import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
-
-export type ApiDspyStepsCredentialPort = (input: {
-  request: Request;
-  permission: AuthzPermission;
-}) => Promise<HandlerManagedCredential>;
+import type {
+  ApiHandlerManagedCredentialPort,
+  ApiRestRuntime,
+} from "../../app-rest/api-rest.runtime.ts";
 
 class ApiDspyStepsCredentialRefusal extends Error {
   constructor(
-    readonly status: Extract<HandlerManagedCredential, { ok: false }>["status"],
+    readonly status: ContentfulStatusCode,
     readonly body: object,
   ) {
     super("DSPy step credential refused");
@@ -30,7 +27,7 @@ export function mountExperimentDspyStepsRest(
   runtime: ApiRestRuntime,
   options: Readonly<{
     experiments: () => ExperimentApi;
-    credential: ApiDspyStepsCredentialPort;
+    credential: ApiHandlerManagedCredentialPort;
     errors: RestErrorHandler;
   }>,
 ): MountableRestApp {

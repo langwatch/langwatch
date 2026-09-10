@@ -122,7 +122,7 @@ function mount(
     run: {
       ports: {} as never,
       progress: {
-        tryGetRunState: async () => options.runState ?? null,
+        findRunState: async () => options.runState ?? null,
       } as never,
       // Every target carries its own prompt and the dataset is inline, so the
       // load reaches none of these: a call is an arrangement bug, not a stub.
