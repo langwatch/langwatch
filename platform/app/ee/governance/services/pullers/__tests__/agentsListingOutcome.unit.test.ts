@@ -64,6 +64,38 @@ describe("given a source's last agents listing", () => {
     });
 
     /**
+     * The bound that stopped the walk is ours, and every page the provider was
+     * asked for came back. Both other causes lie about that: `access` sends
+     * somebody to audit a credential that is working, and `unreachable` tells
+     * a reader that a provider which answered every request did not answer.
+     */
+    it("treats our own page bound as neither a fault to fix nor a provider that went quiet", () => {
+      expect(agentsListingOutcome(row("refused", "too_many_pages"))).toEqual({
+        outcome: "refused",
+        cause: "incomplete",
+      });
+    });
+
+    /**
+     * Stated against the specific wrong answer this change exists to end,
+     * rather than left implied by the assertion above. `too_many_pages` was
+     * added to the vocabulary and mapped nowhere, so it fell through to
+     * `unreachable` and rendered "did not answer" with the remedy "Ask again
+     * in a moment" — advice that provably cannot work, since the next walk
+     * reads the same pages and stops at the same bound. An edit that drops
+     * this reason from the table restores exactly that, and would pass every
+     * other test in this file.
+     */
+    it("does not tell a reader to ask again when asking again reads the same pages", () => {
+      const outcome = agentsListingOutcome(row("refused", "too_many_pages"));
+
+      expect(outcome).not.toEqual({
+        outcome: "refused",
+        cause: "unreachable",
+      });
+    });
+
+    /**
      * The reason column is a plain string because the log outlives the
      * vocabulary, so this build will eventually read words written by a later
      * one. Falling to `unreachable` is the safe half of the pair: its advice is
@@ -73,6 +105,52 @@ describe("given a source's last agents listing", () => {
     it("falls to asking again for a reason this build has never heard of", () => {
       expect(
         agentsListingOutcome(row("refused", "quota_exhausted_v2")),
+      ).toEqual({ outcome: "refused", cause: "unreachable" });
+    });
+
+    /**
+     * The cause table is an object literal, and indexing one with a string
+     * reaches its prototype. `toString` and friends come back as inherited
+     * functions rather than `undefined`, so a `?? "unreachable"` fallback
+     * never fires and a Function lands where a cause belongs. `REFUSAL_VOICE`
+     * has no entry for it and reading a headline off `undefined` throws, so
+     * the screen crashes instead of drawing the refusal it was handed.
+     *
+     * That is strictly worse than the wrong-advice bug the fallback exists to
+     * prevent, and it shipped in this file once already.
+     *
+     * These names are tested one at a time rather than as a loop so a failure
+     * names the word that broke it.
+     */
+    it.each([
+      "toString",
+      "constructor",
+      "valueOf",
+      "hasOwnProperty",
+    ])("falls to asking again for %s, which is also a property name", (inherited) => {
+      expect(agentsListingOutcome(row("refused", inherited))).toEqual({
+        outcome: "refused",
+        cause: "unreachable",
+      });
+    });
+
+    /**
+     * The control, and the whole diagnosis of why the bug above survived a
+     * green suite.
+     *
+     * This assertion passes against the broken lookup, because an ordinary
+     * unknown word is genuinely absent from the table and `??` fires for it.
+     * So any test that reaches for a plausible-sounding unknown reason — which
+     * is what the test above this block does with `quota_exhausted_v2`, and
+     * what anybody writing this file would reach for first — is guaranteed to
+     * miss the inherited-name case entirely.
+     *
+     * Keep both. Deleting this one loses the record of why coverage that looks
+     * complete was not, and the next person writes the same passing test.
+     */
+    it("still falls to asking again for an ordinary unknown word (control)", () => {
+      expect(
+        agentsListingOutcome(row("refused", "some_future_reason")),
       ).toEqual({ outcome: "refused", cause: "unreachable" });
     });
 

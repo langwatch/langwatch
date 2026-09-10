@@ -358,10 +358,18 @@ function retryOrGiveUp({
   /** Names the list in the log line, so a search can tell the two apart. */
   what: string;
 }): void {
+  // `errorType` is the constructor-set `name`, which is stable enough to alert
+  // and group on without depending on message text. The message is kept
+  // alongside it because this is an operator log and the detail is the whole
+  // point of the line: the durable event carries a reason code and nothing
+  // else, so dropping the message here would leave the terminal failure with
+  // no explanation anywhere. That boundary -- message to the log, reason to
+  // the event -- is the same one the run handler above draws.
   const context = {
     sourceId: payload.sourceId,
     requestId: payload.requestId,
     attempt: intentContext.attempt,
+    errorType: error instanceof Error ? error.name : typeof error,
     error: error instanceof Error ? error.message : String(error),
   };
 
