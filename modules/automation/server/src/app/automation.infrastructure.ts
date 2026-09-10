@@ -1,14 +1,14 @@
 import type { AlertType, AutomationLimitNextStep, DatasetActionParams, GraphTriggerEvaluationReason, GraphTriggerEvaluationResult, GraphTriggerSweepCandidate, SlackActionParams, SlackPayload, TriggerMatchRecordedEventData, TriggerSummary, WebhookActionParams, WebhookDeliveryInput } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
-export interface AutomationInfrastructure {  automationClock: AutomationClockPort;
+export interface AutomationInfrastructure {  automationClock: AutomationClock;
   automationDatasetMapper: AutomationDatasetMapperPort;
   automationDispatchError: AutomationDispatchErrorPort;
-  automationEmailCapStore: AutomationEmailCapStorePort;
-  automationEvaluationQueryClassification: AutomationEvaluationQueryClassificationPort;
-  automationEvaluationTraceSummary: AutomationEvaluationTraceSummaryPort;
-  automationEvaluationTriggerFilter: AutomationEvaluationTriggerFilterPort;
-  automationGraphActivity: AutomationGraphActivityPort;
-  automationGraphDelivery: AutomationGraphDeliveryPort;
+  automationEmailCapStore: AutomationEmailCapStore;
+  automationEvaluationQueryClassification: AutomationEvaluationQueryClassification;
+  automationEvaluationTraceSummary: AutomationEvaluationTraceSummary;
+  automationEvaluationTriggerFilter: AutomationEvaluationTriggerFilter;
+  automationGraphActivity: AutomationGraphActivity;
+  automationGraphDelivery: AutomationGraphDelivery;
   automationGraphNotifier: AutomationGraphNotifierPort;
   automationHeartbeat: AutomationHeartbeatPort;
   automationIntentRetention: AutomationIntentRetentionPort;
@@ -22,7 +22,7 @@ export interface AutomationInfrastructure {  automationClock: AutomationClockPor
   automationSlackProvider: AutomationSlackProviderPort;
   automationTestFire: AutomationTestFirePort;
   automationTraceTriggerCatalogue: AutomationTraceTriggerCataloguePort;
-  automationTriggerMatchRecorder: AutomationTriggerMatchRecorderPort;
+  automationTriggerMatchRecorder: AutomationTriggerMatchRecorder;
   automationWebhookProvider: AutomationWebhookProviderPort;
   scheduledJobStore: ScheduledJobStorePort;
   schedulerWake: SchedulerWakePort;
@@ -30,12 +30,12 @@ export interface AutomationInfrastructure {  automationClock: AutomationClockPor
 }
 
 
-export interface AutomationClockPort {
+export interface AutomationClock {
   now(): Instant;
 }
 
 
-export interface AutomationEvaluationTriggerFilterPort {
+export interface AutomationEvaluationTriggerFilter {
   readsEvaluations(input: {
     filters: Record<string, unknown>;
     filterQuery: string | null;
@@ -43,7 +43,7 @@ export interface AutomationEvaluationTriggerFilterPort {
 }
 
 
-export interface AutomationTriggerMatchRecorderPort {
+export interface AutomationTriggerMatchRecorder {
   send(
     input: TriggerMatchRecordedEventData & {
       tenantId: string;
@@ -61,7 +61,7 @@ export interface AutomationTriggerMatchRecorderPort {
  * subscriber never touches, and `TraceService` satisfies this port
  * structurally so an application composition is unchanged.
  */
-export interface AutomationEvaluationTraceSummaryPort {
+export interface AutomationEvaluationTraceSummary {
   tryGetSummary(input: {
     projectId: string;
     traceId: string;
@@ -75,7 +75,7 @@ export interface AutomationEvaluationTraceSummaryPort {
  * of the customer's own query text, not a read. Narrowed off `TraceService`
  * for the same reason the summary read is, and satisfied by it structurally.
  */
-export interface AutomationEvaluationQueryClassificationPort {
+export interface AutomationEvaluationQueryClassification {
   classifyQuery(input: { query: string }): TraceQueryClassification;
 }
 
@@ -103,7 +103,7 @@ export interface AutomationEvaluationQueryClassificationPort {
  * ledger's and needs a runaway notifier. Adding either would make every
  * implementer supply a collaborator the caller never reaches.
  */
-export interface AutomationGraphActivityPort {
+export interface AutomationGraphActivity {
   /**
    * The project's active automations that watch a custom graph.
    *
@@ -152,7 +152,7 @@ export interface AutomationProjectIdentityPort {
  * adapter. Keeping this nominal boundary prevents composition from reaching
  * into the process service while it is being constructed.
  */
-export interface AutomationGraphDeliveryPort {
+export interface AutomationGraphDelivery {
   filterSuppressed(input: {
     projectId: string;
     triggerId: string;
@@ -463,7 +463,7 @@ export interface AutomationTraceTriggerCataloguePort {
 }
 
 
-export interface AutomationEmailCapStorePort {
+export interface AutomationEmailCapStore {
   trySet(
     key: string,
     value: string,

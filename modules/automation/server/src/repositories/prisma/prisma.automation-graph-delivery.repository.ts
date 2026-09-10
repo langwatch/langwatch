@@ -1,4 +1,4 @@
-import type { AutomationClockPort } from "../../app/automation.infrastructure.ts";
+import type { AutomationClock } from "../../app/automation.infrastructure.ts";
 import {
   PrismaEmailSuppressionRepository,
   type EmailSuppressionDatabase,
@@ -17,7 +17,7 @@ import { AutomationGraphDeliveryService } from "../../services/automation-graph-
 export class PrismaAutomationGraphDeliveryRepository {
   static create(input: {
     database: TriggerDatabase & EmailSuppressionDatabase & WebhookDeliveryDatabase;
-    clock: AutomationClockPort;
+    clock: AutomationClock;
   }): AutomationGraphDeliveryService {
     return AutomationGraphDeliveryService.create({
       triggers: PrismaTriggerRepository.create(input.database, input.clock),

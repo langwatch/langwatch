@@ -75,10 +75,10 @@ export {
 export { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 export { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
 export type {
-  AutomationEvaluationQueryClassificationPort as AutomationEvaluationQueryClassification,
-  AutomationEvaluationTraceSummaryPort as AutomationEvaluationTraceSummary,
-  AutomationEvaluationTriggerFilterPort as AutomationEvaluationTriggerFilter,
-  AutomationTriggerMatchRecorderPort as AutomationTriggerMatchRecorder,
+  AutomationEvaluationQueryClassification as AutomationEvaluationQueryClassification,
+  AutomationEvaluationTraceSummary as AutomationEvaluationTraceSummary,
+  AutomationEvaluationTriggerFilter as AutomationEvaluationTriggerFilter,
+  AutomationTriggerMatchRecorder as AutomationTriggerMatchRecorder,
 } from "./app/automation.infrastructure.ts";
 export type {
   LogOverflowIntent,
@@ -116,7 +116,7 @@ export {
   AutomationDispatchError,
 } from "./services/automation-graph-runtime.service.ts";
 export { AutomationSlackBotTokenDecryptor } from "./services/automation-slack-secrets.service.ts";
-export type { AutomationGraphDeliveryPort as AutomationGraphDelivery } from "./app/automation.infrastructure.ts";
+export type { AutomationGraphDelivery as AutomationGraphDelivery } from "./app/automation.infrastructure.ts";
 export { AutomationRunaway, type ClaimLease } from "./repositories/automation-runaway.repository.ts";
 export { AutomationRunawayNotice } from "./channels/automation-runaway-notice.channel.ts";
 export { AutomationRunawaySignals } from "./services/automation-runaway-signals.service.ts";
@@ -190,9 +190,9 @@ export {
 } from "./services/automation-trace-trigger-catalogue.service.ts";
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service.ts";
 export { GraphAlertDispatchService } from "./services/graph-alert-dispatch.service.ts";
-export type { AutomationClockPort as AutomationClock } from "./app/automation.infrastructure.ts";
+export type { AutomationClock as AutomationClock } from "./app/automation.infrastructure.ts";
 export type {
-  AutomationGraphActivityPort as AutomationGraphActivity,
+  AutomationGraphActivity as AutomationGraphActivity,
   AutomationProjectIdentityPort,
 } from "./app/automation.infrastructure.ts";
 export {

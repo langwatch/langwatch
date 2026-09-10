@@ -2,7 +2,7 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
-  AutomationClockPort,
+  AutomationClock,
   AutomationDispatchErrorPort,
   AutomationLoggerPort,
   AutomationNotificationDeliveryPort,
@@ -43,7 +43,7 @@ export class PrismaAutomationGraphActivityRepository {
   static create(input: {
     /** The one database client the composing process opened. */
     prisma: AutomationGraphActivityDatabase;
-    clock: AutomationClockPort;
+    clock: AutomationClock;
     projects: AutomationProjectIdentityPort;
     analytics: AnalyticsService;
     /** The process's outbound transports: mail, Slack, webhook. */
