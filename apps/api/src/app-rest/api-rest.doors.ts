@@ -41,7 +41,12 @@ import {
   mountScimWebhookRest,
 } from "../features/enterprise/scim-rest.mount.ts";
 import { mountStoredObjectFileRest } from "../features/stored-object/stored-object-file-rest.mount.ts";
+import { mountExperimentDspyStepsRest } from "../features/experiment/experiment-dspy-steps-rest.mount.ts";
+import { mountExperimentInitRest } from "../features/experiment/experiment-init-rest.mount.ts";
+import { mountExperimentRest } from "../features/experiment/experiment-rest.mount.ts";
+import { mountExperimentV3Rest } from "../features/experiment/experiment-v3-rest.mount.ts";
 import { mountStoredObjectRest } from "../features/stored-object/stored-object-rest.mount.ts";
+import { mountTrackedEventRest } from "../features/trace/tracked-event-rest.mount.ts";
 import { mountSuiteRest } from "../features/suite/suite-rest.mount.ts";
 import { mountMeRest } from "../features/user/me-rest.mount.ts";
 import { mountUserAvatarRest } from "../features/user/user-avatar-rest.mount.ts";
@@ -173,8 +178,35 @@ export const API_REST_DOORS = [
   },
   { family: "scenario-generate", owner: "process", paths: ["/api/scenario/generate"] },
   { family: "playground", owner: "process", paths: ["/api/playground"] },
-  { family: "experiment-workbench", owner: "process", paths: ["/api/experiments"] },
-  { family: "experiment-init", owner: "process", paths: ["/api/experiment/init"] },
+  {
+    family: "experiment-workbench",
+    owner: "module",
+    paths: ["/api/experiments", "/api/evaluations/v3/*"],
+    mount: ({ runtime, services, ports }: ApiRestDoorContext) =>
+      services.experimentWorkbench
+        ? mountExperimentV3Rest(runtime, {
+            collaborators: services.experimentWorkbench,
+            errors: ports.errors,
+          })
+        : null,
+  },
+  {
+    family: "experiment-init",
+    owner: "module",
+    paths: ["/api/experiment/init"],
+    mount: ({ runtime, services, packaged, ports }: ApiRestDoorContext) => {
+      const experiments = packaged?.services.experiments;
+      if (!services.experimentInit || !experiments) return null;
+
+      return [
+        mountExperimentInitRest(runtime, {
+          experiments,
+          collaborators: services.experimentInit,
+          errors: ports.errors,
+        }),
+      ];
+    },
+  },
   {
     family: "workflow-run",
     owner: "process",
@@ -328,7 +360,20 @@ export const API_REST_DOORS = [
       ];
     },
   },
-  { family: "experiments", owner: "module", paths: ["/api/v1/experiments"] },
+  {
+    family: "experiments",
+    owner: "module",
+    paths: ["/api/experiments", "/api/v1/experiments"],
+    mount: ({ runtime, packaged, ports }: ApiRestDoorContext) =>
+      packaged?.services.experiments
+        ? [
+            mountExperimentRest(runtime, {
+              experiments: packaged.services.experiments,
+              errors: ports.errors,
+            }),
+          ]
+        : null,
+  },
   {
     family: "files",
     owner: "module",
@@ -425,6 +470,11 @@ export const API_REST_DOORS = [
     family: "tracked-events",
     owner: "module",
     paths: ["/api/events/track", "/api/track_event"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const trackedEvents = packaged?.services.trackedEvents;
+      if (!trackedEvents) return null;
+      return mountTrackedEventRest(runtime, { ports: trackedEvents, errors: packaged.ports.legacyErrors });
+    },
     absent:
       "API process serves neither /api/events/track nor /api/track_event: recording a feedback event needs the trace command queue this process did not register, and a door mounted without one would answer 200 to a rating it then dropped.",
   },
@@ -432,7 +482,21 @@ export const API_REST_DOORS = [
   { family: "webhooks", owner: "module", paths: ["/api/webhooks/v1/*"] },
   { family: "workflows", owner: "module", paths: ["/api/workflows", "/api/v1/workflows"] },
   { family: "ops-clickhouse-explain", owner: "process", paths: ["/api/ops/clickhouse/explain"] },
-  { family: "dspy-steps", owner: "process", paths: ["/api/dspy/log_steps", "/api/v1/dspy/log_steps"] },
+  {
+    family: "dspy-steps",
+    owner: "module",
+    paths: ["/api/dspy/log_steps", "/api/v1/dspy/log_steps"],
+    mount: ({ runtime, packaged, ports }: ApiRestDoorContext) =>
+      packaged?.services.experiments
+        ? [
+            mountExperimentDspyStepsRest(runtime, {
+              experiments: packaged.services.experiments,
+              credential: ports.handlerManagedCredential,
+              errors: ports.errors,
+            }),
+          ]
+        : null,
+  },
   {
     family: "mcp-authorize",
     owner: "module",
