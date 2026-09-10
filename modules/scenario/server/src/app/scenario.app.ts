@@ -16,6 +16,7 @@ import {
   type RunParameterValues,
   type RunTarget,
   type Scenario,
+  type ScenarioAuthorLabel,
   type ScenarioCaller,
   type ScenarioCreateInput,
   type ScenarioDuplicateInput,
@@ -191,11 +192,12 @@ export class ScenarioApp implements ScenarioApi {
 
   /**
    * The author a versioned write is recorded under. One spelling, in one place. Two doors built
-   * this literal for themselves — the CRUD update and the version restore — which is two chances
-   * for a saved version to name the wrong author or none.
+   * this literal for themselves - the CRUD update and the version restore - which is two chances
+   * for a saved version to name the wrong author or none. The label is the caller's own: tRPC
+   * always names "user", REST names "cli" or "api" off the X-LangWatch-Surface header.
    */
-  private authorFor(by: ScenarioCaller): { userId: string; label: "user" } {
-    return { userId: by.id, label: "user" };
+  private authorFor(by: ScenarioCaller): { userId: string; label: ScenarioAuthorLabel } {
+    return { userId: by.id, label: by.label };
   }
 
   // -- the test case itself --------------------------------------------------

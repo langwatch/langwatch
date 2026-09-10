@@ -136,6 +136,39 @@ export {
 } from "./adapters/result-atoms.clickhouse.adapter.ts";
 export { RunConfigurationsClickHouseAdapter } from "./adapters/run-configurations.clickhouse.adapter.ts";
 export { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
+export {
+  createScenarioRest,
+  ScenarioRestNotThereError,
+  scenarioRestErrorHandler,
+  scenarioRestSurface,
+} from "./transport/scenario.rest.ts";
+export {
+  createSimulationRunsRest,
+  SimulationRunNotThereError,
+  simulationRunErrorHandler,
+  type ScenarioRunPlatformUrlBuilder,
+} from "./transport/simulation-run.rest.ts";
+export {
+  createScenarioGenerateRest,
+  SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
+  SCENARIO_GENERATE_FEATURE_KEY,
+  type ScenarioGenerateRestPorts,
+  type ScenarioGenerateRestSession,
+} from "./transport/scenario-generate.rest.ts";
+export {
+  createScenarioRunExportRest,
+  type ScenarioRunExportPort,
+  type ScenarioRunExportRequestFields,
+  type ScenarioRunExportRestPorts,
+} from "./transport/scenario-run-export.rest.ts";
+export {
+  archiveScenarioRun,
+  archiveScenarioSetRuns,
+  createScenarioEventsRest,
+  ScenarioRunNotThereError,
+  scenarioEventErrorHandler,
+  type InlineMediaExtraction,
+} from "./transport/scenario-event.rest.ts";
 export { ScenarioRunRejectedError } from "./rules/scenario-run-request.rules.ts";
 export { filterRunsByTimestamp } from "./rules/simulation-run-timestamp-filter.rules.ts";
 

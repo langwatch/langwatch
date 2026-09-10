@@ -62,7 +62,7 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   // -- the cases a project defines -------------------------------------------
   .procedure("create")
   .withPermission("scenarios:manage")
-  .handle(({ app, input, actor }) => app.create(input, { id: actor.id }))
+  .handle(({ app, input, actor }) => app.create(input, { id: actor.id, label: "user" }))
 
   .procedure("getAll")
   .withPermission("scenarios:view")
@@ -86,7 +86,10 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   .handle(({ app, input, actor }) => {
     const { id, projectId, expectedVersion, ...data } = input;
 
-    return app.update({ id, projectId, ...data, expectedVersion }, { id: actor.id });
+    return app.update(
+      { id, projectId, ...data, expectedVersion },
+      { id: actor.id, label: "user" },
+    );
   })
 
   .procedure("archive")
@@ -108,7 +111,7 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   .handle(({ app, input, actor }) =>
     app.duplicate(
       { scenarioId: input.scenarioId, projectId: input.projectId },
-      { id: actor.id },
+      { id: actor.id, label: "user" },
     ),
   )
 
@@ -164,7 +167,7 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
         scenarioId: input.scenarioId,
         version: input.version,
       },
-      { id: actor.id },
+      { id: actor.id, label: "user" },
     ),
   )
 

@@ -43,26 +43,6 @@
     "./composition/stalled-runs-backfill": {
       "types": "./dist/tasks/stalled-runs-backfill.task.d.ts",
       "default": "./src/tasks/stalled-runs-backfill.task.ts"
-    },
-    "./api-rest/scenario-event": {
-      "types": "./dist/transport/api-rest/scenario-event.api.d.ts",
-      "default": "./src/transport/api-rest/scenario-event.api.ts"
-    },
-    "./api-rest/scenario-run-export": {
-      "types": "./dist/transport/api-rest/scenario-run-export.api.d.ts",
-      "default": "./src/transport/api-rest/scenario-run-export.api.ts"
-    },
-    "./api-rest/scenario": {
-      "types": "./dist/transport/api-rest/scenario.api.d.ts",
-      "default": "./src/transport/api-rest/scenario.api.ts"
-    },
-    "./api-rest/simulation-run": {
-      "types": "./dist/transport/api-rest/simulation-run.api.d.ts",
-      "default": "./src/transport/api-rest/simulation-run.api.ts"
-    },
-    "./api-rest/scenario-generate": {
-      "types": "./dist/transport/api-rest/scenario-generate.api.d.ts",
-      "default": "./src/transport/api-rest/scenario-generate.api.ts"
     }
   },
   "scripts": {

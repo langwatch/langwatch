@@ -31,9 +31,11 @@ import type {
 import type { OrganizationProvisioningPort } from "@langwatch/organization-server";
 import type { ProjectManagementDirectory } from "@langwatch/project-server";
 import type { ScenarioTabRegistry, SimulationService } from "@langwatch/scenario-contract";
-import type { InlineMediaExtraction } from "@langwatch/scenario-server/api-rest/scenario-event";
-import type { ScenarioRunPlatformUrlBuilder } from "@langwatch/scenario-server/api-rest/simulation-run";
-import type { ScenarioService } from "@langwatch/scenario-server";
+import type {
+  InlineMediaExtraction,
+  ScenarioRunPlatformUrlBuilder,
+  ScenarioService,
+} from "@langwatch/scenario-server";
 import type {
   FilesProjectPermissionCheck,
   FilesRateLimiter,

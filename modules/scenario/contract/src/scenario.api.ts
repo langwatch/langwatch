@@ -8,6 +8,7 @@ import type { EventEmitter } from "node:events";
 import type { RunActor } from "./run-actor.ts";
 import type {
   Scenario,
+  ScenarioAuthorLabel,
   ScenarioIdInput,
   ScenarioCreateInput,
   ScenarioUpdateInput,
@@ -112,9 +113,10 @@ export type ResolvedScenarioRunParametersForScenario = ResolvedScenarioRunParame
 };
 
 
-/** Who a write is attributed to. */
+/** Who a write is attributed to, and the surface they wrote it through. */
 export interface ScenarioCaller {
   readonly id: string;
+  readonly label: ScenarioAuthorLabel;
 }
 
 /** What one queued run needs to know about itself. */

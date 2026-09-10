@@ -2,12 +2,14 @@
  * This process's composition of the scenario editor's author-assist
  * (`@langwatch/scenario-server`).
  */
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import type { MountableRestApp, RestErrorHandler } from "@langwatch/api/rest";
 import {
+  createScenarioGenerateRest,
   SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
-  createScenarioGenerateRestApp,
-} from "@langwatch/scenario-server/api-rest/scenario-generate";
+} from "@langwatch/scenario-server";
+import { ScenarioApi } from "@langwatch/scenario-contract";
 
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 import type { ApiAuthoringModelResolver } from "../../app/api-authoring-model.composition.ts";
 import type {
   ApiHandlerManagedSessionPort,
@@ -18,24 +20,27 @@ import type {
 const SCENARIO_GENERATE_TIMEOUT_ENV = "SCENARIO_GENERATE_TIMEOUT_MS";
 
 /** `/api/scenario/generate`, bound to one process. */
-export function mountScenarioGenerateRest(options: {
-  security: AppRestSecurity;
-  session: ApiHandlerManagedSessionPort;
-  resolveModel: ApiAuthoringModelResolver;
-  /** The cap one generation is allowed, asked again on every request. */
-  timeoutMs: () => number;
-}): MountableRestApp {
-  const { security, session, resolveModel, timeoutMs } = options;
-  return createScenarioGenerateRestApp<HandlerManagedSession>({
-    security,
-    ports: {
-      resolveSession: (request) => session.resolve(request),
-      probeProjectPermission: (person, projectId, permission) =>
-        session.permitted({ session: person, projectId, permission }),
-      resolveModel,
-      timeoutMs,
-    },
+export function mountScenarioGenerateRest(
+  runtime: ApiRestRuntime,
+  options: {
+    scenarios: () => ScenarioApi;
+    session: ApiHandlerManagedSessionPort;
+    resolveModel: ApiAuthoringModelResolver;
+    /** The cap one generation is allowed, asked again on every request. */
+    timeoutMs: () => number;
+    errors: RestErrorHandler;
+  },
+): MountableRestApp {
+  const { scenarios, session, resolveModel, timeoutMs, errors } = options;
+  const declaration = createScenarioGenerateRest<HandlerManagedSession>({
+    resolveSession: (request) => session.resolve(request),
+    probeProjectPermission: (person, projectId, permission) =>
+      session.permitted({ session: person, projectId, permission }),
+    resolveModel,
+    timeoutMs,
   });
+
+  return runtime.mount(declaration, scenarios, { onError: errors });
 }
 
 /**

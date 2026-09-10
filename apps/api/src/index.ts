@@ -248,10 +248,10 @@ export {
 export { createTeamsRestApp } from "@langwatch/organization-server";
 export {
   archiveScenarioSetRuns,
-  createScenarioEventsRestApp,
-} from "@langwatch/scenario-server/api-rest/scenario-event";
-export { createScenariosRestApp } from "@langwatch/scenario-server/api-rest/scenario";
-export { createSimulationRunsRestApp } from "@langwatch/scenario-server/api-rest/simulation-run";
+  createScenarioEventsRest,
+  createScenarioRest,
+  createSimulationRunsRest,
+} from "@langwatch/scenario-server";
 export {
   type WorkflowEvaluationTrigger,
 } from "@langwatch/workflow-server";

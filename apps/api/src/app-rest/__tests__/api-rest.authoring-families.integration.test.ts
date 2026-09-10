@@ -3,7 +3,7 @@
  * the door registry opens.
  */
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS } from "@langwatch/scenario-server/api-rest/scenario-generate";
+import { SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS } from "@langwatch/scenario-server";
 import type { WorkflowApp } from "@langwatch/workflow-server";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";

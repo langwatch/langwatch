@@ -18,12 +18,7 @@
     "./src/adapters/simulation-eventing.adapter.ts",
     "./src/ports/simulation-execution.port.ts",
     "./src/adapters/simulation-processing-producer.adapter.ts",
-    "./src/tasks/stalled-runs-backfill.task.ts",
-    "./src/transport/api-rest/scenario-event.api.ts",
-    "./src/transport/api-rest/scenario-run-export.api.ts",
-    "./src/transport/api-rest/scenario.api.ts",
-    "./src/transport/api-rest/simulation-run.api.ts",
-    "./src/transport/api-rest/scenario-generate.api.ts"
+    "./src/tasks/stalled-runs-backfill.task.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

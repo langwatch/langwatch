@@ -3,21 +3,23 @@
  * A bulk export must be attributable to a person, so a process with no
  * browser-session transport leaves the family unmounted.
  */
-import type { AppRestBroadcast, AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import type { AppRestBroadcast, MountableRestApp, RestErrorHandler } from "@langwatch/api/rest";
 import { generate } from "@langwatch/ksuid";
-import { createScenarioRunExportRestApp } from "@langwatch/scenario-server/api-rest/scenario-run-export";
 import {
+  createScenarioRunExportRest,
   ScenarioRunExportForbiddenError,
   ScenarioRunExportService,
   ScenarioRunExportUnauthenticatedError,
 } from "@langwatch/scenario-server";
 import {
   scenarioRunExportRequestSchema,
+  ScenarioApi,
   type ScenarioRunExportRequest,
   type SimulationService,
 } from "@langwatch/scenario-contract";
 import type { z } from "zod";
 
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 import type {
   ApiHandlerManagedSessionPort,
   HandlerManagedSession,
@@ -40,33 +42,36 @@ export type ScenarioRunExportAudit = (entry: {
 }) => Promise<void>;
 
 /** `/api/export/scenario-runs`, bound to one process's simulation store. */
-export function mountScenarioRunExportRest(options: {
-  security: AppRestSecurity;
-  simulations: () => SimulationService;
-  broadcast: () => AppRestBroadcast;
-  session: ApiHandlerManagedSessionPort;
-  recordExportRequested: ScenarioRunExportAudit;
-}): MountableRestApp {
+export function mountScenarioRunExportRest(
+  runtime: ApiRestRuntime,
+  options: {
+    scenarios: () => ScenarioApi;
+    simulations: () => SimulationService;
+    broadcast: () => AppRestBroadcast;
+    session: ApiHandlerManagedSessionPort;
+    recordExportRequested: ScenarioRunExportAudit;
+    errors: RestErrorHandler;
+  },
+): MountableRestApp {
   // Explicit type arguments, not inferred. Every port below is a
   // context-sensitive arrow, so the session parameter is fixed before any of
   // them can supply a candidate.
-  return createScenarioRunExportRestApp<
+  const declaration = createScenarioRunExportRest<
     ScenarioRunExportRequest,
     z.input<typeof scenarioRunExportRequestSchema>,
     HandlerManagedSession
   >({
-    security: options.security,
-    ports: {
-      requestSchema: scenarioRunExportRequestSchema,
-      resolveSession: (request) => options.session.resolve(request),
-      probeProjectPermission: (session, projectId, permission) =>
-        options.session.permitted({ session, projectId, permission }),
-      recordExportRequested: options.recordExportRequested,
-      exports: () => ScenarioRunExportService.create(options.simulations()),
-      broadcast: options.broadcast,
-      newExportId: () => generate(EXPORT_KSUID_RESOURCE).toString(),
-      unauthenticatedError: () => new ScenarioRunExportUnauthenticatedError(),
-      forbiddenError: (projectId) => new ScenarioRunExportForbiddenError(projectId),
-    },
-  }).mountable;
+    requestSchema: scenarioRunExportRequestSchema,
+    resolveSession: (request) => options.session.resolve(request),
+    probeProjectPermission: (session, projectId, permission) =>
+      options.session.permitted({ session, projectId, permission }),
+    recordExportRequested: options.recordExportRequested,
+    exports: () => ScenarioRunExportService.create(options.simulations()),
+    broadcast: options.broadcast,
+    newExportId: () => generate(EXPORT_KSUID_RESOURCE).toString(),
+    unauthenticatedError: () => new ScenarioRunExportUnauthenticatedError(),
+    forbiddenError: (projectId) => new ScenarioRunExportForbiddenError(projectId),
+  });
+
+  return runtime.mount(declaration, options.scenarios, { onError: options.errors });
 }

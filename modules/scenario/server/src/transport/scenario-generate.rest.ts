@@ -1,17 +1,23 @@
 /**
- * `POST /api/scenario/generate` — the scenario editor's author-assist.
- *    browser keys its own copy off `error.code` (ADR-045).
+ * `POST /api/scenario/generate` - the scenario editor's author-assist. The
+ * caller's session is resolved and probed for `scenarios:manage` in the
+ * handler rather than at the door, because the permission is asked against a
+ * `projectId` the BODY names, not one the credential already scoped - so the
+ * route declares `deferredScope` and answers its own JSON bodies (ADR-045:
+ * the browser keys its own copy off `error.code`).
  */
-import { handlerManagedAuth } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import { deferredScope } from "@langwatch/api/access";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { ScenarioApi } from "@langwatch/scenario-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateObject, type LanguageModel } from "ai";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
 import {
   isAbortLikeError,
   nlpgoHandledErrorFrom,
-} from "../../rules/scenario-generate-nlpgo-error.rules.ts";
+} from "../rules/scenario-generate-nlpgo-error.rules.ts";
 
 const logger = createLogger("langwatch:api:scenario:generate");
 
@@ -98,42 +104,48 @@ Given a description of an agent and desired scenario, generate:
 
 When refining an existing scenario, incorporate the user's feedback while preserving the overall structure and any parts they haven't asked to change.`;
 
-/** `/api/scenario/generate`, bound to one process. */
-export function createScenarioGenerateRestApp<
-  TSession extends ScenarioGenerateRestSession,
->(options: {
-  security: AppRestSecurity;
-  ports: ScenarioGenerateRestPorts<TSession>;
-}): MountableRestApp {
-  const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api/scenario" });
+/** A JSON answer this door writes itself, in the shape the browser has always read. */
+const answer = (status: ContentfulStatusCode, body: object) => ({
+  status,
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(body),
+});
 
-  secured
-    .access(
-      handlerManagedAuth({
-        reason: "user session validated in-handler via the process's session resolver",
-        permissions: ["scenarios:manage"],
-        credential: "session",
-      }),
-    )
-    .post("/generate", async (c) => {
-      const session = await ports.resolveSession(c.req.raw);
+const DOOR_REASON =
+  "the caller's projectId arrives in the body, not the credential's own scope, so the session and its scenarios:manage permission are resolved and probed in the handler";
+
+/** `/api/scenario/generate`, bound to one process's ports. */
+export function createScenarioGenerateRest<TSession extends ScenarioGenerateRestSession>(
+  ports: ScenarioGenerateRestPorts<TSession>,
+) {
+  return defineRestRouter(ScenarioApi)
+    .withNamespace("scenario")
+    .withVersion(MANAGEMENT_API_VERSION)
+    .withAddressing("literal", { v1Twin: false })
+
+    .post("/generate", "generateScenario")
+    .withRawBody("text", { mediaType: "application/json" })
+    .withAccess(deferredScope({ reason: DOOR_REASON }))
+    .withRawResponse({ produces: "application/json" })
+    .withDocs({ description: "Generate or refine a scenario with the author-assist model" })
+    .handle(async ({ raw, request }) => {
+      const session = await ports.resolveSession(request);
       if (!session) {
-        return c.json({ error: "You must be logged in to access this endpoint." }, 401);
+        return answer(401, { error: "You must be logged in to access this endpoint." });
       }
 
       let body: z.infer<typeof requestSchema>;
       try {
-        body = requestSchema.parse(await c.req.json());
+        body = requestSchema.parse(JSON.parse(raw));
       } catch (error) {
         logger.error({ error }, "Invalid request body");
-        return c.json({ error: "Invalid request body" }, 400);
+        return answer(400, { error: "Invalid request body" });
       }
 
       const { prompt, currentScenario, projectId } = body;
 
       if (!(await ports.probeProjectPermission(session, projectId, "scenarios:manage"))) {
-        return c.json({ error: "You do not have permission to access this endpoint." }, 403);
+        return answer(403, { error: "You do not have permission to access this endpoint." });
       }
 
       try {
@@ -155,10 +167,10 @@ export function createScenarioGenerateRestApp<
           abortSignal: AbortSignal.timeout(ports.timeoutMs()),
         });
 
-        return c.json({ scenario: result.object });
+        return answer(200, { scenario: result.object });
       } catch (error) {
         // A refusal the Go engine named arrives as a typed envelope on the AI
-        // SDK error. Forward the CODE and the serialized form — the message is
+        // SDK error. Forward the CODE and the serialized form - the message is
         // server copy and stays server-side.
         const handled = nlpgoHandledErrorFrom(error);
         if (handled) {
@@ -166,28 +178,25 @@ export function createScenarioGenerateRestApp<
             { error: handled.serialize() },
             "Scenario generation rejected by LLM gateway",
           );
-          return c.json(
-            { error: handled.code, domainError: handled.serialize() },
-            handled.httpStatus as 400,
-          );
+          return answer(handled.httpStatus as ContentfulStatusCode, {
+            error: handled.code,
+            domainError: handled.serialize(),
+          });
         }
 
         if (isAbortLikeError(error)) {
           logger.warn({ error }, "Scenario generation timed out");
-          return c.json(
-            {
-              error:
-                "Scenario generation took too long and was stopped. This is usually temporary — please try again in a moment.",
-            },
-            504,
-          );
+          return answer(504, {
+            error:
+              "Scenario generation took too long and was stopped. This is usually temporary - please try again in a moment.",
+          });
         }
 
         logger.error({ error }, "Error generating scenario");
         // Generic on purpose (ADR-045): the cause is on the log line above.
-        return c.json({ error: "Failed to generate scenario" }, 500);
+        return answer(500, { error: "Failed to generate scenario" });
       }
-    });
+    })
 
-  return secured.mountable;
+    .build();
 }

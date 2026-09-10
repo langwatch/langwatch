@@ -23,6 +23,7 @@ import {
 import type { ErrorHandler } from "hono";
 import { z } from "zod";
 import {
+  defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
@@ -38,6 +39,22 @@ const logger = createLogger("langwatch:api:scenarios");
  * family's own error and rendered by the family's own handler.
  */
 export class ScenarioRestNotThereError extends Error {}
+
+/**
+ * The surface a write declares itself through, bound off the
+ * X-LangWatch-Surface header. Only "cli" is honoured; every other value -
+ * absent included - reads as "api", so a caller cannot claim an in-process
+ * surface over the wire.
+ */
+export const scenarioRestSurface = defineRestMiddleware(
+  "scenarioRestSurface",
+  z.string().nullable(),
+);
+
+/** The version history's author label for a REST write, off its declared surface. */
+function scenarioAuthorLabel(surface: string | null): "cli" | "api" {
+  return surface?.toLowerCase() === "cli" ? "cli" : "api";
+}
 
 /** The family's 404s, in the body they have always had. */
 export const scenarioRestErrorHandler =
@@ -310,8 +327,8 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
     .withOutput(scenarioResponseWithPlatformUrlSchema)
     .withStatus(201)
     .withDocs({ description: "Create a new scenario" })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input: body, scope }, project) => {
+    .withMiddleware(projectRestFacts, scenarioRestSurface)
+    .handle(async ({ app, input: body, scope }, project, surface) => {
       logger.info({ projectId: scope.id }, "Creating scenario");
       const scenario = await app.create(
         {
@@ -327,7 +344,7 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
           ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
           ...(body.testSuiteId !== undefined && { testSuiteId: body.testSuiteId }),
         },
-        { id: project.actorId },
+        { id: project.actorId, label: scenarioAuthorLabel(surface) },
       );
       return withPlatformUrl(scenario, project.projectSlug);
     })
@@ -343,8 +360,8 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
     .withPermission("scenarios:update")
     .withOutput(scenarioResponseWithPlatformUrlSchema)
     .withDocs({ description: "Update an existing scenario", responses: scenarioNotFoundResponse })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, project) => {
+    .withMiddleware(projectRestFacts, scenarioRestSurface)
+    .handle(async ({ app, input, scope }, project, surface) => {
       const { id, ...body } = input;
       logger.info({ projectId: scope.id, scenarioId: id }, "Updating scenario");
 
@@ -353,7 +370,7 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
 
       const scenario = await app.update(
         { id, projectId: scope.id, ...scenarioUpdateData(body) },
-        { id: project.actorId },
+        { id: project.actorId, label: scenarioAuthorLabel(surface) },
       );
       return withPlatformUrl(scenario, project.projectSlug);
     })
@@ -364,8 +381,8 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
     .withPermission("scenarios:update")
     .withOutput(scenarioResponseWithPlatformUrlSchema)
     .withDocs({ description: "Update an existing scenario", responses: scenarioNotFoundResponse })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, project) => {
+    .withMiddleware(projectRestFacts, scenarioRestSurface)
+    .handle(async ({ app, input, scope }, project, surface) => {
       const { id, ...body } = input;
       logger.info({ projectId: scope.id, scenarioId: id }, "Updating scenario");
 
@@ -374,7 +391,7 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
 
       const scenario = await app.update(
         { id, projectId: scope.id, ...scenarioUpdateData(body) },
-        { id: project.actorId },
+        { id: project.actorId, label: scenarioAuthorLabel(surface) },
       );
       return withPlatformUrl(scenario, project.projectSlug);
     })

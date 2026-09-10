@@ -1,5 +1,5 @@
 import type { PlatformUrlBuilder } from "@langwatch/api/rest";
-import type { ScenarioRunPlatformUrlBuilder } from "@langwatch/scenario-server/api-rest/simulation-run";
+import type { ScenarioRunPlatformUrlBuilder } from "@langwatch/scenario-server";
 import { scenarioRunPath } from "@langwatch/suite-contract";
 
 /**

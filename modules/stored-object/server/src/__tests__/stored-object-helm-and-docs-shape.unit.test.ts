@@ -326,7 +326,7 @@ describe("Route handlers delegate to the service and never touch the repository 
       // objects of its own: the walk arrives as a port the process binds to
       // its own service, so the transport cannot reach past it.
       const route = readRepoFile(
-        "modules/scenario/server/src/transport/api-rest/scenario-event.api.ts",
+        "modules/scenario/server/src/transport/scenario-event.rest.ts",
       );
 
       expect(route).toContain("extractInlineMedia");
