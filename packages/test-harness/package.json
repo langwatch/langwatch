@@ -32,6 +32,7 @@
     "@testcontainers/clickhouse": "catalog:",
     "nanoid": "catalog:",
     "picomatch": "^4.0.4",
+    "pino": "catalog:",
     "typescript": "catalog:"
   },
   "devDependencies": {

@@ -1,4 +1,8 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig, type ViteUserConfig } from "vitest/config";
+
+// Absolute so it resolves the same regardless of the consuming package's cwd.
+const CONSOLE_GUARD_SETUP = fileURLToPath(new URL("./console-guard.ts", import.meta.url));
 
 /**
  * The one vitest shape every package in the workspace declares. It carries the
@@ -7,8 +11,12 @@ import { defineConfig, type ViteUserConfig } from "vitest/config";
  * registry - so a package's own config says only what is different about it.
  */
 export interface ModuleVitestConfigOptions {
-  /** `node` runs with isolation off by default; `jsdom` keeps isolation on. */
-  kind: "node" | "jsdom";
+  /**
+   * `node` runs with isolation off by default; `jsdom` keeps isolation on.
+   * `unit` is `node` plus the console-output guard (piloted here first,
+   * before it rolls out to every unit suite).
+   */
+  kind: "node" | "jsdom" | "unit";
   include?: string[];
   exclude?: string[];
   /** Overrides the default for the kind. Set `true` when a suite mocks modules. */
@@ -41,6 +49,8 @@ export function moduleVitestTestOptions(
   // files share a module graph. Off, the graph is evaluated once per worker.
   const resolvedIsolate = isolate ?? false;
   const resolvedCss = css ?? (FAST_MODE ? false : true);
+  const resolvedSetupFiles =
+    kind === "unit" ? [CONSOLE_GUARD_SETUP, ...(setupFiles ?? [])] : setupFiles;
   return {
     environment: kind === "jsdom" ? "jsdom" : "node",
     isolate: resolvedIsolate,
@@ -64,7 +74,7 @@ export function moduleVitestTestOptions(
     watch: false,
     exclude: exclude ?? DEFAULT_EXCLUDE,
     ...(include ? { include } : {}),
-    ...(setupFiles ? { setupFiles } : {}),
+    ...(resolvedSetupFiles ? { setupFiles: resolvedSetupFiles } : {}),
     ...(testTimeout === undefined ? {} : { testTimeout }),
     ...(dir === undefined ? {} : { dir }),
     ...test,

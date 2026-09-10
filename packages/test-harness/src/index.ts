@@ -60,6 +60,8 @@ export {
 } from "./unit-shard-hard-floor.ts";
 export { createWeigher, loadDurationManifest, type DurationManifest } from "./shard-weights.ts";
 export { scanTestSourceForUnsafeDeleteMany, type TeardownViolation } from "./teardown-scan.ts";
+export { createTestLogger, type TestLogLine, type TestLogLines } from "./test-logger.ts";
+export { allowConsole } from "./console-guard.ts";
 export { closeTsAstSession, parseSourceText, parseSourceTexts } from "./ts-ast.ts";
 export { aliasesForFile, parseVitestConfigAliases, type ModuleAlias } from "./vitest-alias-table.ts";
 export * from "./nlpgo-binary-stamp.ts";

@@ -162,7 +162,15 @@ mounts the real router on a real `createApiRestRuntime` (exemplar:
 apps/api/src/features/analytics/__tests__/query-rest.mount.integration.test.ts)
 over a module booted with its memory repositories through the fixture in
 `modules/<m>/server/src/app/__tests__/<m>.fixture.ts` (no `testing.ts` in a server package). A hand-written `{ getById: vi.fn() }` object literal or a
-class stub in a test is a defect to fix, not a style choice.
+class stub in a test is a defect to fix, not a style choice. `createLogger`
+(`@langwatch/observability`) is silent under vitest by default, so a test
+that asserts on logging never calls it directly: `createTestLogger()` from
+`@langwatch/test-harness` returns `{ logger, lines }`, a real pino instance
+writing synchronously into an in-memory `lines` array (`lines.find(level,
+msgIncludes)` reads one record back). Pass `logger` wherever the code under
+test takes one, and drop `LANGWATCH_TEST_LOGS=1` into that package's own
+`vitest.config.ts` `test.env` only if a suite asserts on `createLogger`'s own
+behaviour rather than on a caller's.
 
 ## The shape comes from the reference, not from the brief
 
