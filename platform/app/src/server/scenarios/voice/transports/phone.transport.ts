@@ -24,8 +24,8 @@ import { HandledError } from "@langwatch/handled-error";
 import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
 import type {
-	VoiceTransportCredential,
-	VoiceTransportRunner,
+  VoiceTransportCredential,
+  VoiceTransportRunner,
 } from "../voice-transport.registry";
 
 /**
@@ -34,14 +34,14 @@ import type {
  * same way the ElevenLabs runner surfaces its own missing-key message.
  */
 export const PHONE_NO_CREDENTIAL_MESSAGE =
-	"No Twilio credentials in this project. Add them under Settings > Model Providers.";
+  "No Twilio credentials in this project. Add them under Settings > Model Providers.";
 
 /**
  * Shown on the browser-driven paths (availability, mint, record), which a phone
  * target has no meaning in: a phone call has no browser leg.
  */
 export const PHONE_NO_BROWSER_CALL_MESSAGE =
-	"Phone targets have no browser call. Run a scenario against the phone number instead.";
+  "Phone targets have no browser call. Run a scenario against the phone number instead.";
 
 /** Prefix for a run whose Twilio connect or a-leg dial failed. */
 export const PHONE_CONNECT_REJECTED_PREFIX = "Twilio rejected the call";
@@ -63,39 +63,39 @@ export const TWILIO_MAX_CALL_DURATION_CAP_SECONDS = 300;
  * voice-session errors use, with the base's default customer fault.
  */
 export class VoicePhoneTransportUnavailableError extends HandledError {
-	declare readonly code: "voice_phone_transport_unavailable";
-	constructor(message: string = PHONE_NO_BROWSER_CALL_MESSAGE) {
-		super("voice_phone_transport_unavailable", message, { httpStatus: 400 });
-		this.name = "VoicePhoneTransportUnavailableError";
-	}
+  declare readonly code: "voice_phone_transport_unavailable";
+  constructor(message: string = PHONE_NO_BROWSER_CALL_MESSAGE) {
+    super("voice_phone_transport_unavailable", message, { httpStatus: 400 });
+    this.name = "VoicePhoneTransportUnavailableError";
+  }
 }
 
 /** The narrow slice of `TwilioAgentAdapter` the runner drives. A fake standing
  *  in for it in a test implements just these three methods. */
 export interface TwilioAdapterLike {
-	connect(): Promise<void>;
-	disconnect(): Promise<void>;
-	placeCall(args: {
-		to: string;
-		attachStream?: "a-leg" | "b-leg";
-		maxCallDurationSeconds?: number;
-	}): Promise<void>;
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  placeCall(args: {
+    to: string;
+    attachStream?: "a-leg" | "b-leg";
+    maxCallDurationSeconds?: number;
+  }): Promise<void>;
 }
 
 /** Builds the SDK adapter; injectable so a test drives a fake instead of Twilio. */
 export type TwilioAgentFactory = (options: {
-	accountSid: string;
-	authToken: string;
-	/** The account's OWN Twilio number (the "from"), NOT the destination. */
-	phoneNumber: string;
-	publicBaseUrl?: string;
-	allowedCallees: readonly string[];
-	/** The target under test is the agent; the synthetic caller is the user. */
-	role: "AGENT";
+  accountSid: string;
+  authToken: string;
+  /** The account's OWN Twilio number (the "from"), NOT the destination. */
+  phoneNumber: string;
+  publicBaseUrl?: string;
+  allowedCallees: readonly string[];
+  /** The target under test is the agent; the synthetic caller is the user. */
+  role: "AGENT";
 }) => TwilioAdapterLike;
 
 const defaultTwilioAgentFactory: TwilioAgentFactory = (options) =>
-	ScenarioRunner.voice.twilioAgent(options) as unknown as TwilioAdapterLike;
+  ScenarioRunner.voice.twilioAgent(options) as unknown as TwilioAdapterLike;
 
 /**
  * The app's public HTTPS base URL the SDK routes Twilio's media stream to.
@@ -105,42 +105,42 @@ const defaultTwilioAgentFactory: TwilioAgentFactory = (options) =>
  * it without threading the config object.
  */
 export function resolvePublicBaseUrl(
-	processEnv: NodeJS.ProcessEnv = process.env,
+  processEnv: NodeJS.ProcessEnv = process.env,
 ): string | undefined {
-	return (
-		processEnv.VOICE_PUBLIC_BASE_URL?.trim() ||
-		processEnv.BASE_HOST?.trim() ||
-		undefined
-	);
+  return (
+    processEnv.VOICE_PUBLIC_BASE_URL?.trim() ||
+    processEnv.BASE_HOST?.trim() ||
+    undefined
+  );
 }
 
 /** The dependencies the phone runner is built from. Injected in tests so a fake
  *  Twilio adapter and a controlled env stand in for the real SDK and host. */
 export interface PhoneTransportDeps {
-	twilioAgentFactory?: TwilioAgentFactory;
-	processEnv?: NodeJS.ProcessEnv;
+  twilioAgentFactory?: TwilioAgentFactory;
+  processEnv?: NodeJS.ProcessEnv;
 }
 
 /** The Twilio branch of the credential union, or a thrown error. A credential
  *  built for another transport reaching this runner is a wiring bug. */
 function twilioCredentialOf(credential: VoiceTransportCredential): {
-	accountSid: string;
-	authToken: string;
-	fromNumber: string;
+  accountSid: string;
+  authToken: string;
+  fromNumber: string;
 } {
-	if (credential.kind !== "twilio") {
-		throw new Error(`Phone transport received a ${credential.kind} credential`);
-	}
-	return {
-		accountSid: credential.accountSid,
-		authToken: credential.authToken,
-		fromNumber: credential.fromNumber,
-	};
+  if (credential.kind !== "twilio") {
+    throw new Error(`Phone transport received a ${credential.kind} credential`);
+  }
+  return {
+    accountSid: credential.accountSid,
+    authToken: credential.authToken,
+    fromNumber: credential.fromNumber,
+  };
 }
 
 function reasonOf(error: unknown): string {
-	if (error instanceof Error && error.message.length > 0) return error.message;
-	return String(error);
+  if (error instanceof Error && error.message.length > 0) return error.message;
+  return String(error);
 }
 
 /**
@@ -153,29 +153,29 @@ function reasonOf(error: unknown): string {
  * edge reads as the run's error rather than a raw socket throw.
  */
 function withOutboundDial(
-	adapter: TwilioAdapterLike,
-	{
-		to,
-		maxCallDurationSeconds,
-	}: { to: string; maxCallDurationSeconds: number },
+  adapter: TwilioAdapterLike,
+  {
+    to,
+    maxCallDurationSeconds,
+  }: { to: string; maxCallDurationSeconds: number },
 ): TwilioAdapterLike {
-	const originalConnect = adapter.connect.bind(adapter);
-	adapter.connect = async () => {
-		try {
-			await originalConnect();
-			await adapter.placeCall({
-				to,
-				attachStream: "a-leg",
-				maxCallDurationSeconds,
-			});
-		} catch (error) {
-			await adapter.disconnect().catch(() => {
-				// Best-effort: the rejection below is what the caller sees.
-			});
-			throw new Error(`${PHONE_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`);
-		}
-	};
-	return adapter;
+  const originalConnect = adapter.connect.bind(adapter);
+  adapter.connect = async () => {
+    try {
+      await originalConnect();
+      await adapter.placeCall({
+        to,
+        attachStream: "a-leg",
+        maxCallDurationSeconds,
+      });
+    } catch (error) {
+      await adapter.disconnect().catch(() => {
+        // Best-effort: the rejection below is what the caller sees.
+      });
+      throw new Error(`${PHONE_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`);
+    }
+  };
+  return adapter;
 }
 
 /**
@@ -183,60 +183,60 @@ function withOutboundDial(
  * the production instance; tests build their own with a fake adapter factory.
  */
 export function createPhoneTransport(
-	deps: PhoneTransportDeps = {},
+  deps: PhoneTransportDeps = {},
 ): VoiceTransportRunner {
-	const twilioAgentFactory =
-		deps.twilioAgentFactory ?? defaultTwilioAgentFactory;
+  const twilioAgentFactory =
+    deps.twilioAgentFactory ?? defaultTwilioAgentFactory;
 
-	return {
-		missingKeyMessage: PHONE_NO_CREDENTIAL_MESSAGE,
+  return {
+    missingKeyMessage: PHONE_NO_CREDENTIAL_MESSAGE,
 
-		// A phone target has no browser call, so the browser-driven flow's
-		// availability guard fails fast here; the headless dial never calls this.
-		assertAvailable(): never {
-			throw new VoicePhoneTransportUnavailableError();
-		},
+    // A phone target has no browser call, so the browser-driven flow's
+    // availability guard fails fast here; the headless dial never calls this.
+    assertAvailable(): never {
+      throw new VoicePhoneTransportUnavailableError();
+    },
 
-		mintSession(): Promise<never> {
-			throw new VoicePhoneTransportUnavailableError();
-		},
+    mintSession(): Promise<never> {
+      throw new VoicePhoneTransportUnavailableError();
+    },
 
-		fetchCallRecord(): Promise<never> {
-			throw new VoicePhoneTransportUnavailableError();
-		},
+    fetchCallRecord(): Promise<never> {
+      throw new VoicePhoneTransportUnavailableError();
+    },
 
-		async endCall(adapter): Promise<void> {
-			// The SDK adapter's `disconnect()` hangs up the live a-leg call via REST
-			// and closes the media socket; the cast is sealed in this one vendor
-			// module rather than living at the child's call site.
-			await (adapter as { disconnect?: () => Promise<void> }).disconnect?.();
-		},
+    async endCall(adapter): Promise<void> {
+      // The SDK adapter's `disconnect()` hangs up the live a-leg call via REST
+      // and closes the media socket; the cast is sealed in this one vendor
+      // module rather than living at the child's call site.
+      await (adapter as { disconnect?: () => Promise<void> }).disconnect?.();
+    },
 
-		createAgentAdapter({ agentId, credential, maxCallSeconds }): AgentAdapter {
-			const twilio = twilioCredentialOf(credential);
-			// The SDK caps an a-leg call at 300s and throws above it; a project whose
-			// VOICE_CALL_MAX_SECONDS is higher is clamped down to the cap.
-			const maxCallDurationSeconds = Math.min(
-				maxCallSeconds,
-				TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
-			);
-			const adapter = twilioAgentFactory({
-				accountSid: twilio.accountSid,
-				authToken: twilio.authToken,
-				phoneNumber: twilio.fromNumber,
-				publicBaseUrl: resolvePublicBaseUrl(deps.processEnv),
-				// Only the dialled target is allowlisted, so the SDK's deny-by-default
-				// a-leg guard passes for exactly this number and nothing else. There is
-				// no user-facing allowlist; this guard is internal to the SDK.
-				allowedCallees: [agentId],
-				role: "AGENT",
-			});
-			return withOutboundDial(adapter, {
-				to: agentId,
-				maxCallDurationSeconds,
-			}) as unknown as AgentAdapter;
-		},
-	};
+    createAgentAdapter({ agentId, credential, maxCallSeconds }): AgentAdapter {
+      const twilio = twilioCredentialOf(credential);
+      // The SDK caps an a-leg call at 300s and throws above it; a project whose
+      // VOICE_CALL_MAX_SECONDS is higher is clamped down to the cap.
+      const maxCallDurationSeconds = Math.min(
+        maxCallSeconds,
+        TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
+      );
+      const adapter = twilioAgentFactory({
+        accountSid: twilio.accountSid,
+        authToken: twilio.authToken,
+        phoneNumber: twilio.fromNumber,
+        publicBaseUrl: resolvePublicBaseUrl(deps.processEnv),
+        // Only the dialled target is allowlisted, so the SDK's deny-by-default
+        // a-leg guard passes for exactly this number and nothing else. There is
+        // no user-facing allowlist; this guard is internal to the SDK.
+        allowedCallees: [agentId],
+        role: "AGENT",
+      });
+      return withOutboundDial(adapter, {
+        to: agentId,
+        maxCallDurationSeconds,
+      }) as unknown as AgentAdapter;
+    },
+  };
 }
 
 export const phoneTransport: VoiceTransportRunner = createPhoneTransport();

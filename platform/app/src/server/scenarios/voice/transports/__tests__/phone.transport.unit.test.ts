@@ -5,22 +5,22 @@
 import { describe, expect, it, vi } from "vitest";
 import type { VoiceTransportCredential } from "../../voice-transport.registry";
 import {
-	createPhoneTransport,
-	PHONE_CONNECT_REJECTED_PREFIX,
-	PHONE_NO_BROWSER_CALL_MESSAGE,
-	phoneTransport,
-	resolvePublicBaseUrl,
-	TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
-	type TwilioAdapterLike,
-	type TwilioAgentFactory,
-	VoicePhoneTransportUnavailableError,
+  createPhoneTransport,
+  PHONE_CONNECT_REJECTED_PREFIX,
+  PHONE_NO_BROWSER_CALL_MESSAGE,
+  phoneTransport,
+  resolvePublicBaseUrl,
+  TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
+  type TwilioAdapterLike,
+  type TwilioAgentFactory,
+  VoicePhoneTransportUnavailableError,
 } from "../phone.transport";
 
 const TWILIO_CREDENTIAL: VoiceTransportCredential = {
-	kind: "twilio",
-	accountSid: "AC123",
-	authToken: "tok-secret",
-	fromNumber: "+14155550000",
+  kind: "twilio",
+  accountSid: "AC123",
+  authToken: "tok-secret",
+  fromNumber: "+14155550000",
 };
 
 /** The E.164 destination under test, dialled as the a-leg. */
@@ -30,242 +30,243 @@ const TARGET = "+14155559999";
 type Connectable = { connect: () => Promise<void> };
 
 interface FakeAdapter extends TwilioAdapterLike {
-	readonly placeCallArgs: Array<Parameters<TwilioAdapterLike["placeCall"]>[0]>;
-	readonly disconnectCount: () => number;
+  readonly placeCallArgs: Array<Parameters<TwilioAdapterLike["placeCall"]>[0]>;
+  readonly disconnectCount: () => number;
 }
 
 function fakeAdapter(
-	behaviour: { connectRejects?: Error; placeCallRejects?: Error } = {},
+  behaviour: { connectRejects?: Error; placeCallRejects?: Error } = {},
 ): FakeAdapter {
-	const placeCallArgs: Array<Parameters<TwilioAdapterLike["placeCall"]>[0]> =
-		[];
-	let disconnects = 0;
-	return {
-		placeCallArgs,
-		disconnectCount: () => disconnects,
-		connect: vi.fn(async () => {
-			if (behaviour.connectRejects) throw behaviour.connectRejects;
-		}),
-		disconnect: vi.fn(async () => {
-			disconnects += 1;
-		}),
-		placeCall: vi.fn(async (args) => {
-			placeCallArgs.push(args);
-			if (behaviour.placeCallRejects) throw behaviour.placeCallRejects;
-		}),
-	};
+  const placeCallArgs: Array<Parameters<TwilioAdapterLike["placeCall"]>[0]> =
+    [];
+  let disconnects = 0;
+  return {
+    placeCallArgs,
+    disconnectCount: () => disconnects,
+    connect: vi.fn(async () => {
+      if (behaviour.connectRejects) throw behaviour.connectRejects;
+    }),
+    disconnect: vi.fn(async () => {
+      disconnects += 1;
+    }),
+    placeCall: vi.fn(async (args) => {
+      placeCallArgs.push(args);
+      if (behaviour.placeCallRejects) throw behaviour.placeCallRejects;
+    }),
+  };
 }
 
 function buildTransport({
-	adapter = fakeAdapter(),
-	processEnv = { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
+  adapter = fakeAdapter(),
+  processEnv = { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
 }: {
-	adapter?: FakeAdapter;
-	processEnv?: NodeJS.ProcessEnv;
+  adapter?: FakeAdapter;
+  processEnv?: NodeJS.ProcessEnv;
 } = {}) {
-	const factoryOptions: Array<Parameters<TwilioAgentFactory>[0]> = [];
-	const twilioAgentFactory: TwilioAgentFactory = (options) => {
-		factoryOptions.push(options);
-		return adapter;
-	};
-	const transport = createPhoneTransport({ twilioAgentFactory, processEnv });
-	return { transport, adapter, factoryOptions };
+  const factoryOptions: Array<Parameters<TwilioAgentFactory>[0]> = [];
+  const twilioAgentFactory: TwilioAgentFactory = (options) => {
+    factoryOptions.push(options);
+    return adapter;
+  };
+  const transport = createPhoneTransport({ twilioAgentFactory, processEnv });
+  return { transport, adapter, factoryOptions };
 }
 
 describe("phoneTransport", () => {
-	describe("given a phone target with a valid Twilio credential", () => {
-		describe("when the run places the call", () => {
-			/** @scenario "A phone call dials the target number over the account's own line" */
-			it("dials the target as an a-leg call from the account's own number", async () => {
-				const { transport, adapter, factoryOptions } = buildTransport();
-				const built = transport.createAgentAdapter({
-					agentId: TARGET,
-					credential: TWILIO_CREDENTIAL,
-					maxCallSeconds: 120,
-				});
-				await (built as unknown as Connectable).connect();
+  describe("given a phone target with a valid Twilio credential", () => {
+    describe("when the run places the call", () => {
+      /** @scenario "A phone call dials the target number over the account's own line" */
+      it("dials the target as an a-leg call from the account's own number", async () => {
+        const { transport, adapter, factoryOptions } = buildTransport();
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+        await (built as unknown as Connectable).connect();
 
-				expect(factoryOptions[0]?.accountSid).toBe("AC123");
-				expect(factoryOptions[0]?.authToken).toBe("tok-secret");
-				// The account's OWN number is the "from", never the destination.
-				expect(factoryOptions[0]?.phoneNumber).toBe("+14155550000");
-				expect(factoryOptions[0]?.role).toBe("AGENT");
-				expect(adapter.placeCallArgs[0]).toMatchObject({
-					to: TARGET,
-					attachStream: "a-leg",
-				});
-			});
+        expect(factoryOptions[0]?.accountSid).toBe("AC123");
+        expect(factoryOptions[0]?.authToken).toBe("tok-secret");
+        // The account's OWN number is the "from", never the destination.
+        expect(factoryOptions[0]?.phoneNumber).toBe("+14155550000");
+        expect(factoryOptions[0]?.role).toBe("AGENT");
+        expect(adapter.placeCallArgs[0]).toMatchObject({
+          to: TARGET,
+          attachStream: "a-leg",
+        });
+      });
 
-			/** @scenario "A phone call allows only the dialled number" */
-			it("passes only the dialled target to the transport's internal allowlist", () => {
-				const { transport, factoryOptions } = buildTransport();
-				transport.createAgentAdapter({
-					agentId: TARGET,
-					credential: TWILIO_CREDENTIAL,
-					maxCallSeconds: 120,
-				});
-				expect(factoryOptions[0]?.allowedCallees).toEqual([TARGET]);
-			});
-		});
+      /** @scenario "A phone call allows only the dialled number" */
+      it("passes only the dialled target to the transport's internal allowlist", () => {
+        const { transport, factoryOptions } = buildTransport();
+        transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+        expect(factoryOptions[0]?.allowedCallees).toEqual([TARGET]);
+      });
+    });
 
-		describe("when the project's call limit is above the transport's cap", () => {
-			/** @scenario "A phone call's duration is capped at the transport's hard limit" */
-			it("clamps the call duration to the transport's own maximum", async () => {
-				const { transport, adapter } = buildTransport();
-				const built = transport.createAgentAdapter({
-					agentId: TARGET,
-					credential: TWILIO_CREDENTIAL,
-					maxCallSeconds: 600,
-				});
-				await (built as unknown as Connectable).connect();
-				expect(adapter.placeCallArgs[0]?.maxCallDurationSeconds).toBe(
-					TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
-				);
-			});
-		});
+    describe("when the project's call limit is above the transport's cap", () => {
+      /** @scenario "A phone call's duration is capped at the transport's hard limit" */
+      it("clamps the call duration to the transport's own maximum", async () => {
+        const { transport, adapter } = buildTransport();
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 600,
+        });
+        await (built as unknown as Connectable).connect();
+        expect(adapter.placeCallArgs[0]?.maxCallDurationSeconds).toBe(
+          TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
+        );
+      });
+    });
 
-		describe("when the project's call limit is below the transport's cap", () => {
-			it("dials with the project's own smaller limit", async () => {
-				const { transport, adapter } = buildTransport();
-				const built = transport.createAgentAdapter({
-					agentId: TARGET,
-					credential: TWILIO_CREDENTIAL,
-					maxCallSeconds: 90,
-				});
-				await (built as unknown as Connectable).connect();
-				expect(adapter.placeCallArgs[0]?.maxCallDurationSeconds).toBe(90);
-			});
-		});
+    describe("when the project's call limit is below the transport's cap", () => {
+      it("dials with the project's own smaller limit", async () => {
+        const { transport, adapter } = buildTransport();
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 90,
+        });
+        await (built as unknown as Connectable).connect();
+        expect(adapter.placeCallArgs[0]?.maxCallDurationSeconds).toBe(90);
+      });
+    });
 
-		describe("when the live call is ended", () => {
-			/** @scenario "Ending a phone call while it is live hangs up the call" */
-			it("hangs up by disconnecting the adapter", async () => {
-				const { transport, adapter } = buildTransport();
-				const built = transport.createAgentAdapter({
-					agentId: TARGET,
-					credential: TWILIO_CREDENTIAL,
-					maxCallSeconds: 120,
-				});
-				await transport.endCall(built);
-				expect(adapter.disconnectCount()).toBe(1);
-			});
-		});
+    describe("when the live call is ended", () => {
+      /** @scenario "Ending a phone call while it is live hangs up the call" */
+      it("hangs up by disconnecting the adapter", async () => {
+        const { transport, adapter } = buildTransport();
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+        await transport.endCall(built);
+        expect(adapter.disconnectCount()).toBe(1);
+      });
+    });
 
-		describe("when the a-leg dial is refused", () => {
-			it("surfaces the refusal as the run's error and releases the socket", async () => {
-				const adapter = fakeAdapter({
-					placeCallRejects: new Error("callee not allowed"),
-				});
-				const { transport } = buildTransport({ adapter });
-				const built = transport.createAgentAdapter({
-					agentId: TARGET,
-					credential: TWILIO_CREDENTIAL,
-					maxCallSeconds: 120,
-				});
-				await expect(
-					(built as unknown as Connectable).connect(),
-				).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
-				expect(adapter.disconnectCount()).toBe(1);
-			});
-		});
+    describe("when the a-leg dial is refused", () => {
+      it("surfaces the refusal as the run's error and releases the socket", async () => {
+        const adapter = fakeAdapter({
+          placeCallRejects: new Error("callee not allowed"),
+        });
+        const { transport } = buildTransport({ adapter });
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+        await expect(
+          (built as unknown as Connectable).connect(),
+        ).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
+        expect(adapter.disconnectCount()).toBe(1);
+      });
+    });
 
-		describe("when the connect handshake fails", () => {
-			it("surfaces the failure as the run's error and never dials", async () => {
-				const adapter = fakeAdapter({
-					connectRejects: new Error("edge not reachable"),
-				});
-				const { transport } = buildTransport({ adapter });
-				const built = transport.createAgentAdapter({
-					agentId: TARGET,
-					credential: TWILIO_CREDENTIAL,
-					maxCallSeconds: 120,
-				});
-				await expect(
-					(built as unknown as Connectable).connect(),
-				).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
-				expect(adapter.placeCallArgs).toHaveLength(0);
-			});
-		});
-	});
+    describe("when the connect handshake fails", () => {
+      it("surfaces the failure as the run's error and never dials", async () => {
+        const adapter = fakeAdapter({
+          connectRejects: new Error("edge not reachable"),
+        });
+        const { transport } = buildTransport({ adapter });
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+        await expect(
+          (built as unknown as Connectable).connect(),
+        ).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
+        expect(adapter.placeCallArgs).toHaveLength(0);
+      });
+    });
+  });
 
-	describe("given a credential built for another transport", () => {
-		describe("when the phone runner builds its adapter", () => {
-			it("throws rather than reading a shape it cannot use", () => {
-				const { transport } = buildTransport();
-				expect(() =>
-					transport.createAgentAdapter({
-						agentId: TARGET,
-						credential: {
-							kind: "elevenlabs",
-							apiKey: "k",
-							baseUrl: "https://x",
-						},
-						maxCallSeconds: 120,
-					}),
-				).toThrow(/elevenlabs credential/);
-			});
-		});
-	});
+  describe("given a credential built for another transport", () => {
+    describe("when the phone runner builds its adapter", () => {
+      it("throws rather than reading a shape it cannot use", () => {
+        const { transport } = buildTransport();
+        expect(() =>
+          transport.createAgentAdapter({
+            agentId: TARGET,
+            credential: {
+              kind: "elevenlabs",
+              apiKey: "k",
+              baseUrl: "https://x",
+            },
+            maxCallSeconds: 120,
+          }),
+        ).toThrow(/elevenlabs credential/);
+      });
+    });
+  });
 
-	describe("given a phone target has no browser call", () => {
-		describe("when a browser session mint or record is attempted", () => {
-			/** @scenario "A phone target has no browser call" */
-			it("throws the unavailable error from every browser-only method", () => {
-				const assertThrows = (call: () => unknown) => {
-					expect(call).toThrow(VoicePhoneTransportUnavailableError);
-					try {
-						call();
-					} catch (error) {
-						expect((error as VoicePhoneTransportUnavailableError).code).toBe(
-							"voice_phone_transport_unavailable",
-						);
-						expect((error as Error).message).toBe(
-							PHONE_NO_BROWSER_CALL_MESSAGE,
-						);
-					}
-				};
-				assertThrows(() => phoneTransport.assertAvailable?.());
-				assertThrows(() =>
-					phoneTransport.mintSession({
-						agentId: TARGET,
-						credential: TWILIO_CREDENTIAL,
-					}),
-				);
-				assertThrows(() =>
-					phoneTransport.fetchCallRecord({
-						conversationId: "c",
-						credential: TWILIO_CREDENTIAL,
-						audioProxyUrl: "/audio",
-					}),
-				);
-			});
-		});
-	});
+  describe("given a phone target has no browser call", () => {
+    describe("when a browser session mint or record is attempted", () => {
+      /** @scenario "A phone target has no browser call" */
+      it("throws the unavailable error from every browser-only method", () => {
+        const assertThrows = (call: () => unknown) => {
+          expect(call).toThrow(VoicePhoneTransportUnavailableError);
+          try {
+            call();
+          } catch (error) {
+            expect((error as VoicePhoneTransportUnavailableError).code).toBe(
+              "voice_phone_transport_unavailable",
+            );
+            expect((error as Error).message).toBe(
+              PHONE_NO_BROWSER_CALL_MESSAGE,
+            );
+          }
+        };
+        assertThrows(() => phoneTransport.assertAvailable?.());
+        assertThrows(() =>
+          phoneTransport.mintSession({
+            agentId: TARGET,
+            credential: TWILIO_CREDENTIAL,
+          }),
+        );
+        assertThrows(() =>
+          phoneTransport.fetchCallRecord({
+            conversationId: "c",
+            credential: TWILIO_CREDENTIAL,
+            audioProxyUrl: "/audio",
+          }),
+        );
+      });
+    });
+  });
 
-	describe("given the public base URL is resolved", () => {
-		describe("when VOICE_PUBLIC_BASE_URL is set", () => {
-			it("uses it over the app's own base host", () => {
-				expect(
-					resolvePublicBaseUrl({
-						VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
-						BASE_HOST: "https://app.example.com",
-					}),
-				).toBe("https://voice.example.com");
-			});
-		});
+  describe("given the public base URL is resolved", () => {
+    describe("when VOICE_PUBLIC_BASE_URL is set", () => {
+      it("uses it over the app's own base host", () => {
+        expect(
+          resolvePublicBaseUrl({
+            VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
+            BASE_HOST: "https://app.example.com",
+          }),
+        ).toBe("https://voice.example.com");
+      });
+    });
 
-		describe("when VOICE_PUBLIC_BASE_URL is unset", () => {
-			it("falls back to the app's own base host", () => {
-				expect(
-					resolvePublicBaseUrl({ BASE_HOST: "https://app.example.com" }),
-				).toBe("https://app.example.com");
-			});
-		});
+    describe("when VOICE_PUBLIC_BASE_URL is unset", () => {
+      /** @scenario "VOICE_PUBLIC_BASE_URL is optional and falls back to the app's public base host" */
+      it("falls back to the app's own base host", () => {
+        expect(
+          resolvePublicBaseUrl({ BASE_HOST: "https://app.example.com" }),
+        ).toBe("https://app.example.com");
+      });
+    });
 
-		describe("when neither is set", () => {
-			it("resolves to undefined", () => {
-				expect(resolvePublicBaseUrl({})).toBeUndefined();
-			});
-		});
-	});
+    describe("when neither is set", () => {
+      it("resolves to undefined", () => {
+        expect(resolvePublicBaseUrl({})).toBeUndefined();
+      });
+    });
+  });
 });

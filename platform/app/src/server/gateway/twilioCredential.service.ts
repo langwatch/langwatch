@@ -18,24 +18,24 @@ import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.r
 
 /** The account SID, auth token and origination number a phone run dials with. */
 export interface TwilioCredential {
-	/** The Twilio account the call is billed to. */
-	accountSid: string;
-	/** The account auth token. The one secret field of the three. */
-	authToken: string;
-	/** The account's own Twilio number (E.164) the call originates FROM. */
-	fromNumber: string;
+  /** The Twilio account the call is billed to. */
+  accountSid: string;
+  /** The account auth token. The one secret field of the three. */
+  authToken: string;
+  /** The account's own Twilio number (E.164) the call originates FROM. */
+  fromNumber: string;
 }
 
 /** The decrypted custom keys of a Twilio row, or null for anything else. */
 async function twilioKeys(
-	modelProviderId: string,
+  modelProviderId: string,
 ): Promise<Record<string, unknown> | null> {
-	const provider = await prisma.modelProvider.findUnique({
-		where: { id: modelProviderId },
-		select: { provider: true, customKeys: true },
-	});
-	if (provider?.provider !== "twilio") return null;
-	return readCustomKeys(provider.customKeys).keys;
+  const provider = await prisma.modelProvider.findUnique({
+    where: { id: modelProviderId },
+    select: { provider: true, customKeys: true },
+  });
+  if (provider?.provider !== "twilio") return null;
+  return readCustomKeys(provider.customKeys).keys;
 }
 
 /**
@@ -47,14 +47,14 @@ async function twilioKeys(
  * other provider read does.
  */
 export async function findTwilioProviderForProject({
-	projectId,
+  projectId,
 }: {
-	projectId: string;
+  projectId: string;
 }): Promise<{ id: string } | null> {
-	const repository = new ModelProviderRepository(prisma);
-	const rows = await repository.findAllAccessibleForProject(projectId);
-	const row = rows.find((r) => r.provider === "twilio" && r.enabled);
-	return row?.id ? { id: row.id } : null;
+  const repository = new ModelProviderRepository(prisma);
+  const rows = await repository.findAllAccessibleForProject(projectId);
+  const row = rows.find((r) => r.provider === "twilio" && r.enabled);
+  return row?.id ? { id: row.id } : null;
 }
 
 /**
@@ -64,17 +64,17 @@ export async function findTwilioProviderForProject({
  * rather than reaching Twilio with an empty field.
  */
 export async function getTwilioCredential({
-	modelProviderId,
+  modelProviderId,
 }: {
-	modelProviderId: string;
+  modelProviderId: string;
 }): Promise<TwilioCredential | null> {
-	const keys = await twilioKeys(modelProviderId);
-	if (!keys) return null;
-	const accountSid = keys.TWILIO_ACCOUNT_SID;
-	const authToken = keys.TWILIO_AUTH_TOKEN;
-	const fromNumber = keys.TWILIO_FROM_NUMBER;
-	if (typeof accountSid !== "string" || accountSid.length === 0) return null;
-	if (typeof authToken !== "string" || authToken.length === 0) return null;
-	if (typeof fromNumber !== "string" || fromNumber.length === 0) return null;
-	return { accountSid, authToken, fromNumber };
+  const keys = await twilioKeys(modelProviderId);
+  if (!keys) return null;
+  const accountSid = keys.TWILIO_ACCOUNT_SID;
+  const authToken = keys.TWILIO_AUTH_TOKEN;
+  const fromNumber = keys.TWILIO_FROM_NUMBER;
+  if (typeof accountSid !== "string" || accountSid.length === 0) return null;
+  if (typeof authToken !== "string" || authToken.length === 0) return null;
+  if (typeof fromNumber !== "string" || fromNumber.length === 0) return null;
+  return { accountSid, authToken, fromNumber };
 }

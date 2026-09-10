@@ -18,8 +18,8 @@ import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
 import {
-	DEFAULT_CALL_TIMEOUT_MS,
-	MAX_CALL_TIMEOUT_MS,
+  DEFAULT_CALL_TIMEOUT_MS,
+  MAX_CALL_TIMEOUT_MS,
 } from "~/server/connected-agents/constants";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
@@ -29,16 +29,16 @@ import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
 import { isAgentTestScenarioId } from "../agent-test-scenario";
 import {
-	mergeRunParameters,
-	parseScenarioParameterDefinitions,
-	partitionParameterDefinitions,
-	type RunParameterValues,
-	withoutParameterNames,
+  mergeRunParameters,
+  parseScenarioParameterDefinitions,
+  partitionParameterDefinitions,
+  type RunParameterValues,
+  withoutParameterNames,
 } from "../parameters";
 import { type ResolvedRunModels, resolveRunModels } from "../run-models";
 import {
-	decryptRunSecretValues,
-	type RunSecretCiphertext,
+  decryptRunSecretValues,
+  type RunSecretCiphertext,
 } from "../run-secret-values";
 import { prefetchAgentTestData } from "./agent-test-prefetch";
 import { renderScenarioContent } from "./scenario-content-template";
@@ -49,53 +49,53 @@ const logger = createLogger("langwatch:scenarios:data-prefetcher");
 import { tryGetAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { decrypt } from "~/utils/encryption";
 import {
-	AgentRepository,
-	type TypedAgent,
+  AgentRepository,
+  type TypedAgent,
 } from "../../agents/agent.repository";
 import {
-	parseVoiceAgentConfig,
-	voiceAgentExternalId,
+  parseVoiceAgentConfig,
+  voiceAgentExternalId,
 } from "../../agents/voice/voice-agent.config";
 import {
-	getProjectModelProviders,
-	prepareEnvKeys,
-	prepareLitellmParams,
+  getProjectModelProviders,
+  prepareEnvKeys,
+  prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
 import { prisma } from "../../db";
 import {
-	findElevenLabsProviderForProject,
-	getElevenLabsApiCredential,
+  findElevenLabsProviderForProject,
+  getElevenLabsApiCredential,
 } from "../../gateway/elevenLabsCredential.service";
 import {
-	findTwilioProviderForProject,
-	getTwilioCredential,
+  findTwilioProviderForProject,
+  getTwilioCredential,
 } from "../../gateway/twilioCredential.service";
 import {
-	PromptService,
-	type VersionedPrompt,
+  PromptService,
+  type VersionedPrompt,
 } from "../../prompt-config/prompt.service";
 import { type FieldMapping, FieldMappingSchema } from "../field-mapping";
 import { ScenarioService } from "../scenario.service";
 import {
-	type CallerVoiceConfig,
-	parseCallerVoiceConfig,
+  type CallerVoiceConfig,
+  parseCallerVoiceConfig,
 } from "../voice/caller-voice.config";
 import { voiceCallMaxSeconds } from "../voice/voice-limits";
 import { resolveTraceWaitTimeoutMs } from "./ingest-lag.service";
 import {
-	AuthConfigSchema,
-	type ChildProcessJobData,
-	type CodeAgentData,
-	type ConnectedAgentData,
-	type ExecutionContext,
-	type HttpAgentData,
-	type LiteLLMParams,
-	type PromptConfigData,
-	type ScenarioConfig,
-	type TargetAdapterData,
-	type TargetConfig,
-	type VoiceAgentData,
-	type WorkflowAgentData,
+  AuthConfigSchema,
+  type ChildProcessJobData,
+  type CodeAgentData,
+  type ConnectedAgentData,
+  type ExecutionContext,
+  type HttpAgentData,
+  type LiteLLMParams,
+  type PromptConfigData,
+  type ScenarioConfig,
+  type TargetAdapterData,
+  type TargetConfig,
+  type VoiceAgentData,
+  type WorkflowAgentData,
 } from "./types";
 
 // ============================================================================
@@ -104,24 +104,24 @@ import {
 
 /** Minimal interface for scenario lookup - uses only what prefetcher needs */
 export interface ScenarioFetcher {
-	getById(params: { projectId: string; id: string }): Promise<{
-		id: string;
-		name: string;
-		situation: string;
-		criteria: string[];
-		labels: string[];
-		/** Per-scenario user-simulator model override (null = use default). */
-		simulatorModel?: string | null;
-		/** Per-scenario judge model override (null = use default). */
-		judgeModel?: string | null;
-		/** The parameters the scenario declares, as stored on its JSON column. */
-		parameters?: unknown;
-		/** Turn config (ADR-015); null = SDK default. */
-		maxTurns?: number | null;
-		minTurns?: number | null;
-		/** The scenario's caller-voice JSON, for a voice target. Parsed tolerantly. */
-		callerVoice?: unknown;
-	} | null>;
+  getById(params: { projectId: string; id: string }): Promise<{
+    id: string;
+    name: string;
+    situation: string;
+    criteria: string[];
+    labels: string[];
+    /** Per-scenario user-simulator model override (null = use default). */
+    simulatorModel?: string | null;
+    /** Per-scenario judge model override (null = use default). */
+    judgeModel?: string | null;
+    /** The parameters the scenario declares, as stored on its JSON column. */
+    parameters?: unknown;
+    /** Turn config (ADR-015); null = SDK default. */
+    maxTurns?: number | null;
+    minTurns?: number | null;
+    /** The scenario's caller-voice JSON, for a voice target. Parsed tolerantly. */
+    callerVoice?: unknown;
+  } | null>;
 }
 
 /**
@@ -131,40 +131,40 @@ export interface ScenarioFetcher {
  * the event-sourcing queue. Returns null when the run is not part of a suite.
  */
 export interface SuiteConfigFetcher {
-	getBySetId(
-		setId: string,
-		projectId: string,
-	): Promise<{
-		simulatorModel: string | null;
-		judgeModel: string | null;
-		/**
-		 * The suite's configured targets. Prompt targets carry the bindings from a
-		 * scenario source to the prompt's declared inputs; agents keep theirs on
-		 * the agent record. Read through the same set-id lookup as the model
-		 * overrides, so no binding has to travel through the event queue.
-		 */
-		targets?: Array<{
-			type: string;
-			referenceId: string;
-			scenarioMappings?: Record<string, FieldMapping>;
-		}>;
-	} | null>;
+  getBySetId(
+    setId: string,
+    projectId: string,
+  ): Promise<{
+    simulatorModel: string | null;
+    judgeModel: string | null;
+    /**
+     * The suite's configured targets. Prompt targets carry the bindings from a
+     * scenario source to the prompt's declared inputs; agents keep theirs on
+     * the agent record. Read through the same set-id lookup as the model
+     * overrides, so no binding has to travel through the event queue.
+     */
+    targets?: Array<{
+      type: string;
+      referenceId: string;
+      scenarioMappings?: Record<string, FieldMapping>;
+    }>;
+  } | null>;
 }
 
 /** Minimal interface for prompt lookup - uses only what prefetcher needs */
 export interface PromptFetcher {
-	getPromptByIdOrHandle(params: {
-		projectId: string;
-		idOrHandle: string;
-	}): Promise<VersionedPrompt | null>;
+  getPromptByIdOrHandle(params: {
+    projectId: string;
+    idOrHandle: string;
+  }): Promise<VersionedPrompt | null>;
 }
 
 /** Minimal interface for agent lookup - uses only what prefetcher needs */
 export interface AgentFetcher {
-	findById(params: {
-		projectId: string;
-		id: string;
-	}): Promise<TypedAgent | null>;
+  findById(params: {
+    projectId: string;
+    id: string;
+  }): Promise<TypedAgent | null>;
 }
 
 /**
@@ -172,10 +172,10 @@ export interface AgentFetcher {
  * for a workflow so the worker-thread adapter can execute it without DB access.
  */
 export interface WorkflowVersionFetcher {
-	getLatestDsl(params: {
-		projectId: string;
-		workflowId: string;
-	}): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null>;
+  getLatestDsl(params: {
+    projectId: string;
+    workflowId: string;
+  }): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null>;
 }
 
 /**
@@ -185,10 +185,10 @@ export interface WorkflowVersionFetcher {
  * and the project row is already being read.
  */
 export interface ProjectFetcher {
-	findUnique(projectId: string): Promise<{
-		apiKey: string | null;
-		team: { organizationId: string } | null;
-	} | null>;
+  findUnique(projectId: string): Promise<{
+    apiKey: string | null;
+    team: { organizationId: string } | null;
+  } | null>;
 }
 
 /**
@@ -197,10 +197,10 @@ export interface ProjectFetcher {
  * to do its work once per row.
  */
 export interface SandboxKeyMinter {
-	mint(params: {
-		projectId: string;
-		organizationId: string;
-	}): Promise<string | undefined>;
+  mint(params: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<string | undefined>;
 }
 
 /**
@@ -209,7 +209,7 @@ export interface SandboxKeyMinter {
  * prefetcher catches and returns a structured failure to the caller.
  */
 export interface ModelResolver {
-	resolve(featureKey: string, projectId: string): Promise<string>;
+  resolve(featureKey: string, projectId: string): Promise<string>;
 }
 
 /**
@@ -219,29 +219,29 @@ export interface ModelResolver {
  * UI or from a scenario worker.
  */
 export interface ProjectSecretsFetcher {
-	getSecrets(projectId: string): Promise<Record<string, string>>;
+  getSecrets(projectId: string): Promise<Record<string, string>>;
 }
 
 /** Reason codes for model params preparation failures */
 export type ModelParamsFailureReason =
-	| "invalid_model_format"
-	| "provider_not_found"
-	| "provider_not_enabled"
-	| "missing_params"
-	| "model_not_configured"
-	| "preparation_error";
+  | "invalid_model_format"
+  | "provider_not_found"
+  | "provider_not_enabled"
+  | "missing_params"
+  | "model_not_configured"
+  | "preparation_error";
 
 /** Structured result from model params preparation */
 export type ModelParamsResult =
-	| {
-			success: true;
-			params: LiteLLMParams;
-	  }
-	| { success: false; reason: ModelParamsFailureReason; message: string };
+  | {
+      success: true;
+      params: LiteLLMParams;
+    }
+  | { success: false; reason: ModelParamsFailureReason; message: string };
 
 /** Minimal interface for model params preparation */
 export interface ModelParamsProvider {
-	prepare(projectId: string, model: string): Promise<ModelParamsResult>;
+  prepare(projectId: string, model: string): Promise<ModelParamsResult>;
 }
 
 /**
@@ -250,22 +250,22 @@ export interface ModelParamsProvider {
  * ones whose judge fetches remote traces.
  */
 export interface TraceWaitBudgetResolver {
-	resolveTraceWaitTimeoutMs(params: { projectId: string }): Promise<number>;
+  resolveTraceWaitTimeoutMs(params: { projectId: string }): Promise<number>;
 }
 
 /** All dependencies required by prefetchScenarioData */
 export interface DataPrefetcherDependencies {
-	scenarioFetcher: ScenarioFetcher;
-	suiteConfigFetcher: SuiteConfigFetcher;
-	promptFetcher: PromptFetcher;
-	agentFetcher: AgentFetcher;
-	workflowVersionFetcher: WorkflowVersionFetcher;
-	projectFetcher: ProjectFetcher;
-	modelParamsProvider: ModelParamsProvider;
-	modelResolver: ModelResolver;
-	projectSecretsFetcher: ProjectSecretsFetcher;
-	traceWaitBudgetResolver: TraceWaitBudgetResolver;
-	sandboxKeyMinter: SandboxKeyMinter;
+  scenarioFetcher: ScenarioFetcher;
+  suiteConfigFetcher: SuiteConfigFetcher;
+  promptFetcher: PromptFetcher;
+  agentFetcher: AgentFetcher;
+  workflowVersionFetcher: WorkflowVersionFetcher;
+  projectFetcher: ProjectFetcher;
+  modelParamsProvider: ModelParamsProvider;
+  modelResolver: ModelResolver;
+  projectSecretsFetcher: ProjectSecretsFetcher;
+  traceWaitBudgetResolver: TraceWaitBudgetResolver;
+  sandboxKeyMinter: SandboxKeyMinter;
 }
 
 // ============================================================================
@@ -273,23 +273,23 @@ export interface DataPrefetcherDependencies {
 // ============================================================================
 
 export type PrefetchResult =
-	| {
-			success: true;
-			data: ChildProcessJobData;
-			telemetry: { endpoint: string; apiKey: string };
-			/**
-			 * The models this run resolved. A sibling of `data` rather than a member
-			 * of it: the child process builds its models from the prepared params,
-			 * so it needs no name, while the caller that queues the run records the
-			 * names on it. Null for a scripted run, which resolves no model.
-			 */
-			resolvedModels: ResolvedRunModels | null;
-	  }
-	| {
-			success: false;
-			error: string;
-			reason?: ModelParamsFailureReason;
-	  };
+  | {
+      success: true;
+      data: ChildProcessJobData;
+      telemetry: { endpoint: string; apiKey: string };
+      /**
+       * The models this run resolved. A sibling of `data` rather than a member
+       * of it: the child process builds its models from the prepared params,
+       * so it needs no name, while the caller that queues the run records the
+       * names on it. Null for a scripted run, which resolves no model.
+       */
+      resolvedModels: ResolvedRunModels | null;
+    }
+  | {
+      success: false;
+      error: string;
+      reason?: ModelParamsFailureReason;
+    };
 
 // ============================================================================
 // Core Logic (depends on abstractions)
@@ -300,8 +300,8 @@ export type PrefetchResult =
  * prefetch and resolves much earlier. See `onChildEnvReady`.
  */
 export interface ChildEnvInputs {
-	labels: string[];
-	telemetry: { endpoint: string; apiKey: string };
+  labels: string[];
+  telemetry: { endpoint: string; apiKey: string };
 }
 
 /**
@@ -313,20 +313,20 @@ export interface ChildEnvInputs {
  * same set can be run again with different ones and be a different run.
  */
 export type PrefetchContext = ExecutionContext & {
-	/**
-	 * The values the run resolved for this scenario, as recorded on the queued
-	 * event. Merged again over the scenario's declared defaults here, which
-	 * makes the merge idempotent: a job queued by a build that did not resolve
-	 * them still gets the defaults, and one queued by a build that did gets the
-	 * same answer twice.
-	 */
-	parameters?: RunParameterValues;
-	/**
-	 * The run's secret parameter values, encrypted, as recorded on the queued
-	 * event. Decrypted once here and merged over the project's own secrets, so
-	 * the target reads them as `secrets.NAME` like any other secret.
-	 */
-	secretParameters?: RunSecretCiphertext;
+  /**
+   * The values the run resolved for this scenario, as recorded on the queued
+   * event. Merged again over the scenario's declared defaults here, which
+   * makes the merge idempotent: a job queued by a build that did not resolve
+   * them still gets the defaults, and one queued by a build that did gets the
+   * same answer twice.
+   */
+  parameters?: RunParameterValues;
+  /**
+   * The run's secret parameter values, encrypted, as recorded on the queued
+   * event. Decrypted once here and merged over the project's own secrets, so
+   * the target reads them as `secrets.NAME` like any other secret.
+   */
+  secretParameters?: RunSecretCiphertext;
 };
 
 /**
@@ -341,18 +341,18 @@ export type PrefetchContext = ExecutionContext & {
  * credential without a second project set up for it.
  */
 function withRunSecrets({
-	fetcher,
-	runSecrets,
+  fetcher,
+  runSecrets,
 }: {
-	fetcher: ProjectSecretsFetcher;
-	runSecrets: Record<string, string>;
+  fetcher: ProjectSecretsFetcher;
+  runSecrets: Record<string, string>;
 }): ProjectSecretsFetcher {
-	return {
-		getSecrets: async (projectId: string) => ({
-			...(await fetcher.getSecrets(projectId)),
-			...runSecrets,
-		}),
-	};
+  return {
+    getSecrets: async (projectId: string) => ({
+      ...(await fetcher.getSecrets(projectId)),
+      ...runSecrets,
+    }),
+  };
 }
 
 /**
@@ -360,12 +360,12 @@ function withRunSecrets({
  * label per target type so the run names the kind the customer picked.
  */
 const MISSING_TARGET_LABELS: Record<TargetConfig["type"], string> = {
-	prompt: "Prompt",
-	code: "Code agent",
-	workflow: "Workflow agent",
-	connected: "Connected agent",
-	http: "HTTP agent",
-	voice: "Voice agent",
+  prompt: "Prompt",
+  code: "Code agent",
+  workflow: "Workflow agent",
+  connected: "Connected agent",
+  http: "HTTP agent",
+  voice: "Voice agent",
 };
 
 /**
@@ -386,380 +386,380 @@ const MISSING_TARGET_LABELS: Record<TargetConfig["type"], string> = {
  *   for a run that is about to fail.
  */
 export async function prefetchScenarioData({
-	context,
-	target,
-	deps,
-	onChildEnvReady,
+  context,
+  target,
+  deps,
+  onChildEnvReady,
 }: {
-	context: PrefetchContext;
-	target: TargetConfig;
-	deps: DataPrefetcherDependencies;
-	onChildEnvReady?: (inputs: ChildEnvInputs) => void;
+  context: PrefetchContext;
+  target: TargetConfig;
+  deps: DataPrefetcherDependencies;
+  onChildEnvReady?: (inputs: ChildEnvInputs) => void;
 }): Promise<PrefetchResult> {
-	logger.debug(
-		{
-			projectId: context.projectId,
-			scenarioId: context.scenarioId,
-			batchRunId: context.batchRunId,
-			targetType: target.type,
-		},
-		"Prefetching scenario data",
-	);
+  logger.debug(
+    {
+      projectId: context.projectId,
+      scenarioId: context.scenarioId,
+      batchRunId: context.batchRunId,
+      targetType: target.type,
+    },
+    "Prefetching scenario data",
+  );
 
-	// An agent test has no scenario row and no model: it reads the project and
-	// the agent the way every run does, and nothing else.
-	if (isAgentTestScenarioId(context.scenarioId)) {
-		return prefetchAgentTestData({
-			context,
-			target,
-			reads: {
-				project: () => fetchProject(context.projectId, deps.projectFetcher),
-				adapter: () => fetchAgentData(context.projectId, target, deps),
-				agentName: async () =>
-					(
-						await deps.agentFetcher.findById({
-							projectId: context.projectId,
-							id: target.referenceId,
-						})
-					)?.name ?? null,
-			},
-			onChildEnvReady,
-		});
-	}
+  // An agent test has no scenario row and no model: it reads the project and
+  // the agent the way every run does, and nothing else.
+  if (isAgentTestScenarioId(context.scenarioId)) {
+    return prefetchAgentTestData({
+      context,
+      target,
+      reads: {
+        project: () => fetchProject(context.projectId, deps.projectFetcher),
+        adapter: () => fetchAgentData(context.projectId, target, deps),
+        agentName: async () =>
+          (
+            await deps.agentFetcher.findById({
+              projectId: context.projectId,
+              id: target.referenceId,
+            })
+          )?.name ?? null,
+      },
+      onChildEnvReady,
+    });
+  }
 
-	// Decrypted once, before anything is fetched. A key that no longer opens the
-	// values fails the run here rather than sending the target a request with a
-	// credential missing from it, which would report a result about the
-	// credential instead of about the scenario.
-	let secretDeps = deps;
-	if (
-		context.secretParameters &&
-		Object.keys(context.secretParameters).length > 0
-	) {
-		try {
-			secretDeps = {
-				...deps,
-				projectSecretsFetcher: withRunSecrets({
-					fetcher: deps.projectSecretsFetcher,
-					runSecrets: decryptRunSecretValues(context.secretParameters),
-				}),
-			};
-		} catch (error) {
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			};
-		}
-	}
+  // Decrypted once, before anything is fetched. A key that no longer opens the
+  // values fails the run here rather than sending the target a request with a
+  // credential missing from it, which would report a result about the
+  // credential instead of about the scenario.
+  let secretDeps = deps;
+  if (
+    context.secretParameters &&
+    Object.keys(context.secretParameters).length > 0
+  ) {
+    try {
+      secretDeps = {
+        ...deps,
+        projectSecretsFetcher: withRunSecrets({
+          fetcher: deps.projectSecretsFetcher,
+          runSecrets: decryptRunSecretValues(context.secretParameters),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
 
-	// The scenario, the project, the target adapter and the suite config are
-	// independent lookups keyed off ids we already hold, so they go out together
-	// rather than one await at a time. This runs on the path between a run being
-	// queued and its child starting, once per simulation.
-	//
-	// The checks below keep their original order, so the error reported for any
-	// given failure is unchanged; the only difference is that a doomed run may
-	// have issued the other queries before finding out.
-	const scenarioPromise = fetchScenario({
-		projectId: context.projectId,
-		scenarioId: context.scenarioId,
-		fetcher: deps.scenarioFetcher,
-		suppliedParameters: context.parameters,
-	});
-	const projectPromise = fetchProject(context.projectId, deps.projectFetcher);
-	const adapterPromise = fetchAgentData(context.projectId, target, secretDeps);
-	const suitePromise = deps.suiteConfigFetcher.getBySetId(
-		context.setId,
-		context.projectId,
-	);
+  // The scenario, the project, the target adapter and the suite config are
+  // independent lookups keyed off ids we already hold, so they go out together
+  // rather than one await at a time. This runs on the path between a run being
+  // queued and its child starting, once per simulation.
+  //
+  // The checks below keep their original order, so the error reported for any
+  // given failure is unchanged; the only difference is that a doomed run may
+  // have issued the other queries before finding out.
+  const scenarioPromise = fetchScenario({
+    projectId: context.projectId,
+    scenarioId: context.scenarioId,
+    fetcher: deps.scenarioFetcher,
+    suppliedParameters: context.parameters,
+  });
+  const projectPromise = fetchProject(context.projectId, deps.projectFetcher);
+  const adapterPromise = fetchAgentData(context.projectId, target, secretDeps);
+  const suitePromise = deps.suiteConfigFetcher.getBySetId(
+    context.setId,
+    context.projectId,
+  );
 
-	// The child's environment needs only the scenario's labels and the project's
-	// API key, and those two land well before the adapter, suite config and
-	// model params. Announcing them here lets the caller start the child booting
-	// against the slow half of this function instead of after it — the child is
-	// still one fresh process per run, only started sooner.
-	//
-	// Deliberately not awaited: a failure here is re-reported by the ordered
-	// checks below, and this must not become the thing that decides the run.
-	if (onChildEnvReady) {
-		void Promise.all([scenarioPromise, projectPromise])
-			.then(([scenario, project]) => {
-				if (!scenario || !project.success || !project.data.apiKey) return;
-				onChildEnvReady({
-					labels: scenario.config.labels,
-					telemetry: {
-						endpoint: env.LANGWATCH_ENDPOINT,
-						apiKey: project.data.apiKey,
-					},
-				});
-			})
-			.catch(() => {
-				// Swallowed on purpose: the awaited results below own error reporting.
-			});
-	}
+  // The child's environment needs only the scenario's labels and the project's
+  // API key, and those two land well before the adapter, suite config and
+  // model params. Announcing them here lets the caller start the child booting
+  // against the slow half of this function instead of after it — the child is
+  // still one fresh process per run, only started sooner.
+  //
+  // Deliberately not awaited: a failure here is re-reported by the ordered
+  // checks below, and this must not become the thing that decides the run.
+  if (onChildEnvReady) {
+    void Promise.all([scenarioPromise, projectPromise])
+      .then(([scenario, project]) => {
+        if (!scenario || !project.success || !project.data.apiKey) return;
+        onChildEnvReady({
+          labels: scenario.config.labels,
+          telemetry: {
+            endpoint: env.LANGWATCH_ENDPOINT,
+            apiKey: project.data.apiKey,
+          },
+        });
+      })
+      .catch(() => {
+        // Swallowed on purpose: the awaited results below own error reporting.
+      });
+  }
 
-	const [scenarioResult, projectResult, adapterResult, suiteOverrides] =
-		await Promise.all([
-			scenarioPromise,
-			projectPromise,
-			adapterPromise,
-			suitePromise,
-		]);
+  const [scenarioResult, projectResult, adapterResult, suiteOverrides] =
+    await Promise.all([
+      scenarioPromise,
+      projectPromise,
+      adapterPromise,
+      suitePromise,
+    ]);
 
-	if (!scenarioResult) {
-		logger.warn(
-			{ projectId: context.projectId, scenarioId: context.scenarioId },
-			"Scenario not found",
-		);
-		return {
-			success: false,
-			error: `Scenario ${context.scenarioId} not found`,
-		};
-	}
-	const scenario = scenarioResult.config;
+  if (!scenarioResult) {
+    logger.warn(
+      { projectId: context.projectId, scenarioId: context.scenarioId },
+      "Scenario not found",
+    );
+    return {
+      success: false,
+      error: `Scenario ${context.scenarioId} not found`,
+    };
+  }
+  const scenario = scenarioResult.config;
 
-	if (!projectResult.success) {
-		logger.warn(
-			{ projectId: context.projectId, error: projectResult.error },
-			"Project fetch failed",
-		);
-		return { success: false, error: projectResult.error };
-	}
-	const project = projectResult.data;
+  if (!projectResult.success) {
+    logger.warn(
+      { projectId: context.projectId, error: projectResult.error },
+      "Project fetch failed",
+    );
+    return { success: false, error: projectResult.error };
+  }
+  const project = projectResult.data;
 
-	if (
-		adapterResult !== null &&
-		"success" in adapterResult &&
-		!adapterResult.success
-	) {
-		// Hydration failure from workflow DSL — surface structured error
-		logger.warn(
-			{
-				projectId: context.projectId,
-				targetType: target.type,
-				reason: adapterResult.reason,
-			},
-			`Workflow LLM hydration failed: ${adapterResult.message}`,
-		);
-		return {
-			success: false,
-			error: adapterResult.message,
-			reason: adapterResult.reason,
-		};
-	}
-	const adapterData = adapterResult as TargetAdapterData | null;
-	if (!adapterData) {
-		logger.warn(
-			{
-				projectId: context.projectId,
-				targetType: target.type,
-				targetReferenceId: target.referenceId,
-			},
-			"Target adapter not found",
-		);
-		return {
-			success: false,
-			error: `${MISSING_TARGET_LABELS[target.type]} ${target.referenceId} not found`,
-		};
-	}
+  if (
+    adapterResult !== null &&
+    "success" in adapterResult &&
+    !adapterResult.success
+  ) {
+    // Hydration failure from workflow DSL — surface structured error
+    logger.warn(
+      {
+        projectId: context.projectId,
+        targetType: target.type,
+        reason: adapterResult.reason,
+      },
+      `Workflow LLM hydration failed: ${adapterResult.message}`,
+    );
+    return {
+      success: false,
+      error: adapterResult.message,
+      reason: adapterResult.reason,
+    };
+  }
+  const adapterData = adapterResult as TargetAdapterData | null;
+  if (!adapterData) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        targetType: target.type,
+        targetReferenceId: target.referenceId,
+      },
+      "Target adapter not found",
+    );
+    return {
+      success: false,
+      error: `${MISSING_TARGET_LABELS[target.type]} ${target.referenceId} not found`,
+    };
+  }
 
-	// Resolve the model roles a run needs:
-	//   - the target adapter, ONLY for a prompt target: the prompt's own
-	//     model when set, else the project's scenarios.agent_under_test
-	//     DEFAULT-role default. workflow / code / http targets never consume
-	//     an LLM key for the agent under test — the workflow/code adapters
-	//     send the project's platform API key instead (see
-	//     serialized-adapter.registry.ts) and http needs neither — so
-	//     resolving and preparing one for them is skipped entirely rather
-	//     than risking a project whose FAST/coding default is a
-	//     terms-restricted model (issue #6634).
-	//   - the user-simulator and the judge: a run-plan override, else the
-	//     scenario's own override, else the DEFAULT-role scenarios.user_simulator
-	//     / scenarios.judge model. The split lets the role-play and evaluation
-	//     use a smart model independently of the agent under test.
-	// ModelNotConfiguredError bubbles as a structured "model not configured"
-	// failure with the resolver's message.
-	// A prompt's bindings are configured on the suite target that paired the
-	// prompt with this run plan, so they arrive with the suite rather than with
-	// the prompt. Agents carry their own on the agent record, already loaded
-	// above.
-	// One key for the whole run, and the same key the project's other runs
-	// hold: every turn of this run shares the cache entries it writes, and a key
-	// per turn or per run would leave a ledger of live credentials behind. A
-	// run that cannot get one still runs, and every turn does its own work.
-	if (adapterData.type === "code" && project.organizationId) {
-		adapterData.sandboxApiKey = await deps.sandboxKeyMinter.mint({
-			projectId: context.projectId,
-			organizationId: project.organizationId,
-		});
-	}
+  // Resolve the model roles a run needs:
+  //   - the target adapter, ONLY for a prompt target: the prompt's own
+  //     model when set, else the project's scenarios.agent_under_test
+  //     DEFAULT-role default. workflow / code / http targets never consume
+  //     an LLM key for the agent under test — the workflow/code adapters
+  //     send the project's platform API key instead (see
+  //     serialized-adapter.registry.ts) and http needs neither — so
+  //     resolving and preparing one for them is skipped entirely rather
+  //     than risking a project whose FAST/coding default is a
+  //     terms-restricted model (issue #6634).
+  //   - the user-simulator and the judge: a run-plan override, else the
+  //     scenario's own override, else the DEFAULT-role scenarios.user_simulator
+  //     / scenarios.judge model. The split lets the role-play and evaluation
+  //     use a smart model independently of the agent under test.
+  // ModelNotConfiguredError bubbles as a structured "model not configured"
+  // failure with the resolver's message.
+  // A prompt's bindings are configured on the suite target that paired the
+  // prompt with this run plan, so they arrive with the suite rather than with
+  // the prompt. Agents carry their own on the agent record, already loaded
+  // above.
+  // One key for the whole run, and the same key the project's other runs
+  // hold: every turn of this run shares the cache entries it writes, and a key
+  // per turn or per run would leave a ledger of live credentials behind. A
+  // run that cannot get one still runs, and every turn does its own work.
+  if (adapterData.type === "code" && project.organizationId) {
+    adapterData.sandboxApiKey = await deps.sandboxKeyMinter.mint({
+      projectId: context.projectId,
+      organizationId: project.organizationId,
+    });
+  }
 
-	if (adapterData.type === "prompt") {
-		adapterData.scenarioMappings = suiteOverrides?.targets?.find(
-			(candidate) =>
-				candidate.type === "prompt" &&
-				candidate.referenceId === target.referenceId,
-		)?.scenarioMappings;
-	}
+  if (adapterData.type === "prompt") {
+    adapterData.scenarioMappings = suiteOverrides?.targets?.find(
+      (candidate) =>
+        candidate.type === "prompt" &&
+        candidate.referenceId === target.referenceId,
+    )?.scenarioMappings;
+  }
 
-	let modelForParams: string | undefined;
-	let simulatorModel: string;
-	let judgeModel: string;
-	try {
-		if (adapterData.type === "prompt") {
-			modelForParams = adapterData.model
-				? adapterData.model
-				: await deps.modelResolver.resolve(
-						"scenarios.agent_under_test",
-						context.projectId,
-					);
-		}
-		({ simulatorModel, judgeModel } = await resolveRunModels({
-			plan: {
-				simulatorModel: suiteOverrides?.simulatorModel,
-				judgeModel: suiteOverrides?.judgeModel,
-			},
-			scenario: {
-				simulatorModel: scenarioResult.simulatorModel,
-				judgeModel: scenarioResult.judgeModel,
-			},
-			resolveFeatureModel: (featureKey) =>
-				deps.modelResolver.resolve(featureKey, context.projectId),
-		}));
-	} catch (err) {
-		// A project with no model set for scenarios is the customer's to fix and
-		// carries its own remediation message, so it is named rather than left
-		// reasonless — otherwise the caller cannot tell it from a fault of ours.
-		//
-		// Any other failure here is ours. `error` reaches the customer as the
-		// reason a run or an agent test was refused, so only a message LangWatch
-		// authored may go in it. A HandledError carries a customer-safe message by
-		// contract; everything else is logged and named in one sentence.
-		if (!(err instanceof HandledError)) {
-			logger.error(
-				{ projectId: context.projectId, error: err },
-				"Model resolution failed for a scenario run",
-			);
-		}
-		return {
-			success: false,
-			error:
-				err instanceof HandledError
-					? err.message
-					: "The models this run needs could not be resolved",
-			...(err instanceof ModelNotConfiguredError
-				? { reason: "model_not_configured" as const }
-				: {}),
-		};
-	}
+  let modelForParams: string | undefined;
+  let simulatorModel: string;
+  let judgeModel: string;
+  try {
+    if (adapterData.type === "prompt") {
+      modelForParams = adapterData.model
+        ? adapterData.model
+        : await deps.modelResolver.resolve(
+            "scenarios.agent_under_test",
+            context.projectId,
+          );
+    }
+    ({ simulatorModel, judgeModel } = await resolveRunModels({
+      plan: {
+        simulatorModel: suiteOverrides?.simulatorModel,
+        judgeModel: suiteOverrides?.judgeModel,
+      },
+      scenario: {
+        simulatorModel: scenarioResult.simulatorModel,
+        judgeModel: scenarioResult.judgeModel,
+      },
+      resolveFeatureModel: (featureKey) =>
+        deps.modelResolver.resolve(featureKey, context.projectId),
+    }));
+  } catch (err) {
+    // A project with no model set for scenarios is the customer's to fix and
+    // carries its own remediation message, so it is named rather than left
+    // reasonless — otherwise the caller cannot tell it from a fault of ours.
+    //
+    // Any other failure here is ours. `error` reaches the customer as the
+    // reason a run or an agent test was refused, so only a message LangWatch
+    // authored may go in it. A HandledError carries a customer-safe message by
+    // contract; everything else is logged and named in one sentence.
+    if (!(err instanceof HandledError)) {
+      logger.error(
+        { projectId: context.projectId, error: err },
+        "Model resolution failed for a scenario run",
+      );
+    }
+    return {
+      success: false,
+      error:
+        err instanceof HandledError
+          ? err.message
+          : "The models this run needs could not be resolved",
+      ...(err instanceof ModelNotConfiguredError
+        ? { reason: "model_not_configured" as const }
+        : {}),
+    };
+  }
 
-	const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =
-		await Promise.all([
-			modelForParams !== undefined
-				? deps.modelParamsProvider.prepare(context.projectId, modelForParams)
-				: Promise.resolve(undefined),
-			deps.modelParamsProvider.prepare(context.projectId, simulatorModel),
-			deps.modelParamsProvider.prepare(context.projectId, judgeModel),
-		]);
+  const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =
+    await Promise.all([
+      modelForParams !== undefined
+        ? deps.modelParamsProvider.prepare(context.projectId, modelForParams)
+        : Promise.resolve(undefined),
+      deps.modelParamsProvider.prepare(context.projectId, simulatorModel),
+      deps.modelParamsProvider.prepare(context.projectId, judgeModel),
+    ]);
 
-	if (modelParamsResult && !modelParamsResult.success) {
-		logger.warn(
-			{
-				projectId: context.projectId,
-				role: "adapter",
-				model: modelForParams,
-				reason: modelParamsResult.reason,
-			},
-			`Failed to prepare model params: ${modelParamsResult.message}`,
-		);
-		return {
-			success: false,
-			error: modelParamsResult.message,
-			reason: modelParamsResult.reason,
-		};
-	}
-	if (!simulatorParamsResult.success) {
-		logger.warn(
-			{
-				projectId: context.projectId,
-				role: "user-simulator",
-				model: simulatorModel,
-				reason: simulatorParamsResult.reason,
-			},
-			`Failed to prepare model params: ${simulatorParamsResult.message}`,
-		);
-		return {
-			success: false,
-			error: simulatorParamsResult.message,
-			reason: simulatorParamsResult.reason,
-		};
-	}
-	if (!judgeParamsResult.success) {
-		logger.warn(
-			{
-				projectId: context.projectId,
-				role: "judge",
-				model: judgeModel,
-				reason: judgeParamsResult.reason,
-			},
-			`Failed to prepare model params: ${judgeParamsResult.message}`,
-		);
-		return {
-			success: false,
-			error: judgeParamsResult.message,
-			reason: judgeParamsResult.reason,
-		};
-	}
+  if (modelParamsResult && !modelParamsResult.success) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        role: "adapter",
+        model: modelForParams,
+        reason: modelParamsResult.reason,
+      },
+      `Failed to prepare model params: ${modelParamsResult.message}`,
+    );
+    return {
+      success: false,
+      error: modelParamsResult.message,
+      reason: modelParamsResult.reason,
+    };
+  }
+  if (!simulatorParamsResult.success) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        role: "user-simulator",
+        model: simulatorModel,
+        reason: simulatorParamsResult.reason,
+      },
+      `Failed to prepare model params: ${simulatorParamsResult.message}`,
+    );
+    return {
+      success: false,
+      error: simulatorParamsResult.message,
+      reason: simulatorParamsResult.reason,
+    };
+  }
+  if (!judgeParamsResult.success) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        role: "judge",
+        model: judgeModel,
+        reason: judgeParamsResult.reason,
+      },
+      `Failed to prepare model params: ${judgeParamsResult.message}`,
+    );
+    return {
+      success: false,
+      error: judgeParamsResult.message,
+      reason: judgeParamsResult.reason,
+    };
+  }
 
-	logger.debug(
-		{
-			projectId: context.projectId,
-			scenarioId: context.scenarioId,
-			targetType: target.type,
-		},
-		"Prefetch complete",
-	);
+  logger.debug(
+    {
+      projectId: context.projectId,
+      scenarioId: context.scenarioId,
+      targetType: target.type,
+    },
+    "Prefetch complete",
+  );
 
-	const modelParams = modelParamsResult?.success
-		? modelParamsResult.params
-		: undefined;
+  const modelParams = modelParamsResult?.success
+    ? modelParamsResult.params
+    : undefined;
 
-	// Only an http or a connected target's judge fetches remote traces, so
-	// only those need a wait budget. The resolver degrades to a default on any failure, so this
-	// never fails the prefetch.
-	const traceWaitTimeoutMs =
-		target.type === "http" || target.type === "connected"
-			? await deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs({
-					projectId: context.projectId,
-				})
-			: undefined;
+  // Only an http or a connected target's judge fetches remote traces, so
+  // only those need a wait budget. The resolver degrades to a default on any failure, so this
+  // never fails the prefetch.
+  const traceWaitTimeoutMs =
+    target.type === "http" || target.type === "connected"
+      ? await deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs({
+          projectId: context.projectId,
+        })
+      : undefined;
 
-	return {
-		success: true,
-		data: {
-			context,
-			scenario,
-			parameters: scenarioResult.parameters,
-			adapterData,
-			modelParams,
-			simulatorModelParams: simulatorParamsResult.params,
-			judgeModelParams: judgeParamsResult.params,
-			nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
-			target,
-			...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
-			// The simulated caller's voice, carried to the child for a voice target
-			// only. The child builds the voice user simulator from it and records the
-			// effective values on the run (AC20).
-			...(target.type === "voice"
-				? { callerVoice: scenarioResult.callerVoice }
-				: {}),
-		},
-		telemetry: {
-			endpoint: env.LANGWATCH_ENDPOINT,
-			apiKey: project.apiKey,
-		},
-		resolvedModels: { simulatorModel, judgeModel },
-	};
+  return {
+    success: true,
+    data: {
+      context,
+      scenario,
+      parameters: scenarioResult.parameters,
+      adapterData,
+      modelParams,
+      simulatorModelParams: simulatorParamsResult.params,
+      judgeModelParams: judgeParamsResult.params,
+      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
+      target,
+      ...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
+      // The simulated caller's voice, carried to the child for a voice target
+      // only. The child builds the voice user simulator from it and records the
+      // effective values on the run (AC20).
+      ...(target.type === "voice"
+        ? { callerVoice: scenarioResult.callerVoice }
+        : {}),
+    },
+    telemetry: {
+      endpoint: env.LANGWATCH_ENDPOINT,
+      apiKey: project.apiKey,
+    },
+    resolvedModels: { simulatorModel, judgeModel },
+  };
 }
 
 // ============================================================================
@@ -767,185 +767,185 @@ export async function prefetchScenarioData({
 // ============================================================================
 
 async function fetchScenario({
-	projectId,
-	scenarioId,
-	fetcher,
-	suppliedParameters,
+  projectId,
+  scenarioId,
+  fetcher,
+  suppliedParameters,
 }: {
-	projectId: string;
-	scenarioId: string;
-	fetcher: ScenarioFetcher;
-	suppliedParameters?: RunParameterValues;
+  projectId: string;
+  scenarioId: string;
+  fetcher: ScenarioFetcher;
+  suppliedParameters?: RunParameterValues;
 }): Promise<{
-	config: ScenarioConfig;
-	parameters: RunParameterValues;
-	simulatorModel: string | null;
-	judgeModel: string | null;
-	callerVoice: CallerVoiceConfig;
+  config: ScenarioConfig;
+  parameters: RunParameterValues;
+  simulatorModel: string | null;
+  judgeModel: string | null;
+  callerVoice: CallerVoiceConfig;
 } | null> {
-	const scenario = await fetcher.getById({ projectId, id: scenarioId });
-	if (!scenario) return null;
+  const scenario = await fetcher.getById({ projectId, id: scenarioId });
+  if (!scenario) return null;
 
-	const definitions = parseScenarioParameterDefinitions(scenario.parameters);
-	// The secret declarations are taken out before the merge, so no secret value
-	// can reach `params` or the scenario's own text. They stay in
-	// `declaredNames`, which is what makes a `params.SECRET` reference fail here
-	// as a backstop, the same way the run request already refused it.
-	const { plain, secret } = partitionParameterDefinitions(definitions);
-	const parameters = mergeRunParameters({
-		definitions: plain,
-		values: withoutParameterNames({
-			values: suppliedParameters,
-			names: new Set(secret.map((definition) => definition.name)),
-		}),
-	});
+  const definitions = parseScenarioParameterDefinitions(scenario.parameters);
+  // The secret declarations are taken out before the merge, so no secret value
+  // can reach `params` or the scenario's own text. They stay in
+  // `declaredNames`, which is what makes a `params.SECRET` reference fail here
+  // as a backstop, the same way the run request already refused it.
+  const { plain, secret } = partitionParameterDefinitions(definitions);
+  const parameters = mergeRunParameters({
+    definitions: plain,
+    values: withoutParameterNames({
+      values: suppliedParameters,
+      names: new Set(secret.map((definition) => definition.name)),
+    }),
+  });
 
-	const rendered = await renderScenarioContent({
-		situation: scenario.situation,
-		criteria: scenario.criteria,
-		parameters,
-		declaredNames: definitions.map((definition) => definition.name),
-	});
-	if (!rendered.ok) {
-		// The request that started this run rendered the same text against the
-		// same values and accepted it, so reaching here means the scenario or its
-		// parameters changed underneath a queued run. There is nothing the run can
-		// do with that, and nothing the customer chose that explains it.
-		throw new Error(
-			`Scenario ${scenarioId} ${rendered.field} could not be rendered against the run's parameters (${rendered.reason})`,
-		);
-	}
+  const rendered = await renderScenarioContent({
+    situation: scenario.situation,
+    criteria: scenario.criteria,
+    parameters,
+    declaredNames: definitions.map((definition) => definition.name),
+  });
+  if (!rendered.ok) {
+    // The request that started this run rendered the same text against the
+    // same values and accepted it, so reaching here means the scenario or its
+    // parameters changed underneath a queued run. There is nothing the run can
+    // do with that, and nothing the customer chose that explains it.
+    throw new Error(
+      `Scenario ${scenarioId} ${rendered.field} could not be rendered against the run's parameters (${rendered.reason})`,
+    );
+  }
 
-	return {
-		config: {
-			id: scenario.id,
-			name: scenario.name,
-			situation: rendered.situation,
-			criteria: rendered.criteria,
-			labels: scenario.labels,
-			maxTurns: scenario.maxTurns ?? undefined,
-			minTurns: scenario.minTurns ?? undefined,
-		},
-		parameters,
-		simulatorModel: scenario.simulatorModel ?? null,
-		judgeModel: scenario.judgeModel ?? null,
-		callerVoice: parseCallerVoiceConfig(scenario.callerVoice),
-	};
+  return {
+    config: {
+      id: scenario.id,
+      name: scenario.name,
+      situation: rendered.situation,
+      criteria: rendered.criteria,
+      labels: scenario.labels,
+      maxTurns: scenario.maxTurns ?? undefined,
+      minTurns: scenario.minTurns ?? undefined,
+    },
+    parameters,
+    simulatorModel: scenario.simulatorModel ?? null,
+    judgeModel: scenario.judgeModel ?? null,
+    callerVoice: parseCallerVoiceConfig(scenario.callerVoice),
+  };
 }
 
 type FetchProjectResult =
-	| {
-			success: true;
-			data: { apiKey: string; organizationId: string | null };
-	  }
-	| { success: false; error: string };
+  | {
+      success: true;
+      data: { apiKey: string; organizationId: string | null };
+    }
+  | { success: false; error: string };
 
 async function fetchProject(
-	projectId: string,
-	fetcher: ProjectFetcher,
+  projectId: string,
+  fetcher: ProjectFetcher,
 ): Promise<FetchProjectResult> {
-	const project = await fetcher.findUnique(projectId);
-	if (!project) {
-		return { success: false, error: `Project ${projectId} not found` };
-	}
-	if (!project.apiKey) {
-		return { success: false, error: `Project ${projectId} missing API key` };
-	}
-	return {
-		success: true,
-		data: {
-			apiKey: project.apiKey,
-			organizationId: project.team?.organizationId ?? null,
-		},
-	};
+  const project = await fetcher.findUnique(projectId);
+  if (!project) {
+    return { success: false, error: `Project ${projectId} not found` };
+  }
+  if (!project.apiKey) {
+    return { success: false, error: `Project ${projectId} missing API key` };
+  }
+  return {
+    success: true,
+    data: {
+      apiKey: project.apiKey,
+      organizationId: project.team?.organizationId ?? null,
+    },
+  };
 }
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
 type HydrationFailure = {
-	success: false;
-	reason: ModelParamsFailureReason;
-	message: string;
+  success: false;
+  reason: ModelParamsFailureReason;
+  message: string;
 };
 
 async function fetchAgentData(
-	projectId: string,
-	target: TargetConfig,
-	deps: DataPrefetcherDependencies,
+  projectId: string,
+  target: TargetConfig,
+  deps: DataPrefetcherDependencies,
 ): Promise<TargetAdapterData | HydrationFailure | null> {
-	if (target.type === "prompt") {
-		return fetchPromptConfigData(
-			projectId,
-			target.referenceId,
-			deps.promptFetcher,
-		);
-	}
-	if (target.type === "code") {
-		return fetchCodeAgentData(
-			projectId,
-			target.referenceId,
-			deps.agentFetcher,
-			deps.projectSecretsFetcher,
-		);
-	}
-	if (target.type === "connected") {
-		return fetchConnectedAgentData({
-			projectId,
-			agentId: target.referenceId,
-			fetcher: deps.agentFetcher,
-		});
-	}
-	if (target.type === "workflow") {
-		return fetchWorkflowAgentData({
-			projectId,
-			agentId: target.referenceId,
-			agentFetcher: deps.agentFetcher,
-			workflowVersionFetcher: deps.workflowVersionFetcher,
-			modelParamsProvider: deps.modelParamsProvider,
-			projectSecretsFetcher: deps.projectSecretsFetcher,
-		});
-	}
-	if (target.type === "voice") {
-		return fetchVoiceAgentData({
-			projectId,
-			agentId: target.referenceId,
-			fetcher: deps.agentFetcher,
-		});
-	}
-	return fetchHttpAgentData({
-		projectId,
-		agentId: target.referenceId,
-		fetcher: deps.agentFetcher,
-		projectSecretsFetcher: deps.projectSecretsFetcher,
-	});
+  if (target.type === "prompt") {
+    return fetchPromptConfigData(
+      projectId,
+      target.referenceId,
+      deps.promptFetcher,
+    );
+  }
+  if (target.type === "code") {
+    return fetchCodeAgentData(
+      projectId,
+      target.referenceId,
+      deps.agentFetcher,
+      deps.projectSecretsFetcher,
+    );
+  }
+  if (target.type === "connected") {
+    return fetchConnectedAgentData({
+      projectId,
+      agentId: target.referenceId,
+      fetcher: deps.agentFetcher,
+    });
+  }
+  if (target.type === "workflow") {
+    return fetchWorkflowAgentData({
+      projectId,
+      agentId: target.referenceId,
+      agentFetcher: deps.agentFetcher,
+      workflowVersionFetcher: deps.workflowVersionFetcher,
+      modelParamsProvider: deps.modelParamsProvider,
+      projectSecretsFetcher: deps.projectSecretsFetcher,
+    });
+  }
+  if (target.type === "voice") {
+    return fetchVoiceAgentData({
+      projectId,
+      agentId: target.referenceId,
+      fetcher: deps.agentFetcher,
+    });
+  }
+  return fetchHttpAgentData({
+    projectId,
+    agentId: target.referenceId,
+    fetcher: deps.agentFetcher,
+    projectSecretsFetcher: deps.projectSecretsFetcher,
+  });
 }
 
 async function fetchPromptConfigData(
-	projectId: string,
-	promptId: string,
-	fetcher: PromptFetcher,
+  projectId: string,
+  promptId: string,
+  fetcher: PromptFetcher,
 ): Promise<PromptConfigData | null> {
-	const prompt = await fetcher.getPromptByIdOrHandle({
-		projectId,
-		idOrHandle: promptId,
-	});
-	if (!prompt) return null;
+  const prompt = await fetcher.getPromptByIdOrHandle({
+    projectId,
+    idOrHandle: promptId,
+  });
+  if (!prompt) return null;
 
-	return {
-		type: "prompt",
-		promptId: prompt.id,
-		systemPrompt: prompt.prompt ?? "",
-		messages: (prompt.messages ?? []).filter(
-			(m): m is { role: "user" | "assistant"; content: string } =>
-				m.role === "user" || m.role === "assistant",
-		),
-		inputs: (prompt.inputs ?? []).map((declared) => ({
-			identifier: declared.identifier,
-			type: String(declared.type),
-		})),
-		model: prompt.model ?? undefined,
-		temperature: prompt.temperature ?? undefined,
-		maxTokens: prompt.maxTokens ?? undefined,
-	};
+  return {
+    type: "prompt",
+    promptId: prompt.id,
+    systemPrompt: prompt.prompt ?? "",
+    messages: (prompt.messages ?? []).filter(
+      (m): m is { role: "user" | "assistant"; content: string } =>
+        m.role === "user" || m.role === "assistant",
+    ),
+    inputs: (prompt.inputs ?? []).map((declared) => ({
+      identifier: declared.identifier,
+      type: String(declared.type),
+    })),
+    model: prompt.model ?? undefined,
+    temperature: prompt.temperature ?? undefined,
+    maxTokens: prompt.maxTokens ?? undefined,
+  };
 }
 
 /**
@@ -953,54 +953,54 @@ async function fetchPromptConfigData(
  * Used to safely parse agent.config instead of unsafe type assertion.
  */
 const HttpAgentConfigSchema = z.object({
-	url: z.string(),
-	method: z.string(),
-	headers: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
-	auth: AuthConfigSchema.optional(),
-	bodyTemplate: z.string().optional(),
-	outputPath: z.string().optional(),
-	sessionPath: z.string().optional(),
-	scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  url: z.string(),
+  method: z.string(),
+  headers: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
+  auth: AuthConfigSchema.optional(),
+  bodyTemplate: z.string().optional(),
+  outputPath: z.string().optional(),
+  sessionPath: z.string().optional(),
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 
 async function fetchHttpAgentData({
-	projectId,
-	agentId,
-	fetcher,
-	projectSecretsFetcher,
+  projectId,
+  agentId,
+  fetcher,
+  projectSecretsFetcher,
 }: {
-	projectId: string;
-	agentId: string;
-	fetcher: AgentFetcher;
-	projectSecretsFetcher: ProjectSecretsFetcher;
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
+  projectSecretsFetcher: ProjectSecretsFetcher;
 }): Promise<HttpAgentData | null> {
-	const agent = await fetcher.findById({ projectId, id: agentId });
-	if (agent?.type !== "http") return null;
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "http") return null;
 
-	const parseResult = HttpAgentConfigSchema.safeParse(agent.config);
-	if (!parseResult.success) {
-		return null;
-	}
-	const config = parseResult.data;
+  const parseResult = HttpAgentConfigSchema.safeParse(agent.config);
+  if (!parseResult.success) {
+    return null;
+  }
+  const config = parseResult.data;
 
-	// Loaded once for the whole run, the same way the code and workflow paths
-	// load them: the child process has no database access, so a secret the url,
-	// a header or an auth field references has to travel with the job.
-	const secrets = await projectSecretsFetcher.getSecrets(projectId);
+  // Loaded once for the whole run, the same way the code and workflow paths
+  // load them: the child process has no database access, so a secret the url,
+  // a header or an auth field references has to travel with the job.
+  const secrets = await projectSecretsFetcher.getSecrets(projectId);
 
-	return {
-		type: "http",
-		agentId: agent.id,
-		url: config.url,
-		method: config.method,
-		headers: config.headers ?? [],
-		auth: config.auth,
-		bodyTemplate: config.bodyTemplate,
-		outputPath: config.outputPath,
-		sessionPath: config.sessionPath,
-		scenarioMappings: config.scenarioMappings,
-		secrets,
-	};
+  return {
+    type: "http",
+    agentId: agent.id,
+    url: config.url,
+    method: config.method,
+    headers: config.headers ?? [],
+    auth: config.auth,
+    bodyTemplate: config.bodyTemplate,
+    outputPath: config.outputPath,
+    sessionPath: config.sessionPath,
+    scenarioMappings: config.scenarioMappings,
+    secrets,
+  };
 }
 
 /**
@@ -1009,26 +1009,26 @@ async function fetchHttpAgentData({
  * agent declared, capped by the platform.
  */
 async function fetchConnectedAgentData({
-	projectId,
-	agentId,
-	fetcher,
+  projectId,
+  agentId,
+  fetcher,
 }: {
-	projectId: string;
-	agentId: string;
-	fetcher: AgentFetcher;
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
 }): Promise<ConnectedAgentData | null> {
-	const agent = await fetcher.findById({ projectId, id: agentId });
-	if (agent?.type !== "connected") return null;
-	const config = agent.config as ConnectedComponentConfig;
-	return {
-		type: "connected",
-		agentId: agent.id,
-		endpoint: env.LANGWATCH_ENDPOINT,
-		timeoutMs: Math.min(
-			config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
-			MAX_CALL_TIMEOUT_MS,
-		),
-	};
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "connected") return null;
+  const config = agent.config as ConnectedComponentConfig;
+  return {
+    type: "connected",
+    agentId: agent.id,
+    endpoint: env.LANGWATCH_ENDPOINT,
+    timeoutMs: Math.min(
+      config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
+      MAX_CALL_TIMEOUT_MS,
+    ),
+  };
 }
 
 /**
@@ -1040,36 +1040,36 @@ async function fetchConnectedAgentData({
  * missing-key failure (there is no operator env for either credential).
  */
 export async function resolveVoiceTarget({
-	projectId,
-	config,
+  projectId,
+  config,
 }: {
-	projectId: string;
-	config: ReturnType<typeof parseVoiceAgentConfig>;
+  projectId: string;
+  config: ReturnType<typeof parseVoiceAgentConfig>;
 }): Promise<VoiceAgentData["voiceTarget"]> {
-	switch (config.transport) {
-		case "elevenlabs_convai": {
-			const provider = await findElevenLabsProviderForProject({ projectId });
-			const credential = provider
-				? await getElevenLabsApiCredential({ modelProviderId: provider.id })
-				: null;
-			return {
-				transport: "elevenlabs_convai",
-				agentId: voiceAgentExternalId(config),
-				credential: credential ? { kind: "elevenlabs", ...credential } : null,
-			};
-		}
-		case "phone": {
-			const provider = await findTwilioProviderForProject({ projectId });
-			const credential = provider
-				? await getTwilioCredential({ modelProviderId: provider.id })
-				: null;
-			return {
-				transport: "phone",
-				agentId: voiceAgentExternalId(config),
-				credential: credential ? { kind: "twilio", ...credential } : null,
-			};
-		}
-	}
+  switch (config.transport) {
+    case "elevenlabs_convai": {
+      const provider = await findElevenLabsProviderForProject({ projectId });
+      const credential = provider
+        ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
+        : null;
+      return {
+        transport: "elevenlabs_convai",
+        agentId: voiceAgentExternalId(config),
+        credential: credential ? { kind: "elevenlabs", ...credential } : null,
+      };
+    }
+    case "phone": {
+      const provider = await findTwilioProviderForProject({ projectId });
+      const credential = provider
+        ? await getTwilioCredential({ modelProviderId: provider.id })
+        : null;
+      return {
+        transport: "phone",
+        agentId: voiceAgentExternalId(config),
+        credential: credential ? { kind: "twilio", ...credential } : null,
+      };
+    }
+  }
 }
 
 /**
@@ -1081,48 +1081,48 @@ export async function resolveVoiceTarget({
  * child surfaces as a named failure.
  */
 async function fetchVoiceAgentData({
-	projectId,
-	agentId,
-	fetcher,
+  projectId,
+  agentId,
+  fetcher,
 }: {
-	projectId: string;
-	agentId: string;
-	fetcher: AgentFetcher;
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
 }): Promise<VoiceAgentData | null> {
-	const agent = await fetcher.findById({ projectId, id: agentId });
-	if (agent?.type !== "voice") return null;
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "voice") return null;
 
-	const config = parseVoiceAgentConfig(agent.config);
-	const voiceTarget = await resolveVoiceTarget({ projectId, config });
+  const config = parseVoiceAgentConfig(agent.config);
+  const voiceTarget = await resolveVoiceTarget({ projectId, config });
 
-	// The SDK builds its own OpenAI client from the child's process env for the
-	// caller's TTS and for the transcription the judge uses. The platform's
-	// guardrail is that credentials come from the project's model provider rows
-	// only, so resolve it the same way the model params are: `prepareEnvKeys`
-	// maps the OpenAI provider's customKeys / env fallbacks onto
-	// `OPENAI_API_KEY`. Nothing else from the operator env reaches the child.
-	// (No ElevenLabs key travels here: the target transport's adapter takes its
-	// key as an explicit option, never from env, and `CALLER_VOICES` offers no
-	// `elevenlabs/...` voice today, so no code path in the child reads
-	// `ELEVENLABS_API_KEY`.)
-	const providers = await getProjectModelProviders(projectId);
-	const openaiProvider = providers.openai;
-	const callerEnv: Record<string, string> = {};
-	const openaiApiKey = openaiProvider?.enabled
-		? prepareEnvKeys(openaiProvider).OPENAI_API_KEY
-		: undefined;
-	if (openaiApiKey) callerEnv.OPENAI_API_KEY = openaiApiKey;
+  // The SDK builds its own OpenAI client from the child's process env for the
+  // caller's TTS and for the transcription the judge uses. The platform's
+  // guardrail is that credentials come from the project's model provider rows
+  // only, so resolve it the same way the model params are: `prepareEnvKeys`
+  // maps the OpenAI provider's customKeys / env fallbacks onto
+  // `OPENAI_API_KEY`. Nothing else from the operator env reaches the child.
+  // (No ElevenLabs key travels here: the target transport's adapter takes its
+  // key as an explicit option, never from env, and `CALLER_VOICES` offers no
+  // `elevenlabs/...` voice today, so no code path in the child reads
+  // `ELEVENLABS_API_KEY`.)
+  const providers = await getProjectModelProviders(projectId);
+  const openaiProvider = providers.openai;
+  const callerEnv: Record<string, string> = {};
+  const openaiApiKey = openaiProvider?.enabled
+    ? prepareEnvKeys(openaiProvider).OPENAI_API_KEY
+    : undefined;
+  if (openaiApiKey) callerEnv.OPENAI_API_KEY = openaiApiKey;
 
-	return {
-		type: "voice",
-		agentId: agent.id,
-		voiceTarget,
-		callerEnv,
-		// The whole-call budget the child enforces and the transport clamps a turn
-		// to. Read here (not in the child) so a run records the limit it started
-		// under even if the env changes mid-flight.
-		maxCallSeconds: voiceCallMaxSeconds(),
-	};
+  return {
+    type: "voice",
+    agentId: agent.id,
+    voiceTarget,
+    callerEnv,
+    // The whole-call budget the child enforces and the transport clamps a turn
+    // to. Read here (not in the child) so a run records the limit it started
+    // under even if the env changes mid-flight.
+    maxCallSeconds: voiceCallMaxSeconds(),
+  };
 }
 
 /**
@@ -1130,70 +1130,70 @@ async function fetchVoiceAgentData({
  * Code agents have a parameters array with a "code" entry, plus inputs/outputs.
  */
 const RawCodeAgentConfigSchema = z.object({
-	parameters: z.array(
-		z.object({
-			identifier: z.string(),
-			type: z.string(),
-			value: z.string().optional(),
-		}),
-	),
-	inputs: z
-		.array(
-			z.object({
-				identifier: z.string(),
-				type: z.string(),
-			}),
-		)
-		.optional(),
-	outputs: z
-		.array(
-			z.object({
-				identifier: z.string(),
-				type: z.string(),
-			}),
-		)
-		.optional(),
-	scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
-	scenarioOutputField: z.string().optional(),
-	/** Per-agent code budget in ms; the engine clamps it to the operator ceiling. */
-	timeoutMs: z.number().int().positive().optional(),
+  parameters: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+      value: z.string().optional(),
+    }),
+  ),
+  inputs: z
+    .array(
+      z.object({
+        identifier: z.string(),
+        type: z.string(),
+      }),
+    )
+    .optional(),
+  outputs: z
+    .array(
+      z.object({
+        identifier: z.string(),
+        type: z.string(),
+      }),
+    )
+    .optional(),
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  scenarioOutputField: z.string().optional(),
+  /** Per-agent code budget in ms; the engine clamps it to the operator ceiling. */
+  timeoutMs: z.number().int().positive().optional(),
 });
 
 async function fetchCodeAgentData(
-	projectId: string,
-	agentId: string,
-	fetcher: AgentFetcher,
-	projectSecretsFetcher: ProjectSecretsFetcher,
+  projectId: string,
+  agentId: string,
+  fetcher: AgentFetcher,
+  projectSecretsFetcher: ProjectSecretsFetcher,
 ): Promise<CodeAgentData | null> {
-	const agent = await fetcher.findById({ projectId, id: agentId });
-	if (agent?.type !== "code") return null;
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "code") return null;
 
-	const parseResult = RawCodeAgentConfigSchema.safeParse(agent.config);
-	if (!parseResult.success) {
-		return null;
-	}
-	const config = parseResult.data;
+  const parseResult = RawCodeAgentConfigSchema.safeParse(agent.config);
+  if (!parseResult.success) {
+    return null;
+  }
+  const config = parseResult.data;
 
-	const codeParam = config.parameters.find(
-		(p) => p.identifier === "code" && p.type === "code",
-	);
-	if (!codeParam?.value) {
-		return null;
-	}
+  const codeParam = config.parameters.find(
+    (p) => p.identifier === "code" && p.type === "code",
+  );
+  if (!codeParam?.value) {
+    return null;
+  }
 
-	const secrets = await projectSecretsFetcher.getSecrets(projectId);
+  const secrets = await projectSecretsFetcher.getSecrets(projectId);
 
-	return {
-		type: "code",
-		agentId: agent.id,
-		code: codeParam.value,
-		inputs: config.inputs ?? [],
-		outputs: config.outputs ?? [],
-		scenarioMappings: config.scenarioMappings,
-		scenarioOutputField: config.scenarioOutputField,
-		secrets,
-		timeoutMs: config.timeoutMs,
-	};
+  return {
+    type: "code",
+    agentId: agent.id,
+    code: codeParam.value,
+    inputs: config.inputs ?? [],
+    outputs: config.outputs ?? [],
+    scenarioMappings: config.scenarioMappings,
+    scenarioOutputField: config.scenarioOutputField,
+    secrets,
+    timeoutMs: config.timeoutMs,
+  };
 }
 
 /**
@@ -1202,92 +1202,92 @@ async function fetchCodeAgentData(
  * are the same shape used by code and HTTP agents.
  */
 const RawWorkflowAgentConfigSchema = z.object({
-	workflow_id: z.string().optional(),
-	scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
-	scenarioOutputField: z.string().optional(),
+  workflow_id: z.string().optional(),
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  scenarioOutputField: z.string().optional(),
 });
 
 /** Shape of entry/end node fields extracted from a workflow DSL. */
 interface WorkflowField {
-	identifier: string;
-	type: string;
+  identifier: string;
+  type: string;
 }
 
 async function fetchWorkflowAgentData({
-	projectId,
-	agentId,
-	agentFetcher,
-	workflowVersionFetcher,
-	modelParamsProvider,
-	projectSecretsFetcher,
+  projectId,
+  agentId,
+  agentFetcher,
+  workflowVersionFetcher,
+  modelParamsProvider,
+  projectSecretsFetcher,
 }: {
-	projectId: string;
-	agentId: string;
-	agentFetcher: AgentFetcher;
-	workflowVersionFetcher: WorkflowVersionFetcher;
-	modelParamsProvider: ModelParamsProvider;
-	projectSecretsFetcher: ProjectSecretsFetcher;
+  projectId: string;
+  agentId: string;
+  agentFetcher: AgentFetcher;
+  workflowVersionFetcher: WorkflowVersionFetcher;
+  modelParamsProvider: ModelParamsProvider;
+  projectSecretsFetcher: ProjectSecretsFetcher;
 }): Promise<WorkflowAgentData | HydrationFailure | null> {
-	const agent = await agentFetcher.findById({ projectId, id: agentId });
-	if (agent?.type !== "workflow") return null;
+  const agent = await agentFetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "workflow") return null;
 
-	const parseResult = RawWorkflowAgentConfigSchema.safeParse(agent.config);
-	if (!parseResult.success) return null;
-	const config = parseResult.data;
+  const parseResult = RawWorkflowAgentConfigSchema.safeParse(agent.config);
+  if (!parseResult.success) return null;
+  const config = parseResult.data;
 
-	// workflowId can live on the Agent row or inside the DSL config. Prefer the
-	// agent row (set when the agent was created by WorkflowSelectorDrawer).
-	const workflowId =
-		(agent as TypedAgent & { workflowId?: string | null }).workflowId ??
-		config.workflow_id ??
-		null;
-	if (!workflowId) return null;
+  // workflowId can live on the Agent row or inside the DSL config. Prefer the
+  // agent row (set when the agent was created by WorkflowSelectorDrawer).
+  const workflowId =
+    (agent as TypedAgent & { workflowId?: string | null }).workflowId ??
+    config.workflow_id ??
+    null;
+  if (!workflowId) return null;
 
-	const latest = await workflowVersionFetcher.getLatestDsl({
-		projectId,
-		workflowId,
-	});
-	if (!latest) return null;
+  const latest = await workflowVersionFetcher.getLatestDsl({
+    projectId,
+    workflowId,
+  });
+  if (!latest) return null;
 
-	const hydrateResult = await hydrateLlmParameters({
-		dsl: latest.dsl,
-		projectId,
-		modelParamsProvider,
-	});
+  const hydrateResult = await hydrateLlmParameters({
+    dsl: latest.dsl,
+    projectId,
+    modelParamsProvider,
+  });
 
-	if (!hydrateResult.success) {
-		return {
-			success: false,
-			reason: hydrateResult.reason,
-			message: hydrateResult.message,
-		};
-	}
+  if (!hydrateResult.success) {
+    return {
+      success: false,
+      reason: hydrateResult.reason,
+      message: hydrateResult.message,
+    };
+  }
 
-	const { inputs, outputs } = extractWorkflowIO(hydrateResult.dsl);
+  const { inputs, outputs } = extractWorkflowIO(hydrateResult.dsl);
 
-	const secrets = await projectSecretsFetcher.getSecrets(projectId);
+  const secrets = await projectSecretsFetcher.getSecrets(projectId);
 
-	const data: WorkflowAgentData = {
-		type: "workflow",
-		agentId: agent.id,
-		workflowId: latest.workflowId,
-		workflow: hydrateResult.dsl,
-		inputs,
-		outputs,
-		scenarioMappings: config.scenarioMappings,
-		scenarioOutputField: config.scenarioOutputField,
-		secrets,
-	};
+  const data: WorkflowAgentData = {
+    type: "workflow",
+    agentId: agent.id,
+    workflowId: latest.workflowId,
+    workflow: hydrateResult.dsl,
+    inputs,
+    outputs,
+    scenarioMappings: config.scenarioMappings,
+    scenarioOutputField: config.scenarioOutputField,
+    secrets,
+  };
 
-	validateWorkflowAgentMappings(data);
+  validateWorkflowAgentMappings(data);
 
-	return data;
+  return data;
 }
 
 /** Discriminated result type returned by hydrateLlmParameters */
 type HydrateLlmResult =
-	| { success: true; dsl: Record<string, unknown> }
-	| { success: false; reason: ModelParamsFailureReason; message: string };
+  | { success: true; dsl: Record<string, unknown> }
+  | { success: false; reason: ModelParamsFailureReason; message: string };
 
 /**
  * Injects litellm_params into every llm-type parameter across all DSL nodes.
@@ -1301,151 +1301,151 @@ type HydrateLlmResult =
  * "dummy" api_key and causes the same AuthenticationError this PR fixes.
  */
 async function hydrateLlmParameters({
-	dsl,
-	projectId,
-	modelParamsProvider,
+  dsl,
+  projectId,
+  modelParamsProvider,
 }: {
-	dsl: Record<string, unknown>;
-	projectId: string;
-	modelParamsProvider: ModelParamsProvider;
+  dsl: Record<string, unknown>;
+  projectId: string;
+  modelParamsProvider: ModelParamsProvider;
 }): Promise<HydrateLlmResult> {
-	const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
-	if (nodes.length === 0) return { success: true, dsl };
+  const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
+  if (nodes.length === 0) return { success: true, dsl };
 
-	// Legacy fallback. `default_llm` only exists on raw persisted DSLs from
-	// spec_version <= 1.4 (nodes own their config since 1.5); this reader
-	// keeps tolerating it because scenario agents can reference old workflow
-	// versions that were never re-saved. On 1.5+ DSLs a modelless llm
-	// parameter is stale state and must NOT be silently substituted — leave
-	// it unhydrated so the engine raises its typed llm_model_not_set error.
-	const specParts =
-		typeof dsl.spec_version === "string"
-			? dsl.spec_version.split(".").map(Number)
-			: [];
-	const specMajor = specParts[0] ?? NaN;
-	const specMinor = specParts[1] ?? 0;
-	const legacyDsl =
-		!Number.isFinite(specMajor) ||
-		!Number.isFinite(specMinor) ||
-		specMajor < 1 ||
-		(specMajor === 1 && specMinor < 5);
-	const defaultLlm =
-		legacyDsl && typeof dsl.default_llm === "object" && dsl.default_llm !== null
-			? (dsl.default_llm as Record<string, unknown>)
-			: null;
-	const defaultModel = legacyDsl
-		? typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
-			? defaultLlm.model
-			: DEFAULT_MODEL
-		: undefined;
+  // Legacy fallback. `default_llm` only exists on raw persisted DSLs from
+  // spec_version <= 1.4 (nodes own their config since 1.5); this reader
+  // keeps tolerating it because scenario agents can reference old workflow
+  // versions that were never re-saved. On 1.5+ DSLs a modelless llm
+  // parameter is stale state and must NOT be silently substituted — leave
+  // it unhydrated so the engine raises its typed llm_model_not_set error.
+  const specParts =
+    typeof dsl.spec_version === "string"
+      ? dsl.spec_version.split(".").map(Number)
+      : [];
+  const specMajor = specParts[0] ?? NaN;
+  const specMinor = specParts[1] ?? 0;
+  const legacyDsl =
+    !Number.isFinite(specMajor) ||
+    !Number.isFinite(specMinor) ||
+    specMajor < 1 ||
+    (specMajor === 1 && specMinor < 5);
+  const defaultLlm =
+    legacyDsl && typeof dsl.default_llm === "object" && dsl.default_llm !== null
+      ? (dsl.default_llm as Record<string, unknown>)
+      : null;
+  const defaultModel = legacyDsl
+    ? typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
+      ? defaultLlm.model
+      : DEFAULT_MODEL
+    : undefined;
 
-	// Collect unique models needed before hitting the provider
-	const modelsNeeded = new Set<string>();
-	for (const node of nodes) {
-		if (typeof node !== "object" || node === null) continue;
-		const n = node as Record<string, unknown>;
-		const nodeData =
-			typeof n.data === "object" && n.data !== null
-				? (n.data as Record<string, unknown>)
-				: null;
-		const rawParameters = nodeData?.parameters;
-		const parameters = Array.isArray(rawParameters)
-			? (rawParameters as unknown[])
-			: [];
-		for (const param of parameters) {
-			if (typeof param !== "object" || param === null) continue;
-			const p = param as Record<string, unknown>;
-			if (p.type !== "llm") continue;
-			const value =
-				typeof p.value === "object" && p.value !== null
-					? (p.value as Record<string, unknown>)
-					: null;
-			const model =
-				typeof value?.model === "string" && value.model.length > 0
-					? value.model
-					: defaultModel;
-			if (model) modelsNeeded.add(model);
-		}
-	}
+  // Collect unique models needed before hitting the provider
+  const modelsNeeded = new Set<string>();
+  for (const node of nodes) {
+    if (typeof node !== "object" || node === null) continue;
+    const n = node as Record<string, unknown>;
+    const nodeData =
+      typeof n.data === "object" && n.data !== null
+        ? (n.data as Record<string, unknown>)
+        : null;
+    const rawParameters = nodeData?.parameters;
+    const parameters = Array.isArray(rawParameters)
+      ? (rawParameters as unknown[])
+      : [];
+    for (const param of parameters) {
+      if (typeof param !== "object" || param === null) continue;
+      const p = param as Record<string, unknown>;
+      if (p.type !== "llm") continue;
+      const value =
+        typeof p.value === "object" && p.value !== null
+          ? (p.value as Record<string, unknown>)
+          : null;
+      const model =
+        typeof value?.model === "string" && value.model.length > 0
+          ? value.model
+          : defaultModel;
+      if (model) modelsNeeded.add(model);
+    }
+  }
 
-	if (modelsNeeded.size === 0) return { success: true, dsl };
+  if (modelsNeeded.size === 0) return { success: true, dsl };
 
-	// Fetch litellm_params for each unique model — fail fast on first failure.
-	// Partial hydration is not safe: a partially-hydrated DSL still reaches the
-	// NLP service with "dummy" api_key for the un-hydrated nodes.
-	const litellmParamsByModel = new Map<string, Record<string, unknown>>();
-	const prepareResults = await Promise.all(
-		Array.from(modelsNeeded).map(async (model) => {
-			const result = await modelParamsProvider.prepare(projectId, model);
-			return { model, result };
-		}),
-	);
+  // Fetch litellm_params for each unique model — fail fast on first failure.
+  // Partial hydration is not safe: a partially-hydrated DSL still reaches the
+  // NLP service with "dummy" api_key for the un-hydrated nodes.
+  const litellmParamsByModel = new Map<string, Record<string, unknown>>();
+  const prepareResults = await Promise.all(
+    Array.from(modelsNeeded).map(async (model) => {
+      const result = await modelParamsProvider.prepare(projectId, model);
+      return { model, result };
+    }),
+  );
 
-	for (const { model, result } of prepareResults) {
-		if (!result.success) {
-			logger.warn(
-				{ projectId, model, reason: result.reason },
-				`Failed to hydrate llm parameter: ${result.message}`,
-			);
-			return { success: false, reason: result.reason, message: result.message };
-		}
-		litellmParamsByModel.set(model, result.params as Record<string, unknown>);
-	}
+  for (const { model, result } of prepareResults) {
+    if (!result.success) {
+      logger.warn(
+        { projectId, model, reason: result.reason },
+        `Failed to hydrate llm parameter: ${result.message}`,
+      );
+      return { success: false, reason: result.reason, message: result.message };
+    }
+    litellmParamsByModel.set(model, result.params as Record<string, unknown>);
+  }
 
-	const hydratedNodes = nodes.map((node) => {
-		if (typeof node !== "object" || node === null) return node;
-		const n = node as Record<string, unknown>;
-		const data =
-			typeof n.data === "object" && n.data !== null
-				? (n.data as Record<string, unknown>)
-				: null;
-		if (!data) return node;
+  const hydratedNodes = nodes.map((node) => {
+    if (typeof node !== "object" || node === null) return node;
+    const n = node as Record<string, unknown>;
+    const data =
+      typeof n.data === "object" && n.data !== null
+        ? (n.data as Record<string, unknown>)
+        : null;
+    if (!data) return node;
 
-		const parameters = Array.isArray(data.parameters)
-			? (data.parameters as unknown[])
-			: null;
-		if (!parameters) return node;
+    const parameters = Array.isArray(data.parameters)
+      ? (data.parameters as unknown[])
+      : null;
+    if (!parameters) return node;
 
-		const hydratedParams = parameters.map((param) => {
-			if (typeof param !== "object" || param === null) return param;
-			const p = param as Record<string, unknown>;
-			if (p.type !== "llm") return param;
+    const hydratedParams = parameters.map((param) => {
+      if (typeof param !== "object" || param === null) return param;
+      const p = param as Record<string, unknown>;
+      if (p.type !== "llm") return param;
 
-			const existingValue =
-				typeof p.value === "object" && p.value !== null
-					? (p.value as Record<string, unknown>)
-					: null;
-			const model =
-				typeof existingValue?.model === "string" &&
-				existingValue.model.length > 0
-					? existingValue.model
-					: defaultModel;
-			if (!model) return param;
+      const existingValue =
+        typeof p.value === "object" && p.value !== null
+          ? (p.value as Record<string, unknown>)
+          : null;
+      const model =
+        typeof existingValue?.model === "string" &&
+        existingValue.model.length > 0
+          ? existingValue.model
+          : defaultModel;
+      if (!model) return param;
 
-			const litellmParams = litellmParamsByModel.get(model);
-			if (!litellmParams) return param;
+      const litellmParams = litellmParamsByModel.get(model);
+      if (!litellmParams) return param;
 
-			// Use existing value if present, otherwise fall back to default_llm or { model }.
-			// Normalize to snake_case to match addEnvs.ts behaviour (e.g. maxTokens → max_tokens).
-			const rawBaseValue = existingValue ?? defaultLlm ?? { model };
-			// Cast through unknown then to the expected intersection type — rawBaseValue is opaque
-			// Record<string, unknown> from the DSL and normalizeToSnakeCase is safe on any object.
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const normalizedBase = normalizeToSnakeCase(rawBaseValue as any);
+      // Use existing value if present, otherwise fall back to default_llm or { model }.
+      // Normalize to snake_case to match addEnvs.ts behaviour (e.g. maxTokens → max_tokens).
+      const rawBaseValue = existingValue ?? defaultLlm ?? { model };
+      // Cast through unknown then to the expected intersection type — rawBaseValue is opaque
+      // Record<string, unknown> from the DSL and normalizeToSnakeCase is safe on any object.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const normalizedBase = normalizeToSnakeCase(rawBaseValue as any);
 
-			// Guarantee top-level `model` — partial existingValue (e.g. only `temperature`) would
-			// otherwise pass through without one, diverging from addEnvs.ts which derives model via
-			// LLMConfig contract. Downstream NLP reads value.model directly.
-			return {
-				...p,
-				value: { ...normalizedBase, model, litellm_params: litellmParams },
-			};
-		});
+      // Guarantee top-level `model` — partial existingValue (e.g. only `temperature`) would
+      // otherwise pass through without one, diverging from addEnvs.ts which derives model via
+      // LLMConfig contract. Downstream NLP reads value.model directly.
+      return {
+        ...p,
+        value: { ...normalizedBase, model, litellm_params: litellmParams },
+      };
+    });
 
-		return { ...n, data: { ...data, parameters: hydratedParams } };
-	});
+    return { ...n, data: { ...data, parameters: hydratedParams } };
+  });
 
-	return { success: true, dsl: { ...dsl, nodes: hydratedNodes } };
+  return { success: true, dsl: { ...dsl, nodes: hydratedNodes } };
 }
 
 /**
@@ -1458,38 +1458,38 @@ async function hydrateLlmParameters({
  * `input`/`output` identifier as a fallback.
  */
 function extractWorkflowIO(dsl: Record<string, unknown>): {
-	inputs: WorkflowField[];
-	outputs: WorkflowField[];
+  inputs: WorkflowField[];
+  outputs: WorkflowField[];
 } {
-	const nodes = (Array.isArray(dsl.nodes) ? dsl.nodes : []) as Node[];
-	const edges = (Array.isArray(dsl.edges) ? dsl.edges : []) as Edge[];
+  const nodes = (Array.isArray(dsl.nodes) ? dsl.nodes : []) as Node[];
+  const edges = (Array.isArray(dsl.edges) ? dsl.edges : []) as Edge[];
 
-	const { inputs: rawInputs, outputs: rawOutputs } = getInputsOutputs(
-		edges,
-		nodes,
-	);
+  const { inputs: rawInputs, outputs: rawOutputs } = getInputsOutputs(
+    edges,
+    nodes,
+  );
 
-	const inputs: WorkflowField[] = (rawInputs ?? []).flatMap((i) =>
-		typeof i.identifier === "string"
-			? [{ identifier: i.identifier, type: "str" }]
-			: [],
-	);
+  const inputs: WorkflowField[] = (rawInputs ?? []).flatMap((i) =>
+    typeof i.identifier === "string"
+      ? [{ identifier: i.identifier, type: "str" }]
+      : [],
+  );
 
-	const outputs: WorkflowField[] = (
-		Array.isArray(rawOutputs) ? rawOutputs : []
-	).flatMap((o: unknown): WorkflowField[] => {
-		if (typeof o !== "object" || o === null) return [];
-		const field = o as { identifier?: unknown; type?: unknown };
-		if (typeof field.identifier !== "string") return [];
-		return [
-			{
-				identifier: field.identifier,
-				type: typeof field.type === "string" ? field.type : "str",
-			},
-		];
-	});
+  const outputs: WorkflowField[] = (
+    Array.isArray(rawOutputs) ? rawOutputs : []
+  ).flatMap((o: unknown): WorkflowField[] => {
+    if (typeof o !== "object" || o === null) return [];
+    const field = o as { identifier?: unknown; type?: unknown };
+    if (typeof field.identifier !== "string") return [];
+    return [
+      {
+        identifier: field.identifier,
+        type: typeof field.type === "string" ? field.type : "str",
+      },
+    ];
+  });
 
-	return { inputs, outputs };
+  return { inputs, outputs };
 }
 
 // ============================================================================
@@ -1507,176 +1507,176 @@ function extractWorkflowIO(dsl: Record<string, unknown>): {
  * - Model providers for LiteLLM params
  */
 export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
-	const scenarioService = ScenarioService.create(prisma);
-	const promptService = new PromptService(prisma);
-	const agentRepository = new AgentRepository(prisma);
+  const scenarioService = ScenarioService.create(prisma);
+  const promptService = new PromptService(prisma);
+  const agentRepository = new AgentRepository(prisma);
 
-	return {
-		scenarioFetcher: {
-			getById: (params) => scenarioService.getById(params),
-		},
-		suiteConfigFetcher: {
-			getBySetId: async (setId, projectId) => {
-				const suiteId = extractSuiteId(setId);
-				if (!suiteId) return null;
-				const suite = await prisma.simulationSuite.findFirst({
-					where: { id: suiteId, projectId },
-					select: { simulatorModel: true, judgeModel: true, targets: true },
-				});
-				if (!suite) return null;
-				return {
-					simulatorModel: suite.simulatorModel,
-					judgeModel: suite.judgeModel,
-					targets: parseSuiteTargets(suite.targets),
-				};
-			},
-		},
-		promptFetcher: {
-			getPromptByIdOrHandle: (params) =>
-				promptService.getPromptByIdOrHandle(params),
-		},
-		agentFetcher: {
-			findById: (params) => agentRepository.findById(params),
-		},
-		workflowVersionFetcher: {
-			getLatestDsl: async ({ projectId, workflowId }) => {
-				const workflow = await prisma.workflow.findFirst({
-					where: { id: workflowId, projectId, archivedAt: null },
-					select: { id: true, latestVersionId: true },
-				});
-				if (!workflow?.latestVersionId) return null;
-				const version = await prisma.workflowVersion.findFirst({
-					where: { id: workflow.latestVersionId, projectId },
-					select: { dsl: true },
-				});
-				if (!version) return null;
-				return {
-					workflowId: workflow.id,
-					dsl: version.dsl as unknown as Record<string, unknown>,
-				};
-			},
-		},
-		projectFetcher: {
-			findUnique: async (projectId) =>
-				prisma.project.findUnique({
-					where: { id: projectId },
-					select: { apiKey: true, team: { select: { organizationId: true } } },
-				}),
-		},
-		sandboxKeyMinter: {
-			mint: (params) => tryGetAgentSandboxApiKey({ prisma, ...params }),
-		},
-		modelResolver: {
-			resolve: async (featureKey, projectId) => {
-				const resolved = await resolveModelForFeature(featureKey, {
-					prisma,
-					projectId,
-				});
-				return resolved.model;
-			},
-		},
-		traceWaitBudgetResolver: {
-			resolveTraceWaitTimeoutMs: (params) => resolveTraceWaitTimeoutMs(params),
-		},
-		projectSecretsFetcher: {
-			getSecrets: async (projectId) => {
-				const rows = await prisma.projectSecret.findMany({
-					where: { projectId },
-					select: { name: true, encryptedValue: true },
-				});
-				const secrets: Record<string, string> = {};
-				for (const row of rows) {
-					try {
-						secrets[row.name] = decrypt(row.encryptedValue);
-					} catch (err) {
-						// Wrap per-secret so a single corrupt row yields a readable error
-						// instead of a raw crypto stack trace surfacing at the caller.
-						throw new Error(
-							`Failed to decrypt project secret "${row.name}": ${
-								err instanceof Error ? err.message : String(err)
-							}`,
-						);
-					}
-				}
-				return secrets;
-			},
-		},
-		modelParamsProvider: {
-			prepare: async (projectId, model): Promise<ModelParamsResult> => {
-				try {
-					if (!model.includes("/")) {
-						return {
-							success: false,
-							reason: "invalid_model_format",
-							message: `Invalid model format '${model}' - expected 'provider/model' format (e.g., 'openai/gpt-4')`,
-						};
-					}
+  return {
+    scenarioFetcher: {
+      getById: (params) => scenarioService.getById(params),
+    },
+    suiteConfigFetcher: {
+      getBySetId: async (setId, projectId) => {
+        const suiteId = extractSuiteId(setId);
+        if (!suiteId) return null;
+        const suite = await prisma.simulationSuite.findFirst({
+          where: { id: suiteId, projectId },
+          select: { simulatorModel: true, judgeModel: true, targets: true },
+        });
+        if (!suite) return null;
+        return {
+          simulatorModel: suite.simulatorModel,
+          judgeModel: suite.judgeModel,
+          targets: parseSuiteTargets(suite.targets),
+        };
+      },
+    },
+    promptFetcher: {
+      getPromptByIdOrHandle: (params) =>
+        promptService.getPromptByIdOrHandle(params),
+    },
+    agentFetcher: {
+      findById: (params) => agentRepository.findById(params),
+    },
+    workflowVersionFetcher: {
+      getLatestDsl: async ({ projectId, workflowId }) => {
+        const workflow = await prisma.workflow.findFirst({
+          where: { id: workflowId, projectId, archivedAt: null },
+          select: { id: true, latestVersionId: true },
+        });
+        if (!workflow?.latestVersionId) return null;
+        const version = await prisma.workflowVersion.findFirst({
+          where: { id: workflow.latestVersionId, projectId },
+          select: { dsl: true },
+        });
+        if (!version) return null;
+        return {
+          workflowId: workflow.id,
+          dsl: version.dsl as unknown as Record<string, unknown>,
+        };
+      },
+    },
+    projectFetcher: {
+      findUnique: async (projectId) =>
+        prisma.project.findUnique({
+          where: { id: projectId },
+          select: { apiKey: true, team: { select: { organizationId: true } } },
+        }),
+    },
+    sandboxKeyMinter: {
+      mint: (params) => tryGetAgentSandboxApiKey({ prisma, ...params }),
+    },
+    modelResolver: {
+      resolve: async (featureKey, projectId) => {
+        const resolved = await resolveModelForFeature(featureKey, {
+          prisma,
+          projectId,
+        });
+        return resolved.model;
+      },
+    },
+    traceWaitBudgetResolver: {
+      resolveTraceWaitTimeoutMs: (params) => resolveTraceWaitTimeoutMs(params),
+    },
+    projectSecretsFetcher: {
+      getSecrets: async (projectId) => {
+        const rows = await prisma.projectSecret.findMany({
+          where: { projectId },
+          select: { name: true, encryptedValue: true },
+        });
+        const secrets: Record<string, string> = {};
+        for (const row of rows) {
+          try {
+            secrets[row.name] = decrypt(row.encryptedValue);
+          } catch (err) {
+            // Wrap per-secret so a single corrupt row yields a readable error
+            // instead of a raw crypto stack trace surfacing at the caller.
+            throw new Error(
+              `Failed to decrypt project secret "${row.name}": ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }
+        return secrets;
+      },
+    },
+    modelParamsProvider: {
+      prepare: async (projectId, model): Promise<ModelParamsResult> => {
+        try {
+          if (!model.includes("/")) {
+            return {
+              success: false,
+              reason: "invalid_model_format",
+              message: `Invalid model format '${model}' - expected 'provider/model' format (e.g., 'openai/gpt-4')`,
+            };
+          }
 
-					const providerKey = model.split("/")[0];
-					if (!providerKey) {
-						return {
-							success: false,
-							reason: "invalid_model_format",
-							message: `Invalid model format '${model}' - expected 'provider/model' format (e.g., 'openai/gpt-4')`,
-						};
-					}
+          const providerKey = model.split("/")[0];
+          if (!providerKey) {
+            return {
+              success: false,
+              reason: "invalid_model_format",
+              message: `Invalid model format '${model}' - expected 'provider/model' format (e.g., 'openai/gpt-4')`,
+            };
+          }
 
-					const providers = await getProjectModelProviders(projectId);
-					const provider = providers[providerKey];
+          const providers = await getProjectModelProviders(projectId);
+          const provider = providers[providerKey];
 
-					if (!provider) {
-						return {
-							success: false,
-							reason: "provider_not_found",
-							message: `Provider '${providerKey}' not found for this project. Available providers: ${Object.keys(providers).join(", ") || "none"}`,
-						};
-					}
+          if (!provider) {
+            return {
+              success: false,
+              reason: "provider_not_found",
+              message: `Provider '${providerKey}' not found for this project. Available providers: ${Object.keys(providers).join(", ") || "none"}`,
+            };
+          }
 
-					if (!provider.enabled) {
-						return {
-							success: false,
-							reason: "provider_not_enabled",
-							message: `Provider '${providerKey}' is not enabled for this project. Enable it in Settings > Model Providers.`,
-						};
-					}
+          if (!provider.enabled) {
+            return {
+              success: false,
+              reason: "provider_not_enabled",
+              message: `Provider '${providerKey}' is not enabled for this project. Enable it in Settings > Model Providers.`,
+            };
+          }
 
-					const params = await prepareLitellmParams({
-						model,
-						modelProvider: provider,
-						projectId,
-					});
+          const params = await prepareLitellmParams({
+            model,
+            modelProvider: provider,
+            projectId,
+          });
 
-					const hasCredentials = !!(
-						params.api_key ||
-						params.vertex_credentials ||
-						params.aws_access_key_id
-					);
-					if (!hasCredentials || !params.model) {
-						const missing = [];
-						if (!hasCredentials) missing.push("API key");
-						if (!params.model) missing.push("model");
-						return {
-							success: false,
-							reason: "missing_params",
-							message: `Provider '${providerKey}' is missing required configuration: ${missing.join(" and ")}. Check Settings > Model Providers.`,
-						};
-					}
+          const hasCredentials = !!(
+            params.api_key ||
+            params.vertex_credentials ||
+            params.aws_access_key_id
+          );
+          if (!hasCredentials || !params.model) {
+            const missing = [];
+            if (!hasCredentials) missing.push("API key");
+            if (!params.model) missing.push("model");
+            return {
+              success: false,
+              reason: "missing_params",
+              message: `Provider '${providerKey}' is missing required configuration: ${missing.join(" and ")}. Check Settings > Model Providers.`,
+            };
+          }
 
-					return {
-						success: true,
-						params: params as LiteLLMParams,
-					};
-				} catch (error) {
-					const errorMessage =
-						error instanceof Error ? error.message : String(error);
-					logger.error({ error }, "failed to prepare LiteLLM params");
-					return {
-						success: false,
-						reason: "preparation_error",
-						message: `Unexpected error preparing model params: ${errorMessage}`,
-					};
-				}
-			},
-		},
-	};
+          return {
+            success: true,
+            params: params as LiteLLMParams,
+          };
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          logger.error({ error }, "failed to prepare LiteLLM params");
+          return {
+            success: false,
+            reason: "preparation_error",
+            message: `Unexpected error preparing model params: ${errorMessage}`,
+          };
+        }
+      },
+    },
+  };
 }
