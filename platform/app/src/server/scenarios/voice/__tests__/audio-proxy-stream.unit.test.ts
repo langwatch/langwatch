@@ -4,6 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { proxyAudioStream } from "../audio-proxy-stream";
+import { VoiceRecordingUnavailableError } from "../voice-session.service";
 
 /** A minimal upstream stand-in with the three fields the proxy reads. */
 const okUpstream = (contentType: string | null) => ({
@@ -42,6 +43,38 @@ describe("proxyAudioStream", () => {
       });
 
       expect(response.headers.get("content-type")).toBe("audio/mpeg");
+    });
+  });
+
+  describe("when the caller's signal is already aborted before the fetch starts", () => {
+    it("rejects promptly instead of waiting for the timeout", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          (_url: string, init: { signal?: AbortSignal }) =>
+            new Promise((_resolve, reject) => {
+              if (init.signal?.aborted) {
+                reject(new DOMException("aborted", "AbortError"));
+                return;
+              }
+              init.signal?.addEventListener("abort", () =>
+                reject(new DOMException("aborted", "AbortError")),
+              );
+            }),
+        ),
+      );
+
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        proxyAudioStream({
+          signal: controller.signal,
+          url: "https://provider.example/v1/audio",
+          headers: {},
+          fallbackContentType: "audio/mpeg",
+        }),
+      ).rejects.toBeInstanceOf(VoiceRecordingUnavailableError);
     });
   });
 });

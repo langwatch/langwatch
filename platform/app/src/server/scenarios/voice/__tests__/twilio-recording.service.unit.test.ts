@@ -45,4 +45,35 @@ describe("resolveTwilioRecordingWavUrl", () => {
       await expect(promise).resolves.toBeNull();
     });
   });
+
+  describe("when the caller's signal is already aborted before the fetch starts", () => {
+    it("returns null promptly instead of waiting for the timeout", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          (_url: string, init: { signal?: AbortSignal }) =>
+            new Promise((_resolve, reject) => {
+              if (init.signal?.aborted) {
+                reject(new DOMException("aborted", "AbortError"));
+                return;
+              }
+              init.signal?.addEventListener("abort", () =>
+                reject(new DOMException("aborted", "AbortError")),
+              );
+            }),
+        ),
+      );
+
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await resolveTwilioRecordingWavUrl({
+        credential: CREDENTIAL,
+        callSid: "CA1",
+        signal: controller.signal,
+      });
+
+      expect(result).toBeNull();
+    });
+  });
 });

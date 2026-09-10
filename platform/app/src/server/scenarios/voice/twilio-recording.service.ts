@@ -55,6 +55,10 @@ export async function resolveTwilioRecordingWavUrl({
     () => timeoutController.abort(),
     VOICE_HTTP_TIMEOUT_MS,
   );
+  // The abort event fires at most once. A signal already aborted before we
+  // got here would never reach a freshly-added listener, so the fetch would
+  // start anyway and could wait the full timeout.
+  if (signal.aborted) timeoutController.abort();
   const onCallerAbort = () => timeoutController.abort();
   signal.addEventListener("abort", onCallerAbort);
 
