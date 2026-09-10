@@ -1,3 +1,4 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
 import { ClickHouseCodingAgentRepositories } from "../clickhouse/clickhouse.coding-agent.repositories.ts";
@@ -9,33 +10,16 @@ import {
 } from "./redis.coding-agent-session-pipeline.repository.ts";
 import { ModelCatalogCostEstimatorAdapter } from "../../services/model-catalog-cost-estimator.service.ts";
 import { OtelCodingAgentCostMetricsAdapter } from "../../services/coding-agent-cost-metrics.service.ts";
-import {
-  CodingAgentClickHouse,
-  type CodingAgentClickHouseClient,
-} from "../../app/coding-agent.members.ts";
 import type { CodingAgentProjectActivity } from "../../app/coding-agent.members.ts";
 import type { CodingAgentPullRequestMapping } from "../../app/coding-agent.members.ts";
 
-/** Binds the feature's ClickHouse port to a process's tenant-keyed resolver. */
-class ResolvedCodingAgentClickHouse implements CodingAgentClickHouse {
-  static create(
-    resolveClient: (tenantId: string) => Promise<CodingAgentClickHouseClient>,
-  ): ResolvedCodingAgentClickHouse {
-    return new ResolvedCodingAgentClickHouse(resolveClient);
-  }
-
-  private constructor(
-    private readonly resolveClient: (tenantId: string) => Promise<CodingAgentClickHouseClient>,
-  ) {
-  }
-
-  resolve(tenantId: string): Promise<CodingAgentClickHouseClient> {
-    return this.resolveClient(tenantId);
-  }
-}
-
 export type RedisCodingAgentProcessingRepositoryOptions = {
-  resolveClient: (tenantId: string) => Promise<CodingAgentClickHouseClient>;
+  /**
+   * The process's one ClickHouse client. It routes each statement to the
+   * server its tenant belongs on, so the pipeline holds no per-tenant client
+   * and cannot obtain an unscoped one.
+   */
+  clickhouse: ClickHouseQueryClient;
   /** The fallback for rows whose tenant declares no retention override. */
   defaultRetentionDays: number;
   /**
@@ -59,8 +43,8 @@ export type RedisCodingAgentProcessingRepositoryOptions = {
 };
 
 /**
- * Durable coding-agent session processing (ADR-056), composed from a
- * tenant-keyed ClickHouse client and the process's own Redis.
+ * Durable coding-agent session processing (ADR-056), composed from the
+ * process's one ClickHouse client and its own Redis.
  */
 export class RedisCodingAgentProcessingRepository {
   static create(
@@ -79,8 +63,8 @@ export class RedisCodingAgentProcessingRepository {
       modelProviders: ModelCatalogCostEstimatorAdapter.create(),
       costMetrics: OtelCodingAgentCostMetricsAdapter.create(),
       projections: CodingAgentProjectionPersistenceService.create(
-        ClickHouseCodingAgentRepositories.create({
-          clickhouse: ResolvedCodingAgentClickHouse.create(options.resolveClient),
+        ClickHouseCodingAgentRepositories.createWith({
+          clickhouse: options.clickhouse,
           defaultRetentionDays: options.defaultRetentionDays,
         }),
       ),

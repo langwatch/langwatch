@@ -99,8 +99,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
     spendRating: ModelCatalogGatewaySpendRatingAdapter.create(),
     spendConfirmation: new RecordingSpendConfirmation(),
   };
-  const runtime = await createApp({ name: "gateway-elevenlabs-integration" })
-    .withInfrastructure({})
+  const runtime = await createApp({ role: "api", config: {} })
     .withModule(gatewayServer, {
       members: {
         elevenLabsWebhook: {
@@ -116,7 +115,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
         },
       },
     })
-    .boot({ role: "api" });
+    .boot();
   const gateway = runtime.module(gatewayServer).provided;
   const rest = createRestRuntime({
     identity: {

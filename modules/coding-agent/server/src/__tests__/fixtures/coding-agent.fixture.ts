@@ -11,6 +11,14 @@ import {
   codingAgentSessionFixture,
 } from "@langwatch/coding-agent-contract/testing";
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import {
+  ClickHouseQueryClient,
+  TenantGuard,
+  type InsertRequest,
+  type QueryDriver,
+  type QueryRequest,
+  type QueryResult,
+} from "@langwatch/clickhouse-client";
 import { createServer, type Server } from "node:http";
 import {
   type GithubApi,
@@ -25,7 +33,6 @@ import type { Instant } from "@langwatch/time";
 import { TestProjectApi } from "./test-project-api.ts";
 import { CodingAgentBillingPolicy } from "../../app/coding-agent.members.ts";
 import { CodingAgentClock } from "../../app/coding-agent.members.ts";
-import { CodingAgentClickHouse } from "../../app/coding-agent.members.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../../repositories/coding-agent-trace-session.repository.ts";
@@ -38,14 +45,28 @@ export const TEST_NOW_MS = CODING_AGENT_TEST_NOW_MS;
 
 type ClickHouseRequest = { url: string; body: string };
 
-/** A typed local ClickHouse wire fixture for package runtime-adapter tests. */
-export class TestClickHouseEndpoint implements CodingAgentClickHouse {
+/**
+ * A typed local ClickHouse wire fixture for package runtime-adapter tests.
+ *
+ * It stands in for the process's ONE client rather than for a resolver: the
+ * repositories are handed {@link TestClickHouseEndpoint.clickhouse}, name their
+ * tenant on every statement, and the guard below refuses one that cannot. What
+ * reaches this endpoint is what a real server would have received.
+ */
+export class TestClickHouseEndpoint {
+  /** The process's one client, pointed at this endpoint. */
+  readonly clickhouse: ClickHouseQueryClient;
+
   private constructor(
     private readonly server: Server,
     private readonly client: ClickHouseClient,
     readonly requests: ClickHouseRequest[],
     readonly queryRows: Array<Array<Record<string, unknown>>>,
   ) {
+    this.clickhouse = new ClickHouseQueryClient({
+      driver: singleEndpointDriver(client),
+      tenantGuard: new TenantGuard(),
+    });
   }
 
   static async create(): Promise<TestClickHouseEndpoint> {
@@ -73,16 +94,50 @@ export class TestClickHouseEndpoint implements CodingAgentClickHouse {
     return endpoint;
   }
 
-  async resolve(): Promise<ClickHouseClient> {
-    return this.client;
-  }
-
   async close(): Promise<void> {
     await this.client.close();
     await new Promise<void>((resolve, reject) => {
       this.server.close((error) => (error ? reject(error) : resolve()));
     });
   }
+}
+
+/**
+ * The one endpoint this fixture opened, as a driver. Real routing lives in
+ * `@langwatch/infrastructure`; a fixture reaches one server, so this places
+ * every statement on it whatever tenant it named.
+ */
+function singleEndpointDriver(client: ClickHouseClient): QueryDriver {
+  return {
+    async execute<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
+      const result = await client.query({
+        query: request.sql,
+        format: "JSONEachRow",
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+      return { rows: await result.json<Row>() };
+    },
+
+    async insert(request: InsertRequest): Promise<void> {
+      await client.insert({
+        table: request.table,
+        values: request.rows as Record<string, unknown>[],
+        format: "JSONEachRow",
+        ...(request.settings === undefined
+          ? {}
+          : { clickhouse_settings: request.settings as Record<string, never> }),
+      });
+    },
+
+    async command(request: QueryRequest): Promise<void> {
+      await client.command({
+        query: request.sql,
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+  };
 }
 
 export function session(overrides: Partial<CodingAgentSession> = {}): CodingAgentSession {

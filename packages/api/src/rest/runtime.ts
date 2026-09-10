@@ -65,7 +65,12 @@ import {
   readIdempotencyKey,
   type IdempotentRunner,
 } from "./idempotency.ts";
-import { deprecatedAlias, deprecationNotice, documentRoute } from "./openapi.ts";
+import {
+  CREDENTIAL_CLASS_BY_DOOR as CREDENTIAL_CLASS,
+  deprecatedAlias,
+  deprecationNotice,
+  documentRoute,
+} from "./openapi.ts";
 import {
   bodyLimit,
   cachedRestAnswer,
@@ -286,7 +291,9 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
             }),
             policy: registryPolicy({ route, options, credential }),
             credentialClass:
-              route.access?.kind === "public" ? "none" : CREDENTIAL_CLASS[routeCredential(route, credential)],
+              route.access?.kind === "public"
+                ? "none"
+                : CREDENTIAL_CLASS[routeCredential(route, credential)],
             credential:
               route.access?.kind === "public" ? "public" : routeCredential(route, credential),
             family: declaration.namespace,
@@ -322,7 +329,11 @@ function assertPortsBound<Api>({
   for (const route of declaration.routes) {
     const address = `${route.method.toUpperCase()} ${base}${route.path}`;
 
-    if (route.credential && route.credential !== declaration.credential && !ports.doors?.[route.credential]) {
+    if (
+      route.credential &&
+      route.credential !== declaration.credential &&
+      !ports.doors?.[route.credential]
+    ) {
       throw new Error(
         `REST ${address} answers behind the "${route.credential}" door, and this runtime opens ` +
           "no door of that kind",
@@ -1892,17 +1903,6 @@ const HANDLER_CREDENTIAL = {
   browser: "session",
   internalSecret: "internal",
 } as const satisfies Record<Exclude<Credential, "public">, HandlerCredential>;
-
-/** Which security scheme a consumer of each credential presents. */
-const CREDENTIAL_CLASS = {
-  project: "project_api_key",
-  organization: "organization_api_key",
-  scimToken: "scim_token",
-  "instance-admin": "instance_admin_api_key",
-  browser: "session",
-  internalSecret: "internal_secret",
-  public: "none",
-} as const satisfies Record<Credential, CredentialClass>;
 
 /**
  * What the route registry records: the door authenticates and enforces, so the

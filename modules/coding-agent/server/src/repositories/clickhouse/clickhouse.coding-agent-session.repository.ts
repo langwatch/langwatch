@@ -6,10 +6,7 @@ import type {
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type {
-  CodingAgentClickHouseClient,
-  CodingAgentClickHouse,
-} from "../../app/coding-agent.members.ts";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
 import type {
   CodingAgentReadMetrics,
@@ -19,10 +16,11 @@ import type { CodingAgentSessionRepository as SessionRepository } from "../codin
 import { nowInstant } from "@langwatch/time";
 import {
   clickHouseMomentOf,
-  groupTenantsByClient,
   asNumber,
   asStringArray,
   parseClickHouseDateTimeMs,
+  routingTenantOf,
+  CROSS_TENANT_ROLLUP,
   type ClickHouseMoment,
 } from "./clickhouse.mapper.ts";
 
@@ -351,20 +349,20 @@ function toRecord({
 
 export class CodingAgentSessionClickHouseRepository implements SessionRepository {
   private constructor(
-    private readonly clickHouse: CodingAgentClickHouse,
+    private readonly clickhouse: ClickHouseQueryClient,
     private readonly defaultTraceRetentionDays: number,
     private readonly metrics: CodingAgentReadMetrics,
     private readonly clock: CodingAgentClock,
   ) {}
 
   static create(deps: {
-    clickHouse: CodingAgentClickHouse;
+    clickhouse: ClickHouseQueryClient;
     defaultTraceRetentionDays: number;
     metrics: CodingAgentReadMetrics;
     clock: CodingAgentClock;
   }): CodingAgentSessionClickHouseRepository {
     return new CodingAgentSessionClickHouseRepository(
-      deps.clickHouse,
+      deps.clickhouse,
       deps.defaultTraceRetentionDays,
       deps.metrics,
       deps.clock,
@@ -391,11 +389,11 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       { tenantId: row.tenantId },
       "CodingAgentSessionClickHouseRepository.upsert",
     );
-    const client = await this.clickHouse.resolve(row.tenantId);
     try {
-      await client.insert({
+      await this.clickhouse.insert({
+        tenantId: row.tenantId,
         table: TABLE_NAME,
-        values: [
+        rows: [
           toRecord({
             row,
             retentionDays: retentionDays ?? this.defaultTraceRetentionDays,
@@ -403,8 +401,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
             versionStampMs: this.nextVersionStamp(row.updatedAt),
           }),
         ],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
       logger.warn(
@@ -432,15 +429,16 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       { tenantId },
       "CodingAgentSessionClickHouseRepository.findBySessionId",
     );
-    const client = await this.clickHouse.resolve(tenantId);
-
     const partitionFilter =
       window !== undefined
         ? "AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
         : "";
 
-    const result = await client.query({
-      query: `
+    const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+      tenantId,
+      table: TABLE_NAME,
+      kind: "read",
+      sql: `
         SELECT *
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
@@ -461,15 +459,13 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           StartedAt ASC
         LIMIT 1
       `,
-      query_params: {
+      params: {
         tenantId,
         sessionId,
         ...(window !== undefined ? { from: window.fromMs, to: window.toMs } : {}),
       },
-      format: "JSONEachRow",
     });
 
-    const rows = await result.json<Record<string, unknown>>();
     return rows[0] ?? null;
   }
 
@@ -526,8 +522,6 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       { tenantId },
       "CodingAgentSessionClickHouseRepository.findManyRecent",
     );
-    const client = await this.clickHouse.resolve(tenantId);
-
     const userFilter = userId !== undefined ? "AND UserId = {userId:String}" : "";
 
     const startedAt = performance.now();
@@ -540,8 +534,11 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
 
     let rows: Record<string, unknown>[];
     try {
-      const result = await client.query({
-        query: `
+      ({ rows } = await this.clickhouse.query<Record<string, unknown>>({
+        tenantId,
+        table: TABLE_NAME,
+        kind: "read",
+        sql: `
           SELECT *
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
@@ -556,7 +553,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           ORDER BY StartedAt DESC
           LIMIT {limit:UInt32}
         `,
-        query_params: {
+        params: {
           tenantId,
           from: fromMs,
           to: toMs,
@@ -568,10 +565,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           limit: limit * LIST_READ_DEDUP_OVERFETCH,
           ...(userId !== undefined ? { userId } : {}),
         },
-        format: "JSONEachRow",
-      });
-
-      rows = await result.json<Record<string, unknown>>();
+      }));
     } catch (error) {
       observe("error");
       throw error;
@@ -614,29 +608,18 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       );
     }
 
-    const groups = await groupTenantsByClient({
+    return this.listBranchSessions({
       tenantIds,
-      clickHouse: this.clickHouse,
+      repositoryHost,
+      repositoryOwner,
+      repositoryName,
+      branches,
+      startedAtFromMs,
     });
-    const rows: CodingAgentBranchSessionRow[] = [];
-    for (const group of groups) {
-      rows.push(
-        ...(await this.listBranchSessionsForClient({
-          ...group,
-          repositoryHost,
-          repositoryOwner,
-          repositoryName,
-          branches,
-          startedAtFromMs,
-        })),
-      );
-    }
-    return rows;
   }
 
-  /** One endpoint's share of a repository's branch sessions. */
-  private async listBranchSessionsForClient({
-    client,
+  /** The rollup's one statement over an organization's project tenants. */
+  private async listBranchSessions({
     tenantIds,
     repositoryHost,
     repositoryOwner,
@@ -644,7 +627,6 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     branches,
     startedAtFromMs,
   }: {
-    client: CodingAgentClickHouseClient;
     tenantIds: string[];
     repositoryHost: string;
     repositoryOwner: string;
@@ -652,8 +634,12 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     branches: string[];
     startedAtFromMs: number;
   }): Promise<CodingAgentBranchSessionRow[]> {
-    const result = await client.query({
-      query: `
+    const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+      tenantId: routingTenantOf(tenantIds),
+      table: TABLE_NAME,
+      kind: "read",
+      unscoped: CROSS_TENANT_ROLLUP,
+      sql: `
         SELECT ${BRANCH_SESSION_COLUMNS}
         FROM ${TABLE_NAME}
         WHERE TenantId IN {tenantIds:Array(String)}
@@ -673,7 +659,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           )
         ORDER BY StartedAt ASC
       `,
-      query_params: {
+      params: {
         tenantIds,
         // Case-folded on both sides. A session stores the remote's casing verbatim, while the
         // pull-request mapping stores its host and repository lowercased, so an exact match here
@@ -688,10 +674,8 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
         branches,
         from: startedAtFromMs,
       },
-      format: "JSONEachRow",
     });
 
-    const rows = await result.json<Record<string, unknown>>();
     // Deduped per tenant, not across the whole result: the shared helper keys
     // on SessionId alone, which is right for a single-tenant read but would
     // collapse two organizations' projects that happen to share a provider
@@ -730,14 +714,12 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       );
     }
 
-    const groups = await groupTenantsByClient({
-      tenantIds,
-      clickHouse: this.clickHouse,
-    });
-    const collected: CodingAgentSessionBranchRecord[] = [];
-    for (const group of groups) {
-      const result = await group.client.query({
-        query: `
+    const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+      tenantId: routingTenantOf(tenantIds),
+      table: TABLE_NAME,
+      kind: "read",
+      unscoped: CROSS_TENANT_ROLLUP,
+      sql: `
           SELECT ${BRANCH_SESSION_COLUMNS}
           FROM ${TABLE_NAME}
           WHERE TenantId IN {tenantIds:Array(String)}
@@ -751,28 +733,23 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
             )
           ORDER BY StartedAt ASC
         `,
-        query_params: {
-          tenantIds: group.tenantIds,
-          sessionIds,
-          from: startedAtFromMs,
-        },
-        format: "JSONEachRow",
-      });
-      const rows = await result.json<Record<string, unknown>>();
-      const byTenant = new Map<string, Record<string, unknown>[]>();
-      for (const row of rows) {
-        const tenantId = String(row.TenantId ?? "");
-        const list = byTenant.get(tenantId) ?? [];
-        list.push(row);
-        byTenant.set(tenantId, list);
-      }
-      collected.push(
-        ...[...byTenant.values()].flatMap((tenantRows) =>
-          dedupToLatestPerSession(tenantRows).map(toBranchSessionRow),
-        ),
-      );
+      params: {
+        tenantIds,
+        sessionIds,
+        from: startedAtFromMs,
+      },
+    });
+
+    const byTenant = new Map<string, Record<string, unknown>[]>();
+    for (const row of rows) {
+      const tenantId = String(row.TenantId ?? "");
+      const list = byTenant.get(tenantId) ?? [];
+      list.push(row);
+      byTenant.set(tenantId, list);
     }
-    return collected;
+    return [...byTenant.values()].flatMap((tenantRows) =>
+      dedupToLatestPerSession(tenantRows).map(toBranchSessionRow),
+    );
   }
 
   async upsertBatch(
@@ -787,8 +764,8 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
 
     const tenantId = first.row.tenantId;
     EventUtils.validateTenantId({ tenantId }, "CodingAgentSessionClickHouseRepository.upsertBatch");
-    // A batch insert resolves ONE client, so a row from another tenant would be
-    // written into this tenant's ClickHouse. Refuse rather than cross the line.
+    // A batch is written for ONE tenant, so a row from another would land in
+    // this tenant's ClickHouse. Refuse rather than cross the line.
     for (const { row } of entries) {
       if (row.tenantId !== tenantId) {
         throw new SecurityError(
@@ -799,11 +776,11 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       }
     }
 
-    const client = await this.clickHouse.resolve(tenantId);
     try {
-      await client.insert({
+      await this.clickhouse.insert({
+        tenantId,
         table: TABLE_NAME,
-        values: entries.map(({ row, retentionDays, appliedEventIds }) =>
+        rows: entries.map(({ row, retentionDays, appliedEventIds }) =>
           toRecord({
             row,
             retentionDays: retentionDays ?? this.defaultTraceRetentionDays,
@@ -811,8 +788,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
             versionStampMs: this.nextVersionStamp(row.updatedAt),
           }),
         ),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
       logger.warn(

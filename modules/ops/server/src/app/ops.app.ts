@@ -388,8 +388,6 @@ export interface OpsAppInfrastructure {
   queuePayloadDecoder: QueuePayloadDecoder;
   schedulerWake: SchedulerWake;
   storageStatsMetrics: StorageStatsMetrics;
-  usageStatsClickHouseClient: UsageStatsClickHouseClient;
-  usageStatsClickHouseClientResolver: UsageStatsClickHouseClientResolver;
   usageStatsErrorReporter: UsageStatsErrorReporter;
   usageStatsTelemetryClient: UsageStatsTelemetryClient;
 }
@@ -1610,26 +1608,6 @@ export interface UsageStatsReport extends Omit<UsageStatsProjectCounts, "project
 export interface UsageStatsCountInput {
   organizationId: string;
   projectIds: string[];
-}
-
-export interface UsageStatsClickHouseQuery {
-  query: string;
-  query_params: { projectIds: string[] };
-  format: "JSONEachRow";
-}
-
-export interface UsageStatsClickHouseQueryResult {
-  json(): Promise<unknown>;
-}
-
-
-export interface UsageStatsClickHouseClient {
-  query(input: UsageStatsClickHouseQuery): Promise<UsageStatsClickHouseQueryResult>;
-}
-
-/** Resolves the ClickHouse client for the organization owning a report. */
-export interface UsageStatsClickHouseClientResolver {
-  tryResolve(organizationId: string): Promise<UsageStatsClickHouseClient | null>;
 }
 
 export interface UsageStatsCollector {

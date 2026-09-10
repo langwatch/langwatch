@@ -6,6 +6,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { z } from "zod";
 import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
 
 const mutationRowSchema = z
@@ -18,23 +19,6 @@ const mutationRowSchema = z
   })
   .strict();
 
-type QueryParams = Record<string, number | string | string[]>;
-
-export type RetentionClickHouseClient = {
-  command(input: { query: string; query_params: QueryParams }): Promise<void>;
-  query(input: {
-    query: string;
-    query_params: QueryParams;
-    format: "JSONEachRow";
-    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
-    unscoped?: { reason: string };
-  }): Promise<{ json(): Promise<unknown> }>;
-};
-
-export type RetentionClickHouseClientResolver = (
-  projectId: string,
-) => Promise<RetentionClickHouseClient>;
-
 const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 
 function tenantFilterParams(projectId: string): Record<string, string> {
@@ -42,14 +26,21 @@ function tenantFilterParams(projectId: string): Record<string, string> {
   return { tenantFilterNeedle: `WHERE TenantId = '${escapedProjectId}'` };
 }
 
+/**
+ * Retention rewrites, over the process's one ClickHouse client.
+ *
+ * The client routes each statement to the server its tenant belongs on, so
+ * this repository holds no per-tenant client and cannot obtain an unscoped
+ * one: every call below names the project it acts for.
+ */
 export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRetentionRepository {
   static create(options: {
-    resolveClient: RetentionClickHouseClientResolver;
+    clickhouse: ClickHouseQueryClient;
   }): ClickHouseRetroactiveRetentionRepository {
-    return new ClickHouseRetroactiveRetentionRepository(options.resolveClient);
+    return new ClickHouseRetroactiveRetentionRepository(options.clickhouse);
   }
 
-  private constructor(private readonly resolveClient: RetentionClickHouseClientResolver) {}
+  private constructor(private readonly clickhouse: ClickHouseQueryClient) {}
 
   async triggerUpdate(input: {
     projectId: string;
@@ -59,9 +50,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     const tables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, category]) => category === input.category)
       .map(([table]) => table);
-    const client = await this.resolveClient(input.projectId);
     const activeMutations = await this.getActiveMutations({
-      client,
       projectId: input.projectId,
       tables,
     });
@@ -71,13 +60,16 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     }
 
     for (const table of tables) {
-      await client.command({
-        query:
+      await this.clickhouse.command({
+        tenantId: input.projectId,
+        table,
+        kind: "write",
+        sql:
           `ALTER TABLE ${table} ` +
           "UPDATE _retention_days = {retentionDays:UInt16} " +
           "WHERE TenantId = {tenantId:String} " +
           "AND _retention_days != {retentionDays:UInt16}",
-        query_params: {
+        params: {
           tenantId: input.projectId,
           retentionDays: input.newRetentionDays,
         },
@@ -88,9 +80,11 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
   }
 
   async getMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {
-    const client = await this.resolveClient(input.projectId);
-    const result = await client.query({
-      query: `
+    const { rows } = await this.clickhouse.query<unknown>({
+      tenantId: input.projectId,
+      table: "system.mutations",
+      kind: "read",
+      sql: `
         SELECT
           mutation_id AS mutationId,
           table AS table,
@@ -103,35 +97,42 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
           AND is_done = 0
         ORDER BY create_time DESC
       `,
-      query_params: tenantFilterParams(input.projectId),
-      format: "JSONEachRow",
+      params: tenantFilterParams(input.projectId),
       unscoped: {
         reason:
           "system.mutations carries no tenant column: the project is matched inside the recorded mutation command instead, which is what tenantFilterSql does.",
       },
     });
 
-    return this.parseRows(await result.json());
+    return this.parseRows(rows);
   }
 
   async killMutation(input: { projectId: string; mutationId: string }): Promise<void> {
-    const client = await this.resolveClient(input.projectId);
-    await client.command({
-      query: "KILL MUTATION WHERE mutation_id = {mutationId:String} " + `AND ${tenantFilterSql}`,
-      query_params: {
+    await this.clickhouse.command({
+      tenantId: input.projectId,
+      table: "system.mutations",
+      kind: "write",
+      sql: "KILL MUTATION WHERE mutation_id = {mutationId:String} " + `AND ${tenantFilterSql}`,
+      params: {
         mutationId: input.mutationId,
         ...tenantFilterParams(input.projectId),
+      },
+      unscoped: {
+        reason:
+          "KILL MUTATION reads system.mutations, which carries no tenant column: the project is matched inside the recorded mutation command instead, which is what tenantFilterSql does.",
       },
     });
   }
 
   private async getActiveMutations(input: {
-    client: RetentionClickHouseClient;
     projectId: string;
     tables: string[];
   }): Promise<RetroactiveMutationProgress[]> {
-    const result = await input.client.query({
-      query: `
+    const { rows } = await this.clickhouse.query<unknown>({
+      tenantId: input.projectId,
+      table: "system.mutations",
+      kind: "read",
+      sql: `
         SELECT
           mutation_id AS mutationId,
           table AS table,
@@ -144,15 +145,14 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
           AND ${tenantFilterSql}
           AND is_done = 0
       `,
-      query_params: { tables: input.tables, ...tenantFilterParams(input.projectId) },
-      format: "JSONEachRow",
+      params: { tables: input.tables, ...tenantFilterParams(input.projectId) },
       unscoped: {
         reason:
           "system.mutations carries no tenant column: the project is matched inside the recorded mutation command instead, which is what tenantFilterSql does.",
       },
     });
 
-    return this.parseRows(await result.json());
+    return this.parseRows(rows);
   }
 
   private parseRows(rows: unknown): RetroactiveMutationProgress[] {

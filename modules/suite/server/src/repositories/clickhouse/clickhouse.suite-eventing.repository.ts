@@ -1,9 +1,10 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { SuiteEventingCapabilities } from "../suite-eventing.repository.ts";
-import type { SuiteClickHouseClient } from "../clickhouse-client.repository.ts";
 import { ClickHouseSuiteRunRepository } from "./clickhouse.suite-run.repository.ts";
 
 export type ClickHouseSuiteEventingAdapterOptions = {
-  resolveClient: (projectId: string) => Promise<SuiteClickHouseClient>;
+  /** The process's one ClickHouse client, which routes each statement itself. */
+  clickhouse: ClickHouseQueryClient;
   defaultRetentionDays: number;
 };
 
@@ -18,7 +19,7 @@ export class ClickhouseSuiteEventingRepository {
   build(): SuiteEventingCapabilities {
     return {
       suiteRunState: ClickHouseSuiteRunRepository.create({
-        resolveClient: this.options.resolveClient,
+        clickhouse: this.options.clickhouse,
         defaultRetentionDays: this.options.defaultRetentionDays,
       }),
     };

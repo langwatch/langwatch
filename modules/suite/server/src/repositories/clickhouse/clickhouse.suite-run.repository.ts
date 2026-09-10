@@ -17,11 +17,16 @@ import {
   type SuiteRunStateData,
   type SuiteRunStateInput,
 } from "@langwatch/suite-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { SuiteRunReadRepository } from "../suite-run.repository.ts";
-import type { SuiteClickHouseClient } from "../clickhouse-client.repository.ts";
 
 export type SuiteRunClickHouseRepositoryOptions = {
-  resolveClient: (projectId: string) => Promise<SuiteClickHouseClient>;
+  /**
+   * The process's one ClickHouse client. It routes each statement to the
+   * server its tenant belongs on, so this repository holds no per-tenant
+   * client and cannot obtain an unscoped one.
+   */
+  clickhouse: ClickHouseQueryClient;
   defaultRetentionDays: number;
 };
 
@@ -47,13 +52,13 @@ export class ClickHouseSuiteRunRepository
   ): Promise<Projection<SuiteRunStateData> | null> {
     EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.tryGetProjection");
     try {
-      const client = await this.options.resolveClient(String(context.tenantId));
-      const result = await client.query({
-        query: ClickHouseSuiteRunRepository.projectionQuery(),
-        query_params: { tenantId: context.tenantId, batchRunId: aggregateId },
-        format: "JSONEachRow",
+      const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
+        tenantId: String(context.tenantId),
+        sql: ClickHouseSuiteRunRepository.projectionQuery(),
+        params: { tenantId: String(context.tenantId), batchRunId: aggregateId },
+        table: TABLE_NAME,
+        kind: "read",
       });
-      const rows = await result.json<Record<string, unknown>>();
       const row = rows[0];
       if (!row) return null;
       return {
@@ -96,18 +101,17 @@ export class ClickHouseSuiteRunRepository
       );
     }
     try {
-      const client = await this.options.resolveClient(String(context.tenantId));
-      await client.insert({
+      await this.options.clickhouse.insert({
+        tenantId: String(context.tenantId),
         table: TABLE_NAME,
-        values: [
+        rows: [
           ClickHouseSuiteRunRepository.mapProjectionToRow(
             projection,
             context,
             this.options.defaultRetentionDays,
           ),
         ],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+        settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
     } catch (error) {
       throw this.storeError({
@@ -142,18 +146,17 @@ export class ClickHouseSuiteRunRepository
       }
     }
     try {
-      const client = await this.options.resolveClient(String(context.tenantId));
-      await client.insert({
+      await this.options.clickhouse.insert({
+        tenantId: String(context.tenantId),
         table: TABLE_NAME,
-        values: projections.map((projection) =>
+        rows: projections.map((projection) =>
           ClickHouseSuiteRunRepository.mapProjectionToRow(
             projection,
             context,
             this.options.defaultRetentionDays,
           ),
         ),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
       throw this.storeError({
@@ -168,9 +171,11 @@ export class ClickHouseSuiteRunRepository
   }
 
   async tryGetSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
-    const client = await this.options.resolveClient(input.projectId);
-    const result = await client.query({
-      query: `
+    const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
+      tenantId: input.projectId,
+      table: TABLE_NAME,
+      kind: "read",
+      sql: `
         SELECT
           t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
           t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId,
@@ -195,19 +200,19 @@ export class ClickHouseSuiteRunRepository
           )
         LIMIT 1
       `,
-      query_params: { projectId: input.projectId, batchRunId: input.batchRunId },
-      format: "JSONEachRow",
+      params: { projectId: input.projectId, batchRunId: input.batchRunId },
     });
-    const rows = await result.json<Record<string, unknown>>();
     return rows[0] ? ClickHouseSuiteRunRepository.mapRowToState(rows[0]) : null;
   }
 
   async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
-    const client = await this.options.resolveClient(input.projectId);
     const limit = Math.min(input.limit ?? 50, 100);
     const scenarioSetIds = ClickHouseSuiteRunRepository.expandSetIdFilter(input.scenarioSetId);
-    const result = await client.query({
-      query: `
+    const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
+      tenantId: input.projectId,
+      table: TABLE_NAME,
+      kind: "read",
+      sql: `
         SELECT
           t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
           t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId,
@@ -233,10 +238,8 @@ export class ClickHouseSuiteRunRepository
         ORDER BY t.CreatedAt DESC
         LIMIT {limit:UInt32}
       `,
-      query_params: { projectId: input.projectId, scenarioSetIds, limit },
-      format: "JSONEachRow",
+      params: { projectId: input.projectId, scenarioSetIds, limit },
     });
-    const rows = await result.json<Record<string, unknown>>();
     return rows.map((row) => ClickHouseSuiteRunRepository.mapRowToState(row));
   }
   private storeError(input: {

@@ -12,7 +12,18 @@ import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
 import { DataRetentionCacheStore } from "../../stores/data-retention-cache.store.ts";
 import { DataRetentionService } from "../data-retention.service.ts";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { MemoryRetroactiveRetentionRepository } from "../../repositories/memory/memory.retroactive-retention.repository.ts";
 import { StorageMeterService } from "../storage-meter.service.ts";
+
+/** These cases never meter: a read reaching ClickHouse is the test failing. */
+function refusingClickHouse(): ClickHouseQueryClient {
+  return {
+    query: async () => {
+      throw new Error("storage metering is not part of this case");
+    },
+  } as unknown as ClickHouseQueryClient;
+}
 
 const DEFAULT_DAYS = 49;
 const PROJECT = retentionTestGraph.projectId;
@@ -43,6 +54,7 @@ function createService(
     cache?: DataRetentionCacheStore;
     projects?: ProjectApi;
     organizations?: OrganizationApi;
+    retroactive?: MemoryRetroactiveRetentionRepository;
   }> = {},
 ) {
   return DataRetentionService.create({
@@ -51,15 +63,21 @@ function createService(
     projects: input.projects ?? createDataRetentionTestProjects(),
     organizations: input.organizations ?? createDataRetentionTestOrganizations(),
     defaultRetentionDays: DEFAULT_DAYS,
-    retroactive: null,
+    retroactive: input.retroactive ?? MemoryRetroactiveRetentionRepository.create(),
     cache: input.cache ?? new RecordingCache(),
-    storageMeter: StorageMeterService.create({ resolveClickHouseClient: null }),
+    storageMeter: StorageMeterService.create({ clickhouse: refusingClickHouse() }),
   });
 }
 
 describe("DataRetentionService", () => {
-  describe("given no ClickHouse was composed", () => {
-    it("refuses a retroactive rewrite and answers no progress", async () => {
+  describe("given a rewrite was asked for", () => {
+    /**
+     * The store is never absent: a deployment with no ClickHouse refuses at
+     * boot naming this module and the member. So a rewrite that was asked for
+     * is reported as in progress until it is killed, rather than a read
+     * answering "nothing is running" because there was nowhere to look.
+     */
+    it("reports it as in progress until it is killed", async () => {
       const service = createService();
 
       await expect(
@@ -68,13 +86,22 @@ describe("DataRetentionService", () => {
           category: "traces",
           newRetentionDays: DEFAULT_DAYS,
         }),
-      ).rejects.toThrow("ClickHouse not available");
+      ).resolves.toMatchObject({ tables: expect.any(Array) });
+
+      const progress = await service.getRetroactiveMutationProgress({ projectId: PROJECT });
+      expect(progress.length).toBeGreaterThan(0);
+      expect(progress.every((mutation) => mutation.category === "traces")).toBe(true);
+
+      for (const mutation of progress) {
+        await service.killRetroactiveMutation({
+          projectId: PROJECT,
+          mutationId: mutation.mutationId,
+        });
+      }
+
       await expect(service.getRetroactiveMutationProgress({ projectId: PROJECT })).resolves.toEqual(
         [],
       );
-      await expect(
-        service.killRetroactiveMutation({ projectId: PROJECT, mutationId: "mutation" }),
-      ).resolves.toBeUndefined();
     });
   });
 

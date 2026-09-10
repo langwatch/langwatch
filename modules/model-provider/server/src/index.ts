@@ -43,7 +43,7 @@ export {
   type RegistryModelProviderCatalogOptions,
 } from "./services/registry.model-provider-catalog.service.ts";
 export { UnmanagedModelProviderGatewayAdapter } from "./services/unmanaged.model-provider-gateway.service.ts";
-export { HttpModelProviderCredentialProbeAdapter } from "./adapters/http.model-provider-credential-probe.adapter.ts";
+export { HttpModelProviderCredentialProbeAdapter } from "./services/http.model-provider-credential-probe.service.ts";
 export { UnavailableModelProviderCredentialProbeAdapter } from "./services/unavailable.model-provider-credential-probe.service.ts";
 export {
   CodexOAuthModelProviderTokenRefresherAdapter,

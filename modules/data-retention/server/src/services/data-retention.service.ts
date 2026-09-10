@@ -1,5 +1,4 @@
 import {
-  DataRetentionBackendUnavailableError,
   killRetroactiveMutationInputSchema,
   ScopeTargetNotFoundError,
   platformDefaultRetentionDaysSchema,
@@ -41,7 +40,13 @@ export type DataRetentionServiceOptions = Readonly<{
   organizations: OrganizationApi;
   defaultRetentionDays: number;
   /** Null on a deployment that composed no ClickHouse. */
-  retroactive: RetroactiveRetentionRepository | null;
+  /**
+   * The rewrite path. Not nullable: a deployment with no ClickHouse refuses at
+   * boot naming the module and the member, so by the time this service exists
+   * there is a store behind it. Answering `[]` for "no backend" is what let a
+   * project's in-flight retention rewrite read as finished.
+   */
+  retroactive: RetroactiveRetentionRepository;
   cache: DataRetentionCacheStore;
   storageMeter: StorageMeterService;
 }>;
@@ -196,10 +201,6 @@ export class DataRetentionService {
     input: RetroactiveRetentionUpdateInput,
   ): Promise<{ tables: string[] }> {
     const parsed = retroactiveRetentionUpdateInputSchema.parse(input);
-    if (!this.options.retroactive) {
-      throw new DataRetentionBackendUnavailableError();
-    }
-
     return this.options.retroactive.triggerUpdate(parsed);
   }
 
@@ -207,16 +208,12 @@ export class DataRetentionService {
     input: RetroactiveMutationProjectInput,
   ): Promise<RetroactiveMutationProgress[]> {
     const parsed = retroactiveMutationProjectInputSchema.parse(input);
-    if (!this.options.retroactive) {
-      return [];
-    }
-
     return this.options.retroactive.getMutationProgress(parsed);
   }
 
   async killRetroactiveMutation(input: KillRetroactiveMutationInput): Promise<void> {
     const parsed = killRetroactiveMutationInputSchema.parse(input);
-    await this.options.retroactive?.killMutation(parsed);
+    await this.options.retroactive.killMutation(parsed);
   }
 
   getTotalStorageBytes(input: { tenantId: string }): Promise<number> {

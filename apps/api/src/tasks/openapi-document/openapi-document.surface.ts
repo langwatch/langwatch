@@ -237,7 +237,7 @@ export function composeOpenApiDocumentSurface({
         }
 
         claimed.set(operationKey, claimant);
-        app.on(method, path, ...stack, unreachable);
+        app.on([method], [path], ...stack, unreachable);
         operations.push({
           operationKey,
           path,

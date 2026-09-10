@@ -180,7 +180,7 @@ import {
   type MakeDefaultWritePlan,
   makeDefaultOffer,
 } from "../../model/logic/langy-make-default-offer.ts";
-import { langyToolNarrator } from "../../model/adapters/langy-tool-narrator.adapter.ts";
+import { langyToolNarrator } from "../../model/logic/langy-tool-narrator.ts";
 import { buildTimeTravelView } from "../../behavior/logic/langy-time-travel.ts";
 import { isInternalHref } from "../../behavior/logic/spa-link.ts";
 import { tapeForConversation, useLangyDevLog } from "../../behavior/stores/langy-dev-log.ts";

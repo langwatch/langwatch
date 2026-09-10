@@ -2,7 +2,7 @@ import type { CodingAgentSessionMetricSeriesRecord } from "@langwatch/coding-age
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import type { CodingAgentClickHouse } from "../../app/coding-agent.members.ts";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   clickHouseMomentOf,
   type ClickHouseMoment,
@@ -39,17 +39,17 @@ interface ClickHouseWriteRecord {
 
 export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepository {
   static create({
-    clickHouse,
+    clickhouse,
     defaultTraceRetentionDays,
   }: {
-    clickHouse: CodingAgentClickHouse;
+    clickhouse: ClickHouseQueryClient;
     defaultTraceRetentionDays: number;
   }): SessionMetricSeriesClickHouseRepository {
-    return new SessionMetricSeriesClickHouseRepository(clickHouse, defaultTraceRetentionDays);
+    return new SessionMetricSeriesClickHouseRepository(clickhouse, defaultTraceRetentionDays);
   }
 
   private constructor(
-    private readonly clickHouse: CodingAgentClickHouse,
+    private readonly clickhouse: ClickHouseQueryClient,
     private readonly defaultTraceRetentionDays: number,
   ) {}
 
@@ -62,9 +62,8 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
 
     const tenantId = first.tenantId;
     EventUtils.validateTenantId({ tenantId }, "SessionMetricSeriesClickHouseRepository.ensure");
-    // A batch insert resolves ONE client, so a row from another tenant would
-    // be written into this tenant's ClickHouse. Refuse rather than cross the
-    // line.
+    // A batch is written for ONE tenant, so a row from another would land in
+    // this tenant's ClickHouse. Refuse rather than cross the line.
     for (const record of records) {
       if (record.tenantId !== tenantId) {
         throw new SecurityError(
@@ -91,13 +90,12 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
       _retention_days: retentionDays ?? this.defaultTraceRetentionDays,
     }));
 
-    const client = await this.clickHouse.resolve(tenantId);
     try {
-      await client.insert({
+      await this.clickhouse.insert({
+        tenantId,
         table: TABLE_NAME,
-        values,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: values,
+        settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
       logger.warn(
@@ -129,15 +127,21 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
       { tenantId },
       "SessionMetricSeriesClickHouseRepository.findTotalsBySessionIds",
     );
-    const client = await this.clickHouse.resolve(tenantId);
-
     // Converge each unit FIRST (argMax by AsOf per SeriesId), then sum the converged values.
     // An IN-tuple filter on (SeriesId, max(AsOf)) is not enough here: a byte-identical
     // re-delivery leaves two un-merged rows sharing the winning AsOf, both pass the filter,
     // and a plain sum counts the unit twice. UpdatedAt breaks AsOf ties so a same-timestamp
     // correction converges on the newest write instead of an arbitrary row.
-    const result = await client.query({
-      query: `
+    const { rows } = await this.clickhouse.query<{
+      SessionId: string;
+      MetricName: string;
+      Bucket: string;
+      Total: number;
+    }>({
+      tenantId,
+      table: TABLE_NAME,
+      kind: "read",
+      sql: `
         SELECT
           SessionId,
           MetricName,
@@ -157,16 +161,9 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
         )
         GROUP BY SessionId, MetricName, Bucket
       `,
-      query_params: { tenantId, sessionIds, from: fromMs, to: toMs },
-      format: "JSONEachRow",
+      params: { tenantId, sessionIds, from: fromMs, to: toMs },
     });
 
-    const rows = await result.json<{
-      SessionId: string;
-      MetricName: string;
-      Bucket: string;
-      Total: number;
-    }>();
     return rows.map((row) => ({
       sessionId: row.SessionId,
       metricName: row.MetricName,

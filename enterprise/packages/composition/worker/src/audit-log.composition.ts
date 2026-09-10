@@ -1,7 +1,7 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { auditLogServer } from "@langwatch/enterprise-audit-log-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 
 const DEFAULT_MAX_ARGS_BYTES = 4 * 1024;
 
@@ -16,10 +16,8 @@ export class EnterpriseWorkerAuditLog {
     prisma: PrismaClient;
     maxArgsBytes?: number;
   }): Promise<EnterpriseWorkerAuditLog> {
-    const runtime = await createApp({ name: "enterprise-worker:audit-log" })
-      .withPersistence("postgres", { prisma: options.prisma })
-      .withInfrastructure({})
-      .withModule(auditLogServer)
+    const runtime = await createApp({ role: "api", config: {} })
+      .withModules([withMemoryRepositories(auditLogServer)])
       .boot({
         role: "worker",
         config: { "audit-log": { maxArgsBytes: options.maxArgsBytes ?? DEFAULT_MAX_ARGS_BYTES } },

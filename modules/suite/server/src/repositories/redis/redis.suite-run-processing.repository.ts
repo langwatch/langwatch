@@ -6,7 +6,7 @@ import {
   SuiteRunProcessingPipelineAdapter,
   type SuiteRunProcessingPipeline,
 } from "../../services/suite-run-processing.service.ts";
-import type { SuiteClickHouseClient } from "../clickhouse-client.repository.ts";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 /**
  * The Redis keyspace the suite-run fold's read-through cache occupies. A
@@ -16,7 +16,8 @@ import type { SuiteClickHouseClient } from "../clickhouse-client.repository.ts";
 const SUITE_RUN_FOLD_CACHE_KEY_PREFIX = "suite_runs";
 
 export type ClickHouseSuiteRunProcessingAdapterOptions = {
-  resolveClient: (projectId: string) => Promise<SuiteClickHouseClient>;
+  /** The process's one ClickHouse client, which routes each statement itself. */
+  clickhouse: ClickHouseQueryClient;
   /** The fallback for rows whose tenant declares no retention override. */
   defaultRetentionDays: number;
   /**
@@ -30,8 +31,8 @@ export type ClickHouseSuiteRunProcessingAdapterOptions = {
 };
 
 /**
- * Durable suite-run processing, composed from a tenant-keyed ClickHouse client and the
- * process's own Redis.
+ * Durable suite-run processing, composed from the process's own ClickHouse
+ * client and its own Redis.
  */
 export class RedisSuiteRunProcessingRepository {
   static create(
@@ -47,7 +48,7 @@ export class RedisSuiteRunProcessingRepository {
       suiteRunStateFoldStore: new RedisCachedFoldStore<SuiteRunStateData>(
         new RepositoryFoldStore<SuiteRunStateData>(
           ClickhouseSuiteEventingRepository.create({
-            resolveClient: this.options.resolveClient,
+            clickhouse: this.options.clickhouse,
             defaultRetentionDays: this.options.defaultRetentionDays,
           }).build().suiteRunState,
           SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,

@@ -1,20 +1,15 @@
-import {
-  createAnnotationTestAuthz,
-  createAnnotationTestApp,
-  createAnnotationTestOrganizations,
-  createAnnotationTestProjects,
-  createAnnotationTestTraces,
-  createAnnotationTestUsers,
-} from "../../app/__tests__/annotation.fixture.ts";
 /**
  * @vitest-environment node
+ * The annotation tRPC family over real annotation storage: what a suggestion
+ * carries onto the trace, what a span-only comment still marks, and what a
+ * queue page resolves.
  */
-import { initTRPC } from "@trpc/server";
-import { createTrpcService } from "@langwatch/api/trpc";
-import { createTrpcHandlerBinding } from "@langwatch/api/composition";
-import { nanoid } from "nanoid";
-import { afterAll, describe, expect, it, vi } from "vitest";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import {
+  annotationApiCreateInputSchema,
+  annotationApiOptimizedQueuesInputSchema,
+  type AnnotationApi,
+} from "@langwatch/annotation-contract";
+import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -23,11 +18,19 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
+import { initTRPC } from "@trpc/server";
+import { nanoid } from "nanoid";
+import { afterAll, describe, expect, it, vi } from "vitest";
+
 import {
-  annotationApiCreateInputSchema,
-  annotationApiOptimizedQueuesInputSchema,
-  type AnnotationApi,
-} from "@langwatch/annotation-contract";
+  createAnnotationTestAuthz,
+  createAnnotationTestApp,
+  createAnnotationTestOrganizations,
+  createAnnotationTestProjects,
+  createAnnotationTestTraces,
+  createAnnotationTestUsers,
+} from "../../app/__tests__/annotation.fixture.ts";
 import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
 import { PrismaAnnotationRepository } from "../../repositories/prisma/prisma.annotation.repository.ts";
 import { annotationTrpcTransport } from "../annotation.trpc.ts";
@@ -38,6 +41,8 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
+type TestContext = { actor: { id: string } };
+
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl
   ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
@@ -47,6 +52,41 @@ const connection = databaseUrl
 const prisma = connection?.client as PrismaClient;
 
 const projectId = "test-project-id";
+const CALLER_USER_ID = "test-user-annotation-suggestion";
+
+/**
+ * The declared family on the runtime a process mounts it on: the caller the
+ * process resolves, and an authorization that admits, so what the tests
+ * observe is the transport and the application rather than a permission gate.
+ */
+function callerFor(app: AnnotationApi) {
+  const trpc = initTRPC.context<TestContext>().create();
+
+  const ports: TrpcRuntimePorts<TestContext> = {
+    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
+    authorization: {
+      forRequest: () => ({
+        getDecision: async () => ({ permitted: true, organizationRole: null }),
+        getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+        checkScopeLineage: async () => ({ kind: "consistent" }),
+      }),
+    },
+    denials: {
+      membershipDisabled: () => new Error("membership disabled"),
+      liteMemberRestricted: () => new Error("lite member"),
+    },
+    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
+    errors: {
+      report: () => {},
+      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
+      translate: () => undefined,
+    },
+  };
+
+  return createTrpcRuntime<TestContext>({ root: trpc, procedure: trpc.procedure, ports })
+    .mount(annotationTrpcTransport, () => app)
+    .createCaller({ actor: { id: CALLER_USER_ID } });
+}
 
 describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace sync", () => {
   const mockWriteTraceSuggestion = vi.fn(async () => undefined);
@@ -76,7 +116,7 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
       },
       dependencies: {
         projects: createAnnotationTestProjects(),
-        organizations: createAnnotationTestOrganizations(["test-user-annotation-suggestion"]),
+        organizations: createAnnotationTestOrganizations([CALLER_USER_ID]),
         traces,
         users: createAnnotationTestUsers(),
         permissions,
@@ -87,23 +127,7 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
   const app = appFor();
 
   function harness() {
-    const trpc = initTRPC.context<{ actor: { id: string } }>().create();
-
-    const service = createTrpcService({
-      root: trpc,
-      procedures: { protected: trpc.procedure, policy: () => (procedure) => procedure },
-      handlerBinding: createTrpcHandlerBinding<{ actor: { id: string } }, AnnotationApi>(
-        async ({ ctx }) => ({
-          app,
-          actor: { type: "user", id: ctx.actor.id },
-          scope: null,
-        }),
-      ),
-    });
-
-    return annotationTrpcTransport.router(service).createCaller({
-      actor: { id: "test-user-annotation-suggestion" },
-    });
+    return callerFor(app);
   }
 
   const spanSuggestionTraceId = `test-trace-annotation-suggestion-${nanoid()}`;
@@ -184,7 +208,7 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
         id: nanoid(),
         projectId,
         traceId: queueTraceId,
-        userId: "test-user-annotation-suggestion",
+        userId: CALLER_USER_ID,
         comment: "the whole trace is off",
         isThumbsUp: null,
         scoreOptions: {},
@@ -195,7 +219,7 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
         id: nanoid(),
         projectId,
         traceId: queueTraceId,
-        userId: "test-user-annotation-suggestion",
+        userId: CALLER_USER_ID,
         comment: "about span-1",
         isThumbsUp: null,
         scoreOptions: {},
@@ -210,27 +234,11 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
       await scopedApp.queueTraces({
         projectId,
         traceIds: [queueTraceId],
-        annotators: ["user-test-user-annotation-suggestion"],
-        userId: "test-user-annotation-suggestion",
+        annotators: [`user-${CALLER_USER_ID}`],
+        userId: CALLER_USER_ID,
       });
 
-      const trpc = initTRPC.context<{ actor: { id: string } }>().create();
-
-      const service = createTrpcService({
-        root: trpc,
-        procedures: { protected: trpc.procedure, policy: () => (procedure) => procedure },
-        handlerBinding: createTrpcHandlerBinding<{ actor: { id: string } }, AnnotationApi>(
-          async ({ ctx }) => ({
-            app: scopedApp,
-            actor: { type: "user", id: ctx.actor.id },
-            scope: null,
-          }),
-        ),
-      });
-
-      const caller = annotationTrpcTransport.router(service).createCaller({
-        actor: { id: "test-user-annotation-suggestion" },
-      });
+      const caller = callerFor(scopedApp);
 
       const input = annotationApiOptimizedQueuesInputSchema.parse({
         projectId,

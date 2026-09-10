@@ -3,11 +3,12 @@ import { ClickHouseCodingAgentRepositories } from "./clickhouse/clickhouse.codin
 import { MemoryCodingAgentRepositories } from "./memory/memory.coding-agent.repositories.ts";
 
 /**
- * The two tiers a process selects between. There is no Postgres tier: every
- * row this module owns is a projection in ClickHouse, so the durable tier is
- * named for the store it reads.
+ * The two tiers a process selects between: `live` reaches the real stores,
+ * `memory` stands them in. Neither is named after a database — every row this
+ * module owns is a projection in ClickHouse, which the live tier's folder and
+ * the member it requires already say.
  */
 export const codingAgentRepositories = defineRepositories({
-  clickhouse: ClickHouseCodingAgentRepositories,
+  live: ClickHouseCodingAgentRepositories,
   memory: MemoryCodingAgentRepositories,
 });

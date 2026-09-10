@@ -322,6 +322,22 @@ export function documentedPathOf(honoPath: string): string {
 }
 
 /**
+ * Which security scheme a consumer of each door credential presents. The one
+ * table: the runtime reads it to classify a mounted route, and the document
+ * generator reads it to classify a declared one, so a family cannot be
+ * enforced behind one credential and advertised under another.
+ */
+export const CREDENTIAL_CLASS_BY_DOOR = {
+  project: "project_api_key",
+  organization: "organization_api_key",
+  scimToken: "scim_token",
+  "instance-admin": "instance_admin_api_key",
+  browser: "session",
+  internalSecret: "internal_secret",
+  public: "none",
+} as const satisfies Record<RestDoorCredential | "public", CredentialClass>;
+
+/**
  * Which security schemes the published document offers for each credential
  * class. Only classes an API consumer can actually present appear; the
  * omission is the point, since an empty requirement list means "no
@@ -454,10 +470,7 @@ export function handWrittenDocs(spec: DescribeRouteOptions): EndpointDocs {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The sentence a deprecated answer carries, written or derived. */
-export function deprecationNotice({
-  successor,
-  notice,
-}: RestDeprecation): string {
+export function deprecationNotice({ successor, notice }: RestDeprecation): string {
   return notice ?? `This endpoint is deprecated; use ${successor}`;
 }
 

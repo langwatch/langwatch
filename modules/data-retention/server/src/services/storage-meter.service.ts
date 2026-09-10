@@ -8,7 +8,7 @@ import {
   RETENTION_TABLE_CATEGORY_MAP,
   PRODUCTION_STORAGE_METER_TABLES,
 } from "@langwatch/data-retention-contract/retention-tables";
-import type { StorageMeterClickHouseResolver } from "../app/data-retention.members.ts";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   RedisStorageMeterCacheStore,
   type StorageMeterRedis,
@@ -51,13 +51,14 @@ type StorageMeterCategoryTotals = {
 
 export class StorageMeterService {
   static create(options: {
-    resolveClickHouseClient: StorageMeterClickHouseResolver | null;
+    /** The process's one ClickHouse client, which routes each read itself. */
+    clickhouse: ClickHouseQueryClient;
     redis?: StorageMeterRedis | null;
     now?: () => number;
     cache?: StorageMeterCacheStore;
   }): StorageMeterService {
     return new StorageMeterService(
-      options.resolveClickHouseClient,
+      options.clickhouse,
       options.cache ??
         RedisStorageMeterCacheStore.create({
           redis: options.redis,
@@ -69,7 +70,7 @@ export class StorageMeterService {
   }
 
   private constructor(
-    private readonly resolveClickHouseClient: StorageMeterClickHouseResolver | null,
+    private readonly clickhouse: ClickHouseQueryClient,
     private readonly cache: StorageMeterCacheStore,
     private readonly now: () => number,
   ) {}
@@ -137,25 +138,34 @@ export class StorageMeterService {
       scenarios: 0,
       experiments: 0,
     };
-    if (!this.resolveClickHouseClient) {
-      return storageBreakdownSchema.parse({ totalBytes: 0, byCategory });
-    }
-
-    const client = await this.resolveClickHouseClient(tenantId);
+    let firstFailure: unknown;
+    let failures = 0;
     for (const table of PRODUCTION_STORAGE_METER_TABLES) {
       try {
-        const result = await client.query({
-          query: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
-          query_params: { tenantId },
-          format: "JSONEachRow",
-          clickhouse_settings: METERING_CLICKHOUSE_SETTINGS,
+        const { rows } = await this.clickhouse.query<unknown>({
+          tenantId,
+          table,
+          kind: "read",
+          sql: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
+          params: { tenantId },
+          settings: METERING_CLICKHOUSE_SETTINGS,
         });
-        const tableBytes = this.parseTotal(await result.json());
+        const tableBytes = this.parseTotal(rows);
         const category = RETENTION_TABLE_CATEGORY_MAP[table];
         byCategory[category] += tableBytes;
       } catch (error) {
+        failures += 1;
+        firstFailure ??= error;
         logger.warn({ tenantId, table, error }, "Failed to query _size_bytes");
       }
+    }
+
+    // One table that would not answer is a gap in the breakdown. EVERY table
+    // refusing is the store being unreachable, and reporting that as zero
+    // bytes is the quiet downgrade: the caller caches it, the storage card
+    // reads empty, and nothing says the number is not a measurement.
+    if (failures === PRODUCTION_STORAGE_METER_TABLES.length) {
+      throw firstFailure;
     }
 
     return storageBreakdownSchema.parse({
@@ -187,24 +197,20 @@ export class StorageMeterService {
   }
 
   private async queryTotalBytes(tenantId: string): Promise<number> {
-    if (!this.resolveClickHouseClient) {
-      return 0;
-    }
-
-    const client = await this.resolveClickHouseClient(tenantId);
     const unions = PRODUCTION_STORAGE_METER_TABLES.map(
       (table) => `SELECT sum(_size_bytes) AS t FROM ${table} WHERE TenantId = {tenantId:String}`,
     ).join("\n  UNION ALL\n  ");
 
     try {
-      const result = await client.query({
-        query: `SELECT sum(t) AS total FROM (\n  ${unions}\n)`,
-        query_params: { tenantId },
-        format: "JSONEachRow",
-        clickhouse_settings: METERING_CLICKHOUSE_SETTINGS,
+      const { rows } = await this.clickhouse.query<unknown>({
+        tenantId,
+        kind: "read",
+        sql: `SELECT sum(t) AS total FROM (\n  ${unions}\n)`,
+        params: { tenantId },
+        settings: METERING_CLICKHOUSE_SETTINGS,
       });
 
-      return this.parseTotal(await result.json());
+      return this.parseTotal(rows);
     } catch (error) {
       logger.warn(
         { tenantId, error },

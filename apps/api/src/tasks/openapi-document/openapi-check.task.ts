@@ -4,10 +4,7 @@ import { serverModules } from "@langwatch/installed-modules/server";
 import { Task } from "@langwatch/task";
 
 import { checkOpenApiDocument, renderDriftReport } from "./openapi-document.checker.ts";
-import {
-  declaredRestFamilies,
-  type InstalledModule,
-} from "./openapi-document.declarations.ts";
+import { declaredRestFamilies, type InstalledModule } from "./openapi-document.declarations.ts";
 import { DEFAULT_SCRATCH_PATH } from "./openapi-document.generator.ts";
 
 /**

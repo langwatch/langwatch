@@ -1,4 +1,3 @@
-import type { ClickHouseClient, QueryParams } from "@clickhouse/client";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DataRetentionApi,
@@ -26,12 +25,9 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { DataRetentionPlanResolver } from "./data-retention.members.ts";
-import type { StorageMeterClickHouseClient } from "./data-retention.members.ts";
-import {
-  ClickHouseRetroactiveRetentionRepository,
-  type RetentionClickHouseClient,
-} from "../repositories/clickhouse/clickhouse.retroactive-retention.repository.ts";
+import { ClickHouseRetroactiveRetentionRepository } from "../repositories/clickhouse/clickhouse.retroactive-retention.repository.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
 import {
   RedisDataRetentionCacheStore,
@@ -51,7 +47,6 @@ import { StorageMeterService } from "../services/storage-meter.service.ts";
 const DEFAULT_CACHE_TTL_MS = 60_000;
 
 /** Resolves the ClickHouse the retention rewrites and the meter run on. */
-export type TenantClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;
 
 /** A project's place in the organization chain, plus the name it renders under. */
 export type RetentionProjectLineage = Readonly<{
@@ -110,7 +105,6 @@ export type DataRetentionInfrastructure = Readonly<{
   /** What an organization's plan permits of its retention. */
   plans: DataRetentionPlanResolver;
   redis: (DataRetentionRedis & StorageMeterRedis) | null;
-  resolveClickHouseClient: TenantClickHouseClientResolver | null;
   cacheTtlMs?: number;
 }>;
 
@@ -118,35 +112,19 @@ export type DataRetentionAppConfig = Readonly<{
   platformDefaultRetentionDays: number;
 }>;
 
+/**
+ * Both ClickHouse paths this feature has - the retention rewrite and the
+ * storage meter - run on the process's one `clickhouse` member. A deployment
+ * that named no ClickHouse refuses at boot naming this module and that member,
+ * rather than metering every project at zero bytes and rewriting nothing while
+ * reporting success.
+ */
 type DataRetentionSetup = FeatureSetup<
   typeof DataRetentionApp.dependencies,
-  DataRetentionInfrastructure,
+  DataRetentionInfrastructure & MembersRead<typeof DataRetentionApp.reads>,
   DataRetentionAppConfig,
   DataRetentionRepositories
 >;
-
-/** The rewrite path, over the process's own ClickHouse. */
-function retentionClient(client: ClickHouseClient): RetentionClickHouseClient {
-  return {
-    async command(input): Promise<void> {
-      await client.command(input);
-    },
-    async query(input): Promise<{ json(): Promise<unknown> }> {
-      const result = await client.query(input);
-      return { json: () => result.json<unknown>() };
-    },
-  };
-}
-
-/** The metering path, which only ever reads. */
-function meterClient(client: ClickHouseClient): StorageMeterClickHouseClient {
-  return {
-    query: async (input: QueryParams) => {
-      const result = await client.query(input);
-      return { json: () => result.json<unknown>() };
-    },
-  };
-}
 
 export class DataRetentionApp implements DataRetentionApiContract {
   static readonly contract = DataRetentionApi;
@@ -159,6 +137,7 @@ export class DataRetentionApp implements DataRetentionApiContract {
   static readonly configSchema = z.object({
     platformDefaultRetentionDays: platformDefaultRetentionDaysSchema,
   });
+  static readonly reads = reads("clickhouse");
 
   readonly #retention: DataRetentionService;
   readonly #policy: DataRetentionPolicyService;
@@ -186,11 +165,8 @@ export class DataRetentionApp implements DataRetentionApiContract {
     dependencies,
     config,
   }: DataRetentionSetup): DataRetentionApp {
-    const resolveClient = members.resolveClickHouseClient;
     const storageMeter = StorageMeterService.create({
-      resolveClickHouseClient: resolveClient
-        ? async (tenantId) => meterClient(await resolveClient(tenantId))
-        : null,
+      clickhouse: members.clickhouse,
       redis: members.redis,
     });
     const retention = DataRetentionService.create({
@@ -199,11 +175,9 @@ export class DataRetentionApp implements DataRetentionApiContract {
       projects: dependencies.projects,
       organizations: dependencies.organizations,
       defaultRetentionDays: config.platformDefaultRetentionDays,
-      retroactive: resolveClient
-        ? ClickHouseRetroactiveRetentionRepository.create({
-            resolveClient: async (projectId) => retentionClient(await resolveClient(projectId)),
-          })
-        : null,
+      retroactive: ClickHouseRetroactiveRetentionRepository.create({
+        clickhouse: members.clickhouse,
+      }),
       cache: RedisDataRetentionCacheStore.create({
         redis: members.redis,
         ttlMs: members.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS,

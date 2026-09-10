@@ -1,3 +1,4 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type IORedis from "ioredis";
@@ -9,7 +10,6 @@ import {
   type UsageStatsWorkerConfig,
 } from "../../app/ops.app.ts";
 import type {
-  UsageStatsClickHouseClientResolver,
   UsageStatsErrorReporter,
   UsageStatsTelemetryClient,
   UsageStatsWorkerDatabase,
@@ -49,7 +49,8 @@ export interface OpsWorkerAdapterOptions {
   };
   usageStats: {
     database: UsageStatsWorkerDatabase;
-    clickhouse: UsageStatsClickHouseClientResolver;
+    /** The process's one ClickHouse client, which routes each read itself. */
+    clickhouse: ClickHouseQueryClient;
     config: UsageStatsWorkerConfig;
     telemetry: UsageStatsTelemetryClient;
     errors: UsageStatsErrorReporter;

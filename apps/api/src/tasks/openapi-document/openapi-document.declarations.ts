@@ -23,6 +23,8 @@ export type InstalledModule = Readonly<{
   name?: unknown;
   transports?: readonly {
     readonly protocol?: unknown;
+    /** The tRPC namespace, where a descriptor carries one. Unread here. */
+    readonly namespace?: unknown;
     readonly router?: unknown;
   }[];
 }>;

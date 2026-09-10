@@ -8,7 +8,7 @@ import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { dataPrivacyServer } from "../../data-privacy.server.ts";
@@ -44,17 +44,13 @@ async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacy
     scopeOrganizationId,
   });
 
-  const runtime = await createApp({ name: "data-privacy-boundary-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+  const runtime = await createApp({ role: "api", config: {} })
     .withProvided(ProjectApi, createDataPrivacyTestProjects())
     .withProvided(OrganizationApi, createApiFixture<OrganizationApi>())
     .withProvided(AuthzApi, permittedAuthz)
     .withProvided(FeatureFlagApi, createApiFixture<FeatureFlagApi>())
-    .withModule(dataPrivacyServer, {
-      members: dataPrivacyTestInfrastructure(directory),
-    })
-    .boot({ role: "api" });
+    .withModules([withMemoryRepositories(dataPrivacyServer)])
+    .boot();
 
   return runtime.module(dataPrivacyServer).provided;
 }

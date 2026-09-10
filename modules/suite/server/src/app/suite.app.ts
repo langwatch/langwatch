@@ -7,18 +7,18 @@ import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contra
 import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
 import { ScenarioApi, type ScenarioApi as ScenarioApiType } from "@langwatch/scenario-contract";
 import type {
+  RunActor,
+  ScenarioRunConfig,
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
   ScenarioTestSuiteIdInput,
   SimulationExternalSetSummary,
   SimulationProjectDateRangeInput,
 } from "@langwatch/scenario-contract";
-import { SuiteApi, SuiteNotFoundError, SuiteRunParameters, SuiteRunResult, SuiteScopeNotAllowedError, SuiteTarget, type CreateSuiteCommand, type Suite, type SuiteArchivedNamesInput, type SuiteIdInput, type SuiteRunAllInput, type SuiteRunAllResult, type SuiteRunInput, type SuiteRunPlanInput, type SuiteRunPlanResult, type UpdateSuiteCommand } from "@langwatch/suite-contract";
+import { SuiteApi, SuiteNotFoundError, SuiteRunParameters, SuiteRunResult, SuiteScopeNotAllowedError, SuiteTarget, type CreateSuiteCommand, type StartSuiteRunCommandData, type Suite, type SuiteArchivedNamesInput, type SuiteIdInput, type SuiteRunAllInput, type SuiteRunAllResult, type SuiteRunInput, type SuiteRunPlanInput, type SuiteRunPlanResult, type UpdateSuiteCommand } from "@langwatch/suite-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { SuiteExecution } from "./suite.app.ts";
-import type { SuiteClickHouseClient } from "../repositories/clickhouse-client.repository.ts";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
-import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import type { ConnectedPresenceReader } from "../services/connected-target.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
@@ -48,11 +48,10 @@ export type SuiteOrTestSuite =
   | Readonly<{ kind: "suite"; suite: Suite }>
   | Readonly<{ kind: "test_suite"; testSuite: ScenarioTestSuite }>;
 
-/** Technical ports supplied by the process root. Peer features arrive as API tokens. */
+/** What the process root supplies. Peer features arrive as API tokens. */
 export interface SuiteAppInfrastructure {
   execution: SuiteExecution;
   connectedPresence?: ConnectedPresenceReader;
-  resolveClickHouseClient: ((projectId: string) => Promise<SuiteClickHouseClient>) | null;
   defaultRetentionDays: number;
   generateId?: () => string;
   now?: () => Instant;
@@ -67,9 +66,15 @@ export interface SuiteAppDependencies {
   projects: ProjectApiType;
 }
 
+/**
+ * The run projection is read from ClickHouse and from nowhere else, so this
+ * module reads the process's `clickhouse` member. A deployment that named no
+ * ClickHouse refuses at boot naming this module and that member, rather than
+ * serving an empty run history out of a store nothing ever wrote to.
+ */
 type SuiteSetup = FeatureSetup<
   typeof SuiteApp.dependencies,
-  SuiteAppInfrastructure,
+  SuiteAppInfrastructure & MembersRead<typeof SuiteApp.reads>,
   undefined,
   SuiteRepositories
 >;
@@ -82,17 +87,14 @@ export class SuiteApp implements SuiteApi {
     prompts: PromptApi,
     projects: ProjectApi,
   };
+  static readonly reads = reads("clickhouse");
 
   static create(setup: SuiteSetup): SuiteApp {
     const { members, dependencies, repositories } = setup;
-    // The run projection is ClickHouse's, not this feature's persistence: a
-    // process that composed no client folds into memory instead.
-    const runRepository = members.resolveClickHouseClient
-      ? ClickHouseSuiteRunRepository.create({
-          resolveClient: members.resolveClickHouseClient,
-          defaultRetentionDays: members.defaultRetentionDays,
-        })
-      : MemorySuiteRunRepository.create();
+    const runRepository = ClickHouseSuiteRunRepository.create({
+      clickhouse: members.clickhouse,
+      defaultRetentionDays: members.defaultRetentionDays,
+    });
 
     const suites = SuiteService.create({
       repository: repositories.suites,

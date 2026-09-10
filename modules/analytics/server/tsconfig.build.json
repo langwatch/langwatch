@@ -14,12 +14,12 @@
   "files": [
     "./src/index.ts",
     "./src/testing.ts",
-    "./src/transport/api-trpc/analytics.api.ts",
-    "./src/transport/api-trpc/langwatch-ql.api.ts",
-    "./src/transport/api-rest/analytics.api.ts",
-    "./src/transport/api-rest/analytics-legacy.api.ts",
-    "./src/transport/api-rest/langwatch-ql.api.ts",
-    "./src/transport/api-rest/query.api.ts"
+    "./src/transport/analytics.trpc.ts",
+    "./src/transport/analytics-lwql.trpc.ts",
+    "./src/transport/analytics.rest.ts",
+    "./src/transport/analytics-legacy.rest.ts",
+    "./src/transport/query.rest.ts",
+    "./src/transport/saved-workbench-chart.rest.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

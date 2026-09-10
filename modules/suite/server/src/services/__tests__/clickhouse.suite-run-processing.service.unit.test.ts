@@ -43,17 +43,14 @@ function compose(
   } = {},
 ) {
   const insert = vi.fn(
-    async (_request: { table: string; values: readonly unknown[] }) => undefined,
+    async (_request: { tenantId: string; table: string; rows: readonly unknown[] }) => undefined,
   );
-  const resolveClient = vi.fn(async () => ({
-    insert,
-    query: async () => ({ json: async () => [] }),
-  }));
+  const clickhouse = { insert, query: async () => ({ rows: [] }) };
   const set = vi.fn(async (..._args: unknown[]) => "OK");
   const redis = { get: vi.fn(async () => null), set };
 
   const pipeline: SuiteRunProcessingPipeline = RedisSuiteRunProcessingRepository.create({
-    resolveClient,
+    clickhouse: clickhouse as never,
     defaultRetentionDays: 49,
     redis: redis as never,
     ...(options.foldCacheTtlSeconds === undefined
@@ -61,7 +58,7 @@ function compose(
       : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
   }).buildProcessing();
 
-  return { pipeline, insert, resolveClient, redis, set };
+  return { pipeline, insert, clickhouse, redis, set };
 }
 
 function runStateStore(
@@ -108,15 +105,15 @@ describe("ClickHouseSuiteRunProcessingAdapter", () => {
 
   describe("when a suite run's folded state is stored", () => {
     /** @scenario "Suite-run state is written through the client this graph resolved" */
-    it("resolves the client for the tenant the state names", async () => {
-      const { pipeline, resolveClient, insert } = compose();
+    it("names the tenant the state names, and the table it belongs in", async () => {
+      const { pipeline, insert } = compose();
 
       await storeThrough(pipeline);
 
-      // The client this composition resolved, for the tenant the fold names.
-      // A pipeline handed any other client registers the identical routing
-      // keys and writes its rows somewhere nothing reads.
-      expect(resolveClient).toHaveBeenCalledWith("project_alpha");
+      // The batch names its tenant, and the process's one client routes it
+      // there. A pipeline that wrote without naming one registers the
+      // identical routing keys and puts its rows where nothing reads them.
+      expect(insert.mock.calls.map(([request]) => request.tenantId)).toEqual(["project_alpha"]);
       expect(insert.mock.calls.map(([request]) => request.table)).toEqual(["suite_runs"]);
     });
 
@@ -129,7 +126,7 @@ describe("ClickHouseSuiteRunProcessingAdapter", () => {
       // 49 is the `defaultRetentionDays` this adapter was composed with, not a
       // number configured a second time. Two graphs stamping different
       // retentions on one table expire each other's rows.
-      expect(insert.mock.calls[0]![0].values[0]).toMatchObject({
+      expect(insert.mock.calls[0]![0].rows[0]).toMatchObject({
         TenantId: "project_alpha",
         BatchRunId: "batch_1",
         _retention_days: 49,

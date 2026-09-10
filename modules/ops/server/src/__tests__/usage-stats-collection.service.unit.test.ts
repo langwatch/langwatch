@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  UsageStatsClickHouseClient,
-  UsageStatsClickHouseClientResolver,
   type UsageStatsClickHouseQuery,
 } from "../index.ts";
 import type { UsageStatsProjectDatabase, UsageStatsProjectCounts } from "../app/ops.app.ts";
@@ -9,6 +7,7 @@ import {
   UsageStatsClickHouseRepository,
   UsageStatsProjectRepository,
 } from "../repositories/observe/usage-stats.repository.ts";
+import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
 import { ClickHouseUsageStatsRepository } from "../repositories/clickhouse/clickhouse.usage-stats.repository.ts";
 import { PrismaUsageStatsProjectRepository } from "../repositories/prisma/prisma.usage-stats-project.repository.ts";
 import { UsageStatsCollectionService } from "../services/usage-stats-collection.service.ts";
@@ -43,19 +42,17 @@ class CountsFake extends UsageStatsClickHouseRepository {
   readonly findScenarioRunCount = vi.fn(async () => 75);
 }
 
-class ClickHouseClientFake implements UsageStatsClickHouseClient {
-  readonly query = vi.fn<(input: UsageStatsClickHouseQuery) => ReturnType<typeof queryResult>>();
-}
+/** The process's one ClickHouse client, stood in for by its `query`. */
+class ClickHouseClientFake {
+  readonly query = vi.fn<(input: QueryRequest) => ReturnType<typeof queryResult>>();
 
-class ClickHouseClientsFake implements UsageStatsClickHouseClientResolver {
-  readonly tryResolve =
-    vi.fn<(organizationId: string) => Promise<UsageStatsClickHouseClient | null>>();
+  get client(): ClickHouseQueryClient {
+    return this as unknown as ClickHouseQueryClient;
+  }
 }
 
 function queryResult(total: string) {
-  return Promise.resolve({
-    json: async () => [{ Total: total }],
-  });
+  return Promise.resolve({ rows: [{ Total: total }] });
 }
 
 function serviceFor({
@@ -161,54 +158,88 @@ describe("PrismaUsageStatsProjectRepository", () => {
 });
 
 describe("ClickHouseUsageStatsRepository", () => {
-  it("returns zero without projects or an available ClickHouse client", async () => {
-    const clients = new ClickHouseClientsFake();
-    const repository = ClickHouseUsageStatsRepository.create(clients);
+  it("counts nothing, and asks nothing, for an organization with no projects", async () => {
+    const client = new ClickHouseClientFake();
+    const repository = ClickHouseUsageStatsRepository.create(client.client);
 
     await expect(
       repository.findTraceCount({ organizationId: "organization-1", projectIds: [] }),
     ).resolves.toBe(0);
+    expect(client.query).not.toHaveBeenCalled();
+  });
 
-    clients.tryResolve.mockResolvedValue(null);
+  /**
+   * A store that will not answer is not an organization with no traces. Zero
+   * is a measurement, and reporting one for a read that never happened is the
+   * failure this repository must not have.
+   */
+  it("raises when the store refuses rather than reporting zero usage", async () => {
+    const client = new ClickHouseClientFake();
+    client.query.mockRejectedValue(new Error("clickhouse unavailable"));
+    const repository = ClickHouseUsageStatsRepository.create(client.client);
+
     await expect(
-      repository.findScenarioRunCount({
+      repository.findTraceCount({
         organizationId: "organization-1",
         projectIds: ["project-1"],
       }),
-    ).resolves.toBe(0);
+    ).rejects.toThrow("clickhouse unavailable");
+  });
+
+  it("counts every project of the organization, each named as its own tenant", async () => {
+    const client = new ClickHouseClientFake();
+    client.query.mockImplementation(() => queryResult("10"));
+    const repository = ClickHouseUsageStatsRepository.create(client.client);
+
+    await expect(
+      repository.findTraceCount({
+        organizationId: "organization-1",
+        projectIds: ["project-1", "project-2", "project-1"],
+      }),
+    ).resolves.toBe(20);
+    expect(client.query.mock.calls.map(([request]) => request.tenantId)).toEqual([
+      "project-1",
+      "project-2",
+    ]);
   });
 
   it("uses the existing trace_summaries and simulation_runs queries unchanged", async () => {
     const client = new ClickHouseClientFake();
     client.query.mockImplementationOnce(() => queryResult("200"));
     client.query.mockImplementationOnce(() => queryResult("75"));
-    const clients = new ClickHouseClientsFake();
-    clients.tryResolve.mockResolvedValue(client);
-    const repository = ClickHouseUsageStatsRepository.create(clients);
+    const repository = ClickHouseUsageStatsRepository.create(client.client);
     const input = { organizationId: "organization-1", projectIds: ["project-1"] };
 
     await expect(repository.findTraceCount(input)).resolves.toBe(200);
     await expect(repository.findScenarioRunCount(input)).resolves.toBe(75);
 
-    expect(client.query).toHaveBeenNthCalledWith(1, {
-      query: expect.stringContaining(
-        "SELECT toString(count(DISTINCT TraceId)) AS Total\n        FROM trace_summaries",
-      ),
-      query_params: { projectIds: ["project-1"] },
-      format: "JSONEachRow",
-    });
-    expect(client.query).toHaveBeenNthCalledWith(2, {
-      query: expect.stringContaining(
-        "SELECT toString(count()) AS Total\n        FROM simulation_runs AS t",
-      ),
-      query_params: { projectIds: ["project-1"] },
-      format: "JSONEachRow",
-    });
-    const traceQuery = client.query.mock.calls[0]?.[0].query;
+    expect(client.query).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        tenantId: "project-1",
+        table: "trace_summaries",
+        sql: expect.stringContaining(
+          "SELECT toString(count(DISTINCT TraceId)) AS Total\n        FROM trace_summaries",
+        ),
+        params: { projectId: "project-1" },
+      }),
+    );
+    expect(client.query).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        tenantId: "project-1",
+        table: "simulation_runs",
+        sql: expect.stringContaining(
+          "SELECT toString(count()) AS Total\n        FROM simulation_runs AS t",
+        ),
+        params: { projectId: "project-1" },
+      }),
+    );
+    const traceQuery = client.query.mock.calls[0]?.[0].sql;
     expect(traceQuery).not.toContain("trace_analytics");
     expect(traceQuery).not.toMatch(/rollup|timeseries/i);
 
-    const scenarioQuery = client.query.mock.calls[1]?.[0].query;
+    const scenarioQuery = client.query.mock.calls[1]?.[0].sql;
     expect(scenarioQuery).not.toContain("LIMIT 1 BY");
     expect(scenarioQuery).not.toMatch(/SELECT\s+\*\s+FROM\s+simulation_runs/i);
     expect(scenarioQuery).toContain("AND t.ArchivedAt IS NULL");

@@ -3,10 +3,7 @@ import { resolve } from "node:path";
 import { serverModules } from "@langwatch/installed-modules/server";
 import { Task } from "@langwatch/task";
 
-import {
-  declaredRestFamilies,
-  type InstalledModule,
-} from "./openapi-document.declarations.ts";
+import { declaredRestFamilies, type InstalledModule } from "./openapi-document.declarations.ts";
 import { DEFAULT_SCRATCH_PATH, generateOpenApiDocument } from "./openapi-document.generator.ts";
 
 /**

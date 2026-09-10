@@ -5,7 +5,6 @@ export { MemoryCodingAgentRepositories } from "./repositories/memory/memory.codi
 export type { CodingAgentRepositories } from "./repositories/coding-agent.repositories.ts";
 export {
   CodingAgentBillingPolicy,
-  CodingAgentClickHouse,
   CodingAgentClock,
   CodingAgentCostEstimator,
   CodingAgentProjectActivity,

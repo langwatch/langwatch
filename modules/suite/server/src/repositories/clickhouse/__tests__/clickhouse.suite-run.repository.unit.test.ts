@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId, SecurityError, StoreError } from "@langwatch/eventing";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { ClickHouseSuiteRunRepository } from "../clickhouse.suite-run.repository.ts";
 
 const stateRow = {
@@ -30,13 +31,16 @@ const projectionRow = {
 };
 const { LastEventOccurredAt: _legacyLastEventOccurredAt, ...stateReadRow } = stateRow;
 
+/**
+ * The process's one ClickHouse client, stood in for. Nothing here resolves an
+ * endpoint: the repository names its tenant on every statement and the client
+ * routes it, which is what these cases assert.
+ */
 function setup(rows: unknown[] = [stateReadRow]) {
-  const query = vi.fn().mockResolvedValue({
-    json: async <T>(): Promise<T[]> => rows as T[],
-  });
+  const query = vi.fn().mockResolvedValue({ rows });
   const insert = vi.fn().mockResolvedValue(undefined);
   const repository = ClickHouseSuiteRunRepository.create({
-    resolveClient: async () => ({ query, insert }),
+    clickhouse: { query, insert } as unknown as ClickHouseQueryClient,
     defaultRetentionDays: 30,
   });
   return { repository, query, insert };
@@ -58,9 +62,33 @@ describe("ClickHouseSuiteRunRepository", () => {
   it("deduplicates latest state by the tenant and batch tuple", async () => {
     const { repository, query } = setup([]);
     await repository.tryGetSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" });
-    const sql = query.mock.calls[0]?.[0]?.query as string;
+    const sql = query.mock.calls[0]?.[0]?.sql as string;
     expect(sql).toContain("(t.TenantId, t.BatchRunId, t.UpdatedAt) IN");
     expect(sql).toContain("GROUP BY TenantId, BatchRunId");
+    expect(query.mock.calls[0]?.[0]).toMatchObject({
+      tenantId: "project_1",
+      table: "suite_runs",
+    });
+  });
+
+  /** Every write names the tenant the client routes it by. */
+  it("names the tenant on the batch it writes", async () => {
+    const { repository, insert } = setup([]);
+    await repository.storeProjectionBatch(
+      [
+        {
+          id: "projection_2",
+          aggregateId: "batch_1",
+          tenantId: createTenantId("project_1"),
+          version: "2026-08-25",
+          data: stateRow,
+        },
+      ],
+      { tenantId: createTenantId("project_1") },
+    );
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: "project_1", table: "suite_runs" }),
+    );
   });
 
   it("reads and writes the same row shape used by the Eventing fold store", async () => {
@@ -91,10 +119,10 @@ describe("ClickHouseSuiteRunRepository", () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         table: "suite_runs",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+        settings: { async_insert: 1, wait_for_async_insert: 0 },
       }),
     );
-    expect(insert.mock.calls[0]?.[0]?.values[0]).toMatchObject({
+    expect(insert.mock.calls[0]?.[0]?.rows[0]).toMatchObject({
       LastEventOccurredAt: new Date(stateRow.LastEventOccurredAt),
       _retention_days: 14,
     });
@@ -113,26 +141,29 @@ describe("ClickHouseSuiteRunRepository", () => {
       limit: 999,
     });
     const defaultInput = query.mock.calls[0]?.[0] as {
-      query_params: Record<string, unknown>;
+      params: Record<string, unknown>;
     };
     const cappedInput = query.mock.calls[1]?.[0] as {
-      query_params: Record<string, unknown>;
+      params: Record<string, unknown>;
     };
-    expect(defaultInput.query_params).toMatchObject({
+    expect(defaultInput.params).toMatchObject({
       scenarioSetIds: ["default", ""],
       limit: 50,
     });
-    expect(cappedInput.query_params.limit).toBe(100);
-    const sql = query.mock.calls[0]?.[0]?.query as string;
+    expect(cappedInput.params.limit).toBe(100);
+    const sql = query.mock.calls[0]?.[0]?.sql as string;
     expect(sql).toContain("GROUP BY TenantId, ScenarioSetId, BatchRunId");
     expect(sql).toContain("ORDER BY t.CreatedAt DESC");
   });
 
-  it("wraps ClickHouse resolution failures instead of silently succeeding", async () => {
+  it("wraps ClickHouse failures instead of silently succeeding", async () => {
     const repository = ClickHouseSuiteRunRepository.create({
-      resolveClient: async () => {
-        throw new Error("clickhouse unavailable");
-      },
+      clickhouse: {
+        query: async () => {
+          throw new Error("clickhouse unavailable");
+        },
+        insert: async () => {},
+      } as unknown as ClickHouseQueryClient,
       defaultRetentionDays: 30,
     });
     await expect(
@@ -178,8 +209,8 @@ describe("ClickHouseSuiteRunRepository", () => {
     );
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-        values: [expect.objectContaining({ _retention_days: 30 })],
+        settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: [expect.objectContaining({ _retention_days: 30 })],
       }),
     );
   });

@@ -1,4 +1,4 @@
-export { SuiteRuntime, type SuiteEventingCapabilities } from "./repositories/suite-eventing.repository.ts";
+export type { SuiteEventingCapabilities } from "./repositories/suite-eventing.repository.ts";
 export {
   ClickhouseSuiteEventingRepository as ClickHouseSuiteEventingAdapter,
   type ClickHouseSuiteEventingAdapterOptions,
@@ -25,7 +25,6 @@ export {
   type ConnectedTargetAgent,
   type ConnectedTargetReferenceReader,
 } from "./services/connected-target.service.ts";
-export type { SuiteClickHouseClient } from "./repositories/clickhouse-client.repository.ts";
 export {
   CompleteSuiteRunItemCommand,
   RecordSuiteRunItemStartedCommand,

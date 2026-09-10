@@ -34,7 +34,13 @@ type RestDescriptor = Readonly<{
 /** The family, its descriptor and its declaration, ready for either seam. */
 export type FixtureFamily = DeclaredRestFamily & { readonly descriptor: RestDescriptor };
 
-function familyOf({ module, descriptor }: { module: string; descriptor: RestDescriptor }): FixtureFamily {
+function familyOf({
+  module,
+  descriptor,
+}: {
+  module: string;
+  descriptor: RestDescriptor;
+}): FixtureFamily {
   return {
     module,
     descriptor,

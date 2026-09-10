@@ -1,40 +1,31 @@
 import { RetroactiveMutationInProgressError } from "@langwatch/data-retention-contract";
 import { describe, expect, it } from "vitest";
-import {
-  ClickHouseRetroactiveRetentionRepository,
-  type RetentionClickHouseClient,
-} from "../clickhouse.retroactive-retention.repository.ts";
+import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import { ClickHouseRetroactiveRetentionRepository } from "../clickhouse.retroactive-retention.repository.ts";
 
-type QueryParams = Record<string, number | string | string[]>;
-type CommandRequest = { query: string; query_params: QueryParams };
-type QueryRequest = CommandRequest & { format: "JSONEachRow" };
-
-function createClient(rows: unknown): {
-  client: RetentionClickHouseClient;
-  commands: CommandRequest[];
-  queries: QueryRequest[];
-} {
-  const commands: CommandRequest[] = [];
-  const queries: QueryRequest[] = [];
-  const client: RetentionClickHouseClient = {
-    async command(input): Promise<void> {
-      commands.push(input);
-    },
-    async query(input): Promise<{ json(): Promise<unknown> }> {
-      queries.push(input);
-      return { json: async () => rows };
-    },
-  };
-
-  return { client, commands, queries };
-}
-
+/**
+ * The process's one ClickHouse client, stood in for. Nothing here resolves an
+ * endpoint: each statement names the tenant it acts for and the client routes
+ * it, which is what these cases record.
+ */
 function createRepository(rows: unknown) {
-  const fake = createClient(rows);
-  const repository = ClickHouseRetroactiveRetentionRepository.create({
-    resolveClient: async () => fake.client,
-  });
-  return { ...fake, repository };
+  const commands: QueryRequest[] = [];
+  const queries: QueryRequest[] = [];
+  const clickhouse = {
+    async command(request: QueryRequest): Promise<void> {
+      commands.push(request);
+    },
+    async query(request: QueryRequest): Promise<{ rows: unknown[] }> {
+      queries.push(request);
+      return { rows: rows as unknown[] };
+    },
+  } as unknown as ClickHouseQueryClient;
+
+  return {
+    commands,
+    queries,
+    repository: ClickHouseRetroactiveRetentionRepository.create({ clickhouse }),
+  };
 }
 
 function required<T>(value: T | undefined): T {
@@ -82,17 +73,17 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
 
     for (const table of expectedTables) {
       const command = required(
-        commands.find((candidate) => candidate.query.includes(`ALTER TABLE ${table}`)),
+        commands.find((candidate) => candidate.sql.includes(`ALTER TABLE ${table}`)),
       );
-      expect(command.query).toContain("UPDATE _retention_days = {retentionDays:UInt16}");
-      expect(command.query).toContain("WHERE TenantId = {tenantId:String}");
-      expect(command.query).toContain("_retention_days != {retentionDays:UInt16}");
-      expect(command.query_params).toEqual({ tenantId: "project-1", retentionDays: 91 });
+      expect(command.sql).toContain("UPDATE _retention_days = {retentionDays:UInt16}");
+      expect(command.sql).toContain("WHERE TenantId = {tenantId:String}");
+      expect(command.sql).toContain("_retention_days != {retentionDays:UInt16}");
+      expect(command.params).toEqual({ tenantId: "project-1", retentionDays: 91 });
     }
 
-    expect(commands.some((command) => command.query.includes("TraceId"))).toBe(false);
-    expect(commands.some((command) => command.query.includes("NOT IN"))).toBe(false);
-    expect(commands.some((command) => command.query.includes("'project-1'"))).toBe(false);
+    expect(commands.some((command) => command.sql.includes("TraceId"))).toBe(false);
+    expect(commands.some((command) => command.sql.includes("NOT IN"))).toBe(false);
+    expect(commands.some((command) => command.sql.includes("'project-1'"))).toBe(false);
   });
 
   /** @scenario "Apply retention to existing project data" */
@@ -103,7 +94,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       category: "scenarios",
       newRetentionDays: 63,
     });
-    expect(scenarios.commands.map((command) => command.query)).toEqual(
+    expect(scenarios.commands.map((command) => command.sql)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("ALTER TABLE simulation_runs"),
         expect.stringContaining("ALTER TABLE suite_runs"),
@@ -116,7 +107,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       category: "experiments",
       newRetentionDays: 119,
     });
-    expect(experiments.commands.map((command) => command.query)).toEqual(
+    expect(experiments.commands.map((command) => command.sql)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("ALTER TABLE experiment_runs"),
         expect.stringContaining("ALTER TABLE experiment_run_items"),
@@ -200,10 +191,10 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       "scenarios",
     ]);
     const query = required(queries[0]);
-    expect(query.query_params).toEqual({
+    expect(query.params).toEqual({
       tenantFilterNeedle: "WHERE TenantId = 'weird\\'\\\\id'",
     });
-    expect(query.query).not.toContain("weird'\\id");
+    expect(query.sql).not.toContain("weird'\\id");
   });
 
   it("parameterizes mutation cancellation and scopes it to the tenant", async () => {
@@ -212,11 +203,11 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     await repository.killMutation({ projectId: "project-1", mutationId: "mut-xyz" });
 
     const command = required(commands[0]);
-    expect(command.query).toContain("mutation_id = {mutationId:String}");
-    expect(command.query_params).toEqual({
+    expect(command.sql).toContain("mutation_id = {mutationId:String}");
+    expect(command.params).toEqual({
       mutationId: "mut-xyz",
       tenantFilterNeedle: "WHERE TenantId = 'project-1'",
     });
-    expect(command.query).not.toContain("'mut-xyz'");
+    expect(command.sql).not.toContain("'mut-xyz'");
   });
 });

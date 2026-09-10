@@ -67,11 +67,7 @@ export {
 export { QueuePayloadDecoder } from "./app/ops.app.ts";
 export {
   UsageStatsErrorReporter,
-  UsageStatsClickHouseClient,
-  UsageStatsClickHouseClientResolver,
   UsageStatsTelemetryClient,
-  type UsageStatsClickHouseQuery,
-  type UsageStatsClickHouseQueryResult,
   type UsageStatsWorkerDatabase,
 } from "./app/ops.app.ts";
 export {

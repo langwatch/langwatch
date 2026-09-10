@@ -82,7 +82,7 @@ describe("given a family declared behind a project key", () => {
       expect(operationAt(generated.document, "POST /api/v1/widgets")?.["x-access-policy"]).toEqual({
         kind: "handlerManaged",
         credential: ["project_api_key"],
-        permissions: ["widgets:manage"],
+        permissions: ["annotations:manage"],
       });
     });
 
@@ -129,10 +129,7 @@ describe("given a family declared behind a project key", () => {
       const generated = await generate([projectFamily]);
       const written = JSON.parse(await readFile(generated.outputPath, "utf8")) as OpenApiDocument;
 
-      expect(Object.keys(written.paths ?? {})).toEqual([
-        "/api/v1/widgets",
-        "/api/v1/widgets/{id}",
-      ]);
+      expect(Object.keys(written.paths ?? {})).toEqual(["/api/v1/widgets", "/api/v1/widgets/{id}"]);
     });
   });
 });

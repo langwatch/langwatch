@@ -2,7 +2,7 @@ import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-cont
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import type { CodingAgentClickHouse } from "../../app/coding-agent.members.ts";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   clickHouseMomentOf,
   parseClickHouseDateTimeMs,
@@ -25,17 +25,17 @@ interface ClickHouseWriteRecord {
 
 export class CodingAgentTraceSessionClickHouseRepository implements TraceSessionRepository {
   static create({
-    clickHouse,
+    clickhouse,
     defaultTraceRetentionDays,
   }: {
-    clickHouse: CodingAgentClickHouse;
+    clickhouse: ClickHouseQueryClient;
     defaultTraceRetentionDays: number;
   }): CodingAgentTraceSessionClickHouseRepository {
-    return new CodingAgentTraceSessionClickHouseRepository(clickHouse, defaultTraceRetentionDays);
+    return new CodingAgentTraceSessionClickHouseRepository(clickhouse, defaultTraceRetentionDays);
   }
 
   private constructor(
-    private readonly clickHouse: CodingAgentClickHouse,
+    private readonly clickhouse: ClickHouseQueryClient,
     private readonly defaultTraceRetentionDays: number,
   ) {}
 
@@ -45,9 +45,8 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
 
     const tenantId = first.tenantId;
     EventUtils.validateTenantId({ tenantId }, "CodingAgentTraceSessionClickHouseRepository.ensure");
-    // A batch insert resolves ONE client, so a row from another tenant would
-    // be written into this tenant's ClickHouse. Refuse rather than cross the
-    // line.
+    // A batch is written for ONE tenant, so a row from another would land in
+    // this tenant's ClickHouse. Refuse rather than cross the line.
     for (const record of records) {
       if (record.tenantId !== tenantId) {
         throw new SecurityError(
@@ -68,13 +67,12 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       _retention_days: retentionDays ?? this.defaultTraceRetentionDays,
     }));
 
-    const client = await this.clickHouse.resolve(tenantId);
     try {
-      await client.insert({
+      await this.clickhouse.insert({
+        tenantId,
         table: TABLE_NAME,
-        values,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: values,
+        settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
       logger.warn(
@@ -100,10 +98,15 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       { tenantId },
       "CodingAgentTraceSessionClickHouseRepository.findByTraceId",
     );
-    const client = await this.clickHouse.resolve(tenantId);
-
-    const result = await client.query({
-      query: `
+    const { rows } = await this.clickhouse.query<{
+      TraceId: string;
+      SessionId: string;
+      OccurredAt: string;
+    }>({
+      tenantId,
+      table: TABLE_NAME,
+      kind: "read",
+      sql: `
         SELECT TraceId, SessionId, OccurredAt
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
@@ -118,15 +121,9 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
         ORDER BY SessionId != TraceId DESC, OccurredAt DESC, SessionId ASC
         LIMIT 1
       `,
-      query_params: { tenantId, traceId },
-      format: "JSONEachRow",
+      params: { tenantId, traceId },
     });
 
-    const rows = await result.json<{
-      TraceId: string;
-      SessionId: string;
-      OccurredAt: string;
-    }>();
     const first = rows[0];
     if (!first) return null;
     return {

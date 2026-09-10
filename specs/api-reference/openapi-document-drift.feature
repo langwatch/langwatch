@@ -1,20 +1,19 @@
-Feature: The published OpenAPI document tracks the surface the API process serves
+Feature: The published OpenAPI document is generated from the module declarations
   As an integrator generating a client from the LangWatch API description
-  I want the document to describe routes that answer
+  I want the document to describe the routes the installed modules declare
   So that a generated call does not 404 against an operation the document promised
 
   # The document at apps/api/src/features/discovery/openapi-document.json is a
   # FROZEN artifact: three routes serve it and both SDKs generate clients from
-  # it. Its producer went with the retired monolith, so for a while nothing
-  # regenerated it and nothing checked it — an operation could be added, or a
-  # whole family could stop being mounted, and neither an integrator nor CI
-  # would see it.
+  # it. Its first producer read a doors table and composed the whole API
+  # process over stand-in collaborators that refused if a handler reached them,
+  # which meant a family whose stand-in was wrong left the document silently.
   #
-  # What replaces the producer is a describer. It composes the process's OWN
-  # mount — the same `createApiProcessRestFeatures` enumeration production
-  # runs — over stand-in collaborators that refuse if a handler ever reaches
-  # them, and describes what that mount registers. It writes to a path the
-  # caller names, never to the artifact.
+  # The producer now reads the module declarations instead. Every REST family
+  # is one `defineRestRouter(<F>Api)` carrying each route's method, path,
+  # credential, permission and schemas, and the union of the installed
+  # declarations IS the document. Nothing on that path boots a process, opens a
+  # client or resolves a member.
   #
   # The two directions of drift are not symmetrical, and that asymmetry is the
   # whole design: a removed route breaks a client that already exists, while an
@@ -22,16 +21,16 @@ Feature: The published OpenAPI document tracks the surface the API process serve
 
   Background:
     Given the OpenAPI document is frozen and served by three routes
-    And the generator describes the families the API process mounts
+    And the generator describes the families the installed modules declare
 
-  Rule: describing the surface never writes the frozen document
+  Rule: describing the declarations never writes the frozen document
 
     @unit
     Scenario: The generator writes only where the caller pointed it
       Given a caller that names an output path
       When the description is generated
       Then the description is written to that path
-      And the frozen document is byte-for-byte unchanged
+      And no other path is written
 
     @unit
     Scenario: The checker writes only its scratch file
@@ -39,195 +38,187 @@ Feature: The published OpenAPI document tracks the surface the API process serve
       When the check completes
       Then the frozen document is byte-for-byte unchanged
 
-  Rule: the description covers every family the process mounts
+  Rule: every declared route is described or accounted for by its own declaration
+
+    # A route absent because its declaration says so is a decision. A route
+    # absent because nothing could read its declaration is a hole that reads,
+    # in a document diff, exactly like a deletion.
 
     @unit
-    Scenario: Every mounted family contributes its operations
-      Given the process mounts its REST families over stand-in collaborators
+    Scenario: Every declared route contributes its operation
+      Given a family declaring a list, a read and a create
       When the description is generated
-      Then each family that publishes route descriptions appears in the document
+      Then the document publishes one operation for each of them
+      And the run reports how many families and routes it read
 
     @unit
-    Scenario: Each parameter is declared once per operation
-      Given a family documents the replay key by hand on a route the pipeline already marks idempotent
+    Scenario: A route its declaration hides is left out and named
+      Given a family with one route the declaration hides
       When the description is generated
-      Then the operation lists the Idempotency-Key header once
-      And no operation in the document repeats a parameter
+      Then the hidden operation is not published
+      And the run reports it against the declaration that hid it
 
     @unit
-    Scenario: An operation no security scheme can express is left out and named
-      Given a route reachable only by a browser session
-      And the route carries a route description
+    Scenario: A family behind a browser session publishes nothing
+      Given a family whose door is a browser session
       When the description is generated
-      Then the operation is not published
+      Then the family publishes no operation, because no API client holds a cookie
+      And the run still counts the routes it read
+
+    @unit
+    Scenario: An operation no security scheme can express is dropped and named
+      Given a published family holding one route that raises a browser door itself
+      When the description is generated
+      Then that operation is not published
       And the run reports it as unpublishable rather than publishing it unauthenticated
 
-  Rule: a documented operation the process stopped serving fails the check
+    @unit
+    Scenario: A module whose declaration cannot be read fails the run
+      Given an installed module whose REST router throws
+      When the installed declarations are collected
+      Then the run fails naming the module
+      And no family is silently dropped
 
     @unit
-    Scenario: A documented operation with no route behind it is reported as removed
-      Given the frozen document lists an operation the process serves no route for
+    Scenario: A router handing back something that is not a declaration fails the run
+      Given an installed module whose REST router returns a bare object
+      When the installed declarations are collected
+      Then the run fails naming the module
+
+    @unit
+    Scenario: A tRPC transport beside a REST one is passed over
+      Given an installed module declaring both a tRPC and a REST transport
+      When the installed declarations are collected
+      Then only the REST family is read
+
+  Rule: the document names one canonical address per declared route
+
+    # A dated family answers one operation at three addresses — its dated path,
+    # its `latest` path and its bare path — and each is the same call reached
+    # through a different version selector. OpenAPI cannot say that, so
+    # publishing all three would hand a client generator three names for one
+    # call. The document names the bare address at its `/api/v1` twin, which is
+    # the URL an integrator is told to call.
+
+    @unit
+    Scenario: A declared route is published at its canonical v1 address
+      Given a family addressed at a bare /api path with a /api/v1 twin
+      When the description is generated
+      Then the document lists the operation under its /api/v1 path
+
+    @unit
+    Scenario: A collection route is addressed at the family root
+      Given a route whose declared path is the family root
+      When its published address is computed
+      Then it is the family's own address with no trailing segment
+
+    @unit
+    Scenario: A path parameter is spelled the way the document spells it
+      Given a route whose declared path names a parameter
+      When its published address is computed
+      Then the parameter is written in braces
+
+    @unit
+    Scenario: A family with no v1 twin keeps the address it declares
+      Given a family addressed literally that opted out of the /api/v1 alias
+      When the description is generated
+      Then the document lists its operations at the paths the routes write
+
+    @unit
+    Scenario: Two declarations cannot publish at one address
+      Given two families whose declarations resolve to one published address
+      When the surface is composed
+      Then the run fails naming the address and both claimants
+
+  Rule: every published operation states the credential and the access it declares
+
+    # An operation publishes the security scheme a caller presents, and beside
+    # it an `x-access-policy` extension saying what that credential has to
+    # hold. The policy carries no prose reason: that describes how a handler is
+    # built, and the document is read by customers.
+
+    @unit
+    Scenario: A family behind a project key publishes the project scheme
+      Given a family whose declared door is a project credential
+      When the description is generated
+      Then its operations require the project API key scheme
+
+    @unit
+    Scenario: A family behind an organization key publishes the admin scheme
+      Given a family whose declared door is an organization credential
+      When the description is generated
+      Then its operations require the admin API key scheme
+
+    @unit
+    Scenario: A family behind the deployment's own secret is published, not dropped
+      Given a family whose declared door is the internal shared secret
+      When the description is generated
+      Then its operations require the internal scheme
+
+    @unit
+    Scenario: An operation requiring a permission publishes the permission
+      Given a route that declares an RBAC permission
+      When the description is generated
+      Then the operation publishes that permission beside its credential class
+
+  Rule: an operation carries the prose and the shapes its declaration wrote
+
+    @unit
+    Scenario: The declared operation id and summary are published
+      Given a route that declares an operation name and a summary
+      When the description is generated
+      Then both appear on the published operation
+
+    @unit
+    Scenario: A declared path parameter is published
+      Given a route that parses a path parameter
+      When the description is generated
+      Then the operation lists it as a required path parameter
+
+    @unit
+    Scenario: A declared request body is published as JSON Schema
+      Given a route that declares an input schema
+      When the description is generated
+      Then the operation publishes that shape as its JSON request body
+
+  Rule: a documented operation no declaration publishes fails the check
+
+    @unit
+    Scenario: A documented operation with no declaration behind it is reported as removed
+      Given the frozen document lists an operation no installed family declares
       When the check runs
       Then the operation is reported as removed
-      And the check fails
+      And it is counted as a regression
 
     @unit
-    Scenario: A served operation the document omits is reported and does not fail
-      Given the process serves an operation the frozen document does not list
+    Scenario: A removal already at the baseline is inherited, not caused
+      Given the checker's baseline names the removed operation
+      When the check runs
+      Then the operation is reported as baselined rather than as a regression
+
+    @unit
+    Scenario: A declared operation the document omits is reported and does not fail
+      Given a declaration publishing an operation the frozen document does not list
       When the check runs
       Then the operation is reported as added
       And the check still passes
 
     @unit
-    Scenario: A documented operation served by an undescribed route is not a removal
-      Given the frozen document describes an operation by hand
-      And the process registers a route for it that carries no route description
+    Scenario: A documented operation whose declaration hides it is not a removal
+      Given the frozen document describes by hand an operation its declaration hides
       When the check runs
-      Then the operation is reported as served and undescribed
+      Then the operation is reported as declared and undescribed
       And it is not reported as removed
 
     @unit
     Scenario: An operation whose enforced credential moved is reported as changed
       Given the frozen document publishes one security requirement for an operation
-      And the process now enforces a different credential class on that route
+      And the declaration now names a different credential for that route
       When the check runs
       Then the operation is reported as changed with both requirements
 
-  Rule: the document names the canonical /api/v1 address of every route
-
-    # Every REST family answers at both /api/{family} and /api/v1/{family},
-    # and the published document names ONE of the two. It names the canonical
-    # v1 address, because that is the URL an integrator is told to call. A
-    # path that already carries a version segment of its own, and a family
-    # the mount opted out of the alias, keep the only address they answer on.
-
     @unit
-    Scenario: A described route is published at its canonical v1 address
-      Given a family mounted at a bare /api path with a /api/v1 twin
-      When the description is generated
-      Then the document lists the operation under its /api/v1 path
-      And the bare /api path is not listed beside it
-
-    @unit
-    Scenario: A path carrying its own version segment is published unchanged
-      Given a family whose routes already name a version segment
-      When the description is generated
-      Then the document lists those paths exactly as the routes spell them
-
-    @unit
-    Scenario: A family with no v1 twin keeps its bare address
-      Given a family the mount opted out of the /api/v1 alias
-      When the description is generated
-      Then the document lists its operations under the bare /api path
-
-    @unit
-    Scenario: Two families cannot publish at one canonical address
-      Given a bare family whose v1 twin is another family's declared base
-      When the description is generated
-      Then the run fails naming the path both families claim
-
-  Rule: a body the routes leave unschema'd is described as unstated, not as a shape
-
-    # A family that reads its body raw, or writes its answer raw, states a media
-    # type and no shape. The description used to publish that as a media object
-    # with nothing in it, which every client generator reads as `unknown`: a
-    # required request body no caller can fill, and a success status that widens
-    # the response of every other status beside it. None of that is what the
-    # route said. Nothing here invents a schema — the document just stops
-    # claiming more than the route declared.
-
-    @unit
-    Scenario: A status with no schema is described without a body
-      Given a route that writes its answer raw and describes another status by hand
-      When the description is generated
-      Then the status with no schema keeps its description and describes no body
-      And the status that names a schema keeps it
-
-    @unit
-    Scenario: A body of unstated shape is not required
-      Given a route that reads its body raw and describes no shape for it
-      When the description is generated
-      Then the request body still names the media type the route reads
-      And the request body is not required
-
-    @unit
-    Scenario: No published response describes a body it cannot name
-      Given the description of every mounted family
-      When the description is generated
-      Then no response media object in it is published without a schema
-
-    @unit
-    Scenario: A declared schema is left alone
-      Given a request body and a response that each name a schema
-      When the description is generated
-      Then both are published exactly as declared
-
-    @unit
-    Scenario: A body with one described media type stays required
-      Given a required request body naming one media type with a schema and one without
-      When the description is generated
-      Then the request body stays required
-      And both media types are kept
-
-    @unit
-    Scenario: A status keeps the media types it did describe
-      Given a status naming one media type with a schema and one without
-      When the description is generated
-      Then only the media type with no schema is dropped
-      And the status keeps its description
-
-  Rule: every published operation states the access decision its route declares
-
-    # Every route mounted through the secured app builder declares exactly one
-    # access policy, and until now the document kept none of it: an operation
-    # published the security scheme a caller presents and said nothing about
-    # what that credential has to hold. An integrator reading the description
-    # could see that a call takes a project API key and not that the key needs
-    # a particular permission, and an auditor could not answer "what does this
-    # endpoint demand?" from the published artifact at all.
-    #
-    # The policy is published as an `x-access-policy` extension carrying the
-    # declared kind, the credential classes admitted, the permission where the
-    # policy names one, and the permissions a self-enforcing handler checks.
-    # It carries no `reason`: that prose describes how a handler is built, and
-    # the document is read by customers.
-
-    @unit
-    Scenario: Every published operation carries its access policy
-      Given the description of every mounted family
-      When the description is generated
-      Then every operation states the access policy its route declares
-      And the policy names one of the declared policy kinds
-
-    @unit
-    Scenario: An operation requiring a permission publishes the permission
-      Given a route that requires an RBAC permission
-      When the description is generated
-      Then the operation publishes that permission beside its credential class
-
-    @unit
-    Scenario: An unauthenticated operation says it is public
-      Given a route declared public
-      When the description is generated
-      Then the operation states the public kind
-      And it admits no credential
-
-    @unit
-    Scenario: A handler gating on something other than a permission publishes an empty list
-      Given a route whose handler enforces access itself without an RBAC permission
-      When the description is generated
-      Then the operation states the handler-managed kind
-      And its permission list is published as empty rather than omitted
-
-    @unit
-    Scenario: A route reachable by two credentials names both
-      Given a handler-managed route that answers an API key and a browser session
-      When the description is generated
-      Then the operation names both credential classes
-
-    @unit
-    Scenario: The published policy carries data and nothing else
-      Given the description of every mounted family
-      When the description is generated
-      Then no published policy carries a function or a closure
-      And no published policy carries the reviewer's prose reason
+    Scenario: The rendered report names every operation the run would fail on
+      Given a check run holding a regression
+      When the report is rendered for a terminal
+      Then it names the operation
