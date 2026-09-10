@@ -36,8 +36,8 @@ vi.mock("~/server/gateway/elevenLabsCredential.service", () => ({
 }));
 
 import { PHONE_NO_CREDENTIAL_MESSAGE } from "../../voice/transports/phone.transport";
-import { createSerializedVoiceAgentAdapter } from "../serialized-adapters/voice-agent.adapter";
 import { resolveVoiceTarget } from "../data-prefetcher";
+import { createSerializedVoiceAgentAdapter } from "../serialized-adapters/voice-agent.adapter";
 
 beforeEach(() => vi.clearAllMocks());
 
