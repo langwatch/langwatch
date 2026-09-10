@@ -6,16 +6,7 @@
  * person. A Langy session key is labelled as such so an agent's edits are
  * distinguishable from a person's in the version history.
  */
-import type { WorkbenchActor } from "@langwatch/experiment-contract";
-
-/**
- * The credential as this rule needs it: its class, the member it acts as, and
- * whether it is an agent's session key. Named structurally so the rule stays
- * free of the transport it is read from.
- */
-export type WorkbenchCredential =
-  | Readonly<{ kind: "apiKey"; userId: string | null; isLangySessionKey?: boolean }>
-  | Readonly<{ kind: "legacyProjectKey" }>;
+import type { WorkbenchActor, WorkbenchCredential } from "@langwatch/experiment-contract";
 
 export const workbenchActorFrom = ({
   credential,

@@ -1,3 +1,4 @@
+import { WorkflowService } from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 import {
   ExperimentNotFoundError,
@@ -18,7 +19,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { WorkflowService } from "@langwatch/workflow-contract";
+
 import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter.ts";
 import type { Instant } from "@langwatch/time";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -30,7 +31,7 @@ const evaluators: EvaluatorApi = createApiFixture<EvaluatorApi>();
 evaluators.getById = async () => {
   throw new Error("missing");
 };
-const workflows: WorkflowService = Object.create(WorkflowService.prototype);
+const workflows: WorkflowService = createApiFixture<WorkflowService>();
 workflows.getById = async () => {
   throw new Error("missing");
 };

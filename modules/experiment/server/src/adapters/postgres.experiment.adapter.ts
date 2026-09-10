@@ -1,3 +1,4 @@
+import type { WorkflowService } from "@langwatch/workflow-server";
 import {
   PrismaExperimentWorkflowVersionRepository,
   type ExperimentWorkflowVersionDatabase,
@@ -7,7 +8,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import {
   PrismaExperimentRepository,
   type ExperimentDatabase,

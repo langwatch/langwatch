@@ -2,15 +2,16 @@
  * The experiment application: the rules that moved off its two doors onto it.
  * @vitest-environment node
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Experiment } from "@langwatch/experiment-contract";
 import type { ExperimentService } from "../../services/experiment.service.ts";
-import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
+import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
-import { ExperimentApp } from "../experiment.app.ts";
+import { ExperimentApp, type ExperimentAppDependencies } from "../experiment.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -93,7 +94,19 @@ function harness({
     ...workflows,
   } as unknown as WorkflowService;
 
-  const monitors = { deleteForExperiment: vi.fn(async () => undefined) };
+  const monitors = {
+    deleteForExperiment: vi.fn(async () => undefined),
+    upsertForExperiment: vi.fn(async () => undefined),
+  };
+  const workflowAuthoring = {
+    create: vi.fn(async () => ({ id: "workflow-1" })),
+    saveVersion: vi.fn(async () => undefined),
+    copyWithDatasets: vi.fn(async () => ({ workflowId: "workflow-2", dsl: {} as never })),
+  };
+  const runLookup = { resolve: vi.fn(async () => experiment) };
+  const permissions = { mayManageEvaluations: vi.fn(async () => true) };
+  const people = { namesOf: vi.fn(async () => []) };
+  const modelCosts = { listFor: vi.fn(async () => []) };
   const broadcast = {
     getTenantEmitter: vi.fn(),
     cleanupTenantEmitter: vi.fn(),
@@ -107,10 +120,16 @@ function harness({
       dependencies: {},
       infrastructure: {
         experiments: experimentService,
+        runLookup: runLookup as unknown as ExperimentAppDependencies["runLookup"],
         workflows: workflowService,
-        dataset: {} as unknown as DatasetApi,
+        workflowAuthoring,
+        dataset: {} as DatasetApi,
         monitors,
         broadcast,
+        permissions,
+        people,
+        modelCosts,
+        slugify: (value: string) => value,
       },
       config: undefined,
       resources: new ResourceScope(),

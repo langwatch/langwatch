@@ -3,12 +3,9 @@
  * now, so the fake is passed in instead), so this runs the classification and mapping logic without a live NLP service. The workflow run and the grading evaluators are two separate dispatches, so they are scripted separately and the fake answers each by the message it was given.
  * @see specs/experiments-v3/evaluation-execution.feature
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { EvaluatorConfig } from "@langwatch/experiment-contract";
-import type {
-  StudioServerEvent,
-  StudioWorkflow,
-  WorkflowService,
-} from "@langwatch/workflow-contract";
+import type { StudioServerEvent, StudioWorkflow } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
 import type { ExperimentRunPorts } from "../../rules/experiment-run-input.rules.ts";

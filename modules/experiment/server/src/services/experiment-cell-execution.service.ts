@@ -4,13 +4,9 @@
  * are priced at the project's canonical rate, since the engine reports counts and has no prices.
  */
 
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { ExecutionCell, EvaluationV3Event } from "@langwatch/experiment-contract";
-import type {
-  ExecutionState,
-  StudioServerEvent,
-  StudioWorkflow,
-  WorkflowService,
-} from "@langwatch/workflow-contract";
+import type { ExecutionState, StudioServerEvent, StudioWorkflow } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { createLogger } from "@langwatch/observability";

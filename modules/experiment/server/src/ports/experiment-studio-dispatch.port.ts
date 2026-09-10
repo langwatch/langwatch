@@ -11,7 +11,7 @@ import type {
  * back; who dials the engine, which model providers it strips parameters for
  * and which NLP runtime carries the stream are all facts of the process, not of
  * the run. The retired application threaded an `nlpLambda` runtime and a
- * `ModelProviderService` through nine call sites to reach one function; both
+ * `ModelProviderApi` through nine call sites to reach one function; both
  * were pass-through, so both are behind this instead.
  *
  * A stream failure is reported to the caller AS a studio event rather than

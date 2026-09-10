@@ -1,9 +1,16 @@
 /**
  * The experiment feature's application: what both of its doors call.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type { Dataset, DatasetApi } from "@langwatch/dataset-contract";
 import {
   ExperimentApi,
+  type ExperimentCaller,
+  type ExperimentRunLookupInput,
+  type ExperimentUpdateFrame,
+  type ExperimentWithRuns,
+  type ExperimentWorkflowCopyInput,
+  type ExperimentWorkflowVersionInput,
   type CommitWorkbenchVersionInput,
   type CompleteExperimentRunInput,
   type CreateEvaluationsV3Input,
@@ -40,18 +47,14 @@ import {
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
 } from "@langwatch/experiment-contract";
+import type { ModelCostRate } from "@langwatch/model-provider-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { on } from "node:events";
 import type { ExperimentService } from "../services/experiment.service.ts";
-import {
-  WorkflowNotFoundError,
-  type WorkflowService,
-  type WorkflowWithVersion,
-} from "@langwatch/workflow-contract";
+import type { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
+import { WorkflowNotFoundError, type StudioWorkflow, type WorkflowWithVersion } from "@langwatch/workflow-contract";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
-import {
-  workbenchActorFrom,
-  type WorkbenchCredential,
-} from "../rules/experiment-workbench-actor.rules.ts";
+import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 
 /**
  * The project-scoped signal fan-out an editor tab follows. Declared as the two
@@ -59,39 +62,94 @@ import {
  * every other subscription surface.
  */
 export type ExperimentBroadcast = Readonly<{
-  getTenantEmitter(projectId: string): NodeJS.EventEmitter;
+  getTenantEmitter(projectId: string): EventEmitter;
   cleanupTenantEmitter(projectId: string): void;
 }>;
 
-/** The one monitor write an archive cascades into. */
+/** The two monitor writes an experiment drives: its publication and its archive. */
 export type ExperimentMonitorCascade = Readonly<{
   deleteForExperiment(
     input: Readonly<{ projectId: string; experimentId: string }>,
   ): Promise<unknown>;
+  /**
+   * Creates or replaces the monitor an experiment is published as. `mappings`
+   * arrives as the wizard stored it; canonicalising it is the monitor side's,
+   * because the mapping vocabulary is the tracer's rather than this feature's.
+   */
+  upsertForExperiment(
+    input: Readonly<{
+      projectId: string;
+      experimentId: string;
+      monitor: Readonly<{
+        name: string;
+        checkType: string;
+        slug: string;
+        preconditions: unknown;
+        parameters: Record<string, unknown>;
+        mappings: unknown;
+        sample: number;
+        enabled: boolean;
+        executionMode: string;
+      }>;
+    }>,
+  ): Promise<unknown>;
 }>;
 
 /**
- * Who a workbench write is attributed to, in the one vocabulary both doors can
- * speak.
+ * The studio writes a wizard experiment drives. Separate from the read-only
+ * `WorkflowService` because these three CREATE graphs, and a read surface
+ * that could create one would be a different promise.
  */
-export type ExperimentCaller =
-  | Readonly<{ kind: "user"; id: string }>
-  | Readonly<{ kind: "credential"; credential: WorkbenchCredential | null | undefined }>;
+export type ExperimentWorkflowAuthoring = Readonly<{
+  create(
+    input: Readonly<{
+      projectId: string;
+      name: string;
+      icon?: string | null;
+      description?: string | null;
+    }>,
+  ): Promise<Readonly<{ id: string }>>;
+  saveVersion(input: ExperimentWorkflowVersionInput): Promise<void>;
+  copyWithDatasets(
+    input: ExperimentWorkflowCopyInput,
+  ): Promise<Readonly<{ workflowId: string; dsl: StudioWorkflow }>>;
+}>;
 
-/** One experiment with the run history the list and read surfaces show beside it. */
-export type ExperimentWithRuns = Readonly<{
-  experiment: Experiment;
-  runsCount: number;
-  lastRunAt: number | null;
+/** What the doors ask about the caller, beyond the check already declared. */
+export type ExperimentPermissions = Readonly<{
+  mayManageEvaluations(
+    input: Readonly<{ actorId: string; projectId: string }>,
+  ): Promise<boolean>;
+}>;
+
+/** The project's own model cost rules, as the pricing cascade reads them. */
+export type ExperimentModelCosts = Readonly<{
+  listFor(input: Readonly<{ projectId: string }>): Promise<readonly ModelCostRate[]>;
+}>;
+
+/** The display names behind the author ids a version history stores. */
+export type ExperimentPeople = Readonly<{
+  namesOf(
+    ids: readonly string[],
+  ): Promise<ReadonlyArray<Readonly<{ id: string; name: string | null }>>>;
 }>;
 
 /** What the process composes this feature's application from. */
 export interface ExperimentAppDependencies {
   experiments: ExperimentService;
+  /** The ONE find-or-create rule this deployment resolves an SDK slug through. */
+  runLookup: ExperimentFindOrCreateService;
   workflows: WorkflowService;
+  workflowAuthoring: ExperimentWorkflowAuthoring;
   dataset: DatasetApi;
   monitors: ExperimentMonitorCascade;
   broadcast: ExperimentBroadcast;
+  permissions: ExperimentPermissions;
+  people: ExperimentPeople;
+  /** The project's own model cost rules, as the pricing cascade reads them. */
+  modelCosts: ExperimentModelCosts;
+  /** The slug this deployment derives from a name. */
+  slugify(value: string): string;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -183,6 +241,11 @@ export class ExperimentApp implements ExperimentApi {
   /** The project's most recent experiment, or null when it has none. */
   findLatest(input: Readonly<{ projectId: string }>): Promise<Experiment | null> {
     return this.#dependencies.experiments.findLatest(input);
+  }
+
+  /** The experiment an SDK's own identifier names, created if it is free. */
+  findOrCreateForRun(input: ExperimentRunLookupInput): Promise<Experiment> {
+    return this.#dependencies.runLookup.resolve(input);
   }
 
   /** The name the next unnamed experiment in the project gets. */
@@ -406,7 +469,8 @@ export class ExperimentApp implements ExperimentApi {
   // ── Workflows ──────────────────────────────────────────────────
 
   /**
-   * The workflow behind an experiment, or null when it is gone.
+   * The workflow behind an experiment, or null when it is gone. Also what the
+   * wizard save and the copy ask to know an id still resolves in a project.
    */
   async findWorkflow(
     input: Readonly<{ id: string; projectId: string; includeVersion?: boolean }>,
@@ -446,14 +510,102 @@ export class ExperimentApp implements ExperimentApi {
 
   // ── Broadcast ──────────────────────────────────────────────────
 
-  /** The project's signal fan-out, for a tab following workbench writes. */
-  getTenantEmitter(projectId: string): NodeJS.EventEmitter {
-    return this.#dependencies.broadcast.getTenantEmitter(projectId);
+  /**
+   * The freshness signals a workbench save lands on, for as long as the caller
+   * listens. Subscribing and releasing are paired here so no door can hold the
+   * fan-out open past the tab that asked for it.
+   */
+  async *watchUpdates(
+    input: Readonly<{ projectId: string; signal?: AbortSignal | undefined }>,
+  ): AsyncIterable<ExperimentUpdateFrame> {
+    const emitter = this.#dependencies.broadcast.getTenantEmitter(input.projectId);
+    try {
+      for await (const eventArgs of on(emitter, "experiment_updated", {
+        ...(input.signal ? { signal: input.signal } : {}),
+      })) {
+        yield (eventArgs as unknown[])[0] as ExperimentUpdateFrame;
+      }
+    } finally {
+      this.#dependencies.broadcast.cleanupTenantEmitter(input.projectId);
+    }
   }
 
-  /** Releases the fan-out once the last subscriber has gone. */
-  cleanupTenantEmitter(projectId: string): void {
-    this.#dependencies.broadcast.cleanupTenantEmitter(projectId);
+  // ── Studio writes ──────────────────────────────────────────────
+
+  /** Creates the workflow a new wizard experiment writes its versions into. */
+  createWorkflow(
+    input: Readonly<{
+      projectId: string;
+      name: string;
+      icon?: string | null;
+      description?: string | null;
+    }>,
+  ): Promise<Readonly<{ id: string }>> {
+    return this.#dependencies.workflowAuthoring.create(input);
+  }
+
+  /** Writes a workflow version, autosaved or committed. */
+  saveWorkflowVersion(input: ExperimentWorkflowVersionInput): Promise<void> {
+    return this.#dependencies.workflowAuthoring.saveVersion(input);
+  }
+
+  /** Copies a workflow, and optionally its datasets, into another project. */
+  copyWorkflowWithDatasets(
+    input: ExperimentWorkflowCopyInput,
+  ): Promise<Readonly<{ workflowId: string; dsl: StudioWorkflow }>> {
+    return this.#dependencies.workflowAuthoring.copyWithDatasets(input);
+  }
+
+  // ── Monitors ───────────────────────────────────────────────────
+
+  /** Creates or replaces the monitor an experiment is published as. */
+  async publishAsMonitor(
+    input: Readonly<{
+      projectId: string;
+      experimentId: string;
+      monitor: Readonly<{
+        name: string;
+        checkType: string;
+        slug: string;
+        preconditions: unknown;
+        parameters: Record<string, unknown>;
+        mappings: unknown;
+        sample: number;
+        enabled: boolean;
+        executionMode: string;
+      }>;
+    }>,
+  ): Promise<void> {
+    await this.#dependencies.monitors.upsertForExperiment(input);
+  }
+
+  // ── The caller and the deployment ──────────────────────────────
+
+  /** The slug this deployment derives from a name. */
+  slugFor(value: string): string {
+    return this.#dependencies.slugify(value);
+  }
+
+  /**
+   * Whether the caller may manage evaluations in a project the declared check
+   * never covered.
+   */
+  mayManageEvaluations(input: Readonly<{ actorId: string; projectId: string }>): Promise<boolean> {
+    return this.#dependencies.permissions.mayManageEvaluations(input);
+  }
+
+  /** The project's own model cost rules, for the optimizer log's pricing. */
+  listModelCosts(input: Readonly<{ projectId: string }>): Promise<readonly ModelCostRate[]> {
+    return this.#dependencies.modelCosts.listFor(input);
+  }
+
+  /** The display names behind the author ids on a version history. */
+  resolveAuthorNames(
+    authorIds: readonly string[],
+  ): Promise<ReadonlyArray<Readonly<{ id: string; name: string | null }>>> {
+    if (authorIds.length === 0) return Promise.resolve([]);
+
+    return this.#dependencies.people.namesOf(authorIds);
   }
 
   /**

@@ -1,6 +1,7 @@
 /**
  * The wizard, the workbench and the runs behind both, composed as their own feature.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { TupleParam } from "@clickhouse/client";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AgentApi } from "@langwatch/agent-contract";
@@ -22,7 +23,7 @@ import {
   type ExperimentTrpcPorts,
 } from "@langwatch/experiment-server";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -30,7 +31,7 @@ import { PostgresPromptAdapter } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { WorkflowVersionRequiredError } from "@langwatch/workflow-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import type { WorkflowApp } from "@langwatch/workflow-server";
 import { EventEmitter } from "node:events";
 import { nanoid } from "nanoid";
@@ -78,7 +79,7 @@ export type ExperimentPeers = Readonly<{
   /** The agents a wizard references and a run resolves. */
   agents: AgentApi;
   /** The gateway a run's dispatch and its price table read. */
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   /** Reports a cell's result onto the evaluation pipeline. */
   reportEvaluation: (data: ReportEvaluationCommandData) => Promise<unknown>;
 }>;

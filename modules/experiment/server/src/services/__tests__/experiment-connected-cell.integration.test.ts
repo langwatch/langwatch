@@ -3,9 +3,10 @@
  * connected agent as a workbench column.
  * @see specs/experiments-v3/connected-agent-target.feature
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluatorConfig } from "@langwatch/experiment-contract";
-import type { StudioServerEvent, WorkflowService } from "@langwatch/workflow-contract";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 const scripted = vi.hoisted(() => ({
   component: [] as StudioServerEvent[],

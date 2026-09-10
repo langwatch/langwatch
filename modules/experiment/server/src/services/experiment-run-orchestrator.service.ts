@@ -1,5 +1,6 @@
 /** Manages evaluation execution across cells: builds/dispatches workflows, maps events to SSE. */
 
+import type { WorkflowService } from "@langwatch/workflow-server";
 import {
   type ESBatchEvaluationTarget,
   type EvaluationsV3State,
@@ -11,7 +12,7 @@ import {
   type RecordTargetResultCommandData,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
-import type { ExecutionState, StudioWorkflow, WorkflowService } from "@langwatch/workflow-contract";
+import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port.ts";
 import type { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port.ts";

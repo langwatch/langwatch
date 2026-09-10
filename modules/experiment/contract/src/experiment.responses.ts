@@ -100,3 +100,4 @@ export const experimentUpdateFrameSchema = z.object({
   event: z.unknown(),
   timestamp: z.number().optional(),
 });
+export type ExperimentUpdateFrame = z.infer<typeof experimentUpdateFrameSchema>;

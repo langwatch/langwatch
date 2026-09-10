@@ -1,3 +1,4 @@
+import type { WorkflowService } from "@langwatch/workflow-server";
 import {
   createInitialUIState,
   type DatasetColumn,
@@ -7,12 +8,7 @@ import {
   type FindOrCreateWorkflowExperimentInput,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
-import type {
-  Entry,
-  Field,
-  StudioWorkflow as WorkflowDSL,
-  WorkflowService,
-} from "@langwatch/workflow-contract";
+import type { Entry, Field, StudioWorkflow as WorkflowDSL } from "@langwatch/workflow-contract";
 import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port.ts";
 import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port.ts";
 import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port.ts";

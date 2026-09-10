@@ -2,13 +2,14 @@
  * Whether everything a workbench state points at still exists.
  */
 
+import { WorkflowService } from "@langwatch/workflow-server";
 import { describe, expect, it } from "vitest";
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { WorkflowNotFoundError, WorkflowService } from "@langwatch/workflow-contract";
+import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import {
   persistedEvaluationsV3StateSchema,
   WorkbenchMissingReferenceError,
@@ -43,7 +44,7 @@ function servicesAnswering(answers: Answers = {}) {
     throw new EvaluatorNotFoundError("evaluator_missing");
   };
 
-  const workflows: WorkflowService = Object.create(WorkflowService.prototype);
+  const workflows: WorkflowService = createApiFixture<WorkflowService>();
   workflows.getById = async () => {
     if (answers.workflow === "found") return {} as never;
     if (answers.workflow === "down") throw new Error("workflow service unreachable");

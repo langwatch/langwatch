@@ -4,6 +4,7 @@
  * queue rather than a failure, so the turn is retried inside a bounded budget with jitter.
  */
 
+import type { WorkflowService } from "@langwatch/workflow-server";
 import {
   BUSY_RETRY_AFTER_MS,
   DEFAULT_CALL_TIMEOUT_MS,
@@ -23,7 +24,7 @@ import {
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateOtelSpanId, generateOtelTraceId } from "@langwatch/trace-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import { buildEvaluatorCellWorkflow } from "../processes/experiment-cell-workflow.process.ts";
 import {
   buildConnectedCall,

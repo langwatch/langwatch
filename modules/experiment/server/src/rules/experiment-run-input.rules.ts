@@ -4,6 +4,7 @@
  * so every layer of the run can name them without reaching for the orchestrator itself.
  */
 
+import type { WorkflowService } from "@langwatch/workflow-server";
 import type {
   CarriedOverCell,
   EvaluationsV3State,
@@ -11,7 +12,7 @@ import type {
   ExecutionScope,
 } from "@langwatch/experiment-contract";
 import type { ExperimentService } from "../services/experiment.service.ts";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import type {
   Agent as TypedAgent,
   CallOutcome,

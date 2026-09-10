@@ -3,6 +3,7 @@
  * stops, the three ways a run is read back, and the four the saved setup is
  * read and written through.
  */
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { handlerManagedAuth, publicEndpoint } from "@langwatch/api";
 import {
   type AppRestSecurity,
@@ -17,10 +18,11 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+
 import {
   ExperimentNotFoundError,
   ExperimentRunNotFoundError as RunNotFoundError,
+  type WorkbenchCredential,
   ExperimentVersionNotFoundError,
   InvalidExperimentConfigurationError,
   createInitialUIState,
@@ -62,10 +64,7 @@ import {
   workbenchStateResponseSchema,
   workbenchVersionProbeResponseSchema,
 } from "../../rules/experiment-schemas.rules.ts";
-import {
-  workbenchActorFrom,
-  type WorkbenchCredential,
-} from "../../rules/experiment-workbench-actor.rules.ts";
+import { workbenchActorFrom } from "../../rules/experiment-workbench-actor.rules.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 

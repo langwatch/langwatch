@@ -28,14 +28,16 @@ export {
 export {
   ExperimentApp,
   type ExperimentAppDependencies,
+  type ExperimentModelCosts,
   type ExperimentBroadcast,
-  type ExperimentCaller,
   type ExperimentMonitorCascade,
-  type ExperimentWithRuns,
+  type ExperimentPeople,
+  type ExperimentPermissions,
+  type ExperimentWorkflowAuthoring,
 } from "./app/experiment.app.ts";
 export { experimentServer } from "./experiment.server.ts";
-// The tRPC transport is not exported: it still names the deleted legacy builder.
-export { createExperimentsRestApp } from "./transport/api-rest/experiment.api.ts";
+export { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
+export { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 export { createBlankWorkbenchState } from "./rules/experiment-blank-workbench-state.rules.ts";
 export { workbenchActorFrom } from "./rules/experiment-workbench-actor.rules.ts";
 export {
@@ -161,13 +163,8 @@ export {
   ExperimentFindOrCreateService,
   type ExperimentFindOrCreateInput,
 } from "./services/experiment-find-or-create.service.ts";
+export { experimentInitRest, experimentInitCaller } from "./transport/experiment-init.rest.ts";
 export {
-  createExperimentInitRestApp,
-  type ExperimentInitRestCredential,
-  type ExperimentInitRestPorts,
-} from "./transport/api-rest/experiment-init.api.ts";
-export {
-  createDspyStepsRestApp,
-  type DspyStepsRestCredential,
-  type DspyStepsRestPorts,
-} from "./transport/api-rest/experiment-dspy-steps.api.ts";
+  experimentDspyStepsRest,
+  dspyStepsCaller,
+} from "./transport/experiment-dspy-steps.rest.ts";

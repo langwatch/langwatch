@@ -27,6 +27,9 @@
   ],
   "references": [
     {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
@@ -40,6 +43,9 @@
     },
     {
       "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
       "path": "../../scenario/contract/tsconfig.build.json"

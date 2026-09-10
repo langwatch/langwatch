@@ -1,3 +1,4 @@
+import { WorkflowService } from "@langwatch/workflow-server";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -16,7 +17,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { WorkflowService } from "@langwatch/workflow-contract";
+
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
@@ -54,7 +55,7 @@ const references = {
   prompts: {} as PromptApi,
   agents: createApiFixture<AgentApi>(),
   evaluators: createApiFixture<EvaluatorApi>(),
-  workflows: Object.create(WorkflowService.prototype) as WorkflowService,
+  workflows: createApiFixture<WorkflowService>(),
   dataset: {} as DatasetApi,
 };
 
