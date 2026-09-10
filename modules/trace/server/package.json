@@ -48,14 +48,6 @@
       "types": "./dist/transport/api-trpc/trace-view-gates.api.d.ts",
       "default": "./src/transport/api-trpc/trace-view-gates.api.ts"
     },
-    "./api-rest/tracked-event": {
-      "types": "./dist/transport/api-rest/tracked-event.api.d.ts",
-      "default": "./src/transport/api-rest/tracked-event.api.ts"
-    },
-    "./api-rest/trace-export": {
-      "types": "./dist/transport/api-rest/trace-export.api.d.ts",
-      "default": "./src/transport/api-rest/trace-export.api.ts"
-    },
     "./api-rest/otlp-ingest": {
       "types": "./dist/transport/api-rest/otlp-ingest.api.d.ts",
       "default": "./src/transport/api-rest/otlp-ingest.api.ts"

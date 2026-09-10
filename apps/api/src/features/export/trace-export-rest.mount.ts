@@ -2,13 +2,18 @@
  * `POST /api/export/traces/download`, composed from this process's own graph. The bulk
  * trace download, beside the bulk run download one file over.
  */
-import type { AppRestBroadcast, AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import type { AppRestBroadcast, MountableRestApp } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { sharedFiltersInputSchema } from "@langwatch/analytics-server";
-import { createExportTracesRestApp } from "@langwatch/trace-server/api-rest/trace-export";
-import { TraceExportService, traceExportRequestShape } from "@langwatch/trace-server";
+import {
+  traceExportRest,
+  TraceExportService,
+  traceExportRequestShape,
+  type TraceExportRestPorts,
+} from "@langwatch/trace-server";
 import { z } from "zod";
 
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session.ts";
 import type { ApiTraceReadStackPort } from "../trace/trace-read-stack.port.ts";
 
@@ -52,7 +57,6 @@ class TraceExportFailedError extends HandledError {
 }
 
 export type ApiTraceExportRestOptions = Readonly<{
-  security: AppRestSecurity;
   /** The one read stack every trace surface on this process redacts through. */
   reads: ApiTraceReadStackPort;
   /** The one session port every handler-managed family on this process reads. */
@@ -62,29 +66,31 @@ export type ApiTraceExportRestOptions = Readonly<{
 }>;
 
 /** Builds the download family over this process's read stack and session. */
-export function mountApiTraceExportRest(options: ApiTraceExportRestOptions): MountableRestApp {
+export function mountApiTraceExportRest(
+  runtime: ApiRestRuntime,
+  options: ApiTraceExportRestOptions,
+): MountableRestApp {
   const { reads, session } = options;
 
-  return createExportTracesRestApp({
-    security: options.security,
-    ports: {
-      requestSchema: traceExportRequestSchema,
-      resolveSession: (request) => session.resolve(request),
-      probeProjectPermission: (resolved, projectId, permission) =>
-        session.permitted({ session: resolved, projectId, permission }),
-      // The SAME redactions the explorer and the waterfall read through,
-      // resolved for the person who asked rather than for the project.
-      getViewerProtections: (resolved, input) =>
-        reads.getViewerProtections({ session: { user: { id: resolved.user.id } } }, input),
-      // Resolved per request, never at mount: the port says so, and mounting a
-      // family must not force the read stack behind it to be constructed.
-      // The LEGACY read, which is the one that answers `getAllTracesForProject`
-      // — the export's whole loop. `tree` is the contract-shaped reader beside
-      // it and carries no such method.
-      exports: () => TraceExportService.create({ traceService: reads.readers().read }),
-      broadcast: options.broadcast,
-      unauthenticatedError: () => new TraceExportUnauthenticatedError(),
-      exportFailedError: (cause) => new TraceExportFailedError(cause),
-    },
-  }).mountable;
+  const app = (): TraceExportRestPorts<z.infer<typeof traceExportRequestSchema>, unknown, unknown> => ({
+    requestSchema: traceExportRequestSchema,
+    resolveSession: (request) => session.resolve(request),
+    probeProjectPermission: (resolved, projectId, permission) =>
+      session.permitted({ session: resolved, projectId, permission }),
+    // The SAME redactions the explorer and the waterfall read through,
+    // resolved for the person who asked rather than for the project.
+    getViewerProtections: (resolved, input) =>
+      reads.getViewerProtections({ session: { user: { id: resolved.user.id } } }, input),
+    // Resolved per request, never at mount: the port says so, and mounting a
+    // family must not force the read stack behind it to be constructed.
+    // The LEGACY read, which is the one that answers `getAllTracesForProject`
+    // - the export's whole loop. `tree` is the contract-shaped reader beside
+    // it and carries no such method.
+    exports: () => TraceExportService.create({ traceService: reads.readers().read }),
+    broadcast: options.broadcast,
+    unauthenticatedError: () => new TraceExportUnauthenticatedError(),
+    exportFailedError: (cause) => new TraceExportFailedError(cause),
+  });
+
+  return runtime.mount(traceExportRest.router(), app);
 }

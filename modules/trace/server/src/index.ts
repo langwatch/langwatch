@@ -473,3 +473,18 @@ export { traceServer, type TraceInfrastructure } from "./trace.server.ts";
 export { spansTrpcTransport } from "./transport/spans.trpc.ts";
 export { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
 export { tracesTrpcTransport } from "./transport/traces.trpc.ts";
+
+export {
+  TrackedEventApi,
+  trackedEventRest,
+  trackedEventRestErrorHandler,
+  type TrackedEventPorts,
+} from "./transport/tracked-event.rest.ts";
+
+export {
+  TraceExportApi,
+  traceExportRest,
+  type TraceExportPort,
+  type TraceExportRequestFields,
+  type TraceExportRestPorts,
+} from "./transport/trace-export.rest.ts";

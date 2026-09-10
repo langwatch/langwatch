@@ -2,8 +2,8 @@
  * What `POST /api/events/track` and `POST /api/track_event` need from this
  * process, bound to the span builder the trace package owns.
  *
- * The family itself — the routes, the two-pass validation, the response
- * bodies — lives in `@langwatch/trace-server`'s `tracked-event.api.ts`. What
+ * The family itself - the routes, the two-pass validation, the response
+ * bodies - lives in `@langwatch/trace-server`'s `tracked-event.rest.ts`. What
  * lives here are the five ports that file declares, and each one is bound to
  * something this process ALREADY has rather than to a second copy of it:
  *
@@ -31,7 +31,7 @@ import { zodErrorMessage } from "@langwatch/config";
 import { ValidationError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { predefinedEventsSchemas, predefinedEventTypes } from "@langwatch/trace-contract";
-import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
+import type { TrackedEventPorts } from "@langwatch/trace-server";
 import { TrackedEventSpanService } from "@langwatch/trace-server";
 import { z } from "zod";
 

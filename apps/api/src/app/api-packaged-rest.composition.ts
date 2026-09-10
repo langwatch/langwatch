@@ -28,7 +28,7 @@ import type {
   CollectorProject,
   CollectorUsageLimitPort,
 } from "@langwatch/trace-server/api-rest/collector";
-import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
+import type { TrackedEventPorts } from "@langwatch/trace-server";
 import type { WorkflowEvaluationOutcome } from "@langwatch/workflow-server";
 import type { MiddlewareHandler } from "hono";
 

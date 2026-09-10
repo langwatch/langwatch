@@ -7,26 +7,33 @@
  * id rides back on the `X-Export-Id` response header.
  *
  * This is the HTTP layer: authentication, authorization, headers and
- * streaming. Everything else arrives as a port — the session, the permission
+ * streaming. Everything else arrives as a port - the session, the permission
  * probe, the caller's read-time redactions, the export itself, the tenant
  * broadcast, and the two errors the application's registry writes copy for.
+ * The request schema is a port too (the deployment's own analytics filter
+ * vocabulary), so the body is read raw and validated by hand rather than
+ * through `withInput`, which needs a schema fixed at declaration time.
  */
+import { deferredScope } from "@langwatch/api/access";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  requestValidationErrorFrom,
+  type AppRestBroadcast,
+  type RestRawResult,
+} from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import crypto from "crypto";
-import type { Env } from "hono";
-import type { z } from "zod";
-import { handlerManagedAuth } from "@langwatch/api";
-import {
-  type AppRestBroadcast,
-  type AppRestSecurity,
-  type SecuredApp,
-  validator as zValidator,
-} from "@langwatch/api/rest";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
+import type { z } from "zod";
 
 const logger = createLogger("langwatch:api:export-traces");
+
+const SESSION_REASON =
+  "the process's session port resolves the signed-in person and this handler checks " +
+  "traces:view on the project the request body names";
 
 /** What this route reads out of an export request; the rest is forwarded. */
 export type TraceExportRequestFields = Readonly<{
@@ -63,7 +70,7 @@ export interface TraceExportRestPorts<
    * The export request as a caller sends it.
    *
    * Both the parsed shape and the shape a caller SENDS are carried, because
-   * they can differ, and the validator types the 400 body off the sent shape.
+   * they can differ, and the validator types the 422 body off the sent shape.
    */
   requestSchema: z.ZodType<TRequest, TRequestRaw>;
   /** The live session behind this request, or null when there is none. */
@@ -75,7 +82,7 @@ export interface TraceExportRestPorts<
     permission: AuthzPermission,
   ): Promise<boolean>;
   /**
-   * The caller's read-time redactions for one project — cost visibility, the
+   * The caller's read-time redactions for one project - cost visibility, the
    * data-privacy policy's content categories, the restricted-attribute rules
    * and the plan's visibility cutoff. Passed straight through to the export.
    */
@@ -97,19 +104,27 @@ export interface TraceExportRestPorts<
   exportFailedError(cause: unknown): Error;
 }
 
+export const TraceExportApi = moduleApi<
+  TraceExportRestPorts<TraceExportRequestFields, unknown, unknown>
+>("trace");
+
+/** A JSON answer this door writes itself. */
+const jsonAnswer = (body: unknown, status: number): Response =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
 /** The rows of one export, streamed out chunk by chunk with a progress event per chunk. */
-function exportStream<TRequest extends TraceExportRequestFields, TRequestRaw, TSession>({
+function exportStream({
   request,
   protections,
   exportId,
   exportService,
   broadcast,
 }: {
-  request: TRequest;
+  request: TraceExportRequestFields;
   protections: unknown;
   exportId: string;
-  exportService: ReturnType<TraceExportRestPorts<TRequest, TRequestRaw, TSession>["exports"]>;
-  broadcast: ReturnType<TraceExportRestPorts<TRequest, TRequestRaw, TSession>["broadcast"]>;
+  exportService: TraceExportPort<TraceExportRequestFields>;
+  broadcast: AppRestBroadcast;
 }): ReadableStream {
   const encoder = new TextEncoder();
 
@@ -161,7 +176,6 @@ function exportHeaders({
   exportId: string;
   totalCount: number;
 }): Headers {
-  // Build file name: {project_id} - Traces - {YYYY-MM-DD} - {mode}.{ext}
   const today = nowInstant().toString().slice(0, 10);
   const extension = request.format === "csv" ? "csv" : "jsonl";
   const fileName = `${request.projectId} - Traces - ${today} - ${request.mode}.${extension}`;
@@ -177,104 +191,69 @@ function exportHeaders({
   });
 }
 
-/**
- * REST for the trace export download, built against one process's security.
- */
-export function createExportTracesRestApp<
-  TRequest extends TraceExportRequestFields,
-  TRequestRaw,
-  TSession,
->(options: {
-  security: AppRestSecurity;
-  ports: TraceExportRestPorts<TRequest, TRequestRaw, TSession>;
-}): SecuredApp<Env> {
-  const { security, ports } = options;
+export const traceExportRest = defineRestRouter(TraceExportApi)
+  .withNamespace("export-traces")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withAddressing("literal", { v1Twin: false })
 
-  const secured = security.createServiceApp({ basePath: "/api/export/traces" });
+  .post("/api/export/traces/download", "downloadTraceExport")
+  .withRawBody("text", { mediaType: "application/json" })
+  .withAccess(deferredScope({ reason: SESSION_REASON }))
+  .withRawResponse({ produces: "application/octet-stream" })
+  .withDocs({ hide: true })
+  .handle(async ({ app, raw, request }): Promise<RestRawResult> => {
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(raw as string);
+    } catch {
+      return jsonAnswer({ error: "Invalid JSON body" }, 400);
+    }
 
-  /**
-   * POST /download — Stream trace data as a file download.
-   *
-   * Authenticates via session, checks traces:view permission, then streams
-   * CSV or JSONL data from the export's async generator directly to the HTTP
-   * response. Sets Content-Disposition for browser file download.
-   *
-   * Broadcasts progress events so any pod's tRPC subscription can relay them
-   * to the client. The export ID is returned in the X-Export-Id header.
-   */
-  secured
-    .access(
-      handlerManagedAuth({
-        reason: "user session + traces:view enforced in-handler",
-        permissions: ["traces:view"],
-        credential: "session",
-      }),
-    )
-    .post("/download", zValidator("json", ports.requestSchema), async (c) => {
-      const request = c.req.valid("json");
+    const parsed = app.requestSchema.safeParse(parsedBody);
+    if (!parsed.success) {
+      throw requestValidationErrorFrom({ target: "json", error: parsed.error, input: parsedBody });
+    }
+    const request = parsed.data;
 
-      // Authenticate
-      const session = await ports.resolveSession(c.req.raw);
-      if (!session) {
-        throw ports.unauthenticatedError();
-      }
+    const session = await app.resolveSession(request);
+    if (!session) throw app.unauthenticatedError();
 
-      // Authorize
-      const hasPermission = await ports.probeProjectPermission(
-        session,
-        request.projectId,
-        "traces:view",
-      );
-      if (!hasPermission) {
-        return c.json(
-          { error: "You do not have permission to access this endpoint." },
-          { status: 403 },
-        );
-      }
+    const hasPermission = await app.probeProjectPermission(session, request.projectId, "traces:view");
+    if (!hasPermission) {
+      return jsonAnswer({ error: "You do not have permission to access this endpoint." }, 403);
+    }
 
-      // Derive RBAC protections from the user's session and project role
-      const protections = await ports.getViewerProtections(session, {
-        projectId: request.projectId,
-      });
+    const protections = await app.getViewerProtections(session, { projectId: request.projectId });
 
-      logger.info(
-        {
-          projectId: request.projectId,
-          mode: request.mode,
-          format: request.format,
-        },
-        "Starting trace export download",
-      );
+    logger.info(
+      { projectId: request.projectId, mode: request.mode, format: request.format },
+      "Starting trace export download",
+    );
 
-      const exportId = crypto.randomUUID();
-      const broadcast = ports.broadcast();
-      const exportService = ports.exports();
+    const exportId = crypto.randomUUID();
+    const broadcast = app.broadcast();
+    const exportService = app.exports();
 
-      let totalCount: number;
-      try {
-        totalCount = await exportService.getTotalCount({ request, protections });
-      } catch (error) {
-        // A failure that already knows what it is — a query timeout, a time range
-        // too wide, ClickHouse unavailable — says something more useful than
-        // "the export failed", so it travels untouched. Anything else becomes the
-        // generic export failure, which at least tells the user nothing was
-        // changed; the cause rides its reason chain for the log line.
-        if (HandledError.isHandled(error)) throw error;
-        throw ports.exportFailedError(error);
-      }
+    let totalCount: number;
+    try {
+      totalCount = await exportService.getTotalCount({ request, protections });
+    } catch (error) {
+      // A failure that already knows what it is - a query timeout, a time range
+      // too wide, ClickHouse unavailable - says something more useful than
+      // "the export failed", so it travels untouched. Anything else becomes the
+      // generic export failure, which at least tells the user nothing was
+      // changed; the cause rides its reason chain for the log line.
+      if (HandledError.isHandled(error)) throw error;
+      throw app.exportFailedError(error);
+    }
 
-      const stream = exportStream({
-        request,
-        protections,
-        exportId,
-        exportService,
-        broadcast,
-      });
+    const stream = exportStream({ request, protections, exportId, exportService, broadcast });
 
-      return new Response(stream, {
-        headers: exportHeaders({ request, exportId, totalCount }),
-      });
-    });
+    return {
+      status: 200,
+      headers: Object.fromEntries(exportHeaders({ request, exportId, totalCount }).entries()),
+      body: stream,
+    };
+  })
 
-  return secured;
-}
+  .build();

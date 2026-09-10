@@ -12,7 +12,7 @@ import {
   TraceSpanDedupPort,
   TrackedEventSpanService,
 } from "@langwatch/trace-server";
-import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
+import type { TrackedEventPorts } from "@langwatch/trace-server";
 import type { UserAvatarObjectReader } from "@langwatch/user-server";
 import { Hono, type MiddlewareHandler } from "hono";
 import { generateSpecs } from "hono-openapi";

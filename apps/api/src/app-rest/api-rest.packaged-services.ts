@@ -39,7 +39,7 @@ import type {
   FilesRateLimiter,
   StoredObjectApp,
 } from "@langwatch/stored-object-server";
-import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
+import type { TrackedEventPorts } from "@langwatch/trace-server";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { WorkflowEvaluationTrigger, WorkflowService,} from "@langwatch/workflow-server";

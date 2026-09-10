@@ -230,16 +230,12 @@ export { createGovernanceRestApp } from "@langwatch/enterprise-api";
 
 
 export { type CodingAgentCallerScope } from "@langwatch/coding-agent-server";
+export { type TrackedEventPorts } from "@langwatch/trace-server";
 export {
-  createEventsRestApp,
-  type TrackedEventPorts,
-} from "@langwatch/trace-server/api-rest/tracked-event";
-export {
-  createExportTracesRestApp,
   type TraceExportPort,
   type TraceExportRequestFields,
   type TraceExportRestPorts,
-} from "@langwatch/trace-server/api-rest/trace-export";
+} from "@langwatch/trace-server";
 export { createGroupRestApp } from "@langwatch/organization-server";
 
 
