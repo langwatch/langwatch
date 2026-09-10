@@ -19,8 +19,9 @@ Feature: Testing ElevenLabs conversational AI agents
     Then a simulated user talks to their voice agent
     And the run is judged against their criteria
     And they can see the results
-    And they can see the whole conversation
-    And they can listen to the entire conversation
+    And they can see the whole conversation as a transcript
+    And they can listen to the whole call
     And they can listen to each part of the conversation
     And they can see the threads and traces for their agent and for the scenario runner
     And the traces carry the audio and they can listen to it there
+    And the traces carry all the metadata the call makes available
