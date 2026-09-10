@@ -1,11 +1,11 @@
-import type { TraceAnalyticsProjectionPort } from "./projection/trace-analytics-projection.repository.ts";
-import type { TraceDerivationSpanReaderPort } from "./read/trace-derivation-span-reader.repository.ts";
-import type { TraceExistencePort } from "./read/trace-existence.repository.ts";
+import type { TraceAnalyticsProjectionRepository } from "./projection/trace-analytics-projection.repository.ts";
+import type { TraceDerivationSpanReaderRepository } from "./read/trace-derivation-span-reader.repository.ts";
+import type { TraceExistenceRepository } from "./read/trace-existence.repository.ts";
 import type { LogRecordStorageRepository } from "./log-record-storage.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
-import type { TraceAnalyticsRollupPort } from "./projection/trace-analytics-rollup.repository.ts";
-import type { TraceSummaryProjectionPort } from "./projection/trace-summary-projection.repository.ts";
+import type { TraceAnalyticsRollupRepository } from "./projection/trace-analytics-rollup.repository.ts";
+import type { TraceSummaryProjectionRepository } from "./projection/trace-summary-projection.repository.ts";
 import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { TraceListRepository } from "@langwatch/trace-contract";
@@ -20,12 +20,12 @@ import type { TracePayloadReaderPort } from "./read/trace-payload-reader.reposit
  */
 export interface TraceRepositories {
   readonly editOverlay: TraceEditOverlayRepository;
-  readonly summaryProjection: TraceSummaryProjectionPort;
-  readonly analyticsProjection: TraceAnalyticsProjectionPort;
-  readonly analyticsRollup: TraceAnalyticsRollupPort;
+  readonly summaryProjection: TraceSummaryProjectionRepository;
+  readonly analyticsProjection: TraceAnalyticsProjectionRepository;
+  readonly analyticsRollup: TraceAnalyticsRollupRepository;
   readonly spanStorage: SpanStorageRepository;
-  readonly existence: TraceExistencePort;
-  readonly derivationSpans: TraceDerivationSpanReaderPort;
+  readonly existence: TraceExistenceRepository;
+  readonly derivationSpans: TraceDerivationSpanReaderRepository;
   readonly summary: TraceSummaryRepository;
   readonly logRecords: LogRecordStorageRepository;
   readonly list: TraceListRepository;

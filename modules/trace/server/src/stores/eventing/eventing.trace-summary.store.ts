@@ -1,6 +1,6 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { TraceSummaryProjectionPort } from "../../repositories/projection/trace-summary-projection.repository.ts";
+import { TraceSummaryProjectionRepository } from "../../repositories/projection/trace-summary-projection.repository.ts";
 
 /**
  * Thin FoldProjectionStore adapter for trace summaries. Delegates directly to
@@ -8,12 +8,12 @@ import { TraceSummaryProjectionPort } from "../../repositories/projection/trace-
  */
 export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> {
   private constructor(
-    private readonly storage: TraceSummaryProjectionPort,
+    private readonly storage: TraceSummaryProjectionRepository,
     private readonly defaultRetentionDays: number,
   ) {}
 
   static create(options: {
-    storage: TraceSummaryProjectionPort;
+    storage: TraceSummaryProjectionRepository;
     defaultRetentionDays: number;
   }): TraceSummaryStore {
     return new TraceSummaryStore(options.storage, options.defaultRetentionDays);

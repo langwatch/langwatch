@@ -1,5 +1,5 @@
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import type { TraceDerivationSpanReaderPort } from "../../repositories/read/trace-derivation-span-reader.repository.ts";
+import type { TraceDerivationSpanReaderRepository } from "../../repositories/read/trace-derivation-span-reader.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
@@ -23,13 +23,13 @@ interface MemoEntry {
  * during a drain. With no `foldVersion` the read passes straight through, never cached.
  */
 export class TraceEventDerivationService {
-  static create(options: { spans: TraceDerivationSpanReaderPort }): TraceEventDerivationService {
+  static create(options: { spans: TraceDerivationSpanReaderRepository }): TraceEventDerivationService {
     return new TraceEventDerivationService(options.spans);
   }
 
   private readonly memo = new Map<string, MemoEntry>();
 
-  private constructor(private readonly spans: TraceDerivationSpanReaderPort) {}
+  private constructor(private readonly spans: TraceDerivationSpanReaderRepository) {}
 
   derive(input: {
     projectId: string;

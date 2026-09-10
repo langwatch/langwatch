@@ -1,7 +1,7 @@
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import {
-  TraceAnalyticsProjectionPort,
+  TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
 } from "../../repositories/projection/trace-analytics-projection.repository.ts";
 import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
@@ -43,7 +43,7 @@ const signalState = (): TraceAnalyticsData => ({
 /** Records everything written, and reads back whatever was written last. */
 function recordingPort() {
   const written: TraceAnalyticsProjectionEntry[] = [];
-  const storage = new (class extends TraceAnalyticsProjectionPort {
+  const storage = new (class extends TraceAnalyticsProjectionRepository {
     async upsert(entry: TraceAnalyticsProjectionEntry): Promise<void> {
       written.push(entry);
     }

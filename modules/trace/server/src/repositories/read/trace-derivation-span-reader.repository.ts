@@ -20,7 +20,7 @@ import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contrac
  * columns a derivation reads; the nested groups are what production throws
  * `Attempt to read after eof` on. Do not reach for this to render a span.
  */
-export abstract class TraceDerivationSpanReaderPort {
+export abstract class TraceDerivationSpanReaderRepository {
   abstract findNormalizedSpansByTraceId(input: {
     tenantId: string;
     traceId: string;

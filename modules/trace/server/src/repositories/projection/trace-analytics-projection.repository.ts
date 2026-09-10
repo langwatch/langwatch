@@ -12,7 +12,7 @@ export type TraceAnalyticsProjectionRead = {
 };
 
 /** Private persistence capability for the trace_analytics projection. */
-export abstract class TraceAnalyticsProjectionPort {
+export abstract class TraceAnalyticsProjectionRepository {
   abstract upsert(entry: TraceAnalyticsProjectionEntry): Promise<void>;
 
   async upsertBatch(_entries: TraceAnalyticsProjectionEntry[]): Promise<void> {

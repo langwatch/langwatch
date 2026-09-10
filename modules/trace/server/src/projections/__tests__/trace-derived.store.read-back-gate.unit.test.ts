@@ -9,7 +9,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import {
-  TraceAnalyticsProjectionPort,
+  TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
 } from "../../repositories/projection/trace-analytics-projection.repository.ts";
 import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
@@ -50,7 +50,7 @@ function project(state: TraceAnalyticsData): TraceAnalyticsRow {
 
 /** A port that answers reads from a single fixed row. */
 function storeOver(row: TraceAnalyticsRow): TraceAnalyticsStore {
-  const storage = new (class extends TraceAnalyticsProjectionPort {
+  const storage = new (class extends TraceAnalyticsProjectionRepository {
     async upsert(): Promise<void> {}
     async findByTraceId() {
       return { row, appliedEventIds: ["evt-1", "evt-2"] };
@@ -169,7 +169,7 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
   /** A port that answers reads from whatever the store actually wrote. */
   function recordingPort() {
     const rows: TraceAnalyticsRow[] = [];
-    const storage = new (class extends TraceAnalyticsProjectionPort {
+    const storage = new (class extends TraceAnalyticsProjectionRepository {
       async upsert(entry: TraceAnalyticsProjectionEntry): Promise<void> {
         rows.push(entry.row);
       }

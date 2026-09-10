@@ -1,6 +1,6 @@
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceDerivationSpanReaderPort } from "../../../repositories/read/trace-derivation-span-reader.repository.ts";
+import { TraceDerivationSpanReaderRepository } from "../../../repositories/read/trace-derivation-span-reader.repository.ts";
 import { TraceModelCostPort } from "../../../ports/trace-model-cost.port.ts";
 import { ScenarioRoleMetricsDerivationService } from "../../support/scenario-role-metrics-derivation.service.ts";
 import { SpanCostService } from "../../span/span-cost.service.ts";
@@ -16,7 +16,7 @@ import { TraceEventDerivationService } from "../../ingestion/trace-event-derivat
  */
 
 /** Counts how many times each underlying span read is issued. */
-class CountingReader extends TraceDerivationSpanReaderPort {
+class CountingReader extends TraceDerivationSpanReaderRepository {
   spanReads = 0;
   eventReads = 0;
 

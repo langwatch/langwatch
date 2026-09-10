@@ -2,7 +2,7 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
 import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.projection.ts";
-import { TraceAnalyticsRollupPort } from "../projection/trace-analytics-rollup.repository.ts";
+import { TraceAnalyticsRollupRepository } from "../projection/trace-analytics-rollup.repository.ts";
 
 const TABLE_NAME = "trace_analytics_rollup" as const;
 
@@ -66,7 +66,7 @@ function toClickHouseRecord(
   };
 }
 
-export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRollupPort {
+export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRollupRepository {
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;

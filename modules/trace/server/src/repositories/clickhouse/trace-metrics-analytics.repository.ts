@@ -7,7 +7,7 @@ import {
   type TraceAnalyticsRow,
 } from "../../projections/trace-derived.projection.ts";
 import {
-  TraceAnalyticsProjectionPort,
+  TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,
 } from "../projection/trace-analytics-projection.repository.ts";
 import { queryWindowed } from "./windowed-read.mapper.ts";
@@ -85,7 +85,7 @@ interface ClickHouseTraceAnalyticsWriteRecord {
   _retention_days: number;
 }
 
-export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjectionPort {
+export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjectionRepository {
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;

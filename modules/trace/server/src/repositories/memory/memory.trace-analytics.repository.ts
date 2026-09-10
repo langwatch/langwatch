@@ -1,5 +1,5 @@
 import {
-  TraceAnalyticsProjectionPort,
+  TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
   type TraceAnalyticsProjectionRead,
 } from "../projection/trace-analytics-projection.repository.ts";
@@ -9,7 +9,7 @@ import {
  * written row per tenant and trace, so a read-back fold recovers its own writes
  * within the process instead of refusing.
  */
-export class MemoryTraceAnalyticsRepository extends TraceAnalyticsProjectionPort {
+export class MemoryTraceAnalyticsRepository extends TraceAnalyticsProjectionRepository {
   private readonly rows = new Map<string, TraceAnalyticsProjectionRead>();
 
   static create(): MemoryTraceAnalyticsRepository {

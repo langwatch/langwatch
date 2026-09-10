@@ -110,7 +110,7 @@ export { TraceQueryEvaluationAdapter } from "./adapters/trace-query-evaluation.a
 export type { FieldDef } from "@langwatch/trace-contract";
 export { TraceSummaryReaderPort } from "./repositories/read/trace-summary-reader.repository.ts";
 export {
-  TraceSummaryProjectionPort,
+  TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
   type TraceSummaryReadWindow,
 } from "./repositories/projection/trace-summary-projection.repository.ts";
@@ -126,7 +126,7 @@ export { TraceSpanNormalizationPort } from "./ports/trace-span-normalization.por
 export { TraceSpanStoragePort } from "./repositories/span-storage-write.repository.ts";
 export { TraceSpanStorageClickHouseRepository } from "./repositories/clickhouse/trace-span-storage.repository.ts";
 export { TraceStoredSpanReaderPort } from "./repositories/read/trace-stored-span-reader.repository.ts";
-export { TraceDerivationSpanReaderPort } from "./repositories/read/trace-derivation-span-reader.repository.ts";
+export { TraceDerivationSpanReaderRepository } from "./repositories/read/trace-derivation-span-reader.repository.ts";
 export { TraceDerivationSpanClickHouseRepository } from "./repositories/clickhouse/trace-derivation-span.repository.ts";
 export { TraceEventDerivationService } from "./services/ingestion/trace-event-derivation.service.ts";
 export {
@@ -140,11 +140,11 @@ export { TraceAnalyticsClickHouseRepository } from "./repositories/clickhouse/tr
 export { TraceAnalyticsRollupClickHouseRepository } from "./repositories/clickhouse/trace-analytics-rollup.repository.ts";
 export { TraceStoredSpanReaderClickHouseRepository } from "./repositories/clickhouse/trace-span-storage.repository.ts";
 export {
-  TraceAnalyticsProjectionPort,
+  TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
   type TraceAnalyticsProjectionRead,
 } from "./repositories/projection/trace-analytics-projection.repository.ts";
-export { TraceAnalyticsRollupPort } from "./repositories/projection/trace-analytics-rollup.repository.ts";
+export { TraceAnalyticsRollupRepository } from "./repositories/projection/trace-analytics-rollup.repository.ts";
 export {
   RECORD_SPAN_DEDUPLICATION,
   EventingRecordSpanAdapter as RecordSpanCommand,
@@ -300,7 +300,7 @@ export {
   detectCausalityLoop,
   type EvaluationTriggerSubscriberDeps,
 } from "./subscribers/evaluation-trigger.subscriber.ts";
-export { TraceExistencePort } from "./repositories/read/trace-existence.repository.ts";
+export { TraceExistenceRepository } from "./repositories/read/trace-existence.repository.ts";
 export { ClickHouseTraceExistenceRepository } from "./repositories/clickhouse/trace-existence.repository.ts";
 export {
   TraceEditOverlayService,

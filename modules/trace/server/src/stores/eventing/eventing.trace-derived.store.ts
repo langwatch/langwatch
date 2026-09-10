@@ -5,7 +5,7 @@ import {
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "../../projections/trace-derived.projection.ts";
-import { TraceAnalyticsProjectionPort } from "../../repositories/projection/trace-analytics-projection.repository.ts";
+import { TraceAnalyticsProjectionRepository } from "../../repositories/projection/trace-analytics-projection.repository.ts";
 
 /**
  * The projection stamps `getWithApplied` will decode: the current shape, and the pre-split
@@ -25,12 +25,12 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
  */
 export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsData> {
   private constructor(
-    private readonly storage: TraceAnalyticsProjectionPort,
+    private readonly storage: TraceAnalyticsProjectionRepository,
     private readonly defaultRetentionDays: number,
   ) {}
 
   static create(options: {
-    storage: TraceAnalyticsProjectionPort;
+    storage: TraceAnalyticsProjectionRepository;
     defaultRetentionDays: number;
   }): TraceAnalyticsStore {
     return new TraceAnalyticsStore(options.storage, options.defaultRetentionDays);

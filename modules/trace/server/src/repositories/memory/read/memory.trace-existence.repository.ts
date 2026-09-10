@@ -1,4 +1,4 @@
-import { TraceExistencePort } from "../../read/trace-existence.repository.ts";
+import { TraceExistenceRepository } from "../../read/trace-existence.repository.ts";
 import type { MemoryTraceSpanStore } from "./memory-trace-span.store.ts";
 
 /**
@@ -6,7 +6,7 @@ import type { MemoryTraceSpanStore } from "./memory-trace-span.store.ts";
  * one store the span storage row writes into, so a trace exists here exactly
  * when a span of it was written.
  */
-export class MemoryTraceExistenceRepository extends TraceExistencePort {
+export class MemoryTraceExistenceRepository extends TraceExistenceRepository {
   readonly #store: MemoryTraceSpanStore;
 
   static create(store: MemoryTraceSpanStore): MemoryTraceExistenceRepository {

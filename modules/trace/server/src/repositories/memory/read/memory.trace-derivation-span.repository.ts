@@ -1,5 +1,5 @@
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
-import { TraceDerivationSpanReaderPort } from "../../read/trace-derivation-span-reader.repository.ts";
+import { TraceDerivationSpanReaderRepository } from "../../read/trace-derivation-span-reader.repository.ts";
 import type { MemoryTraceSpanStore } from "./memory-trace-span.store.ts";
 
 /**
@@ -7,7 +7,7 @@ import type { MemoryTraceSpanStore } from "./memory-trace-span.store.ts";
  * storage row wrote, same trace-at-a-time read: the partition hint is
  * meaningless without partitions, so it is accepted and ignored.
  */
-export class MemoryTraceDerivationSpanRepository extends TraceDerivationSpanReaderPort {
+export class MemoryTraceDerivationSpanRepository extends TraceDerivationSpanReaderRepository {
   readonly #store: MemoryTraceSpanStore;
 
   static create(store: MemoryTraceSpanStore): MemoryTraceDerivationSpanRepository {

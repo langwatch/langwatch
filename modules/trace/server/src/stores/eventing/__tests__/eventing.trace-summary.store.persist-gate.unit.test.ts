@@ -11,7 +11,7 @@
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { TraceSummaryProjectionPort } from "../../../repositories/projection/trace-summary-projection.repository.ts";
+import type { TraceSummaryProjectionRepository } from "../../../repositories/projection/trace-summary-projection.repository.ts";
 import { TraceSummaryStore } from "../eventing.trace-summary.store.ts";
 
 const context = {
@@ -38,7 +38,7 @@ function state(overrides: Partial<TraceSummaryData>): TraceSummaryData {
 function storeWithRecorder() {
   const upsert = vi.fn(async () => undefined);
   const upsertBatch = vi.fn(async () => undefined);
-  const storage = { upsert, upsertBatch } as unknown as TraceSummaryProjectionPort;
+  const storage = { upsert, upsertBatch } as unknown as TraceSummaryProjectionRepository;
   return {
     store: TraceSummaryStore.create({ storage, defaultRetentionDays: 30 }),
     upsert,

@@ -6,7 +6,7 @@
  * both need to know an id addresses something before they write a row against
  * it, and neither of them may reach into trace storage to find out.
  */
-export abstract class TraceExistencePort {
+export abstract class TraceExistenceRepository {
   abstract findExistingTraceIds(input: {
     projectId: string;
     traceIds: readonly string[];

@@ -10,7 +10,7 @@ import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-re
 import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
 import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
 import {
-  TraceSummaryProjectionPort,
+  TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
   type TraceSummaryReadWindow,
 } from "../projection/trace-summary-projection.repository.ts";
@@ -698,7 +698,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
  * fold writes with differs, and it is reshaped here rather than at a
  * composition root.
  */
-export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProjectionPort {
+export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProjectionRepository {
   private constructor(private readonly repository: TraceSummaryClickHouseRepository) {
     super();
   }

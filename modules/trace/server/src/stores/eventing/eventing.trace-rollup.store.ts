@@ -1,6 +1,6 @@
 import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.projection.ts";
-import { TraceAnalyticsRollupPort } from "../../repositories/projection/trace-analytics-rollup.repository.ts";
+import { TraceAnalyticsRollupRepository } from "../../repositories/projection/trace-analytics-rollup.repository.ts";
 
 /**
  * Thin AppendStore adapter for the trace_analytics_rollup map projection
@@ -9,12 +9,12 @@ import { TraceAnalyticsRollupPort } from "../../repositories/projection/trace-an
  */
 export class TraceAnalyticsRollupStore implements AppendStore<TraceAnalyticsRollupRow> {
   private constructor(
-    private readonly storage: TraceAnalyticsRollupPort,
+    private readonly storage: TraceAnalyticsRollupRepository,
     private readonly defaultRetentionDays: number,
   ) {}
 
   static create(options: {
-    storage: TraceAnalyticsRollupPort;
+    storage: TraceAnalyticsRollupRepository;
     defaultRetentionDays: number;
   }): TraceAnalyticsRollupStore {
     return new TraceAnalyticsRollupStore(options.storage, options.defaultRetentionDays);

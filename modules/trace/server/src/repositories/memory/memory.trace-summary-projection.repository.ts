@@ -1,6 +1,6 @@
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
-  TraceSummaryProjectionPort,
+  TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
 } from "../projection/trace-summary-projection.repository.ts";
 
@@ -9,7 +9,7 @@ import {
  * written summary per tenant and trace, so a fold that reads its own writes
  * back runs to completion without a durable store behind it.
  */
-export class MemoryTraceSummaryProjectionRepository extends TraceSummaryProjectionPort {
+export class MemoryTraceSummaryProjectionRepository extends TraceSummaryProjectionRepository {
   private readonly summaries = new Map<string, TraceSummaryData>();
 
   static create(): MemoryTraceSummaryProjectionRepository {

@@ -12,7 +12,7 @@ export type TraceSummaryProjectionEntry = {
 };
 
 /** Private persistence capability for the trace_summaries projection. */
-export abstract class TraceSummaryProjectionPort {
+export abstract class TraceSummaryProjectionRepository {
   abstract upsert(entry: TraceSummaryProjectionEntry): Promise<void>;
 
   async upsertBatch(_entries: TraceSummaryProjectionEntry[]): Promise<void> {

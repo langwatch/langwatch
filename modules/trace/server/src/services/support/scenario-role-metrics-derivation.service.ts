@@ -1,4 +1,4 @@
-import type { TraceDerivationSpanReaderPort } from "../../repositories/read/trace-derivation-span-reader.repository.ts";
+import type { TraceDerivationSpanReaderRepository } from "../../repositories/read/trace-derivation-span-reader.repository.ts";
 import { deriveScenarioRoleMetricsFromSpans } from "../../rules/scenario-role-metrics.rules.ts";
 import type { ScenarioRoleMetrics } from "../../rules/scenario-role-metrics.rules.ts";
 import { SpanCostService } from "../span/span-cost.service.ts";
@@ -43,7 +43,7 @@ export interface ScenarioRoleMetricsDerivationInput {
  */
 export class ScenarioRoleMetricsDerivationService {
   static create(options: {
-    spans: TraceDerivationSpanReaderPort;
+    spans: TraceDerivationSpanReaderRepository;
     /**
      * How a span's cost is estimated when it carries none. The static model catalog is correct
      * here, not the operator's per-project overrides: those price a span at record time, and
@@ -62,7 +62,7 @@ export class ScenarioRoleMetricsDerivationService {
   private readonly memo = new Map<string, MemoEntry>();
 
   private constructor(
-    private readonly spans: TraceDerivationSpanReaderPort,
+    private readonly spans: TraceDerivationSpanReaderRepository,
     private readonly spanCosts: SpanCostService,
     private readonly now: () => number,
   ) {}

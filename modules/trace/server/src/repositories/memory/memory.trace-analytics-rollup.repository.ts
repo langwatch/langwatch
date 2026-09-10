@@ -1,4 +1,4 @@
-import { TraceAnalyticsRollupPort } from "../projection/trace-analytics-rollup.repository.ts";
+import { TraceAnalyticsRollupRepository } from "../projection/trace-analytics-rollup.repository.ts";
 import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.projection.ts";
 
 /**
@@ -6,7 +6,7 @@ import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.pro
  * every append and keeps it in memory, so a fold that rolls up runs to
  * completion without a durable store behind it.
  */
-export class MemoryTraceAnalyticsRollupRepository extends TraceAnalyticsRollupPort {
+export class MemoryTraceAnalyticsRollupRepository extends TraceAnalyticsRollupRepository {
   readonly appended: TraceAnalyticsRollupRow[] = [];
 
   static create(): MemoryTraceAnalyticsRollupRepository {

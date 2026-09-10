@@ -5,7 +5,7 @@ import {
 } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  TraceSummaryProjectionPort,
+  TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
 } from "../../repositories/projection/trace-summary-projection.repository.ts";
 import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
@@ -31,7 +31,7 @@ const SPAN_COUNT = 40;
 const BASE_MS = 1_760_000_000_000;
 
 /** The persistence boundary, answering reads from whatever was written. */
-class MemoryProjectionPort extends TraceSummaryProjectionPort {
+class MemoryProjectionPort extends TraceSummaryProjectionRepository {
   readonly written: TraceSummaryProjectionEntry[] = [];
 
   async upsert(entry: TraceSummaryProjectionEntry): Promise<void> {

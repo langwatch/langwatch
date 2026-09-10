@@ -13,7 +13,7 @@ import {
   type TraceAnalyticsRow,
 } from "../trace-derived.projection.ts";
 import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store.ts";
-import { TraceAnalyticsProjectionPort } from "../../repositories/projection/trace-analytics-projection.repository.ts";
+import { TraceAnalyticsProjectionRepository } from "../../repositories/projection/trace-analytics-projection.repository.ts";
 import {
   createSpanReceivedEvent,
   createTestRuntime,
@@ -163,7 +163,7 @@ describe("traceAnalytics storage anchor", () => {
       /** @scenario "A trace whose only signal is a log record is anchored in real time" */
       it("writes the row, carrying the anchor the fold froze", async () => {
         const upsert = vi.fn().mockResolvedValue(undefined);
-        const storage = new (class extends TraceAnalyticsProjectionPort {
+        const storage = new (class extends TraceAnalyticsProjectionRepository {
           upsert = upsert;
           async findByTraceId() {
             return null;
