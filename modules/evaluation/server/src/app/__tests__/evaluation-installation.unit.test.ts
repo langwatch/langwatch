@@ -6,7 +6,7 @@
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ModelProviderApi as ModelProviderApiToken } from "@langwatch/model-provider-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -15,9 +15,8 @@ import { describe, expect, it } from "vitest";
 import { evaluationServer } from "../../evaluation.server.ts";
 import { createEvaluationTestInfrastructure } from "./evaluation.fixture.ts";
 
-function process() {
-  return createApp({ name: "evaluation-installation-test" })
-    .withPersistence("memory", {})
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
     .withInfrastructure(createEvaluationTestInfrastructure())
     .withProvided(WorkflowApi, createApiFixture<WorkflowApi>())
     .withProvided(TraceApi, createApiFixture<TraceApi>())
@@ -25,13 +24,13 @@ function process() {
       ModelProviderApiToken,
       createApiFixture<ModelProviderApi>({ getExecutionProviders: async () => ({}) }),
     )
-    .withModule(evaluationServer);
+    .withModules([withMemoryRepositories(evaluationServer)]);
 }
 
 describe("given a process that installs the evaluation feature", () => {
   describe("when it boots", () => {
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-      const runtime = await process().boot({ role });
+      const runtime = await process(role).boot();
 
       try {
         const app = runtime.service(EvaluationApi);

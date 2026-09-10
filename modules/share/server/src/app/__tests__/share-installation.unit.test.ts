@@ -1,7 +1,7 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { ShareApi, ShareLinkNotFoundError } from "@langwatch/share-contract";
 import { describe, expect, it } from "vitest";
 import { shareServer } from "../../share.server.ts";
@@ -11,19 +11,17 @@ import {
   createShareTestProjects,
 } from "./share.fixture.ts";
 
-function process() {
-  return createApp({ name: "share-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
     .withProvided(AuthzApi, createShareTestAuthz())
     .withProvided(DataRetentionApi, createShareTestDataRetention())
     .withProvided(ProjectApi, createShareTestProjects())
-    .withModule(shareServer, { members: { redis: null } });
+    .withModules([withMemoryRepositories(shareServer)]);
 }
 
 describe("share app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process().boot({ role });
+    const runtime = await process(role).boot();
 
     try {
       const app = runtime.service(ShareApi);

@@ -5,7 +5,7 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import { OpsApi } from "@langwatch/ops-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -24,26 +24,19 @@ import {
 const STAFF_ID = "user_olive";
 
 function process(connections = RecordingSsoConnectionLedger.create()) {
-  return createApp({ name: "sso-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+  return createApp({ role: "api", config: {} })
     .withProvided(LicensingApi, createSsoTestLicensing())
     .withProvided(OpsApi, createSsoTestOperators())
     .withProvided(UserApi, createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL }))
     .withProvided(AuditLogApi, createSsoTestAuditLog())
-    .withModule(ssoServer, {
-      members: { connections, logger: RecordingSsoGateLogger.create() },
-    });
+    .withModules([withMemoryRepositories(ssoServer)]);
 }
 
 describe("given a process that installed single sign-on", () => {
   describe("when the api role boots it", () => {
     it("serves the feature api the back office reads", async () => {
       const connections = RecordingSsoConnectionLedger.create();
-      const runtime = await process(connections).boot({
-        role: "api",
-        config: { sso: createSsoTestConfiguration() },
-      });
+      const runtime = await process(connections).boot();
 
       try {
         const app = runtime.service(SsoApi);

@@ -5,7 +5,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { dataRetentionServer } from "../../data-retention.server.ts";
@@ -18,17 +18,13 @@ import {
   retentionTestGraph,
 } from "./data-retention.fixture.ts";
 
-function process() {
-  return createApp({ name: "data-retention-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
     .withProvided(ProjectApi, createDataRetentionTestProjects())
     .withProvided(OrganizationApi, createDataRetentionTestOrganizations())
     .withProvided(AuthzApi, createDataRetentionTestAuthz())
     .withProvided(UserApi, createDataRetentionTestUsers())
-    .withModule(dataRetentionServer, {
-      members: createDataRetentionTestInfrastructure(),
-    });
+    .withModules([withMemoryRepositories(dataRetentionServer)]);
 }
 
 describe("data retention app installation", () => {

@@ -39,6 +39,32 @@ export function noMembers<Members>(): MemberSource<Members> {
   };
 }
 
+/**
+ * The members a caller hands in, as a source.
+ *
+ * This is the whole of ruling 11's test seam: a member passed is used, and a
+ * member absent is refused BY NAME when a module reads it, never quietly
+ * replaced. It opens nothing, so a test that needs a frozen clock and a memory
+ * cache says so and gets no client library with it.
+ */
+export function membersFrom<Members>(
+  supplied: Readonly<Partial<Members>>,
+): MemberSource<Members> {
+  const names = Object.keys(supplied) as (keyof Members & string)[];
+
+  return {
+    order: names,
+    read(name) {
+      if (!Object.hasOwn(supplied, name)) {
+        throw new Error(`No "${name}" member was handed to this process.`);
+      }
+
+      return supplied[name] as Members[typeof name];
+    },
+    async close() {},
+  };
+}
+
 /** A member a module declared that this process cannot supply. */
 export class MissingMemberError extends Error {
   constructor(

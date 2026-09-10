@@ -1,7 +1,7 @@
 import { AuthApi } from "@langwatch/auth-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -13,19 +13,17 @@ import {
   createUserTestOrganizations,
 } from "./user.fixture.ts";
 
-function process() {
-  return createApp({ name: "user-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
     .withProvided(AuthApi, createUserTestAuth())
     .withProvided(OrganizationApi, createUserTestOrganizations())
     .withProvided(OpsApi, createUserTestOps())
-    .withModule(userServer, { members: createUserTestInfrastructure() });
+    .withModules([withMemoryRepositories(userServer)]);
 }
 
 describe("user app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process().boot({ role });
+    const runtime = await process(role).boot();
 
     try {
       const app = runtime.service(UserApi);
@@ -47,7 +45,7 @@ describe("user app installation", () => {
   });
 
   it("rotates a password through the credential repository the installer selected", async () => {
-    const runtime = await process().boot({ role: "api" });
+    const runtime = await process("api").boot();
 
     try {
       const app = runtime.service(UserApi);
@@ -77,8 +75,8 @@ describe("user app installation", () => {
   });
 
   it("allocates independent memory repositories for each installation", async () => {
-    const first = await process().boot({ role: "api" });
-    const second = await process().boot({ role: "api" });
+    const first = await process("api").boot();
+    const second = await process("api").boot();
 
     try {
       const created = await first.service(UserApi).createCredentialUser({

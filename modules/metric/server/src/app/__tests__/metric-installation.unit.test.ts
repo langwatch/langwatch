@@ -1,6 +1,6 @@
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { MetricApi } from "@langwatch/metric-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { metricServer } from "../../metric.server.ts";
@@ -24,11 +24,9 @@ const GAUGE_REQUEST = {
 };
 
 function process(redactMetricAttributes: DataPrivacyApi["redactMetricAttributes"]) {
-  return createApp({ name: "metric-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+  return createApp({ role: "api", config: {} })
     .withProvided(DataPrivacyApi, createApiFixture<DataPrivacyApi>({ redactMetricAttributes }))
-    .withModule(metricServer);
+    .withModules([withMemoryRepositories(metricServer)]);
 }
 
 describe("metric app installation", () => {
@@ -38,7 +36,7 @@ describe("metric app installation", () => {
       const redactMetricAttributes = vi.fn<DataPrivacyApi["redactMetricAttributes"]>(
         async () => {},
       );
-      const runtime = await process(redactMetricAttributes).boot({ role: "worker" });
+      const runtime = await process(redactMetricAttributes).boot();
 
       try {
         const app = runtime.service(MetricApi);

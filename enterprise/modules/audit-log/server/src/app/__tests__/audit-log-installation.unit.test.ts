@@ -1,13 +1,11 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
 import { auditLogServer } from "../../audit-log.server.ts";
 
-function process() {
-  return createApp({ name: "audit-log-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
-    .withModule(auditLogServer);
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
+    .withModules([withMemoryRepositories(auditLogServer)]);
 }
 
 const command = {

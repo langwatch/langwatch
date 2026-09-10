@@ -15,10 +15,8 @@ import { resolveFeatureFlagConfig } from "@langwatch/feature-flag-contract";
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 
-function process() {
-  return createApp({ name: "feature-flag-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
     .withProvided(AuthzApi, createFeatureFlagTestAuthz())
     .withProvided(ProjectApi, createFeatureFlagTestProjects())
     .withProvided(OrganizationApi, TestOrganizations.create().api())
@@ -32,7 +30,7 @@ function process() {
 
 describe("feature flag app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process().boot({ role });
+    const runtime = await process(role).boot();
 
     try {
       const app = runtime.service(FeatureFlagApi);
@@ -50,8 +48,8 @@ describe("feature flag app installation", () => {
   });
 
   it("allocates independent memory repositories for each installation", async () => {
-    const first = await process().boot({ role: "api" });
-    const second = await process().boot({ role: "api" });
+    const first = await process("api").boot();
+    const second = await process("api").boot();
 
     try {
       await first
@@ -70,7 +68,7 @@ describe("feature flag app installation", () => {
   });
 
   it("refuses a key the registry does not define", async () => {
-    const runtime = await process().boot({ role: "api" });
+    const runtime = await process("api").boot();
 
     try {
       await expect(

@@ -1,16 +1,12 @@
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { SecretApi, SecretNotFoundError } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 import { secretServer } from "../../secret.server.ts";
 import { ReversibleTestSecretEncryption } from "./secret.fixture.ts";
 
-function process() {
-  return createApp({ name: "secret-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
-    .withModule(secretServer, {
-      members: { encryption: new ReversibleTestSecretEncryption() },
-    });
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
+    .withModules([withMemoryRepositories(secretServer)]);
 }
 
 const input = { projectId: "project-1", name: "OPENAI_API_KEY", value: "sk-live" };
@@ -18,7 +14,7 @@ const caller = { id: "user-1" };
 
 describe("secret app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process().boot({ role });
+    const runtime = await process(role).boot();
 
     try {
       const app = runtime.service(SecretApi);
@@ -45,8 +41,8 @@ describe("secret app installation", () => {
   });
 
   it("allocates independent memory repositories for each installation", async () => {
-    const first = await process().boot({ role: "api" });
-    const second = await process().boot({ role: "api" });
+    const first = await process("api").boot();
+    const second = await process("api").boot();
 
     try {
       const created = await first.service(SecretApi).create(input, caller);
@@ -65,7 +61,7 @@ describe("secret app installation", () => {
 
   /** @scenario "Secret values never leave the boundary" */
   it("answers metadata that carries neither the value nor the ciphertext", async () => {
-    const runtime = await process().boot({ role: "api" });
+    const runtime = await process("api").boot();
 
     try {
       const app = runtime.service(SecretApi);

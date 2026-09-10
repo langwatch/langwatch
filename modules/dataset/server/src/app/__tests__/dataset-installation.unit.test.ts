@@ -7,26 +7,24 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
 import { ExperimentApi } from "@langwatch/experiment-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
 
 import { datasetServer } from "../../dataset.server.ts";
 import { createDatasetTestAuthz, createDatasetTestExperiments } from "./dataset.fixture.ts";
 
-function process() {
-  return createApp({ name: "dataset-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
     .withProvided(ExperimentApi, createDatasetTestExperiments())
     .withProvided(AuthzApi, createDatasetTestAuthz())
-    .withModule(datasetServer, { members: {} });
+    .withModules([withMemoryRepositories(datasetServer)]);
 }
 
 const projectId = "project-1";
 
 describe("dataset app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process().boot({ role });
+    const runtime = await process(role).boot();
 
     try {
       const app = runtime.service(DatasetApi);
@@ -57,8 +55,8 @@ describe("dataset app installation", () => {
   });
 
   it("allocates independent memory repositories for each installation", async () => {
-    const first = await process().boot({ role: "api" });
-    const second = await process().boot({ role: "api" });
+    const first = await process("api").boot();
+    const second = await process("api").boot();
 
     try {
       const created = await first

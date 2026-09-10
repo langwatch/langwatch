@@ -1,7 +1,7 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { RoleApi } from "@langwatch/role-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -14,10 +14,8 @@ import {
 
 const ORGANIZATION_ID = "org-1";
 
-function process() {
-  return createApp({ name: "role-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
     .withProvided(
       AuthzApi,
       createApiFixture<AuthzApi>({
@@ -36,18 +34,12 @@ function process() {
     )
     .withProvided(OrganizationApi, createApiFixture<OrganizationApi>())
     .withProvided(UserApi, createApiFixture<UserApi>())
-    .withModule(roleServer, {
-      members: {
-        scope: new AllowingTestRoleScope(),
-        plan: new AllowingTestRolePlan(),
-        bindingIds: new CountingTestRoleBindingIds(),
-      },
-    });
+    .withModules([withMemoryRepositories(roleServer)]);
 }
 
 describe("role app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process().boot({ role });
+    const runtime = await process(role).boot();
 
     try {
       const app = runtime.service(RoleApi);
@@ -62,7 +54,7 @@ describe("role app installation", () => {
   });
 
   it("publishes the permission catalog every custom role is written from", async () => {
-    const runtime = await process().boot({ role: "api" });
+    const runtime = await process(role).boot();
 
     try {
       const catalog = await runtime.service(RoleApi).getPermissionCatalog();

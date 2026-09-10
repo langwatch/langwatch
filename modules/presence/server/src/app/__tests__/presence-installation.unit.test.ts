@@ -5,7 +5,7 @@
  */
 import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -19,8 +19,7 @@ import {
 } from "./presence.fixture.ts";
 
 function bootPresence() {
-  return createApp({ name: "langwatch-api" })
-    .withPersistence("memory", {})
+  return createApp({ role: "api", config: {} })
     .withInfrastructure({
       broadcast: new RecordingPresenceBroadcast(),
       emitters: new TestPresenceEmitters(),
@@ -28,8 +27,8 @@ function bootPresence() {
     })
     .withProvided(ProjectApi, createPresenceTestProjects())
     .withProvided(UserApi, createPresenceTestUsers({ name: "Ada", image: null }))
-    .withModule(presenceServer)
-    .boot({ role: "api" });
+    .withModules([withMemoryRepositories(presenceServer)])
+    .boot();
 }
 
 describe("given a process that installs presence", () => {

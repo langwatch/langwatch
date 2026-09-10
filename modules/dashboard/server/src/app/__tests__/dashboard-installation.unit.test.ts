@@ -2,7 +2,7 @@ import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { DashboardApi, DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
 
 import { dashboardServer } from "../../dashboard.server.ts";
@@ -13,20 +13,19 @@ import {
   createDashboardTestProjects,
 } from "./dashboard.fixture.ts";
 
-function process() {
-  return createApp({ name: "dashboard-installation-test" })
-    .withPersistence("memory", {})
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
     .withInfrastructure(createDashboardTestInfrastructure())
     .withProvided(AnalyticsApi, createDashboardTestAnalytics())
     .withProvided(AutomationApi, createDashboardTestAutomation())
     .withProvided(ProjectApi, createDashboardTestProjects())
-    .withModule(dashboardServer);
+    .withModules([withMemoryRepositories(dashboardServer)]);
 }
 
 describe("dashboard app installation", () => {
   describe("given a process that boots the feature over memory", () => {
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-      const runtime = await process().boot({ role });
+      const runtime = await process(role).boot();
 
       try {
         const app = runtime.service(DashboardApi);

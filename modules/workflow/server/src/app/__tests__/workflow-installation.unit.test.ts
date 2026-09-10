@@ -2,7 +2,7 @@
  * The workflow module installs, in every role it serves, and the token the
  * transports bind to resolves to the app the installer built.
  */
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
@@ -30,18 +30,17 @@ const workflow = {
 } satisfies Workflow;
 
 function process_() {
-  return createApp({ name: "workflow-installation-test" })
-    .withPersistence("memory", {})
+  return createApp({ role: "api", config: {} })
     .withInfrastructure(
       createWorkflowTestInfrastructure({ workflows: createWorkflowTestService([workflow]) }),
     )
-    .withModule(workflowServer);
+    .withModules([withMemoryRepositories(workflowServer)]);
 }
 
 describe("workflow app installation", () => {
   describe("given a process that supplies the module's members", () => {
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-      const runtime = await process_().boot({ role });
+      const runtime = await process_().boot();
 
       try {
         const app = runtime.service(WorkflowApi);

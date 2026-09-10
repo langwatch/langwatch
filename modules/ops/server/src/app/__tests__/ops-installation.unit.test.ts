@@ -8,7 +8,7 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -16,22 +16,21 @@ import { describe, expect, it } from "vitest";
 import { opsServer } from "../../ops.server.ts";
 import { createOpsTestInfrastructure, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
 
-function process() {
-  return createApp({ name: "ops-installation-test" })
-    .withPersistence("memory", {})
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
     .withInfrastructure(createOpsTestInfrastructure())
     .withProvided(UserApi, createApiFixture<UserApi>())
     .withProvided(AuthApi, createApiFixture<AuthApi>())
     .withProvided(ProjectApi, createApiFixture<ProjectApi>({ searchByQuery: async () => [] }))
     .withProvided(AuditLogApi, createApiFixture<AuditLogApi>({ record: async () => {} }))
     .withProvided(ApiKeyApi, createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }))
-    .withModule(opsServer);
+    .withModules([withMemoryRepositories(opsServer)]);
 }
 
 describe("ops app installation", () => {
   describe("given a process that boots the feature over memory", () => {
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-      const runtime = await process().boot({ role });
+      const runtime = await process(role).boot();
 
       try {
         const app = runtime.service(OpsApi);

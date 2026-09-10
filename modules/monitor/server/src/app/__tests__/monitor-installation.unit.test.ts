@@ -15,10 +15,8 @@ import {
   FakeMonitorReplication,
 } from "./monitor.fixture.ts";
 
-function process() {
-  return createApp({ name: "monitor-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+function process(role: "api" | "worker") {
+  return createApp({ role, config: {} })
     .withProvided(
       AuthzApi,
       createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
@@ -47,7 +45,7 @@ const created: MonitorCreateInput = {
 
 describe("monitor app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process().boot({ role });
+    const runtime = await process(role).boot();
 
     try {
       const app = runtime.service(MonitorApi);
@@ -66,8 +64,8 @@ describe("monitor app installation", () => {
   });
 
   it("allocates independent memory repositories for each installation", async () => {
-    const first = await process().boot({ role: "api" });
-    const second = await process().boot({ role: "api" });
+    const first = await process("api").boot();
+    const second = await process("api").boot();
 
     try {
       await first.service(MonitorApi).create({ ...created });

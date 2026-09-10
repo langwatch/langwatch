@@ -46,6 +46,7 @@ export {
 export {
   buildClaimedMembers,
   membersFor,
+  membersFrom,
   noMembers,
   MissingMemberError,
   type MemberClaim,

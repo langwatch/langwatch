@@ -4,7 +4,7 @@ import {
   type Plan,
   type ProjectSpendRollup,
 } from "@langwatch/entitlement-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -69,16 +69,15 @@ class RecordingSpendRepository implements OrganizationSpendRepository {
 
 describe("entitlement app installation", () => {
   it("installs a working capability in the api role", async () => {
-    const runtime = await createApp({ name: "entitlement-installation-test" })
-      .withPersistence("memory", {})
+    const runtime = await createApp({ role: "api", config: {} })
       .withInfrastructure({
         baseline: free,
         counter: TestUsageCounter.create(120),
         warnings: TestUsageWarnings.create(),
       })
       .withProvided(UserApi, createEntitlementTestUsers())
-      .withModule(entitlementServer)
-      .boot({ role: "api" });
+      .withModules([withMemoryRepositories(entitlementServer)])
+      .boot();
 
     try {
       const app = runtime.service(EntitlementApi);

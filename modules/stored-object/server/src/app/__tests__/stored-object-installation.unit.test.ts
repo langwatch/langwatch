@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see modules/stored-object/specs/stored-objects.feature
  */
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
@@ -10,10 +10,9 @@ import { storedObjectServer } from "../../stored-object.server.ts";
 import { createStoredObjectTestInfrastructure } from "./stored-object.fixture.ts";
 
 function installation() {
-  return createApp({ name: "stored-object-installation-test" })
-    .withPersistence("memory", {})
+  return createApp({ role: "api", config: {} })
     .withInfrastructure(createStoredObjectTestInfrastructure())
-    .withModule(storedObjectServer);
+    .withModules([withMemoryRepositories(storedObjectServer)]);
 }
 
 const bytes = {
@@ -33,7 +32,7 @@ describe("stored-object app installation", () => {
     it.each(["api", "worker", "task"] as const)(
       "installs a working app in the %s role",
       async (role) => {
-        const runtime = await installation().boot({ role });
+        const runtime = await installation().boot();
 
         try {
           const app = runtime.service(StoredObjectApi);
@@ -57,8 +56,8 @@ describe("stored-object app installation", () => {
 
     /** @scenario "A process boots the Stored Objects feature over either backend" */
     it("allocates independent memory repositories for each installation", async () => {
-      const first = await installation().boot({ role: "api" });
-      const second = await installation().boot({ role: "api" });
+      const first = await installation().boot();
+      const second = await installation().boot();
 
       try {
         const stored = await first.service(StoredObjectApi).storeFromBytes(bytes);
