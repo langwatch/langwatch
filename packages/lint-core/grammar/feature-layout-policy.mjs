@@ -82,6 +82,23 @@ export const CONTRACT_ARTIFACT_SUFFIX = /\.(?:app|commands|errors|events|queries
 // role. Owned state is a repository, messages to something the module does not
 // own are a channel, behaviour is a service, a client the process supplies is a
 // member of the module's Infrastructure beside the app.
+/**
+ * The closed list, in prose, for the message a refused file prints.
+ *
+ * The grammar does not say what is forbidden. It says what is allowed, and
+ * this sentence is that list read aloud, so an agent that is refused is told
+ * the shape to move to rather than being left to guess. It sits beside
+ * `SERVER_PATTERNS` because a message that drifts from the patterns coaches
+ * the reader into the shape the patterns refuse; a test pins the two together.
+ */
+export const SERVER_HOMES =
+  "index.ts, <feature>.server.ts, app/<feature>.app.ts, " +
+  "transport/<feature>.<rest|trpc|ws>.ts, services/<name>.service.ts, " +
+  "repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), " +
+  "channels/ (the interface, the bundle, the registry, and a tier folder beside them), " +
+  "eventing/<feature>.pipeline.ts and what it names, rules/<name>.rules.ts, " +
+  "tasks/<name>.task.ts, migrations/";
+
 export const SERVER_PATTERNS = [
   /^index\.ts$/,
   new RegExp(`^${NAME}\\.server\\.ts$`),
@@ -100,12 +117,17 @@ export const SERVER_PATTERNS = [
   new RegExp(`^channels/${NAME}(?:-channels)?\\.registry\\.ts$`),
   new RegExp(`^channels/${NAME}(?:\\.${NAME})?\\.channels\\.ts$`),
   new RegExp(`^channels/(${CHANNEL_TIER})/\\1\\.${NAME}\\.(?:channel|channels)\\.ts$`),
-  new RegExp(`^stores/${NAME}(?:\\.${NAME})?\\.store\\.ts$`),
-  new RegExp(`^stores/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.store\\.ts$`),
-  new RegExp(`^projections/${NAME}\\.projection\\.ts$`),
-  new RegExp(`^subscribers/${NAME}\\.subscriber\\.ts$`),
-  new RegExp(`^processes/${NAME}\\.process\\.ts$`),
-  new RegExp(`^intents/${NAME}\\.intent\\.ts$`),
+  // Event sourcing is one folder, not six. The pipeline declares the aggregate,
+  // its events, its projections, its subscribers, its process managers and its
+  // commands through `definePipeline` from `@langwatch/eventing`; the files
+  // beside it hold what that declaration names.
+  new RegExp(`^eventing/${NAME}\\.pipeline\\.ts$`),
+  new RegExp(
+    `^eventing/${NAME}\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
+  ),
+  new RegExp(
+    `^eventing/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
+  ),
   // One-shot programs run from the task launcher, composed by apps/tasks.
   new RegExp(`^tasks/${NAME}\\.task\\.ts$`),
   // Flat API declarations and explicit WebSocket protocol integrations.

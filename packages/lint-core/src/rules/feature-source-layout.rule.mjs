@@ -4,16 +4,13 @@ import {
   PROCESS_MANAGER_SERVICE_PATTERN,
   PURE_VALUE_CONSTRUCTORS,
   RULES_PATTERN,
+  SERVER_HOMES,
   SERVER_ONLY_CONTRACT_ARTIFACT,
   SERVER_PATTERNS,
   isLowerKebabFilename,
   isFeatureApiContract,
 } from "../../grammar/feature-layout-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
-
-const SERVER_HOMES =
-  "services/, ports/, repository bundles and registries, stores/, adapters/, projections/, subscribers/, " +
-  "processes/, intents/, rules/, tasks/, transport/<surface>/ or transport/<feature>.<rest|trpc|ws>.ts, migrations/, app/, fixtures/, <feature>.server.ts";
 
 function definitionOf(context, identifier) {
   let scope = context.sourceCode.getScope(identifier);
@@ -86,7 +83,7 @@ export const featureSourceLayoutRule = defineRule({
       fix: "Move the class or `new` into a service or adapter and pass its result in.",
     },
     serverPath: {
-      what: `\`{{path}}\` has no home in layout v0. Allowed: ${SERVER_HOMES}.`,
+      what: `\`{{path}}\` has no home in layout v0. Only this shape is allowed: ${SERVER_HOMES}.`,
       fix: "Move it to the directory matching its artifact suffix.",
     },
   },

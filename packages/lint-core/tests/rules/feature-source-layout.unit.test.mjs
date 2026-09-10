@@ -85,8 +85,9 @@ describe("given a strict feature server module", () => {
       const found = report("modules/agent/server/src/misc/agent.helper.ts");
 
       expect(found.map((e) => e.messageId)).toEqual(["serverPath"]);
-      expect(found[0].message).toContain("services/");
-      expect(found[0].message).toContain("transport/<surface>/");
+      expect(found[0].message).toContain("Only this shape is allowed");
+      expect(found[0].message).toContain("services/<name>.service.ts");
+      expect(found[0].message).not.toContain("transport/<surface>/");
     });
   });
 
@@ -153,4 +154,33 @@ it.each([
   "modules/agent/contract/src/nested/agent.api.ts",
 ])("keeps noncanonical API modules out of contracts: %s", (file) => {
   expect(report(file).map((entry) => entry.messageId)).toEqual(["contractServerArtifact"]);
+});
+
+describe("given a channel in a strict feature server module", () => {
+  describe("when the interface sits at channels/<subject>.channel.ts", () => {
+    /** @scenario "A channel interface lives at channels/<subject>.channel.ts" */
+    it("reports nothing", () => {
+      expect(report("modules/agent/server/src/channels/webhook.channel.ts")).toEqual([]);
+    });
+  });
+
+  describe("when an implementation is named for its tier folder", () => {
+    /** @scenario "A channel implementation is named for its tier folder" */
+    it("reports nothing", () => {
+      expect(report("modules/agent/server/src/channels/http/http.webhook.channel.ts")).toEqual([]);
+      expect(
+        report("modules/agent/server/src/channels/memory/memory.webhook.channel.ts"),
+      ).toEqual([]);
+      expect(report("modules/agent/server/src/channels/agent-channels.registry.ts")).toEqual([]);
+    });
+  });
+
+  describe("when an implementation claims a tier it does not sit in", () => {
+    /** @scenario "A channel implementation in the wrong tier folder is refused" */
+    it("reports serverPath", () => {
+      const found = report("modules/agent/server/src/channels/http/redis.webhook.channel.ts");
+
+      expect(found.map((e) => e.messageId)).toEqual(["serverPath"]);
+    });
+  });
 });
