@@ -11,6 +11,7 @@ export const CANONICAL_ARTIFACTS = new Set([
   "adapter",
   "app",
   "api",
+  "channel",
   "commands",
   "errors",
   "events",
@@ -37,7 +38,13 @@ export const TEST_LEVELS = new Set(["unit", "integration", "e2e"]);
  */
 export const TEST_DIRECTORY = /(?:^|\/)__tests__\//;
 
-export const SERVER_QUALIFIED_ARTIFACTS = new Set(["adapter", "mapper", "repository", "store"]);
+export const SERVER_QUALIFIED_ARTIFACTS = new Set([
+  "adapter",
+  "channel",
+  "mapper",
+  "repository",
+  "store",
+]);
 export const SERVER_ARCHITECTURAL_QUALIFIERS = [
   "clickhouse",
   "eventing",
@@ -49,6 +56,14 @@ export const SERVER_ARCHITECTURAL_QUALIFIERS = [
   "redis",
   "routed",
 ];
+
+/**
+ * The tiers a channel implementation may sit in. The folder name and the
+ * filename's first qualifier are the same word, so a file cannot claim one
+ * tier while living in another.
+ */
+export const CHANNEL_TIERS = ["eventing", "http", "memory", "redis", "ses", "slack", "sqs"];
+const CHANNEL_TIER = CHANNEL_TIERS.join("|");
 
 /** The feature API token has one portable home; other API modules are transports. */
 export function isFeatureApiContract(sourcePath, feature) {
@@ -62,17 +77,17 @@ export const SERVER_ONLY_CONTRACT_ARTIFACT =
   /\.(?:adapter|api|mapper|migration|port|projection|repository|store)\.ts$/;
 export const CONTRACT_ARTIFACT_SUFFIX = /\.(?:app|commands|errors|events|queries|service)\.ts$/;
 
+// This list is closed. A server source file is one of these shapes or it is not
+// allowed: there is no folder for a name that states a technique rather than a
+// role. Owned state is a repository, messages to something the module does not
+// own are a channel, behaviour is a service, a client the process supplies is a
+// member of the module's Infrastructure beside the app.
 export const SERVER_PATTERNS = [
   /^index\.ts$/,
-  // Legacy (feature-shape inventories it): a server package has no test-only entrypoint.
-  /^testing\.ts$/,
   new RegExp(`^${NAME}\\.server\\.ts$`),
   // A feature app groups its public services; transport adapters stay outside it.
   new RegExp(`^app/${NAME}\\.app\\.ts$`),
-  // Legacy (feature-shape inventories it): builders now live in app/__tests__/<name>.fixture.ts.
-  new RegExp(`^fixtures/${NAME}\\.fixture\\.ts$`),
   new RegExp(`^services/${NAME}\\.service\\.ts$`),
-  new RegExp(`^ports/${NAME}\\.port\\.ts$`),
   new RegExp(`^repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
   // A feature can select a repository bundle by persistence backend.
   new RegExp(`^repositories/${NAME}(?:-repositories)?\\.registry\\.ts$`),
@@ -80,18 +95,19 @@ export const SERVER_PATTERNS = [
   new RegExp(
     `^repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|repositories|store)\\.ts$`,
   ),
+  // A channel carries messages to or from something the module does not own.
+  new RegExp(`^channels/${NAME}(?:\\.${NAME})?\\.channel\\.ts$`),
+  new RegExp(`^channels/${NAME}(?:-channels)?\\.registry\\.ts$`),
+  new RegExp(`^channels/${NAME}(?:\\.${NAME})?\\.channels\\.ts$`),
+  new RegExp(`^channels/(${CHANNEL_TIER})/\\1\\.${NAME}\\.(?:channel|channels)\\.ts$`),
   new RegExp(`^stores/${NAME}(?:\\.${NAME})?\\.store\\.ts$`),
   new RegExp(`^stores/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.store\\.ts$`),
   new RegExp(`^projections/${NAME}\\.projection\\.ts$`),
   new RegExp(`^subscribers/${NAME}\\.subscriber\\.ts$`),
   new RegExp(`^processes/${NAME}\\.process\\.ts$`),
   new RegExp(`^intents/${NAME}\\.intent\\.ts$`),
-  // A persistence adapter (postgres.*, prisma.*) is legacy; repositories select their backend.
-  new RegExp(`^adapters/${NAME}(?:\\.${NAME})?\\.adapter\\.ts$`),
   // One-shot programs run from the task launcher, composed by apps/tasks.
   new RegExp(`^tasks/${NAME}\\.task\\.ts$`),
-  // Legacy (feature-shape inventories it): a feature declares one flat file per protocol.
-  new RegExp(`^transport/${NAME}/${NAME}\\.api\\.ts$`),
   // Flat API declarations and explicit WebSocket protocol integrations.
   new RegExp(`^transport/${NAME}\\.(?:rest|trpc|ws)\\.ts$`),
   new RegExp(`^migrations/${NAME}-import\\.${NAME}\\.migration\\.ts$`),
@@ -173,6 +189,7 @@ export const ARTIFACT_PARTS = new Set([
   "app",
   "adapter",
   "api",
+  "channel",
   "commands",
   "errors",
   "events",
@@ -192,6 +209,7 @@ export const ARTIFACT_PARTS = new Set([
 
 export const QUALIFIED_ARTIFACTS = new Set([
   "adapter",
+  "channel",
   "mapper",
   "migration",
   "repository",
@@ -199,7 +217,7 @@ export const QUALIFIED_ARTIFACTS = new Set([
 ]);
 
 export const SUBJECT_ARTIFACT =
-  /\.(?:adapter|app|commands|errors|events|intent|process|projection|queries|repository|service|store|subscriber)\.tsx?$/;
+  /\.(?:adapter|app|channel|commands|errors|events|intent|process|projection|queries|repository|service|store|subscriber)\.tsx?$/;
 
 export function claimsSubject(candidate, feature, subject) {
   if (candidate === subject) return true;

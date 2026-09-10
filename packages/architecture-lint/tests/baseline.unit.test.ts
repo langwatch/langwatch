@@ -215,6 +215,26 @@ describe("given a baseline file", () => {
     });
   });
 
+  describe("when a rule the merge base never carried is measured for the first time", () => {
+    /** @scenario "A rule new to the tree seeds its rows rather than growing them" */
+    it("accepts every row of the new rule and still refuses growth of a known one", () => {
+      const seeding = {
+        ...policy,
+        growth: {
+          ...policy.growth,
+          seeds: (entry, reference) =>
+            !reference.some((known) => known.key.split("|")[0] === entry.key.split("|")[0]),
+        },
+      } satisfies typeof policy;
+      const reference = [row("a|one")];
+      const current = [row("a|one"), row("a|two"), row("fresh|one"), row("fresh|two")];
+
+      expect(
+        shrinkCheck({ current, reference, policy: seeding, file: "f.json" }).map((v) => v.message),
+      ).toEqual(["Example baseline cannot add a|two."]);
+    });
+  });
+
   describe("when a fresh measurement is written", () => {
     /** @scenario "A collected baseline keeps the date an existing row carries" */
     it("keeps the prior date, dates a new row today, and sorts by key", () => {

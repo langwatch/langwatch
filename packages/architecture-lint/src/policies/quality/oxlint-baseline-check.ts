@@ -16,6 +16,13 @@ import type { ArchitectureViolation } from "../../types.ts";
  */
 const BASELINE_FILE = "oxlint-baseline.json";
 
+/** The rule half of a `<rule>|<file>` key. */
+function ruleOf(key: string): string | undefined {
+  const separator = key.indexOf("|");
+
+  return separator === -1 ? void 0 : key.slice(0, separator);
+}
+
 export const OXLINT_BASELINE: BaselinePolicy = {
   id: "oxlint",
   file: BASELINE_FILE,
@@ -31,6 +38,11 @@ export const OXLINT_BASELINE: BaselinePolicy = {
       message: `Baseline entry ${entry.key} is not in the merge base; the oxlint baseline is shrink-only.`,
       allowed: "Fix the offending file and remove it from the baseline; do not add new entries.",
     }),
+    seeds: (entry, reference) => {
+      const rule = ruleOf(entry.key);
+
+      return rule !== void 0 && !reference.some((known) => ruleOf(known.key) === rule);
+    },
   },
 };
 

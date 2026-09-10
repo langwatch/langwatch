@@ -40,6 +40,12 @@ export type RowCopy = { message: string; allowed?: string };
 
 export type BaselineGrowthCopy = {
   added: (entry: BaselineEntry) => RowCopy;
+  /**
+   * A rule that did not exist in the merge base cannot have shrunk from
+   * anything, so its first measurement is a seed rather than growth. Growth of
+   * a rule the merge base already knew is still refused.
+   */
+  seeds?: (entry: BaselineEntry, reference: readonly BaselineEntry[]) => boolean;
   raised?: (entry: BaselineEntry) => RowCopy;
   postponed?: (entry: BaselineEntry) => RowCopy;
 };
@@ -330,6 +336,8 @@ export function shrinkCheck({
     const previous = before.get(entry.key);
 
     if (!previous) {
+      if (growth.seeds?.(entry, reference)) continue;
+
       violations.push(violation({ policy, file, copy: growth.added(entry), kind: "growth" }));
       continue;
     }
