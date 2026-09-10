@@ -18,14 +18,8 @@ import type {
   BillingSubscriptionApi,
   CurrencyRequest,
 } from "@langwatch/enterprise-billing-server";
-import type {
-  ScimApi,
-  SsoApi,
-  GovernanceApp,
-  GovernanceApi,
-  OrganizationSessionPolicyService,
-  WebhookApp,
-} from "@langwatch/enterprise-api";
+import type { ScimApi, SsoApi, GovernanceApp, OrganizationSessionPolicyService, WebhookApp } from "@langwatch/enterprise-api";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";;
 import type { LicensingApi, LimitType } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApp } from "@langwatch/gateway-server";
 import type { GithubApi } from "@langwatch/github-contract";

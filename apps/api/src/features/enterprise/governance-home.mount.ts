@@ -36,11 +36,8 @@
  * Specs:
  *   - specs/ai-gateway/governance/persona-home-resolver.feature
  */
-import {
-  PersonaHomeResolverService,
-  type GovernanceApi,
-  type PersonaResolution,
-} from "@langwatch/enterprise-api";
+import { PersonaHomeResolverService, type PersonaResolution } from "@langwatch/enterprise-api";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";;
 import { appTrpcPolicy, type TrpcApiMount } from "@langwatch/api/trpc";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
