@@ -29,14 +29,8 @@ import type { CronRestPorts } from "../features/cron/cron-rest.ts";
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 
-import type { AuthzService } from "@langwatch/authz-contract";
-import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type {
-  OrganizationRestInviteService,
-  OrganizationRestService,
-} from "@langwatch/organization-server";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { ShareApi } from "@langwatch/share-contract";
+import type { OrganizationManagementRestOptions } from "../features/organization/organization-management-rest.mount.ts";
+import type { OrganizationsProvisioningRestOptions } from "../features/organization/organizations-rest.mount.ts";
 
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -59,8 +53,8 @@ import type { OtlpIngestRestPorts } from "@langwatch/trace-server/api-rest/otlp-
 import type { CollectorRestPorts } from "@langwatch/trace-server/api-rest/collector";
 import type {
   ApiTraceLegacyRestCollaborators,
-  ApiTracesRestCollaborators,
-} from "../features/trace/trace-rest.mount.ts";
+} from "../features/trace/trace-legacy-rest.mount.ts";
+import type { ApiTracesRestOptions } from "../features/trace/traces-rest.mount.ts";
 import type { OpsClickHouseExplainRestPorts } from "../features/ops/ops-clickhouse-explain-rest.mount.ts";
 import type { DspyStepsRestPorts } from "@langwatch/experiment-server";
 import type { McpAuthorizeRestPorts } from "../features/mcp/mcp-authorize-rest.mount.ts";
@@ -113,27 +107,13 @@ export type ApiRestServices = Readonly<{
         recordExportRequested: ScenarioRunExportAudit;
       }>
     | undefined;
-  organizationManagement?:
-    | Readonly<{
-        organizations: () => OrganizationRestService;
-        permissions: () => AuthzService;
-        plans: () => PlanProvider;
-        shares: () => ShareApi;
-        projects: () => ProjectApi;
-        audit: AppRestManagementAuditPort;
-        /**
-         * The invitation half, where the process composed one. Absent, the
-         * three invitation routes refuse by name rather than listing nothing.
-         */
-        invites?: (() => OrganizationRestInviteService) | undefined;
-        /** The acceptance link an invite carries, from the same service. */
-        buildInviteAcceptUrl?: ((inviteCode: string) => string) | undefined;
-      }>
-    | undefined;
+  organizationManagement?: OrganizationManagementRestOptions | undefined;
+  /** The `organizations` instance-admin provisioning family's app, or none. */
+  organizationsProvisioning?: OrganizationsProvisioningRestOptions | undefined;
   /**
    * The v1 trace reads' collaborators, or none.
    */
-  traceReads?: ApiTracesRestCollaborators | undefined;
+  traceReads?: ApiTracesRestOptions | undefined;
   /**
    * The deprecated `/api/trace/*` and `/api/thread/:id` family's collaborators, or none.
    */

@@ -13,7 +13,6 @@ import {
 import type { ScimUserProvisioning } from "@langwatch/enterprise-scim-server";
 import { IdentityEventingPort } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 import { installApiUser } from "../user.composition.ts";
 

@@ -3,6 +3,7 @@
  */
 import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type {
   AuthzApi,
   AuthzGetDecisionInput,
@@ -161,6 +162,7 @@ async function composePersonFeatures(
     avatarStorage: { store: async () => ({ id: "avatar" }) },
     avatarObjects: { findById: async () => null },
     processName: "langwatch-api",
+    identity: createApiFixture<IdentityApi>(),
   });
 
   const organization = await installApiOrganization({
@@ -189,6 +191,7 @@ async function composePersonFeatures(
     rateLimit,
     baseHost: "https://app.acme.test",
     demoProject: { userId: "", projectId: "" },
+    identity: createApiFixture<IdentityApi>(),
   });
 
   return { user, organization };

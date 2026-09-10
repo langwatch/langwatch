@@ -107,10 +107,7 @@ export function composeApiAuthoringRest(options: {
   if (resolveModel && workflows && studioDispatch) {
     composition.workflowStudio = {
       session,
-      resolveModel,
       workflows: () => workflows,
-      postEvent: (input) => studioDispatch.postEvent(input),
-      ...(options.reportError ? { reportError: options.reportError } : {}),
     };
   } else {
     report?.absent(

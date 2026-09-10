@@ -12,11 +12,24 @@ import { createMonitorsRest } from "@langwatch/monitor-server";
 import type { Logger } from "@langwatch/observability";
 import { secretRest, secretsAliasRest } from "@langwatch/secret-server";
 
+import { mountLangWatchQLRest } from "../features/analytics/langwatch-ql-rest.mount.ts";
+import { mountQueryRest } from "../features/analytics/query-rest.mount.ts";
+import { mountEvaluationsLegacyRest } from "../features/evaluation/evaluations-legacy-rest.mount.ts";
+import {
+  mountModelProviderRest,
+  mountModelDefaultsRest,
+} from "../features/model-provider/model-provider-rest.mount.ts";
+import { mountWorkflowStudioRest } from "../features/workflow/workflow-studio-rest.mount.ts";
+import { mountWorkflowRunRest } from "../features/workflow/workflow-run-rest.mount.ts";
+
 import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
 import { mountAuthCliDeviceFlowRest } from "../features/auth/auth-cli-device-flow-rest.mount.ts";
 import { mountAuthRest } from "../features/auth/auth-rest.mount.ts";
 import { mountAgentRest } from "../features/agent/agent-rest.mount.ts";
 import { mountApiKeyRest } from "../features/api-key/api-key-rest.mount.ts";
+import { mountTracesRest } from "../features/trace/traces-rest.mount.ts";
+import { mountOrganizationManagementRest } from "../features/organization/organization-management-rest.mount.ts";
+import { mountOrganizationsRest } from "../features/organization/organizations-rest.mount.ts";
 import { mountPromptsRest } from "../features/prompt/prompt-rest.mount.ts";
 import {
   mountCodingAgentRest,
@@ -35,6 +48,11 @@ import { mountMcpAuthorizeRest } from "../features/mcp/mcp-authorize-rest.mount.
 import { mountPlatformHealthRest } from "../features/platform-health/platform-health-rest.mount.ts";
 import { mountProjectRest } from "../features/project/project-rest.mount.ts";
 import { mountRumRest } from "../features/rum/rum-rest.mount.ts";
+import {
+  mountGatewayAgentCacheRest,
+  mountGatewayElevenLabsWebhookRest,
+} from "../features/gateway/gateway-rest.mount.ts";
+import { mountGatewayPlatformRest } from "../features/gateway/gateway-platform-rest.mount.ts";
 import {
   mountScenarioEventsRest,
   mountScenariosRest,
@@ -158,8 +176,26 @@ export const API_REST_DOORS = [
     family: "langwatch-ql",
     owner: "process",
     paths: ["/api/v1/projects/:projectId/analytics/*"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.langWatchQL
+        ? [
+            mountLangWatchQLRest(runtime, {
+              collaborators: services.langWatchQL.collaborators,
+              dashboard: services.langWatchQL.dashboard,
+              publicBaseUrl: services.publicBaseUrl,
+            }),
+          ]
+        : null,
   },
-  { family: "query", owner: "process", paths: ["/api/v1/query"] },
+  {
+    family: "query",
+    owner: "process",
+    paths: ["/api/v1/query"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.langWatchQL
+        ? [mountQueryRest(runtime, { collaborators: services.langWatchQL.collaborators })]
+        : null,
+  },
   {
     family: "prompts",
     owner: "module",
@@ -175,6 +211,12 @@ export const API_REST_DOORS = [
     family: "organization-management",
     owner: "process",
     paths: ["/api/organization", "/api/v1/organization"],
+    mount: ({ runtime, services }: ApiRestDoorContext) => {
+      const organizationManagement = services.organizationManagement;
+      if (!organizationManagement) return null;
+
+      return [mountOrganizationManagementRest(runtime, organizationManagement)];
+    },
   },
   { family: "trace-export", owner: "process", paths: ["/api/export/traces/download"] },
   { family: "scenario-run-export", owner: "process", paths: ["/api/export/scenario-runs"] },
@@ -182,6 +224,8 @@ export const API_REST_DOORS = [
     family: "workflow-studio",
     owner: "process",
     paths: ["/api/workflows/code-completion", "/api/workflows/post_event"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.workflowStudio ? [mountWorkflowStudioRest(runtime, services.workflowStudio)] : null,
   },
   { family: "scenario-generate", owner: "process", paths: ["/api/scenario/generate"] },
   { family: "playground", owner: "process", paths: ["/api/playground"] },
@@ -218,6 +262,8 @@ export const API_REST_DOORS = [
     family: "workflow-run",
     owner: "process",
     paths: ["/api/workflows/:id/run", "/api/optimization/:id/run"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.workflowRun ? [mountWorkflowRunRest(runtime, services.workflowRun)] : null,
   },
   {
     family: "annotations",
@@ -303,14 +349,30 @@ export const API_REST_DOORS = [
     mount: ({ runtime, packaged }: ApiRestDoorContext) =>
       packaged?.services.scim ? [mountScimWebhookRest(runtime, packaged.services.scim)] : null,
   },
-  { family: "traces", owner: "process", paths: ["/api/traces", "/api/v1/traces"] },
+  {
+    family: "traces",
+    owner: "module",
+    paths: ["/api/traces", "/api/v1/traces"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.traceReads ? [mountTracesRest(runtime, services.traceReads)] : null,
+  },
   { family: "trace-legacy", owner: "process", paths: ["/api/trace/*", "/api/thread/:id"] },
   {
     family: "evaluations-legacy",
     owner: "process",
     paths: ["/api/evaluations/*", "/api/v1/evaluations/*"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) =>
+      packaged?.services.evaluations
+        ? [mountEvaluationsLegacyRest(runtime, packaged.services.evaluations)]
+        : null,
   },
-  { family: "agent-cache", owner: "module", paths: ["/api/agent-cache", "/api/v1/agent-cache"] },
+  {
+    family: "agent-cache",
+    owner: "module",
+    paths: ["/api/agent-cache", "/api/v1/agent-cache"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.agentCache ? [mountGatewayAgentCacheRest(runtime, services.agentCache)] : null,
+  },
   {
     family: "agents",
     owner: "module",
@@ -419,6 +481,14 @@ export const API_REST_DOORS = [
     family: "model-providers",
     owner: "module",
     paths: ["/api/model-providers", "/api/v1/model-providers", "/api/v1/model-defaults"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const modelProviders = packaged?.services.modelProviders;
+      if (!modelProviders) return null;
+      return [
+        mountModelProviderRest(runtime, modelProviders),
+        mountModelDefaultsRest(runtime, modelProviders),
+      ];
+    },
   },
   {
     family: "monitors",
@@ -439,6 +509,12 @@ export const API_REST_DOORS = [
     family: "organizations",
     owner: "module",
     paths: ["/api/organizations", "/api/v1/organizations"],
+    mount: ({ runtime, services }: ApiRestDoorContext) => {
+      const organizationsProvisioning = services.organizationsProvisioning;
+      if (!organizationsProvisioning) return null;
+
+      return [mountOrganizationsRest(runtime, organizationsProvisioning)];
+    },
   },
   {
     family: "projects",
@@ -464,14 +540,14 @@ export const API_REST_DOORS = [
       const scenarioTabs = packaged?.services.scenarioTabs;
       const broadcast = packaged?.services.broadcast;
       const extractInlineMedia = packaged?.ports.extractInlineMedia;
-      if (
+      const unavailable =
         !packaged ||
         !scenarios ||
         !simulations ||
         !scenarioTabs ||
         !broadcast ||
-        !extractInlineMedia
-      ) {
+        !extractInlineMedia;
+      if (unavailable) {
         return null;
       }
 
@@ -648,14 +724,31 @@ export const API_REST_DOORS = [
           })
         : null,
   },
-  { family: "gateway-platform", owner: "module", paths: ["/api/gateway/v1/*"] },
+  {
+    family: "gateway-platform",
+    owner: "module",
+    paths: ["/api/gateway/v1/*"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      // Reuses the same GatewayApi accessor `agent-cache` composes; see the
+      // lane report for the dedicated `gatewayPlatform` accessor this should
+      // move to instead of overloading agentCache's name.
+      services.agentCache ? [mountGatewayPlatformRest(runtime, services.agentCache)] : null,
+  },
   {
     family: "gateway-spend",
     owner: "module",
     paths: ["/api/gateway/v1/spend-events", "/api/gateway/v1/spend-summaries"],
   },
   { family: "gateway-internal", owner: "module", paths: ["/api/internal/gateway/*"] },
-  { family: "elevenlabs-webhook", owner: "module", paths: ["/api/elevenlabs/webhook"] },
+  {
+    family: "elevenlabs-webhook",
+    owner: "module",
+    paths: ["/api/elevenlabs/webhook/:modelProviderId"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.elevenLabsWebhook
+        ? [mountGatewayElevenLabsWebhookRest(runtime, services.elevenLabsWebhook)]
+        : null,
+  },
   {
     family: "api-keys",
     owner: "module",

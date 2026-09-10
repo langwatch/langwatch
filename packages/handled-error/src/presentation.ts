@@ -264,6 +264,10 @@ const presentations = {
     describe: () =>
       "It may have been deleted, or it may still be arriving. Traces take a few seconds to appear.",
   },
+  trace_id_ambiguous: {
+    title: "Trace ID is ambiguous",
+    describe: () => "That prefix matches more than one trace. Use a longer prefix.",
+  },
   span_not_found: {
     title: "Span not found",
     describe: () => "It may have been deleted along with its trace.",

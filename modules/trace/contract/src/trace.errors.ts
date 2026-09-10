@@ -16,6 +16,22 @@ export class TraceNotFoundError extends NotFoundError {
   }
 }
 
+/** A trace ID prefix a caller sent matches more than one trace. */
+export class TraceIdAmbiguousError extends HandledError {
+  declare readonly code: "trace_id_ambiguous";
+
+  constructor(
+    readonly prefix: string,
+    readonly candidateTraceIds: readonly string[],
+  ) {
+    super("trace_id_ambiguous", `Trace ID prefix "${prefix}" is ambiguous.`, {
+      httpStatus: 409,
+      meta: { candidateTraceIds },
+    });
+    this.name = "TraceIdAmbiguousError";
+  }
+}
+
 export class FilterParseError extends HandledError {
   declare readonly code: "filter_parse_error";
 

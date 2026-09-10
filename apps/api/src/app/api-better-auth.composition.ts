@@ -15,7 +15,7 @@ import {
 } from "@langwatch/auth-server";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
-import type { RoutingDecision, SignInMethodPolicy } from "@langwatch/identity-contract";
+import type { IdentityApi, RoutingDecision, SignInMethodPolicy } from "@langwatch/identity-contract";
 import { sendResetPasswordEmail } from "@langwatch/mail";
 import {
   BetterAuthCeremonyBridgeAdapter,
@@ -26,7 +26,6 @@ import {
   IdentityService,
   IdentityWriteGateService,
   newIdentityCommandId,
-  PostgresIdentityGuardsAdapter,
   PrismaIdentityAccountsRepository,
   PrismaIdentityHeadsRepository,
   PrismaIdentityNewbornRepository,
@@ -348,9 +347,14 @@ export class ApiBetterAuthIdentityBranch {
   static compose(options: {
     database: PrismaClient;
     eventing: IdentityEventingPort;
+    identity: IdentityApi;
   }): ApiBetterAuthIdentityBranch {
     const { database, eventing } = options;
-    const guards = PostgresIdentityGuardsAdapter.create({ database }).build();
+    const guards = {
+      identityGuards: options.identity.guards(),
+      mfaGuards: options.identity.mfaGuards(),
+      reservations: options.identity.reservations(),
+    };
     // The SAME address lock the guards claim through (ADR-116 §6): the fold releases it
     // once no live identifier of that user carries the value, so a second instance here
     // would release something this process never claimed.
@@ -508,6 +512,8 @@ export type ApiBetterAuthCompositionOptions = Readonly<{
    * stand in and this composition says so once at boot.
    */
   identityEventing?: IdentityEventingPort | undefined;
+  /** The identity app the identity branch's guards and address lock read. Required together with `identityEventing`. */
+  identity?: IdentityApi | undefined;
   logger: Logger;
 }>;
 
@@ -525,12 +531,14 @@ export function composeApiBetterAuth(options: ApiBetterAuthCompositionOptions) {
     );
   }
 
-  const identityBranch = options.identityEventing
-    ? ApiBetterAuthIdentityBranch.compose({
-        database: options.database,
-        eventing: options.identityEventing,
-      })
-    : undefined;
+  const identityBranch =
+    options.identityEventing && options.identity
+      ? ApiBetterAuthIdentityBranch.compose({
+          database: options.database,
+          eventing: options.identityEventing,
+          identity: options.identity,
+        })
+      : undefined;
 
   if (!identityBranch) {
     logger.warn(

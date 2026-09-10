@@ -8,15 +8,16 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   BetterAuthAccountQueriesAdapter,
+  identityServer,
   IdentityEventingPort,
   IdentityLedgerWriterAdapter,
   IdentityService,
-  PostgresIdentityGuardsAdapter,
   PrismaIdentityHeadsRepository,
   PrismaIdentityProjectionRepository,
   PrismaIdentityVerificationRepository,
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { AdminAccessService } from "@langwatch/ops-server";
 import { OpsApi } from "@langwatch/ops-contract";
@@ -40,6 +41,7 @@ import {
   apiAuthInfrastructure,
   type ApiPersonDeploymentFacts,
 } from "../auth/auth.composition.ts";
+import { apiIdentityInfrastructure } from "../identity/identity.composition.ts";
 import { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount.ts";
 
 import type { ComposedUserFeature } from "./user.composition.types.ts";
@@ -92,6 +94,26 @@ export async function installApiUser(options: {
     adminEmails: deployment.adminEmails ?? [],
   });
 
+  // Identity boots first, over the SAME connection: the ceremony's guards and
+  // address lock (ADR-116 §6) must exist before `userInfrastructure` below
+  // can close over them.
+  const identityRuntime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma })
+    .withInfrastructure({})
+    .withModule(identityServer, {
+      infrastructure: apiIdentityInfrastructure({
+        prisma,
+        eventing: options.eventing,
+        operators: {
+          isPlatformOperatorEmail: ({ email }) => adminAccess.isAdmin({ email }),
+        },
+        mail: null,
+        eventSourcing: undefined,
+      }),
+    })
+    .boot({ role: "api" });
+  const identity: IdentityApi = identityRuntime.module(identityServer).provided;
+
   const runtime = await createApp({ name: "langwatch-api" })
     .withPersistence("postgres", { prisma })
     .withInfrastructure({})
@@ -117,6 +139,7 @@ export async function installApiUser(options: {
         unavailable,
         organizations,
         projects,
+        identity,
       }),
     })
     .boot({ role: "api" });
@@ -127,6 +150,7 @@ export async function installApiUser(options: {
   return {
     app,
     auth,
+    identity,
     config: { opsSidebarEmails: AdminAccessService.parseEmails(deployment.adminEmails ?? []) },
     routers: (mount) => ({
       user: createUserTrpcRouter(mount.runtime),
@@ -149,6 +173,7 @@ export function refusingUserFeature(processName: string): ComposedUserFeature {
   return {
     app: refusing<UserApi>(),
     auth: refusing<AuthApi>(),
+    identity: refusing<IdentityApi>(),
     config: {},
     routers: (mount) => ({
       user: createUserTrpcRouter(mount.runtime),
@@ -169,6 +194,7 @@ function userInfrastructure(options: {
   avatarObjects: UserAvatarObjects;
   personalUsage?: (() => UserPersonalUsageReader | undefined) | undefined;
   mail?: Pick<ApiPersonMailPort, "sendBudgetIncreaseRequest"> | undefined;
+  identity: IdentityApi;
   rateLimit(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<Readonly<{ allowed: boolean; resetAt: number }>>;
@@ -296,7 +322,11 @@ function userInfrastructure(options: {
         });
       },
     },
-    verification: verificationCeremony({ prisma, eventing: options.eventing }),
+    verification: verificationCeremony({
+      prisma,
+      eventing: options.eventing,
+      identity: options.identity,
+    }),
     personalUsage: {
       personalUsage: (input) => {
         const reader = options.personalUsage?.();
@@ -314,20 +344,21 @@ function userInfrastructure(options: {
 function verificationCeremony(options: {
   prisma: PrismaClient;
   eventing: IdentityEventingPort;
+  identity: IdentityApi;
 }): UserInfrastructure["verification"] {
-  const { prisma } = options;
-  const guards = PostgresIdentityGuardsAdapter.create({ database: prisma }).build();
+  const { prisma, identity } = options;
+  const reservations = identity.reservations();
   const ceremony = VerificationCeremonyService.create(
     new PrismaIdentityVerificationRepository(prisma),
     PrismaIdentityHeadsRepository.create(prisma),
     IdentityService.create(
-      guards.identityGuards,
+      identity.guards(),
       IdentityLedgerWriterAdapter.create({
         // The SAME address lock the guards claim through (ADR-116 §6): the
         // guards claim before stating a fact and the fold releases once no
         // live identifier of that user carries the value, so a second lock
         // instance here would release something this process never claimed.
-        projectionStore: new PrismaIdentityProjectionRepository(prisma, guards.reservations),
+        projectionStore: new PrismaIdentityProjectionRepository(prisma, reservations),
         eventing: options.eventing,
       }),
     ),

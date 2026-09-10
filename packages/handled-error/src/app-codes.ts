@@ -510,6 +510,7 @@ export const APP_ERROR_CODES = [
   "test_fire_rate_limited",
   "test_fire_unavailable",
   "time_range_too_wide",
+  "trace_id_ambiguous",
   "trace_not_evaluatable",
   "trace_not_found",
   "trace_project_required",

@@ -9,6 +9,7 @@ import type {
   PermissionDecision,
 } from "@langwatch/authz-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
@@ -196,6 +197,7 @@ async function composeApplication() {
     rateLimit: async () => ({ allowed: true, resetAt: 0 }),
     baseHost: "https://app.langwatch.test",
     demoProject: { userId: "", projectId: "" },
+    identity: createApiFixture<IdentityApi>(),
   });
 
   const projectFeature = await installApiProject({

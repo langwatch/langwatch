@@ -97,8 +97,8 @@ export type ApiScimDirectoryCredentialPort = (input: {
 export type ApiRestDoor = RestDoorCredential | "public";
 
 /**
- * Which doors this process opens. The two it does not are named rather than
- * omitted: a declaration reaching for one is refused at MOUNT, by door name,
+ * Which doors this process opens. The one it does not is named rather than
+ * omitted: a declaration reaching for it is refused at MOUNT, by door name,
  * instead of reaching a request that resolves nobody.
  */
 const OPENED_DOORS = {
@@ -108,7 +108,7 @@ const OPENED_DOORS = {
   organizationKey: true,
   scimToken: true,
   internalSecret: false,
-  instanceAdminKey: false,
+  instanceAdminKey: true,
 } as const satisfies Record<ApiRestDoor, boolean>;
 
 /** The doors above that this process actually opens. */
@@ -150,6 +150,14 @@ export type ApiRestRuntimePorts = Readonly<{
    * that names one.
    */
   directoryCredential?: ApiScimDirectoryCredentialPort | undefined;
+  /**
+   * Constant-time bearer check against this deployment's instance
+   * administrator key (`verifyInstanceAdminKey`): 404 where unconfigured or
+   * SaaS, then a 401 refusal or a pass. Absent, this process opens no
+   * instance-admin door and says so at the mount of the first family that
+   * names one.
+   */
+  instanceAdminCredential?: MiddlewareHandler | undefined;
   /** The counter behind every route that declared how often one caller may ask. */
   rateLimiter?: RateLimiter | undefined;
   /** The store behind every route that declared how long its answer stands. */
@@ -290,6 +298,20 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
       },
       ...stores,
     }),
+    // The instance administrator bearer: holding it IS the authority, so
+    // every route identifies rather than authenticates, and the check
+    // itself runs as this door's own middleware, ahead of any route.
+    instanceAdminKey: createRestRuntime({
+      identity: {
+        authenticate: () => {
+          throw new Error(
+            "The instance admin door asks no permission of the bearer it was opened on.",
+          );
+        },
+        identify: () => ({ actor: null, scope: null }),
+      },
+      ...stores,
+    }),
     // The byte doors a page and a key both reach: the verifier below has
     // already decided, so this reads its answer rather than asking again.
     session: createRestRuntime({
@@ -328,12 +350,18 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
       const door = openDoorFor(declaration, {
         verified: verifier !== null,
         directory: ports.directoryCredential !== undefined,
+        instanceAdmin: ports.instanceAdminCredential !== undefined,
       });
 
       return openDoors[door].mount(declaration, {
         app,
         onError: renderRefusal(options.onError ?? ports.errors),
-        ...mountMiddleware({ door, verifier, options }),
+        ...mountMiddleware({
+          door,
+          verifier,
+          instanceAdminCredential: ports.instanceAdminCredential,
+          options,
+        }),
         facts: [
           ...(door === "projectKey" ? [projectFacts(resolved)] : []),
           ...(options.facts ?? []),
@@ -349,7 +377,7 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
  */
 function openDoorFor<Api>(
   declaration: RestTransportDeclaration<Api>,
-  opened: Readonly<{ verified: boolean; directory: boolean }>,
+  opened: Readonly<{ verified: boolean; directory: boolean; instanceAdmin: boolean }>,
 ): OpenApiRestDoor {
   const door = doorOf(declaration);
 
@@ -374,6 +402,13 @@ function openDoorFor<Api>(
     );
   }
 
+  if (door === "instanceAdminKey" && !opened.instanceAdmin) {
+    throw new Error(
+      `REST "${declaration.namespace}" answers behind the instance administrator bearer, and ` +
+        "this process composed no instance-admin credential check to open it with",
+    );
+  }
+
   return door;
 }
 
@@ -392,14 +427,21 @@ function directoryOf(ports: ApiRestRuntimePorts): ApiScimDirectoryCredentialPort
 function mountMiddleware({
   door,
   verifier,
+  instanceAdminCredential,
   options,
 }: {
   door: OpenApiRestDoor;
   verifier: readonly MiddlewareHandler[] | null;
+  instanceAdminCredential: MiddlewareHandler | undefined;
   options: ApiRestMountOptions;
 }): { middleware?: readonly MiddlewareHandler[] } {
   const own = options.middleware ?? [];
-  const middleware = door === "session" && verifier ? [...verifier, ...own] : own;
+  const middleware =
+    door === "session" && verifier
+      ? [...verifier, ...own]
+      : door === "instanceAdminKey" && instanceAdminCredential
+        ? [instanceAdminCredential, ...own]
+        : own;
 
   return middleware.length > 0 ? { middleware } : {};
 }

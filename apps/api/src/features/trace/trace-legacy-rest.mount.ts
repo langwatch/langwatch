@@ -1,14 +1,13 @@
 /**
- * This process's composition of the three packaged trace REST families
- * (`@langwatch/trace-server`): the v1 reads, the deprecated `/api/trace/*` endpoints and
- * the SDK collector.
+ * This process's composition of the two remaining packaged trace REST
+ * families (`@langwatch/trace-server`): the deprecated `/api/trace/*`
+ * endpoints and the SDK collector. The v1 reads live in
+ * `traces-rest.mount.ts`, on the module's own `defineRestRouter` declaration.
  */
 import {
   credentialPrincipalOfToken,
-  flexibleDateSchema,
   type AppRestSecurity,
   type MountableRestApp,
-  type PlatformUrlBuilder,
 } from "@langwatch/api/rest";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TraceApp } from "@langwatch/trace-server";
@@ -20,31 +19,12 @@ import {
   createTraceLegacyRestApp,
   type TraceLegacyCredentialPort,
 } from "@langwatch/trace-server/api-rest/trace-legacy";
-import {
-  createTracesRestApp,
-  traceSearchBodyExtensions,
-  type TracesRestReadPort,
-} from "@langwatch/trace-server/api-rest/traces";
 import { fromZodError } from "zod-validation-error";
 import { z } from "zod";
 
 import { API_TRACE_LIST_INPUT } from "../../app/api-trace-read-stack.composition.ts";
 import type { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
 import type { ApiHandlerManagedCredentialPort } from "../../app-rest/api-rest.runtime.ts";
-
-/**
- * The v1 search body: the deployment's filter vocabulary, minus the three fields this
- * door takes from elsewhere, plus the family's own additive half.
- */
-const traceSearchBodySchema = API_TRACE_LIST_INPUT.omit({
-  projectId: true,
-  startDate: true,
-  endDate: true,
-}).extend({
-  startDate: flexibleDateSchema,
-  endDate: flexibleDateSchema,
-  ...traceSearchBodyExtensions,
-});
 
 /**
  * The deprecated `/api/trace/search` body. The same vocabulary, parsed STRICTLY — that
@@ -74,58 +54,6 @@ const traceLegacySearchBodySchema = API_TRACE_LIST_INPUT.omit({
     llmMode: z.boolean().optional().default(false),
   })
   .strict();
-
-/** What this process supplies the v1 family. */
-export type ApiTracesRestCollaborators = Readonly<{
-  /** The read stack the browser's own trace surfaces answer from. */
-  reads: ApiTraceReadStackPort;
-  /** Deep links back into the product, built from the deployment's origin. */
-  platformUrl: PlatformUrlBuilder;
-  /**
-   * The reserved-metadata amendment, or none. Absent where this process
-   * registered no command queue, and then `PATCH /:traceId/metadata` is not
-   * registered at all rather than answering 200 to a write it dropped.
-   */
-  updateTraceMetadata?:
-    | ((input: {
-        projectId: string;
-        traceId: string;
-        metadata: Record<string, unknown>;
-      }) => Promise<void>)
-    | undefined;
-}>;
-
-/** `/api/traces/*`, bound to one process's trace read stack. */
-export function mountTracesRest(options: {
-  security: AppRestSecurity;
-  collaborators: ApiTracesRestCollaborators;
-}): MountableRestApp {
-  const { reads, platformUrl, updateTraceMetadata } = options.collaborators;
-  return createTracesRestApp({
-    security: options.security,
-    ports: {
-      searchBodySchema: traceSearchBodySchema,
-      traces: () => reads.readers().read as unknown as TracesRestReadPort,
-      getProtections: (input) => reads.getApiKeyProtections(input),
-      platformUrl,
-      ...(updateTraceMetadata
-        ? {
-            updateTraceMetadata: (input) =>
-              updateTraceMetadata({
-                projectId: input.projectId,
-                traceId: input.traceId,
-                metadata: input.metadata as Record<string, unknown>,
-              }),
-          }
-        : {}),
-      // Named absence: the coding-agent transcript join is not supplied
-      // because `composeApiTraceReadStack` refuses `LogService.getLogsByTraceId`
-      // by name, and deriving a transcript without it would answer an empty
-      // one for every trace. Not a missing session store (this process does
-      // compose `CodingAgentApp`) — the transcript never reads a session.
-    },
-  });
-}
 
 /** What this process supplies the deprecated family. */
 export type ApiTraceLegacyRestCollaborators = Readonly<{

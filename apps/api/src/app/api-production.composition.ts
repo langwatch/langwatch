@@ -183,7 +183,11 @@ import {
   composeApiOrganizationInvites,
   type ApiOrganizationInvites,
 } from "./api-organization-invites.composition.ts";
-import { installApiGateway } from "../features/gateway/gateway.composition.ts";
+import {
+  composeGatewayAgentCache,
+  composeGatewayElevenLabsWebhook,
+  installApiGateway,
+} from "../features/gateway/gateway.composition.ts";
 import { composeEnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition.ts";
 import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition.ts";
@@ -1217,6 +1221,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       database && directory
         ? await this.resolveGithub(options, database.client, queueInfrastructure, directory)
         : undefined;
+    this.composedGatewaySpendPipeline = composeApiGatewaySpendPipeline({
+      eventing: this.composedEventing?.eventSourcing,
+      processName: options.config.serviceName,
+      report: LoggedApiGatewaySpendPipelineAbsence.create(createLogger(options.config.serviceName)),
+    });
     this.composedGateway = await this.composeGateway(options, infrastructure);
     // The back office, composed from the shared infrastructure plus the three other features it
     // names: the people a row is about, the session an impersonation is started against, and
@@ -1898,15 +1907,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ...(payloads ? { payloads } : {}),
       report: LoggedApiTraceIngestAbsence.create(createLogger(serviceName)),
     });
-    // The spend pipeline, registered producer-only. Registered BEFORE the
-    // internal family is composed because that family's `/spend-commands`
-    // route is the only reason a producer exists on this tier, and the voice
-    // settlement it also serves confirms through the same registration.
-    this.composedGatewaySpendPipeline = composeApiGatewaySpendPipeline({
-      eventing: this.composedEventing?.eventSourcing,
-      processName: serviceName,
-      report: LoggedApiGatewaySpendPipelineAbsence.create(createLogger(serviceName)),
-    });
     const bugReports = this.composeBugReports(tenancy);
     const unsubscribe = this.composeUnsubscribe();
     const cron = this.composeCron();
@@ -1967,7 +1967,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // operations the contract does not declare — so the management door and the members screen
     // answer from one service. The share ledger and the plan provider are TAKEN from the halves
     // that composed them for the same reason.
-    const organizationRest = this.composedOrganization.rest;
+    const organizationRest = this.composedOrganization.app;
     const shares = this.composedShare?.app;
     const plans = this.composedPlanProvider;
     // The bulk run export. Composed only where this process holds BOTH a
@@ -2073,40 +2073,21 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // The three synchronous run URLs, over the SAME graph service the
     // workbench's own cells dispatch through — so a run started over REST and
     // one started as an experiment cell resolve one published version, not two.
-    const workflowRun = experimentService
-      ? {
-          credential: (input: { request: Request; permission: AuthzPermission }) =>
-            handlerManagedCredentials.authenticate(input),
-          workflows: () => experimentRun.workflows,
-        }
-      : undefined;
+    const workflowRun = workflowService ? { workflows: () => this.composedWorkflow.app } : void 0;
     // The five subsystem probes, built once for both doors that read them: the
     // project-keyed `/api/health/*` family here, and the monitoring-keyed
     // platform-health family the process installed above.
     const healthProbes = this.composeHealthProbes({ publicBaseUrl, apiKeys: tenancy.apiKeys });
-    // The SAME invitation service `organization.*` administers over tRPC, so a
-    // provisioning tool that creates an invitation here and an administrator
-    // who lists them in the app see one set of invitations with one acceptance
-    // link each. Absent, the three invitation routes keep refusing by name.
-    const organizationInvites = this.composedOrganizationInvites;
-    const organizationManagement =
-      organizationRest && shares && plans && projects
-        ? {
-            organizations: () => organizationRest,
-            permissions: () => authz,
-            plans: () => plans,
-            shares: () => shares,
-            projects: () => projects,
-            audit: this.composeManagementAudit(),
-            ...(organizationInvites
-              ? {
-                  invites: () => organizationInvites.rest,
-                  buildInviteAcceptUrl: (inviteCode: string) =>
-                    organizationInvites.buildInviteAcceptUrl(inviteCode),
-                }
-              : {}),
-          }
-        : undefined;
+    const organizationManagement = organizationRest
+      ? {
+          organizations: () => organizationRest,
+          plans: () => plans,
+          audit: this.composeManagementAudit(),
+        }
+      : undefined;
+    const organizationsProvisioning = organizationRest
+      ? { organizations: () => organizationRest }
+      : undefined;
     // The public trace doors, over the SAME read stack the explorer and the
     // legacy grid answer from. Taken from the observability half rather than
     // built again: two read stacks would be two answers to what one caller may
@@ -2314,6 +2295,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       users: this.composedUser.app,
       ...(this.composedDataset ? { dataset: this.composedDataset } : {}),
       ...(this.composedEvaluator ? { evaluator: this.composedEvaluator } : {}),
+      evaluations: this.composedEvaluation,
       ...(this.composedMonitor ? { monitor: this.composedMonitor } : {}),
       dashboard: this.composedDashboard,
       legacyErrors: ApiRestObservabilityComposition.create().legacyErrorHandler,
@@ -2378,10 +2360,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         packaged,
         services: {
           ...this.composedAnnotation.restServices,
+          ...this.composedGateway.restServices,
           ...this.composedStoredObject.restServices,
           analytics: () => analytics,
           ...(langWatchQL ? { langWatchQL } : {}),
           ...(organizationManagement ? { organizationManagement } : {}),
+          ...(organizationsProvisioning ? { organizationsProvisioning } : {}),
           ...(traceExport ? { traceExport } : {}),
           ...(scenarioRunExport ? { scenarioRunExport } : {}),
           ...(authoring ? { authoring } : {}),
@@ -3649,6 +3633,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // if that permission ever widens, who may attest a customer's domain must not widen
       // with it.
       operators: this.platformOperators(options),
+      // The SAME identity app the user graph booted, for the SSO connection ledger's address lock.
+      identity: this.composedUser.identity,
       report: LoggedApiEnterpriseApplicationAbsence.create(
         createLogger("langwatch:api:enterprise-application"),
       ),
@@ -3680,6 +3666,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             projects: tenancy.projects,
             grants,
             permissions,
+            shares: share.app,
+            apiKeys: tenancy.apiKeys,
             auth: session.auth,
             // The SAME application `user.*` answers from: a second would
             // provision a personal workspace for somebody the /me screens do
@@ -3695,6 +3683,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
     this.composedOrganization = await installApiOrganization({
       infrastructure,
+      // The SAME identity app, for the caller's own verified addresses (D11 invitation matching).
+      identity: this.composedUser.identity,
       peers: {
         encryption,
         ...(invites ? { invites } : {}),
@@ -4040,7 +4030,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // three keyed creates refuse by name rather than executing unguarded.
     const idempotency = this.options.gatewayIdempotency ?? this.composedIdempotency?.gateway;
 
+    const agentCache = composeGatewayAgentCache({
+      encryption: this.composedEncryption,
+      redis: this.composedQueueRedis,
+    });
+    const elevenLabsWebhook = composeGatewayElevenLabsWebhook({
+      prisma: database?.client,
+      encryption: this.composedEncryption,
+      spendConfirmation: this.composedGatewaySpendPipeline?.confirmation,
+    });
+
     return installApiGateway({
+      ...(agentCache ? { agentCache } : {}),
+      ...(elevenLabsWebhook ? { elevenLabsWebhook } : {}),
       infrastructure,
       // The three other features the gateway reaches, named one by one. Absent
       // together: a process holding none of them composes a refusing gateway,
@@ -4136,6 +4138,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The process's ONE counter, so a caller cannot get two invite budgets.
       rateLimit: (input) => this.rateLimiter.consume(input),
       baseHost: options.config.infrastructure.execution.publicBaseUrl ?? "",
+      // The SAME identity app, for the acceptor's own verified addresses.
+      identity: this.composedUser.identity,
     });
     return this.composedOrganizationInvites;
   }

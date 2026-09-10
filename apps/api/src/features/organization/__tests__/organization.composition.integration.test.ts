@@ -9,6 +9,7 @@
 import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AuthzApi, AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { organizationRepositories } from "@langwatch/organization-server";
 import { instantiateRepositories } from "@langwatch/runtime-composition";
@@ -164,6 +165,7 @@ async function install(options: { invitations?: { ports: never } } = {}) {
     rateLimit: async () => ({ allowed: true, resetAt: 0 }),
     baseHost: "https://app.langwatch.test",
     demoProject: { userId: "", projectId: "" },
+    identity: createApiFixture<IdentityApi>(),
   });
 }
 

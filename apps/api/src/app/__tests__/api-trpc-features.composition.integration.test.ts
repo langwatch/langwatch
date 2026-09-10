@@ -15,6 +15,7 @@ import type {
 } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -538,6 +539,7 @@ async function composeSessionApplication(options: {
         rateLimit: async () => ({ allowed: true, resetAt: 0 }),
         baseHost: "https://app.langwatch.test",
         demoProject: { userId: "demo-user", projectId: "demo-project" },
+        identity: createApiFixture<IdentityApi>(),
       }),
     },
     infrastructure,

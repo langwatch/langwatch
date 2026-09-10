@@ -4,6 +4,8 @@
  * @regression
  */
 import type { IdentityEventingPort } from "@langwatch/identity-server";
+import type { IdentityApi } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,6 +25,15 @@ function eventing(): IdentityEventingPort {
   return { tryPipelineCommand: vi.fn(async () => null) } as unknown as IdentityEventingPort;
 }
 
+/** Only `guards`/`mfaGuards`/`reservations` are read by this branch. */
+function identity(): IdentityApi {
+  return createApiFixture<IdentityApi>({
+    guards: () => ({}) as ReturnType<IdentityApi["guards"]>,
+    mfaGuards: () => ({}) as ReturnType<IdentityApi["mfaGuards"]>,
+    reservations: () => ({}) as ReturnType<IdentityApi["reservations"]>,
+  });
+}
+
 describe("ApiBetterAuthIdentityBranch", () => {
   /** @scenario "The API process composes the identity branch when it has an event stack" */
   describe("given a process that registered its identity pipeline", () => {
@@ -30,6 +41,7 @@ describe("ApiBetterAuthIdentityBranch", () => {
       const branch = ApiBetterAuthIdentityBranch.compose({
         database: database(),
         eventing: eventing(),
+        identity: identity(),
       });
 
       expect(branch.storage()).toBeInstanceOf(ApiIdentityBetterAuthStorage);
@@ -41,6 +53,7 @@ describe("ApiBetterAuthIdentityBranch", () => {
       const branch = ApiBetterAuthIdentityBranch.compose({
         database: database(),
         eventing: eventing(),
+        identity: identity(),
       });
       const ceremonies = branch.identity();
 

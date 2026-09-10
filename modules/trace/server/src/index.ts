@@ -323,6 +323,7 @@ export {
 export type { TraceEditOverlayRow } from "./repositories/trace-edit-overlay.repository.ts";
 export {
   TraceService as TraceLegacyReadService,
+  AmbiguousTraceIdPrefixError,
   type BlobResolutionDeps,
 } from "./services/read/trace-legacy-read.service.ts";
 export type {

@@ -26,13 +26,13 @@ import {
   JoinRequestLedgerWriterAdapter,
   JoinRequestService,
   JoinRequestsService,
-  PostgresIdentityEmailAdapter,
   PrismaJoinCandidateRepository,
   PrismaJoinMembershipRepository,
   PrismaJoinRequestProjectionRepository,
   PrismaJoinRequestReadRepository,
   PrismaJoinSettingRepository,
 } from "@langwatch/identity-server";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { createApp } from "@langwatch/runtime-composition";
 import { toDate } from "@langwatch/time";
@@ -66,6 +66,8 @@ import {
 } from "@langwatch/organization-server";
 import type { OrganizationUserRole, PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { ShareApi } from "@langwatch/share-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { UserApi } from "@langwatch/user-contract";
@@ -184,6 +186,10 @@ export type OrganizationMembershipPeers = Readonly<{
    * and a second copy of the answer would redact differently.
    */
   permissions: AuthzApi;
+  /** Revokes trace shares after a settings write turns trace sharing off. */
+  shares: ShareApi;
+  /** Mints the bootstrap admin service key a provisioned organization needs. */
+  apiKeys: ApiKeyApi;
   /** The grant ledger every membership write states its access on. */
   grants: AuthzGrantsService;
   /** The Auth service a disabled membership's browser sessions are revoked through. */
@@ -219,6 +225,8 @@ export async function installApiOrganization(options: {
   baseHost: string;
   /** The demo project every caller may read, where a deployment names one. */
   demoProject: Readonly<{ userId: string; projectId: string }>;
+  /** The identity app, for the caller's own verified addresses (D11 invitation matching). */
+  identity: IdentityApi;
 }): Promise<ComposedOrganizationFeature> {
   const logger = createLogger("langwatch:api:organization");
 
@@ -235,6 +243,7 @@ export async function installApiOrganization(options: {
     encryption: options.peers.encryption,
     baseHost: options.baseHost,
     demoProject: options.demoProject,
+    identity: options.identity,
   });
 
   return {
@@ -313,9 +322,11 @@ async function composeMembershipHalf(options: {
   baseHost: string;
   /** The demo project every caller may read, where a deployment names one. */
   demoProject: OrganizationDemoProject;
+  /** The identity app, for the caller's own verified addresses (D11 invitation matching). */
+  identity: IdentityApi;
 }): Promise<OrganizationMembership> {
-  const { prisma, plans, peers, logger, baseHost, encryption } = options;
-  const { projects, grants, users, eventing, mail, processName } = peers;
+  const { prisma, plans, peers, logger, baseHost, encryption, identity } = options;
+  const { projects, grants, users, eventing, mail, processName, shares, apiKeys } = peers;
   const unavailable = (capability: string) => new ApiOrganizationUnavailableError(capability);
 
   const prompts = LoggedApiOrganizationPromptSeed.create({ processName, logger });
@@ -323,7 +334,6 @@ async function composeMembershipHalf(options: {
     plans,
     memberships: PrismaUsageMembershipRepository.create(prisma),
   });
-  const identityEmails = PostgresIdentityEmailAdapter.create({ database: prisma }).build();
 
   function notifyNothing(what: string): void {
     logger.warn(
@@ -380,7 +390,7 @@ async function composeMembershipHalf(options: {
    * procedure starts here.
    */
   const verifiedEmailFor = async ({ userId }: { userId: string }): Promise<string | null> => {
-    const verified = await identityEmails.tryVerifiedEmailsOf({ userId });
+    const verified = await identity.verifiedEmailsOf({ userId });
     if (verified !== null) return verified[0]?.value ?? null;
     const row = await prisma.user.findUnique({
       where: { id: userId },
@@ -406,6 +416,8 @@ async function composeMembershipHalf(options: {
     .withProvided(ProjectApi, projects)
     .withProvided(AuthzApi, peers.permissions)
     .withProvided(UserApi, users as UserApi)
+    .withProvided(ShareApi, shares)
+    .withProvided(ApiKeyApi, apiKeys)
     .withModule(organizationServer, {
       infrastructure: {
         identities: PersonalWorkspaceIdentityAdapter.create(),

@@ -137,3 +137,41 @@ Files changed, grouped by package. Exact lines for each shared file. Namespaces
 and families served with counts versus origin/main. Wire deltas with reasons.
 Scenario bindings ported. Test and typecheck results per package. Baseline rows
 to drop as `rule|path` keys. Unfinished items, numbered.
+
+## Reading budget (binding)
+
+A lane at 150k tokens after five minutes has read, not written. The rules:
+never Read a file whole; `tslsp-cli outline FILE` first, then Read the one
+line range you need, at most 120 lines, once. A framework signature
+(`withModule`, `defineRestRouter`, `defineRestMiddleware`, `runtime.mount`) is
+`tslsp-cli hover --symbol X`, never a Read of packages/api or
+packages/runtime-composition source. An exemplar is one outline plus one
+handler, not the file. No grep for exemplars: the brief names them. Write the
+new file first from the exemplar's shape, then `diagnostics --file` tells you
+what the types want; that is cheaper than reading the types. Cap: 60 tool
+calls, 100k tokens; a lane past either stops and reports what is landed.
+
+## Tests use the harness (binding)
+
+`@langwatch/test-harness` is the test toolkit and every lane uses it rather
+than hand-rolling stubs: `createApiFixture<XApi>({ ...only the methods the
+test calls })` for an app or peer double (an uncalled method throws by name,
+so a test never passes on a silent no-op), `cleanupTestRows` for datastore
+rows, `startTestClickHouseEndpoints` for isolated ClickHouse. A transport test
+mounts the real router on a real `createApiRestRuntime` (exemplar:
+apps/api/src/features/analytics/__tests__/query-rest.mount.integration.test.ts)
+over a module booted with its memory repositories through the fixture in
+`modules/<m>/server/src/app/__tests__/<m>.fixture.ts` (no `testing.ts` in a server package). A hand-written `{ getById: vi.fn() }` object literal or a
+class stub in a test is a defect to fix, not a style choice.
+
+## The shape comes from the reference, not from the brief
+
+Load the `architecture-guide` skill and then the `module` skill and follow its
+`references/convert.md`; copy `modules/annotation`, never the module next to
+you. In particular: a peer module's `*Api` token goes in the app's `static
+dependencies` and arrives at boot; technical needs (a clock, a base host, an
+error reporter, encryption) are members of `<F>Infrastructure` supplied by the
+process in `withInfrastructure`; every capability is a method on the one app;
+handlers read `{ input, app, actor, scope, signal }`; middleware is credential,
+audit, rate limit and body format only. No facts, effects, extended apps,
+delegates, Proxies, `refusing*` twins, `ports/` or `adapters/`.

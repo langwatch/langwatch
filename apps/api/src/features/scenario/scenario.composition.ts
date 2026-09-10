@@ -7,7 +7,6 @@ import { MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { SimulationService } from "@langwatch/scenario-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -18,10 +17,17 @@ import { createApp, LocalFeatureApis, type ResourceScope } from "@langwatch/runt
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import {
   AgentTestService,
+  MemoryResultAtomsRepository,
+  MemoryRunConfigurationsRepository,
+  NullSimulationRepository,
   PostgresScenarioRepositories,
-  ResultAtomsClickHouseAdapter,
-  RunConfigurationsClickHouseAdapter,
+  ResultAtomsClickHouseRepository,
+  ResultAtomsService,
+  RunConfigurationsClickHouseRepository,
+  RunConfigurationsService,
   scenarioServer,
+  SimulationClickHouseRepository,
+  SimulationService,
   type ScenarioAppInfrastructure,
   ScenarioClockPort,
   ScenarioExecutionPrefetcherService,
@@ -34,8 +40,7 @@ import {
   ScenarioTabStorePort,
   NlpFetchAdapter,
   SerializedAgentRegistryAdapter,
-  SimulationClickHouseAdapter,
-  SimulationWindowedReadPort,
+  SimulationWindowedRepository,
   RedisCancellationPublisherAdapter,
   RedisScenarioTabStoreAdapter,
   UnavailableCancellationPublisherAdapter,
@@ -346,7 +351,7 @@ function composeRunConfigurations(options: ScenarioFeatureCollaborators): RunCon
 /**
  * The partition-window policy, unapplied.
  */
-class UnwindowedApiSimulationRead extends SimulationWindowedReadPort {
+class UnwindowedApiSimulationRead extends SimulationWindowedRepository {
   query<Result>(input: SimulationWindowedReadInput<Result>): Promise<Result> {
     return input.run(null);
   }

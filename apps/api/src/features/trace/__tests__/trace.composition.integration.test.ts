@@ -562,10 +562,24 @@ describe("given a process that composed no trace read stack", () => {
     ).rejects.toMatchObject({ code: "service_unavailable" });
   });
 
-  it("still hands out the tenant emitter both subscriptions stream off", () => {
+  it("still streams tenant updates when reads are absent", async () => {
     const { group, emitterFor } = composeGroup();
+    const emitter = emitterFor("project-1") as unknown as EventEmitter;
+    const controller = new AbortController();
+    const updates = group.traces.streamUpdates({
+      projectId: "project-1",
+      channel: "trace_updated",
+      signal: controller.signal,
+    });
+    const next = updates.next();
 
-    expect(group.traces.getTenantEmitter("project-1")).toBe(emitterFor("project-1"));
+    await vi.waitFor(() => {
+      expect(emitter.listenerCount("trace_updated")).toBe(1);
+    });
+    emitter.emit("trace_updated", { traceId: "trace-1" });
+
+    await expect(next).resolves.toEqual({ done: false, value: { traceId: "trace-1" } });
+    await updates.return(void 0);
   });
 
   it("names every capability it did not compose", () => {

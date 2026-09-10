@@ -20,15 +20,17 @@ Read these two files first and treat them as your instructions:
 
 Your job has four parts and nothing else.
 
-SPAWN. Pick two or three tasks that touch disjoint files (never two lanes in
-one module). For each, write the lane prompt from section 5 of the handover
-into a file with the task line filled in, then start it detached:
-
-  tmux new-session -d -s lane-<name> -c $PWD \
-    "codex exec --dangerously-bypass-approvals-and-sandbox \
-      -m gpt-5.6-sol -c model_reasoning_effort=high \
-      -o /tmp/lane-<name>.report.md - < /tmp/lane-<name>.prompt \
-      > /tmp/lane-<name>.log 2>&1"
+SPAWN. Pick two to four tasks that touch disjoint files (never two lanes in
+one module). Write each lane prompt from the handover's lane prompt into the
+job scratch directory with the task line and the owned paths filled in, then
+start it with the Agent tool, subagent_type general-purpose, model sonnet,
+prompt "Read and follow <path> exactly". Every prompt carries: the end shape
+(defineModule.withRepositories.withApp.withTransports, repositories/{prisma,
+clickhouse,redis,memory}, flat *.rest.ts and *.trpc.ts, one install line per
+module), the rule that a conversion goes straight to that shape and never to
+an interim one, that api-production.composition.ts never grows (it is being
+deleted by the install mechanic), and that every identifier goes through
+tslsp-cli (`npx --no-install @0xdeafcafe/tslsp-cli`).
 
 INSPECT. Every 15 minutes look at each lane: the log's modification time, the
 last few lines, and `git status --porcelain` for the files it owns. A lane
@@ -71,29 +73,13 @@ Start now: run the counters, say what is dirty, and spawn your first two
 lanes.
 ```
 
-## 1a. Sharing the checkout with another agent
+## 1a. Ownership
 
-More than one agent works in this checkout: this session's lanes, a Codex
-session, and whoever is at the keyboard. They collide when two of them rewrite
-the same file, which is expensive to unpick and easy to prevent.
-
-The board is `.claims.tsv` at the repo root, git-ignored, driven by one script:
-
-```
-bash dev/scripts/claim.sh take <who> "<task>" <paths...>   # before editing
-bash dev/scripts/claim.sh check <paths...>                 # who holds these
-bash dev/scripts/claim.sh list                             # everything live
-bash dev/scripts/claim.sh done <who>                       # release
-```
-
-Every agent, whatever its make, does three things: `check` the paths before it
-starts, `take` them with its own name and its task, and `done` when it stops.
-A claim older than three hours lists as STALE rather than disappearing, so an
-agent that died still says where it died. The board is advisory, not a lock:
-it works because everyone reads it, and it costs one line each way.
-
-Put the claim line in every lane prompt you write, and read the board before
-choosing which tasks to spawn.
+One agent set works in this checkout: this session's lanes and whoever is at
+the keyboard. A lane owns exactly the paths its prompt names and touches
+nothing else; shared files (the doors file, the process compositions, the
+baselines) are the coordinator's, and a lane hands over exact lines for them
+in its report. That is the whole protocol.
 
 ## 2. What the coordinator must not do itself
 

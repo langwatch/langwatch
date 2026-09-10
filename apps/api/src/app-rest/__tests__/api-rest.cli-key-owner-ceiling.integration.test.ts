@@ -4,11 +4,15 @@
  * time: the project door refuses, the listing narrows instead of refusing.
  */
 import type { Project, ProjectApi } from "@langwatch/project-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
+import type { TraceApp } from "@langwatch/trace-server";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TestProjectApi } from "../../app/__tests__/support/test-project-api.ts";
 import { testProject } from "../../app/__tests__/support/project-fixtures.ts";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ApiTracesRestCollaborators } from "../../features/trace/trace-rest.mount.ts";
+import type { ApiTracesRestOptions } from "../../features/trace/traces-rest.mount.ts";
+import type { ApiTraceReadStackPort } from "../../features/trace/trace-read-stack.port.ts";
 import {
   REST_AUTH_ORGANIZATION,
   REST_AUTH_PROJECT,
@@ -144,13 +148,16 @@ function mountTraces(options: {
   world: RestAuthWorld;
   readTraces: () => Promise<{ groups: unknown[]; traceChecks: object; totalHits: number }>;
 }): MountedRestFamily {
-  const traceReads = {
+  const traceReads: ApiTracesRestOptions = {
+    traces: () =>
+      createApiFixture<TraceApi>({
+        listTraces: options.readTraces as never,
+      }) as TraceApp,
     reads: {
-      readers: () => ({ read: { getAllTracesForProject: options.readTraces } }),
       getApiKeyProtections: async () => ({ canSeeCapturedInput: true, canSeeCapturedOutput: true }),
-    },
+    } as unknown as ApiTraceReadStackPort,
     platformUrl: () => "https://app.langwatch.test/acme/traces",
-  } as unknown as ApiTracesRestCollaborators;
+  };
 
   return mountRestFamily({
     security: options.world.security(),

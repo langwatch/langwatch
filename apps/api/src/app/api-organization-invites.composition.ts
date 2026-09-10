@@ -21,7 +21,7 @@ import {
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import { PostgresIdentityEmailAdapter } from "@langwatch/identity-server";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RoleApi } from "@langwatch/role-contract";
 import type { ApiOrganizationInvitePort } from "../features/organization/organization.composition.ts";
@@ -128,6 +128,8 @@ export type ApiOrganizationInvitesOptions = Readonly<{
   joinRequests?: ApiOrganizationInviteJoinRequests | undefined;
   /** The mail gateway, where a host composed one. */
   mail?: OrganizationInviteMailPort | undefined;
+  /** The identity app, for the acceptor's own verified addresses. */
+  identity: IdentityApi;
 }>;
 
 /**
@@ -157,13 +159,9 @@ export function composeApiOrganizationInvites(
     ...(options.mail ? { mail: options.mail } : {}),
   });
 
-  // The identity read fork, over the client this process already composed.
-  // Not process-bound: it reads the `Identifier` projection and one
-  // migration-state row, which is the reason `api-auth.composition.ts` builds
-  // one of these for itself rather than being handed it.
-  const identityEmails = PostgresIdentityEmailAdapter.create({
-    database: options.prisma,
-  }).build();
+  // The identity app the api process boots once and hands to every feature
+  // that needs its own verified-address read.
+  const identity = options.identity;
   const joinRequests = options.joinRequests;
 
   const ports: OrganizationInvitePortShape = {
@@ -192,7 +190,7 @@ export function composeApiOrganizationInvites(
     matchInviteToAcceptor: async (_ctx, input) => {
       // A user not yet on identifiers keeps the legacy case-insensitive
       // session-email comparison byte for byte, and `null` is what says so.
-      const matchable = await identityEmails.tryVerifiedEmailsOf({ userId: input.userId });
+      const matchable = await identity.verifiedEmailsOf({ userId: input.userId });
       return InviteService.matchInviteToAcceptor({
         inviteEmail: input.inviteEmail,
         sessionEmail: input.sessionEmail,

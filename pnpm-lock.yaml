@@ -8189,6 +8189,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -8259,6 +8262,9 @@ importers:
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
+      '@langwatch/share-contract':
+        specifier: workspace:*
+        version: link:../../share/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

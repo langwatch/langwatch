@@ -38,12 +38,8 @@ import {
 import { PostgresSessionPolicyAdapter } from "@langwatch/enterprise-governance-server";
 import type { EventSourcing } from "@langwatch/eventing";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
-import {
-  PlatformOperatorPort,
-  PostgresSsoConnectionPipelineAdapter,
-  PrismaSsoConnectionBackofficeRepository,
-  SsoConnectionBackofficeService,
-} from "@langwatch/identity-server";
+import { PlatformOperatorPort } from "@langwatch/identity-server";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
@@ -83,6 +79,8 @@ export type ApiEnterpriseApplicationOptions = Readonly<{
   eventSourcing: EventSourcing | undefined;
   /** Who this deployment counts as a platform operator, for the connection guards. */
   operators: PlatformOperatorPort;
+  /** The identity app, over the SAME graph the pipeline commands through. */
+  identity: IdentityApi;
   report?: ApiEnterpriseApplicationAbsenceReport;
 }>;
 
@@ -168,40 +166,31 @@ function composeWebhooks(
 function composeBackoffice(
   options: ApiEnterpriseApplicationOptions & { prisma: PrismaClient },
 ): (() => SsoConnectionLedgerPort) | undefined {
-  const { prisma, eventSourcing, operators } = options;
+  const { eventSourcing, identity } = options;
+  // The identity app only builds a working `ssoBackoffice` when it was booted
+  // with an `ssoConnectionLedger` (Q3(c)), which this process supplies only
+  // where it has a queue to append through.
   if (!eventSourcing) return undefined;
 
-  const pipeline = PostgresSsoConnectionPipelineAdapter.create({
-    database: prisma,
-    eventSourcing,
-    operators,
-  });
-  const service = SsoConnectionBackofficeService.create({
-    reads: PrismaSsoConnectionBackofficeRepository.create(prisma),
-    connections: () => pipeline.connections(),
-  });
-  const port = asBackofficePort(service);
+  const port = asBackofficePort(identity);
 
   return () => port;
 }
 
-/**
- * The service, under the names the ledger port reads. One verb differs: the port asks
- * `findById` for a read that answers `null`, and the service names that read `tryGetById`.
- */
-function asBackofficePort(service: SsoConnectionBackofficeService): SsoConnectionLedgerPort {
+/** The app's SSO backoffice, under the names the ledger port reads. */
+function asBackofficePort(identity: IdentityApi): SsoConnectionLedgerPort {
   return {
-    list: (input) => service.list(input),
-    findById: (input) => service.tryGetById(input),
-    registerConnection: (input) => service.registerConnection(input),
-    claimDomain: (input) => service.claimDomain(input),
-    approveDomainClaim: (input) => service.approveDomainClaim(input),
-    rejectDomainClaim: (input) => service.rejectDomainClaim(input),
-    attestDomain: (input) => service.attestDomain(input),
-    activateConnection: (input) => service.activateConnection(input),
-    suspendConnection: (input) => service.suspendConnection(input),
-    resumeConnection: (input) => service.resumeConnection(input),
-    requestTeardown: (input) => service.requestTeardown(input),
+    list: (input) => identity.ssoBackoffice().list(input),
+    findById: (input) => identity.ssoBackoffice().findById(input),
+    registerConnection: (input) => identity.ssoBackoffice().registerConnection(input),
+    claimDomain: (input) => identity.ssoBackoffice().claimDomain(input),
+    approveDomainClaim: (input) => identity.ssoBackoffice().approveDomainClaim(input),
+    rejectDomainClaim: (input) => identity.ssoBackoffice().rejectDomainClaim(input),
+    attestDomain: (input) => identity.ssoBackoffice().attestDomain(input),
+    activateConnection: (input) => identity.ssoBackoffice().activateConnection(input),
+    suspendConnection: (input) => identity.ssoBackoffice().suspendConnection(input),
+    resumeConnection: (input) => identity.ssoBackoffice().resumeConnection(input),
+    requestTeardown: (input) => identity.ssoBackoffice().requestTeardown(input),
   };
 }
 
