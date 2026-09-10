@@ -61,6 +61,7 @@
     // Measured 2026-09-10: 70 files, 80 reports, across 20 modules, seeded
     // into the shrink-only baseline. The channel conversion (ADR-144 decision
     // 9) empties services/ of conduits and the rows go with it.
+    "langwatch/refusal-is-a-handled-error": "error",
     "langwatch/channel-takes-only-its-client": "error",
     "langwatch/repository-takes-only-its-store": "error",
     "langwatch/service-does-not-open-a-channel": "error",
