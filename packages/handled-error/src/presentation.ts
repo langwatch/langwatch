@@ -2133,8 +2133,7 @@ const presentations = {
   },
   scenario_run_rejected: {
     title: "This run cannot start as asked",
-    describe: (error) =>
-      error.message ||
+    describe: () =>
       "Check the scenario, its parameters and the target the run points at, then try again.",
   },
   // ---- secret run parameters ----
