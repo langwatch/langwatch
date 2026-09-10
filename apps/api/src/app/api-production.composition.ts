@@ -204,7 +204,6 @@ import {
 import type { GithubApi } from "@langwatch/github-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { ExperimentApi } from "@langwatch/experiment-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
 
 import { createPlatformUrlBuilder } from "./api-rest-ports.ts";
