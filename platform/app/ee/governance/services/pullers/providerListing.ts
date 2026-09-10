@@ -46,7 +46,28 @@ export type ListingRefusalReason =
   /** A 2xx that was not the documented shape. A proxy or a captive portal. */
   | "malformed_response"
   /** The source holds no credential this provider can sign in with. */
-  | "not_configured";
+  | "not_configured"
+  /**
+   * The collection is longer than the walk will follow. The one member that
+   * describes OUR side rather than the provider's.
+   *
+   * Every other reason here answers "what did the provider do". This one
+   * answers "where did we stop", and it needs its own member because the
+   * others cannot express it: each page was asked for and answered, correctly
+   * and with a success status, and then a bound we chose ended the walk. It is
+   * the same distinction `LISTING_FAILED_REASON` exists to keep — a reader who
+   * cannot tell "your credential was rejected" from "we could not finish" gets
+   * offered a fix for a problem they do not have.
+   *
+   * It also carries a different instruction. `unavailable` and `unreachable`
+   * mean try again; this one is permanent until something changes, because the
+   * next walk reads the same pages and stops in the same place.
+   *
+   * `status` is null against this reason even though answers did come back:
+   * the field carries the status of a provider answer that FAILED, and here
+   * none did.
+   */
+  | "too_many_pages";
 
 export interface ListingRefusal {
   reason: ListingRefusalReason;

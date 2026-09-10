@@ -320,9 +320,12 @@ describe("listCopilotAgents paging", () => {
 
       const listing = await listCopilotAgents({ environmentUrl, token: "t" });
 
+      // Not `unavailable`: every one of those pages answered, and answered
+      // 200. The bound that ended the walk is ours, so the reason names our
+      // side and the retry advice the provider reasons carry does not apply.
       expect(listing).toEqual({
         outcome: "refused",
-        refusal: { reason: "unavailable", status: null },
+        refusal: { reason: "too_many_pages", status: null },
       });
       expect(fetchMock).toHaveBeenCalledTimes(MAX_BOT_PAGES);
     });
@@ -486,9 +489,10 @@ describe("listGenieAgents", () => {
 
       const listing = await listGenieAgents({ workspaceUrl, token: "t" });
 
+      // Same reasoning as the Copilot walk: the pages answered, we stopped.
       expect(listing).toEqual({
         outcome: "refused",
-        refusal: { reason: "unavailable", status: null },
+        refusal: { reason: "too_many_pages", status: null },
       });
     });
   });

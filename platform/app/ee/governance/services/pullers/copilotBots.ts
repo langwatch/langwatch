@@ -275,7 +275,7 @@ export async function listCopilotAgents(params: {
   // are undiscoverable by repeating the action, and a screen showing a subset
   // as the whole set is worse than one saying it could not enumerate.
   if (read.hasMorePages) {
-    return agentsRefused({ reason: "unavailable", status: null });
+    return agentsRefused({ reason: "too_many_pages", status: null });
   }
 
   return agentsListed(
