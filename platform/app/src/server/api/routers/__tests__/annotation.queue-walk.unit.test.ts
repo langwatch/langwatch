@@ -10,6 +10,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { guardProjectId } from "~/utils/dbMultiTenancyProtection";
 import { createInnerTRPCContext } from "../../trpc";
 import { annotationRouter } from "../annotation";
 
@@ -114,6 +115,34 @@ const readsTowardsFrontOfQueue = (args: {
   orderBy?: { createdAt?: string }[];
 }) => args.orderBy?.[0]?.createdAt === "asc";
 
+/**
+ * One queue-item read, answered only if the real multitenancy guard lets it
+ * through.
+ *
+ * The stub routes every `AnnotationQueueItem` call through the middleware the
+ * live client runs rather than answering blindly, so these tests execute the
+ * real tenancy check against the real `where` the router builds. A stub that
+ * skips the guard cannot observe a walk that throws on every call in
+ * production, which is exactly what shipped: the guard reads `projectId` at
+ * the top level only for a model outside `SCOPED_MODELS`
+ * (`~/utils/dbMultiTenancyProtection.ts:894`), so a `where` wrapped in `AND`
+ * hides the tenancy predicate from it.
+ */
+const guardedQueueItemRead =
+  (action: string, answer: (args: any) => unknown) => async (args: unknown) => {
+    await guardProjectId(
+      {
+        model: "AnnotationQueueItem",
+        action,
+        args,
+        dataPath: [],
+        runInTransaction: false,
+      } as never,
+      async () => undefined,
+    );
+    return answer(args);
+  };
+
 function makePrismaStub(): PrismaClient {
   mockQueueItemCount
     .mockResolvedValueOnce(QUEUE_LENGTH)
@@ -132,9 +161,9 @@ function makePrismaStub(): PrismaClient {
 
   return {
     annotationQueueItem: {
-      findFirst: mockQueueItemFindFirst,
-      findMany: mockQueueItemFindMany,
-      count: mockQueueItemCount,
+      findFirst: guardedQueueItemRead("findFirst", mockQueueItemFindFirst),
+      findMany: guardedQueueItemRead("findMany", mockQueueItemFindMany),
+      count: guardedQueueItemRead("count", mockQueueItemCount),
     },
     annotation: { findMany: mockAnnotationFindMany },
     annotationQueue: { findMany: mockQueueFindMany },
@@ -147,6 +176,7 @@ function makePrismaStub(): PrismaClient {
 }
 
 let caller: ReturnType<typeof annotationRouter.createCaller>;
+let prisma: PrismaClient;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -162,7 +192,8 @@ beforeEach(() => {
     permissionChecked: true,
     publiclyShared: false,
   });
-  ctx.prisma = makePrismaStub();
+  prisma = makePrismaStub();
+  ctx.prisma = prisma;
   caller = annotationRouter.createCaller(ctx);
 });
 
@@ -246,6 +277,47 @@ describe("given a queue far longer than one read could carry", () => {
 
       expect(step.queueFinished).toBe(false);
       expect(mockFindExistingTraceIds).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the reads are checked for tenancy the way the live client checks them", () => {
+    /**
+     * The stub only has teeth if the guard it runs can actually refuse, so
+     * prove that first: a read with no tenancy predicate must be turned away.
+     * Without this the three tests below would pass on a guard that had been
+     * quietly disarmed.
+     */
+    it("refuses a queue-item read that carries no tenancy predicate", async () => {
+      await expect(
+        prisma.annotationQueueItem.findFirst({ where: { id: "qi-2" } }),
+      ).rejects.toThrow(/requires a 'projectId'/);
+    });
+
+    describe("when the reviewer opens the item a link names", () => {
+      it("resolves that item", async () => {
+        const step = await caller.getQueueWalkStep({
+          projectId: PROJECT_ID,
+          queueItemId: "qi-2",
+        });
+
+        expect(step.item?.id).toBe(WALKED_ITEM.id);
+      });
+    });
+
+    describe("when the reviewer opens the walk with no item named", () => {
+      /**
+       * Naming no item takes the walk down the one lookup that reads the
+       * `where` as built, so every remaining read is a neighbourhood seek:
+       * the count of what is ahead and the two ids either side. Anything that
+       * throws here is one of those three, not the named-item lookup.
+       */
+      it("reads back its place and the ids either side", async () => {
+        const step = await caller.getQueueWalkStep({ projectId: PROJECT_ID });
+
+        expect(step.position).toBe(AHEAD_OF_WALKED + 1);
+        expect(step.previousItemId).toBe("qi-1");
+        expect(step.nextItemId).toBe("qi-3");
+      });
     });
   });
 

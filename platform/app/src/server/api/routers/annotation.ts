@@ -298,6 +298,28 @@ type QueueItemWhere = Prisma.AnnotationQueueItemWhereInput & {
 };
 
 /**
+ * A queue-item `where` narrowed by one more clause.
+ *
+ * `projectId` is lifted back to the top on purpose. For a model outside
+ * `SCOPED_MODELS` the multitenancy guard looks for tenancy at the top of the
+ * `where` and never recurses into `AND`
+ * (`src/utils/dbMultiTenancyProtection.ts:894`), so wrapping a `where` that
+ * carries `projectId` inside a plain `AND` hides it from the guard and every
+ * such read throws. Keeping the whole original clause inside the `AND` leaves
+ * what the query matches exactly as it was.
+ */
+const narrowQueueItemWhere = ({
+  where,
+  clause,
+}: {
+  where: QueueItemWhere;
+  clause: Prisma.AnnotationQueueItemWhereInput;
+}): Prisma.AnnotationQueueItemWhereInput => ({
+  projectId: where.projectId,
+  AND: [where, clause],
+});
+
+/**
  * Which queue items the optimized list reads. The clauses stack rather than
  * replace: the caller's reach is settled first, and the reviewer's own pick of
  * queues is applied last, so a queue id from anywhere else can subtract rows
@@ -1452,7 +1474,7 @@ const findWalkItem = async ({
 }) => {
   const named = queueItemId
     ? await ctx.prisma.annotationQueueItem.findFirst({
-        where: { AND: [where, { id: queueItemId }] },
+        where: narrowQueueItemWhere({ where, clause: { id: queueItemId } }),
         include,
       })
     : null;
@@ -1488,14 +1510,16 @@ const resolveWalkPlace = async ({
   const after = queueWalkNeighbourhood(current, "after");
 
   const [ahead, previous, next] = await Promise.all([
-    ctx.prisma.annotationQueueItem.count({ where: { AND: [where, before] } }),
+    ctx.prisma.annotationQueueItem.count({
+      where: narrowQueueItemWhere({ where, clause: before }),
+    }),
     ctx.prisma.annotationQueueItem.findFirst({
-      where: { AND: [where, before] },
+      where: narrowQueueItemWhere({ where, clause: before }),
       orderBy: queueWalkOrderReversed,
       select: { id: true },
     }),
     ctx.prisma.annotationQueueItem.findFirst({
-      where: { AND: [where, after] },
+      where: narrowQueueItemWhere({ where, clause: after }),
       orderBy: queueWalkOrder,
       select: { id: true },
     }),
