@@ -30,46 +30,50 @@ import {
   type ApiKeySelectionInput,
   type RevokeApiKeyInput,
   type ApiKeyCallerReadInput,
+  apiKeyServerConfigSchema,
+  type ApiKeyServerConfig,
 } from "@langwatch/api-key-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 import { ApiKeyTokenAdapter } from "../repositories/memory/memory.api-key-token.repository.ts";
-import type { ApiKeyBindingId } from "./api-key.app.ts";
-import type { ApiKeyDiagnostics } from "./api-key.app.ts";
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
+import { ApiKeyBindingIdAdapter } from "../services/api-key-binding-id.service.ts";
+import { ApiKeyDiagnosticsAdapter } from "../services/api-key-diagnostics.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
-import {
-  LegacyApiKeyGrantService,
-  type AuthzBindingIdDeriver,
-} from "../services/legacy-api-key-grant.service.ts";
+import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
 
 /** Who an operation is performed by, and whose membership is proved. */
 export interface ApiKeyCaller {
   readonly id: string;
 }
 
-/** The technical collaborators the composing process supplies. */
-export interface ApiKeyInfrastructure {
-  /** The HMAC key a stored secret is derived under. */
-  readonly pepper: string;
-  readonly bindingIds: ApiKeyBindingId;
-  readonly deriveBindingId: AuthzBindingIdDeriver;
-  readonly diagnostics: ApiKeyDiagnostics;
-}
 type ApiKeyDependencies = Readonly<{
   authorization: typeof AuthzApi;
   organizations: typeof OrganizationApi;
   projects: typeof ProjectApi;
 }>;
-export type ApiKeySetup = FeatureSetup<
-  ApiKeyDependencies,
-  ApiKeyInfrastructure,
-  undefined,
-  ApiKeyRepositories
->;
+
+/**
+ * Everything the process hands this module, one member per key: its own
+ * repositories, the peer applications it names, and its own config slice. The
+ * HMAC pepper is in that slice rather than in a member of its own — it is a
+ * value the module already declares an environment binding for
+ * (`API_KEY_PEPPER`), and the ksuid generator, the grant-id derivation and the
+ * warning log below are derived from what is already here rather than asked
+ * of the process, so this list IS the module's member set.
+ */
+export type ApiKeySetup = Readonly<{
+  repositories: ApiKeyRepositories;
+  dependencies: Readonly<{
+    authorization: AuthzApi;
+    organizations: OrganizationApi;
+    projects: ProjectApi;
+  }>;
+  config: ApiKeyServerConfig;
+}>;
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
 export type CreateApiKeyRequest = Readonly<{
@@ -102,6 +106,8 @@ export class ApiKeyApp implements ApiKeyApi {
     projects: ProjectApi,
   };
 
+  static readonly configSchema = apiKeyServerConfigSchema;
+
   static create(setup: ApiKeySetup): ApiKeyApp {
     const authorization = setup.dependencies.authorization;
 
@@ -112,14 +118,19 @@ export class ApiKeyApp implements ApiKeyApi {
         grants: authorization,
         organizations: setup.dependencies.organizations,
         projects: setup.dependencies.projects,
-        bindingIds: setup.infrastructure.bindingIds,
+        bindingIds: ApiKeyBindingIdAdapter.create(),
         legacyGrants: LegacyApiKeyGrantService.create({
           authz: authorization,
           grants: authorization,
-          deriveBindingId: setup.infrastructure.deriveBindingId,
-          diagnostics: setup.infrastructure.diagnostics,
+          // The peer's own derivation, asked for rather than reimplemented: a
+          // second copy that drifted would write bindings the revocation
+          // queries never find.
+          deriveBindingId: (input) => authorization.deriveGrantId(input),
+          diagnostics: ApiKeyDiagnosticsAdapter.create(createLogger("langwatch:api-key")),
         }),
-        tokens: ApiKeyTokenAdapter.create(setup.infrastructure.pepper),
+        // Blank is a configured state, not a refusal: a key hashed with no
+        // pepper still authenticates, as the config leaf says.
+        tokens: ApiKeyTokenAdapter.create(setup.config.pepper ?? ""),
       }),
       authorization,
     );
@@ -523,12 +534,3 @@ export class ApiKeyApp implements ApiKeyApi {
   }
 }
 
-/** Generates opaque AuthZ binding identifiers for API-key grants. */
-export interface ApiKeyBindingId {
-  generateBindingId(): string;
-}
-
-
-export interface ApiKeyDiagnostics {
-  warn(context: Record<string, unknown>, message: string): void;
-}

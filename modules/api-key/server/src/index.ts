@@ -32,12 +32,12 @@ export { ApiKeyTokenAdapter } from "./repositories/memory/memory.api-key-token.r
 export type { AuthzBindingIdDeriver } from "./services/legacy-api-key-grant.service.ts";
 export {
   ApiKeyApp,
-  type ApiKeyInfrastructure,
   type ApiKeySetup,
   type ApiKeyCaller,
   type CreateApiKeyRequest,
   type UpdateApiKeyRequest,
 } from "./app/api-key.app.ts";
+export { apiKeyEventing } from "./eventing/api-key.pipeline.ts";
 export { apiKeyServer } from "./api-key.server.ts";
 export { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
 export { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";

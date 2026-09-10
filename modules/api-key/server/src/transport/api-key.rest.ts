@@ -304,6 +304,10 @@ export const apiKeyRest = defineRestRouter(ApiKeyApi)
   .withPermission("organization:view")
   .withOutput(apiKeyRestDetailSchema)
   .withDocs(GET_API_KEY)
+  // Reading one key by id names a person, so it leaves a trail: the runtime
+  // writes the row from the actor, the id in the path and the organization
+  // the door resolved.
+  .withAudit("management.api-key.read")
   .withMiddleware(apiKeyRestCredential)
   .handle(async ({ app, input, scope }, caller) =>
     detailOf(
@@ -326,6 +330,7 @@ export const apiKeyRest = defineRestRouter(ApiKeyApi)
   .withPermission("organization:manage")
   .withOutput(apiKeyRestDetailSchema)
   .withDocs(UPDATE_API_KEY)
+  .withAudit("management.api-key.update")
   .withMiddleware(apiKeyRestCredential)
   .handle(async ({ app, input, scope }, caller) => {
     const isAdmin = await callerIsAdmin({ app, caller, organizationId: scope.id });

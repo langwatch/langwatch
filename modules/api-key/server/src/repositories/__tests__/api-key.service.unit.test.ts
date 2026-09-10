@@ -16,7 +16,7 @@ import {
   type StoredApiKey,
 } from "../api-key.repository.ts";
 import { ApiKeyTokenAdapter } from "../memory/memory.api-key-token.repository.ts";
-import { ApiKeyBindingId } from "../../app/api-key.app.ts";
+import type { ApiKeyBindingId } from "../../services/api-key-binding-id.service.ts";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
 class TestApiKeyBindingId implements ApiKeyBindingId {

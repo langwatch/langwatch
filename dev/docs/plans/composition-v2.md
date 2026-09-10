@@ -194,28 +194,119 @@ A Sonnet lane follows this and nothing else.
 1. Read `modules/<m>/server/src/<m>.server.ts` and
    `apps/api/src/features/<m>/*` - that directory is the whole list of what the
    process does for this module.
-2. Rewrite `<M>Infrastructure` as `Needs<"…" | "…">` over pool member names;
-   anything not a pool member is derived inside `<M>App.create` from `secrets`,
-   `clock` or `logger`.
-3. Add `.needs<<M>Infrastructure>()("…", "…")` to the module declaration, the
-   tuple exhaustive over the interface.
+2. Delete `<M>Infrastructure`. Its members become named keys of the parameter
+   `<M>App.create` takes, beside `repositories` and `dependencies`, because
+   `keyof` that parameter and the repository factory's own signature ARE the
+   module's member set now. Each old member goes to exactly one of four homes,
+   in this order of preference:
+   - **derived in `create`** from what the module already has (annotation's
+     logger, api-key's ksuid binding-id generator and its warning log);
+   - **asked of a peer** through its `<F>Api` token, where the peer owns the
+     answer (api-key's binding-id derivation is `authorization.deriveGrantId`,
+     because a second copy of a deterministic id derivation drifts and writes
+     rows the revocation queries never find);
+   - **the module's own config slice**, where the value has an environment
+     binding the module already declares — give the App a `static readonly
+     configSchema` and read `setup.config` (api-key's `API_KEY_PEPPER`);
+   - **a named pool member**, and only then.
+   A member that fits none of the four is a finding to report, not a member to
+   invent.
+3. Drop `.build()` from the declaration and name it with `defineServerModule`.
+   Every call already answers something installable. There is no `.needs(...)`
+   tuple and no `<M>Needs` type: naming a member the pool does not have is a
+   compile error at the App's own `create`, which is where the member set is
+   stated.
 4. Move each mount-side credential binding onto its route as
    `.withCredential(kind)`; the family default stays on the router.
 5. Move each mount-side audit middleware onto its routes as
    `.withAudit("<action>")`, one per audited method, and list the old actions in
    the report.
 6. Move idempotency, rate limit, cache and body limit the same way.
-7. Delete the family `onError`; if the wire error shape is not the house shape,
-   pin it in `modules/<m>/contract/src/<m>.errors.ts`.
+7. The family `onError` MOVES, it does not die, wherever the family is
+   published and its bodies are not the house shape. Export the renderer from
+   the module's own transport file beside the declaration
+   (`annotationRestErrors` beside `annotationRest`) and hand it to
+   `runtime.mount`. Deleting it instead silently rewrites what a customer's
+   integration parses: `/api/annotations` answers `{ status, message }` and the
+   house renderer answers `{ error, message, …meta, fault }` at a different
+   status vocabulary. `FeatureInstallOptions.rest.onError` therefore survives
+   until the declaration can state a family's wire error shape itself; the
+   "What dies" row above is premature.
 8. Delete `apps/api/src/features/<m>/` and the module's lines in
    `api-production.composition.ts`, `app-trpc.features.ts` and
    `api-rest.doors.ts` (hand these lines to the coordinator, do not edit them
-   in a shared lane).
-9. Point the module's tests at `createApiFixture`, which now boots `createApp`
-   with `createTestInfrastructure()`.
-10. Run `rtk pnpm --filter @langwatch/<m>-server test:unit`, regenerate the
+   in a shared lane). **This step cannot run before step 3 lands.** Until
+   `createApp` mounts a module's declared transports on the same Hono root the
+   process serves from, deleting the module's installer takes the family off
+   the wire. Before then a lane shrinks those files only by what the module
+   actually took over — an audit middleware, a bound error renderer — and
+   reports the rest as queued.
+9. Move every conduit out of the services. Run
+   `go run ./tools/shapemod channels modules/<m>` for the candidate list, then
+   for each one: declare the interface in the module's own message types at
+   `channels/<subject>.channel.ts`, move the implementation to
+   `channels/<tier>/<tier>.<subject>.channel.ts` (`eventing`, `redis`, `http`,
+   `sqs`, `ses`, `slack`), write its memory twin under `channels/memory/`, and
+   register both in `channels/<m>-channels.registry.ts` with
+   `defineChannels({ live, memory })`. The service takes the channel interface;
+   it imports no bus, no pub/sub and no HTTP client
+   (`service-does-not-open-a-channel`).
+10. Point the module's tests at the SAME `createApp` production uses:
+   `createApp({ role: "api", config, repositories: "memory", channels: "memory" })`,
+   handing in any member the test cares about as a named argument. There is no
+   `createTestInfrastructure`, no test-only builder and no pool for a fixture to
+   assemble — one seam, so there is no test-only path to rot. Memory is asked
+   for by name; it is never a default and never what a missing database falls
+   back to.
+   **Open**: a peer Api is not a pool member, so none of the named arguments
+   answers `ProjectApi`. Installing the peer's module instead installs its peers
+   after it (annotation names five; api-key names three; the chain reaches the
+   authz ledger), which is no longer a unit test. The seam that hands one peer's
+   Api in by its token has to survive whatever `withProvided` is renamed to.
+11. Run `rtk pnpm --filter @langwatch/<m>-server test:unit`, regenerate the
     address inventory, and report a zero-line inventory diff or explain every
     line of it.
+
+## What converting annotation and api-key found
+
+Beyond the corrections folded into the recipe above, five primitives the recipe
+assumes are not there yet. A lane converting one of the other 45 stops at each
+of these rather than working around it.
+
+1. **`createApp` still takes a pool.** The signature in the tree is
+   `createApp({ role, config, infrastructure }).withModules(…).boot()`. The
+   rulings' `repositories: "postgres" | "memory"`, `channels: "live" | "memory"`
+   and the flattened member arguments are not built, and `persistenceFor(pool)`
+   — inferring the backend from whether a Prisma client happens to exist — is
+   exactly the inference ruling 12 refuses.
+2. **No peer seam.** `withProvided` is gone from `ApplicationBuilder` and
+   nothing replaces it, so 464 call sites across the tree name a method that no
+   longer exists and no converted module's test can supply a peer.
+3. **The tRPC declaration has no `withAudit`.** The REST half fulfils a declared
+   action from the pool; the tRPC half has no declaration for one, so a module
+   recording a curated row has nowhere to move it to. In api-key's case the
+   curated row turned out to be a duplicate of the automatic mutation row,
+   written under the same action, adding only an id the generic redaction was
+   masking — the fix was the redaction rule, not a new declaration. Check that
+   first for any other module before asking for the primitive.
+4. **The REST runtime still cannot resolve a credential OBJECT for a route.**
+   `apiKeyRestCredential` asks whether the KEY may act organization-wide, not
+   only its holder, and that fact is still bound by the process with
+   `bindRestMiddleware`. Until step 4 of this plan lands,
+   `apps/api/src/features/<m>/<m>-rest.mount.ts` cannot be deleted for any
+   family that asks a question about its own credential.
+5. **An audit action must be dotted lower kebab.** `assertAuditAction` refuses
+   `management.apiKey.read`, so moving a mount-side action onto a route renames
+   what the trail records. api-key's two became `management.api-key.read` and
+   `management.api-key.update`. The runtime also writes a row for a refusal,
+   carrying the handled code, where the mount-side middleware wrote one only
+   after a 2xx — a widening a converting lane must state, not discover.
+
+One shape rule the conversion surfaced: a module's App must not be the home of
+its services' own seams. `ApiKeyBindingId` and `ApiKeyDiagnostics` were declared
+in `api-key.app.ts` and implemented in `services/`, so app and services imported
+each other and `verbatimModuleSyntax` refused the cycle. Each interface belongs
+in the service file that answers it.
 
 ## Order of conversion
 

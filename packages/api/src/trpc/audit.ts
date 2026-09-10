@@ -203,9 +203,23 @@ const REDACTED_SCALAR_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
 const SENSITIVE_FIELD_NAME =
   /(password|passphrase|privatekey|publickey|secretkey|sharedsecret|clientsecret|signingkey|apikey|accesskey|encryptionkey|licensekey|certificate|secret|token(?!s)|credential|slackwebhook|webhookurl|authorization|bearer)/;
 
+/**
+ * A name ending in `Id` or `Ids` NAMES a credential; it does not carry one.
+ * `apiKeyId` is the row reference the trail is read by — without it a
+ * revocation row cannot say which key was retired, and the surfaces that
+ * needed it were wrapping their own applications to smuggle it past this
+ * rule. `apiKeySecret` still matches the rule below; `apiKeySecretId` is an
+ * identifier either way.
+ */
+const IDENTIFIER_FIELD_NAME = /ids?$/;
+
 /** Whether a field's name says its value is credential material. */
 function isSensitiveFieldName(name: string): boolean {
-  return SENSITIVE_FIELD_NAME.test(name.toLowerCase().replace(/[^a-z0-9]/g, ""));
+  const normalised = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  if (IDENTIFIER_FIELD_NAME.test(normalised)) return false;
+
+  return SENSITIVE_FIELD_NAME.test(normalised);
 }
 
 /**

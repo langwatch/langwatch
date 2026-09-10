@@ -272,6 +272,25 @@ describe("redactAuditArgs", () => {
 
         expect(redactAuditArgs({ input, action: "prompts.update" })).toBe(input);
       });
+
+      // The trail is read by the row a write acted on. A key's id is that
+      // row's name, not the key: masking it left a revocation row that could
+      // not say which credential was retired.
+      it("leaves the identifier of a credential alone", () => {
+        const input = { organizationId: "org-1", apiKeyId: "key-1", tokenIds: ["token-1"] };
+
+        expect(redactAuditArgs({ input, action: "apiKey.revoke" })).toBe(input);
+      });
+
+      it("still redacts the credential the identifier names", () => {
+        const redacted = redactAuditArgs({
+          input: { apiKeyId: "key-1", apiKeySecret: { value: "sk-live-1" } },
+          action: "apiKey.rotate",
+        }) as Record<string, unknown>;
+
+        expect(redacted.apiKeyId).toBe("key-1");
+        expect(redacted.apiKeySecret).toEqual({ value: "[redacted]" });
+      });
     });
   });
 

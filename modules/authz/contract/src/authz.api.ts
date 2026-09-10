@@ -152,6 +152,22 @@ export interface AuthzApi {
     projectId: string;
     permission: import("./registry.ts").AuthzPermission;
   }): Promise<boolean>;
+  /**
+   * The identifier a grant is written under, derived from what the grant IS.
+   *
+   * Deterministic on purpose (ADR-092 s13): two writers deriving the same
+   * grant name it the same id, so a replay deduplicates instead of doubling a
+   * binding. It is asked for here rather than reimplemented by each module
+   * that writes a binding on somebody else's behalf, because a second
+   * derivation that drifts writes rows the revocation queries never find.
+   */
+  deriveGrantId(input: {
+    organizationId: string;
+    principal: import("./authz-grant.events.ts").LedgerPrincipal;
+    scope: import("./authz-grant.events.ts").LedgerScope;
+    resourceToken?: string;
+    occurredAtMs: number;
+  }): string;
 }
 
 export const AuthzApi = moduleApi<AuthzApi>("authz");

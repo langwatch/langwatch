@@ -10,6 +10,7 @@ import {
   ForbiddenError,
   HttpError,
   UnauthorizedError,
+  type RestAuditRow,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
@@ -61,8 +62,17 @@ export function mountApiKeyRest(
 ) {
   const apiKeys: ApiKeyApi = Object.assign(new TestApiKeyService(), options.apiKeys);
   const granted = new Set(options.granted ?? ["organization:view", "organization:manage"]);
+  // The trail the two addressed management routes declare. The runtime refuses
+  // to mount a declared action with nowhere to write it, so a family that
+  // stopped auditing would fail here rather than go quiet in production.
+  const audit: RestAuditRow[] = [];
 
   const runtime = createRestRuntime({
+    audit: {
+      record: (row) => {
+        audit.push(row);
+      },
+    },
     identity: {
       authenticate: ({ request, permission }) => {
         const userId = callerOf(request);
@@ -100,5 +110,5 @@ export function mountApiKeyRest(
       }),
     );
 
-  return { hono, send };
+  return { hono, send, audit };
 }

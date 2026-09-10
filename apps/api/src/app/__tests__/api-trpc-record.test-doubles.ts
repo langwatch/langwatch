@@ -245,7 +245,7 @@ export function stubApiKeyFeature(): ComposedApiKeyFeature {
   return {
     app: stub("apiKeys"),
     router: (mount) =>
-      createApiKeyTrpcRouter({ runtime: mount.runtime, recordAudit: () => undefined }),
+      createApiKeyTrpcRouter({ runtime: mount.runtime }),
   };
 }
 

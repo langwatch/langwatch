@@ -42,7 +42,6 @@ import {
 import { ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile } from "@langwatch/user-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { createLogger } from "@langwatch/observability";
 import { generate } from "@langwatch/ksuid";
 import { fromDate, nowInstant } from "@langwatch/time";
@@ -52,12 +51,24 @@ import { AnnotationService } from "#services/annotation.service";
 import { AnnotationQueueService } from "#services/annotation-queue.service";
 import { AnnotationScoreService } from "#services/annotation-score.service";
 
-type AnnotationSetup = FeatureSetup<
-  typeof AnnotationApp.dependencies,
-  never,
-  undefined,
-  AnnotationRepositories
->;
+/**
+ * Everything the process hands this module, named one member per key: the
+ * repositories the registry built and the peer applications the module reads
+ * through their own tokens. There is nothing else — annotation keeps no state
+ * outside its own tables and reaches nothing the process owns — so this list
+ * IS the module's member set, and a member added here that the process cannot
+ * supply is a compile error at the call that installs it.
+ */
+type AnnotationSetup = Readonly<{
+  repositories: AnnotationRepositories;
+  dependencies: Readonly<{
+    projects: ProjectApi;
+    organizations: OrganizationApi;
+    traces: TraceApi;
+    users: UserApi;
+    permissions: AuthzApi;
+  }>;
+}>;
 const logger = createLogger("langwatch:annotation:app");
 const annotatorReferenceSchema = z.string().transform((reference, context) => {
   if (reference.startsWith("queue-") && reference.length > 6) {

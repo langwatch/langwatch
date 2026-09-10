@@ -1,5 +1,14 @@
 import { generate } from "@langwatch/ksuid";
-import { ApiKeyBindingId } from "../app/api-key.app.ts";
+
+/**
+ * Generates opaque AuthZ binding identifiers for API-key grants. Declared
+ * beside the one thing that answers it: an application is not the home of a
+ * service's own seam, and stating it there made the app and its services
+ * import each other.
+ */
+export interface ApiKeyBindingId {
+  generateBindingId(): string;
+}
 
 /**
  * The AuthZ binding identifier an API-key grant is written under.

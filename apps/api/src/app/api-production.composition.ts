@@ -3191,10 +3191,7 @@ export class ApiProductionComposition extends ApiRuntimeComposition {
     // installed here. It is the SAME object every REST door authenticates a
     // caller through, so this surface never has a second answer to what a key is
     // and never a refusing twin standing in for one.
-    this.composedApiKey = composeApiKeyFeature({
-      audit: this.resolveAudit(),
-      app: tenancy.apiKeys,
-    });
+    this.composedApiKey = composeApiKeyFeature({ app: tenancy.apiKeys });
     // A host that injected its own api-key and organization pair composed no
     // tenancy here, so it holds the collaborator set whole and hands it in
     // rather than having these features built for it.

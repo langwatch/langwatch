@@ -5,7 +5,7 @@ import type {
   LedgerPrincipal,
   LedgerScope,
 } from "@langwatch/authz-contract";
-import type { ApiKeyDiagnostics } from "../app/api-key.app.ts";
+import type { ApiKeyDiagnostics } from "./api-key-diagnostics.service.ts";
 import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
 
 const MINT_GUARD_TTL_MS = 60_000;

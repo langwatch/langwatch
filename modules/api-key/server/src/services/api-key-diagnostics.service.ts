@@ -1,5 +1,9 @@
 import type { Logger } from "@langwatch/observability";
-import { ApiKeyDiagnostics } from "../app/api-key.app.ts";
+
+/** Where an API-key grant warning goes, declared beside what answers it. */
+export interface ApiKeyDiagnostics {
+  warn(context: Record<string, unknown>, message: string): void;
+}
 
 /**
  * Where an API-key grant warning goes.

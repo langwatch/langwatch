@@ -340,11 +340,13 @@ describe("the apiKey tRPC transport", () => {
         { organizationId: ORG_ID, apiKeyId: "ak_1" },
         { id: USER_ID },
       );
-      // The generic redaction names `apiKeyId` credential-shaped and masks it
-      // in the automatic row's arguments; the curated mount entry carries it.
+      // One row, and it names the key that was retired: `{ success: true }`
+      // carries no target id, so the arguments are the only place the trail
+      // can read which credential this was.
+      expect(audit.entries).toHaveLength(1);
       expect(audit.entries[0]).toMatchObject({
         action: "apiKey.revoke",
-        args: { organizationId: ORG_ID, apiKeyId: "[redacted]" },
+        args: { organizationId: ORG_ID, apiKeyId: "ak_1" },
       });
     });
 

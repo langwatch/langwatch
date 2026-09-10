@@ -1,7 +1,7 @@
 import type { ApiKey } from "@langwatch/api-key-contract";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiKeyDiagnostics } from "../../app/api-key.app.ts";
+import type { ApiKeyDiagnostics } from "../api-key-diagnostics.service.ts";
 import { LegacyApiKeyGrantService } from "../legacy-api-key-grant.service.ts";
 import { fromDate } from "@langwatch/time";
 

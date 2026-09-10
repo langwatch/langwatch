@@ -31,7 +31,7 @@ import {
 import { mountWorkflowStudioRest } from "../features/workflow/workflow-studio-rest.mount.ts";
 import { mountWorkflowRunRest } from "../features/workflow/workflow-run-rest.mount.ts";
 
-import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
+import { annotationRest, annotationRestErrors } from "@langwatch/annotation-server";
 import { mountAuthCliDeviceFlowRest } from "../features/auth/auth-cli-device-flow-rest.mount.ts";
 import { mountAuthRest } from "../features/auth/auth-rest.mount.ts";
 import { mountAgentRest } from "../features/agent/agent-rest.mount.ts";
@@ -300,8 +300,17 @@ export const API_REST_DOORS = [
     family: "annotations",
     owner: "module",
     paths: ["/api/annotations", "/api/v1/annotations"],
+    // Mounted straight from the module's own declaration. The renderer for
+    // the bodies this published family answers with travels beside it, so the
+    // process contributes nothing but the door.
     mount: ({ runtime, services }: ApiRestDoorContext) =>
-      services.annotations ? [mountAnnotationRest(runtime, services.annotations)] : null,
+      services.annotations
+        ? [
+            runtime.mount(annotationRest.router(), services.annotations, {
+              onError: annotationRestErrors,
+            }),
+          ]
+        : null,
   },
   {
     family: "stored-objects",
@@ -851,7 +860,7 @@ export const API_REST_DOORS = [
       const apiKeys = packaged?.services.apiKeys;
       if (!apiKeys) return null;
 
-      return [mountApiKeyRest(runtime, { apiKeys, audit: packaged.ports.managementAudit })];
+      return [mountApiKeyRest(runtime, { apiKeys })];
     },
   },
   {

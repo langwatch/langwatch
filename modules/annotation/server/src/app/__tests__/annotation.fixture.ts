@@ -3,7 +3,6 @@ import type { OrganizationApi, User } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 import { AnnotationApp } from "../annotation.app.ts";
@@ -84,7 +83,5 @@ export function createAnnotationTestApp(
       users: input.dependencies?.users ?? createAnnotationTestUsers(),
       permissions: input.dependencies?.permissions ?? createAnnotationTestAuthz(),
     },
-    config: void 0,
-    resources: new ResourceScope(),
   });
 }

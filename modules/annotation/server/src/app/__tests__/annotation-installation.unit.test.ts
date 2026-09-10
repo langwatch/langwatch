@@ -22,16 +22,33 @@ import {
   createAnnotationTestUsers,
 } from "./annotation.fixture.ts";
 
+/**
+ * One process, stated once: what it is, which backends it wants, and the
+ * members it hands in itself. Memory is asked for BY NAME — it is never a
+ * default and never what a missing database falls back to — so this is the
+ * same seam production uses with `repositories: "postgres"`, not a test-only
+ * builder that can rot apart from it.
+ *
+ * The five `withProvided` lines are the one thing the declarative shape has no
+ * word for. A peer is not a member of the pool, so it is not one of the named
+ * arguments above; and installing the peer's own module instead would install
+ * its peers after it, down to the authz ledger, which is not a unit test. The
+ * seam that hands one peer's Api in by its token has to survive the rename,
+ * whatever it ends up called.
+ */
 function process() {
-  return createApp({ name: "annotation-installation-test" })
-    .withPersistence("memory", {})
-    .withInfrastructure({})
+  return createApp({
+    role: "api",
+    config: {},
+    repositories: "memory",
+    channels: "memory",
+  })
     .withProvided(ProjectApi, createAnnotationTestProjects())
     .withProvided(OrganizationApi, createAnnotationTestOrganizations())
     .withProvided(TraceApi, createAnnotationTestTraces())
     .withProvided(UserApi, createAnnotationTestUsers())
     .withProvided(AuthzApi, createAnnotationTestAuthz())
-    .withModule(annotationServer);
+    .withModules([annotationServer]);
 }
 
 const input = {
@@ -42,8 +59,8 @@ const input = {
 };
 
 describe("annotation app installation", () => {
-  it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process().boot({ role });
+  it("installs a working app", async () => {
+    const runtime = await process().boot();
 
     try {
       const app = runtime.service(AnnotationApi);
@@ -70,8 +87,8 @@ describe("annotation app installation", () => {
   });
 
   it("allocates independent memory repositories for each installation", async () => {
-    const first = await process().boot({ role: "api" });
-    const second = await process().boot({ role: "api" });
+    const first = await process().boot();
+    const second = await process().boot();
 
     try {
       const created = await first.service(AnnotationApi).createUnattributed(input);

@@ -1,12 +1,6 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import {
-  ApiKeyBindingIdAdapter,
-  ApiKeyDiagnosticsAdapter,
-  apiKeyServer,
-  type ApiKeyApp,
-} from "@langwatch/api-key-server";
+import { apiKeyServer, type ApiKeyApp } from "@langwatch/api-key-server";
 import { AuthzApi, type AuthzGrantsService, type AuthzService } from "@langwatch/authz-contract";
-import { EventingAuthzGrantAdapter } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import {
@@ -137,19 +131,20 @@ export class ApiTenancyComposition {
     // are chosen once, here. The SAME AuthZ service answers both the permission
     // checks and the legacy grant writes, exactly as it did before, because the
     // module names one authorization token for both.
+    // The module states its own shape: its repositories, its three peers and
+    // its config slice. The ksuid generator, the grant-id derivation and the
+    // warning log this root used to hand in are derived inside the module now
+    // — the first two from what the module already has, the third from the
+    // peer that owns the ledger — so the only thing left to say here is which
+    // pepper the stored hashes were written under.
     const runtime = await createApp({ name: "langwatch-api" })
       .withPersistence("postgres", { prisma: database })
-      .withInfrastructure({
-        pepper: options.pepper,
-        bindingIds: ApiKeyBindingIdAdapter.create(),
-        deriveBindingId: EventingAuthzGrantAdapter.deriveGrantId,
-        diagnostics: ApiKeyDiagnosticsAdapter.create(createLogger("langwatch:api-key")),
-      })
+      .withInfrastructure({})
       .withProvided(AuthzApi, options.authz.permissions)
       .withProvided(OrganizationApi, organizations)
       .withProvided(ProjectApi, options.projectApi)
       .withModule(apiKeyServer)
-      .boot({ role: "api" });
+      .boot({ role: "api", config: { "api-key": { pepper: options.pepper } } });
 
     options.resources?.own("api credential store", () => runtime.stop());
 

@@ -530,6 +530,54 @@ describe("the api-keys REST family", () => {
   });
 
   describe("when one key is read by id", () => {
+    // The two management rows this family has always written are declared on
+    // the routes now rather than bound around the mount, so they travel with
+    // the module instead of with the process that installs it.
+    it("records the read on the trail, naming the key and the organization", async () => {
+      const { send, audit } = mountApiKeyRest({
+        apiKeys: {
+          getByIdForCaller: vi.fn(async () => apiKeyDetail({})),
+          isOrgAdmin: vi.fn(async () => true),
+          credentialCanManageOrganization: vi.fn(async () => true),
+        },
+      });
+
+      await send("/api/api-keys/api-key-1");
+
+      expect(audit).toEqual([
+        {
+          actorId: CALLER_USER_ID,
+          action: "management.api-key.read",
+          scope: { tier: "organization", id: ORGANIZATION_ID },
+          params: { id: "api-key-1" },
+          resultId: "api-key-1",
+        },
+      ]);
+    });
+
+    // A refusal disclosed nothing, but it is still an attempt on a named key,
+    // and the row carries the code that refused it.
+    it("records a refused read with the code that refused it", async () => {
+      const { send, audit } = mountApiKeyRest({
+        apiKeys: {
+          getByIdForCaller: vi.fn(async () => {
+            throw new ApiKeyNotFoundError("api-key-1");
+          }),
+          isOrgAdmin: vi.fn(async () => false),
+          credentialCanManageOrganization: vi.fn(async () => false),
+        },
+      });
+
+      await send("/api/api-keys/api-key-1");
+
+      expect(audit).toHaveLength(1);
+      expect(audit[0]).toMatchObject({
+        action: "management.api-key.read",
+        params: { id: "api-key-1" },
+        errorCode: "api_key_not_found",
+      });
+    });
+
     /** @scenario Fetching an API key returns its bindings */
     it("returns the key's identity, permission mode and bindings in both shapes", async () => {
       const getByIdForCaller = vi.fn(async () =>
@@ -672,6 +720,28 @@ describe("the api-keys REST family", () => {
   });
 
   describe("when a key is edited", () => {
+    it("records the edit on the trail, naming the key and the organization", async () => {
+      const { send, audit } = mountApiKeyRest({
+        apiKeys: {
+          update: vi.fn(async () => apiKey({ name: "rename-after" })),
+          getByIdForCaller: vi.fn(async () => apiKeyDetail({ name: "rename-after" })),
+          isOrgAdmin: vi.fn(async () => true),
+        },
+      });
+
+      await send("/api/api-keys/api-key-1", { method: "PATCH", body: { name: "rename-after" } });
+
+      expect(audit).toEqual([
+        {
+          actorId: CALLER_USER_ID,
+          action: "management.api-key.update",
+          scope: { tier: "organization", id: ORGANIZATION_ID },
+          params: { id: "api-key-1" },
+          resultId: "api-key-1",
+        },
+      ]);
+    });
+
     /** @scenario Renaming an API key preserves its bindings */
     it("reads the key back through the same path the fetch serves", async () => {
       const update = vi.fn(async () => apiKey({ name: "rename-after" }));
