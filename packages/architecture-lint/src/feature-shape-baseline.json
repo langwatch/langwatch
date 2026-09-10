@@ -3,10 +3,6 @@
   "policy": "feature-shape",
   "entries": [
     {
-      "key": "agent|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "analytics|contract-service",
       "measured": "2026-09-08"
     },
@@ -48,10 +44,6 @@
     },
     {
       "key": "api-key|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "audit-log|memory-twin-untested",
       "measured": "2026-09-08"
     },
     {
