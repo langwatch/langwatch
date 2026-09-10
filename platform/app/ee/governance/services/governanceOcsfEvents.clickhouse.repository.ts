@@ -249,42 +249,64 @@ function decodeSeatReport(
   };
 }
 
+function toOcsfEventValues(row: GovernanceOcsfEventInput) {
+  return {
+    TenantId: row.tenantId,
+    OcsfSchemaVersion: OCSF_SCHEMA_VERSION,
+    EventId: row.eventId,
+    TraceId: row.traceId,
+    SourceId: row.sourceId,
+    SourceType: row.sourceType,
+    ClassUid: OCSF_CLASS_API_ACTIVITY,
+    CategoryUid: OCSF_CATEGORY_APPLICATION_ACTIVITY,
+    ActivityId: row.activityId,
+    TypeUid: OCSF_CLASS_API_ACTIVITY * 100 + row.activityId,
+    SeverityId: row.severityId,
+    EventTime: row.eventTime,
+    ActorUserId: row.actorUserId,
+    ActorEmail: row.actorEmail,
+    ActorEnduserId: row.actorEnduserId,
+    ActionName: row.actionName,
+    TargetName: row.targetName,
+    AnomalyAlertId: row.anomalyAlertId,
+    RawOcsfJson: row.rawOcsfJson,
+  };
+}
+
 export class GovernanceOcsfEventsClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async insertEvent(row: GovernanceOcsfEventInput): Promise<void> {
-    if (!row.tenantId || !row.eventId) {
+    await this.insertEvents([row]);
+  }
+
+  /**
+   * One INSERT for a whole page of rows. A pull lands hundreds of audit rows
+   * per page, and one statement per row was hundreds of queries in flight
+   * against a server whose entire budget may be 32 (#8064). Every row must
+   * belong to the same tenant: the client is resolved once, for that tenant,
+   * and a mixed page is refused rather than split.
+   */
+  async insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void> {
+    if (rows.length === 0) return;
+    for (const row of rows) {
+      if (!row.tenantId || !row.eventId) {
+        throw new Error(
+          "GovernanceOcsfEventsClickHouseRepository.insertEvents: tenantId / eventId are required",
+        );
+      }
+    }
+    const tenantId = rows[0]!.tenantId;
+    if (rows.some((row) => row.tenantId !== tenantId)) {
       throw new Error(
-        "GovernanceOcsfEventsClickHouseRepository.insertEvent: tenantId / eventId are required",
+        "GovernanceOcsfEventsClickHouseRepository.insertEvents: every row must belong to the same tenant",
       );
     }
     try {
-      const client = await this.resolveClient(row.tenantId);
+      const client = await this.resolveClient(tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: [
-          {
-            TenantId: row.tenantId,
-            OcsfSchemaVersion: OCSF_SCHEMA_VERSION,
-            EventId: row.eventId,
-            TraceId: row.traceId,
-            SourceId: row.sourceId,
-            SourceType: row.sourceType,
-            ClassUid: OCSF_CLASS_API_ACTIVITY,
-            CategoryUid: OCSF_CATEGORY_APPLICATION_ACTIVITY,
-            ActivityId: row.activityId,
-            TypeUid: OCSF_CLASS_API_ACTIVITY * 100 + row.activityId,
-            SeverityId: row.severityId,
-            EventTime: row.eventTime,
-            ActorUserId: row.actorUserId,
-            ActorEmail: row.actorEmail,
-            ActorEnduserId: row.actorEnduserId,
-            ActionName: row.actionName,
-            TargetName: row.targetName,
-            AnomalyAlertId: row.anomalyAlertId,
-            RawOcsfJson: row.rawOcsfJson,
-          },
-        ],
+        values: rows.map(toOcsfEventValues),
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
@@ -293,12 +315,13 @@ export class GovernanceOcsfEventsClickHouseRepository {
         error instanceof Error ? error.message : String(error);
       logger.error(
         {
-          tenantId: row.tenantId,
-          eventId: row.eventId,
-          traceId: row.traceId,
+          tenantId,
+          rowCount: rows.length,
+          firstEventId: rows[0]!.eventId,
+          firstTraceId: rows[0]!.traceId,
           error: errorMessage,
         },
-        "Failed to insert governance_ocsf_events row",
+        "Failed to insert governance_ocsf_events rows",
       );
       throw error;
     }

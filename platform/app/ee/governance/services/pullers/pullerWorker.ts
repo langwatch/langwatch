@@ -654,10 +654,14 @@ async function writePulledEvents({
 }
 
 /**
- * The per-event writes of one run: each kept event's OCSF audit row, and its
- * usage record beside it. Returns the priced periods split by whether the
- * cost flag let them be stored — the dropped ones become the source's
- * unpriced window, and the recorded ones are what later closes that window.
+ * The writes of one run: the kept events' OCSF audit rows as one insert for
+ * the page, then each event's usage record. Returns the priced periods split
+ * by whether the cost flag let them be stored — the dropped ones become the
+ * source's unpriced window, and the recorded ones are what later closes that
+ * window.
+ *
+ * One insert per page, not per row: a page of several hundred rows was that
+ * many statements in flight, and a dev ClickHouse budgets 32 (#8064).
  */
 async function writeAuditAndUsageRows({
   kept,
@@ -678,15 +682,19 @@ async function writeAuditAndUsageRows({
 }): Promise<{ droppedPeriodsMs: number[]; recordedPeriodsMs: number[] }> {
   const droppedPeriodsMs: number[] = [];
   const recordedPeriodsMs: number[] = [];
-  for (const event of kept) {
-    await ocsfRepo.insertEvent(
-      mapToOcsfRow({
-        event,
-        tenantId: govProjectId,
-        ingestionSourceId: source.id,
-        sourceType: source.sourceType,
-      }),
+  if (kept.length > 0) {
+    await ocsfRepo.insertEvents(
+      kept.map((event) =>
+        mapToOcsfRow({
+          event,
+          tenantId: govProjectId,
+          ingestionSourceId: source.id,
+          sourceType: source.sourceType,
+        }),
+      ),
     );
+  }
+  for (const event of kept) {
     const { pricedPeriodMs } = await recordPulledUsageFor({
       event,
       source,
