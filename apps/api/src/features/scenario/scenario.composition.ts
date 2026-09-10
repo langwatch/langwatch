@@ -212,7 +212,7 @@ export async function installApiScenario(
   // prompt target read the same rows.
   const prompts = PostgresPromptAdapter.create({ database: options.prisma }).build();
 
-  const promptApp = PromptApp.create({ prompts, projects: options.projects });
+  const promptApp = PromptApp.createReader({ prompts, projects: options.projects });
   const suite = await installApiSuite({
     prisma: options.prisma,
     peers: {

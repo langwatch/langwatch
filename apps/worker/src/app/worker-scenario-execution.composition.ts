@@ -249,7 +249,7 @@ export async function createWorkerScenarioExecutionGraph(input: {
   }).build();
 
   const agents = input.agents;
-  const promptApp = PromptApp.create({ prompts, projects: deps.projects });
+  const promptApp = PromptApp.createReader({ prompts, projects: deps.projects });
 
   // The suite application, over the feature's own repositories. This process
   // starts no run — the refusal below says so by name — but it reads the plans

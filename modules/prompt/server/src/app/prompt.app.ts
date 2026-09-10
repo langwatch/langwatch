@@ -197,6 +197,27 @@ export class PromptApp implements PromptApi {
     });
   }
 
+  /**
+   * The read-only twin a scenario process holds: it lists and prefetches
+   * prompts for a run and never writes one, so every permission check and
+   * every write refuses by name instead of reaching a peer it does not have.
+   */
+  static createReader(input: { prompts: PromptService; projects: ProjectApi }): PromptApp {
+    const permissions = new Proxy({} as AuthzApi, {
+      get: (_target, property) => (): never => {
+        throw new Error(
+          `The prompt reader holds no permission peer: ${String(property)} is not available on this process`,
+        );
+      },
+    });
+    return new PromptApp({
+      prompts: input.prompts,
+      projects: input.projects,
+      permissions,
+      infrastructure: { prompts: input.prompts, afterPromptCreated: () => undefined },
+    });
+  }
+
   #dependencies: PromptAppDependencies;
 
   private constructor(dependencies: PromptAppDependencies) {
