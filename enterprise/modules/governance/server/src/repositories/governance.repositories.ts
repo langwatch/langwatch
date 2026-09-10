@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { AdminWorkspaceViewAuditRepository } from "./audit/admin-workspace-view-audit.repository.ts";
 import type { AnomalyRulePort } from "./policy/anomaly-rule.repository.ts";
 import type { DepartmentPort } from "./directory/department.repository.ts";
 import type { GovernanceDirectoryPort } from "./directory/governance-directory.repository.ts";
@@ -21,6 +22,7 @@ import type { OrganizationSupportContactRepository } from "./directory/organizat
  * here with no memory twin behind them.
  */
 export interface GovernanceRepositories {
+  readonly adminWorkspaceViewAudit: AdminWorkspaceViewAuditRepository;
   readonly anomalyRules: AnomalyRulePort;
   readonly departments: DepartmentPort;
   readonly directory: GovernanceDirectoryPort;
