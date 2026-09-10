@@ -13,6 +13,8 @@ export * from "./gateway.api.ts";
 export * from "./gateway-budget.trpc.ts";
 export * from "./gateway-cache-rule.trpc.ts";
 export * from "./gateway-guardrail.trpc.ts";
+export * from "./gateway-usage.trpc.ts";
+export * from "./virtual-key.trpc.ts";
 export * from "./virtual-key-config.ts";
 export * from "./virtual-key.schemas.ts";
 export * from "./gateway-wire-enums.ts";

@@ -5,6 +5,11 @@
  */
 
 import { type Instant, nowInstant } from "@langwatch/time";
+import type {
+  ScopeInput,
+  VirtualKeyBudgetInput,
+  VirtualKeyWithScopes,
+} from "@langwatch/gateway-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -26,39 +31,13 @@ import {
 } from "@langwatch/gateway-contract";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port.ts";
-import {
-  type ScopeInput,
-  type GatewayVirtualKeysPort,
-  type VirtualKeyWithScopes,
-} from "../ports/gateway-virtual-key.port.ts";
+import type { GatewayVirtualKeysPort } from "../ports/gateway-virtual-key.port.ts";
 
 export const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
 // Joins a guardrail direction to its id in a set key. A NUL can never appear in either half.
 const GUARDRAIL_KEY_SEPARATOR = "\0";
 
-/**
- * The budget a key carries on itself, created in the same transaction as the
- * key. `null` on update removes the cap by archiving. The zod schema is the
- * single validation source, shared by tRPC and REST.
- */
-export const virtualKeyBudgetInputSchema = z.object({
-  // A decimal number of dollars, strictly positive. String rather
-  // than number to survive JSON round-trips without float drift; the
-  // regex rejects partial parses ("10abs"), signs, and bare dots.
-  limitUsd: z
-    .string()
-    .trim()
-    .regex(/^\d+(\.\d+)?$/, "limitUsd must be a decimal number")
-    .refine((v) => Number.parseFloat(v) > 0, {
-      message: "limitUsd must be greater than zero",
-    }),
-  window: z.enum(["DAY", "WEEK", "MONTH"]),
-  onBreach: z.enum(["BLOCK", "WARN"]).optional(),
-  name: z.string().min(1).max(128).optional(),
-});
-
-export type VirtualKeyBudgetInput = z.infer<typeof virtualKeyBudgetInputSchema>;
 
 export type CreateVirtualKeyInput = {
   organizationId: string;

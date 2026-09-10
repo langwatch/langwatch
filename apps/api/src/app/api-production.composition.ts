@@ -184,7 +184,7 @@ import {
   composeApiOrganizationInvites,
   type ApiOrganizationInvites,
 } from "./api-organization-invites.composition.ts";
-import { composeGatewayFeature } from "../features/gateway/gateway.composition.ts";
+import { installApiGateway } from "../features/gateway/gateway.composition.ts";
 import { composeEnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition.ts";
 import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition.ts";
@@ -1218,7 +1218,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       database && directory
         ? await this.resolveGithub(options, database.client, queueInfrastructure, directory)
         : undefined;
-    this.composedGateway = this.composeGateway(options, infrastructure);
+    this.composedGateway = await this.composeGateway(options, infrastructure);
     // The back office, composed from the shared infrastructure plus the three other features it
     // names: the people a row is about, the session an impersonation is started against, and
     // the projects a scheduled job is scoped to. It used to ride inside the agent half, which
@@ -4022,10 +4022,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * The gateway-group half, over this process's own graph.
    */
-  private composeGateway(
+  private async composeGateway(
     options: ApiRuntimeCompositionOptions,
     infrastructure: ApiTrpcInfrastructure | undefined,
-  ): ComposedGatewayFeature {
+  ): Promise<ComposedGatewayFeature> {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
     const evaluators = this.composedEvaluators;
@@ -4037,7 +4037,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // three keyed creates refuse by name rather than executing unguarded.
     const idempotency = this.options.gatewayIdempotency ?? this.composedIdempotency?.gateway;
 
-    return composeGatewayFeature({
+    return installApiGateway({
       infrastructure,
       // The three other features the gateway reaches, named one by one. Absent
       // together: a process holding none of them composes a refusing gateway,

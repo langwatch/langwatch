@@ -9,6 +9,7 @@ import {
   GatewayWindow,
   type GatewayBudget,
 } from "@langwatch/gateway-contract";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
 import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
 import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port.ts";
@@ -16,8 +17,8 @@ import type {
   GatewayKeyBudgetRepository,
   GatewayKeyBudgetScope,
 } from "../repositories/gateway-key-budget.repository.ts";
-import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
-import type { VirtualKeyBudgetInput } from "./virtual-key-validation.service.ts";
+
+import type { VirtualKeyBudgetInput } from "@langwatch/gateway-contract";
 import { nowInstant } from "@langwatch/time";
 
 export class VirtualKeyBudgetService {

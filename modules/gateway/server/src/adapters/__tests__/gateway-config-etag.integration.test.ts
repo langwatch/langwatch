@@ -3,6 +3,7 @@
  * Real Postgres. Every 60s the gateway revalidates via If-None-Match; the token must move when config moves, including writes that bypass the service. Spec: specs/ai-gateway/governance/provider-credential-rotation.feature
  */
 import { nanoid } from "nanoid";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -14,7 +15,6 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { GatewayConfigAssemblyAdapter } from "../postgres.gateway-config-assembly.adapter.ts";
-import type { VirtualKeyWithScopes } from "../../ports/gateway-virtual-key.port.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

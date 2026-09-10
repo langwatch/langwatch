@@ -10,7 +10,7 @@ import type {
 } from "@langwatch/authz-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { GithubService } from "@langwatch/github-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -21,7 +21,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition.ts";
-import { composeGatewayFeature } from "../gateway.composition.ts";
+import { installApiGateway } from "../gateway.composition.ts";
 import { composeAuthFeature } from "../../auth/auth.composition.ts";
 import { testAuthApi } from "../../auth/__tests__/support/test-auth-api.ts";
 import { refusingUserFeature } from "../../user/user.composition.ts";
@@ -47,11 +47,11 @@ import { refusingLangyFeature } from "../../langy/langy.composition.ts";
 import { refusingAnalyticsFeature } from "../../analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../dataset/dataset.composition.ts";
 import { refusingPromptFeature } from "../../prompt/prompt.composition.ts";
-import { refusingScenarioFeature } from "../../scenario/scenario.composition.ts";
+import { stubScenarioFeature } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingBugReportFeature } from "../../bug-report/bug-report.composition.ts";
 import { refusingIntegrationsChecksFeature } from "../../project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../annotation/annotation-absence.ts";
-import { refusingHttpProxyFeature } from "../../agent/http-proxy.composition.ts";
+import { composeHttpProxyFeature } from "../../agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../model-provider/model-provider.composition.ts";
 import { refusingTraceFeature } from "../../trace/trace.composition.ts";
 import { refusingWorkflowFeature } from "../../workflow/workflow.composition.ts";
@@ -145,7 +145,7 @@ function testGithub() {
   return {
     isOrganizationMember: vi.fn(async () => true),
     getConnectionStatus: vi.fn(async () => ({ configured: true, connected: false })),
-  } as unknown as GithubService & {
+  } as unknown as GithubApi & {
     isOrganizationMember: ReturnType<typeof vi.fn>;
     getConnectionStatus: ReturnType<typeof vi.fn>;
   };
@@ -167,7 +167,9 @@ function testEnterprise(setupState: Record<string, boolean>) {
   } as never;
 }
 
-function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unknown } = {}) {
+async function composeApplication(
+  overrides: { saasBilling?: boolean; enterprise?: unknown } = {},
+) {
   const prisma = testPrisma();
   const authz = testAuthz();
   const github = testGithub();
@@ -190,11 +192,11 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
     audit: undefined,
   };
 
-  const gateway = composeGatewayFeature({
+  const gateway = await installApiGateway({
     infrastructure,
     peers: {
       projects,
-      evaluators: {} as unknown as EvaluatorApi,
+      evaluators: createApiFixture<EvaluatorApi>(),
       monitors: stub<MonitorApi>("monitors"),
     },
     // No ClickHouse: the gateway ledger is a projection there, so the spend
@@ -212,7 +214,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       apiKey: stubApiKeyFeature(),
       langy: refusingLangyFeature(),
       ops: stubOpsFeature(),
-      scenario: refusingScenarioFeature(),
+      scenario: stubScenarioFeature(),
       analytics: refusingAnalyticsFeature(),
       featureFlag: stubFeatureFlagFeature(),
       dataset: refusingDatasetFeature(),
@@ -229,7 +231,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       annotation: refusingAnnotationFeature(),
       dashboard: stubDashboardFeature(),
       entitlement: stubEntitlementFeature(),
-      httpProxy: refusingHttpProxyFeature(),
+      httpProxy: composeHttpProxyFeature(),
       modelProvider: refusingModelProviderFeature(),
       share: stubShareFeature(),
       topic: stubTopicFeature(),
@@ -303,8 +305,8 @@ function refusal(body: unknown): string {
 
 describe("given an API process composed with the gateway feature", () => {
   describe("when the record is built", () => {
-    it("mounts all twenty-one gateway and governance namespaces beside `github`", () => {
-      const { application } = composeApplication();
+    it("mounts all twenty-one gateway and governance namespaces beside `github`", async () => {
+      const { application } = await composeApplication();
 
       const mounted = Object.keys(
         (application.trpc as unknown as { _def: { record: Record<string, unknown> } })._def.record,
@@ -365,8 +367,8 @@ describe("given an API process composed with the gateway feature", () => {
       ]);
     });
 
-    it("hands each of the gateway's three kinds of door what it needs", () => {
-      const { gateway } = composeApplication();
+    it("hands each of the gateway's three kinds of door what it needs", async () => {
+      const { gateway } = await composeApplication();
 
       // The application `ctx.app` and the two REST families read, and the
       // stores the spend and internal families walk directly. The six routers
@@ -378,7 +380,7 @@ describe("given an API process composed with the gateway feature", () => {
 
   describe("when a project lists the guardrails its gateway traffic is held against", () => {
     it("reads them through the gateway application this half composes", async () => {
-      const { application, prisma } = composeApplication();
+      const { application, prisma } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "gatewayGuardrails.list", {
         projectId: PROJECT_ID,
@@ -392,7 +394,7 @@ describe("given an API process composed with the gateway feature", () => {
 
   describe("when a member lists the virtual keys they can see", () => {
     it("resolves visibility from their own membership rather than a coarse grant", async () => {
-      const { application, prisma } = composeApplication();
+      const { application, prisma } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "virtualKeys.list", {
         organizationId: ORGANIZATION_ID,
@@ -410,14 +412,14 @@ describe("given an API process composed with the gateway feature", () => {
      * that has genuinely spent nothing — so this asserts it on the
      * composition rather than on a list whose emptiness would be vacuous.
      */
-    it("composes the gateway application with its spend source switched off by name", () => {
-      const { gateway } = composeApplication();
+    it("composes the gateway application with its spend source switched off by name", async () => {
+      const { gateway } = await composeApplication();
 
       expect(gateway.app.spendSourceAvailable).toBe(false);
     });
 
     it("still answers the budget list, through the ledger this half composed", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "gatewayBudgets.list", {
         organizationId: ORGANIZATION_ID,
@@ -430,7 +432,7 @@ describe("given an API process composed with the gateway feature", () => {
 
   describe("when the signed-in member asks which page to land on", () => {
     it("gathers the decision from this half's own ports and the governance rollup", async () => {
-      const { application, prisma } = composeApplication({
+      const { application, prisma } = await composeApplication({
         enterprise: testEnterprise({
           hasPersonalVKs: false,
           hasIngestionSources: false,
@@ -455,7 +457,7 @@ describe("given an API process composed with the gateway feature", () => {
     });
 
     it("refuses by name when no governance capability answers the setup rollup", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { body } = await callTrpc(application, "governance.resolveHome", {
         organizationId: ORGANIZATION_ID,
@@ -467,7 +469,7 @@ describe("given an API process composed with the gateway feature", () => {
 
   describe("when the settings page asks whether GitHub is connected", () => {
     it("answers through the one GitHub service both this surface and the agent reads share", async () => {
-      const { application, github } = composeApplication();
+      const { application, github } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "github.getConnectionStatus", {
         organizationId: ORGANIZATION_ID,
@@ -485,7 +487,7 @@ describe("given an API process composed with the gateway feature", () => {
 
   describe("when no Enterprise application is composed", () => {
     it("still mounts the governance console, and refuses each read by name", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { body } = await callTrpc(application, "ingestionSources.list", {
         organizationId: ORGANIZATION_ID,
@@ -495,7 +497,7 @@ describe("given an API process composed with the gateway feature", () => {
     });
 
     it("refuses a personal virtual key mint by name rather than minting one", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { body } = await callTrpc(
         application,
@@ -515,7 +517,7 @@ describe("given an API process composed with the gateway feature", () => {
      * from "the call failed", and a namespace that is not there tells it neither.
      */
     it("mounts the billing namespaces with no procedures on them", async () => {
-      const { application } = composeApplication({ saasBilling: false });
+      const { application } = await composeApplication({ saasBilling: false });
 
       const { body } = await callTrpc(application, "currency.detectCurrency", {});
 
@@ -523,7 +525,7 @@ describe("given an API process composed with the gateway feature", () => {
     });
 
     it("serves the currency detection when the installation does bill", async () => {
-      const { application } = composeApplication({ saasBilling: true });
+      const { application } = await composeApplication({ saasBilling: true });
 
       const { body } = await callTrpc(application, "currency.detectCurrency", {});
 

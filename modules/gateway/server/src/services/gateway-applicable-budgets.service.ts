@@ -4,6 +4,7 @@
  * constraint that will not be enforced. Spend comes from the rollup the budgets page reads.
  */
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { ScopeInput } from "@langwatch/gateway-contract";
 
 import {
   type BudgetSpendTarget,
@@ -16,7 +17,7 @@ import {
   type GatewayResolvedBudget,
 } from "@langwatch/gateway-contract";
 import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
-import { type ScopeInput } from "../ports/gateway-virtual-key.port.ts";
+
 import type { GatewayService } from "./gateway.service.ts";
 
 export type DraftVirtualKey = {

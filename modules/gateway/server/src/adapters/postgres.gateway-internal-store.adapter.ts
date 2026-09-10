@@ -1,11 +1,12 @@
 import { fromDate, type Instant, toDate } from "@langwatch/time";
 import { toGatewayBudgetRow } from "../repositories/prisma/prisma.gateway-budget.repository.ts";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { GatewayBudget, GatewayBudgetBucketBoundary } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { GatewayInternalStorePort } from "../ports/gateway-internal-store.port.ts";
-import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
+
 import { gatewayRoutingPolicySelect } from "../ports/gateway-virtual-key.port.ts";
 
 const logger = createLogger("langwatch:gateway:internal-store");

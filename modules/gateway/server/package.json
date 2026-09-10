@@ -84,14 +84,6 @@
       "types": "./dist/transport/api-trpc/gateway-spend-event.api.d.ts",
       "default": "./src/transport/api-trpc/gateway-spend-event.api.ts"
     },
-    "./api-trpc/gateway-usage": {
-      "types": "./dist/transport/api-trpc/gateway-usage.api.d.ts",
-      "default": "./src/transport/api-trpc/gateway-usage.api.ts"
-    },
-    "./api-trpc/virtual-key": {
-      "types": "./dist/transport/api-trpc/virtual-key.api.d.ts",
-      "default": "./src/transport/api-trpc/virtual-key.api.ts"
-    },
     "./api-rest/gateway-platform": {
       "types": "./dist/transport/api-rest/gateway-platform.api.d.ts",
       "default": "./src/transport/api-rest/gateway-platform.api.ts"

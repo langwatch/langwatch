@@ -5,6 +5,7 @@
  */
 
 import { randomBytes } from "crypto";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import { TRPCError } from "@trpc/server";
 import type { VirtualKeyConfig, VirtualKeyRoutingMode } from "@langwatch/gateway-contract";
 import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port.ts";
@@ -20,10 +21,7 @@ import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts"
 import type { GatewayTransactionPort } from "../ports/gateway-transaction.port.ts";
 import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port.ts";
 import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port.ts";
-import type {
-  GatewayVirtualKeysPort,
-  VirtualKeyWithScopes,
-} from "../ports/gateway-virtual-key.port.ts";
+import type { GatewayVirtualKeysPort } from "../ports/gateway-virtual-key.port.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import {
   VirtualKeyValidationService,

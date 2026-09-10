@@ -144,3 +144,60 @@ export type GatewayRealtimeSession = {
   createdAt: Instant;
   updatedAt: Instant;
 };
+
+/** One place a virtual key is reachable from: an organization, a team or a project. */
+export type GatewayVirtualKeyScope = {
+  scopeType: "ORGANIZATION" | "PROJECT" | "TEAM";
+  scopeId: string;
+};
+
+/** The visibility set a write states, which is the same shape a read answers. */
+export type ScopeInput = GatewayVirtualKeyScope;
+
+/**
+ * A key with the joins every read of it carries: the scopes it is reachable
+ * from, the person it acts for, and the routing policy it fails over through.
+ * `metadata` and `config` stay unknown here - both are customer-authored Json
+ * that only the parsers in this package are allowed to interpret.
+ */
+export type GatewayVirtualKeyRecord = {
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string | null;
+  status: VirtualKeyStatus;
+  purpose: VirtualKeyPurpose;
+  externalId: string | null;
+  metadata: unknown;
+  disabledAt: Instant | null;
+  disabledReason: string | null;
+  expiresAt: Instant | null;
+  hashedSecret: string;
+  displayPrefix: string;
+  principalUserId: string | null;
+  traceProjectId: string | null;
+  config: unknown;
+  revision: bigint;
+  previousHashedSecret: string | null;
+  previousSecretValidUntil: Instant | null;
+  revokedAt: Instant | null;
+  revokedById: string | null;
+  createdAt: Instant;
+  updatedAt: Instant;
+  createdById: string;
+  lastUsedAt: Instant | null;
+  routingPolicyId: string | null;
+  routingMode: VirtualKeyRoutingMode;
+  scopes: GatewayVirtualKeyScope[];
+  principalUser: { id: string; name: string | null; email: string | null } | null;
+  routingPolicy: {
+    id: string;
+    name: string;
+    modelAliases: unknown;
+    defaultModel: string | null;
+    policyRules: unknown;
+  } | null;
+};
+
+/** The same record, named for the join a caller cares about. */
+export type VirtualKeyWithScopes = GatewayVirtualKeyRecord;

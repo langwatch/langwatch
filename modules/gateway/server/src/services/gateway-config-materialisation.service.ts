@@ -4,6 +4,7 @@
  * computes from its scope graph plus the optional routing policy's ordering.
  */
 import type { ModelProvider } from "@langwatch/gateway-contract";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 
 import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port.ts";
 import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
@@ -16,7 +17,7 @@ import {
   type GatewayResolvedBudget,
 } from "@langwatch/gateway-contract";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
-import { type VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
+
 import {
   budgetToWire,
   buildProviderSlot,

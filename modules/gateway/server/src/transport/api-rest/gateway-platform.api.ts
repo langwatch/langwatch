@@ -5,6 +5,7 @@
  */
 
 import { type Instant, nowInstant, Temporal, type TimeInput, toEpochMs } from "@langwatch/time";
+import type { GatewayVirtualKeyScope } from "@langwatch/gateway-contract";
 /** The expiry a request carries, as the service reads it: absent, cleared, or a moment. */
 function expiryInstant(value: TimeInput | null | undefined): Instant | null | undefined {
   return value === undefined || value === null
@@ -55,7 +56,7 @@ import {
   PAGE_LIMIT_DEFAULT,
   PAGE_LIMIT_MAX,
 } from "../../adapters/gateway-wire-pagination.adapter.ts";
-import type { GatewayVirtualKeyScope } from "../../ports/gateway-virtual-key.port.ts";
+
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GatewayActor, GatewayApp, GatewayVirtualKeyBudgetInput } from "#app/gateway.app";
 

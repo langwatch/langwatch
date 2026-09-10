@@ -9,56 +9,13 @@ export const gatewayRoutingPolicySelect = {
   policyRules: true,
 } as const;
 
-import type { ResourceMetadata } from "@langwatch/gateway-contract";
+import type {
+  GatewayVirtualKeyRecord,
+  GatewayVirtualKeyScope,
+  ResourceMetadata,
+} from "@langwatch/gateway-contract";
 import type { GatewayPersistenceTransaction } from "./gateway-change-events.port.ts";
 
-export type GatewayVirtualKeyScope = {
-  scopeType: "ORGANIZATION" | "PROJECT" | "TEAM";
-  scopeId: string;
-};
-
-export type ScopeInput = GatewayVirtualKeyScope;
-
-export type GatewayVirtualKeyRecord = {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  status: "ACTIVE" | "DISABLED" | "REVOKED";
-  purpose: "LANGY" | "USER";
-  externalId: string | null;
-  metadata: unknown;
-  disabledAt: Instant | null;
-  disabledReason: string | null;
-  expiresAt: Instant | null;
-  hashedSecret: string;
-  displayPrefix: string;
-  principalUserId: string | null;
-  traceProjectId: string | null;
-  config: unknown;
-  revision: bigint;
-  previousHashedSecret: string | null;
-  previousSecretValidUntil: Instant | null;
-  revokedAt: Instant | null;
-  revokedById: string | null;
-  createdAt: Instant;
-  updatedAt: Instant;
-  createdById: string;
-  lastUsedAt: Instant | null;
-  routingPolicyId: string | null;
-  routingMode: "FALLBACK_ALL" | "NONE" | "POLICY";
-  scopes: GatewayVirtualKeyScope[];
-  principalUser: { id: string; name: string | null; email: string | null } | null;
-  routingPolicy: {
-    id: string;
-    name: string;
-    modelAliases: unknown;
-    defaultModel: string | null;
-    policyRules: unknown;
-  } | null;
-};
-
-export type VirtualKeyWithScopes = GatewayVirtualKeyRecord;
 
 export type CreateGatewayVirtualKeyInput = {
   id: string;

@@ -1,7 +1,7 @@
 import type { GatewayBudget, GatewayBudgetBucketBoundary } from "@langwatch/gateway-contract";
 
 import type { Instant } from "@langwatch/time";
-import type { VirtualKeyWithScopes } from "./gateway-virtual-key.port.ts";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 
 /**
  * The row reads the Go data plane's control-plane calls make that no service

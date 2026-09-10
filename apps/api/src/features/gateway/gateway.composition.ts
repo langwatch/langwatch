@@ -5,7 +5,7 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-server";
+import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -61,12 +61,18 @@ export type GatewayFeatureOptions = Readonly<{
 import { createGatewayTrpcRouters } from "./gateway-trpc.mount.ts";
 import type { ComposedGatewayFeature } from "./gateway.composition.types.ts";
 
-/** Composes the gateway over this process's graph, or over its refusals. */
-export function composeGatewayFeature(options: GatewayFeatureOptions): ComposedGatewayFeature {
+/**
+ * Installs the gateway on this process: it boots the module at `role: "api"`
+ * over the graph the process opened, or answers the refusing twin where the
+ * process opened none of it.
+ */
+export async function installApiGateway(
+  options: GatewayFeatureOptions,
+): Promise<ComposedGatewayFeature> {
   const { infrastructure, peers } = options;
   if (!infrastructure || !peers) return refusingGateway();
 
-  const composition = composeApiGateway({
+  const composition = await composeApiGateway({
     prisma: infrastructure.prisma,
     authz: infrastructure.authz,
     projects: peers.projects,
@@ -94,7 +100,7 @@ const logger: Pick<Logger, "info"> = createLogger("langwatch:api:gateway");
 function refusingGateway(): ComposedGatewayFeature {
   logger.info(
     {},
-    "API composed no gateway application: the virtual keys, budgets, cache rules, guardrails, usage and spend-event surfaces all mount and refuse by name",
+      "API installed no gateway application: the virtual keys, budgets, cache rules, guardrails, usage and spend-event surfaces all mount and refuse by name",
   );
 
   const app = new Proxy({} as ApiTrpcFeatureApplication["gateway"], {

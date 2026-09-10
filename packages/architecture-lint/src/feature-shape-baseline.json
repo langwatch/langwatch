@@ -195,10 +195,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "gateway|installer-not-booted",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "gateway|legacy-transport-runtime",
       "measured": "2026-09-08"
     },

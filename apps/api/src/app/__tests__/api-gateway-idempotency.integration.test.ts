@@ -19,6 +19,7 @@
  * @see specs/ai-gateway/idempotency.feature
  */
 // @vitest-environment node
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
@@ -84,15 +85,15 @@ function testReceiptStore() {
 }
 
 /** The gateway composition's collaborators, none of which this seam reaches. */
-function composeGatewayWith(idempotency: ReturnType<typeof composeApiIdempotency>) {
+async function composeGatewayWith(idempotency: ReturnType<typeof composeApiIdempotency>) {
   const receipts = testReceiptStore();
   return {
     receipts,
-    gateway: composeApiGateway({
+    gateway: await composeApiGateway({
       prisma: receipts as unknown as PrismaClient,
       authz: { hasPermission: async () => true } as unknown as AuthzService,
       projects: new TestProjectApi(),
-      evaluators: {} as unknown as EvaluatorApi,
+      evaluators: createApiFixture<EvaluatorApi>(),
       monitors: {} as unknown as MonitorService,
       clickhouse: null,
       virtualKeyPepper: undefined,
@@ -131,7 +132,7 @@ describe("the gateway application's Idempotency-Key runner", () => {
     /** @scenario "Retrying a create with the same key replays the first response" */
     it("executes a keyed create once and replays its stored answer", async () => {
       const receipts = testReceiptStore();
-      const { gateway } = composeGatewayWith(composeLedgerOver(receipts));
+      const { gateway } = await composeGatewayWith(composeLedgerOver(receipts));
       const create = vi.fn(async () =>
         Response.json({ id: "vk_1", secret: "shown once" }, { status: 201 }),
       );
@@ -161,7 +162,7 @@ describe("the gateway application's Idempotency-Key runner", () => {
 
     it("writes the stored response as ciphertext rather than as readable JSON", async () => {
       const receipts = testReceiptStore();
-      const { gateway } = composeGatewayWith(composeLedgerOver(receipts));
+      const { gateway } = await composeGatewayWith(composeLedgerOver(receipts));
 
       await gateway.app.idempotency({
         operation: "gateway.v1.virtual-keys.create",
@@ -181,7 +182,7 @@ describe("the gateway application's Idempotency-Key runner", () => {
     /** @scenario "A retry sent while the original is still running is refused" */
     it("refuses a concurrent retry under the same key rather than creating twice", async () => {
       const receipts = testReceiptStore();
-      const { gateway } = composeGatewayWith(composeLedgerOver(receipts));
+      const { gateway } = await composeGatewayWith(composeLedgerOver(receipts));
       let runs = 0;
       let release: (() => void) | undefined;
       const held = new Promise<void>((resolve) => {
@@ -222,7 +223,7 @@ describe("the gateway application's Idempotency-Key runner", () => {
 
   describe("given a process that composed no receipt ledger", () => {
     it("refuses a keyed create by name rather than executing it unguarded", async () => {
-      const { gateway } = composeGatewayWith(undefined);
+      const { gateway } = await composeGatewayWith(undefined);
       const create = vi.fn(async () => Response.json({ id: "vk_1" }, { status: 201 }));
 
       const refusal = await refusalFrom(() =>
@@ -239,7 +240,7 @@ describe("the gateway application's Idempotency-Key runner", () => {
       expect(create).not.toHaveBeenCalled();
     });
 
-    it("is not composed when the process holds a database but no cipher", () => {
+    it("is not composed when the process holds a database but no cipher", async () => {
       expect(
         composeApiIdempotency({
           database: testReceiptStore() as unknown as PrismaClient,

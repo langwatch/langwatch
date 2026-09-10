@@ -2,6 +2,7 @@
  * @vitest-environment node
  * Scope-aware RBAC for the personal-VK path, over real Postgres.
  */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
   EventingAuthzCommandDispatcherAdapter,
@@ -12,7 +13,7 @@ import {
   AppPersonalVirtualKeyIssuerPort,
   type GovernanceVirtualKeyPort,
 } from "@langwatch/enterprise-api";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import {
   GovernanceApp,
   PersonalVirtualKeyTrpcApi,
@@ -82,14 +83,14 @@ const GATEWAY_BASE_URL = "https://gateway.test";
 
 /**
  * The personal-key half of the Governance capability, and a refusal for every
- * other. `GovernanceService` is one object over fifteen surfaces; a suite that
+ * other. `GovernanceApi` is one object over fifteen surfaces; a suite that
  * reaches a second one from a personal-key call has found a bug, and says so.
  */
 function governanceServiceFor(personalKeys: {
-  list: GovernanceService["personalVirtualKeyList"];
-  issue: GovernanceService["personalVirtualKeyIssue"];
-}): GovernanceService {
-  return new Proxy({} as GovernanceService, {
+  list: GovernanceApi["personalVirtualKeyList"];
+  issue: GovernanceApi["personalVirtualKeyIssue"];
+}): GovernanceApi {
+  return new Proxy({} as GovernanceApi, {
     get(_target, property) {
       if (property === "personalVirtualKeyList") return personalKeys.list;
       if (property === "personalVirtualKeyIssue") return personalKeys.issue;
@@ -102,7 +103,7 @@ function governanceServiceFor(personalKeys: {
 }
 
 /** The governance application this process would compose, over real Postgres. */
-function buildGovernanceApp(): GovernanceApp {
+async function buildGovernanceApp(): Promise<GovernanceApp> {
   const bindingIds = KsuidAuthzBindingIdAdapter.create();
   const authz = PostgresAuthzAdapter.create({
     database: prisma,
@@ -130,11 +131,11 @@ function buildGovernanceApp(): GovernanceApp {
     organizations,
   });
 
-  const gateway = composeApiGateway({
+  const gateway = await composeApiGateway({
     prisma,
     authz: authz.authz,
     projects,
-    evaluators: {} as unknown as EvaluatorApi,
+    evaluators: createApiFixture<EvaluatorApi>(),
     monitors: {} as unknown as MonitorService,
     clickhouse: null,
     virtualKeyPepper: "test-virtual-key-pepper",
@@ -265,7 +266,7 @@ describe.skipIf(!databaseUrl)("personalVirtualKeys — scope-aware RBAC (real Po
   let mayaVk: string;
 
   beforeAll(async () => {
-    governanceApp = buildGovernanceApp();
+    governanceApp = await buildGovernanceApp();
     router = buildRouter();
 
     await prisma.organization.create({ data: { id: ORG_ID, name: ns, slug: ORG_ID } });

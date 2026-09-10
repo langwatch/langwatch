@@ -18,6 +18,7 @@
  * argument assertion.
  */
 // @vitest-environment node
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
@@ -66,13 +67,13 @@ function gatewayPrisma() {
   return { prisma: { virtualKey } as unknown as PrismaClient, findMany };
 }
 
-function composeGateway() {
+async function composeGateway() {
   const { prisma, findMany } = gatewayPrisma();
-  const composition = composeApiGateway({
+  const composition = await composeApiGateway({
     prisma,
     authz: { hasPermission: async () => true } as unknown as AuthzService,
     projects: new TestProjectApi(),
-    evaluators: {} as unknown as EvaluatorApi,
+    evaluators: createApiFixture<EvaluatorApi>(),
     monitors: {} as unknown as MonitorService,
     clickhouse: null,
     virtualKeyPepper: "test-virtual-key-pepper",
@@ -84,7 +85,7 @@ describe("given an API process that composed the gateway application", () => {
   describe("when a page of spend rows needs a label per key", () => {
     /** @scenario "Virtual key rows are read only through the gateway feature" */
     it("resolves the names through the gateway's own repository, fenced by the organization", async () => {
-      const { composition, findMany } = composeGateway();
+      const { composition, findMany } = await composeGateway();
 
       const names = await composition.app.resolveVirtualKeyNames({
         organizationId: ORGANIZATION_ID,
@@ -102,7 +103,7 @@ describe("given an API process that composed the gateway application", () => {
     });
 
     it("asks the table nothing when the page named no keys", async () => {
-      const { composition, findMany } = composeGateway();
+      const { composition, findMany } = await composeGateway();
 
       await expect(
         composition.app.resolveVirtualKeyNames({

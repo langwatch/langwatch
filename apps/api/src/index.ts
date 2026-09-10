@@ -54,10 +54,7 @@ export {
 } from "./features/entitlement/entitlement.composition.ts";
 export type { ComposedEntitlementFeature } from "./features/entitlement/entitlement.composition.types.ts";
 /** The studio's outbound dispatch and the agent test's own trace write. */
-export {
-  composeHttpProxyFeature,
-  refusingHttpProxyFeature,
-} from "./features/agent/http-proxy.composition.ts";
+export { composeHttpProxyFeature } from "./features/agent/http-proxy.composition.ts";
 export type { ComposedHttpProxyFeature } from "./features/agent/http-proxy.composition.types.ts";
 /** The model providers a tenant attaches, and the cost rules they are priced by. */
 export {
@@ -73,11 +70,11 @@ export type {
 } from "./features/dashboard/dashboard.composition.ts";
 export type { ComposedDashboardFeature } from "./features/dashboard/dashboard.composition.types.ts";
 /**
- * The AI Gateway, composed as its own feature: one application for its six
+ * The AI Gateway, installed as its own feature: one application for its six
  * tRPC namespaces, its `ctx.app` slice and its two REST families.
  */
 export {
-  composeGatewayFeature,
+  installApiGateway,
   type GatewayFeatureOptions,
   type GatewayPeers,
 } from "./features/gateway/gateway.composition.ts";

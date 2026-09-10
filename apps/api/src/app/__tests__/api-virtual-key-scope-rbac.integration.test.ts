@@ -3,6 +3,7 @@
  * Scope-aware RBAC for the VirtualKey write paths, over real Postgres.
  * Spec: specs/ai-gateway/governance/vk-scope-rbac.feature
  */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
   EventingAuthzCommandDispatcherAdapter,
@@ -10,10 +11,8 @@ import {
   PostgresAuthzAdapter,
 } from "@langwatch/authz-server";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import {
-  VirtualKeyTrpcApi,
-  type VirtualKeyTrpcContext,
-} from "@langwatch/gateway-server/api-trpc/virtual-key";
+import { bindTrpcFact, createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";
+import { gatewaySessionFact, virtualKeyTrpcTransport } from "@langwatch/gateway-server";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import {
@@ -58,6 +57,37 @@ const prisma = connection?.client as PrismaClient;
 
 type Caller = ReturnType<ReturnType<typeof buildRouter>["createCaller"]>;
 
+/** The one signed-in person a call arrives as, as this suite supplies them. */
+type VirtualKeyTestContext = { actor: { id: string }; session: { user: { id: string } } };
+
+/**
+ * Every process port the mounted declaration runs on. Authorization always
+ * permits here: what this suite proves is the per-scope check the APPLICATION
+ * makes, so a declared permission standing in front of it would hide it.
+ */
+function testPorts(): TrpcRuntimePorts<VirtualKeyTestContext> {
+  return {
+    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
+    authorization: {
+      forRequest: () => ({
+        getDecision: async () => ({ permitted: true, organizationRole: null }),
+        getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+        checkScopeLineage: async () => ({ kind: "consistent" }),
+      }),
+    },
+    denials: {
+      membershipDisabled: () => new Error("membership disabled"),
+      liteMemberRestricted: () => new Error("lite member"),
+    },
+    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
+    errors: {
+      report: () => {},
+      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
+      translate: () => undefined,
+    },
+  };
+}
+
 /** The real permission cascade, over the same rows the fixture seeds. */
 function buildAuthz(): AuthzService {
   const bindingIds = KsuidAuthzBindingIdAdapter.create();
@@ -73,7 +103,7 @@ function buildAuthz(): AuthzService {
 }
 
 /** The gateway application this process composes, wired to real Postgres. */
-function buildGateway() {
+async function buildGateway() {
   const projects = createPrismaProjectApi({
     database: prisma,
     credentials: ProjectCredentialsAdapter.create(),
@@ -85,11 +115,11 @@ function buildGateway() {
     } as unknown as OrganizationService,
   });
 
-  return composeApiGateway({
+  return await composeApiGateway({
     prisma,
     authz: buildAuthz(),
     projects,
-    evaluators: {} as unknown as EvaluatorApi,
+    evaluators: createApiFixture<EvaluatorApi>(),
     monitors: {} as unknown as MonitorService,
     clickhouse: null,
     virtualKeyPepper: "test-virtual-key-pepper",
@@ -99,17 +129,16 @@ function buildGateway() {
 /**
  * The `virtualKeys.*` router on a bare root.
  */
-function buildRouter(gateway: ReturnType<typeof buildGateway>) {
-  const trpc = initTRPC.context<VirtualKeyTrpcContext>().create();
-  return VirtualKeyTrpcApi.create(
-    trpc,
-    {
-      protected: trpc.procedure,
-      resolverAuthorizedPolicy: () => (procedure) => procedure,
-      validateOutput: true,
-    },
-    gateway.app.schemas,
-  );
+function buildRouter(gateway: Awaited<ReturnType<typeof buildGateway>>) {
+  const trpc = initTRPC.context<VirtualKeyTestContext>().create();
+
+  return createTrpcRuntime<VirtualKeyTestContext>({
+    root: trpc,
+    procedure: trpc.procedure,
+    ports: testPorts(),
+  }).mount(virtualKeyTrpcTransport, () => gateway.app, {
+    facts: [bindTrpcFact(gatewaySessionFact, (ctx) => ctx.session)],
+  });
 }
 
 describe.skipIf(!databaseUrl)("virtualKeys — scope-aware RBAC (real Postgres)", () => {
@@ -121,14 +150,13 @@ describe.skipIf(!databaseUrl)("virtualKeys — scope-aware RBAC (real Postgres)"
   const PROJECT_ML_PROD = `proj-mlprod-${ns}`;
   const OWNER_ID = `usr-owner-${ns}`;
 
-  let gateway: ReturnType<typeof buildGateway>;
+  let gateway: Awaited<ReturnType<typeof buildGateway>>;
   let router: ReturnType<typeof buildRouter>;
   let seq = 0;
 
   function callerFor(uid: string): Caller {
     return router.createCaller({
-      app: { gateway: gateway.app },
-      actor: () => ({ id: uid }),
+      actor: { id: uid },
       session: { user: { id: uid } },
     });
   }
@@ -220,7 +248,7 @@ describe.skipIf(!databaseUrl)("virtualKeys — scope-aware RBAC (real Postgres)"
   }
 
   beforeAll(async () => {
-    gateway = buildGateway();
+    gateway = await buildGateway();
     router = buildRouter(gateway);
 
     await prisma.organization.create({ data: { id: ORG_ID, name: ns, slug: ORG_ID } });

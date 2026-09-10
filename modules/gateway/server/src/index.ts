@@ -3,6 +3,11 @@ export { gatewayServer } from "./gateway.server.ts";
 export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
+export { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
+export {
+  gatewaySessionFact,
+  virtualKeyTrpcTransport,
+} from "./transport/virtual-key.trpc.ts";
 export {
   PrismaGatewayAdapter,
   type GatewayPersistence,
@@ -89,7 +94,6 @@ export { PrismaGatewayInternalStoreAdapter } from "./adapters/postgres.gateway-i
  */
 export { VirtualKeyService } from "./services/virtual-key.service.ts";
 export {
-  virtualKeyBudgetInputSchema,
   type CreateVirtualKeyInput,
   type CreatedVirtualKey,
 } from "./services/virtual-key-validation.service.ts";

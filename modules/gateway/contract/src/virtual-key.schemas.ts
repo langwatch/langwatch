@@ -59,41 +59,61 @@ export const virtualKeyApiApplicableBudgetsInputSchema = z.object({
   principalUserId: z.string().nullable().optional(),
 });
 
-/** Minting a key. `budgetInput` is the process's canonical budget parser. */
-export function virtualKeyApiCreateInputSchema<TBudget>(budgetInput: z.ZodType<TBudget>) {
-  return z.object({
-    organizationId: z.string(),
-    name: z.string().min(1).max(128),
-    description: z.string().optional(),
-    principalUserId: z.string().nullable().optional(),
-    scopes: z.array(virtualKeyApiScopeAssignmentSchema).min(1),
-    traceProjectId: z.string().nullable().optional(),
-    routingPolicyId: z.string().nullable().optional(),
-    routingMode: virtualKeyApiRoutingModeSchema.optional(),
-    /** When the key stops serving. Omit it and the key never expires. */
-    expiresAt: z.coerce.date().optional(),
-    budget: budgetInput.nullable().optional(),
-    config: virtualKeyConfigSchema.partial().optional(),
-  });
-}
+/**
+ * The budget a key carries on itself, created in the same transaction as the
+ * key. `null` on update removes the cap by archiving. One parser, shared by
+ * tRPC and REST, so the decimal regex and the positive-amount refinement
+ * cannot drift into two answers.
+ */
+export const virtualKeyBudgetInputSchema = z.object({
+  // A decimal number of dollars, strictly positive. String rather
+  // than number to survive JSON round-trips without float drift; the
+  // regex rejects partial parses ("10abs"), signs, and bare dots.
+  limitUsd: z
+    .string()
+    .trim()
+    .regex(/^\d+(\.\d+)?$/, "limitUsd must be a decimal number")
+    .refine((v) => Number.parseFloat(v) > 0, {
+      message: "limitUsd must be greater than zero",
+    }),
+  window: z.enum(["DAY", "WEEK", "MONTH"]),
+  onBreach: z.enum(["BLOCK", "WARN"]).optional(),
+  name: z.string().min(1).max(128).optional(),
+});
 
-/** Editing a key. `budgetInput` is the process's canonical budget parser. */
-export function virtualKeyApiUpdateInputSchema<TBudget>(budgetInput: z.ZodType<TBudget>) {
-  return z.object({
-    organizationId: z.string(),
-    id: z.string(),
-    name: z.string().min(1).max(128).optional(),
-    description: z.string().nullable().optional(),
-    scopes: z.array(virtualKeyApiScopeAssignmentSchema).min(1).optional(),
-    traceProjectId: z.string().nullable().optional(),
-    routingPolicyId: z.string().nullable().optional(),
-    routingMode: virtualKeyApiRoutingModeSchema.optional(),
-    /** Omitted leaves it alone; null clears it; a date moves it. */
-    expiresAt: z.coerce.date().nullable().optional(),
-    budget: budgetInput.nullable().optional(),
-    config: virtualKeyConfigSchema.partial().optional(),
-  });
-}
+export type VirtualKeyBudgetInput = z.infer<typeof virtualKeyBudgetInputSchema>;
+
+/** Minting a key, over the one canonical budget parser above. */
+export const virtualKeyApiCreateInputSchema = z.object({
+  organizationId: z.string(),
+  name: z.string().min(1).max(128),
+  description: z.string().optional(),
+  principalUserId: z.string().nullable().optional(),
+  scopes: z.array(virtualKeyApiScopeAssignmentSchema).min(1),
+  traceProjectId: z.string().nullable().optional(),
+  routingPolicyId: z.string().nullable().optional(),
+  routingMode: virtualKeyApiRoutingModeSchema.optional(),
+  /** When the key stops serving. Omit it and the key never expires. */
+  expiresAt: z.coerce.date().optional(),
+  budget: virtualKeyBudgetInputSchema.nullable().optional(),
+  config: virtualKeyConfigSchema.partial().optional(),
+});
+
+/** Editing a key, over the same parser. */
+export const virtualKeyApiUpdateInputSchema = z.object({
+  organizationId: z.string(),
+  id: z.string(),
+  name: z.string().min(1).max(128).optional(),
+  description: z.string().nullable().optional(),
+  scopes: z.array(virtualKeyApiScopeAssignmentSchema).min(1).optional(),
+  traceProjectId: z.string().nullable().optional(),
+  routingPolicyId: z.string().nullable().optional(),
+  routingMode: virtualKeyApiRoutingModeSchema.optional(),
+  /** Omitted leaves it alone; null clears it; a date moves it. */
+  expiresAt: z.coerce.date().nullable().optional(),
+  budget: virtualKeyBudgetInputSchema.nullable().optional(),
+  config: virtualKeyConfigSchema.partial().optional(),
+});
 
 export type VirtualKeyApiRoutingMode = z.infer<typeof virtualKeyApiRoutingModeSchema>;
 export type VirtualKeyApiScopeAssignment = z.infer<typeof virtualKeyApiScopeAssignmentSchema>;

@@ -2,6 +2,7 @@
  * The gateway feature's application: the one typed thing every door is given, replacing seven previously-separate bags (six private Gateway*Application types plus GatewayPlatformRestPorts) that named the same members differently or with different signatures. Virtual-key WRITE pre-flight, run identically by every door, lives here as behaviour rather than duplicated thirteen times. A caller arrives as {@link GatewayActor}, an argument rather than read from session/request, so one check serves both a browser session and an API key. Budget row shapes moved to @langwatch/gateway-contract ({@link GatewayApplicableBudget}, {@link GatewayVirtualKeyDirectBudget}) since a generic type parameter never actually reached the browser — every tRPC transport declared `app` with no type arguments, so it always typed against `unknown`.
  */
 import type { Instant } from "@langwatch/time";
+import type { GatewayVirtualKeyScope, VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { IdempotentRunner } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -35,10 +36,7 @@ import type {
 } from "../adapters/gateway-virtual-key-dto.adapter.ts";
 import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
 import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port.ts";
-import type {
-  GatewayVirtualKeyScope,
-  VirtualKeyWithScopes,
-} from "../ports/gateway-virtual-key.port.ts";
+
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
 
@@ -533,7 +531,7 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.spendEvents;
   }
 
-  tryGetVirtualKeyById(id: string, organizationId: string) {
+  findVirtualKeyById(id: string, organizationId: string) {
     return this.#dependencies.virtualKeys.tryGetById(id, organizationId);
   }
 

@@ -43,16 +43,10 @@ export const ABSENT_API_TRPC_NAMESPACES = [
     consequence: "the experiment workbench lists nothing",
   },
   {
-    namespace: "virtualKeys",
-    module: "gateway",
-    consequence: "no gateway key is listed or minted",
-  },
-  {
     namespace: "gatewaySpendEvents",
     module: "gateway",
     consequence: "no gateway spend event is readable",
   },
-  { namespace: "gatewayUsage", module: "gateway", consequence: "no gateway usage rolls up" },
   {
     namespace: "governance",
     module: "enterprise-governance",

@@ -109,6 +109,8 @@ export function createAppTrpcFeatures(options: {
     gatewayBudgets: gatewayRouters.gatewayBudgets,
     gatewayCacheRules: gatewayRouters.gatewayCacheRules,
     gatewayGuardrails: gatewayRouters.gatewayGuardrails,
+    gatewayUsage: gatewayRouters.gatewayUsage,
+    virtualKeys: gatewayRouters.virtualKeys,
     // The GitHub App an organization connected, and the pull requests its
     // coding agents opened.
     github: composeGithubTrpcRouter({ mount, infrastructure }),

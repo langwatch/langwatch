@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import {
   GatewayGuardrailProjectMismatchError,
   GatewayScopeOrgMismatchError,
@@ -9,7 +10,7 @@ import {
 import type { GatewayScopePermissionsPort } from "../ports/gateway-scope-permissions.port.ts";
 import type { GuardrailAttachment } from "@langwatch/gateway-contract";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
-import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
+
 import type { VirtualKeyService } from "./virtual-key.service.ts";
 
 /**

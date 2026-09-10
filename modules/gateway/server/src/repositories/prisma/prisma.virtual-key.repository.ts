@@ -2,6 +2,7 @@
  * Data-access for VirtualKey. Post-collapse model: organization-scoped + reachable from N (scopeType, scopeId) entries in VirtualKeyScope. dbMultiTenancyProtection enforces every where-clause carries organizationId, a row id, a hashedSecret, or a scopes:{some:{...}} predicate.
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "@langwatch/gateway-contract";
 import { fromDate, type Instant, toDate } from "@langwatch/time";
 import { identityPatchData } from "@langwatch/gateway-contract";
 import { z } from "zod";
@@ -10,8 +11,6 @@ import { gatewayRoutingPolicySelect } from "../../ports/gateway-virtual-key.port
 import {
   GatewayVirtualKeysPort,
   type CreateGatewayVirtualKeyInput,
-  type GatewayVirtualKeyRecord,
-  type GatewayVirtualKeyScope,
   type SetGatewayVirtualKeyDisabledInput,
   type UpdateGatewayVirtualKeyInput,
 } from "../../ports/gateway-virtual-key.port.ts";

@@ -11,6 +11,7 @@ import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-tr
 import type { ApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators.ts";
 import type { ApiTrpcFeatureApplicationSlices } from "../api-trpc-features.composition.ts";
 import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mount.ts";
+import type { ComposedGatewayFeature } from "../../features/gateway/gateway.composition.types.ts";
 import { refusingLangyFeature } from "../../features/langy/langy.composition.ts";
 import type { ComposedOpsFeature } from "../../features/ops/ops.composition.types.ts";
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition.ts";
@@ -25,7 +26,8 @@ import type { ComposedDataRetentionFeature } from "../../features/data-retention
 import { createMonitorTrpcRouter } from "../../features/monitor/monitor-trpc.mount.ts";
 import { refusingHomeFeature } from "../../features/project/home.composition.ts";
 import { createRoleBindingTrpcRouter, createRoleTrpcRouter } from "../../features/role/role-trpc.mount.ts";
-import { refusingScenarioFeature } from "../../features/scenario/scenario.composition.ts";
+import { scenarioTrpcTransport } from "@langwatch/scenario-server";
+import type { ComposedScenarioFeature } from "../../features/scenario/scenario.composition.types.ts";
 import { createStoredObjectTrpcRouter } from "../../features/stored-object/stored-object-trpc.mount.ts";
 import { refusingAnnotationFeature } from "../../features/annotation/annotation-absence.ts";
 import {
@@ -40,7 +42,7 @@ import {
   createUsageLimitsTrpcRouter,
 } from "../../features/entitlement/entitlement-trpc.mount.ts";
 import type { ComposedEntitlementFeature } from "../../features/entitlement/entitlement.composition.types.ts";
-import { refusingHttpProxyFeature } from "../../features/agent/http-proxy.composition.ts";
+import { composeHttpProxyFeature } from "../../features/agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../features/model-provider/model-provider.composition.ts";
 import {
   createPinnedTraceTrpcRouter,
@@ -362,16 +364,55 @@ export function stubOpsFeature(): ComposedOpsFeature {
   return { app: stub("app.ops") };
 }
 
+/**
+ * The gateway on a suite that installed no application: the namespaces mount
+ * on the real declarations and every call refuses, which is what the record
+ * and the declaration sweep read.
+ */
+export function stubGatewayFeature(): ComposedGatewayFeature {
+  return {
+    app: stub("app.gateway", { schemas: { virtualKeyBudgetInput: anySchema } }),
+    composition: undefined,
+    routers: (mount) => createGatewayTrpcRouters(mount.runtime),
+  };
+}
+
+/**
+ * The scenario half on a process that composed no graph for it: every call
+ * refuses by name. The composition itself no longer publishes a refusing twin -
+ * a real process throws at compose time - so the doubles that stand in for one
+ * build it here.
+ */
+export function stubScenarioFeature(): ComposedScenarioFeature {
+  const refuse = <T>(capability: string): T =>
+    new Proxy(
+      {},
+      {
+        get: () => (): never => {
+          throw new Error(`${capability} is not available on this deployment`);
+        },
+        has: () => true,
+      },
+    ) as T;
+
+  return {
+    scenarios: refuse("The scenario surface"),
+    scenarioService: refuse("The scenario store"),
+    scenarioTabs: refuse("The scenario tab registry"),
+    simulations: refuse("The simulation run store"),
+    suites: refuse("The suite surface"),
+    routers: (mount) => ({
+      scenarios: mount.runtime.mount(scenarioTrpcTransport, (ctx) => ctx.app.scenarios),
+    }),
+  };
+}
+
 export function stubComposedFeatures(): ComposedApiFeatures {
   return {
-    gateway: {
-      app: stub("app.gateway", { schemas: { virtualKeyBudgetInput: anySchema } }),
-      composition: undefined,
-      routers: (mount) => createGatewayTrpcRouters(mount.runtime),
-    },
+    gateway: stubGatewayFeature(),
     langy: refusingLangyFeature(),
     ops: stubOpsFeature(),
-    scenario: refusingScenarioFeature(),
+    scenario: stubScenarioFeature(),
     analytics: refusingAnalyticsFeature(),
     featureFlag: stubFeatureFlagFeature(),
     dataset: refusingDatasetFeature(),
@@ -388,7 +429,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     annotation: refusingAnnotationFeature(),
     dashboard: stubDashboardFeature(),
     entitlement: stubEntitlementFeature(),
-    httpProxy: refusingHttpProxyFeature(),
+    httpProxy: composeHttpProxyFeature(),
     modelProvider: refusingModelProviderFeature(),
     share: stubShareFeature(),
     topic: stubTopicFeature(),
