@@ -240,6 +240,32 @@ test_enabled_with_https_port_public_base_url_renders() {
   echo "ok   [https publicBaseUrl with port] renders with VOICE_PUBLIC_BASE_URL=https://voice.example.com:8443"
 }
 
+# @scenario "The voice worker refuses a public address whose port is out of range"
+test_enabled_with_out_of_range_port_public_base_url_refuses() {
+  local out
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com:65536"); then
+    fail "out-of-range port publicBaseUrl" "chart rendered when voice.publicBaseUrl used port 65536"
+    return
+  fi
+  case "$out" in
+    *"must be an https origin only"*)
+      echo "ok   [out-of-range port publicBaseUrl] refused with the expected message for port 65536" ;;
+    *)
+      fail "out-of-range port publicBaseUrl" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+  esac
+
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com:0"); then
+    fail "out-of-range port publicBaseUrl" "chart rendered when voice.publicBaseUrl used port 0"
+    return
+  fi
+  case "$out" in
+    *"must be an https origin only"*)
+      echo "ok   [out-of-range port publicBaseUrl] refused with the expected message for port 0" ;;
+    *)
+      fail "out-of-range port publicBaseUrl" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+  esac
+}
+
 # @scenario "The voice worker refuses a public address that includes a path"
 test_enabled_with_path_public_base_url_refuses() {
   local out
@@ -321,6 +347,7 @@ test_enabled_without_public_base_url_refuses
 test_enabled_with_http_public_base_url_refuses
 test_enabled_with_https_public_base_url_renders
 test_enabled_with_https_port_public_base_url_renders
+test_enabled_with_out_of_range_port_public_base_url_refuses
 test_enabled_with_path_public_base_url_refuses
 test_enabled_with_query_public_base_url_refuses
 test_enabled_with_trailing_slash_public_base_url_refuses

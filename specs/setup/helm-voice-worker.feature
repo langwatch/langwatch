@@ -100,6 +100,12 @@ Feature: The voice worker is opt-in and cannot render half-configured
       Then the voice worker comes up with that public address, port included, configured
 
     @e2e
+    Scenario: The voice worker refuses a public address whose port is out of range
+      Given the voice worker is turned on with its public address set to an https:// origin whose port is 65536
+      When the chart renders
+      Then the install is refused, naming the invalid public address
+
+    @e2e
     Scenario: The voice worker refuses a public address that includes a path
       Given the voice worker is turned on with its public address set to an https:// origin that includes a path
       When the chart renders

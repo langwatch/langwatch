@@ -2,8 +2,8 @@
 {{- if not .Values.voice.publicBaseUrl }}
 {{- fail "voice.publicBaseUrl is required when voice.enabled is true, Media Streams connects inbound to this URL, and the worker refuses to start without it. Set it to the public https:// origin fronting the voice Service/Ingress." }}
 {{- end }}
-{{- if not (regexMatch "^https://[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*(:[0-9]{1,5})?$" .Values.voice.publicBaseUrl) }}
-{{- fail (printf "voice.publicBaseUrl (%q) must be an https origin only: scheme, hostname, optional port, no path or query, for example https://voice.example.com." .Values.voice.publicBaseUrl) }}
+{{- if not (regexMatch "^https://[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$" .Values.voice.publicBaseUrl) }}
+{{- fail (printf "voice.publicBaseUrl (%q) must be an https origin only: scheme, hostname, optional port 1-65535, no path or query, for example https://voice.example.com." .Values.voice.publicBaseUrl) }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
