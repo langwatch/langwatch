@@ -50,7 +50,7 @@ function redisChannel(eventType: BroadcastEventType): string {
  * available, uses Redis pub/sub for high availability across multiple server instances. If no
  * redis, it will not orchestrate but send directly.
  */
-export class BroadcastAdapter extends PresenceBroadcastPort implements PresenceEmitterPort {
+export class RedisBroadcastRepository extends PresenceBroadcastPort implements PresenceEmitterPort {
   private static readonly DRAIN_DELAY_MS = 2000;
 
   private eventEmitters = new Map<string, EventEmitter>();
@@ -64,8 +64,8 @@ export class BroadcastAdapter extends PresenceBroadcastPort implements PresenceE
   private readonly subscriberRateLimiter = new BroadcastTenantRateLimiterAdapter();
   private closed = false;
 
-  static create(redis: Cluster | IORedis | null): BroadcastAdapter {
-    return new BroadcastAdapter(redis);
+  static create(redis: Cluster | IORedis | null): RedisBroadcastRepository {
+    return new RedisBroadcastRepository(redis);
   }
 
   private constructor(private readonly redis: Cluster | IORedis | null) {
@@ -324,7 +324,7 @@ export class BroadcastAdapter extends PresenceBroadcastPort implements PresenceE
     this.active = false;
 
     // Allow in-flight Redis publishes to drain
-    await new Promise((resolve) => setTimeout(resolve, BroadcastAdapter.DRAIN_DELAY_MS));
+    await new Promise((resolve) => setTimeout(resolve, RedisBroadcastRepository.DRAIN_DELAY_MS));
 
     if (!this.subscriber) return;
 
