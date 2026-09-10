@@ -36,6 +36,8 @@ export type RestTransportDocs = Readonly<{
   readonly description?: string;
   /** The groups the operation is filed under in the published reference. */
   readonly tags?: readonly string[];
+  /** Kept out of the published document: an alias or a compatibility path. */
+  readonly hide?: boolean;
   /**
    * The answers the operation documents beyond its declared success, built by
    * `documentedResponses`. Merged over the generated success block.
@@ -88,6 +90,8 @@ export function restRouteDocumentation({
   if (route.docs?.summary !== undefined) options.summary = route.docs.summary;
 
   if (route.docs?.tags !== undefined) options.tags = [...route.docs.tags];
+
+  if (route.docs?.hide) options.hide = true;
 
   const requestBody = publishedRequestBody(route);
 

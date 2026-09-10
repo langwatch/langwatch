@@ -22,6 +22,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ApiPackagedRestCollaborators } from "../api-rest.packaged-services.ts";
 import type { ApiRestFamilyName } from "../api-rest.doors.ts";
 import { openTestRestDoors } from "./support/rest-doors.harness.ts";
+import { TEST_PROJECT } from "./support/rest-family.harness.ts";
 import { createApiDualCredentialAuth } from "../../app/api-dual-credential-auth.ts";
 import { createApiTrackedEventPorts } from "../../features/trace/tracked-event-ports.adapter.ts";
 /** Every base path the packaged list can claim, and the family that owns it. */
@@ -409,9 +410,20 @@ function mount(collaborators: ApiPackagedRestCollaborators, report?: MountReport
   for (const app of openTestRestDoors({
     packaged: collaborators,
     ports: {
-      handlerManagedCredential: () => {
-        throw new Error("These families authenticate through the framework chain.");
-      },
+      handlerManagedCredential: async () => ({
+        ok: true as const,
+        project: TEST_PROJECT,
+        resolved: {
+          type: "apiKey" as const,
+          apiKeyId: "key-1",
+          userId: null,
+          organizationId: TEST_PROJECT.organizationId,
+          ingestSourceType: null,
+          ingestionTemplateId: null,
+          project: TEST_PROJECT,
+        },
+        markUsed: () => undefined,
+      }),
       rateLimit: async () => ({ allowed: true }),
     },
     ...(report ? { absence: report } : {}),

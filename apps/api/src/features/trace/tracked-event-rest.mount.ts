@@ -33,7 +33,7 @@ export function mountTrackedEventRest(
   const canonical = runtime.mount(trackedEventRest.router(), options.ports, { onError });
   const alias = runtime.mount(
     trackedEventLegacyPathRest.router(),
-    (): TrackedEventLegacyPathApi => ({ forward: (request) => canonical.fetch(request) }),
+    (): TrackedEventLegacyPathApi => ({ forward: async (request) => canonical.fetch(request) }),
     { onError },
   );
 
