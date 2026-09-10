@@ -363,19 +363,11 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "trace|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "trace|refusing-composition",
       "measured": "2026-09-08"
     },
     {
       "key": "trace|testing-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "trace|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {

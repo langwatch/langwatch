@@ -36,6 +36,12 @@ export const traceDependencies = {
 
 export type TraceInfrastructure = Readonly<{
   trace: Readonly<{
+    /**
+     * Still passed by the worker's own infrastructure factory and read by
+     * nothing here: the reviewer correction now comes from the repository
+     * registry. Removing it is a one-line change in
+     * apps/worker/src/app/worker-trace-app.composition.ts.
+     */
     connection: PrismaConnection;
     resolveClickHouseClient: (tenantId: string) => Promise<ClickHouseClient>;
     defaultRetentionDays: number;

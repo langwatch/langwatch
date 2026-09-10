@@ -2,7 +2,14 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
 import { TraceAnalyticsClickHouseRepository } from "../clickhouse/trace-metrics-analytics.repository.ts";
 import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
-import { TraceSummaryProjectionClickHouseRepository } from "../clickhouse/trace-summary.repository.ts";
+import {
+  TraceSummaryClickHouseRepository,
+  TraceSummaryProjectionClickHouseRepository,
+} from "../clickhouse/trace-summary.repository.ts";
+import { ClickHouseTraceExistenceRepository } from "../clickhouse/trace-existence.repository.ts";
+import { LogRecordStorageClickHouseRepository } from "../clickhouse/log-record-storage.repository.ts";
+import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repository.ts";
+import { TraceDerivationSpanClickHouseRepository } from "../clickhouse/trace-derivation-span.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
 import { PrismaTraceEditOverlayRepository } from "./prisma.trace-edit-overlay.repository.ts";
 
@@ -32,6 +39,15 @@ export class PostgresTraceRepositories {
       summaryProjection: TraceSummaryProjectionClickHouseRepository.create(storage),
       analyticsProjection: TraceAnalyticsClickHouseRepository.create(storage),
       analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create(storage),
+      spanStorage: SpanStorageClickHouseRepository.create(infrastructure.clickhouse),
+      existence: ClickHouseTraceExistenceRepository.create({
+        resolveClient: infrastructure.clickhouse,
+      }),
+      derivationSpans: TraceDerivationSpanClickHouseRepository.create({
+        resolveClient: infrastructure.clickhouse,
+      }),
+      summary: TraceSummaryClickHouseRepository.create(storage),
+      logRecords: LogRecordStorageClickHouseRepository.create(infrastructure.clickhouse),
     };
   }
 }

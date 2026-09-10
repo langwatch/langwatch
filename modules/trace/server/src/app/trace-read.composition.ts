@@ -5,7 +5,6 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { LogApi } from "@langwatch/log-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
@@ -16,15 +15,11 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { TraceTreeComposition } from "./trace-tree.composition.ts";
-import { TraceDerivationSpanClickHouseRepository } from "../repositories/clickhouse/trace-derivation-span.repository.ts";
-import { ClickHouseTraceExistenceRepository } from "../repositories/clickhouse/trace-existence.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import { ClickHouseTraceEventPayloadRepository } from "../repositories/clickhouse/trace-event-payload.repository.ts";
-import { LogRecordStorageClickHouseRepository } from "../repositories/clickhouse/log-record-storage.repository.ts";
 import { LogRecordStorageService } from "../services/log/trace-log-record-read.service.ts";
 import { SessionGroupsClickHouseRepository } from "../repositories/clickhouse/session-groups.repository.ts";
 import { SessionGroupsService } from "../services/session/trace-session-groups.service.ts";
-import { SpanStorageClickHouseRepository } from "../repositories/clickhouse/span-storage.repository.ts";
 import { SpanStorageService } from "../services/offload/trace-span-storage-read.service.ts";
 import { TraceEditOverlayService } from "../services/edit-overlay/trace-edit-overlay.service.ts";
 import { TraceEventDerivationService } from "../services/ingestion/trace-event-derivation.service.ts";
@@ -38,7 +33,6 @@ import {
   TraceQueryFieldValuesPort,
   type TraceQueryFieldValuesInput,
 } from "../ports/query-field-values.port.ts";
-import { TraceSummaryClickHouseRepository } from "../repositories/clickhouse/trace-summary.repository.ts";
 import { TraceSummaryService } from "../services/read/trace-summary-read.service.ts";
 import {
   TraceViewerProtectionService,
@@ -49,10 +43,11 @@ import { type TraceAppDependencies } from "../app/trace.app.ts";
 import { type TraceBlobStoreService } from "../services/offload/trace-blob-store.service.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { type TraceProcessingCommands } from "../ports/trace-processing-installer.port.ts";
-import { PrismaTraceEditOverlayRepository } from "../repositories/prisma/prisma.trace-edit-overlay.repository.ts";
+import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 
 export type TraceReaderCompositionOptions = {
-  connection: PrismaConnection;
+  /** The rows the registry chose for this process, one tier over both stores. */
+  repositories: TraceRepositories;
   resolveClickHouseClient: (tenantId: string) => Promise<ClickHouseClient>;
   defaultRetentionDays: number;
   canonicalisation: TraceCanonicalisationService;
@@ -80,12 +75,10 @@ export function composeTraceAppDependencies(
   const resolve = options.resolveClickHouseClient;
   const ioExtractionService = TraceIOExtractionService.create(options.canonicalisation);
   const blobResolutionDeps = { blobStore: options.blobStore, ioExtractionService };
-  const spanStorageRepository = new SpanStorageClickHouseRepository(resolve);
-  const editOverlay = TraceEditOverlayService.create(
-    PrismaTraceEditOverlayRepository.create(options.connection.client),
-  );
+  const spanStorageRepository = options.repositories.spanStorage;
+  const editOverlay = TraceEditOverlayService.create(options.repositories.editOverlay);
   const logRecords = LogRecordStorageService.create({
-    repository: new LogRecordStorageClickHouseRepository(resolve),
+    repository: options.repositories.logRecords,
     canonical: options.logs,
   });
   const read = TraceLegacyReadService.create({
@@ -140,7 +133,7 @@ export function composeTraceAppDependencies(
       },
     },
     eventDerivation: TraceEventDerivationService.create({
-      spans: TraceDerivationSpanClickHouseRepository.create({ resolveClient: resolve }),
+      spans: options.repositories.derivationSpans,
     }),
     payloads: ClickHouseTraceEventPayloadRepository.createResolved({ resolveClient: resolve }),
     fullIo: TraceReadFullIo.create(ioExtractionService),
@@ -148,7 +141,7 @@ export function composeTraceAppDependencies(
 
   return {
     traces: {
-      existence: ClickHouseTraceExistenceRepository.create({ resolveClient: resolve }),
+      existence: options.repositories.existence,
       read,
       list,
       sessionGroups: SessionGroupsService.create({
@@ -158,10 +151,7 @@ export function composeTraceAppDependencies(
       }),
       spans: SpanStorageService.create({ repository: spanStorageRepository, blobResolutionDeps }),
       summary: TraceSummaryService.create({
-        repository: TraceSummaryClickHouseRepository.create({
-          resolveClient: resolve,
-          defaultRetentionDays: options.defaultRetentionDays,
-        }),
+        repository: options.repositories.summary,
         fullResolutionDeps: { spanStorageRepository, ...blobResolutionDeps },
       }),
       tree,

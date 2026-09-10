@@ -141,6 +141,11 @@ export async function createWorkerObservabilityApps(
   const runtime = await createApp({ name: "langwatch-worker-observability" })
     .withPersistence("postgres", {
       prisma: options.connection.client,
+      // The trace tier spans two stores that coexist: Postgres holds the
+      // reviewer correction, ClickHouse the projections the fold commits
+      // through, so both are required inputs of the one "postgres" tier.
+      clickhouse: options.resolveClickHouseClient,
+      defaultRetentionDays: options.config.retention.defaultDays,
       // The model-provider repositories are built over the deployment's own
       // cipher: the stored credential is a wire format shared between
       // processes, so it travels with the connection.

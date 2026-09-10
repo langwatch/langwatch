@@ -1,4 +1,5 @@
 import type { Protections, TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { on } from "node:events";
 import {
   TraceIngestionUnavailableError,
   recordCapturedSpanInputSchema,
@@ -75,6 +76,7 @@ import { ClaudeCodeLogEnrichmentService } from "../services/canonicalisers/codin
 import type { TraceService as TraceTreeService } from "../services/support/trace.service.ts";
 import { nowInstant } from "@langwatch/time";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { traceDependencies, type TraceInfrastructure } from "./trace-composition.types.ts";
 import { composeTraceAppDependencies } from "./trace-read.composition.ts";
 
@@ -370,13 +372,14 @@ export class TraceApp implements TraceApi {
   static create(
     input:
       | TraceAppDependencies
-      | FeatureSetup<typeof traceDependencies, TraceInfrastructure, undefined>,
+      | FeatureSetup<typeof traceDependencies, TraceInfrastructure, undefined, TraceRepositories>,
   ): TraceApp {
     const dependencies =
       "infrastructure" in input
         ? composeTraceAppDependencies({
             ...input.infrastructure.trace,
             ...input.dependencies,
+            repositories: input.repositories,
             protections: {
               authz: input.dependencies.authz,
               projects: input.dependencies.projects,
@@ -690,14 +693,22 @@ export class TraceApp implements TraceApi {
   // The process's broadcast fabric
   // -------------------------------------------------------------------------
 
-  /** The tenant's live-update emitter, for the duration of one subscription. */
-  getTenantEmitter(tenantId: string): NodeJS.EventEmitter {
-    return this.#dependencies.broadcast.getTenantEmitter(tenantId);
-  }
+  async *streamUpdates(input: {
+    projectId: string;
+    channel: "trace_updated" | "discover_updated";
+    signal?: unknown;
+  }): AsyncGenerator<unknown> {
+    const emitter = this.#dependencies.broadcast.getTenantEmitter(input.projectId);
 
-  /** Releases it when that subscription ends, however it ends. */
-  cleanupTenantEmitter(tenantId: string): void {
-    this.#dependencies.broadcast.cleanupTenantEmitter(tenantId);
+    try {
+      for await (const eventArgs of on(emitter, input.channel, {
+        signal: input.signal as AbortSignal | undefined,
+      })) {
+        yield eventArgs[0];
+      }
+    } finally {
+      this.#dependencies.broadcast.cleanupTenantEmitter(input.projectId);
+    }
   }
 
   // -------------------------------------------------------------------------
