@@ -196,8 +196,8 @@ jobs:
 
       # The voice worker is opt-in (langwatch/langwatch#8015): the default
       # install must render none of it, and enabling it must refuse to render
-      # without the two values it cannot work without (publicBaseUrl, the
-      # Twilio secret) — only visible in the rendered output.
+      # without the value it cannot work without (publicBaseUrl), only
+      # visible in the rendered output.
       - name: "assert the opt-in voice worker renders correctly"
         if: "!cancelled()"
         run: ./tests/voice-worker.sh
