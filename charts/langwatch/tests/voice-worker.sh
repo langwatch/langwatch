@@ -203,7 +203,7 @@ test_enabled_with_http_public_base_url_refuses() {
     return
   fi
   case "$out" in
-    *"must be an https:// URL with a hostname"*)
+    *"must be an https origin only"*)
       echo "ok   [http publicBaseUrl] refused with the expected message" ;;
     *)
       fail "http publicBaseUrl" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
@@ -225,6 +225,91 @@ test_enabled_with_https_public_base_url_renders() {
   echo "ok   [https publicBaseUrl] renders with VOICE_PUBLIC_BASE_URL=https://voice.example.com"
 }
 
+# @scenario "Turning on the voice worker with a valid https:// public address including a port renders"
+test_enabled_with_https_port_public_base_url_renders() {
+  local block
+  block=$(render_component "deployment.yaml" "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com:8443")
+  if [ -z "$block" ]; then
+    fail "https publicBaseUrl with port" "rendered no voice Deployment with a valid https:// voice.publicBaseUrl including a port"
+    return
+  fi
+  if ! printf '%s' "$block" | grep -A1 "name: VOICE_PUBLIC_BASE_URL" | grep -q 'value: "https://voice.example.com:8443"'; then
+    fail "https publicBaseUrl with port" "expected VOICE_PUBLIC_BASE_URL=https://voice.example.com:8443"
+    return
+  fi
+  echo "ok   [https publicBaseUrl with port] renders with VOICE_PUBLIC_BASE_URL=https://voice.example.com:8443"
+}
+
+# @scenario "The voice worker refuses a public address that includes a path"
+test_enabled_with_path_public_base_url_refuses() {
+  local out
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com/twilio"); then
+    fail "publicBaseUrl with path" "chart rendered when voice.publicBaseUrl included a path"
+    return
+  fi
+  case "$out" in
+    *"must be an https origin only"*)
+      echo "ok   [publicBaseUrl with path] refused with the expected message" ;;
+    *)
+      fail "publicBaseUrl with path" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+  esac
+}
+
+# @scenario "The voice worker refuses a public address that includes a query string"
+test_enabled_with_query_public_base_url_refuses() {
+  local out
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com?x=1"); then
+    fail "publicBaseUrl with query" "chart rendered when voice.publicBaseUrl included a query string"
+    return
+  fi
+  case "$out" in
+    *"must be an https origin only"*)
+      echo "ok   [publicBaseUrl with query] refused with the expected message" ;;
+    *)
+      fail "publicBaseUrl with query" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+  esac
+}
+
+# @scenario "The voice worker refuses a public address with a trailing slash"
+test_enabled_with_trailing_slash_public_base_url_refuses() {
+  local out
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com/"); then
+    fail "publicBaseUrl with trailing slash" "chart rendered when voice.publicBaseUrl had a trailing slash"
+    return
+  fi
+  case "$out" in
+    *"must be an https origin only"*)
+      echo "ok   [publicBaseUrl with trailing slash] refused with the expected message" ;;
+    *)
+      fail "publicBaseUrl with trailing slash" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+  esac
+}
+
+# @scenario "The voice worker refuses a public address with a malformed hostname"
+test_enabled_with_malformed_host_public_base_url_refuses() {
+  local out
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://"); then
+    fail "publicBaseUrl with no hostname" "chart rendered when voice.publicBaseUrl had no hostname"
+    return
+  fi
+  case "$out" in
+    *"must be an https origin only"*)
+      echo "ok   [publicBaseUrl with no hostname] refused with the expected message" ;;
+    *)
+      fail "publicBaseUrl with no hostname" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+  esac
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://-bad.example.com"); then
+    fail "publicBaseUrl with leading-hyphen hostname" "chart rendered when voice.publicBaseUrl's hostname started with a hyphen"
+    return
+  fi
+  case "$out" in
+    *"must be an https origin only"*)
+      echo "ok   [publicBaseUrl with leading-hyphen hostname] refused with the expected message" ;;
+    *)
+      fail "publicBaseUrl with leading-hyphen hostname" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+  esac
+}
+
 test_default_has_no_voice_resources
 test_explicit_false_matches_default
 test_enabled_renders_deployment
@@ -235,6 +320,11 @@ test_ingress_host_mismatch_refuses
 test_enabled_without_public_base_url_refuses
 test_enabled_with_http_public_base_url_refuses
 test_enabled_with_https_public_base_url_renders
+test_enabled_with_https_port_public_base_url_renders
+test_enabled_with_path_public_base_url_refuses
+test_enabled_with_query_public_base_url_refuses
+test_enabled_with_trailing_slash_public_base_url_refuses
+test_enabled_with_malformed_host_public_base_url_refuses
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures assertion(s) failed"

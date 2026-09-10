@@ -86,3 +86,39 @@ Feature: The voice worker is opt-in and cannot render half-configured
       Given the voice worker is turned on with its public address set to a plain http:// URL
       When the chart renders
       Then the install is refused, naming the invalid public address
+
+    @e2e
+    Scenario: Turning on the voice worker with a valid https:// public address renders
+      Given the voice worker is turned on with its public address set to a valid https:// origin
+      When the chart renders
+      Then the voice worker comes up with that public address configured
+
+    @e2e
+    Scenario: Turning on the voice worker with a valid https:// public address including a port renders
+      Given the voice worker is turned on with its public address set to a valid https:// origin that includes a port
+      When the chart renders
+      Then the voice worker comes up with that public address, port included, configured
+
+    @e2e
+    Scenario: The voice worker refuses a public address that includes a path
+      Given the voice worker is turned on with its public address set to an https:// origin that includes a path
+      When the chart renders
+      Then the install is refused, naming the invalid public address
+
+    @e2e
+    Scenario: The voice worker refuses a public address that includes a query string
+      Given the voice worker is turned on with its public address set to an https:// origin that includes a query string
+      When the chart renders
+      Then the install is refused, naming the invalid public address
+
+    @e2e
+    Scenario: The voice worker refuses a public address with a trailing slash
+      Given the voice worker is turned on with its public address set to an https:// origin with a trailing slash
+      When the chart renders
+      Then the install is refused, naming the invalid public address
+
+    @e2e
+    Scenario: The voice worker refuses a public address with a malformed hostname
+      Given the voice worker is turned on with its public address set to an https:// origin with no hostname, or one starting with a hyphen
+      When the chart renders
+      Then the install is refused, naming the invalid public address
