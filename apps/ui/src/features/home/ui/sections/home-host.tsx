@@ -12,7 +12,7 @@ import {
   type ProjectHomeOrganization,
   type ProjectHomeProject,
   type ProjectHomeUser,
-} from "@langwatch/project-web/screens/home";
+} from "@langwatch/project-web/home";
 import { useMemo, type ReactNode } from "react";
 
 import {

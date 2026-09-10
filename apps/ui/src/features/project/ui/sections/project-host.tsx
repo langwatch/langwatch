@@ -10,7 +10,7 @@ import {
   type ProjectHostOrganization,
   type ProjectHostPort,
   type ProjectHostProject,
-} from "@langwatch/project-web/screens/project-settings";
+} from "@langwatch/project-web/project-settings";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
 

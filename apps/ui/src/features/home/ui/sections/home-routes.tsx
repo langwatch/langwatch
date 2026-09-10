@@ -4,7 +4,7 @@
  * redirect — an address read and a navigation a package may not do itself.
  */
 
-import { projectHomeScreens } from "@langwatch/project-web/screens/home";
+import { projectHomeScreens } from "@langwatch/project-web/home";
 import { useEffect, type ComponentType } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

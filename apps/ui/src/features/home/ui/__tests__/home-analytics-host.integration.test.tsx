@@ -26,9 +26,9 @@ vi.mock("@langwatch/analytics-web/analytics", async () => {
   };
 });
 
-vi.mock("@langwatch/project-web/screens/home", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/project-web/screens/home")>(
-    "@langwatch/project-web/screens/home",
+vi.mock("@langwatch/project-web/home", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/project-web/home")>(
+    "@langwatch/project-web/home",
   );
   const { useAnalyticsHost } = await vi.importActual<
     typeof import("@langwatch/analytics-web/analytics")

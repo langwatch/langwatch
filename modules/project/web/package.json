@@ -8,15 +8,15 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/home": {
-      "langwatch-declaration-source": "./src/screens/home/index.ts",
-      "types": "./dist/screens/home/index.d.ts",
-      "default": "./src/screens/home/index.ts"
+    "./home": {
+      "langwatch-declaration-source": "./src/home.ts",
+      "types": "./dist/home.d.ts",
+      "default": "./src/home.ts"
     },
-    "./screens/project-settings": {
-      "langwatch-declaration-source": "./src/screens/project-settings/index.ts",
-      "types": "./dist/screens/project-settings/index.d.ts",
-      "default": "./src/screens/project-settings/index.ts"
+    "./project-settings": {
+      "langwatch-declaration-source": "./src/project-settings.ts",
+      "types": "./dist/project-settings.d.ts",
+      "default": "./src/project-settings.ts"
     },
     "./surfaces/tech-stack": {
       "langwatch-declaration-source": "./src/ui/blocks/tech-stack.tsx",

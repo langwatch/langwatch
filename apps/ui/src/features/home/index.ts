@@ -4,7 +4,7 @@
  * `features/project` — `/[project]` and `/settings` differ in policy.
  */
 
-import { homeApi } from "@langwatch/project-web/screens/home";
+import { homeApi } from "@langwatch/project-web/home";
 import { uiFeature } from "../../behavior/ui-feature";
 import { homePageLoaders } from "./ui/sections/home-routes";
 

@@ -86,7 +86,7 @@ vi.mock("@langwatch/annotation-web/annotation-scores", () => ({
   AnnotationScoresHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@langwatch/project-web/screens/project-settings", () => ({
+vi.mock("@langwatch/project-web/project-settings", () => ({
   projectApi: apiNode(),
   projectScreens: { projectSettings: screenFor("the general settings page") },
   ProjectHostPort: class {},
