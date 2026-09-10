@@ -20,7 +20,8 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   // The signed-out auth screens (ADR-117). Every one of these answers a
   // question somebody asks BEFORE they have a session, so none of them can
   // be a protectedProcedure without breaking sign-in itself. Each carries a
-  // .noPermission reason at its definition and its own per-IP rate limit.
+  // .noPermission reason at its definition, and each but `auth.priorSession`
+  // its own per-IP rate limit.
   //
   // `route` deliberately reads account existence and credential KINDS so it
   // can send an unknown address to sign-up and offer a known account only the
@@ -38,6 +39,13 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   // Requires the high-entropy, address-bound proof issued after the mailbox
   // link is opened; the address alone cannot query this decision.
   "auth.signUpEnrollment",
+  // The one signed-out procedure here with NO rate limit, deliberately. It
+  // takes no input, so the most it can ever describe is the session cookie
+  // the caller themselves presented: there is no address to pass in, and so
+  // no budget to spend on anybody else's behalf. A revoked session answers
+  // exactly as no session does, which is what stops the sign-in screen from
+  // confirming that an account exists. See PriorSessionService.
+  "auth.priorSession",
   // Client bootstrap: exposes only the PUBLIC_* env whitelist, no tenant data.
   "publicEnv",
   // The one anonymous trace read. Token-gated by ShareService.resolveForViewer;
