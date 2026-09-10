@@ -1105,7 +1105,7 @@ voice:
   # Public https:// origin the call provider dials back to; the worker
   # derives wss://<host>/twilio/<nonce> from it. Required whenever
   # voice.enabled is true, the chart refuses to render without it.
-  ## @param voice.publicBaseUrl [string] Public https:// origin the call provider connects to (e.g. https://voice.example.com). Required when voice.enabled is true.
+  ## @param voice.publicBaseUrl [string] Public https:// origin the call provider connects to (e.g. https://voice.example.com). Required when voice.enabled is true. Must have a hostname after the scheme and no trailing slash; a value that does not match this is rejected, not trimmed.
   publicBaseUrl: ""
 
   # TCP port of the Media Streams WebSocket listener inside the pod.

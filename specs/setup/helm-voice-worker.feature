@@ -80,3 +80,9 @@ Feature: The voice worker is opt-in and cannot render half-configured
       Given the voice worker is turned on with no public address set
       When the chart renders
       Then the install is refused, naming the missing public address
+
+    @e2e
+    Scenario: The voice worker refuses a public address that is not a valid https:// origin
+      Given the voice worker is turned on with its public address set to a plain http:// URL
+      When the chart renders
+      Then the install is refused, naming the invalid public address

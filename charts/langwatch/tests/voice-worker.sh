@@ -195,6 +195,36 @@ test_enabled_without_public_base_url_refuses() {
   esac
 }
 
+# @scenario "The voice worker refuses a public address that is not a valid https:// origin"
+test_enabled_with_http_public_base_url_refuses() {
+  local out
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=http://voice.example.com"); then
+    fail "http publicBaseUrl" "chart rendered when voice.publicBaseUrl used http:// instead of https://"
+    return
+  fi
+  case "$out" in
+    *"must be an https:// URL with a hostname"*)
+      echo "ok   [http publicBaseUrl] refused with the expected message" ;;
+    *)
+      fail "http publicBaseUrl" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+  esac
+}
+
+# @scenario "Turning on the voice worker with a valid https:// public address renders"
+test_enabled_with_https_public_base_url_renders() {
+  local block
+  block=$(render_component "deployment.yaml" "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com")
+  if [ -z "$block" ]; then
+    fail "https publicBaseUrl" "rendered no voice Deployment with a valid https:// voice.publicBaseUrl"
+    return
+  fi
+  if ! printf '%s' "$block" | grep -A1 "name: VOICE_PUBLIC_BASE_URL" | grep -q 'value: "https://voice.example.com"'; then
+    fail "https publicBaseUrl" "expected VOICE_PUBLIC_BASE_URL=https://voice.example.com"
+    return
+  fi
+  echo "ok   [https publicBaseUrl] renders with VOICE_PUBLIC_BASE_URL=https://voice.example.com"
+}
+
 test_default_has_no_voice_resources
 test_explicit_false_matches_default
 test_enabled_renders_deployment
@@ -203,6 +233,8 @@ test_enabled_renders_service_no_ingress
 test_ingress_enabled_renders
 test_ingress_host_mismatch_refuses
 test_enabled_without_public_base_url_refuses
+test_enabled_with_http_public_base_url_refuses
+test_enabled_with_https_public_base_url_renders
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures assertion(s) failed"
