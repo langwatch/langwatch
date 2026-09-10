@@ -121,10 +121,30 @@ export type IngestionPullRunCompletedEventData = z.infer<
   typeof ingestionPullRunCompletedEventDataSchema
 >;
 
+/**
+ * The provider refused the source outright and said so in a sentence we
+ * wrote ourselves (`DispatchError.customerMessage`). It is the one failure
+ * code whose `error` carries no provider reply, so the source page may show
+ * that text as written; every other code collapses to a fixed sentence there.
+ */
+export const PULL_REFUSED_ERROR_CODE = "pull_refused" as const;
+/**
+ * The run ended without a sentence of ours to show: retries exhausted, or a
+ * refusal that carried no customer message. `error` holds the diagnostic
+ * detail for the log and must never reach the page.
+ */
+export const PULL_FAILED_ERROR_CODE = "pull_failed" as const;
+
 export const ingestionPullRunFailedEventDataSchema = sourceEnvelope.extend({
   runId: z.string().min(1),
   scheduledFor: z.number(),
   error: z.string(),
+  /**
+   * Kept as a free string because the log is append-only and early failures
+   * carry codes this file never named. Known values: `PULL_REFUSED_ERROR_CODE`,
+   * `PULL_FAILED_ERROR_CODE`, and `run_abandoned` (written when a replacement
+   * run takes over, see `replacedByRunId`).
+   */
   errorCode: z.string(),
   retryable: z.boolean(),
   /**

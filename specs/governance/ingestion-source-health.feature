@@ -172,3 +172,15 @@ Feature: A broken puller is visible, a flaky one is not
     # because a provider's reply can carry a token. The refusal is the one
     # failure whose message we wrote ourselves, so it is the one that can be
     # shown as written.
+
+  @unit
+  Scenario: A refusal with no customer sentence shows the generic failure text
+    Given a source whose last run was refused by the provider
+    And the refusal came with no sentence of ours to show
+    When a viewer looks at the source
+    Then the row says only that the last pull failed
+    And it quotes nothing from the provider's reply and no part of the key
+    # The refused code is the one whose text the page shows as written, so it
+    # is only ever written beside a sentence we wrote. A refusal that arrives
+    # with just the adapter's diagnostic is filed as a plain failure instead:
+    # the diagnostic reaches the log, never the screen.

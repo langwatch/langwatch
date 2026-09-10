@@ -173,7 +173,12 @@ describe("ingestion pull outbox effect", () => {
       });
     });
 
-    it("falls back to the diagnostic message when the refusal carries no customer sentence", async () => {
+    /** @scenario "A refusal with no customer sentence shows the generic failure text" */
+    it("records a refusal without a customer sentence under the generic failed code, never the refused one", async () => {
+      // The status layer shows the refused code's text as written, so a
+      // refusal that only carries the adapter's diagnostic must not be
+      // filed under it: the diagnostic goes to the event for the log, and
+      // the generic code makes the page fall back to its fixed sentence.
       const recordRunFailed = vi.fn();
       const handler = createIngestionPullRunHandler({
         agentListingPort: { list: () => Promise.reject(new Error("unused")) },
@@ -181,7 +186,7 @@ describe("ingestion pull outbox effect", () => {
         runPort: {
           run: vi.fn().mockRejectedValue(
             new DispatchError({
-              message: "refused outright",
+              message: "HTTP 403 (anthropic cost_report): sk-admin refused",
               retryable: false,
             }),
           ),
@@ -189,11 +194,12 @@ describe("ingestion pull outbox effect", () => {
         commands: () => commandsStub({ recordRunFailed }),
       });
 
-      await handler(intent, context(1));
+      await expect(handler(intent, context(1))).resolves.toBeUndefined();
+      expect(recordRunFailed).toHaveBeenCalledTimes(1);
       expect(recordRunFailed).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: "refused outright",
-          errorCode: "pull_refused",
+          error: "HTTP 403 (anthropic cost_report): sk-admin refused",
+          errorCode: "pull_failed",
           retryable: false,
         }),
       );

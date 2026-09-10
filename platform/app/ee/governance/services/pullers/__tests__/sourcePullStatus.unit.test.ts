@@ -45,3 +45,20 @@ describe("given a source whose last run ended because the provider refused its k
     expect(JSON.stringify(pull)).not.toContain("sk-admin");
   });
 });
+
+describe("given a source whose last run was refused without a sentence of ours to show", () => {
+  /** @scenario "A refusal with no customer sentence shows the generic failure text" */
+  it("shows the generic failure text and quotes nothing from the provider", () => {
+    // The run handler writes the generic failed code for such a refusal, so
+    // the raw diagnostic arrives under `pull_failed`, never `pull_refused`.
+    const pull = status({
+      LastRunAt: 1,
+      LastRunOutcome: "failed",
+      LastRunError: "HTTP 403 (anthropic cost_report): sk-admin refused",
+      LastRunErrorCode: "pull_failed",
+    });
+    expect(pull?.error).toBe("The last pull failed.");
+    expect(JSON.stringify(pull)).not.toContain("sk-admin");
+    expect(JSON.stringify(pull)).not.toContain("403");
+  });
+});

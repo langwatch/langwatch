@@ -11,6 +11,10 @@ import {
 } from "~/server/metrics";
 
 import { LISTING_FAILED_REASON } from "../schemas/constants";
+import {
+  PULL_FAILED_ERROR_CODE,
+  PULL_REFUSED_ERROR_CODE,
+} from "../schemas/events";
 import type {
   IngestionPullListingIntent,
   IngestionPullRunIntent,
@@ -308,16 +312,25 @@ export function createIngestionPullRunHandler(
           },
           "Ingestion pull refused by the provider; not retrying this run",
         );
+        // The source page shows the refused code's text as written, so that
+        // code is only ever paired with a sentence we wrote ourselves. An
+        // adapter that refuses without one gets the generic failed code, and
+        // the page falls back to its fixed sentence; the diagnostic detail
+        // still lands in the event for the log, never on the screen.
+        const refusal =
+          error.customerMessage === undefined
+            ? { error: detail, errorCode: PULL_FAILED_ERROR_CODE }
+            : {
+                error: error.customerMessage,
+                errorCode: PULL_REFUSED_ERROR_CODE,
+              };
         await commands.recordRunFailed({
           tenantId: intentContext.projectId,
           occurredAt: clock(),
           sourceId: payload.sourceId,
           runId: payload.runId,
           scheduledFor: payload.scheduledFor,
-          // The customer sentence is the one the page may show as written;
-          // the diagnostic message is the fallback and carries no reply body.
-          error: error.customerMessage ?? detail,
-          errorCode: "pull_refused",
+          ...refusal,
           retryable: false,
           retryAfterMs: providerRetryAfterMs(error),
         });
@@ -345,7 +358,7 @@ export function createIngestionPullRunHandler(
         runId: payload.runId,
         scheduledFor: payload.scheduledFor,
         error: detail,
-        errorCode: "pull_failed",
+        errorCode: PULL_FAILED_ERROR_CODE,
         // Retries are exhausted — nothing will retry THIS run. The next
         // scheduled wake starts a fresh run from the durable cursor.
         retryable: false,
