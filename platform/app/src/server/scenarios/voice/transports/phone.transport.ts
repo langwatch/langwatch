@@ -23,6 +23,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
@@ -91,7 +92,7 @@ export type TwilioAgentFactory = (options: {
   publicBaseUrl?: string;
   allowedCallees: readonly string[];
   /** The target under test is the agent; the synthetic caller is the user. */
-  role: "AGENT";
+  role: AgentRole;
 }) => TwilioAdapterLike;
 
 const defaultTwilioAgentFactory: TwilioAgentFactory = (options) =>
@@ -229,7 +230,7 @@ export function createPhoneTransport(
         // a-leg guard passes for exactly this number and nothing else. There is
         // no user-facing allowlist; this guard is internal to the SDK.
         allowedCallees: [agentId],
-        role: "AGENT",
+        role: AgentRole.AGENT,
       });
       return withOutboundDial(adapter, {
         to: agentId,

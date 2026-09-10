@@ -22,6 +22,7 @@ import {
 } from "./call-record";
 import type { VoiceSessionTokenPayload } from "./voice-session-token";
 import {
+  type ElevenLabsCredential,
   type VoiceTransportCredential,
   type VoiceTransportRunner,
   voiceTransportRegistry,
@@ -880,7 +881,7 @@ export async function authorizeRecordingPlayback({
   ports: VoiceSessionPorts;
   projectId: string;
   conversationId: string;
-}): Promise<VoiceTransportCredential> {
+}): Promise<ElevenLabsCredential> {
   const transport: VoiceTransport = "elevenlabs_convai";
   const existing = await ports.findExistingRun({
     projectId,
@@ -889,6 +890,14 @@ export async function authorizeRecordingPlayback({
 
   const credential = await ports.resolveCredential({ projectId, transport });
   if (!credential) throw new VoiceRecordingKeyMissingError();
+  // Recording playback only exists for ElevenLabs conversations; a credential
+  // of another kind reaching here is a wiring bug (transport is hardcoded
+  // above), not a customer-facing failure.
+  if (credential.kind !== "elevenlabs") {
+    throw new Error(
+      "Recording playback is only available for ElevenLabs conversations",
+    );
+  }
 
   // A scenario run authorizes playback directly; no provider call needed.
   if (existing) return credential;

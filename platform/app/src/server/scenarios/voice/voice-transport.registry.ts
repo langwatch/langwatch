@@ -31,6 +31,14 @@ export type VoiceTransportCredential =
       fromNumber: string;
     };
 
+/** The ElevenLabs branch of {@link VoiceTransportCredential}, narrowed for
+ *  callers that only ever handle ElevenLabs conversations (recording
+ *  playback has no meaning for a phone target). */
+export type ElevenLabsCredential = Extract<
+  VoiceTransportCredential,
+  { kind: "elevenlabs" }
+>;
+
 /** What a minted browser session needs to open the call, minus the id and
  *  limit the service adds. The signed URL is short-lived and safe to hand out;
  *  the key is not, and never appears here. */

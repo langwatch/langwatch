@@ -1187,5 +1187,33 @@ describe("authorizeRecordingPlayback", () => {
         ).rejects.toBeInstanceOf(VoiceRecordingKeyMissingError);
       });
     });
+
+    describe("given a non ElevenLabs credential", () => {
+      describe("when playback is authorized", () => {
+        it("throws", async () => {
+          const ports = fakePorts({
+            runner: fakeRunner(),
+            over: {
+              resolveCredential: vi.fn(async () => ({
+                kind: "twilio" as const,
+                accountSid: "AC123",
+                authToken: "tok-secret",
+                fromNumber: "+14155550000",
+              })),
+            },
+          });
+
+          await expect(
+            authorizeRecordingPlayback({
+              ports,
+              projectId: "p1",
+              conversationId: "conv_1",
+            }),
+          ).rejects.toThrow(
+            "Recording playback is only available for ElevenLabs conversations",
+          );
+        });
+      });
+    });
   });
 });

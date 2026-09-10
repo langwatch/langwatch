@@ -2,6 +2,7 @@
  * @see specs/features/agents/voice-phone.feature
  */
 
+import { AgentRole } from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
 import type { VoiceTransportCredential } from "../../voice-transport.registry";
 import {
@@ -89,7 +90,7 @@ describe("phoneTransport", () => {
         expect(factoryOptions[0]?.authToken).toBe("tok-secret");
         // The account's OWN number is the "from", never the destination.
         expect(factoryOptions[0]?.phoneNumber).toBe("+14155550000");
-        expect(factoryOptions[0]?.role).toBe("AGENT");
+        expect(factoryOptions[0]?.role).toBe(AgentRole.AGENT);
         expect(adapter.placeCallArgs[0]).toMatchObject({
           to: TARGET,
           attachStream: "a-leg",
