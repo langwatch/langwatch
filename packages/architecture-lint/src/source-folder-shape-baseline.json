@@ -11,6 +11,10 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "crowded-folder|apps/api/src/app-trpc",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "crowded-folder|apps/server/src/predeps",
       "measured": "2026-09-08"
     },
@@ -68,10 +72,6 @@
     },
     {
       "key": "crowded-folder|enterprise/modules/governance/server/src/transport/api-trpc",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|enterprise/modules/governance/web/src/screens/governance",
       "measured": "2026-09-08"
     },
     {
@@ -167,10 +167,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|modules/authz/server/src/adapters",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|modules/automation/contract/src",
       "measured": "2026-09-08"
     },
@@ -196,10 +192,6 @@
     },
     {
       "key": "crowded-folder|modules/coding-agent/contract/src",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|modules/coding-agent/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
@@ -323,6 +315,10 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "crowded-folder|modules/identity/server/src/repositories",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "crowded-folder|modules/identity/server/src/repositories/prisma",
       "measured": "2026-09-08"
     },
@@ -340,10 +336,6 @@
     },
     {
       "key": "crowded-folder|modules/langy/server/src/adapters",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|modules/langy/server/src/ports",
       "measured": "2026-09-08"
     },
     {
@@ -447,8 +439,8 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|modules/ops/web/src/screens/ops",
-      "measured": "2026-09-08"
+      "key": "crowded-folder|modules/ops/web/src/ui/sections/ops",
+      "measured": "2026-09-10"
     },
     {
       "key": "crowded-folder|modules/organization/contract/src",
@@ -475,8 +467,8 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|modules/project/web/src/screens/home/components",
-      "measured": "2026-09-08"
+      "key": "crowded-folder|modules/project/web/src/ui/sections/home/components",
+      "measured": "2026-09-10"
     },
     {
       "key": "crowded-folder|modules/prompt/contract/src",
@@ -727,8 +719,20 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "fragment-file|enterprise/modules/billing/contract/src/currency.trpc.ts",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "fragment-file|enterprise/modules/billing/contract/src/notification-types.ts",
       "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|enterprise/modules/billing/server/src/repositories/memory/memory.organization-pricing.repository.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "fragment-file|enterprise/modules/billing/server/src/repositories/memory/memory.tenant-organization.repository.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "fragment-file|enterprise/modules/billing/web/src/model/display-formatters.ts",
@@ -744,10 +748,6 @@
     },
     {
       "key": "fragment-file|enterprise/modules/governance/contract/src/governance-signals.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|enterprise/modules/governance/contract/src/otlp-receiver-policy.ts",
       "measured": "2026-09-08"
     },
     {
@@ -771,8 +771,8 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|enterprise/modules/licensing/web/src/surfaces/global-upgrade-modal/plan-management-url.ts",
-      "measured": "2026-09-08"
+      "key": "fragment-file|enterprise/modules/licensing/web/src/ui/sections/global-upgrade-modal/plan-management-url.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "fragment-file|enterprise/modules/saas/contract/src/saas-browser.service.ts",
@@ -835,14 +835,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/auth/contract/src/auth.api.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|modules/auth/contract/src/auth.service.ts",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "fragment-file|modules/auth/contract/src/cli-session-keys.ts",
       "measured": "2026-09-08"
     },
@@ -857,6 +849,10 @@
     {
       "key": "fragment-file|modules/authz/contract/src/authz-scope-lineage.ts",
       "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|modules/authz/server/src/repositories/memory/memory.authz-cutover.repository.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "fragment-file|modules/automation/contract/src/automation.queries.ts",
@@ -895,6 +891,14 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "fragment-file|modules/coding-agent/web/src/detail-section.tsx",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "fragment-file|modules/coding-agent/web/src/pull-request-detail.ts",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "fragment-file|modules/dataset/contract/src/dataset-normalization.ts",
       "measured": "2026-09-08"
     },
@@ -916,10 +920,6 @@
     },
     {
       "key": "fragment-file|modules/experiment/contract/src/experiment-run-eventing.events.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|modules/experiment/contract/src/experiment.api.ts",
       "measured": "2026-09-08"
     },
     {
@@ -947,8 +947,8 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/gateway/web/src/surfaces/budget-overview/spent-subline.ts",
-      "measured": "2026-09-08"
+      "key": "fragment-file|modules/gateway/web/src/ui/sections/budget-overview/spent-subline.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "fragment-file|modules/hosted-mcp/contract/src/hosted-mcp.api.ts",
@@ -959,8 +959,16 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "fragment-file|modules/identity/server/src/repositories/memory/memory.identity-latch.repository.ts",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "fragment-file|modules/langy/contract/src/langy-prompt.ts",
       "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|modules/langy/contract/src/setup-skills.trpc.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "fragment-file|modules/langy/web/src/features/langy/ui/sections/derived-cards/langy-choices-card.tsx",
@@ -999,10 +1007,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/ops/contract/src/ops-feature-flag.ts",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "fragment-file|modules/ops/web/src/features/event-store/ui/sections/process-recent-actions-panel.tsx",
       "measured": "2026-09-08"
     },
@@ -1017,6 +1021,14 @@
     {
       "key": "fragment-file|modules/platform-health/contract/src/platform-health.config.ts",
       "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|modules/project/contract/src/home.trpc.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "fragment-file|modules/project/contract/src/integrations-checks.trpc.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "fragment-file|modules/prompt/contract/src/prompt.enums.ts",
@@ -1040,14 +1052,6 @@
     },
     {
       "key": "fragment-file|modules/prompt/web/src/model/prompt-form/save-blocker-message.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|modules/prompt/web/src/organization-badge.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|modules/prompt/web/src/prompt-handle.ts",
       "measured": "2026-09-08"
     },
     {
@@ -1167,18 +1171,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/trace/server/src/adapters/null-query-field-values.adapter.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|modules/trace/server/src/adapters/trace-facet-span-name.clickhouse.adapter.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|modules/trace/server/src/services/canonicalisers/otel/langwatch-canonicaliser.service.ts",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "fragment-file|modules/trace/server/src/services/canonicalisers/vercel-canonicaliser.service.ts",
       "measured": "2026-09-08"
     },
@@ -1237,6 +1229,10 @@
     {
       "key": "fragment-file|modules/webhook/contract/src/webhook.queries.ts",
       "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|modules/webhook/server/src/repositories/memory/memory.webhook-tenants.repository.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "fragment-file|modules/workflow/contract/src/studio-optimization.ts",
@@ -1341,6 +1337,10 @@
     {
       "key": "fragment-file|packages/design-system/src/system/create-system.ts",
       "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/eventing/src/server/retention.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "fragment-file|packages/group-queue/src/latency.ts",
