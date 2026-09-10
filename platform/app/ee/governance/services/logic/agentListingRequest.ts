@@ -19,7 +19,10 @@
  * stay recognisable as one press for whatever reads them later.
  */
 
-import { sourceTypeCanListAgents } from "../agentDiscovery.service";
+// From the leaf, not from `agentDiscovery.service`. That import pulled both
+// pullers and the credential seam into a module whose header promises none of
+// it, and every consumer of this logic carried them.
+import { sourceTypeCanListAgents } from "./agentListingProviders";
 
 /** The columns of an `IngestionSource` this decision actually reads. */
 export interface ListableSourceRecord {

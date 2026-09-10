@@ -410,7 +410,12 @@ function AgentsPane({
   if (isLoading) {
     return (
       <Box padding={6}>
-        <Spinner />
+        {/*
+         * Named, so a screen reader announces a wait rather than nothing at
+         * all — and so a test can assert the wait is what rendered. Without a
+         * name this branch is indistinguishable from an empty pane to both.
+         */}
+        <Spinner aria-label="Loading agents" />
       </Box>
     );
   }

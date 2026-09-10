@@ -11,7 +11,9 @@
  * does with a field the provider stopped reporting, and what happens on the
  * pass where the row already exists.
  *
- * Spec: specs/governance/governance-people-discovery.feature
+ * Spec: specs/ai-governance/dashboard/agents-page.feature — "The list holds
+ * the agents we registered and the agents we found". The rows this repository
+ * writes are the found half.
  */
 import { describe, expect, it } from "vitest";
 

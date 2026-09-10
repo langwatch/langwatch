@@ -41,22 +41,37 @@ interface FakeListingRow {
  * hidden governance project the ask is tenanted to, and the run-status rows
  * that say how the last listing of each source ended.
  *
- * The projection fake APPLIES the where clause rather than returning whatever
- * it was given. A fake that ignored `projectId` would make the tenancy
- * assertion below pass against a query with no tenant predicate at all, which
- * is the exact bug that assertion exists to catch.
+ * BOTH fakes APPLY their where clause rather than returning whatever they were
+ * given. A fake that ignored `projectId` would make the tenancy assertion below
+ * pass against a query with no tenant predicate at all, which is the exact bug
+ * that assertion exists to catch.
+ *
+ * The source fake did ignore `organizationId` until a reviewer noticed, which
+ * is worth recording rather than quietly correcting: this comment already
+ * stated the rule, the projection fake below already followed it, and the
+ * source fake one line away did not. So the file asserted organization scoping
+ * of the source set while being unable to observe it, and dropping the
+ * predicate from `IngestionSourceService.list` — the query that decides whose
+ * sources one tenant can see — would have left every test here green.
  */
 function fakeClient({
   sources,
+  organizationId = "org-1",
   govProjectId = "gov-project-1",
   listings = [],
 }: {
   sources: FakeSource[];
+  organizationId?: string;
   govProjectId?: string | null;
   listings?: FakeListingRow[];
 }) {
   return {
-    ingestionSource: { findMany: vi.fn(async () => sources) },
+    ingestionSource: {
+      findMany: vi.fn(
+        async ({ where }: { where: { organizationId: string } }) =>
+          where.organizationId === organizationId ? sources : [],
+      ),
+    },
     project: {
       findFirst: vi.fn(async () =>
         govProjectId ? { id: govProjectId } : null,
@@ -209,6 +224,28 @@ describe("requesting an agent listing", () => {
         { id: "src-genie", name: "Prod Genie", sourceType: "databricks_genie" },
       ]);
     });
+
+    /**
+     * The predicate that decides whose sources a tenant can see, asserted
+     * rather than assumed.
+     *
+     * Every other test in this file asks as the organization that owns the
+     * fixtures, so all of them would keep passing if `IngestionSourceService
+     * .list` dropped its `organizationId` from the where clause — the query
+     * would return every source in the table and each assertion would still
+     * match. This one asks as somebody else and requires nothing back, which
+     * is the only case in the file that can tell a scoped query from an
+     * unscoped one.
+     */
+    it("reads another organization's sources back as none of its own", async () => {
+      const service = GovernanceAgentSyncService.forReads(
+        fakeClient({ sources: [GENIE, OTEL], organizationId: "org-1" }),
+      );
+
+      await expect(
+        service.listableSources({ organizationId: "org-2" }),
+      ).resolves.toEqual([]);
+    });
   });
 
   /**
@@ -289,6 +326,7 @@ describe("requesting an agent listing", () => {
       const theirs = await GovernanceAgentSyncService.forReads(
         fakeClient({
           sources: [GENIE],
+          organizationId: "org-2",
           govProjectId: "gov-project-of-someone-else",
           listings: [rowOfAnotherOrg],
         }),
