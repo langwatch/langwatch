@@ -39,7 +39,7 @@ function installOver(database: PrismaClient) {
     infrastructure: {
       prisma: database,
       authz: {} as AuthzService,
-    } as unknown as ApiTrpcInfrastructure,
+    } satisfies Pick<ApiTrpcInfrastructure, "prisma" | "authz">,
     peers: {
       projects: {} as ProjectApi,
       evaluators: createApiFixture<EvaluatorApi>(),

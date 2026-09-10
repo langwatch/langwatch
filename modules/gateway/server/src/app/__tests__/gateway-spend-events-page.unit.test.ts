@@ -1,17 +1,18 @@
 /**
  * @vitest-environment node
- * The gatewaySpendEvents transport: filter/cursor passthrough, VK display-name resolution, ClickHouse-absent degrade, declared scope. Refusal now stands on the policy the process hands in, not the app's RBAC middleware — asserts the handler never runs when the policy refuses.
+ * `GatewayApp.findSpendEventsPage`: filter/cursor passthrough to the ledger
+ * repository, virtual-key display-name resolution, and the ClickHouse-absent
+ * degrade. The whole assembly used to live in the tRPC transport; it now
+ * lives here so a REST door and the tRPC door read the same behaviour.
  */
 import { Temporal } from "@langwatch/time";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { initTRPC, TRPCError } from "@trpc/server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GatewaySpendEventTrpcApi } from "../../transport/api-trpc/gateway-spend-event.api.ts";
 import { GatewayApp, type GatewayAppDependencies } from "../gateway.app.ts";
 import type { GatewaySpendEventsService } from "../../services/gateway-spend-events.service.ts";
+import type { SpendEventRow } from "@langwatch/gateway-contract";
 
-import type { SpendEventRow } from "../../ports/gateway-spend-events.port.ts";
 /** The slice of the application this surface reaches, and nothing else. */
 function gatewayAppStub(dependencies: Partial<GatewayAppDependencies>): GatewayApp {
   return GatewayApp.create({
@@ -72,49 +73,18 @@ const BASE_INPUT = {
 const getSpendEventsPage = vi.fn();
 const tryGetOrganizationId = vi.fn();
 const resolveVirtualKeyNames = vi.fn();
-const seenPermissions: string[] = [];
-const denied = new Set<string>();
 
-function harness({ clickHouse = true } = {}) {
-  const trpc = initTRPC
-    .context<{
-      app: { gateway: GatewayApp };
-      actor(): { id: string };
-    }>()
-    .create();
-
-  const router = GatewaySpendEventTrpcApi.create(trpc, {
-    protected: trpc.procedure,
-    // Stands in for the process's chain: it records the declared permission
-    // and refuses before the handler, exactly where the real check sits.
-    policy: (permission) => (procedure) =>
-      (procedure as { use(m: unknown): unknown }).use(({ next }: { next: () => unknown }) => {
-        seenPermissions.push(permission);
-        if (denied.has(permission)) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission" });
-        }
-        return next();
-      }) as typeof procedure,
-    validateOutput: true,
-  });
-
-  return router.createCaller({
-    app: {
-      gateway: gatewayAppStub({
-        spendEvents: clickHouse ? spendEventsStub({ getSpendEventsPage }) : undefined,
-        projects: projectsStub({ tryGetOrganizationId }),
-        resolveVirtualKeyNames,
-      }),
-    },
-    actor: () => ({ id: "user_1" }),
+function app({ clickHouse = true } = {}) {
+  return gatewayAppStub({
+    spendEvents: clickHouse ? spendEventsStub({ getSpendEventsPage }) : undefined,
+    projects: projectsStub({ tryGetOrganizationId }),
+    resolveVirtualKeyNames,
   });
 }
 
-describe("GatewaySpendEventTrpcApi", () => {
+describe("GatewayApp.findSpendEventsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    seenPermissions.length = 0;
-    denied.clear();
     getSpendEventsPage.mockResolvedValue({ rows: [SPEND_ROW], nextCursor: null });
     tryGetOrganizationId.mockResolvedValue("org_1");
     resolveVirtualKeyNames.mockResolvedValue([{ id: "vk_1", name: "Customer A key" }]);
@@ -123,7 +93,7 @@ describe("GatewaySpendEventTrpcApi", () => {
   describe("given a page request carrying filters and a cursor", () => {
     /** @scenario Ledger filters and cursor pass through to the repository page read */
     it("passes filters and cursor through to the repository page read", async () => {
-      await harness().list({
+      await app().findSpendEventsPage({
         ...BASE_INPUT,
         filters: {
           virtualKeyIds: ["vk_1"],
@@ -154,18 +124,17 @@ describe("GatewaySpendEventTrpcApi", () => {
         cursor: { occurredAtMs: 123, gatewayRequestId: "req_0" },
         limit: 25,
       });
-      expect(seenPermissions).toEqual(["gatewayUsage:view"]);
     });
   });
 
   describe("given rows naming a virtual key", () => {
     /** @scenario Ledger rows resolve virtual key display names */
     it("resolves virtual-key display names alongside the rows", async () => {
-      const result = await harness().list(BASE_INPUT);
+      const result = await app().findSpendEventsPage(BASE_INPUT);
 
-      expect(result.rows).toHaveLength(1);
-      expect(result.virtualKeyNames).toEqual({ vk_1: "Customer A key" });
-      expect(result.clickHouseDisabled).toBe(false);
+      expect(result?.rows).toHaveLength(1);
+      expect(result?.virtualKeyNames).toEqual({ vk_1: "Customer A key" });
+      expect(result?.clickHouseDisabled).toBe(false);
       expect(tryGetOrganizationId).toHaveBeenCalledWith(PROJECT_ID);
     });
   });
@@ -175,29 +144,19 @@ describe("GatewaySpendEventTrpcApi", () => {
     it("keeps virtual-key names empty", async () => {
       tryGetOrganizationId.mockResolvedValue(undefined);
 
-      const result = await harness().list(BASE_INPUT);
+      const result = await app().findSpendEventsPage(BASE_INPUT);
 
-      expect(result.virtualKeyNames).toEqual({});
+      expect(result?.virtualKeyNames).toEqual({});
       expect(resolveVirtualKeyNames).not.toHaveBeenCalled();
     });
   });
 
   describe("when the deployment has no ClickHouse spend path", () => {
-    /** @scenario The ledger degrades to an empty page without ClickHouse */
-    it("degrades to an empty page", async () => {
-      const result = await harness({ clickHouse: false }).list(BASE_INPUT);
+    /** @scenario The ledger read answers null without ClickHouse */
+    it("answers null", async () => {
+      const result = await app({ clickHouse: false }).findSpendEventsPage(BASE_INPUT);
 
-      expect(result).toMatchObject({ rows: [], nextCursor: null, clickHouseDisabled: true });
-      expect(getSpendEventsPage).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the policy refuses the declared scope", () => {
-    /** @scenario The ledger requires the gateway usage view scope */
-    it("never reaches the repository", async () => {
-      denied.add("gatewayUsage:view");
-
-      await expect(harness().list(BASE_INPUT)).rejects.toThrow("You do not have permission");
+      expect(result).toBeNull();
       expect(getSpendEventsPage).not.toHaveBeenCalled();
     });
   });

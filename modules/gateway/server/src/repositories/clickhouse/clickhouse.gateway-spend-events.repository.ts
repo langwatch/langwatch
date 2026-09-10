@@ -14,9 +14,14 @@ import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../processes/gateway
 import {
   GatewaySpendFiltersAdapter,
   SPEND_STATUS_IN_FLIGHT,
-  type SpendEventStatus,
 } from "../../adapters/gateway-spend-filters.adapter.ts";
-import { nanoUsdToDecimalString, parseSummedNanoUsd } from "@langwatch/gateway-contract";
+import {
+  nanoUsdToDecimalString,
+  parseSummedNanoUsd,
+  type SpendEventRow,
+  type SpendEventStatus,
+  type SpendFilters,
+} from "@langwatch/gateway-contract";
 import { GatewaySpendGroupingAdapter } from "../../adapters/gateway-spend-grouping.adapter.ts";
 import {
   GatewaySpendCursorAdapter,
@@ -25,9 +30,7 @@ import {
 import {
   GatewaySpendEventsPort,
   type SpendBucket,
-  type SpendEventRow,
   type SpendEventsPageCursor,
-  type SpendFilters,
   type SpendGroupByKey,
   type SpendSummaryRow,
 } from "../../ports/gateway-spend-events.port.ts";

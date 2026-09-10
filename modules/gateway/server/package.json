@@ -80,10 +80,6 @@
       "types": "./dist/projections/gateway-spend.projection.d.ts",
       "default": "./src/projections/gateway-spend.projection.ts"
     },
-    "./api-trpc/gateway-spend-event": {
-      "types": "./dist/transport/api-trpc/gateway-spend-event.api.d.ts",
-      "default": "./src/transport/api-trpc/gateway-spend-event.api.ts"
-    },
     "./api-rest/gateway-platform": {
       "types": "./dist/transport/api-rest/gateway-platform.api.d.ts",
       "default": "./src/transport/api-rest/gateway-platform.api.ts"

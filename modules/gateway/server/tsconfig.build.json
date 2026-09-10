@@ -33,7 +33,7 @@
     "./src/transport/virtual-key.trpc.ts",
     "./src/transport/gateway-cache-rule.trpc.ts",
     "./src/transport/gateway-guardrail.trpc.ts",
-    "./src/transport/api-trpc/gateway-spend-event.api.ts",
+    "./src/transport/gateway-spend-event.trpc.ts",
     "./src/transport/api-rest/gateway-platform.api.ts",
     "./src/transport/api-rest/gateway-internal.api.ts",
     "./src/transport/api-rest/gateway-spend.api.ts",

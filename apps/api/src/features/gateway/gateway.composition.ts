@@ -42,8 +42,12 @@ export type GatewayPeers = Readonly<{
 }>;
 
 export type GatewayFeatureOptions = Readonly<{
-  /** Absent where this process opened no database; see the file docblock. */
-  infrastructure: ApiTrpcInfrastructure | undefined;
+  /**
+   * Absent where this process opened no database; see the file docblock.
+   * Narrowed to what this feature actually reads, so a caller composing a
+   * fixture never needs a full process infrastructure double.
+   */
+  infrastructure: Pick<ApiTrpcInfrastructure, "prisma" | "authz"> | undefined;
   /** Absent where this process composed none of them; see the file docblock. */
   peers: GatewayPeers | undefined;
   /**
@@ -115,7 +119,7 @@ function refusingGateway(): ComposedGatewayFeature {
     has: () => true,
   });
 
-  // The three converted namespaces mount either way, so a client's inferred
+  // The six converted namespaces mount either way, so a client's inferred
   // types never depend on the deployment shape; every call then refuses by
   // name instead of showing a tenant with no budgets in it.
   return {

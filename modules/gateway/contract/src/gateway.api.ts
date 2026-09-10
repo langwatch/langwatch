@@ -32,10 +32,12 @@ import type {
 import type { VirtualKeyBudgetInput } from "./virtual-key.schemas.ts";
 import type { VirtualKeyConfig } from "./virtual-key-config.ts";
 import type {
+  GatewaySpendEventPage,
   GatewayUsageSummary,
   GatewayVirtualKeyUsageSummary,
   VirtualKeyCamelDtoResponse,
 } from "./gateway.responses.ts";
+import type { SpendFilters } from "./gateway-spend.schemas.ts";
 import type {
   GatewayApplicableBudget,
   GatewayVirtualKeyDirectBudget,
@@ -280,6 +282,21 @@ export interface GatewayApi {
   }): Promise<GatewayApplicableBudget[]>;
   /** Whether a person belongs to this organization. */
   isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
+
+  /**
+   * One page of the spend-event ledger for a project, newest first, with
+   * virtual-key names resolved for display. Answers null when this
+   * deployment has no ClickHouse spend source, so a door renders the
+   * disabled state rather than an empty page.
+   */
+  findSpendEventsPage(input: {
+    projectId: string;
+    fromMs: number;
+    toMs: number;
+    filters?: SpendFilters;
+    cursor?: { occurredAtMs: number; gatewayRequestId: string };
+    limit?: number;
+  }): Promise<GatewaySpendEventPage | null>;
 }
 
 export const GatewayApi = moduleApi<GatewayApi>("gateway");

@@ -4,13 +4,8 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
-import {
-  GatewaySpendFiltersAdapter,
-  MAX_FILTER_VALUES,
-  SPEND_STATUS_FILTERS,
-  spendFilterQueryShape,
-  spendFiltersSchema,
-} from "../index.ts";
+import { MAX_FILTER_VALUES, SPEND_STATUS_FILTERS, spendFiltersSchema } from "@langwatch/gateway-contract";
+import { GatewaySpendFiltersAdapter, spendFilterQueryShape } from "../index.ts";
 
 const spendFilters = GatewaySpendFiltersAdapter.create();
 

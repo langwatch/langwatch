@@ -43,11 +43,6 @@ export const ABSENT_API_TRPC_NAMESPACES = [
     consequence: "the experiment workbench lists nothing",
   },
   {
-    namespace: "gatewaySpendEvents",
-    module: "gateway",
-    consequence: "no gateway spend event is readable",
-  },
-  {
     namespace: "governance",
     module: "enterprise-governance",
     consequence: "the governance console and the landing decision answer nothing",

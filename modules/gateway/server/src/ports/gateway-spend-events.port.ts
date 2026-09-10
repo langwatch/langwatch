@@ -1,5 +1,4 @@
-import type { Instant } from "@langwatch/time";
-import type { SpendEventStatus } from "../adapters/gateway-spend-filters.adapter.ts";
+import type { SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
 import type { GatewaySpendState } from "../projections/gateway-spend.projection.ts";
 
 export const SPEND_GROUP_BY_KEYS = [
@@ -16,61 +15,6 @@ export type SpendGroupByKey = (typeof SPEND_GROUP_BY_KEYS)[number];
 
 export const SPEND_BUCKETS = ["none", "hour", "day"] as const;
 export type SpendBucket = (typeof SPEND_BUCKETS)[number];
-
-/** A metadata predicate: the caller's own key, and the values that match. */
-export interface SpendMetadataFilter {
-  key: string;
-  /** Any of these matches. Repeating a key in the query widens it. */
-  values: string[];
-}
-
-export interface SpendFilters {
-  virtualKeyIds?: string[];
-  endUserIds?: string[];
-  principalUserIds?: string[];
-  models?: string[];
-  providerKeys?: string[];
-  requestTypes?: string[];
-  labels?: string[];
-  metadata?: SpendMetadataFilter[];
-  status?: string;
-}
-
-export type SpendEventRow = {
-  tenantId: string;
-  gatewayRequestId: string;
-  organizationId: string;
-  /** Not carried by the command pipeline; kept for response-shape
-   *  stability, always empty. */
-  teamId: string;
-  virtualKeyId: string;
-  principalUserId: string;
-  endUserId: string;
-  traceId: string;
-  model: string;
-  providerKey: string;
-  requestType: string;
-  tokensInput: number;
-  tokensOutput: number;
-  tokensCacheRead: number;
-  tokensCacheWrite: number;
-  tokensReasoning: number;
-  /** Integer nano-USD, the authoritative figure. */
-  costNanoUsd: number;
-  /** Decimal USD string derived from costNanoUsd, up to 9 fractional digits. */
-  costUsd: string;
-  rateVersion: string;
-  status: SpendEventStatus;
-  errorClass: string;
-  httpStatus: number;
-  needsReconciliation: boolean;
-  /** Why settlement fired, set only on settled rows. */
-  settleReason: string;
-  labels: string[];
-  metadata: string;
-  durationMs: number;
-  occurredAt: Instant;
-};
 
 export interface SpendEventsPageCursor {
   occurredAtMs: number;

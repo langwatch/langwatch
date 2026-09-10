@@ -1,12 +1,11 @@
 import type {
   GatewaySpendEventsPort,
   SpendBucket,
-  SpendEventRow,
   SpendEventsPageCursor,
-  SpendFilters,
   SpendGroupByKey,
   SpendSummaryRow,
 } from "../ports/gateway-spend-events.port.ts";
+import type { SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
 
 export class GatewaySpendEventsService {
   private constructor(private readonly repository: GatewaySpendEventsPort) {}

@@ -5,9 +5,14 @@
  */
 
 import { z } from "zod";
-import type { SpendFilters, SpendMetadataFilter } from "../ports/gateway-spend-events.port.ts";
-
-export type SpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
+import {
+  MAX_FILTER_VALUES,
+  SPEND_STATUS_FILTERS,
+  spendStatusFilter,
+  type SpendEventStatus,
+  type SpendFilters,
+  type SpendMetadataFilter,
+} from "@langwatch/gateway-contract";
 
 /**
  * Lifecycle status for a spend row with no outcome yet — named once so
@@ -15,23 +20,6 @@ export type SpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
  * rather than accepting a narrowing that can only answer nothing.
  */
 export const SPEND_STATUS_IN_FLIGHT = "admitted" as const;
-
-/**
- * Every status a caller may narrow on. `success` and `error` are the pre-
- * pipeline spelling of `confirmed` and `failed`, kept so older clients keep
- * working.
- */
-export const SPEND_STATUS_FILTERS = [
-  "success",
-  "error",
-  "admitted",
-  "confirmed",
-  "failed",
-  "settled",
-] as const;
-
-/** The events read's status filter: the whole vocabulary. */
-export const spendStatusFilter = z.enum(SPEND_STATUS_FILTERS);
 
 /**
  * Rollup status filter: shared vocabulary minus in-flight, DERIVED by exclusion
@@ -53,13 +41,6 @@ const LEGACY_STATUS_ALIASES = new Map<string, SpendEventStatus>([
   ["success", "confirmed"],
   ["error", "failed"],
 ]);
-
-/**
- * Max values one filter may name — each becomes a bound ClickHouse array
- * element, so an unbounded repeat is an unbounded query on a billing read.
- * A caller needing more is really naming a team or organization instead.
- */
-export const MAX_FILTER_VALUES = 100;
 
 const id = z.string().min(1).max(100);
 const longId = z.string().min(1).max(256);
@@ -85,45 +66,6 @@ const metadataPair = z
 
 /** The parsed shape of {@link spendFilterQueryShape}. */
 export type SpendFilterQuery = z.infer<z.ZodObject<typeof spendFilterQueryShape>>;
-
-/**
- * The same vocabulary for callers that already speak in structured values
- * rather than query strings, so the tRPC surface behind the Billing events
- * screen narrows exactly the way the REST reads do.
- */
-export const spendFiltersSchema = z.object({
-  virtualKeyIds: z.array(id).max(MAX_FILTER_VALUES).optional(),
-  endUserIds: z.array(longId).max(MAX_FILTER_VALUES).optional(),
-  principalUserIds: z.array(id).max(MAX_FILTER_VALUES).optional(),
-  models: z.array(z.string().min(1).max(200)).max(MAX_FILTER_VALUES).optional(),
-  providerKeys: z.array(id).max(MAX_FILTER_VALUES).optional(),
-  requestTypes: z.array(z.string().min(1).max(50)).max(MAX_FILTER_VALUES).optional(),
-  labels: z.array(z.string().min(1).max(200)).max(MAX_FILTER_VALUES).optional(),
-  metadata: z
-    .array(
-      z.object({
-        // No colon, so this spelling cannot express a key the query spelling
-        // cannot. A filter the screen can set and a reconciliation script
-        // cannot reproduce is the drift this whole module exists to prevent.
-        key: z
-          .string()
-          .min(1)
-          .max(128)
-          .refine((raw) => !raw.includes(":"), {
-            message: "a metadata key cannot contain a colon",
-          }),
-        // Non-empty for the same reason the query spelling is: ClickHouse
-        // answers a missing Map key with the type default, so an empty value
-        // matches every row that lacks the key.
-        values: z.array(z.string().min(1).max(512)).min(1).max(MAX_FILTER_VALUES),
-      }),
-    )
-    .max(MAX_FILTER_VALUES)
-    .optional(),
-  // The whole vocabulary, because this schema backs an EVENTS read. A rollup
-  // caller narrows with {@link spendSummaryStatusFilter} instead.
-  status: spendStatusFilter.optional(),
-}) satisfies z.ZodType<SpendFilters>;
 
 const IN_COLUMNS: ReadonlyArray<readonly [keyof SpendFilters, string]> = [
   ["virtualKeyIds", "VirtualKeyId"],

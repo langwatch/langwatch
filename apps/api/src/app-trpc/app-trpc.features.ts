@@ -111,6 +111,7 @@ export function createAppTrpcFeatures(options: {
     gatewayCacheRules: gatewayRouters.gatewayCacheRules,
     gatewayGuardrails: gatewayRouters.gatewayGuardrails,
     gatewayUsage: gatewayRouters.gatewayUsage,
+    gatewaySpendEvents: gatewayRouters.gatewaySpendEvents,
     virtualKeys: gatewayRouters.virtualKeys,
     // The GitHub App an organization connected, and the pull requests its
     // coding agents opened.

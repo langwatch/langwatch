@@ -2,12 +2,11 @@
  * Binds the gateway module's converted namespaces to this process's execution
  * path: the virtual keys a tenant mints, the usage they roll up, the budgets an
  * organization caps its spend with, the cache-control rules it serves repeat
- * traffic from, and the project-scoped guardrails a key opts into.
+ * traffic from, the project-scoped guardrails a key opts into, and the
+ * spend-event ledger a reconciliation screen pages through.
  *
- * The five declarations come off the installed module, so the procedure
- * names, parsers and answers a client reads are the contract's own. The one gateway
- * namespace still on the legacy builders - the spend-event ledger - stays on
- * the absence list until its filter vocabulary moves to the contract.
+ * The six declarations come off the installed module, so the procedure
+ * names, parsers and answers a client reads are the contract's own.
  */
 import { bindTrpcFact, type TrpcRuntime } from "@langwatch/api/trpc";
 import type { GatewayApi } from "@langwatch/gateway-contract";
@@ -16,6 +15,7 @@ import {
   gatewayCacheRuleTrpcTransport,
   gatewayGuardrailTrpcTransport,
   gatewaySessionFact,
+  gatewaySpendEventTrpcTransport,
   gatewayUsageTrpcTransport,
   virtualKeyTrpcTransport,
 } from "@langwatch/gateway-server";
@@ -43,6 +43,7 @@ export function createGatewayTrpcRouters<TContext extends GatewayHostContext>(
     gatewayBudgets: runtime.mount(gatewayBudgetTrpcTransport, gateway),
     gatewayCacheRules: runtime.mount(gatewayCacheRuleTrpcTransport, gateway),
     gatewayGuardrails: runtime.mount(gatewayGuardrailTrpcTransport, gateway),
+    gatewaySpendEvents: runtime.mount(gatewaySpendEventTrpcTransport, gateway),
     gatewayUsage: runtime.mount(gatewayUsageTrpcTransport, gateway),
     virtualKeys: runtime.mount(virtualKeyTrpcTransport, gateway, session),
   };

@@ -14,7 +14,7 @@ export type ComposedGatewayFeature = Readonly<{
    * the Go data plane materialises a key's warm-cache bundle against the decision store.
    */
   composition: ApiGatewayComposition | undefined;
-  /** The three converted namespaces, mounted on this process's runtime. */
+  /** The six converted namespaces, mounted on this process's runtime. */
   routers(
     mount: ApiTrpcFeatureMount,
   ): ReturnType<typeof createGatewayTrpcRouters<ApiTrpcContext>>;

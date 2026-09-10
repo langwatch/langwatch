@@ -4,6 +4,7 @@ export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 export { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
+export { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 export {
   gatewaySessionFact,
   virtualKeyTrpcTransport,

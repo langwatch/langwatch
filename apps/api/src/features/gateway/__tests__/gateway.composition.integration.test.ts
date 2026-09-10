@@ -142,13 +142,10 @@ function testAuthz(): AuthzService {
 
 /** The GitHub App this deployment registered, as `github.*` reads it. */
 function testGithub() {
-  return {
+  return createApiFixture<GithubApi>({
     isOrganizationMember: vi.fn(async () => true),
     getConnectionStatus: vi.fn(async () => ({ configured: true, connected: false })),
-  } as unknown as GithubApi & {
-    isOrganizationMember: ReturnType<typeof vi.fn>;
-    getConnectionStatus: ReturnType<typeof vi.fn>;
-  };
+  });
 }
 
 /**

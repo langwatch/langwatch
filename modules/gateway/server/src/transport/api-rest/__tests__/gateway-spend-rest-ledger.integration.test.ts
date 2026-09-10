@@ -30,7 +30,7 @@ import { GatewaySpendEventsService } from "../../../services/gateway-spend-event
 import { createGatewaySpendRestApp, type GatewaySpendRestPorts } from "../gateway-spend.api.ts";
 import { testRestSecurity } from "./support/rest-security.support.ts";
 
-import type { SpendEventRow } from "../../../ports/gateway-spend-events.port.ts";
+import type { SpendEventRow } from "@langwatch/gateway-contract";
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);

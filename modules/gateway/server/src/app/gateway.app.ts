@@ -1,7 +1,7 @@
 /**
  * The gateway feature's application: the one typed thing every door is given, replacing seven previously-separate bags (six private Gateway*Application types plus GatewayPlatformRestPorts) that named the same members differently or with different signatures. Virtual-key WRITE pre-flight, run identically by every door, lives here as behaviour rather than duplicated thirteen times. A caller arrives as {@link GatewayActor}, an argument rather than read from session/request, so one check serves both a browser session and an API key. Budget row shapes moved to @langwatch/gateway-contract ({@link GatewayApplicableBudget}, {@link GatewayVirtualKeyDirectBudget}) since a generic type parameter never actually reached the browser — every tRPC transport declared `app` with no type arguments, so it always typed against `unknown`.
  */
-import type { Instant } from "@langwatch/time";
+import { toDate, type Instant } from "@langwatch/time";
 import type { GatewayVirtualKeyScope, VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { IdempotentRunner } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -527,8 +527,40 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.usage.summaryForVirtualKey(input);
   }
 
-  getSpendEventsService(): GatewaySpendEventsService | undefined {
-    return this.#dependencies.spendEvents;
+  async findSpendEventsPage(
+    input: Parameters<GatewayApi["findSpendEventsPage"]>[0],
+  ): ReturnType<GatewayApi["findSpendEventsPage"]> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return null;
+
+    const { rows, nextCursor } = await service.getSpendEventsPage({
+      tenantId: input.projectId,
+      fromMs: input.fromMs,
+      toMs: input.toMs,
+      filters: input.filters ?? {},
+      cursor: input.cursor,
+      limit: input.limit ?? 50,
+    });
+
+    const vkIds = [...new Set(rows.map((r) => r.virtualKeyId))].filter((id) => id.length > 0);
+    // The ids come from this project's own tenant-filtered spend rows, and the
+    // Project service resolves the owning-organization fence without exposing
+    // Project persistence to this transport.
+    const organizationId = await this.findProjectOrganization(input.projectId);
+    const vks =
+      vkIds.length && organizationId
+        ? await this.resolveVirtualKeyNames({ organizationId, virtualKeyIds: vkIds })
+        : [];
+    const virtualKeyNames = Object.fromEntries(vks.map((vk) => [vk.id, vk.name]));
+
+    // The wire still carries a Date on this row, so the instant the ledger
+    // reads becomes one here rather than anywhere above.
+    return {
+      rows: rows.map((row) => ({ ...row, occurredAt: toDate(row.occurredAt) })),
+      nextCursor,
+      virtualKeyNames,
+      clickHouseDisabled: false,
+    };
   }
 
   findVirtualKeyById(id: string, organizationId: string) {
