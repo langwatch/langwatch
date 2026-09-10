@@ -73,7 +73,9 @@ import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
 import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
+import { featureFlagService } from "~/server/featureFlag";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { FilterService } from "~/server/filters/filter.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
@@ -1488,6 +1490,20 @@ export function initializeDefaultApp(options?: {
             budgetCHRepository: new GatewayBudgetClickHouseRepository(
               resolveClickHouseClient,
             ),
+            // Called at EMIT time, once per withdrawal, never memoized here.
+            // A gate resolved when the app booted would keep withdrawing for
+            // as long as the process lived after somebody switched it off.
+            retractionEnabled: async (organizationId: string) =>
+              await featureFlagService.isEnabled(
+                "release_pulled_usage_retraction_enabled",
+                {
+                  distinctId: organizationId,
+                  // Pulled usage is priced for a whole organization, so the
+                  // gate is too — matching the recording flag beside it.
+                  projectId: NOT_TARGETED,
+                  organizationId,
+                },
+              ),
           }
         : undefined,
       governanceCostRollupStore,

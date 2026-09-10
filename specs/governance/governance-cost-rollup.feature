@@ -223,3 +223,73 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     # that touches a foreign bill, and tells the reader we hold no figure for
     # money we hold a perfectly good figure for.
 
+  # --- Recognising the reissue, rather than being told about it ---
+  # Everything above describes what a retraction DOES once one exists. What
+  # produces one is the gap: nothing compares the cell a charge sits in
+  # against the cell the next pull of that same charge is about to land in.
+  # So a reissue is only ever corrected by someone constructing the
+  # correction by hand, and a day that nobody looks at carries the one bill
+  # twice for as long as it is kept.
+  #
+  # Every version of one charge arrives on ONE ordered stream, because the
+  # charge's restatement key is that stream's identity. So the comparison is
+  # against where the charge sits NOW rather than where it first landed. A
+  # record that never moves points at the original cell forever: the first
+  # correction empties that cell, and every later pull withdraws from a cell
+  # already holding nothing.
+  #
+  # The dimensions that may trigger this are exactly the three a charge is
+  # deliberately not identified by - the currency, the agent and the spender.
+  # The model is NOT among them: an adapter that does not list the model
+  # among its dimensions files two models of one period under ONE restatement
+  # key, so a comparison that included the model would read the second model
+  # as a reissue of the first and withdraw money that was really spent.
+
+  @integration
+  Scenario: A bill reissued in another currency is withdrawn by the pull that finds it
+    Given a source that has already pulled a day's bill issued in one currency
+    When the next pull of that same day returns the bill in another currency
+    Then the pull emits a retraction addressed to the first currency's cell
+    And that cell is left stating zero rather than removed
+    And the day totals the reissued amount only
+    # The pull is the ONLY input. Nothing here constructs the correction,
+    # which is what separates this from every scenario above it: those
+    # describe a retraction that already exists, and this one is about
+    # whether anything ever makes one. The emptied cell states zero rather
+    # than going away because removing it would take its restatement key too.
+
+  @integration
+  Scenario: Pulling the corrected day again withdraws nothing
+    Given a source whose reissued bill has already been withdrawn once
+    When that same corrected day is pulled again unchanged
+    Then the pull emits no retraction at all
+    And the day still totals the reissued amount
+    # Asserted on what the pull EMITS, because the totals alone would hold
+    # even if a second retraction fired: it would withdraw from a cell
+    # already at zero and move no money, while the day's revision markers
+    # climbed forever against a correction that happened once.
+
+  @integration
+  Scenario: A charge reissued a second time is compared against where it sits now
+    Given a source whose bill has already been reissued once in another currency
+    When the provider reissues that same bill again against a different spender
+    Then the pull emits a retraction addressed to the second cell, not the first
+    And no earlier version of that bill is left holding money
+    # Two corrections to one charge is the case a record of where the charge
+    # FIRST landed gets wrong: the second correction would be compared
+    # against a cell the first already emptied, leaving the middle version
+    # live and the day carrying it on top of the newest one.
+
+  @unit
+  Scenario: A reissue is recognised from the currency, the agent and the spender only
+    Given a charge already summarized for one model in a period
+    When a charge for a different model arrives under that same restatement key
+    Then nothing withdraws the first model's amount
+    And both models' spend is left standing
+    # A period holding several models is the ordinary case, not a correction,
+    # and an adapter that does not list the model among its dimensions gives
+    # both of them the same restatement key - so this premise is reachable,
+    # not hypothetical. Comparing on the model would withdraw money that was
+    # really spent, which is the one failure here that is worse than the
+    # double-count this whole block exists to prevent.
+
