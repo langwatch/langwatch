@@ -157,7 +157,7 @@ const PROVIDER_DAY_ROWS = [
 const providerDayPanel = () => {
   const card = screen
     .getByText("Cost by provider and day")
-    .closest('[data-testid="cost-panel"]');
+    .closest<HTMLElement>('[data-testid="cost-panel"]');
   if (card === null) {
     throw new Error("the provider-day heading stands outside any cost panel");
   }
