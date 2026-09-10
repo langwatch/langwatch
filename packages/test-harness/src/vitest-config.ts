@@ -31,7 +31,7 @@ export function moduleVitestTestOptions(
     environment: kind === "jsdom" ? "jsdom" : "node",
     // A fresh worker per file is the single largest cost in a suite whose
     // files share a module graph. Off, the graph is evaluated once per worker.
-    isolate: isolate ?? kind === "jsdom",
+    isolate: isolate ?? false,
     pool: "forks",
     // Persists transformed modules between runs, so a rerun skips the
     // transform share of the run entirely.
