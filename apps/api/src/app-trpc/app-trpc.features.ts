@@ -12,6 +12,11 @@ import {
   type BillingSubscriptionApi,
 } from "@langwatch/enterprise-billing-server";
 import { scimTokenTrpcTransport, webhookEndpointTrpcTransport } from "@langwatch/enterprise-api";
+import {
+  spansTrpcTransport,
+  traceEditOverlayTrpcTransport,
+  tracesTrpcTransport,
+} from "@langwatch/trace-server";
 import { HandledError } from "@langwatch/handled-error";
 
 import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../api.application.ts";
@@ -53,6 +58,7 @@ export function createAppTrpcFeatures(options: {
   const monitorRouters = composed.monitor.routers(mount);
   const organizationRouters = composed.organization.routers(mount);
   const roleRouters = composed.role.routers(mount);
+  const langyRouters = composed.langy.routers(mount);
   const scenarioRouters = composed.scenario.routers(mount);
   const secretRouters = composed.secret.routers(mount);
   const shareRouters = composed.share.routers(mount);
@@ -174,6 +180,7 @@ export function createAppTrpcFeatures(options: {
     // namespace used to be mounted on the root directly, which put it outside
     // every audit that reads this list.
     secrets: secretRouters.secrets,
+    setupSkills: langyRouters.setupSkills,
     share: shareRouters.share,
     // The back office's connection ledger. The procedures are declared in the
     // module's own contract, and `ctx.app.sso` is what answers them.
@@ -190,6 +197,12 @@ export function createAppTrpcFeatures(options: {
     user: userRouters.user,
     // Where a spend event is delivered. The entitlement gate is inside the
     // handlers, so nothing decorates this mount.
+    // A project's traces, their spans and the reviewer's edit overlay, served
+    // by the trace module; the explorer and the shared-trace door stay on the
+    // legacy path until their namespaces are declared.
+    traces: mount.runtime.mount(tracesTrpcTransport, (ctx) => ctx.app.traces),
+    spans: mount.runtime.mount(spansTrpcTransport, (ctx) => ctx.app.traces),
+    traceEditOverlay: mount.runtime.mount(traceEditOverlayTrpcTransport, (ctx) => ctx.app.traces),
     webhookEndpoints: mount.runtime.mount(webhookEndpointTrpcTransport, (ctx) => ctx.app.webhooks),
     // One wire namespace assembled from two modules, exactly as the client has
     // always called it. Only the DASHBOARD's half is converted, so the charted

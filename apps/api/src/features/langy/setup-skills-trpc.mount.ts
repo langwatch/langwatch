@@ -1,21 +1,24 @@
 /**
- * App-process transport mount for the setup-skill catalogue.
- *
- * Behaviour is package-owned (`@langwatch/langy-server`, because the bodies are
- * the compiled skills the Langy image ships); this supplies the process's root,
- * authenticated procedure and policy chain. It takes no ports: the catalogue is
- * a compiled artifact the package holds, so there is nothing for the process to
- * answer.
+ * Mounts the Langy module's `setupSkills.*` namespace: the setup instructions
+ * the empty states copy for a coding agent. Reads nothing off the request
+ * beyond the project the `project:view` permission is checked against, so
+ * `ctx.app.langy` is resolved and handed over like any other declared
+ * namespace, with no extra facts.
  */
-import { createTrpcApiService, type TrpcApiMount } from "@langwatch/api/trpc";
-import { SetupSkillsTrpcApi, type SetupSkillsTrpcContext } from "@langwatch/langy-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import type { LangyApi } from "@langwatch/langy-contract";
+import { setupSkillsTrpcTransport } from "@langwatch/langy-server";
 
-/** Mounts `setupSkills.*` on the app process's tRPC root. */
-export function createSetupSkillsTrpcRouter<
-  TContext extends SetupSkillsTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
-  return SetupSkillsTrpcApi.create(mount.root, createTrpcApiService(mount));
+/** The one slice of the process context this namespace reads. */
+export interface LangySetupSkillsHostContext {
+  app: Readonly<{ langy: LangyApi }>;
+}
+
+/** Mounts `setupSkills.*` on the app process's declared tRPC runtime. */
+export function createLangySetupSkillsTrpcRouters<
+  TContext extends LangySetupSkillsHostContext,
+>(runtime: TrpcRuntime<TContext>) {
+  return {
+    setupSkills: runtime.mount(setupSkillsTrpcTransport, (ctx) => ctx.app.langy),
+  };
 }

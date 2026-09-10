@@ -59,12 +59,12 @@ export {
   type LangyTurnRequest,
   type LangyTurnStream,
 } from "./app/langy.app.ts";
-// The three tRPC transports this feature owns are not exported: they still name
-// the deleted legacy builder, so nothing may reach them until each is converted
-// to the declared `defineTrpcRouter` shape. The setup-skill catalogue behind one
-// of them stays reachable, because the bodies are generated from the compiled
-// skills the Langy image ships.
+// `langy.*` and `langyEgress.*` are not exported: they still name the deleted
+// legacy builder, so nothing may reach them until each is converted to the
+// declared `defineTrpcRouter` shape. `setupSkills.*` is converted and exported
+// below.
 export { SetupSkillsService, type SetupSkillId } from "./services/setup-skills.service.ts";
+export { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 // The agent-to-page UI-action channel. Moved here whole from the application
 // that used to hold it; the one thing it could not bring is the workbench's
 // action manifest, which arrives as {@link LangyUiActionCatalogPort}.

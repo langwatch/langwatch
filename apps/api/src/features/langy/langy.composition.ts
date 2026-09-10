@@ -40,6 +40,7 @@ import type { ApiAuditPort } from "../../api-request.policy.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
 import { createPlatformUrlBuilder } from "../../app/api-rest-ports.ts";
+import { createLangySetupSkillsTrpcRouters } from "./setup-skills-trpc.mount.ts";
 
 const LANGY_RELEASE_FLAG = "release_langy_enabled";
 
@@ -119,7 +120,10 @@ export function composeLangyFeature(options: {
   };
   // The two namespaces, their ports and the two gates went with the transport
   // that took them; they return with the converted one.
-  return { app: composeLangy(collaborators) };
+  return {
+    app: composeLangy(collaborators),
+    routers: (mount) => createLangySetupSkillsTrpcRouters(mount.runtime),
+  };
 }
 
 /** One Langy application, refused by name on every member. */
@@ -134,7 +138,10 @@ export function refusingLangyFeature(): ComposedLangyFeature {
     },
   ) as LangyApp;
 
-  return { app };
+  return {
+    app,
+    routers: (mount) => createLangySetupSkillsTrpcRouters(mount.runtime),
+  };
 }
 
 /** A Langy capability this process does not run, refused by name. */

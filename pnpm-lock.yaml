@@ -6854,6 +6854,9 @@ importers:
 
   modules/langy/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -10085,6 +10088,12 @@ importers:
 
   modules/trace/contract:
     dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../analytics/contract
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config

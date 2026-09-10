@@ -126,28 +126,16 @@ export const ABSENT_API_TRPC_NAMESPACES = [
     module: "ops",
     consequence: "the support inbox lists no filed report",
   },
-  { namespace: "setupSkills", module: "langy", consequence: "no setup skill is listed" },
   {
     namespace: "suites",
     module: "suite",
     consequence: "no test suite, folder or suite run is listed",
   },
-  {
-    namespace: "traces",
-    module: "trace",
-    consequence: "the trace explorer lists nothing and watches nothing",
-  },
   { namespace: "tracesV2", module: "trace", consequence: "the discover view lists nothing" },
-  { namespace: "spans", module: "trace", consequence: "no span is read" },
   {
     namespace: "sharedTrace",
     module: "trace",
     consequence: "a shared trace link opens nothing",
-  },
-  {
-    namespace: "traceEditOverlay",
-    module: "trace",
-    consequence: "no trace edit is applied",
   },
   { namespace: "workflow", module: "workflow", consequence: "no workflow is opened or saved" },
   {
