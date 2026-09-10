@@ -86,12 +86,32 @@ func CopyEnvFiles(ctx context.Context, root, dir string) (int, error) {
 		if envFileTracked(ctx, dir, name) {
 			continue
 		}
-		if err := copyEnvFile(filepath.Join(root, name), filepath.Join(dir, name)); err != nil {
-			return copied, err
+		for _, target := range envCopyTargets(dir) {
+			if err := copyEnvFile(filepath.Join(root, name), filepath.Join(target, name)); err != nil {
+				return copied, err
+			}
+			copied++
 		}
-		copied++
 	}
 	return copied, nil
+}
+
+// monolithAppDir is where the monolith layout (origin/main) keeps its
+// application, and where its own scripts load `.env` from: prisma:seed and
+// friends run `tsx --env-file-if-exists=.env` inside platform/app, so a copy
+// at the worktree root alone leaves the base instance's seed with no
+// NODE_ENV, no NEXTAUTH_SECRET and no API_TOKEN_JWT_SECRET.
+const monolithAppDir = "platform/app"
+
+// envCopyTargets lists the directories a dotenv file is copied into: the
+// worktree root always, and the monolith's application directory when the
+// worktree has one.
+func envCopyTargets(dir string) []string {
+	targets := []string{dir}
+	if info, err := os.Stat(filepath.Join(dir, monolithAppDir)); err == nil && info.IsDir() {
+		targets = append(targets, filepath.Join(dir, monolithAppDir))
+	}
+	return targets
 }
 
 // envFileTracked reports whether name is a tracked file in the worktree at
