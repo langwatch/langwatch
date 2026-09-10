@@ -11,9 +11,9 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import { ScimService } from "../scim.service.ts";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { ScimRepositoryPort } from "../../ports/scim-repository.port.ts";
+import type { ScimRepositoryPort } from "../../repositories/scim.repository.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
-import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle.ts";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 

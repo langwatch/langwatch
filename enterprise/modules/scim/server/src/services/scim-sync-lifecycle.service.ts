@@ -28,7 +28,7 @@
  * See specs/identity/scim-connection-sync.feature.
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port.ts";
+import { ScimSyncLifecycle } from "../app/scim.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 import {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
@@ -86,14 +86,13 @@ export interface ScimSyncLifecycleAdapterDeps {
   now?: () => number;
 }
 
-export class ScimSyncLifecycleAdapter extends ScimSyncLifecyclePort {
+export class ScimSyncLifecycleAdapter implements ScimSyncLifecycle {
   private readonly guards: ScimSyncLifecycleGuards;
   private readonly ledger: ScimSyncLifecycleLedger;
   private readonly newCommandId: () => string;
   private readonly now: () => number;
 
   constructor(deps: ScimSyncLifecycleAdapterDeps) {
-    super();
     this.guards = deps.guards;
     this.ledger = deps.ledger;
     this.newCommandId = deps.newCommandId;

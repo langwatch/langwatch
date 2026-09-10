@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ScimDirectoryService } from "../scim-directory.service.ts";
 import { ScimGrantsService } from "../scim-grants.service.ts";
 import { ScimService } from "../scim.service.ts";
-import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle.ts";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";

@@ -14,7 +14,7 @@ import {
   type ScimRoleBindingRecord,
   type ScimTokenRecord,
   type ScimTokenIdentity,
-} from "../../ports/scim-repository.port.ts";
+} from "../scim.repository.ts";
 
 /** The Prisma group row as the SCIM seam reads it: one clock above this line. */
 function scimGroupRecordOf(row: {

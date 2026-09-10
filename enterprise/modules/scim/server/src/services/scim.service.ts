@@ -21,11 +21,11 @@ import {
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
 import { nowInstant } from "@langwatch/time";
-import type { ScimRepositoryPort } from "../ports/scim-repository.port.ts";
+import type { ScimRepositoryPort } from "../repositories/scim.repository.ts";
 import type {
-  ScimSyncLifecyclePort,
+  ScimSyncLifecycle,
   ScimUserPushOperation,
-} from "../ports/scim-sync-lifecycle.port.ts";
+} from "../app/scim.infrastructure.ts";
 import { ScimDirectoryService } from "./scim-directory.service.ts";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
@@ -55,7 +55,7 @@ export class ScimService extends ScimServiceContract {
   private readonly groups: ScimDirectoryService;
   private readonly entitlements: Pick<EntitlementApi, "getActivePlan">;
   private readonly identities: ScimDirectoryIdentityService;
-  private readonly lifecycle: ScimSyncLifecyclePort;
+  private readonly lifecycle: ScimSyncLifecycle;
 
   private constructor({
     prisma,
@@ -73,7 +73,7 @@ export class ScimService extends ScimServiceContract {
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
-    lifecycle: ScimSyncLifecyclePort;
+    lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
   }) {
     super();
@@ -102,7 +102,7 @@ export class ScimService extends ScimServiceContract {
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
-    lifecycle: ScimSyncLifecyclePort;
+    lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
   }): ScimService {
     return new ScimService(options);

@@ -5,8 +5,8 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type {
   ScimRemovalOperation,
-  ScimSyncLifecyclePort,
-} from "../ports/scim-sync-lifecycle.port.ts";
+  ScimSyncLifecycle,
+} from "../app/scim.infrastructure.ts";
 
 const logger = createLogger("langwatch:scim:deprovision");
 const SCIM_ACTOR = { type: "system", name: "scim" } as const;
@@ -20,12 +20,12 @@ export type ScimRemovalManifest = {
 export class ScimDeprovisionService {
   private constructor(
     private readonly grants: AuthzGrantsService,
-    private readonly lifecycle: ScimSyncLifecyclePort,
+    private readonly lifecycle: ScimSyncLifecycle,
   ) {}
 
   static create(options: {
     grants: AuthzGrantsService;
-    lifecycle: ScimSyncLifecyclePort;
+    lifecycle: ScimSyncLifecycle;
   }): ScimDeprovisionService {
     return new ScimDeprovisionService(options.grants, options.lifecycle);
   }

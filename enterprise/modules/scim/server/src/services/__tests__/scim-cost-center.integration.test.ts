@@ -25,8 +25,8 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
-import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle.ts";
-import { PrismaScimRepository } from "../../repositories/prisma/scim.repository.ts";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+import { PrismaScimRepository } from "../../repositories/prisma/prisma.scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 

@@ -5,7 +5,7 @@ import {
   ScimGrantRepositoryPort,
   type ScimGrantBindingScope,
   type ScimRoleBindingRecord,
-} from "../../ports/scim-repository.port.ts";
+} from "../../repositories/scim.repository.ts";
 import { type DesiredScimGrant, ScimGrantsService } from "../scim-grants.service.ts";
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 

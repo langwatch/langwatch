@@ -14,7 +14,7 @@ import {
   ScimGroupMembershipService,
   type ScimGroupMembershipRepository,
 } from "./scim-group-membership.service.ts";
-import type { ScimGroupRecord, ScimRepositoryPort } from "../ports/scim-repository.port.ts";
+import type { ScimGroupRecord, ScimRepositoryPort } from "../repositories/scim.repository.ts";
 
 /**
  * Handles SCIM 2.0 Group resources backed by the Group / GroupMembership tables.

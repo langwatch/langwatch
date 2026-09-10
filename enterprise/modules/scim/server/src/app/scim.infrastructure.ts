@@ -1,17 +1,21 @@
+export interface SCIMInfrastructure {  scimSyncLifecycle: ScimSyncLifecycle;
+}
+
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 export type ScimUserPushOperation = "create" | "update" | "deactivate";
+
 export type ScimRemovalOperation = "delete_user" | "deactivate_user";
 
 /** Durable directory-sync history supplied by the API process composition. */
-export abstract class ScimSyncLifecyclePort {
-  abstract tokenIssued(input: {
+export interface ScimSyncLifecycle {
+  tokenIssued(input: {
     organizationId: string;
     connectionId: string;
     tokenId: string;
   }): Promise<void>;
 
-  abstract userPushed(input: {
+  userPushed(input: {
     organizationId: string;
     connectionId: string;
     userId: string;
@@ -19,14 +23,14 @@ export abstract class ScimSyncLifecyclePort {
     op: ScimUserPushOperation;
   }): Promise<void>;
 
-  abstract groupMapped(input: {
+  groupMapped(input: {
     organizationId: string;
     connectionId: string;
     groupId: string;
     externalId: string | null;
   }): Promise<void>;
 
-  abstract applyFailed(input: {
+  applyFailed(input: {
     organizationId: string;
     connectionId: string;
     op: ScimRemovalOperation;
@@ -35,7 +39,7 @@ export abstract class ScimSyncLifecyclePort {
     userId: string;
   }): Promise<void>;
 
-  abstract revoked(input: {
+  revoked(input: {
     organizationId: string;
     connectionId: string;
     tokenId: string | null;

@@ -5,14 +5,14 @@ import {
   SCIM_ENTERPRISE_USER_SCHEMA,
   type ScimCreateUserRequest,
 } from "@langwatch/enterprise-scim-contract";
-import type { ScimRepositoryPort } from "../scim-repository.port.ts";
-import { scimRepositoryFixture as repository } from "../../__tests__/support/scim-repository-fixture.ts";
-import { ScimService } from "../../services/scim.service.ts";
+import type { ScimRepositoryPort } from "../../scim.repository.ts";
+import { scimRepositoryFixture as repository } from "../../../__tests__/support/scim-repository-fixture.ts";
+import { ScimService } from "../../../services/scim.service.ts";
 import type { UpdateUserProfileInput, UserProfile } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
-import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
-import type { ScimUserProvisioning } from "../../services/scim-provisioning.service.ts";
+import { QuietScimSyncLifecycle } from "../../../services/__tests__/support/quiet-scim-sync-lifecycle.ts";
+import { GrantsFake } from "../../../__tests__/support/grants-fake.ts";
+import type { ScimUserProvisioning } from "../../../services/scim-provisioning.service.ts";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 

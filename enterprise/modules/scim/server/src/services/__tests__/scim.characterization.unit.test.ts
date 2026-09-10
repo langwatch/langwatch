@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ScimService } from "../scim.service.ts";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
-import type { ScimRepositoryPort } from "../../ports/scim-repository.port.ts";
-import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle.ts";
-import type { ScimSyncLifecyclePort } from "../../ports/scim-sync-lifecycle.port.ts";
+import type { ScimRepositoryPort } from "../../repositories/scim.repository.ts";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+import type { ScimSyncLifecycle } from "../../app/scim.infrastructure.ts";
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 
@@ -68,7 +68,7 @@ class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
 function service(
   repo: ScimRepositoryPort,
   enterprise = true,
-  lifecycle: ScimSyncLifecyclePort = new QuietScimSyncLifecycle(),
+  lifecycle: ScimSyncLifecycle = new QuietScimSyncLifecycle(),
 ): ScimService {
   return ScimService.create({
     prisma: repo,
@@ -307,7 +307,7 @@ describe("SCIM characterization: provisioning invariants", () => {
     describe("when a user is pushed", () => {
       /** @scenario "The fact records which connection pushed it, and one directory actor" */
       it("names the connection on the sync history and one system actor throughout", async () => {
-        const lifecycle: ScimSyncLifecyclePort = {
+        const lifecycle: ScimSyncLifecycle = {
           tokenIssued: vi.fn(async () => undefined),
           userPushed: vi.fn(async () => undefined),
           groupMapped: vi.fn(async () => undefined),

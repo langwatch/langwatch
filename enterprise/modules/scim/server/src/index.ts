@@ -17,7 +17,7 @@ export { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
 export { scimProtocolErrorHandler, scimProtocolRest } from "./transport/scim-protocol.rest.ts";
 export { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
 
-export { PostgresScimAdapter, type PostgresScimAdapterOptions } from "./adapters/scim.adapter.ts";
+export { PostgresScimAdapter, type PostgresScimAdapterOptions } from "./services/postgres-scim.service.ts";
 export {
   ScimSyncLifecyclePort,
   type ScimRemovalOperation,
@@ -34,4 +34,4 @@ export type { ScimUserProvisioning } from "./services/scim-provisioning.service.
 export {
   ScimSyncLifecycleAdapter,
   type ScimSyncLifecycleAdapterDeps,
-} from "./adapters/identity.scim-sync-lifecycle.adapter.ts";
+} from "./services/scim-sync-lifecycle.service.ts";

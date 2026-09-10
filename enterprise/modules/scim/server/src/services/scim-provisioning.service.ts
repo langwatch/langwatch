@@ -10,7 +10,7 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
-import type { ScimRepositoryPort } from "../ports/scim-repository.port.ts";
+import type { ScimRepositoryPort } from "../repositories/scim.repository.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
 import {
   ScimCostCenterService,
@@ -33,7 +33,7 @@ import {
 export type ScimUserProvisioning = ScimUserActivation &
   ScimUserProfileReadWrite &
   Pick<UserApi, "findByEmail" | "create">;
-import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port.ts";
+import type { ScimSyncLifecycle } from "../app/scim.infrastructure.ts";
 import {
   isUniqueViolation,
   nameFromScimRequest,
@@ -68,7 +68,7 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
-    lifecycle: ScimSyncLifecyclePort;
+    lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
   }) {
     this.prisma = prisma;
@@ -98,7 +98,7 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
-    lifecycle: ScimSyncLifecyclePort;
+    lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
   }): ScimProvisioningService {
     return new ScimProvisioningService(options);

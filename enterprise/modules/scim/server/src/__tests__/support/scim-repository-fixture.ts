@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { vi } from "vitest";
-import type { ScimRepositoryPort } from "../../ports/scim-repository.port.ts";
+import type { ScimRepositoryPort } from "../../repositories/scim.repository.ts";
 
 /**
  * A complete `ScimRepositoryPort`, answering nothing.
