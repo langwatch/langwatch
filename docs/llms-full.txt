@@ -35404,7 +35404,9 @@ A **Voice** agent type in **Agents** points at an ElevenLabs Conversational AI a
 
 A normal scenario run needs no manual call: the simulated caller speaks the scenario using the caller voice configured on it.
 
-Phone number targets are being added in the app. They sit behind the `release_voice_phone_targets_enabled` flag until the voice worker that dials them ships (see [issue #8014](https://github.com/langwatch/langwatch/issues/8014)).
+**Phone number targets** dial the agent over the phone. A scenario run places an outbound call to the target number through your Twilio account and the simulated caller speaks to whoever answers. The Phone number option appears in the agent drawer once your project has a Twilio provider in **Settings > Model Providers** (account SID, auth token and from-number); until then the drawer points you there. Phone targets have no **Talk to it** button, because a phone call has no browser leg. See [issue #8014](https://github.com/langwatch/langwatch/issues/8014).
+
+On a self-hosted deployment, set `VOICE_PUBLIC_BASE_URL` only when the voice worker has its own hostname; when it is unset the app's own public base host is used.
 
 ## Turn it on
 
