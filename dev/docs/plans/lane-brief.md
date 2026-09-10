@@ -58,9 +58,10 @@ assert on `code` not message prose, every `@scenario` annotation kept bound.
 
 A lane's prompt cache lives five minutes. One tool call or wait longer than
 that discards the whole context and re-reads it at full price. So: no single
-tool call over four minutes; anything longer runs with `run_in_background` and
-is checked every four minutes with a short command. Test runs are split by
-directory while working and the package suite runs once at the end. No
+tool call over four minutes. A vitest run is never backgrounded or cut, so it
+is kept short by scope: touched files while working, one directory at a time,
+the package suite once at the end. Installs, Go tests and stack waits that
+run longer go to `run_in_background` and are checked every four minutes. No
 `typecheck:one` mid-work (it queues behind the machine-wide slot and takes the
 cache with it); `tsc --noEmit --ignoreConfig <file>` while working, the package
 check once at the end. Every tool output is filtered (`tail`, `grep`, vitest
