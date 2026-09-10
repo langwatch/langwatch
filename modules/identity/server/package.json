@@ -30,7 +30,8 @@
   },
   "scripts": {
     "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit -p tsconfig.test.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@langwatch/actor": "workspace:*",

@@ -6786,6 +6786,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../packages/runtime-composition
+      '@langwatch/system-migrations':
+        specifier: workspace:*
+        version: link:../../../packages/system-migrations
       zod:
         specifier: 'catalog:'
         version: 4.4.3

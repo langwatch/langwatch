@@ -3,6 +3,8 @@
  * platform (ADR-101, ADR-115): guards, services and crypto over the app's
  * heads/ledger/records ports. The pure half is `@langwatch/identity-contract`.
  */
+export { identityServer } from "./identity.server.ts";
+export { IdentityApp } from "./app/identity.app.ts";
 export { CryptoIdentifierIdentityAdapter } from "./adapters/crypto.identifier-identity.adapter.ts";
 export {
   type DeriveIdentifierIdInput,
@@ -103,6 +105,7 @@ export type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
 } from "./repositories/identity-reservations.repository.ts";
+export { IdentityLatchRepository } from "./repositories/identity-latch.repository.ts";
 export type { IdentityLedger } from "./rules/identity-ledger.rules.ts";
 export type { IdentityUserGate } from "./rules/identity-user-gate.rules.ts";
 export type { IdentityUsersRepository } from "./repositories/identity-users.repository.ts";

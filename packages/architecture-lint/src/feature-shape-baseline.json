@@ -143,12 +143,8 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "identity|no-app",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "identity|no-installer",
-      "measured": "2026-09-08"
+      "key": "identity|installer-not-booted",
+      "measured": "2026-09-10"
     },
     {
       "key": "identity|persistence-adapter",

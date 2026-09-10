@@ -2,6 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
 import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repository.ts";
+import { PrismaIdentityLatchRepository } from "./prisma.identity-latch.repository.ts";
 import { PrismaIdentityNewbornRepository } from "./prisma.identity-newborn.repository.ts";
 import { PrismaIdentityReservationRepository } from "./prisma.identity-reservations.repository.ts";
 import { PrismaIdentityUsersRepository } from "./prisma.identity-users.repository.ts";
@@ -26,6 +27,7 @@ export class PostgresIdentityRepositories {
 
     return {
       heads: PrismaIdentityHeadsRepository.create(database),
+      latch: PrismaIdentityLatchRepository.create(database),
       users: PrismaIdentityUsersRepository.create(database),
       newborn: PrismaIdentityNewbornRepository.create(database),
       reservations: PrismaIdentityReservationRepository.create(database),

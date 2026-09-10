@@ -8,6 +8,7 @@ import {
   MemoryIdentityUsersRepository,
   MemoryIdentityVerificationRepository,
 } from "./memory.identity-user.repositories.ts";
+import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
 import {
   MemoryJoinCandidateRepository,
   MemoryJoinRequestReadRepository,
@@ -36,6 +37,7 @@ export class MemoryIdentityRepositories {
   static over(store: MemoryIdentityStore): IdentityRepositories {
     return {
       heads: MemoryIdentityHeadsRepository.create(store),
+      latch: MemoryIdentityLatchRepository.create(store),
       users: MemoryIdentityUsersRepository.create(store),
       newborn: MemoryIdentityNewbornRepository.create(store),
       reservations: MemoryIdentityReservationRepository.create(store),

@@ -1,5 +1,6 @@
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
+import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
 import type { IdentityNewbornRepository } from "./identity-newborn.repository.ts";
 import type { IdentityReservationRepository } from "./identity-reservations.repository.ts";
 import type { IdentityUsersRepository } from "./identity-users.repository.ts";
@@ -22,6 +23,7 @@ import type {
  */
 export interface IdentityRepositories {
   readonly heads: IdentityHeadsRepository;
+  readonly latch: IdentityLatchRepository;
   readonly users: IdentityUsersRepository;
   readonly newborn: IdentityNewbornRepository;
   readonly reservations: IdentityReservationRepository;

@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
+import { IdentityLatchRepository } from "../identity-latch.repository.ts";
 
 /**
  * Whether a user's identifier history is in the log and proven — the one fact
@@ -15,12 +16,14 @@ import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identit
  * Reads only, and deliberately narrow: the runner's state machine and its
  * compare-and-set live with the runner. This is the two questions a gate asks.
  */
-export class PrismaIdentityLatchRepository {
+export class PrismaIdentityLatchRepository extends IdentityLatchRepository {
   static create(database: PrismaClient): PrismaIdentityLatchRepository {
     return new PrismaIdentityLatchRepository(database);
   }
 
-  private constructor(private readonly database: PrismaClient) {}
+  private constructor(private readonly database: PrismaClient) {
+    super();
+  }
 
   /**
    * Has ANY user finished the backfill? The question the per-user read asks

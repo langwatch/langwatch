@@ -22,6 +22,8 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/system-migrations": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

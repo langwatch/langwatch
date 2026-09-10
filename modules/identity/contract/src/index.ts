@@ -498,3 +498,4 @@ export {
   SSO_CONNECTION_PIPELINE_NAME,
 } from "./sso-connection-events.ts";
 export * from "./signin-callback.errors.ts";
+export * from "./identity.api.ts";

@@ -52,6 +52,7 @@ export class MemoryIdentityStore {
   readonly joinCandidates = new Map<string, JoinCandidateOrganization[]>();
   readonly ssoConnections = new Map<string, SsoConnectionState>();
   readonly organizationNames = new Map<string, string>();
+  readonly finalizedUsers = new Set<string>();
 
   findUserRow(args: { userId: string }): MemoryUserRow | null {
     return this.users.get(args.userId) ?? null;
