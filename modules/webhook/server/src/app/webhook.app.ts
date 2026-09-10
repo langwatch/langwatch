@@ -12,11 +12,13 @@ import {
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
-import type { WebhookEndpointRuntime } from "../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+import type { WebhookEndpointRuntime } from "../repositories/webhook-endpoint.repository.ts";
+import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
 import type { WebhookDispatchResult } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
-import type { WebhookEventsService } from "../services/webhook-events.service.ts";
-import type { WebhookHealthService } from "../services/webhook-health.service.ts";
+import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
+import { WebhookEventsService } from "../services/webhook-events.service.ts";
+import { WebhookHealthService, type WebhookHealthDeps } from "../services/webhook-health.service.ts";
 
 /** The single-envelope batch a test fire sends. */
 function testFireBody(now: Instant): string {
@@ -88,22 +90,51 @@ export interface WebhookAppDependencies {
   dispatch: WebhookTestDispatch;
 }
 
+/**
+ * What a process supplies beside the repositories the registry resolves: the
+ * collaborators no repository can derive on its own (the process store a
+ * health read shares with the worker's process manager, the entitlement
+ * gate, and the test-fire dispatch).
+ */
+export interface WebhookInfrastructure {
+  /** The durable process store a health read shares with the worker's
+   *  delivery process manager. */
+  processStore: WebhookHealthDeps["processStore"];
+  assertEndpointsEntitled(organizationId: string): Promise<void>;
+  dispatch: WebhookTestDispatch;
+}
+
+type WebhookSetup = FeatureSetup<
+  typeof WebhookApp.dependencies,
+  WebhookInfrastructure,
+  undefined,
+  WebhookRepositories
+>;
+
 export class WebhookApp implements WebhookApiContract {
   static readonly contract = WebhookApi;
   static readonly dependencies = {};
 
-  static create(
-    setup: FeatureSetup<typeof WebhookApp.dependencies, WebhookAppDependencies, undefined>,
-  ): WebhookApp;
+  static create(setup: WebhookSetup): WebhookApp;
   /** Compatibility construction used by process roots not yet on FeatureSetup. */
   static create(dependencies: WebhookAppDependencies): WebhookApp;
-  static create(
-    input:
-      | FeatureSetup<typeof WebhookApp.dependencies, WebhookAppDependencies, undefined>
-      | WebhookAppDependencies,
-  ): WebhookApp {
-    const dependencies = "infrastructure" in input ? input.infrastructure : input;
-    return new WebhookApp(dependencies);
+  static create(input: WebhookSetup | WebhookAppDependencies): WebhookApp {
+    if (!("repositories" in input)) return new WebhookApp(input);
+
+    return new WebhookApp({
+      endpoints: input.repositories.endpoints,
+      events: WebhookEventsService.create({
+        tenants: input.repositories.tenants,
+        events: input.repositories.events,
+        envelopes: WebhookEnvelopeService.create(),
+      }),
+      health: WebhookHealthService.create({
+        endpoints: input.repositories.endpoints,
+        processStore: input.infrastructure.processStore,
+      }),
+      assertEndpointsEntitled: input.infrastructure.assertEndpointsEntitled,
+      dispatch: input.infrastructure.dispatch,
+    });
   }
 
   readonly #dependencies: WebhookAppDependencies;

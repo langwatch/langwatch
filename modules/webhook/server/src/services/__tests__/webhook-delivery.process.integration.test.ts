@@ -36,8 +36,8 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 
-import { WebhookEndpointAdapter } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
-import type { WebhookEndpointRuntime } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+import { PrismaWebhookEndpointRepository } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
+import type { WebhookEndpointRuntime } from "../../repositories/webhook-endpoint.repository.ts";
 import type { WebhookIdPort } from "../../ports/webhook-id.port.ts";
 import type { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
 import {
@@ -320,7 +320,7 @@ describe.skipIf(!databaseUrl)("webhook delivery via the transactional inbox", ()
       },
     });
     projectId = project.id;
-    endpoints = WebhookEndpointAdapter.create({ prisma, ids, secrets });
+    endpoints = PrismaWebhookEndpointRepository.create({ prisma, ids, secrets });
     const created = await endpoints.create({
       organizationId,
       url: "https://receiver.example.com/hooks",

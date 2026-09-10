@@ -20,18 +20,26 @@ export {
   type WebhookEventTypeName,
 } from "@langwatch/webhook-contract";
 export {
-  WebhookEndpointAdapter,
+  PrismaWebhookEndpointRepository,
+  type WebhookEndpointDeps,
+} from "./repositories/prisma/prisma.webhook-endpoint.repository.ts";
+export {
   type WebhookEndpointRuntime,
   type WebhookEndpointServiceOptions,
   type WebhookEndpointStatusSnapshot,
-} from "./adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+} from "./repositories/webhook-endpoint.repository.ts";
 export { WebhookIdPort } from "./ports/webhook-id.port.ts";
 export { WebhookSecretPort } from "./ports/webhook-secret.port.ts";
-// Webhook event reads are composed through the adapter and held as the port.
-// The ClickHouse repository, its client shape and its cursor codec are private
-// to the feature: nothing outside it names them any more.
-export { WebhookEventsAdapter } from "./adapters/clickhouse.webhook-events.adapter.ts";
+// Webhook event reads are composed through the repository and held as the
+// port. Its cursor codec is private to the feature: nothing outside it
+// names that any more.
+export {
+  WebhookEventsClickHouseRepository,
+  type WebhookClickHouseClientResolver,
+} from "./repositories/clickhouse/clickhouse.webhook-events.repository.ts";
 export { WebhookEventsRepositoryPort } from "./ports/webhook-events.port.ts";
+export { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
+export type { WebhookRepositories } from "./repositories/webhook.repositories.ts";
 export {
   WebhookEndpointConfiguration,
   WebhookEndpointPolicyService,
@@ -111,6 +119,7 @@ export {
 export {
   WebhookApp,
   type WebhookAppDependencies,
+  type WebhookInfrastructure,
   type WebhookTestDispatch,
 } from "./app/webhook.app.ts";
 export { webhookServer } from "./webhook.server.ts";

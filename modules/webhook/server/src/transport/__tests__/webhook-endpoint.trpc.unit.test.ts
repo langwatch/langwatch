@@ -9,9 +9,9 @@ import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  WebhookEndpointAdapter,
-  type WebhookEndpointServiceOptions,
-} from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+  PrismaWebhookEndpointRepository,
+  type WebhookEndpointDeps,
+} from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
 import { WebhookApp } from "../../app/webhook.app.ts";
 import { WebhookIdPort } from "../../ports/webhook-id.port.ts";
 import { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
@@ -81,8 +81,8 @@ function buildMockPrisma() {
 
 function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: string[] } = {}) {
   const prisma = options.prisma ?? buildMockPrisma();
-  const endpoints = WebhookEndpointAdapter.create({
-    prisma: prisma as unknown as WebhookEndpointServiceOptions["prisma"],
+  const endpoints = PrismaWebhookEndpointRepository.create({
+    prisma: prisma as unknown as WebhookEndpointDeps["prisma"],
     ids: new TestIdPort(),
     secrets: new TestSecretPort(),
   });

@@ -15,15 +15,16 @@ import {
   HttpWebhookDestinationAdapter,
   WebhookDeliveryService,
   WebhookDestinationAdapter,
-  WebhookEndpointAdapter,
   WebhookEndpointConfiguration,
   WebhookIdPort,
   WebhookSecretPort,
+  webhookRepositories,
   type AwsClientConfigPort,
   type WebhookDeliveryProcessDeps,
   type WebhookDispatchRequest,
-  type WebhookEndpointServiceOptions,
+  type WebhookEndpointDeps,
 } from "@langwatch/webhook-server";
+import { instantiateRepositories } from "@langwatch/runtime-composition";
 import {
   ClickHouseGatewayOpenAdmissionsAdapter,
   EventingGatewaySpendAdapter,
@@ -55,7 +56,7 @@ import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /** The Prisma models the spend graph's debit and webhook paths read and write. */
 export type WorkerGatewaySpendDatabase = GatewayBudgetResolutionDatabase &
-  WebhookEndpointServiceOptions["prisma"];
+  WebhookEndpointDeps["prisma"];
 
 /**
  * Reports composition decisions the spend graph would otherwise hide, each
@@ -297,15 +298,19 @@ function createWebhookDeliveryDeps(
 ): WebhookDeliveryProcessDeps {
   return {
     processStore: options.processStore,
-    endpoints: WebhookEndpointAdapter.create({
-      prisma: options.database,
-      ids: new WorkerWebhookIds(),
-      secrets: resolveWebhookSecrets(options),
-      configuration: WebhookEndpointConfiguration.create({
-        allowInsecureLocalUrls: options.config.webhooks.allowInsecureLocalUrls,
-        allowAmbientAwsCredentials: options.config.webhooks.allowAmbientAwsCredentials,
-      }),
-    }),
+    endpoints: instantiateRepositories(webhookRepositories, {
+      backend: "postgres",
+      infrastructure: {
+        prisma: options.database,
+        ids: new WorkerWebhookIds(),
+        secrets: resolveWebhookSecrets(options),
+        clickhouse: options.resolveClickHouseClient,
+        configuration: WebhookEndpointConfiguration.create({
+          allowInsecureLocalUrls: options.config.webhooks.allowInsecureLocalUrls,
+          allowAmbientAwsCredentials: options.config.webhooks.allowAmbientAwsCredentials,
+        }),
+      },
+    }).endpoints,
     pruneExpiredIdempotencyReceipts: (now) => pruneExpiredIdempotencyReceipts(options, now),
     dispatch: dispatchWebhookThrough(options, logger),
     getPlan: resolveWebhookPlan(options),
@@ -355,7 +360,7 @@ function pruneExpiredIdempotencyReceipts(
 /** The endpoint id format, as the resource prefix the App already mints. */
 class WorkerWebhookIds extends WebhookIdPort {
   newEndpointId(): string {
-    return generate("webhook_endpoint").toString();
+    return generate("webhookendpoint").toString();
   }
 }
 

@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { WebhookRetentionRepository } from "../webhook-retention.repository.ts";
 
 /**
  * Delivery-log retention, honored identically by both webhook channels.
@@ -11,7 +12,7 @@ export const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
  * The two system-owned maintenance sweeps the delivery log needs. Deliberately global and
  * deliberately raw.
  */
-export class PrismaWebhookRetentionRepository {
+export class PrismaWebhookRetentionRepository implements WebhookRetentionRepository {
   private constructor(private readonly prisma: PrismaClient) {}
 
   static create({ prisma }: { prisma: PrismaClient }): PrismaWebhookRetentionRepository {

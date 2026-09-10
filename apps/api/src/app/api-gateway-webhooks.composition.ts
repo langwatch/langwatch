@@ -46,16 +46,19 @@
 import { generate } from "@langwatch/ksuid";
 import {
   WebhookDeliveryService,
-  WebhookEndpointAdapter,
-  WebhookEventsAdapter,
+  WebhookEndpointConfiguration,
+  WebhookEnvelopeService,
   WebhookEventsService,
   WebhookApp,
   WebhookHealthService,
   WebhookIdPort,
   WebhookSecretPort,
+  webhookRepositories,
+  type WebhookClickHouseClientResolver,
   type WebhookDeliveryProcessDeps,
   type WebhookEndpointRuntime,
 } from "@langwatch/webhook-server";
+import { instantiateRepositories } from "@langwatch/runtime-composition";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
@@ -63,7 +66,7 @@ import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { ApiGatewaySpendWebhookPort } from "./api-gateway-spend-rest.composition.ts";
 
 /** One tenant's ClickHouse, as the emitted-envelope log reads it. */
-export type ApiWebhookClickHouseResolver = Parameters<typeof WebhookEventsAdapter.create>[0];
+export type ApiWebhookClickHouseResolver = WebhookClickHouseClientResolver;
 
 export type ApiGatewayWebhooksOptions = Readonly<{
   /** The one guarded connection the registry and the outbox run on. */
@@ -113,13 +116,15 @@ export function composeApiGatewayWebhooks(
     dispatch: () => Promise.reject(new Error("The API process cannot dispatch webhook delivery.")),
   });
 
-  return { webhooks, eventsAvailable: events !== undefined, delivery };
+  // The platform only resolves with ClickHouse present (see
+  // `composeApiWebhookPlatform`), so `events` is always the real service here.
+  return { webhooks, eventsAvailable: true, delivery };
 }
 
 /** The endpoint registry and the emitted-envelope log, as ANY door on this process reads them. */
 export type ApiWebhookPlatform = Readonly<{
   endpoints: WebhookEndpointRuntime;
-  events: WebhookEventsService | undefined;
+  events: WebhookEventsService;
 }>;
 
 /**
@@ -135,26 +140,34 @@ export function composeApiWebhookPlatform(
   options: ApiGatewayWebhooksOptions,
 ): ApiWebhookPlatform | undefined {
   const { database, encryption, resolveClickHouseClient } = options;
-  if (!database || !encryption) return undefined;
+  // Both stores are required by the module's one "postgres" tier (Postgres
+  // for the registry, ClickHouse for the emitted-envelope log), so a
+  // deployment missing either has no webhook platform at all rather than a
+  // half of one silently missing its events log.
+  if (!database || !encryption || !resolveClickHouseClient) return undefined;
 
-  const endpoints: WebhookEndpointRuntime = WebhookEndpointAdapter.create({
-    prisma: database,
-    ids: new ApiWebhookIds(),
-    secrets: ApiWebhookSecrets.create(encryption),
-    // No `configuration` and no `pruneDeliveries`, which is what main composed
-    // too: the first is a per-deployment destination policy nothing here states,
-    // and the second is the maintenance sweep the delivery process manager runs
-    // on the worker.
+  // No `configuration` and no `pruneDeliveries`, which is what main composed
+  // too: the first is a per-deployment destination policy nothing here states,
+  // and the second is the maintenance sweep the delivery process manager runs
+  // on the worker.
+  const repositories = instantiateRepositories(webhookRepositories, {
+    backend: "postgres",
+    infrastructure: {
+      prisma: database,
+      ids: new ApiWebhookIds(),
+      secrets: ApiWebhookSecrets.create(encryption),
+      clickhouse: resolveClickHouseClient,
+      configuration: WebhookEndpointConfiguration.create(),
+    },
   });
 
   return {
-    endpoints,
-    events: resolveClickHouseClient
-      ? WebhookEventsService.create({
-          prisma: database,
-          repository: WebhookEventsAdapter.create(resolveClickHouseClient),
-        })
-      : undefined,
+    endpoints: repositories.endpoints,
+    events: WebhookEventsService.create({
+      tenants: repositories.tenants,
+      events: repositories.events,
+      envelopes: WebhookEnvelopeService.create(),
+    }),
   };
 }
 
@@ -189,7 +202,7 @@ function unrunExecutorCollaborators(): Pick<
 /** The endpoint id format, as the resource prefix the platform already mints. */
 class ApiWebhookIds extends WebhookIdPort {
   newEndpointId(): string {
-    return generate("webhook_endpoint").toString();
+    return generate("webhookendpoint").toString();
   }
 }
 

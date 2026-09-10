@@ -7,15 +7,10 @@ import type {
 import type { Instant } from "@langwatch/time";
 import type { WebhookIdPort } from "../ports/webhook-id.port.ts";
 import type { WebhookSecretPort } from "../ports/webhook-secret.port.ts";
-import {
-  PrismaWebhookEndpointRepository,
-  type WebhookEndpointDatabase,
-} from "../repositories/prisma/prisma.webhook-endpoint.repository.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 import type { WebhookEndpointConfiguration } from "../services/webhook-endpoint-policy.service.ts";
 
 export type WebhookEndpointServiceOptions = {
-  prisma: WebhookEndpointDatabase;
   ids: WebhookIdPort;
   secrets: WebhookSecretPort;
   configuration?: WebhookEndpointConfiguration;
@@ -36,6 +31,13 @@ export type WebhookEndpointStatusSnapshot = {
   lastFailureAt: Instant | null;
 };
 
+/**
+ * Org-anchored webhook endpoint persistence: CRUD with registry-validated
+ * subscriptions, the encrypted signing secret, reversible enable/disable and
+ * the failure-streak bookkeeping behind the 72-hour auto-disable. Backed by
+ * Postgres in production (`repositories/prisma`) and by an in-memory twin
+ * for tests and a database-free boot (`repositories/memory`).
+ */
 export interface WebhookEndpointRuntime {
   create(
     input: CreateWebhookEndpointCommand,
@@ -114,12 +116,4 @@ export interface WebhookEndpointRuntime {
     endpointId: string;
   }): Promise<WebhookEndpointStatusSnapshot>;
   pruneDeliveries(now?: Instant): Promise<number>;
-}
-
-export class WebhookEndpointAdapter {
-  private constructor() {}
-
-  static create(options: WebhookEndpointServiceOptions): WebhookEndpointRuntime {
-    return PrismaWebhookEndpointRepository.create(options);
-  }
 }

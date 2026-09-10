@@ -67,16 +67,19 @@ describe("the API's Enterprise webhook platform", () => {
   });
 
   describe("given a process that keeps no ClickHouse", () => {
-    it("still composes the platform, with only the emitted-envelope log absent", () => {
-      const webhooks = composeApiGatewayWebhooks({
-        database: testDatabase(),
-        encryption: testCipher(),
-        resolveClickHouseClient: null,
-      });
-
-      expect(webhooks?.webhooks.tryGetDeliverable).toBeTypeOf("function");
-      expect(webhooks?.delivery?.appendReplayToEndpointStream).toBeTypeOf("function");
-      expect(webhooks?.eventsAvailable).toBe(false);
+    it("composes no platform at all, because the module's one tier needs both stores", () => {
+      // The registry's "postgres" tier requires ClickHouse alongside Postgres
+      // now (the endpoint registry and the emitted-envelope log are one
+      // module, not two independent halves), so a deployment missing either
+      // store gets no webhook platform rather than a registry with a
+      // permanently unavailable events log.
+      expect(
+        composeApiGatewayWebhooks({
+          database: testDatabase(),
+          encryption: testCipher(),
+          resolveClickHouseClient: null,
+        }),
+      ).toBeUndefined();
     });
   });
 

@@ -29,6 +29,7 @@ import {
   WEBHOOK_DISABLED_REASON_AUTO,
   WEBHOOK_DISABLED_REASON_MANUAL,
 } from "../../services/webhook-endpoint-policy.service.ts";
+import type { WebhookEndpointRuntime } from "../webhook-endpoint.repository.ts";
 
 const logger = createLogger("langwatch:webhooks:endpoint-service");
 const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
@@ -132,7 +133,7 @@ export interface WebhookEndpointDeps {
  * exactly once, at create or roll), reversible enable/disable, and the
  * failure-streak bookkeeping behind the 72-hour auto-disable.
  */
-export class PrismaWebhookEndpointRepository {
+export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
   static readonly tables = prismaTables("WebhookEndpoint", "WebhookEndpointDelivery");
   private readonly configuration: WebhookEndpointConfiguration;
   private readonly policy = WebhookEndpointPolicyService.create();
