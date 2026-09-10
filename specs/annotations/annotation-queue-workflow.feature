@@ -112,11 +112,13 @@ Feature: Walking an annotation queue into a dataset
     # Stepping to another item reads a whole trace, so for a moment the page is
     # still showing the one being left. Anything acted on in that moment acts on
     # the item behind, and where the page would go next is read from it too.
+    # The conversation carries writes of its own — annotating a turn, counting
+    # one into the sitting — so the moment covers it as well as the bar.
     @integration
     Scenario: Nothing acts on the item I have just stepped off
       Given I have moved on to another item
       When the item I asked for is still being read
-      Then every action that would act on the item I left is held
+      Then the page says it is busy and takes no action on the item I left
 
   Rule: A link into the queue opens on work
 

@@ -53,10 +53,15 @@ vi.mock("~/hooks/useAnnotationQueueWalk", () => ({
     const pending = (
       mocks.items as { id: string; doneAt: Date | null; trace: unknown }[]
     ).filter((item) => !item.doneAt);
-    const index = Math.max(
+    const asked = Math.max(
       0,
       pending.findIndex((item) => item.id === queueItemId),
     );
+    // A stale step is the previous item still being served while the one the
+    // URL names is read — which is what `keepPreviousData` does in the hook.
+    // Deriving it from the URL instead would serve the item the reviewer asked
+    // for, and no test could then tell a held control from a useless one.
+    const index = mocks.stepIsStale ? Math.max(0, asked - 1) : asked;
     const item = pending[index] ?? null;
 
     return {
@@ -329,6 +334,24 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(screen.getByRole("button", { name: /Next/ })).toBeDisabled();
       expect(screen.getByRole("button", { name: /Edit trace/ })).toBeDisabled();
       expect(screen.getByRole("button", { name: /Previous/ })).toBeDisabled();
+    });
+
+    /** @scenario "Nothing acts on the item I have just stepped off" */
+    it("holds the conversation, whose own controls would write to the item left behind", () => {
+      mocks.query = { "queue-item": "item-2" };
+      mocks.stepIsStale = true;
+      renderPage();
+
+      // Annotating, ticking a turn into the session and opening a turn all
+      // belong to the conversation rather than the bar, and annotating writes.
+      // The hold therefore sits on the subtree that hosts them, which is what
+      // the reviewer sees dim while the item they asked for is read.
+      const thread = screen
+        .getByTestId("conversation-view")
+        .closest("[aria-busy]");
+
+      expect(thread).toHaveAttribute("aria-busy", "true");
+      expect(thread).toHaveStyle({ pointerEvents: "none" });
     });
   });
 

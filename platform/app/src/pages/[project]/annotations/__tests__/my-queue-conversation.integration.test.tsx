@@ -29,7 +29,13 @@ const OTHER_TURN = { traceId: "trace-9", timestamp: 1_700_000_009_000 };
 const mocks = vi.hoisted(() => ({
   items: [] as unknown[],
   traceDetails: undefined as unknown,
+  /**
+   * Whether the step being served is the item the reviewer has left, with the
+   * one the URL names still being read.
+   */
+  stepIsStale: false,
   query: {} as Record<string, string>,
+  annotateClicked: vi.fn(),
   openDrawer: vi.fn(),
   conversationProps: null as unknown,
   // What the conversation read answers with. `undefined` is "not answered yet".
@@ -47,10 +53,13 @@ const conversationProps = () =>
 vi.mock("~/hooks/useAnnotationQueueWalk", () => ({
   useAnnotationQueueWalk: ({ queueItemId }: { queueItemId?: string }) => {
     const items = mocks.items as { id: string; trace: unknown }[];
-    const index = Math.max(
+    const asked = Math.max(
       0,
       items.findIndex((item) => item.id === queueItemId),
     );
+    // A stale step serves the item the reviewer has left while the one they
+    // asked for is read, the way `keepPreviousData` does in the hook.
+    const index = mocks.stepIsStale ? Math.max(0, asked - 1) : asked;
     const item = items[index] ?? null;
 
     return {
@@ -61,7 +70,7 @@ vi.mock("~/hooks/useAnnotationQueueWalk", () => ({
       nextItemId: item ? (items[index + 1]?.id ?? null) : null,
       queueFinished: items.every((entry) => !entry.trace),
       queueLoading: false,
-      stepIsStale: false,
+      stepIsStale: mocks.stepIsStale,
     };
   },
 }));
@@ -107,6 +116,15 @@ vi.mock("~/features/traces-v2/components/TraceDrawer/conversationView", () => ({
       <div data-testid="conversation-view">
         <button type="button" onClick={() => props.onSelectTurn?.(OTHER_TURN)}>
           pick another turn
+        </button>
+        {/*
+          Stands in for the per-message Annotate the real conversation renders,
+          which writes an annotation against the trace it was rendered with.
+          The page cannot disable it — it belongs to the conversation — so the
+          only thing a test can ask is whether the press reaches it at all.
+        */}
+        <button type="button" onClick={() => mocks.annotateClicked()}>
+          annotate this turn
         </button>
       </div>
     );
@@ -231,6 +249,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.conversationProps = null;
   mocks.query = {};
+  mocks.stepIsStale = false;
   // The thread reads back inside the conversation's window unless a test says
   // otherwise, so the turns are the thread's own.
   mocks.conversationTurns = { items: [{ traceId: "trace-1" }] };

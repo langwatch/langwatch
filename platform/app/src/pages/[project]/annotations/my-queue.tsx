@@ -488,7 +488,39 @@ export default function TraceAnnotations() {
             />
           ) : (
             <CodeBlock.AdapterProvider value={shikiAdapter}>
-              <Box flex="1" minHeight={0} display="flex" flexDirection="column">
+              {/*
+                While the step in hand is the item the reviewer has left, the
+                controls inside the thread — annotate, suggest, the per-turn
+                dataset tick, Edit trace, opening a turn — would act on that
+                item rather than the one asked for, and annotating writes. The
+                hold sits on the subtree rather than on each control: the
+                controls belong to ConversationView, which the trace drawer
+                renders too, so gating them one at a time leaves whatever is
+                added there next ungated.
+
+                Held the way the table holds a subtree over stale rows
+                (TraceTableLayout): dimmed, pointer-inert, and announced as
+                busy. Scrolling goes with it, as it does there. `inert` is what
+                covers the keyboard, which pointer-events does not; React 19
+                reads it as a boolean, so the empty string other call sites
+                pass is read as false.
+              */}
+              <Box
+                flex="1"
+                minHeight={0}
+                display="flex"
+                flexDirection="column"
+                opacity={stepIsStale ? 0.6 : 1}
+                transition="opacity 150ms ease-out"
+                pointerEvents={stepIsStale ? "none" : "auto"}
+                // Driven by staleness alone, never by navigation: the two
+                // states look alike from the bar, and only this one means the
+                // thread on screen belongs to another item.
+                aria-busy={stepIsStale ? true : undefined}
+                {...({ inert: stepIsStale || undefined } as {
+                  inert?: boolean;
+                })}
+              >
                 <IsolatedErrorBoundary
                   scope="Couldn't render this conversation"
                   resetKeys={[currentQueueItem?.trace?.trace_id ?? ""]}
