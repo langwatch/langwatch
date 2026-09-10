@@ -8,7 +8,7 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { openProtections } from "../../../repositories/clickhouse/__tests__/open-protections.ts";
-import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
+import { TestCodingAgentService } from "../../../services/ingestion/__tests__/support/coding-agent.service.fake.ts";
 import { TracesV2TrpcApi } from "../traces-v2.api.ts";
 import {
   createTranscriptApp,

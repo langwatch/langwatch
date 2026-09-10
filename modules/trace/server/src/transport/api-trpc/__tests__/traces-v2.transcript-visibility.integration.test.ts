@@ -43,7 +43,7 @@ import {
   type ResolvedCategory,
 } from "@langwatch/data-privacy-contract";
 
-import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
+import { TestCodingAgentService } from "../../../services/ingestion/__tests__/support/coding-agent.service.fake.ts";
 import { TracesV2TrpcApi } from "../traces-v2.api.ts";
 import {
   createTranscriptApp,
