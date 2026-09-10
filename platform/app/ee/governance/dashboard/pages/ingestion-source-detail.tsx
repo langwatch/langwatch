@@ -59,6 +59,10 @@ import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import type { SourceType } from "../components/ingestionSourceCatalog";
 import { needsIngestSecret } from "../components/ingestionSourceCatalog";
+import {
+  EmptyEventsState,
+  EventsSetupPopover,
+} from "../components/SourceEventsSetup";
 import { SourceEventsTable } from "../components/SourceEventsTable";
 import {
   type SourceEventsPager,
@@ -355,13 +359,17 @@ function SourceActivityPanels({
         health={health ?? null}
         eventsCount={eventsPager.loadedCount}
       />
-      {/* `EmptyEventsHint` walks an admin through setting up an integration.
-          The table only shows it once a load SUCCEEDED and came back empty —
-          showing it on a failed load sends someone debugging a live source
-          off to re-install something that is already working. */}
+      {/* The empty pane says what state this source is in; the (i) beside the
+          heading carries the setup instructions, in BOTH states, because a
+          working source raises "which endpoint was this?" just as often as an
+          idle one. The table shows the empty pane only once a load SUCCEEDED
+          and came back empty — showing it on a failed load sends someone
+          debugging a live source off to re-install something that is already
+          working. */}
       <SourceEventsTable
         pager={eventsPager}
-        emptyState={<EmptyEventsHint source={source} />}
+        emptyState={<EmptyEventsState />}
+        headerAside={<EventsSetupPopover source={source} />}
       />
     </>
   );
@@ -737,95 +745,6 @@ function StaleTimestampCallout({
         records here while those counters remain zero.
       </Text>
     </Box>
-  );
-}
-
-function EmptyEventsHint({ source }: { source: Source }) {
-  const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://langwatch.invalid";
-  const isOtel =
-    source.sourceType === "otel_generic" ||
-    source.sourceType === "claude_cowork";
-  const isWebhook = source.sourceType === "workato";
-  const mode = isOtel ? "otel" : isWebhook ? "webhook" : "<mode>";
-  const endpoint = `${baseUrl}/api/ingest/${mode}/${source.id}`;
-  return (
-    <VStack align="stretch" gap={3}>
-      <Text fontSize="sm" color="fg.muted">
-        No traces from this source yet. Push an OTLP body to{" "}
-        <Code fontSize="xs">{endpoint}</Code> with the source&apos;s bearer
-        secret to start populating.
-      </Text>
-      <Text fontSize="xs" color="fg.muted">
-        Spans land in the LangWatch trace store with this source&apos;s origin
-        tag, viewable in the trace viewer. If you are sending agent traces from
-        your own LangWatch SDK, use{" "}
-        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key
-        - different auth, same trace store. See{" "}
-        <Link
-          href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
-          color="blue.600"
-        >
-          Choosing the right OTel endpoint
-        </Link>
-        .
-      </Text>
-      <Text fontSize="xs" color="fg.muted">
-        Lost the secret? Click <strong>Rotate secret</strong> above - the new
-        bearer is shown once with a copy-paste curl example, and the prior
-        secret stays valid for 24h while you roll the new value through every
-        upstream client.
-      </Text>
-      {isOtel && (
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          padding={3}
-        >
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={2}>
-            Minimum viable OTLP body shape (camelCase keys):
-          </Text>
-          <Code
-            display="block"
-            fontSize="xs"
-            whiteSpace="pre"
-            overflowX="auto"
-            padding={2}
-          >{`{
-  "resource_spans": [{
-    "scope_spans": [{
-      "spans": [{
-        "name": "chat.completion",
-        "startTimeUnixNano": "<NOW_NS>",
-        "attributes": [
-          { "key": "gen_ai.request.model",       "value": { "stringValue": "claude-sonnet-4" } },
-          { "key": "gen_ai.usage.input_tokens",  "value": { "intValue": 120 } },
-          { "key": "gen_ai.usage.output_tokens", "value": { "intValue": 480 } },
-          { "key": "gen_ai.usage.cost_usd",      "value": { "doubleValue": 0.025 } },
-          { "key": "user.email",                 "value": { "stringValue": "you@your.org" } }
-        ]
-      }]
-    }]
-  }]
-}`}</Code>
-          <Text fontSize="xs" color="fg.muted" mt={2}>
-            Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on
-            success. If you get <Code fontSize="xs">events: 0</Code> with a
-            hint, the body shape didn&apos;t parse. See the{" "}
-            <Link
-              href="https://docs.langwatch.ai/ai-gateway/governance/ingestion-sources/otel-generic"
-              color="blue.600"
-            >
-              otel-generic docs
-            </Link>{" "}
-            for the full attribute reference.
-          </Text>
-        </Box>
-      )}
-    </VStack>
   );
 }
 

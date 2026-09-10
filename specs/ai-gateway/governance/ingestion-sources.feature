@@ -614,7 +614,37 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       Given the events request fails
       When the admin views the events section
       Then they see an error message
-      And they do NOT see the "no events yet" setup walkthrough
+      And they do NOT see the "no events yet" empty pane
+
+    # The setup instructions used to BE the empty state: four paragraphs, a
+    # code block and two links in the page body whenever the table came back
+    # empty. That serves neither reader. An admin who has already wired the
+    # source up never sees any of it again, though "which endpoint was this?"
+    # is a question a WORKING source raises just as often; and an admin who
+    # has not wired it up gets a wall of setup text where the page should
+    # first say, in one sentence, what state their source is in.
+    @integration
+    Scenario: An idle source explains itself in a pane, not in a wall of setup text
+      Given a source that has ingested nothing
+      When the admin views the events section
+      Then they see the governance section's shared empty state — a glyph, a
+        headline and one sentence saying nothing has arrived yet
+      And that sentence names no control, so renaming one cannot make it lie
+      And the pane offers nothing to press, because only something upstream
+        can make an event appear
+      And the setup instructions are NOT in the page body
+
+    # In both states, because the questions they answer outlive the setup.
+    # It is a popover on a real button rather than a hover tooltip: the
+    # instructions carry documentation links, and a link inside a hover-only
+    # tooltip cannot be reached by keyboard or by touch.
+    @integration
+    Scenario: Setup instructions sit behind the heading, whatever the source is doing
+      When the admin opens the information control beside the Events heading
+      Then they see the endpoint to push to, what the trace store does with
+        the spans, and what rotating this source's secret does
+      And the documentation links inside it can be reached by keyboard
+      And the control is there whether or not the source has ingested anything
 
     @integration
     Scenario: The pager offers no control it cannot honour
