@@ -22,15 +22,34 @@ const workbenchAttributionShape = {
   runId: z.string().optional(),
 } as const;
 
-/** `getEvaluationsV3BySlug`: the workbench state a page opens on. */
-export const experimentWorkbenchPageSchema = z.object({
-  id: z.string(),
-  slug: z.string(),
+/** `getEvaluationsV3BySlug`: the full experiment and the workbench state a page opens on. */
+export const experimentWorkbenchPageSchema = experimentSchema.extend({
   workbenchState: persistedEvaluationsV3StateSchema.nullable(),
   version: z.number(),
-  updatedAt: z.date(),
   ...workbenchAttributionShape,
 });
+
+/** The monitor row `saveAsMonitor` returned on origin/main. */
+export const experimentPublishedMonitorSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  experimentId: z.string().nullable(),
+  evaluatorId: z.string().nullable(),
+  checkType: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  executionMode: z.string(),
+  enabled: z.boolean(),
+  preconditions: z.unknown(),
+  parameters: z.json(),
+  mappings: z.unknown().nullable(),
+  sample: z.number(),
+  level: z.string(),
+  threadIdleTimeout: z.number().nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+export type ExperimentPublishedMonitor = z.infer<typeof experimentPublishedMonitorSchema>;
 
 /** `getWorkbenchVersion`: the cheap staleness probe — the version alone. */
 export const experimentWorkbenchVersionProbeSchema = z.object({

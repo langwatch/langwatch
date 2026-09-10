@@ -268,13 +268,17 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .procedure("getEvaluationsV3BySlug")
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
-    const workbenchState = await app
-      .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
-      .catch(mapExperimentError);
+    const [experiment, workbenchState] = await Promise.all([
+      app
+        .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
+        .catch(mapExperimentError),
+      app
+        .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
+        .catch(mapExperimentError),
+    ]);
 
     return {
-      id: workbenchState.experimentId,
-      slug: workbenchState.slug,
+      ...experiment,
       workbenchState: workbenchState.state,
       version: workbenchState.version,
       updatedAt: workbenchState.updatedAt,
@@ -399,7 +403,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
       });
     }
 
-    await app.publishAsMonitor({
+    return app.publishAsMonitor({
       projectId: input.projectId,
       experimentId: input.experimentId,
       monitor: {

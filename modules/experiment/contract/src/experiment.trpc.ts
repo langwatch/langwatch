@@ -22,6 +22,7 @@ import {
   experimentArchivedSchema,
   experimentCopiedSchema,
   experimentEvaluationsListPageSchema,
+  experimentPublishedMonitorSchema,
   experimentRunListSchema,
   experimentSavedWorkbenchSchema,
   experimentUpdateFrameSchema,
@@ -114,13 +115,10 @@ export const experimentsTrpc = defineTrpcContract("experiments")
   )
   .withOutput(workbenchSaveResultSchema)
 
-  /**
-   * Publishes the experiment as the monitor it describes. It answers nothing:
-   * the monitor row belongs to the monitor module's own vocabulary, and no
-   * client reads it back.
-   */
+  /** Publishes the experiment and returns the monitor row origin/main returned. */
   .mutation("saveAsMonitor")
   .withInput(projectScopeSchema.extend({ experimentId: z.string() }))
+  .withOutput(experimentPublishedMonitorSchema)
 
   // ── The experiments a project lists ──────────────────────────────
 

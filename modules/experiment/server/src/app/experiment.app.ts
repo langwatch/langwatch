@@ -23,6 +23,7 @@ import {
   type ExperimentLookup,
   type ExperimentPage,
   type ExperimentPageInput,
+  type ExperimentPublishedMonitor,
   type ExperimentRun,
   type ExperimentRunAggregate,
   type ExperimentRunListInput,
@@ -92,7 +93,7 @@ export type ExperimentMonitorCascade = Readonly<{
         executionMode: string;
       }>;
     }>,
-  ): Promise<unknown>;
+  ): Promise<ExperimentPublishedMonitor>;
 }>;
 
 /**
@@ -575,8 +576,8 @@ export class ExperimentApp implements ExperimentApi {
         executionMode: string;
       }>;
     }>,
-  ): Promise<void> {
-    await this.#dependencies.monitors.upsertForExperiment(input);
+  ): Promise<ExperimentPublishedMonitor> {
+    return this.#dependencies.monitors.upsertForExperiment(input);
   }
 
   // ── The caller and the deployment ──────────────────────────────

@@ -9,7 +9,7 @@
  * a declared output schema would reshape every refusal on the way out.
  * Spec: modules/experiment/specs/experiment-service.feature.
  */
-import { deferredScope } from "@langwatch/api/access";
+import { publicRoute } from "@langwatch/api/access";
 import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import { ExperimentApi, experimentInitBodySchema } from "@langwatch/experiment-contract";
@@ -21,9 +21,8 @@ import { INIT_EXPERIMENT } from "../rules/experiment-openapi.rules.ts";
 
 /**
  * Experiments carry their own permission, decoupled from workflows. The check
- * itself is the process's: its credential port resolves the project this key
- * may act in and enforces `experiments:manage` as the key's ceiling, then binds
- * the project as this door's own fact.
+ * itself is the process's: its bound credential fact resolves the project and
+ * enforces `experiments:manage` before the public route handler runs.
  */
 const DOOR_REASON =
   "the process's credential port resolves the project this key may act in and enforces experiments:manage as its ceiling before the handler runs";
@@ -31,9 +30,8 @@ const DOOR_REASON =
 const logger = createLogger("langwatch:experiment:init");
 
 /**
- * The project this request resolved to, bound by the process. The door defers
- * its scope, so the process's own credential port has already refused anything
- * that should not reach here.
+ * The project this request resolved to, bound by the process after its own
+ * credential port has refused anything that should not reach the handler.
  */
 export const experimentInitCaller = defineRestMiddleware(
   "experimentInitCaller",
@@ -71,7 +69,7 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
   // on a bad body - built by `zodErrorMessage` from the schema's own failure -
   // which a validated input cannot hand back.
   .withRawBody("text", { mediaType: "application/json" })
-  .withAccess(deferredScope({ reason: DOOR_REASON }))
+  .withAccess(publicRoute({ reason: DOOR_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withDocs(INIT_EXPERIMENT)
   .withMiddleware(experimentInitCaller)

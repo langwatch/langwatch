@@ -7,13 +7,13 @@
  * This family mixes two credential kinds under one path (a browser session
  * for `execute`/`abort`, a project API key for the other eight), which
  * `defineRestRouter`'s one-door-per-namespace model cannot express. Every
- * route therefore declares `deferredScope` and resolves its own caller
- * through `app`, exactly as `experiment-init.rest.ts` does for its one door.
+ * route therefore declares public access and resolves its own caller through
+ * `app`, exactly as `experiment-init.rest.ts` does through its bound fact.
  * `app` is this family's OWN token, not `ExperimentApi`: it has no installed
  * module (like `AuthDoorApi`), so the process composes an object satisfying
  * it directly. Spec: modules/experiment/specs/experiment-service.feature.
  */
-import { deferredScope, publicRoute } from "@langwatch/api/access";
+import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
@@ -276,7 +276,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // answers 401 to everyone reading the reference.
   .post("/execute", "executeExperiment")
   .withInput(executionRequestSchema)
-  .withAccess(deferredScope({ reason: SESSION_REASON }))
+  .withAccess(publicRoute({ reason: SESSION_REASON }))
   .withRawResponse({ produces: "text/event-stream" })
   .withDocs({ hide: true })
   .handle(async ({ app, input, request }): Promise<RestRawResult> => {
@@ -382,7 +382,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── POST /abort ────────────────────────────────────────────────────────
   .post("/abort", "abortExperimentRun")
   .withRawBody("text", { mediaType: "application/json" })
-  .withAccess(deferredScope({ reason: SESSION_REASON }))
+  .withAccess(publicRoute({ reason: SESSION_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request }): Promise<RestRawResult> => {
@@ -428,7 +428,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // a 400 in this family's own words, and `runInputsBodySchema` parses what
   // is left.
   .withRawBody("text", { mediaType: "application/json" })
-  .withAccess(deferredScope({ reason: RUN_REASON }))
+  .withAccess(publicRoute({ reason: RUN_REASON }))
   .withRawResponse({ produces: ["application/json", "text/event-stream"] })
   .withDocs({
     summary: "Run an experiment",
@@ -602,7 +602,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── GET /runs?experimentSlug=... (list runs for an experiment) ────────
   .get("/runs", "listExperimentRuns")
   .withQuery(listRunsQuerySchema)
-  .withAccess(deferredScope({ reason: READ_REASON }))
+  .withAccess(publicRoute({ reason: READ_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "List runs of an experiment",
@@ -662,7 +662,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── GET /runs/:runId (poll run status) ─────────────────────────────────
   .get("/runs/:runId", "getExperimentRunStatus")
   .withParams(runIdParamsSchema)
-  .withAccess(deferredScope({ reason: READ_REASON }))
+  .withAccess(publicRoute({ reason: READ_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Poll a run",
@@ -766,7 +766,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/runs/:runId/results", "getExperimentRunResults")
   .withParams(runIdParamsSchema)
   .withQuery(runResultsQuerySchema)
-  .withAccess(deferredScope({ reason: READ_REASON }))
+  .withAccess(publicRoute({ reason: READ_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Read run results",
@@ -826,7 +826,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/:slug/workbench-state", "getExperimentWorkbenchState")
   .withParams(slugParamsSchema)
   .withQuery(workbenchStateQuerySchema)
-  .withAccess(deferredScope({ reason: EXPERIMENTS_VIEW_REASON }))
+  .withAccess(publicRoute({ reason: EXPERIMENTS_VIEW_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Read an experiment's setup",
@@ -865,7 +865,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .put("/:slug/workbench-state", "saveExperimentWorkbenchState")
   .withParams(slugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
-  .withAccess(deferredScope({ reason: EXPERIMENTS_UPDATE_REASON }))
+  .withAccess(publicRoute({ reason: EXPERIMENTS_UPDATE_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Save an experiment's setup",
@@ -911,7 +911,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/:slug/versions", "listExperimentWorkbenchVersions")
   .withParams(slugParamsSchema)
   .withQuery(listVersionsQuerySchema)
-  .withAccess(deferredScope({ reason: EXPERIMENTS_VIEW_REASON }))
+  .withAccess(publicRoute({ reason: EXPERIMENTS_VIEW_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "List an experiment's versions",
@@ -970,7 +970,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // ── POST /:slug/versions/:version/restore ────────────────────────────
   .post("/:slug/versions/:version/restore", "restoreExperimentWorkbenchVersion")
   .withParams(slugVersionParamsSchema)
-  .withAccess(deferredScope({ reason: EXPERIMENTS_UPDATE_REASON }))
+  .withAccess(publicRoute({ reason: EXPERIMENTS_UPDATE_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     summary: "Restore an experiment version",

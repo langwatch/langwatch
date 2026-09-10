@@ -6,7 +6,7 @@
  * raw answer rather than a schema that would reshape every refusal on the way
  * out. Spec: modules/experiment/specs/experiment-service.feature.
  */
-import { deferredScope } from "@langwatch/api/access";
+import { publicRoute } from "@langwatch/api/access";
 import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import { dSPyStepRESTParamsSchema, ExperimentApi } from "@langwatch/experiment-contract";
@@ -19,9 +19,8 @@ import { dspyStepOf } from "../rules/experiment-dspy-step.rules.ts";
 
 /**
  * Experiments carry their own permission, decoupled from workflows. The check
- * itself is the process's: its credential port resolves the project this key
- * may act in and enforces `experiments:manage` as the key's ceiling, then binds
- * the project as this door's own fact.
+ * itself is the process's: its bound credential fact resolves the project and
+ * enforces `experiments:manage` before the public route handler runs.
  */
 const DOOR_REASON =
   "the process's credential port resolves the project this key may act in and enforces experiments:manage as its ceiling before the handler runs";
@@ -53,7 +52,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   // accepted, and answers its own sentence - built by `zodErrorMessage` from
   // the schema's own failure - on a bad batch.
   .withRawBody("text", { mediaType: "application/json" })
-  .withAccess(deferredScope({ reason: DOOR_REASON }))
+  .withAccess(publicRoute({ reason: DOOR_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES })
   .withDocs(LOG_DSPY_STEPS)

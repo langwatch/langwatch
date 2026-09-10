@@ -74,12 +74,12 @@ describe("given the experiments tRPC namespace", () => {
       expect(experimentsTrpc.namespace).toBe("experiments");
     });
 
-    it("declares an output for every procedure except the monitor publication", () => {
+    it("declares an output for every procedure", () => {
       const withoutOutput = Object.entries(experimentsTrpc.members)
         .filter(([, member]) => member.output === undefined)
         .map(([name]) => name);
 
-      expect(withoutOutput).toEqual(["saveAsMonitor"]);
+      expect(withoutOutput).toEqual([]);
     });
   });
 

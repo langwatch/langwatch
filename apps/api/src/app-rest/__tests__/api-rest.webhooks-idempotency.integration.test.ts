@@ -14,7 +14,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import { WebhookApp, WebhookEndpointAdapter } from "@langwatch/webhook-server";
+import { WebhookApp, PrismaWebhookEndpointRepository } from "@langwatch/webhook-server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { composeApiIdempotency } from "../../app/api-idempotency.composition.ts";
@@ -145,7 +145,7 @@ function mountWebhooks(): MountedRestFamily {
   const idempotency = composeApiIdempotency({ database: prisma, encryption });
   if (!idempotency) throw new Error("this suite needs the process's receipt ledger");
 
-  const endpoints = WebhookEndpointAdapter.create({
+  const endpoints = PrismaWebhookEndpointRepository.create({
     prisma,
     ids: { newEndpointId: () => `whep_${randomBytes(6).toString("hex")}` },
     secrets: {

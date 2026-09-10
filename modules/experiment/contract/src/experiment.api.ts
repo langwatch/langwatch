@@ -2,7 +2,10 @@ import { moduleApi } from "@langwatch/runtime-composition";
 import type { Dataset } from "@langwatch/dataset-contract";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
 import type { StudioWorkflow, WorkflowWithVersion } from "@langwatch/workflow-contract";
-import type { ExperimentUpdateFrame } from "./experiment.responses.ts";
+import type {
+  ExperimentPublishedMonitor,
+  ExperimentUpdateFrame,
+} from "./experiment.responses.ts";
 import type { ExperimentRunLookupInput } from "./experiment.rest.ts";
 import type { DSPyRunsSummary } from "./experiment-legacy.ts";
 import type {
@@ -222,7 +225,7 @@ export interface ExperimentApi {
         executionMode: string;
       }>;
     }>,
-  ): Promise<void>;
+  ): Promise<ExperimentPublishedMonitor>;
   getDatasets(input: Readonly<{ projectId: string; datasetIds: string[] }>): Promise<Dataset[]>;
   renameDataset(
     input: Readonly<{ datasetId: string; projectId: string; name: string }>,
