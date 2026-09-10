@@ -132,7 +132,24 @@ const isInlined = (id, inlineAll) => {
 const createExternalize = (inlineAll) => ({
   name: "externalize",
   setup(b) {
-    b.onResolve({ filter: /.*/ }, (a) => {
+    b.onResolve({ filter: /.*/ }, async (a) => {
+      // The monorepo ships its own `langwatch` SDK as a workspace package, but a
+      // vendored prebuilt tarball (e.g. @langwatch/scenario) declares a semver
+      // range for `langwatch` that pnpm can satisfy from the registry. Inlining
+      // that published copy pins its OpenTelemetry expectations against the app's
+      // newer externalized @opentelemetry/*, and the scenario child then dies at
+      // module scope. Pin every `langwatch` specifier — whatever imports it — to
+      // the app's own workspace copy so exactly one SDK is in the graph. We
+      // re-resolve from APP rather than the importer, mark the result to break
+      // the recursion, and let the rules below inline the workspace copy (they
+      // already do: the app declares langwatch as workspace:*).
+      if (!a.pluginData?.langwatchPinned && basePackage(a.path) === "langwatch") {
+        return b.resolve(a.path, {
+          resolveDir: APP,
+          kind: a.kind,
+          pluginData: { langwatchPinned: true },
+        });
+      }
       if (isInlined(a.path, inlineAll)) return;
       // Side-effect-only imports keep their side effects (no waiver), or the
       // import statement itself would be dropped.
