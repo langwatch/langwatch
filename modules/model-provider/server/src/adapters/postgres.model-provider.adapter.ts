@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ModelProviderApi as ModelProviderServiceContract } from "@langwatch/model-provider-contract";
+import type { ModelProviderService as ModelProviderServiceContract } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -14,7 +14,7 @@ import {
 import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
-import { ModelProviderApi } from "../services/model-provider.service.ts";
+import { ModelProviderService } from "../services/model-provider.service.ts";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
 
 export interface PostgresModelProviderAdapterOptions {
@@ -39,7 +39,7 @@ export class PostgresModelProviderAdapter {
   }
 
   build(): ModelProviderServiceContract {
-    return ModelProviderApi.create({
+    return ModelProviderService.create({
       repository: PrismaModelProviderRepository.create(
         this.options.database,
         this.options.credentials,
