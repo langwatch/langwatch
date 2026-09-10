@@ -322,6 +322,7 @@ export async function mintVoiceSession({
   const agentId = row?.agentExternalId ?? bodyAgentId;
 
   const runner = runnerFor(ports, transport);
+  runner.assertAvailable?.();
   const credential = await ports.resolveCredential({ projectId, transport });
   if (!credential) throw new VoiceKeyMissingError(runner.missingKeyMessage);
 
@@ -386,10 +387,12 @@ async function fetchProviderRecord(
     projectId,
   }: { transport: VoiceTransport; conversationId: string; projectId: string },
 ): Promise<{ record: CallRecord | null; hasFetchFailed: boolean }> {
+  const runner = runnerFor(ports, transport);
+  runner.assertAvailable?.();
   const credential = await ports.resolveCredential({ projectId, transport });
   if (!credential) return { record: null, hasFetchFailed: false };
   try {
-    const record = await runnerFor(ports, transport).fetchCallRecord({
+    const record = await runner.fetchCallRecord({
       conversationId,
       credential,
       audioProxyUrl: ports.audioProxyUrl({ conversationId, projectId }),

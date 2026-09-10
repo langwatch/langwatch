@@ -55,6 +55,10 @@ export function voiceCallTargetOf({
   if (!agent) return null;
   const parsed = voiceAgentConfigSchema.safeParse(agent.config);
   if (!parsed.success) return null;
+  // The browser call reaches an ElevenLabs agent only; a phone target has no
+  // in-browser call, so no target is resolved for it (the drawer offers the
+  // scenario run instead).
+  if (parsed.data.transport !== "elevenlabs_convai") return null;
   // A call is scored against a scenario only when exactly one scenario is in
   // scope: a single case, or a suite that holds exactly one scenario. Every
   // other scope has no single scenario to write the run under, so no target is

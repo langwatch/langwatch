@@ -14,7 +14,7 @@
 import { z } from "zod";
 
 /** Every transport a voice agent can be reached through. */
-export const VOICE_TRANSPORTS = ["elevenlabs_convai"] as const;
+export const VOICE_TRANSPORTS = ["elevenlabs_convai", "phone"] as const;
 export type VoiceTransport = (typeof VOICE_TRANSPORTS)[number];
 
 export const elevenLabsConvaiTransportSchema = z.object({
@@ -22,23 +22,64 @@ export const elevenLabsConvaiTransportSchema = z.object({
   agentId: z.string().trim().min(1, "Agent id is required").max(128),
 });
 
+/**
+ * E.164: a leading `+`, a non-zero country code digit, then up to 14 more
+ * digits. The number is the whole identity of a phone target, so it is
+ * validated at the schema boundary rather than trusted from the form.
+ */
+export const E164_PHONE_PATTERN = /^\+[1-9]\d{1,14}$/;
+
+export const phoneTransportSchema = z.object({
+  transport: z.literal("phone"),
+  phoneNumber: z
+    .string()
+    .trim()
+    .regex(
+      E164_PHONE_PATTERN,
+      "Enter the number in E.164 form, like +14155550123",
+    ),
+});
+
 export const voiceAgentConfigSchema = z.discriminatedUnion("transport", [
   elevenLabsConvaiTransportSchema,
+  phoneTransportSchema,
 ]);
 export type VoiceAgentConfig = z.infer<typeof voiceAgentConfigSchema>;
 
 /** The words a customer reads for each transport in the drawer. */
 export const VOICE_TRANSPORT_LABELS: Record<VoiceTransport, string> = {
   elevenlabs_convai: "ElevenLabs agent",
+  phone: "Phone number",
 };
 
 /** Model provider whose key signs sessions for this transport. */
-export const VOICE_TRANSPORT_PROVIDER: Record<VoiceTransport, "elevenlabs"> = {
+export const VOICE_TRANSPORT_PROVIDER: Record<
+  VoiceTransport,
+  "elevenlabs" | "twilio"
+> = {
   elevenlabs_convai: "elevenlabs",
+  phone: "twilio",
 };
 
 export const parseVoiceAgentConfig = (config: unknown): VoiceAgentConfig =>
   voiceAgentConfigSchema.parse(config);
+
+/**
+ * The transport's own external identifier for a voice agent: the ElevenLabs
+ * agent id, or the phone number for a phone target. This is the value that
+ * forms the identity key ({@link voiceAgentIdentityKey}), so a phone target
+ * keys on its number (voice:phone:+14155550123). Narrows on the transport with
+ * an exhaustive switch, so a new transport member is a compile error here until
+ * it says which field carries its identity.
+ */
+export const voiceAgentExternalId = (config: VoiceAgentConfig): string => {
+  switch (config.transport) {
+    case "elevenlabs_convai":
+      return config.agentId;
+    case "phone":
+      return config.phoneNumber;
+  }
+};
 
 /**
  * The legacy scenario set drawer "Talk to it" calls used to be written into,

@@ -6,6 +6,10 @@ import { describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { CallRecord } from "../call-record";
 import {
+  phoneTransport,
+  VoicePhoneTransportUnavailableError,
+} from "../transports/phone.transport";
+import {
   authorizeRecordingPlayback,
   finishVoiceSession,
   mintVoiceSession,
@@ -72,7 +76,7 @@ function fakePorts({
     signSessionToken: (payload) => JSON.stringify(payload),
     now: () => 1000,
     newSessionId: () => "sess_generated",
-    registry: { elevenlabs_convai: runner },
+    registry: { elevenlabs_convai: runner, phone: phoneTransport },
     ...over,
   };
 }
@@ -229,6 +233,43 @@ describe("mintVoiceSession", () => {
           }),
         ).rejects.toBeInstanceOf(VoiceKeyMissingError);
         expect(runner.mintSession).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the transport cannot run yet (the phone stub)", () => {
+      /** @scenario "Running a phone target before the voice worker exists fails with a clear message" */
+      it("rejects with the unavailable error before any credential lookup", async () => {
+        const runner = fakeRunner();
+        const resolveCredential = vi.fn(async () => CREDENTIAL);
+        const ports = fakePorts({
+          runner,
+          over: {
+            resolveCredential,
+            registry: { elevenlabs_convai: runner, phone: phoneTransport },
+          },
+        });
+
+        await expect(
+          mintVoiceSession({
+            ports,
+            projectId: "p1",
+            transport: "phone",
+            agentId: "+14155550123",
+            maxDurationSeconds: 300,
+          }),
+        ).rejects.toMatchObject({
+          code: "voice_phone_transport_unavailable",
+        });
+        await expect(
+          mintVoiceSession({
+            ports,
+            projectId: "p1",
+            transport: "phone",
+            agentId: "+14155550123",
+            maxDurationSeconds: 300,
+          }),
+        ).rejects.toBeInstanceOf(VoicePhoneTransportUnavailableError);
+        expect(resolveCredential).not.toHaveBeenCalled();
       });
     });
   });

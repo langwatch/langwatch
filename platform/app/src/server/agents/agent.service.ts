@@ -6,6 +6,7 @@ import type {
   Workflow,
 } from "~/optimization_studio/types/dsl";
 import {
+  type VoiceAgentConfig,
   type VoiceTransport,
   voiceAgentIdentityKey,
 } from "~/server/agents/voice/voice-agent.config";
@@ -252,13 +253,21 @@ export class AgentService {
       identityKey,
     });
     if (existing) return existing;
+    // The external id (agentId) carries the identity for either transport: the
+    // ElevenLabs agent id, or the phone number. Store it under the field the
+    // transport's config member names, narrowing so the discriminated union
+    // stays valid without a cast.
+    const config: VoiceAgentConfig =
+      input.transport === "phone"
+        ? { transport: "phone", phoneNumber: input.agentId }
+        : { transport: input.transport, agentId: input.agentId };
     try {
       return await this.repository.create({
         id: input.id,
         projectId: input.projectId,
         name: input.name,
         type: "voice",
-        config: { transport: input.transport, agentId: input.agentId },
+        config,
         identityKey,
       });
     } catch (error) {
