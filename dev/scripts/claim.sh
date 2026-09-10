@@ -26,6 +26,16 @@ case "${1:-}" in
   take)
     who=$2; task=$3; shift 3
     hold
+    for want in "$@"; do
+      while IFS=$'\t' read -r _at holder _task paths; do
+        [ -z "${holder:-}" ] && [ -z "${paths:-}" ] && continue
+        [ "$holder" = "$who" ] && continue
+        for held in $paths; do
+          case "$want/" in "$held"/*) free; echo "refused: $want is held by $holder ($held)"; exit 1;; esac
+          case "$held/" in "$want"/*) free; echo "refused: $want covers $held, held by $holder"; exit 1;; esac
+        done
+      done < "$board"
+    done
     printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$who" "$task" "$*" >> "$board"
     free
     echo "claimed by $who: $*"
