@@ -2,8 +2,8 @@ import {
   StoredObjectOwnerLookupUnavailableError,
   StoredObjectOwnerResolver,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectOwnerLookupSpan } from "../app/stored-object.infrastructure.ts";
-import { StoredObjectOwnerLookupTelemetry } from "../app/stored-object.infrastructure.ts";
+import type { StoredObjectOwnerLookupSpan } from "../app/stored-object.members.ts";
+import { StoredObjectOwnerLookupTelemetry } from "../app/stored-object.members.ts";
 import {
   StoredObjectOwnerRepository,
   type StoredObjectOwnerLookupResult,

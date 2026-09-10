@@ -1,7 +1,7 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { TraceProjectMetadata } from "../app/trace.infrastructure.ts";
+import type { TraceProjectMetadata } from "../app/trace.members.ts";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:project-metadata");

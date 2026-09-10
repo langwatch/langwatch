@@ -4,7 +4,7 @@ import type {
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import type { GovernanceProjectDirectory } from "../app/governance.infrastructure.ts";
+import type { GovernanceProjectDirectory } from "../app/governance.members.ts";
 import type {
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSink,
@@ -14,7 +14,7 @@ import type {
   IngestionPullSourceReader,
   PulledUsageDispatcher,
   PulledUsageEntitlements,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 import {
   COPILOT_ROUTING_PROFILE,
   CopilotStudioTraceMapperService,

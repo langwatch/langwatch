@@ -20,7 +20,7 @@ import {
   IngestionKeyRepository,
   type StoredIngestionKey,
   type StoredIngestionKeyOwnership,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { IngestionKeyService } from "../ingestion-source-key.service.ts";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";

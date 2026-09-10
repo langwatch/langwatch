@@ -10,7 +10,7 @@ import {
   type TRACE_MAPPINGS,
 } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
-import type { EvaluationSpanDigest } from "../app/evaluation.infrastructure.ts";
+import type { EvaluationSpanDigest } from "../app/evaluation.members.ts";
 
 /**
  * Callback that fetches all traces belonging to a thread.

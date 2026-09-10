@@ -9,7 +9,7 @@ import type {
   OrganizationPromptSeed,
   OrganizationSeatLicense,
   OrganizationSessionRevocation,
-} from "../../app/organization.infrastructure.ts";
+} from "../../app/organization.members.ts";
 import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
 
 const mockInvalidateOrganization = vi.fn();

@@ -8,7 +8,7 @@ import {
   TraceIoExtraction,
   type TraceIoSide,
   type TraceIoValue,
-} from "../../../app/trace.infrastructure.ts";
+} from "../../../app/trace.members.ts";
 import { TraceCanonicalisationService } from "../../canonicalisers/trace-canonicalisation.service.ts";
 import { TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
 

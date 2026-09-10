@@ -120,11 +120,11 @@ export class AnalyticsApp implements AnalyticsApiContract {
   static readonly configSchema = analyticsServerConfigSchema;
 
   static create(setup: AnalyticsSetup): AnalyticsApp {
-    const resolveClient = setup.infrastructure.resolveClickHouseClient;
+    const resolveClient = setup.members.resolveClickHouseClient;
     const analytics = AnalyticsAdapter.create({
       resolveClient: async (tenantId) => (resolveClient ? resolveClient(tenantId) : null),
-      clickhouseEnabled: setup.infrastructure.clickhouseEnabled ?? resolveClient !== null,
-      defaultRetentionDays: setup.infrastructure.defaultRetentionDays,
+      clickhouseEnabled: setup.members.clickhouseEnabled ?? resolveClient !== null,
+      defaultRetentionDays: setup.members.defaultRetentionDays,
     });
     const langwatchQl = setup.config.langwatchQl;
     const connectionValues = [

@@ -50,7 +50,7 @@ const configuredAzure = {
 describe("given the project has no azure_safety provider", () => {
   const app = (environment: Record<string, string | undefined> = {}) =>
     createEvaluationTestApp({
-      infrastructure: { environment: new TestEvaluationInstallEnvironment(environment) },
+      members: { environment: new TestEvaluationInstallEnvironment(environment) },
       dependencies: { modelProviders: modelProviders() },
     });
 
@@ -119,7 +119,7 @@ describe("given an evaluator this install left out", () => {
     /** @scenario "The evaluator inventory names what this install and this project lack" */
     it("says so, separately from it being unconfigured", async () => {
       const catalogue = await createEvaluationTestApp({
-        infrastructure: {
+        members: {
           environment: new TestEvaluationInstallEnvironment({ LANGWATCH_ENABLE_PRESIDIO: "false" }),
         },
       }).listEvaluators({ projectId: PROJECT_ID });
@@ -139,7 +139,7 @@ describe("when the client asks for the project's custom evaluators", () => {
     ]);
 
     const listed = await createEvaluationTestApp({
-      infrastructure: { customEvaluators },
+      members: { customEvaluators },
     }).listCustomEvaluators({ projectId: PROJECT_ID });
 
     expect(listed).toEqual([{ id: "workflow_1", name: "Tone", versions: [] }]);
@@ -159,7 +159,7 @@ describe("given one trace is re-evaluated", () => {
   describe("when the evaluator answers", () => {
     it("returns the evaluator's result to the caller", async () => {
       const app = createEvaluationTestApp({
-        infrastructure: { rescore: new TestEvaluationRescore(PROCESSED_RESULT) },
+        members: { rescore: new TestEvaluationRescore(PROCESSED_RESULT) },
       });
 
       await expect(app.runTraceEvaluation(runInput, { id: USER_ID })).resolves.toEqual(
@@ -173,7 +173,7 @@ describe("given one trace is re-evaluated", () => {
     it("reports the run onto the pipeline against the project's tenant", async () => {
       const report = new TestEvaluationReport();
       const app = createEvaluationTestApp({
-        infrastructure: { rescore: new TestEvaluationRescore(PROCESSED_RESULT), report },
+        members: { rescore: new TestEvaluationRescore(PROCESSED_RESULT), report },
       });
 
       await app.runTraceEvaluation(runInput, { id: USER_ID });
@@ -195,7 +195,7 @@ describe("given one trace is re-evaluated", () => {
     it("attributes the run to the caller", async () => {
       const analytics = new TestEvaluationRunAnalytics();
       const app = createEvaluationTestApp({
-        infrastructure: { rescore: new TestEvaluationRescore(PROCESSED_RESULT), analytics },
+        members: { rescore: new TestEvaluationRescore(PROCESSED_RESULT), analytics },
       });
 
       await app.runTraceEvaluation(runInput, { id: USER_ID });
@@ -210,7 +210,7 @@ describe("given one trace is re-evaluated", () => {
      */
     it("still answers the caller", async () => {
       const app = createEvaluationTestApp({
-        infrastructure: {
+        members: {
           rescore: new TestEvaluationRescore(PROCESSED_RESULT),
           report: new TestEvaluationReport(true),
         },
@@ -227,7 +227,7 @@ describe("given the client warms the evaluator runtime", () => {
   describe("when every probe answers", () => {
     it("sends one probe per requested instance and reports the count", async () => {
       const warmup = new TestEvaluationWarmup();
-      const app = createEvaluationTestApp({ infrastructure: { warmup } });
+      const app = createEvaluationTestApp({ members: { warmup } });
 
       await expect(app.warmupEvaluators({ projectId: PROJECT_ID, count: 3 })).resolves.toEqual({
         success: true,
@@ -241,7 +241,7 @@ describe("given the client warms the evaluator runtime", () => {
     /** @scenario "A warm-up is a nudge rather than a health check" */
     it("succeeds anyway — a warm-up is not a health check", async () => {
       const app = createEvaluationTestApp({
-        infrastructure: { warmup: new TestEvaluationWarmup(true) },
+        members: { warmup: new TestEvaluationWarmup(true) },
       });
 
       await expect(app.warmupEvaluators({ projectId: PROJECT_ID, count: 2 })).resolves.toEqual({

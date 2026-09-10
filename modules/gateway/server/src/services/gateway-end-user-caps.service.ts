@@ -7,7 +7,7 @@ import {
   toWireEnum,
   usdDisplayString,
 } from "@langwatch/gateway-contract";
-import type { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
 import type {
   AttributedUserBudgetTemplate,
   GatewayBudgetRepository,

@@ -38,7 +38,7 @@ import type {
   EvaluationExecution,
   EvaluationInputsResolution,
   EvaluationRetentionFloor,
-} from "./evaluation.infrastructure.ts";
+} from "./evaluation.members.ts";
 import type { EvaluationClickHouseResolver } from "../repositories/clickhouse/evaluation-clickhouse-client.ts";
 import type {
   EvaluationCustomEvaluators,
@@ -47,7 +47,7 @@ import type {
   EvaluationRescore,
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
-} from "../app/evaluation.infrastructure.ts";
+} from "../app/evaluation.members.ts";
 import { ClickHouseEvaluationRepository } from "../repositories/clickhouse/evaluation.repository.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
@@ -171,49 +171,49 @@ export class EvaluationApp implements EvaluationApiContract {
   private constructor(
     service: EvaluationService,
     dependencies: EvaluationSetup["dependencies"],
-    infrastructure: EvaluationInfrastructure,
+    members: EvaluationInfrastructure,
   ) {
     this.#service = service;
     this.#modelProviders = dependencies.modelProviders;
-    this.#environment = infrastructure.environment;
-    this.#customEvaluators = infrastructure.customEvaluators;
-    this.#rescore = infrastructure.rescore;
-    this.#warmup = infrastructure.warmup;
-    this.#analytics = infrastructure.analytics;
-    this.#report = infrastructure.report;
-    this.#experiments = infrastructure.experiments;
-    this.#slugs = infrastructure.slugs;
-    this.#savedEvaluators = infrastructure.savedEvaluators;
-    this.#models = infrastructure.models;
-    this.#ledger = infrastructure.ledger;
-    this.#runner = infrastructure.runner;
+    this.#environment = members.environment;
+    this.#customEvaluators = members.customEvaluators;
+    this.#rescore = members.rescore;
+    this.#warmup = members.warmup;
+    this.#analytics = members.analytics;
+    this.#report = members.report;
+    this.#experiments = members.experiments;
+    this.#slugs = members.slugs;
+    this.#savedEvaluators = members.savedEvaluators;
+    this.#models = members.models;
+    this.#ledger = members.ledger;
+    this.#runner = members.runner;
     this.#autoslug = EvaluationNameAutoslugService.create();
     this.#batchLog = EvaluationBatchLogService.create({
-      experiments: infrastructure.experiments,
-      runs: infrastructure.experimentRuns,
-      report: infrastructure.report,
+      experiments: members.experiments,
+      runs: members.experimentRuns,
+      report: members.report,
     });
   }
 
-  static create({ infrastructure, dependencies }: EvaluationSetup): EvaluationApp {
+  static create({ members, dependencies }: EvaluationSetup): EvaluationApp {
     const repository = ClickHouseEvaluationRepository.create({
-      resolveClient: infrastructure.resolveClickHouse,
-      retentionFloor: infrastructure.retentionFloor,
+      resolveClient: members.resolveClickHouse,
+      retentionFloor: members.retentionFloor,
     });
     const monitorPerformance = ClickHouseMonitorPerformanceRepository.create({
-      resolveClient: infrastructure.resolveClickHouse,
+      resolveClient: members.resolveClickHouse,
     });
 
     return new EvaluationApp(
       EvaluationService.create({
         repository,
         monitorPerformance,
-        execution: infrastructure.execution,
-        inputResolution: infrastructure.inputResolution,
+        execution: members.execution,
+        inputResolution: members.inputResolution,
         workflows: dependencies.workflows,
       }),
       dependencies,
-      infrastructure,
+      members,
     );
   }
 

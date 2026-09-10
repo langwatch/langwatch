@@ -6,7 +6,7 @@ import {
   type ReportSchedule,
   type ReportScheduleInput,
 } from "@langwatch/automation-contract";
-import { AutomationClock } from "../app/automation.infrastructure.ts";
+import { AutomationClock } from "../app/automation.members.ts";
 import { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
 import { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";

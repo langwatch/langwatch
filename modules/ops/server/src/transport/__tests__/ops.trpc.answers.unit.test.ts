@@ -31,9 +31,9 @@ type OpsDeclaration = Parameters<
 function mount(
   declaration: OpsDeclaration,
   capability: Partial<OpsCapability> = {},
-  infrastructure: Parameters<typeof createOpsTestApp>[0]["infrastructure"] = {},
+  members: Parameters<typeof createOpsTestApp>[0]["members"] = {},
 ) {
-  const { app } = createOpsTestApp({ capability, infrastructure });
+  const { app } = createOpsTestApp({ capability, members });
   const trpc = initTRPC.context<OpsAnswersContext>().create();
   const router = createTrpcRuntime<OpsAnswersContext>({
     root: trpc,

@@ -39,7 +39,7 @@ import type {
   LangyEffectMembers,
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
-} from "../app/langy.infrastructure.ts";
+} from "../app/langy.members.ts";
 import {
   langyGenerateTitleIntentSchema,
   langyWorkerDispatchIntentSchema,

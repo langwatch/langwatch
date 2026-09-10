@@ -12,8 +12,8 @@ import { PrismaAuthzCutoverRepository } from "./prisma.authz-cutover.repository.
 export class PostgresAuthzRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create(infrastructure: Readonly<{ prisma: PrismaClient }>): AuthzRepositories {
-    const database = infrastructure.prisma;
+  static create(members: Readonly<{ prisma: PrismaClient }>): AuthzRepositories {
+    const database = members.prisma;
 
     return {
       bindings: PrismaAuthzBindingRepository.create({ database }),

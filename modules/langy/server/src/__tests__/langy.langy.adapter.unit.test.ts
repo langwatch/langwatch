@@ -221,7 +221,7 @@ function compositionOptions() {
 }
 
 function createApp(): LangyApp {
-  const infrastructure = {
+  const members = {
     database: undefined!,
     ...compositionOptions(),
     redis: null,
@@ -229,7 +229,7 @@ function createApp(): LangyApp {
   };
   return LangyApp.create({
     dependencies: {},
-    infrastructure,
+    members,
     config: { agentUrl: undefined, internalSecret: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
   });

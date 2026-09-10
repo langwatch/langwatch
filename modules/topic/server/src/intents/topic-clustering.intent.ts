@@ -41,7 +41,7 @@ export function classifyClusteringError(error: unknown): ClassifiedClusteringErr
       isUserActionable: true,
     };
   }
-  // Unattributed: a bug, a dependency we did not wrap, an infrastructure
+  // Unattributed: a bug, a dependency we did not wrap, an members
   // failure. Fail closed — we do not tell someone their configuration is
   // broken on the strength of not recognising an error.
   return { code: CLUSTERING_ERROR_CODES.INTERNAL, isUserActionable: false };

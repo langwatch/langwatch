@@ -369,7 +369,7 @@ function SettingsForm({
               {organization.useCustomS3 && (
                 <HorizontalFormControl
                   label="S3 Storage"
-                  helper="Configure S3 storage to host data on your own infrastructure. Leave empty to use LangWatch's managed storage."
+                  helper="Configure S3 storage to host data on your own members. Leave empty to use LangWatch's managed storage."
                 >
                   {hasPermission("organization:manage") ? (
                     <VStack width="full" align="start" gap={3}>

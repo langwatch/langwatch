@@ -42,7 +42,7 @@ export type LicenseError = (typeof LICENSE_ERRORS)[keyof typeof LICENSE_ERRORS];
 /**
  * UNLIMITED_PLAN: the plan a self-hosted deployment runs on without a license. A license sells
  * the Enterprise surface (SSO, SCIM, audit logs) and support, not permission to run the
- * software, so nothing the deployment stores on its own infrastructure is capped here.
+ * software, so nothing the deployment stores on its own members is capped here.
  */
 export const UNLIMITED_PLAN: PlanInfo = OPEN_SOURCE_LICENSING_PLAN;
 

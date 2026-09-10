@@ -14,7 +14,7 @@ import {
   type GatewaySpendFailedData,
   type GatewaySpendOutcomeData,
   type GatewaySpendProcessingEvent,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 
 export const GATEWAY_DEBITS_PROCESS_NAME = "gatewayDebits" as const;
 

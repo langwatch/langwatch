@@ -70,17 +70,17 @@ export class PresenceApp implements PresenceApiContract {
     this.#users = users;
   }
 
-  static create({ repositories, infrastructure, dependencies }: PresenceSetup): PresenceApp {
+  static create({ repositories, members, dependencies }: PresenceSetup): PresenceApp {
     const presence = PresenceService.create({
       repository: repositories.sessions,
-      broadcast: infrastructure.broadcast,
+      broadcast: members.broadcast,
       projects: dependencies.projects,
-      diagnostics: infrastructure.diagnostics,
+      diagnostics: members.diagnostics,
     });
 
     return new PresenceApp(
       presence,
-      PresenceStreamService.create({ presence, emitters: infrastructure.emitters }),
+      PresenceStreamService.create({ presence, emitters: members.emitters }),
       dependencies.users,
     );
   }

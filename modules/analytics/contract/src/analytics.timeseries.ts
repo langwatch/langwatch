@@ -155,7 +155,7 @@ export const analyticsFilterOptionsResultSchema = z.object({
 
 export const analyticsTimeseriesRowSchema = z
   .object({
-    // ClickHouse JSONEachRow is an infrastructure boundary, not an API input.
+    // ClickHouse JSONEachRow is an members boundary, not an API input.
     // Keep this deliberately permissive: the displaced parser treated a bad
     // period/date cell as the legacy previous/empty bucket rather than turning a
     // formerly readable response into a transport error.

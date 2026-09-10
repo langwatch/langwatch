@@ -81,7 +81,7 @@ export function createScenarioRestTestApp(
   const app = ScenarioApp.create({
     repositories: MemoryScenarioRepositories.create(),
     dependencies: { users: createApiFixture<UserApi>() },
-    infrastructure: {
+    members: {
       agentTesting: createApiFixture<AgentTestService>(),
       simulations,
       scenarioExecution: createApiFixture<ScenarioExecutionService>(),

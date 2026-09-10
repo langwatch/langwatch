@@ -9,7 +9,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   AppGovernanceEncryption,
   type GovernanceEncryption,
-} from "./governance-infrastructure.adapter.ts";
+} from "./governance-members.adapter.ts";
 
 type PlanProvider = {
   getActivePlan(input: { organizationId: string }): Promise<{ type: string }>;

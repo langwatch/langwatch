@@ -5,7 +5,7 @@ import {
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { z } from "zod";
 import { createMcpHandler, type McpHandler } from "../transport/hosted-mcp.api.ts";
-import type { HostedMcpDependencies } from "./hosted-mcp-infrastructure.ts";
+import type { HostedMcpDependencies } from "./hosted-mcp-members.ts";
 
 export type HostedMcpInfrastructure = Readonly<{
   mcp: Omit<HostedMcpDependencies, "baseHost">;
@@ -31,8 +31,8 @@ export class HostedMcpApp implements HostedMcpApiContract {
     this.#dependencies = dependencies;
   }
 
-  static create({ infrastructure, config }: HostedMcpSetup): HostedMcpApp {
-    return new HostedMcpApp({ ...infrastructure.mcp, baseHost: config.baseHost });
+  static create({ members, config }: HostedMcpSetup): HostedMcpApp {
+    return new HostedMcpApp({ ...members.mcp, baseHost: config.baseHost });
   }
 
   createHandler(): McpHandler {

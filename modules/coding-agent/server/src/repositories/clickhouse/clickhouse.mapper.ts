@@ -6,7 +6,7 @@ import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 import type {
   CodingAgentClickHouseClient,
   CodingAgentClickHouse,
-} from "../../app/coding-agent.infrastructure.ts";
+} from "../../app/coding-agent.members.ts";
 
 /** A moment as a ClickHouse INSERT carries it. The client serialises this into
  *  `DateTime64(3)`; an instant serialises to `{}`, so the conversion is here. */

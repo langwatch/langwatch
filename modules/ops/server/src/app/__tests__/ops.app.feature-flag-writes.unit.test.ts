@@ -46,7 +46,7 @@ function buildApp(): { app: OpsApp; written: string[] } {
   });
 
   const { app } = createOpsTestApp({
-    infrastructure: {
+    members: {
       featureFlags,
       eventingIntrospection: new OneSwitchIntrospection(),
     },
@@ -61,7 +61,7 @@ describe("given an operator writing a feature flag", () => {
     const createCapability = vi.fn<() => OpsCapability>(() => createApiFixture<OpsCapability>());
     const { app } = createOpsTestApp({
       projects: createApiFixture<ProjectApi>({ searchByQuery }),
-      infrastructure: { createCapability, eventingIntrospection: new OneSwitchIntrospection() },
+      members: { createCapability, eventingIntrospection: new OneSwitchIntrospection() },
     });
     const query = { query: "support", organizationId: "organization-a", limit: 7 };
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.service.ts";
-import { GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
+import { GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.members.ts";
 
 const options = { cursor: null, credentials: { token: "admin-key" } };
 const usageConfig = {

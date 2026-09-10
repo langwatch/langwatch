@@ -40,8 +40,8 @@ import type {
   VirtualKeyCamelDto,
   VirtualKeySnakeDto,
 } from "../adapters/gateway-virtual-key-dto.adapter.ts";
-import type { GatewayBudgetSpend } from "./gateway.infrastructure.ts";
-import type { GatewayVirtualKeySpend } from "./gateway.infrastructure.ts";
+import type { GatewayBudgetSpend } from "./gateway.members.ts";
+import type { GatewayVirtualKeySpend } from "./gateway.members.ts";
 
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import {
@@ -419,20 +419,20 @@ export class GatewayApp implements GatewayApi {
   static readonly dependencies = {};
 
   static create(setup: GatewaySetup): GatewayApp {
-    return new GatewayApp(setup.infrastructure);
+    return new GatewayApp(setup.members);
   }
 
   #coreDependencies: GatewayAppDependencies | undefined;
   #agentCache: GatewayAgentCacheService | undefined;
   #elevenLabsWebhook: GatewayElevenLabsWebhookService | undefined;
 
-  private constructor(infrastructure: GatewayInfrastructure) {
-    this.#coreDependencies = "virtualKeys" in infrastructure ? infrastructure : void 0;
-    this.#agentCache = infrastructure.agentCache
-      ? GatewayAgentCacheService.create(infrastructure.agentCache)
+  private constructor(members: GatewayInfrastructure) {
+    this.#coreDependencies = "virtualKeys" in members ? members : void 0;
+    this.#agentCache = members.agentCache
+      ? GatewayAgentCacheService.create(members.agentCache)
       : void 0;
-    this.#elevenLabsWebhook = infrastructure.elevenLabsWebhook
-      ? GatewayElevenLabsWebhookService.create(infrastructure.elevenLabsWebhook)
+    this.#elevenLabsWebhook = members.elevenLabsWebhook
+      ? GatewayElevenLabsWebhookService.create(members.elevenLabsWebhook)
       : void 0;
   }
 
@@ -458,14 +458,14 @@ export class GatewayApp implements GatewayApi {
     signature: string | undefined;
   }): Promise<GatewayElevenLabsWebhookAnswer> {
     const service = this.#elevenLabsWebhook;
-    if (!service) throw new Error("The ElevenLabs family was mounted without its infrastructure");
+    if (!service) throw new Error("The ElevenLabs family was mounted without its members");
 
     return service.receive(input);
   }
 
   #agentCacheService(): GatewayAgentCacheService {
     const service = this.#agentCache;
-    if (!service) throw new Error("The agent-cache family was mounted without its infrastructure");
+    if (!service) throw new Error("The agent-cache family was mounted without its members");
 
     return service;
   }

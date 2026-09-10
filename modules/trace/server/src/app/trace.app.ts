@@ -5,7 +5,7 @@ import {
   recordCapturedSpanInputSchema,
   type RecordCapturedSpanInput,
 } from "@langwatch/trace-contract";
-import type { TraceSpanIngest } from "./trace.infrastructure.ts";
+import type { TraceSpanIngest } from "./trace.members.ts";
 import { TraceCollectorSpanService } from "../services/span/trace-collector-span.service.ts";
 /**
  * The trace feature's application: the one typed thing every door is given, replacing five previously-private bags (SpansApplication, TracesApplication, TraceEditOverlayApplication, SharedTraceApplication, TracesV2Application) that agreed by attention, not construction, and couldn't see each other's declarations. What lives here as a rule rather than a service's own concern: attribution (changeTraceName + reviewer-correction stamp the caller as an argument, not a session read, so one op serves a browser/API-key/job caller alike); full resolution (#4991: a content-consuming read resolves offloads, a listing read stays on preview); the partition-pruning hint (occurredAtMs must be OMITTED, never undefined); the visibility-window verdict; and the sample draw (list ids, then read those traces in full). A door may still shape its own paging/limits/redactions, but not decide privately what the application does.
@@ -68,7 +68,7 @@ import type {
   TraceQueryClassificationInput,
   TraceSummaryLookupInput,
 } from "@langwatch/trace-contract";
-import type { TraceLegacyRead } from "./trace.infrastructure.ts";
+import type { TraceLegacyRead } from "./trace.members.ts";
 import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
 import type { TraceViewerProtectionService } from "../services/viewer/trace-viewer-protection.service.ts";
 import { TraceContentReadServiceImpl } from "../services/content/trace-content-read.service.ts";
@@ -375,9 +375,9 @@ export class TraceApp implements TraceApi {
       | FeatureSetup<typeof traceDependencies, TraceInfrastructure, undefined, TraceRepositories>,
   ): TraceApp {
     const dependencies =
-      "infrastructure" in input
+      "members" in input
         ? composeTraceAppDependencies({
-            ...input.infrastructure.trace,
+            ...input.members.trace,
             ...input.dependencies,
             repositories: input.repositories,
             protections: {
@@ -385,8 +385,8 @@ export class TraceApp implements TraceApi {
               projects: input.dependencies.projects,
               plans: input.dependencies.plans,
               dataPrivacy: input.dependencies.dataPrivacy,
-              fallbackVisibilityDays: input.infrastructure.trace.fallbackVisibilityDays,
-              processName: input.infrastructure.trace.processName,
+              fallbackVisibilityDays: input.members.trace.fallbackVisibilityDays,
+              processName: input.members.trace.processName,
             },
           })
         : input;

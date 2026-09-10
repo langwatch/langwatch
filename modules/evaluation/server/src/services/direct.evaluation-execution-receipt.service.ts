@@ -7,7 +7,7 @@ import {
   EvaluationCostRecorder,
   EvaluationExecution,
   EvaluationExecutionReceipt,
-} from "../app/evaluation.infrastructure.ts";
+} from "../app/evaluation.members.ts";
 
 const logger = createLogger("langwatch:evaluation:execution-receipt");
 

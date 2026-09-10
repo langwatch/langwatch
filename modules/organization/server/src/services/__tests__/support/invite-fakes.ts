@@ -30,7 +30,7 @@ import {
   OrganizationInviteMail,
   OrganizationInviteSeatCensus,
   type OrganizationInviteRateLimit,
-} from "../../../app/organization.infrastructure.ts";
+} from "../../../app/organization.members.ts";
 import { InviteSendThrottleService } from "../../invite-send-throttle.service.ts";
 import type { InviteServiceDependencies } from "../../../rules/invite-contracts.rules.ts";
 import type { PlanProvider, Plan } from "@langwatch/entitlement-contract";

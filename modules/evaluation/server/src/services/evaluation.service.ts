@@ -23,7 +23,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type {
   EvaluationExecution,
   EvaluationInputsResolution,
-} from "../app/evaluation.infrastructure.ts";
+} from "../app/evaluation.members.ts";
 import type { MonitorPerformanceRepository } from "../repositories/monitor-performance.repository.ts";
 import { MonitorPerformanceService } from "./monitor-performance.service.ts";
 import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";

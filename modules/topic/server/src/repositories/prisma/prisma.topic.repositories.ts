@@ -13,10 +13,10 @@ import { PrismaTopicRepository } from "./prisma.topic.repository.ts";
 export class PostgresTopicRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create(infrastructure: Readonly<{ prisma: TopicClusteringDatabase }>): TopicRepositories {
+  static create(members: Readonly<{ prisma: TopicClusteringDatabase }>): TopicRepositories {
     return {
-      topics: PrismaTopicRepository.create({ prisma: infrastructure.prisma }),
-      clustering: PrismaTopicClusteringRepository.create({ database: infrastructure.prisma }),
+      topics: PrismaTopicRepository.create({ prisma: members.prisma }),
+      clustering: PrismaTopicClusteringRepository.create({ database: members.prisma }),
     };
   }
 }

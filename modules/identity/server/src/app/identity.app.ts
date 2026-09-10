@@ -26,7 +26,7 @@ import { SsoConnectionGuardsService } from "../services/sso-connection-guards.se
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
-import type { IdentityInfrastructure } from "./identity-infrastructure.ts";
+import type { IdentityInfrastructure } from "./identity-members.ts";
 
 type IdentitySetup = FeatureSetup<Record<string, never>, IdentityInfrastructure, never> &
   Readonly<{ repositories: IdentityRepositories }>;
@@ -48,18 +48,18 @@ export class IdentityApp implements IdentityApi {
       setup.repositories.heads,
       CachedIdentityLatch.create({
         repository: setup.repositories.latch,
-        ttlMs: setup.infrastructure.latch.ttlMs,
-        maxUsers: setup.infrastructure.latch.maxUsers,
-        now: setup.infrastructure.latch.now,
+        ttlMs: setup.members.latch.ttlMs,
+        maxUsers: setup.members.latch.maxUsers,
+        now: setup.members.latch.now,
       }).gate(),
     );
-    const identity = IdentityService.create(identityGuards, setup.infrastructure.ledger);
+    const identity = IdentityService.create(identityGuards, setup.members.ledger);
     const newbornSweep = IdentityNewbornReconciliationService.create({
       newborns: setup.repositories.newborn,
       identity,
       reservations,
     });
-    const secrets = IdentitySecretCarryService.create(setup.infrastructure.secrets);
+    const secrets = IdentitySecretCarryService.create(setup.members.secrets);
     const backfill = IdentityBackfillService.create(
       setup.repositories.backfill,
       setup.repositories.users,
@@ -70,22 +70,22 @@ export class IdentityApp implements IdentityApi {
     const joinRequestGuards = JoinRequestGuardsService.create({
       requests: setup.repositories.joinRequests,
     });
-    const joinRequestNotifications = setup.infrastructure.mail
+    const joinRequestNotifications = setup.members.mail
       ? JoinRequestNotificationService.create({
-          audience: setup.infrastructure.joinRequestAudience,
-          mail: setup.infrastructure.mail,
+          audience: setup.members.joinRequestAudience,
+          mail: setup.members.mail,
         })
       : null;
     const ssoConnectionGuards = SsoConnectionGuardsService.create({
       connections: setup.repositories.ssoConnections,
       breakGlass: LocalDoorBreakGlassBindingAdapter.create(),
       stranding: setup.repositories.ssoStranding,
-      platformOperators: setup.infrastructure.ssoPlatformOperators,
+      platformOperators: setup.members.ssoPlatformOperators,
     });
     // Q3(c): the ledger is nullable exactly like `mail`; without it neither
     // capability has a store to write through, so both refuse by name.
-    const ssoConnections = setup.infrastructure.ssoConnectionLedger
-      ? SsoConnectionService.create(ssoConnectionGuards, setup.infrastructure.ssoConnectionLedger)
+    const ssoConnections = setup.members.ssoConnectionLedger
+      ? SsoConnectionService.create(ssoConnectionGuards, setup.members.ssoConnectionLedger)
       : null;
     const ssoBackoffice = ssoConnections
       ? SsoConnectionBackofficeService.create({
@@ -93,7 +93,7 @@ export class IdentityApp implements IdentityApi {
           connections: () => ssoConnections,
         })
       : null;
-    const scimSyncGuards = ScimSyncGuardsService.create({ syncs: setup.infrastructure.scimSyncs });
+    const scimSyncGuards = ScimSyncGuardsService.create({ syncs: setup.members.scimSyncs });
 
     return new IdentityApp({
       emails,

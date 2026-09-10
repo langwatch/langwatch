@@ -218,7 +218,7 @@ export type AutomationGraphNotifierResult = GraphAlertDispatchResult;
 
 
 /** Outbound provider calls. Automation owns when and what to send; the process
- * adapter owns SDKs, HTTP policy, mail rendering infrastructure, and secrets. */
+ * adapter owns SDKs, HTTP policy, mail rendering members, and secrets. */
 
 
 
@@ -241,7 +241,7 @@ export type AutomationWebhookStoredParams = {
 
 export type ClaimLease = { key: string; token: string };
 
-/** Explicit infrastructure ports used by Automation's containment policy. */
+/** Explicit members ports used by Automation's containment policy. */
 export interface AutomationRunawayPort {
   countProjectTraces24h(projectId: string): Promise<number>;
   notificationRecipients(params: {

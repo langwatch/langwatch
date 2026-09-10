@@ -9,7 +9,7 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 
-import type { LangyConversationProcessState } from "../../app/langy.infrastructure.ts";
+import type { LangyConversationProcessState } from "../../app/langy.members.ts";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,

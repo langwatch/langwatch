@@ -19,7 +19,7 @@ import type {
   OrganizationInvitations,
   OrganizationPlanGate,
   OrganizationSignals,
-} from "../../app/organization.infrastructure.ts";
+} from "../../app/organization.members.ts";
 import { OrganizationInvitationDoorService } from "../organization-invitation-door.service.ts";
 
 const ORGANIZATION_ID = "org-1";

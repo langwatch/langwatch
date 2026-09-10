@@ -3,7 +3,7 @@
  * can safely walk.
  */
 
-import { GatewaySettlementPolicy } from "../app/gateway.infrastructure.ts";
+import { GatewaySettlementPolicy } from "../app/gateway.members.ts";
 
 import { GatewaySpendGroupByUnstableError } from "@langwatch/gateway-contract";
 import { type SpendBucket, type SpendGroupByKey } from "../ports/gateway-spend-events.port.ts";

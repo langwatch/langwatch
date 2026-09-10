@@ -294,30 +294,30 @@ export class WorkflowApp implements WorkflowApi {
   static readonly dependencies = {} as const;
 
   static create(setup: WorkflowSetup): WorkflowApp {
-    return new WorkflowApp(setup.infrastructure);
+    return new WorkflowApp(setup.members);
   }
 
-  #infrastructure: WorkflowInfrastructure;
+  #members: WorkflowInfrastructure;
   #studioVersions: WorkflowStudioVersionService;
   #studioCopies: WorkflowStudioCopyService;
 
-  private constructor(infrastructure: WorkflowInfrastructure) {
-    this.#infrastructure = infrastructure;
+  private constructor(members: WorkflowInfrastructure) {
+    this.#members = members;
     this.#studioVersions = WorkflowStudioVersionService.create({
-      workflows: infrastructure.workflows,
-      studioDsl: infrastructure.studioDsl,
-      agentMappings: infrastructure.agentMappings,
+      workflows: members.workflows,
+      studioDsl: members.studioDsl,
+      agentMappings: members.agentMappings,
     });
     this.#studioCopies = WorkflowStudioCopyService.create({
-      datasets: infrastructure.datasets,
-      rows: infrastructure.workflowRows,
+      datasets: members.datasets,
+      rows: members.workflowRows,
     });
   }
 
   // -- the workflow itself ---------------------------------------------------
 
   async executeComponent(input: ExecuteWorkflowComponentInput) {
-    const dispatch = this.#infrastructure.studioDispatch;
+    const dispatch = this.#members.studioDispatch;
 
     if (!dispatch) throw new WorkflowExecutionFailedError();
 
@@ -326,7 +326,7 @@ export class WorkflowApp implements WorkflowApi {
 
   /** Every non-archived workflow in the project. */
   list(input: { projectId: string }): Promise<Workflow[]> {
-    return this.#infrastructure.workflows.list(input);
+    return this.#members.workflows.list(input);
   }
 
   /** One workflow, optionally with its current version. */
@@ -335,28 +335,28 @@ export class WorkflowApp implements WorkflowApi {
     projectId: string;
     includeVersion?: boolean;
   }): Promise<WorkflowWithVersion> {
-    return this.#infrastructure.workflows.getById(input);
+    return this.#members.workflows.getById(input);
   }
 
   /** Verifies that a workflow belongs to the requested project. */
   assertInProject(input: { workflowId: string; projectId: string }): Promise<void> {
-    return this.#infrastructure.workflows.assertInProject(input);
+    return this.#members.workflows.assertInProject(input);
   }
 
   listFields(input: { projectId: string; workflowIds: string[] }) {
-    return this.#infrastructure.workflows.listFields(input);
+    return this.#members.workflows.listFields(input);
   }
 
   listSummaries(input: { projectId: string; workflowIds: string[] }) {
-    return this.#infrastructure.workflows.listSummaries(input);
+    return this.#members.workflows.listSummaries(input);
   }
 
   archiveLinked(input: WorkflowReference) {
-    return this.#infrastructure.workflows.archiveLinked(input);
+    return this.#members.workflows.archiveLinked(input);
   }
 
   deleteUncommitted(input: WorkflowReference) {
-    return this.#infrastructure.workflows.deleteUncommitted(input);
+    return this.#members.workflows.deleteUncommitted(input);
   }
 
   /**
@@ -367,7 +367,7 @@ export class WorkflowApp implements WorkflowApi {
     event: StudioClientEvent;
     projectId: string;
   }): Promise<StudioClientEvent> {
-    return this.#infrastructure.workflows.prepareStudioEvent(input);
+    return this.#members.workflows.prepareStudioEvent(input);
   }
 
   /** A peer's inbound Studio event, prepared the same way before it re-enters the graph. */
@@ -375,12 +375,12 @@ export class WorkflowApp implements WorkflowApi {
     event: StudioClientEvent;
     projectId: string;
   }): Promise<StudioClientEvent> {
-    return this.#infrastructure.workflows.enrichStudioEvent(input);
+    return this.#members.workflows.enrichStudioEvent(input);
   }
 
   /** The evaluator-fields shape a peer's guard and run read off this workflow. */
   getFields(input: { workflowId: string; projectId: string }) {
-    return this.#infrastructure.workflows.getFields(input);
+    return this.#members.workflows.getFields(input);
   }
 
   /**
@@ -392,7 +392,7 @@ export class WorkflowApp implements WorkflowApi {
     input: Omit<CreateWorkflowCommand, "authorId">,
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
-    const created = await this.#infrastructure.workflows.create({ ...input, authorId: by.id });
+    const created = await this.#members.workflows.create({ ...input, authorId: by.id });
 
     this.#announceCreated({ workflowId: created.workflow.id, projectId: input.projectId, by });
 
@@ -404,12 +404,12 @@ export class WorkflowApp implements WorkflowApi {
     input: Omit<CopyWorkflowCommand, "authorId">,
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
-    return this.#infrastructure.workflows.copy({ ...input, authorId: by.id });
+    return this.#members.workflows.copy({ ...input, authorId: by.id });
   }
 
   /** Changes a workflow's own metadata: its name, its icon, its description. */
   update(input: UpdateWorkflowCommand): Promise<Workflow> {
-    return this.#infrastructure.workflows.update(input);
+    return this.#members.workflows.update(input);
   }
 
   /** The version history of one workflow. */
@@ -418,32 +418,32 @@ export class WorkflowApp implements WorkflowApi {
     projectId: string;
     mode: WorkflowVersionHistoryMode;
   }): Promise<WorkflowVersionHistoryEntry[]> {
-    return this.#infrastructure.workflows.getVersionHistory(input);
+    return this.#members.workflows.getVersionHistory(input);
   }
 
   /** Makes a stored version current again. */
   restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
-    return this.#infrastructure.workflows.restoreVersion(input);
+    return this.#members.workflows.restoreVersion(input);
   }
 
   /** Publishes one version, attributed to the caller who asked for it. */
   publish(input: Omit<PublishWorkflowCommand, "actorId">, by: WorkflowCaller): Promise<Workflow> {
-    return this.#infrastructure.workflows.publish({ ...input, actorId: by.id });
+    return this.#members.workflows.publish({ ...input, actorId: by.id });
   }
 
   /** Withdraws the published version. */
   unpublish(input: { id: string; projectId: string }): Promise<Workflow> {
-    return this.#infrastructure.workflows.unpublish(input);
+    return this.#members.workflows.unpublish(input);
   }
 
   /** Archives one workflow, or restores it when `unarchive` is set. */
   archive(input: ArchiveWorkflowCommand): Promise<Workflow> {
-    return this.#infrastructure.workflows.archive(input);
+    return this.#members.workflows.archive(input);
   }
 
   /** Runs a workflow synchronously, on its published version unless one is named. */
   run(input: RunWorkflowCommand): Promise<WorkflowRunAnswer> {
-    return this.#infrastructure.workflows.run(input);
+    return this.#members.workflows.run(input);
   }
 
   /**
@@ -455,7 +455,7 @@ export class WorkflowApp implements WorkflowApi {
     projectId: string;
     body: Readonly<Record<string, unknown>>;
   }): Promise<WorkflowRunAnswer> {
-    return this.#infrastructure.workflows.run({
+    return this.#members.workflows.run({
       workflowId: input.workflowId,
       projectId: input.projectId,
       inputs: { ...input.body },
@@ -464,7 +464,7 @@ export class WorkflowApp implements WorkflowApi {
 
   /** Starts one evaluation run of a committed version. */
   triggerEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted> {
-    return this.#infrastructure.evaluations.trigger(input);
+    return this.#members.evaluations.trigger(input);
   }
 
   // -- the Studio's own save and copy ----------------------------------------
@@ -506,7 +506,7 @@ export class WorkflowApp implements WorkflowApi {
   }
 
   completeCode(input: { projectId: string; body: unknown }): Promise<unknown> {
-    return this.#infrastructure.codeCompletions.complete(input);
+    return this.#members.codeCompletions.complete(input);
   }
 
   postStudioEvent(input: {
@@ -514,11 +514,11 @@ export class WorkflowApp implements WorkflowApi {
     event: StudioClientEvent;
     onEvent: (event: StudioServerEvent) => void;
   }): Promise<void> {
-    return this.#infrastructure.studioRuns.postEvent(input);
+    return this.#members.studioRuns.postEvent(input);
   }
 
   reportStudioFailure(error: unknown, context: { projectId: string }): void {
-    this.#infrastructure.signals.failed(error, context);
+    this.#members.signals.failed(error, context);
   }
 
   /**
@@ -536,7 +536,7 @@ export class WorkflowApp implements WorkflowApi {
 
     if (previousDsl === nextDsl) return "no changes";
 
-    return await this.#infrastructure.commitMessages.generate({
+    return await this.#members.commitMessages.generate({
       projectId: input.projectId,
       previousDsl,
       nextDsl,
@@ -547,7 +547,7 @@ export class WorkflowApp implements WorkflowApi {
 
   /** Every evaluator in the project. */
   listEvaluators(input: { projectId: string }): Promise<Evaluator[]> {
-    return this.#infrastructure.evaluators.getAll(input);
+    return this.#members.evaluators.getAll(input);
   }
 
   /**
@@ -561,20 +561,20 @@ export class WorkflowApp implements WorkflowApi {
     name: string;
   }): Promise<Evaluator> {
     const { workflowId, projectId, name } = input;
-    const [existing] = await this.#infrastructure.evaluators.listByWorkflow({
+    const [existing] = await this.#members.evaluators.listByWorkflow({
       workflowId,
       projectId,
     });
 
     if (existing) {
-      return this.#infrastructure.evaluators.update({
+      return this.#members.evaluators.update({
         id: existing.id,
         projectId,
         data: { name },
       });
     }
 
-    return this.#infrastructure.evaluators.create({
+    return this.#members.evaluators.create({
       id: `evaluator_${nanoid()}`,
       projectId,
       name,
@@ -593,11 +593,11 @@ export class WorkflowApp implements WorkflowApi {
     workflowId: string;
     projectId: string;
   }): Promise<void> {
-    const [linked] = await this.#infrastructure.evaluators.listByWorkflow(input);
+    const [linked] = await this.#members.evaluators.listByWorkflow(input);
 
     if (!linked) return;
 
-    await this.#infrastructure.evaluators.archive({
+    await this.#members.evaluators.archive({
       id: linked.id,
       projectId: input.projectId,
     });
@@ -610,7 +610,7 @@ export class WorkflowApp implements WorkflowApi {
     projectId: string;
     permission: AuthzPermission;
   }): Promise<boolean> {
-    return this.#infrastructure.permissions.has(input);
+    return this.#members.permissions.has(input);
   }
 
   // -- copy lineage, related entities and the archive cascade ----------------
@@ -624,12 +624,12 @@ export class WorkflowApp implements WorkflowApi {
     projectId: string;
     viewerUserId: string;
   }): Promise<WorkflowListRow[]> {
-    const workflows = await this.#infrastructure.lineage.listWithCopyLineage({
+    const workflows = await this.#members.lineage.listWithCopyLineage({
       projectId: input.projectId,
     });
 
     const relatedProjectIds = [...new Set(workflows.flatMap(relatedProjectIdsOf))];
-    const probed = await this.#infrastructure.permissions.hasMany({
+    const probed = await this.#members.permissions.hasMany({
       userId: input.viewerUserId,
       projectIds: relatedProjectIds.filter((projectId) => projectId !== input.projectId),
       permission: "workflows:view",
@@ -655,35 +655,35 @@ export class WorkflowApp implements WorkflowApi {
     workflowId: string;
     projectId: string;
   }): Promise<Readonly<{ projectId: string }> | null> {
-    return this.#infrastructure.lineage.findWorkflow(input);
+    return this.#members.lineage.findWorkflow(input);
   }
 
   findCopiesWithPath(input: {
     workflowId: string;
     projectId: string;
   }): Promise<readonly WorkflowCopyWithPath[] | null> {
-    return this.#infrastructure.lineage.findCopiesWithPath(input);
+    return this.#members.lineage.findCopiesWithPath(input);
   }
 
   findWorkflowWithSource(input: {
     workflowId: string;
     projectId: string;
   }): Promise<WorkflowSourceRow | null> {
-    return this.#infrastructure.lineage.findWorkflowWithSource(input);
+    return this.#members.lineage.findWorkflowWithSource(input);
   }
 
   findWorkflowWithCopies(input: {
     workflowId: string;
     projectId: string;
   }): Promise<WorkflowCopiesRow | null> {
-    return this.#infrastructure.lineage.findWorkflowWithCopies(input);
+    return this.#members.lineage.findWorkflowWithCopies(input);
   }
 
   findLatestVersionNumber(input: {
     workflowId: string;
     projectId: string;
   }): Promise<Readonly<{ version: string | null }> | null> {
-    return this.#infrastructure.lineage.findLatestVersionNumber(input);
+    return this.#members.lineage.findLatestVersionNumber(input);
   }
 
   /**
@@ -701,13 +701,13 @@ export class WorkflowApp implements WorkflowApi {
     // Copied out of the readonly views: the confirmation dialog these lists
     // feed types them as plain arrays, and a readonly element type would
     // narrow a client payload that is identical on the wire.
-    const agents = [...(await this.#infrastructure.lineage.listAgents(input))];
+    const agents = [...(await this.#members.lineage.listAgents(input))];
 
     const evaluatorIds = evaluators.map((evaluator) => evaluator.id);
     const monitors =
       evaluatorIds.length > 0
         ? [
-            ...(await this.#infrastructure.lineage.listMonitorsForEvaluators({
+            ...(await this.#members.lineage.listMonitorsForEvaluators({
               projectId: input.projectId,
               evaluatorIds,
             })),
@@ -727,7 +727,7 @@ export class WorkflowApp implements WorkflowApi {
     workflowId: string;
     unarchive?: boolean;
   }): Promise<WorkflowCascadeArchive> {
-    return this.#infrastructure.lineage.cascadeArchive(input);
+    return this.#members.lineage.cascadeArchive(input);
   }
 
   // -- the Optimization Studio's publication flags ---------------------------
@@ -736,14 +736,14 @@ export class WorkflowApp implements WorkflowApi {
     workflowId: string;
     projectId: string;
   }): Promise<WorkflowPublicationFlags | null> {
-    return this.#infrastructure.publications.findFlags(input);
+    return this.#members.publications.findFlags(input);
   }
 
   findWorkflowVersionById(input: {
     versionId: string;
     projectId: string;
   }): Promise<Readonly<Record<string, unknown>> | null> {
-    return this.#infrastructure.publications.findVersion(input);
+    return this.#members.publications.findVersion(input);
   }
 
   setWorkflowFlags(input: {
@@ -752,11 +752,11 @@ export class WorkflowApp implements WorkflowApi {
     isComponent?: boolean;
     isEvaluator?: boolean;
   }): Promise<void> {
-    return this.#infrastructure.publications.setFlags(input);
+    return this.#members.publications.setFlags(input);
   }
 
   listPublishedComponents(input: { projectId: string }): Promise<unknown> {
-    return this.#infrastructure.publications.listPublishedComponents(input);
+    return this.#members.publications.listPublishedComponents(input);
   }
 
   // -- the deployment's own housekeeping ------------------------------------
@@ -768,7 +768,7 @@ export class WorkflowApp implements WorkflowApi {
    * at" read identically to a scheduler, and only one of them is healthy.
    */
   async cleanupOldLambdas(): Promise<void> {
-    const fleet = this.#infrastructure.nlpLambdaFleet;
+    const fleet = this.#members.nlpLambdaFleet;
 
     if (!fleet) throw new NlpLambdaFleetNotComposedError();
 
@@ -780,10 +780,10 @@ export class WorkflowApp implements WorkflowApi {
    * to count must never fail the create that already succeeded.
    */
   #announceCreated(input: { workflowId: string; projectId: string; by: WorkflowCaller }): void {
-    void this.#infrastructure.workflows
+    void this.#members.workflows
       .list({ projectId: input.projectId })
       .then((workflows) => {
-        this.#infrastructure.signals.workflowCreated({
+        this.#members.signals.workflowCreated({
           userId: input.by.id,
           workflowCount: workflows.length,
           workflowId: input.workflowId,
@@ -791,7 +791,7 @@ export class WorkflowApp implements WorkflowApi {
         });
       })
       .catch((error: unknown) => {
-        this.#infrastructure.signals.failed(error, { projectId: input.projectId });
+        this.#members.signals.failed(error, { projectId: input.projectId });
       });
   }
 }
@@ -908,7 +908,7 @@ export type WorkflowExecutionInput = {
   parentTrace?: { traceId: string; parentSpanId: string };
 };
 
-/** Execution is infrastructure: the feature supplies a dispatch port. */
+/** Execution is members: the feature supplies a dispatch port. */
 export interface WorkflowExecution {
   execute(input: WorkflowExecutionInput): Promise<WorkflowRunAnswer>;
 }
@@ -966,7 +966,7 @@ export interface WorkflowDslMigration {
   migrate(dsl: WorkflowDsl): WorkflowDsl;
 }
 
-/** Project credentials and decrypted secrets are application infrastructure. */
+/** Project credentials and decrypted secrets are application members. */
 export interface WorkflowProjectEnvironment {
   get(input: { projectId: string }): Promise<{ apiKey: string; secrets: Record<string, string> }>;
 }

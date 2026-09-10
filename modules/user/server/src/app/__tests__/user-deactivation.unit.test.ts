@@ -33,14 +33,14 @@ describe("user.deactivate", () => {
       auth.revokeAllBrowserSessions.mockImplementation(async () => {
         reached.push("revokeAllBrowserSessions");
       });
-      const infrastructure = createUserTestInfrastructure({
+      const members = createUserTestInfrastructure({
         cliCredentials: {
           revokeForUser: vi.fn(async () => {
             reached.push("revokeCliTokensForUser");
           }),
         },
       });
-      const app = createUserTestApp({ infrastructure, dependencies: { auth } });
+      const app = createUserTestApp({ members, dependencies: { auth } });
       const created = await account(app);
 
       await app.deactivateAccount({

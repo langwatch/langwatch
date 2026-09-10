@@ -36,7 +36,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceLegacyRead } from "../trace.infrastructure.ts";
+import type { TraceLegacyRead } from "../trace.members.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,

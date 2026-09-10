@@ -6,11 +6,11 @@
 
 import { nowInstant } from "@langwatch/time";
 import { TRPCError } from "@trpc/server";
-import { GatewayAudit } from "../app/gateway.infrastructure.ts";
-import { GatewayChangeEvents } from "../app/gateway.infrastructure.ts";
-import type { GatewayTransaction } from "../app/gateway.infrastructure.ts";
-import { GatewayVirtualKeyCrypto } from "../app/gateway.infrastructure.ts";
-import type { GatewayGovernanceSignals } from "../app/gateway.infrastructure.ts";
+import { GatewayAudit } from "../app/gateway.members.ts";
+import { GatewayChangeEvents } from "../app/gateway.members.ts";
+import type { GatewayTransaction } from "../app/gateway.members.ts";
+import { GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
+import type { GatewayGovernanceSignals } from "../app/gateway.members.ts";
 import type { GatewayVirtualKeys } from "../ports/gateway-virtual-key.port.ts";
 import {
   ROTATION_GRACE_MS,

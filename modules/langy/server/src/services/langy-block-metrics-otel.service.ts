@@ -1,6 +1,6 @@
 import { counter } from "@langwatch/observability/metrics";
 import type { LangyBlockCounter } from "./langy-final-parts.service.ts";
-import { LangyBlockMetrics } from "../app/langy.infrastructure.ts";
+import { LangyBlockMetrics } from "../app/langy.members.ts";
 
 export const LANGY_BLOCKS_METRIC_NAME = "langwatch_langy_blocks_total";
 

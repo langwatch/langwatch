@@ -79,7 +79,7 @@ export type {
   AutomationEvaluationTraceSummary as AutomationEvaluationTraceSummary,
   AutomationEvaluationTriggerFilter as AutomationEvaluationTriggerFilter,
   AutomationTriggerMatchRecorder as AutomationTriggerMatchRecorder,
-} from "./app/automation.infrastructure.ts";
+} from "./app/automation.members.ts";
 export type {
   LogOverflowIntent,
   NotifyDigestIntent,
@@ -116,7 +116,7 @@ export {
   AutomationDispatchError,
 } from "./services/automation-graph-runtime.service.ts";
 export { AutomationSlackBotTokenDecryptor } from "./services/automation-slack-secrets.service.ts";
-export type { AutomationGraphDelivery as AutomationGraphDelivery } from "./app/automation.infrastructure.ts";
+export type { AutomationGraphDelivery as AutomationGraphDelivery } from "./app/automation.members.ts";
 export { AutomationRunaway, type ClaimLease } from "./repositories/automation-runaway.repository.ts";
 export { AutomationRunawayNotice } from "./channels/automation-runaway-notice.channel.ts";
 export { AutomationRunawaySignals } from "./services/automation-runaway-signals.service.ts";
@@ -190,11 +190,11 @@ export {
 } from "./services/automation-trace-trigger-catalogue.service.ts";
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service.ts";
 export { GraphAlertDispatchService } from "./services/graph-alert-dispatch.service.ts";
-export type { AutomationClock as AutomationClock } from "./app/automation.infrastructure.ts";
+export type { AutomationClock as AutomationClock } from "./app/automation.members.ts";
 export type {
   AutomationGraphActivity as AutomationGraphActivity,
   AutomationProjectIdentityPort,
-} from "./app/automation.infrastructure.ts";
+} from "./app/automation.members.ts";
 export {
   PrismaAutomationGraphActivityRepository as PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,
@@ -231,7 +231,7 @@ export { buildRetryAfterMessage } from "./rules/retry-after-message.rules.ts";
 
 /**
  * The feature's application: the one object all five of its doors call, and the
- * technical infrastructure a process supplies it with. Its refusals are the
+ * technical members a process supplies it with. Its refusals are the
  * contract's, beside every other error this feature names.
  */
 export {

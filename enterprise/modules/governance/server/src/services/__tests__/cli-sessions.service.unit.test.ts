@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CliTokenStore } from "../../app/governance.infrastructure.ts";
+import { CliTokenStore } from "../../app/governance.members.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../cli-session-inventory.service.ts";
 import { DefaultGovernanceCliTokenRevocationService } from "../cli-token-revocation.service.ts";
 

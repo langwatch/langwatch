@@ -6,8 +6,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it } from "vitest";
 import { NoopCodingAgentReadMetrics } from "../../../services/coding-agent-read-metrics-noop.service.ts";
-import { CodingAgentReadMetrics } from "../../../app/coding-agent.infrastructure.ts";
-import { CodingAgentClickHouse } from "../../../app/coding-agent.infrastructure.ts";
+import { CodingAgentReadMetrics } from "../../../app/coding-agent.members.ts";
+import { CodingAgentClickHouse } from "../../../app/coding-agent.members.ts";
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 

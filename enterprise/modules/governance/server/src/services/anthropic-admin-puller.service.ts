@@ -42,7 +42,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { GovernanceHttpClient } from "../app/governance.infrastructure.ts";
+import type { GovernanceHttpClient } from "../app/governance.members.ts";
 import { AdminUsageReportAdapter } from "./admin-usage-report.service.ts";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import type {

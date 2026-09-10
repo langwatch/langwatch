@@ -4,7 +4,7 @@ import {
   GithubAppTokenCache,
   type GithubPullRequestSummary,
 } from "../../app/github.app.ts";
-import { GithubHost } from "../../app/github.infrastructure.ts";
+import { GithubHost } from "../../app/github.members.ts";
 import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository.ts";
 import type {
   GithubBranchCheckRow,

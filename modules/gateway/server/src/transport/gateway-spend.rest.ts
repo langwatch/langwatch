@@ -34,7 +34,7 @@ import {
   SPEND_GROUP_BY_KEYS,
   type SpendGroupByKey,
 } from "../ports/gateway-spend-events.port.ts";
-import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.infrastructure.ts";
+import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.members.ts";
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-contract";
 import { Temporal, nowInstant } from "@langwatch/time";

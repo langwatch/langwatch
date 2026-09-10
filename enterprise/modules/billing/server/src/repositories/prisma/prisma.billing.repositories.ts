@@ -20,8 +20,8 @@ import { PrismaSubscriptionRepository } from "./prisma.subscription.repository.t
 export class PostgresBillingRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create(infrastructure: Readonly<{ prisma: PrismaClient }>): BillingRepositories {
-    const { prisma } = infrastructure;
+  static create(members: Readonly<{ prisma: PrismaClient }>): BillingRepositories {
+    const { prisma } = members;
 
     const subscriptions = PrismaSubscriptionRepository.create(prisma);
 

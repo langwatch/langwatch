@@ -1,6 +1,6 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
-import { LANGY_UI_ACTIONS_FLAG, LangyUiActionSurface } from "../app/langy.infrastructure.ts";
+import { LANGY_UI_ACTIONS_FLAG, LangyUiActionSurface } from "../app/langy.members.ts";
 
 const logger = createLogger("langwatch:langy:ui-action-surface");
 

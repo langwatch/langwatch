@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { EvaluationInputStorage } from "../../app/evaluation.infrastructure.ts";
+import { EvaluationInputStorage } from "../../app/evaluation.members.ts";
 import { EvaluationInputsOffloadService } from "../evaluation-inputs-offload.service.ts";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,

@@ -430,7 +430,7 @@ describe("the apiKey tRPC transport", () => {
       });
     });
 
-    /** An infrastructure failure is NOT dressed up as a handled one: it leaves
+    /** An members failure is NOT dressed up as a handled one: it leaves
      *  this transport untouched, so the process boundary degrades it to a
      *  generic unknown carrying a trace id (ADR-045). */
     it("rethrows an unhandled failure rather than naming a cause it does not know", async () => {

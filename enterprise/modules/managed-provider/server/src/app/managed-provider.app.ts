@@ -32,10 +32,10 @@ export class ManagedProviderApp implements ManagedProviderApiContract {
     this.#service = service;
   }
 
-  static create({ infrastructure, dependencies }: ManagedProviderSetup): ManagedProviderApp {
+  static create({ members, dependencies }: ManagedProviderSetup): ManagedProviderApp {
     const configuration = ManagedProviderConfigurationService.create({
-      source: infrastructure.source,
-      reporter: infrastructure.reporter,
+      source: members.source,
+      reporter: members.reporter,
     });
     const credentials = HttpManagedProviderCredentialsChannel.create();
 

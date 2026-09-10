@@ -2,7 +2,7 @@ import type {
   GovernanceDiagnosticsSink,
   IngestionPullLifecycleChannel,
   IngestionPullTenantResolver,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 import type {
   IngestionPullLifecycleRepository,

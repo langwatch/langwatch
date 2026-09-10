@@ -15,7 +15,7 @@ import {
   LangevalsPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type StagedLangevalsPayload,
-} from "../../app/topic.infrastructure.ts";
+} from "../../app/topic.members.ts";
 import {
   LangevalsStagedPayloadAdapter,
   PayloadTooLargeError,

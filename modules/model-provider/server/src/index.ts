@@ -29,11 +29,11 @@ export {
   CodexTokenRefresher,
   ModelTranslation,
   ModelProviderIdService,
-} from "./app/model-provider.infrastructure.ts";
+} from "./app/model-provider.members.ts";
 export type {
   ModelProviderEgressRequest,
   ModelProviderEgressResponse,
-} from "./app/model-provider.infrastructure.ts";
+} from "./app/model-provider.members.ts";
 export {
   EncryptedModelProviderCredentialAdapter,
   type CustomKeysRead,

@@ -16,9 +16,9 @@ import type {
 } from "../repositories/gateway-realtime-session.repository.ts";
 import type { SpendUsage } from "@langwatch/gateway-contract";
 import { EMPTY_SPEND_USAGE } from "../processes/gateway-spend-commands.process.ts";
-import type { GatewaySpanIngestion } from "../app/gateway.infrastructure.ts";
-import type { GatewaySpendConfirmation } from "../app/gateway.infrastructure.ts";
-import type { GatewaySpendRating } from "../app/gateway.infrastructure.ts";
+import type { GatewaySpanIngestion } from "../app/gateway.members.ts";
+import type { GatewaySpendConfirmation } from "../app/gateway.members.ts";
+import type { GatewaySpendRating } from "../app/gateway.members.ts";
 import { createHash } from "crypto";
 import { ATTR_KEYS as ATTR, DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import { nowInstant, type Instant } from "@langwatch/time";

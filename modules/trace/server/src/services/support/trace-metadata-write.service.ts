@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { TraceSpanIngest } from "../../app/trace.infrastructure.ts";
+import type { TraceSpanIngest } from "../../app/trace.members.ts";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import type { CustomMetadata, ReservedTraceMetadata } from "@langwatch/trace-contract";
 import { TraceCollectorSpanService } from "../span/trace-collector-span.service.ts";

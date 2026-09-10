@@ -18,7 +18,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 
 import { PrismaGatewayAdapter } from "../../adapters/prisma.gateway.adapter.ts";
 import { PrismaGatewayInternalStoreAdapter } from "../../adapters/postgres.gateway-internal-store.adapter.ts";
-import type { GatewayModelProviderCredentials } from "../../app/gateway.infrastructure.ts";
+import type { GatewayModelProviderCredentials } from "../../app/gateway.members.ts";
 import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 import { VirtualKeyService } from "../../services/virtual-key.service.ts";

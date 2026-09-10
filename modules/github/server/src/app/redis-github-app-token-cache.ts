@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { GithubRepository } from "@langwatch/github-contract";
 
-import type { GithubHost } from "./github.infrastructure.ts";
+import type { GithubHost } from "./github.members.ts";
 import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
 import type { GithubRedis } from "../repositories/redis/github-redis.connection.ts";
 import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";

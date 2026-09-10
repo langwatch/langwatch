@@ -8,7 +8,7 @@
  *
  * The ceremony used to live in the `onboarding.*` transport, where nothing
  * could reach it without a router. It is the onboarding service's now, and this
- * drives it directly over the two infrastructure interfaces it runs through.
+ * drives it directly over the two members interfaces it runs through.
  *
  * @see specs/features/onboarding/intent-fork.feature
  */
@@ -21,7 +21,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   OrganizationCeremony,
   OrganizationSignals,
-} from "../../app/organization.infrastructure.ts";
+} from "../../app/organization.members.ts";
 import { OrganizationOnboardingService } from "../organization-onboarding.service.ts";
 
 const ORGANIZATION = { id: "org_1", name: "Acme Corp" };

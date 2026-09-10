@@ -5,7 +5,7 @@ import {
   TraceAlertTriggerMatchChannel,
   TraceAlertTriggerReader,
   type TraceAlertTrigger,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
 import {
   governanceTraceContext,

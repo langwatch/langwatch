@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   QuarantineTenantResolver,
   QuarantineTraceActivityReader,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { QuarantineFillEvaluatorService } from "../quarantine-fill.service.ts";
 
 const ORGANIZATION_ID = "org-qfe-unit";

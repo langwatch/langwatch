@@ -1,5 +1,5 @@
 /**
- * Unit tests for the scenario infrastructure-error classifier.
+ * Unit tests for the scenario members-error classifier.
  *
  * @see specs/scenarios/scenario-infra-error-surfacing.feature
  */

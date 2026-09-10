@@ -30,7 +30,7 @@ import {
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,
   type GatewaySpendProcessingEvent,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 
 class StubGatewayDebit implements GatewayBudgetLedger {
   resolve(): Promise<GatewayResolvedBudget[]> {

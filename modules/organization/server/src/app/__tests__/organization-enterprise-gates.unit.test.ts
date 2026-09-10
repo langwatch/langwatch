@@ -16,7 +16,7 @@ import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
-import type { OrganizationPlanGate } from "../organization.infrastructure.ts";
+import type { OrganizationPlanGate } from "../organization.members.ts";
 import { ServerOrganizationApp, type ServerOrganizationAppDependencies } from "../organization.app.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -70,7 +70,7 @@ function application(options: { enterprise: boolean }) {
       projects: {} as unknown as ServerOrganizationAppDependencies["projects"],
       permissions: { hasPermission: vi.fn(async () => true) } as unknown as AuthzApi,
     },
-    infrastructure: { plans },
+    members: { plans },
   });
 
   return { app, plans, ...writes };

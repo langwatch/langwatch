@@ -7,7 +7,7 @@ import type {
   PersonalWorkspaceIdentity,
   TeamIdentity,
   OrganizationSettingsSecret,
-} from "../app/organization.infrastructure.ts";
+} from "../app/organization.members.ts";
 import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
 import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
 import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";

@@ -17,7 +17,7 @@ import {
   GroupIdentity,
   PersonalWorkspaceIdentity,
   TeamIdentity,
-} from "../../app/organization.infrastructure.ts";
+} from "../../app/organization.members.ts";
 import type { OrganizationRepository } from "../organization.repository.ts";
 import { GroupRepository } from "../group.repository.ts";
 import { TeamRepository } from "../team.repository.ts";

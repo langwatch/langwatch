@@ -108,7 +108,7 @@ function toStartOfMinute(unixMs: number): ClickHouseMoment {
  * completion — producers can attach `passed: false` alongside
  * `status: "error"` (#6833). Without the status guard such an event
  * increments FailCount AND ErrorCount, so the counters double-count and
- * pass-rate reads an infrastructure error as a real fail.
+ * pass-rate reads an members error as a real fail.
  */
 function scoreOf({ status, score }: { status: string; score: number | null | undefined }): {
   scoreSum: number;

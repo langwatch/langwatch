@@ -141,7 +141,7 @@ Most teams reach for #3 first. I'd reach for #2 — it's local to the query, no 
 **Don't reach for a queue when:**
 - The work is fast and synchronous-ok (< 200ms).
 - The user is *waiting* for it (shoving it in a queue just adds latency and a "we'll email you" UX).
-- You don't already have queue infrastructure and your team is small. The operational cost is real: you now own retries, DLQs, monitoring.
+- You don't already have queue members and your team is small. The operational cost is real: you now own retries, DLQs, monitoring.
 
 **My rule of thumb:** the first queue is the expensive one. Once you have BullMQ + monitoring + DLQ inspection running, the marginal cost of new queues is near zero. So either commit fully or stay async-via-Promise.all. The middle path (one ad-hoc queue, no operational story) bites.`,
   },

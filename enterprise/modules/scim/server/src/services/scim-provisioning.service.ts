@@ -33,7 +33,7 @@ import {
 export type ScimUserProvisioning = ScimUserActivation &
   ScimUserProfileReadWrite &
   Pick<UserApi, "findByEmail" | "create">;
-import type { ScimSyncLifecycle } from "../app/scim.infrastructure.ts";
+import type { ScimSyncLifecycle } from "../app/scim.members.ts";
 import {
   isUniqueViolation,
   nameFromScimRequest,

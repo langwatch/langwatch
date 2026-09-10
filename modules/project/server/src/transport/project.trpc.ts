@@ -253,7 +253,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
       // Everything else behind this is event-store and projection internals,
       // which is a cause we cannot name and the caller cannot act on. It stays
       // an ordinary error so the boundary degrades it to an unknown failure
-      // carrying a trace id rather than dressing an infrastructure fault up as
+      // carrying a trace id rather than dressing an members fault up as
       // handled.
       throw new Error("Failed to trigger topic clustering", { cause: error });
     }

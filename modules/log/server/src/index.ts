@@ -11,7 +11,7 @@ export { ClickhouseLogRepository } from "./repositories/clickhouse/clickhouse.lo
  * and their trace contributions out. Was
  * `platform/app/src/server/app-layer/traces/log-request-collection.service.ts`.
  */
-export type { LogTraceIoExtractor, LogTraceIo } from "./app/log.infrastructure.ts";
+export type { LogTraceIoExtractor, LogTraceIo } from "./app/log.members.ts";
 export {
   LogRequestCollectionService,
   type LogRequestCollectionDeps,

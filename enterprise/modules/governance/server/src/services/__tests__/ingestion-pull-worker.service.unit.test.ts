@@ -10,7 +10,7 @@ import type {
   PulledUsageObservedEventData,
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
-import { GovernanceEncryptor } from "../../app/governance.infrastructure.ts";
+import { GovernanceEncryptor } from "../../app/governance.members.ts";
 import {
   GovernanceOcsfEventSink,
   GovernanceTraceIngestionClient,
@@ -20,7 +20,7 @@ import {
   IngestionPullSourceReader,
   PulledUsageDispatcher,
   PulledUsageEntitlements,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import {
   IngestionPullDeadlineExceededError,
@@ -30,7 +30,7 @@ import {
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../puller-registry.service.ts";
-import type { PulledUsageRateReader } from "../../app/governance.infrastructure.ts";
+import type { PulledUsageRateReader } from "../../app/governance.members.ts";
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 
 function ingestionSource(

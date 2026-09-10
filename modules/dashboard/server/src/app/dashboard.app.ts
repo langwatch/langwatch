@@ -34,10 +34,10 @@ import {
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 
-import type { AlertRedaction } from "./dashboard.infrastructure.ts";
-import type { PlatformUrl } from "./dashboard.infrastructure.ts";
-import type { WorkbenchAccess } from "./dashboard.infrastructure.ts";
-import type { WorkbenchCaller } from "./dashboard.infrastructure.ts";
+import type { AlertRedaction } from "./dashboard.members.ts";
+import type { PlatformUrl } from "./dashboard.members.ts";
+import type { WorkbenchAccess } from "./dashboard.members.ts";
+import type { WorkbenchCaller } from "./dashboard.members.ts";
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { DashboardService } from "../services/dashboard.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
@@ -78,7 +78,7 @@ export class DashboardApp implements DashboardApi {
   #savedViews: SavedViewService;
   #automation: AutomationApiContract;
   #projects: ProjectApiContract;
-  #infrastructure: DashboardInfrastructure;
+  #members: DashboardInfrastructure;
 
   private constructor(
     services: Readonly<{
@@ -87,14 +87,14 @@ export class DashboardApp implements DashboardApi {
       savedViews: SavedViewService;
     }>,
     peers: Readonly<{ automation: AutomationApiContract; projects: ProjectApiContract }>,
-    infrastructure: DashboardInfrastructure,
+    members: DashboardInfrastructure,
   ) {
     this.#dashboards = services.dashboards;
     this.#charts = services.charts;
     this.#savedViews = services.savedViews;
     this.#automation = peers.automation;
     this.#projects = peers.projects;
-    this.#infrastructure = infrastructure;
+    this.#members = members;
   }
 
   static create(setup: DashboardSetup): DashboardApp {
@@ -104,7 +104,7 @@ export class DashboardApp implements DashboardApi {
       {
         dashboards: DashboardService.create({
           repository: setup.repositories.dashboards,
-          workbenchAccess: setup.infrastructure.workbenchAccess,
+          workbenchAccess: setup.members.workbenchAccess,
         }),
         charts: SavedWorkbenchChartService.create({
           repository: setup.repositories.dashboards,
@@ -114,7 +114,7 @@ export class DashboardApp implements DashboardApi {
         savedViews: SavedViewService.create({ repository: setup.repositories.savedViews }),
       },
       { automation: setup.dependencies.automation, projects: setup.dependencies.projects },
-      setup.infrastructure,
+      setup.members,
     );
   }
 
@@ -172,7 +172,7 @@ export class DashboardApp implements DashboardApi {
     return Object.fromEntries(
       input.dashboardIds.map((dashboardId) => [
         dashboardId,
-        this.#infrastructure.platformUrl.linkTo({
+        this.#members.platformUrl.linkTo({
           projectSlug: project.slug,
           path: `/analytics/reports?dashboard=${dashboardId}`,
         }),
@@ -312,7 +312,7 @@ export class DashboardApp implements DashboardApi {
   }): Promise<SavedWorkbenchChart> {
     await this.#requireWorkbench(input.projectId);
 
-    const protections = await this.#infrastructure.workbenchCaller.resolveProtections({
+    const protections = await this.#members.workbenchCaller.resolveProtections({
       actorId: input.actorId,
       projectId: input.projectId,
     });
@@ -344,7 +344,7 @@ export class DashboardApp implements DashboardApi {
         ? undefined
         : {
             definition: input.definition,
-            protections: await this.#infrastructure.workbenchCaller.resolveProtections({
+            protections: await this.#members.workbenchCaller.resolveProtections({
               actorId: input.actorId,
               projectId: input.projectId,
             }),
@@ -402,7 +402,7 @@ export class DashboardApp implements DashboardApi {
   }): Promise<LangWatchQLQueryResult> {
     await this.#requireWorkbench(input.projectId);
 
-    const { project, protections } = await this.#infrastructure.workbenchCaller.resolveRunCaller({
+    const { project, protections } = await this.#members.workbenchCaller.resolveRunCaller({
       actorId: input.actorId,
       projectId: input.projectId,
     });
@@ -512,7 +512,7 @@ export class DashboardApp implements DashboardApi {
    * charts while the feature was off would announce what nobody can use.
    */
   async #requireWorkbench(projectId: string): Promise<void> {
-    const enabled = await this.#infrastructure.workbenchAccess.isWorkbenchEnabled({ projectId });
+    const enabled = await this.#members.workbenchAccess.isWorkbenchEnabled({ projectId });
     if (!enabled) throw new LangWatchQLNotEnabledError();
   }
 
@@ -520,7 +520,7 @@ export class DashboardApp implements DashboardApi {
   #redacted(trigger: Trigger): Trigger {
     return {
       ...trigger,
-      actionParams: this.#infrastructure.alertRedaction.redactActionParams(
+      actionParams: this.#members.alertRedaction.redactActionParams(
         trigger.action,
         trigger.actionParams ?? {},
       ),

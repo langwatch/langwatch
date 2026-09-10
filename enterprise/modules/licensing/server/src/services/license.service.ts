@@ -13,11 +13,11 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { licenseResourceCounts } from "@langwatch/plans";
 import { nowInstant, Temporal, toEpochMs, type Instant } from "@langwatch/time";
-import type { LicenseCryptography } from "../app/licensing.infrastructure.ts";
-import type { LicenseLogger } from "../app/licensing.infrastructure.ts";
-import type { LicenseRetention } from "../app/licensing.infrastructure.ts";
-import type { LicenseUsage } from "../app/licensing.infrastructure.ts";
-import type { LicenseStorage } from "../app/licensing.infrastructure.ts";
+import type { LicenseCryptography } from "../app/licensing.members.ts";
+import type { LicenseLogger } from "../app/licensing.members.ts";
+import type { LicenseRetention } from "../app/licensing.members.ts";
+import type { LicenseUsage } from "../app/licensing.members.ts";
+import type { LicenseStorage } from "../app/licensing.members.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
 export type LicenseRetentionConfiguration = {

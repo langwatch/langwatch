@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CodingAgentSessionEventRecord } from "@langwatch/coding-agent-contract";
-import { CodingAgentClickHouse } from "../../../app/coding-agent.infrastructure.ts";
+import { CodingAgentClickHouse } from "../../../app/coding-agent.members.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 import {
   createTestClickHouseClient,

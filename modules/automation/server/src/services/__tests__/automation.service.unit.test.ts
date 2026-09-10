@@ -14,7 +14,7 @@ import { TriggerRepository } from "../../repositories/trigger.repository.ts";
 import type { ReportScheduleTarget } from "../../repositories/trigger.repository.ts";
 import { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
 import { ReportScheduleService } from "../report-schedule.service.ts";
-import { AutomationClock } from "../../app/automation.infrastructure.ts";
+import { AutomationClock } from "../../app/automation.members.ts";
 import { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
 import type { ScheduledJobRecord } from "../../repositories/automation-scheduled-job.repository.ts";
 import { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";

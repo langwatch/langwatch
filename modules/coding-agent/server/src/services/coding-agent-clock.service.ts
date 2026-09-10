@@ -1,4 +1,4 @@
-import { CodingAgentClock } from "../app/coding-agent.infrastructure.ts";
+import { CodingAgentClock } from "../app/coding-agent.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 export class SystemCodingAgentClockAdapter implements CodingAgentClock {

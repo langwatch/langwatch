@@ -126,7 +126,7 @@ export function createUserTestInfrastructure(
 export function createUserTestApp(
   input: Readonly<{
     repositories?: UserRepositories;
-    infrastructure?: Partial<UserInfrastructure>;
+    members?: Partial<UserInfrastructure>;
     dependencies?: Partial<{
       auth: AuthApi;
       organizations: OrganizationApi;
@@ -136,7 +136,7 @@ export function createUserTestApp(
 ): UserApp {
   return UserApp.create({
     repositories: input.repositories ?? MemoryUserRepositories.create(),
-    infrastructure: createUserTestInfrastructure(input.infrastructure ?? {}),
+    members: createUserTestInfrastructure(input.members ?? {}),
     dependencies: {
       auth: input.dependencies?.auth ?? createUserTestAuth(),
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),

@@ -62,7 +62,7 @@ describe("isPermissionDenial", () => {
     });
   });
 
-  describe("given an infrastructure failure", () => {
+  describe("given an members failure", () => {
     it("treats a dropped connection as an outage, not a refusal", () => {
       expect(isPermissionDenial(new Error("connection reset"))).toBe(false);
     });

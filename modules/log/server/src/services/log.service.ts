@@ -3,7 +3,7 @@ import type {
   LogPiiRedactionLevel,
   LogPreparation,
 } from "@langwatch/log-contract";
-import type { LogPreparer } from "../app/log.infrastructure.ts";
+import type { LogPreparer } from "../app/log.members.ts";
 import type { CanonicalLogRecordRepository } from "../repositories/canonical-log-record.repository.ts";
 
 /** Canonical log preparation and the trace-scoped read, over one repository. */

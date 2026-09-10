@@ -10,11 +10,11 @@ import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
 import { AutomationApp, type AutomationInfrastructure } from "../automation.app.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
-import type { AutomationClock } from "../automation.infrastructure.ts";
+import type { AutomationClock } from "../automation.members.ts";
 import type {
   AutomationGraphNotifier,
   AutomationLogger,
-} from "../automation.infrastructure.ts";
+} from "../automation.members.ts";
 import type { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
 import type { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
 import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
@@ -165,7 +165,7 @@ export function createCanonicalAutomationApp(): {
     setRules: vi.fn(),
     clearStoredFlag: vi.fn(),
   };
-  const infrastructure: AutomationInfrastructure = {
+  const members: AutomationInfrastructure = {
     verifier,
     jobs,
     clock,
@@ -205,7 +205,7 @@ export function createCanonicalAutomationApp(): {
           getActivePlan: vi.fn<EntitlementApiContract["getActivePlan"]>(),
         },
       },
-      infrastructure,
+      members,
       config: automationServerConfigSchema.parse({}),
       resources,
     }),

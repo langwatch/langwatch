@@ -73,7 +73,7 @@ export {
   type TopicClusteringClickHouseQueryParams,
   type TopicClusteringClickHouseResolver,
 } from "./ports/topic-clustering-clickhouse.port.ts";
-export type { TopicClusteringCommands } from "./app/topic.infrastructure.ts";
+export type { TopicClusteringCommands } from "./app/topic.members.ts";
 export {
   LangevalsPayloadStaging,
   STAGED_PAYLOAD_HEADER,

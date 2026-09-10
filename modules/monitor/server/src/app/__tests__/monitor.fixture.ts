@@ -108,7 +108,7 @@ export function createMonitorTestApp(
         input.permissions ??
         createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
     },
-    infrastructure: {
+    members: {
       evaluators: input.evaluators ?? new FakeMonitorEvaluators(),
       performance: input.performance ?? new FakeMonitorPerformance(),
       replication:

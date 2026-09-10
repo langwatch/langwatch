@@ -25,7 +25,7 @@ export interface EvaluationsTagSummary {
   passes: number;
   /** Processed runs with an explicit fail verdict. */
   failed: number;
-  /** Runs whose evaluator crashed — an infrastructure state, not a fail. */
+  /** Runs whose evaluator crashed — an members state, not a fail. */
   errored: number;
   /** Runs that were skipped — neither passed nor failed. */
   skipped: number;

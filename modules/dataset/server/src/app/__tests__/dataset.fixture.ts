@@ -48,7 +48,7 @@ export function createDatasetTestAuthz(permitted = true) {
 export function createDatasetTestApp(
   input: Readonly<{
     repositories?: DatasetRepositories;
-    infrastructure?: DatasetInfrastructure;
+    members?: DatasetInfrastructure;
     dependencies?: Partial<{ experiments: ExperimentApi; permissions: AuthzApi }>;
   }> = {},
 ): DatasetApp {
@@ -58,7 +58,7 @@ export function createDatasetTestApp(
       experiments: input.dependencies?.experiments ?? createDatasetTestExperiments(),
       permissions: input.dependencies?.permissions ?? createDatasetTestAuthz(),
     },
-    infrastructure: input.infrastructure ?? {},
+    members: input.members ?? {},
     config: void 0,
     resources: new ResourceScope(),
   });

@@ -15,7 +15,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GithubProjectActivity } from "../github.infrastructure.ts";
+import { GithubProjectActivity } from "../github.members.ts";
 import { composeGithubBranchDemand } from "../../app/github.app.ts";
 import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
 import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";

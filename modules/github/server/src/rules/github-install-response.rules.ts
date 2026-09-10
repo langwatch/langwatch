@@ -1,4 +1,4 @@
-import { GithubInstallResponse } from "../app/github.infrastructure.ts";
+import { GithubInstallResponse } from "../app/github.members.ts";
 
 export class GithubInstallResponseRules implements GithubInstallResponse {
   static create(): GithubInstallResponseRules {

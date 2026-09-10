@@ -2,7 +2,7 @@ import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import { LicensingEntitlementSourceAdapter } from "../services/licensing-entitlement-source.service.ts";
-import { OrganizationLicense } from "../app/licensing.infrastructure.ts";
+import { OrganizationLicense } from "../app/licensing.members.ts";
 import {
   ENTERPRISE_LICENSE_KEY,
   EXPIRED_ENTERPRISE_LICENSE_KEY,

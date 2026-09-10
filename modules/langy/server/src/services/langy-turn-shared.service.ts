@@ -17,7 +17,7 @@ import {
   LangyUiActionSurface,
   type LangyWorkerProbeInput,
   LangyWorker,
-} from "../app/langy.infrastructure.ts";
+} from "../app/langy.members.ts";
 import type { LangyTurnAccessRepository } from "../repositories/langy-live-turn.repository.ts";
 import type { LangyTurnHandoffRepository } from "../repositories/langy-live-turn.repository.ts";
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";

@@ -15,7 +15,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { ModelProviderCredentialCodec } from "../../../app/model-provider.infrastructure.ts";
+import { ModelProviderCredentialCodec } from "../../../app/model-provider.members.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {

@@ -2,7 +2,7 @@ import type { TraceClickHouseWriteClient } from "../../trace-clickhouse-client.r
 import {
   TraceWindowedReadMetrics,
   type TraceWindowedReadOutcome,
-} from "../../../app/trace.infrastructure.ts";
+} from "../../../app/trace.members.ts";
 
 export class TestWindowedReadMetrics implements TraceWindowedReadMetrics {
   private readonly counts = new Map<string, number>();

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { OrganizationUserRole } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { JoinRequestNotificationMail } from "../app/identity.infrastructure.ts";
+import type { JoinRequestNotificationMail } from "../app/identity.members.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 
 const logger = createLogger("langwatch:identity:join-request-adapters");

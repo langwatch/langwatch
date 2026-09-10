@@ -24,7 +24,7 @@ export class PostgresWebhookRepositories {
   static readonly requires = ["prisma", "ids", "secrets", "clickhouse", "configuration"] as const;
 
   static create(
-    infrastructure: Readonly<{
+    members: Readonly<{
       prisma: PrismaClient;
       ids: WebhookId;
       secrets: WebhookSecret;
@@ -34,14 +34,14 @@ export class PostgresWebhookRepositories {
   ): WebhookRepositories {
     return {
       endpoints: PrismaWebhookEndpointRepository.create({
-        prisma: infrastructure.prisma,
-        ids: infrastructure.ids,
-        secrets: infrastructure.secrets,
-        configuration: infrastructure.configuration,
+        prisma: members.prisma,
+        ids: members.ids,
+        secrets: members.secrets,
+        configuration: members.configuration,
       }),
-      events: WebhookEventsClickHouseRepository.create(infrastructure.clickhouse),
-      retention: PrismaWebhookRetentionRepository.create({ prisma: infrastructure.prisma }),
-      tenants: PrismaWebhookTenantsRepository.create(infrastructure.prisma),
+      events: WebhookEventsClickHouseRepository.create(members.clickhouse),
+      retention: PrismaWebhookRetentionRepository.create({ prisma: members.prisma }),
+      tenants: PrismaWebhookTenantsRepository.create(members.prisma),
     };
   }
 }

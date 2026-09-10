@@ -77,7 +77,7 @@ import type {
   PersonalWorkspaceDiagnostics,
   PersonalWorkspaceIdentity,
   TeamIdentity,
-} from "./organization.infrastructure.ts";
+} from "./organization.members.ts";
 import type {
   CustomRole,
   Organization,
@@ -115,7 +115,7 @@ import type {
   OrganizationJoinRequests,
   OrganizationPlanGate,
   OrganizationSignals,
-} from "./organization.infrastructure.ts";
+} from "./organization.members.ts";
 import {
   organizationMemberDatesFromDate,
   organizationProvisioningSummaryFromDate,
@@ -267,18 +267,18 @@ export class ServerOrganizationApp implements OrganizationApi {
       repository: setup.repositories.organization,
       teams: setup.repositories.team,
       groups: setup.repositories.group,
-      identities: setup.infrastructure.identities,
-      teamIdentities: setup.infrastructure.teamIdentities,
-      groupIdentities: setup.infrastructure.groupIdentities,
+      identities: setup.members.identities,
+      teamIdentities: setup.members.teamIdentities,
+      groupIdentities: setup.members.groupIdentities,
       authz: setup.dependencies.permissions,
       grants: setup.dependencies.permissions,
-      settingsSecrets: setup.infrastructure.settingsSecrets,
-      diagnostics: setup.infrastructure.diagnostics,
+      settingsSecrets: setup.members.settingsSecrets,
+      diagnostics: setup.members.diagnostics,
     });
     const membership = OrganizationMembershipService.create({
       repository: setup.repositories.membership(setup.dependencies.permissions),
-      prompts: setup.infrastructure.prompts,
-      seats: setup.infrastructure.seats,
+      prompts: setup.members.prompts,
+      seats: setup.members.seats,
       sessions: UserApiOrganizationSessionRevocation.create(setup.dependencies.users),
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
     });
@@ -296,7 +296,7 @@ export class ServerOrganizationApp implements OrganizationApi {
       apiKeys: setup.dependencies.apiKeys,
     });
 
-    application.#infrastructure = setup.infrastructure;
+    application.#members = setup.members;
     application.#visibility = OrganizationVisibilityService.create({
       reader: {
         getAllForUser: (input) => membership.getAllForUser(input),
@@ -304,30 +304,30 @@ export class ServerOrganizationApp implements OrganizationApi {
         findMemberById: (input) => membership.findMemberById(input),
       },
       permissions: setup.dependencies.permissions,
-      secrets: setup.infrastructure.settingsSecrets,
-      demoProject: setup.infrastructure.demoProject,
+      secrets: setup.members.settingsSecrets,
+      demoProject: setup.members.demoProject,
     });
     application.#personalTeamScope = PersonalTeamScopeService.create(
       setup.repositories.personalTeamScope,
     );
-    application.#invitationDoor = setup.infrastructure.invitations
+    application.#invitationDoor = setup.members.invitations
       ? OrganizationInvitationDoorService.create({
-          invitations: setup.infrastructure.invitations,
-          joinRequests: setup.infrastructure.joinRequests,
-          plans: setup.infrastructure.plans,
-          signals: setup.infrastructure.signals,
+          invitations: setup.members.invitations,
+          joinRequests: setup.members.joinRequests,
+          plans: setup.members.plans,
+          signals: setup.members.signals,
           ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
         })
       : null;
-    application.#joinDoor = setup.infrastructure.joinRequests
+    application.#joinDoor = setup.members.joinRequests
       ? OrganizationJoinDoorService.create({
-          joinRequests: setup.infrastructure.joinRequests,
-          directory: setup.infrastructure.directory,
+          joinRequests: setup.members.joinRequests,
+          directory: setup.members.directory,
         })
       : null;
     application.#onboarding = OrganizationOnboardingService.create({
-      ceremony: setup.infrastructure.ceremony,
-      signals: setup.infrastructure.signals,
+      ceremony: setup.members.ceremony,
+      signals: setup.members.signals,
       createAndAssign: (input, by) => application.createAndAssign(input, by),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
@@ -340,7 +340,7 @@ export class ServerOrganizationApp implements OrganizationApi {
    * booted one: the door services close over the application, so a suite that
    * built it by hand would drive an application whose doors were never attached.
    *
-   * Only the infrastructure a suite names is supplied; every other member refuses
+   * Only the members a suite names is supplied; every other member refuses
    * by name, which is what a deployment that composed none of it does.
    */
   static createForTesting(setup: {
@@ -349,7 +349,7 @@ export class ServerOrganizationApp implements OrganizationApi {
       shares?: ShareApi;
       apiKeys?: ApiKeyApi;
     };
-    infrastructure?: Partial<OrganizationInfrastructure>;
+    members?: Partial<OrganizationInfrastructure>;
     /** Defaults to a reader that finds no personal team in any scope. */
     personalTeamScope?: PersonalTeamScopeReader;
   }): ServerOrganizationApp {
@@ -365,7 +365,7 @@ export class ServerOrganizationApp implements OrganizationApi {
           projects: dependencies.projects,
         }),
     });
-    const infrastructure = {
+    const members = {
       plans: refusing<OrganizationPlanGate>("organization plan gate"),
       signals: refusing<OrganizationSignals>("organization signals"),
       ceremony: refusing<OrganizationCeremony>("sign-up ceremony"),
@@ -374,10 +374,10 @@ export class ServerOrganizationApp implements OrganizationApi {
       demoProject: { userId: "", projectId: "" },
       invitations: null,
       joinRequests: null,
-      ...setup.infrastructure,
+      ...setup.members,
     } as OrganizationInfrastructure;
 
-    application.#infrastructure = infrastructure;
+    application.#members = members;
     application.#visibility = OrganizationVisibilityService.create({
       reader: {
         getAllForUser: (input) => dependencies.membership.getAllForUser(input),
@@ -386,8 +386,8 @@ export class ServerOrganizationApp implements OrganizationApi {
         findMemberById: (input) => dependencies.membership.findMemberById(input),
       },
       permissions: dependencies.permissions,
-      secrets: infrastructure.settingsSecrets,
-      demoProject: infrastructure.demoProject,
+      secrets: members.settingsSecrets,
+      demoProject: members.demoProject,
     });
     application.#personalTeamScope = PersonalTeamScopeService.create(
       setup.personalTeamScope ?? {
@@ -395,24 +395,24 @@ export class ServerOrganizationApp implements OrganizationApi {
         tryFindForeignPersonalTeamInScopes: async () => null,
       },
     );
-    application.#invitationDoor = infrastructure.invitations
+    application.#invitationDoor = members.invitations
       ? OrganizationInvitationDoorService.create({
-          invitations: infrastructure.invitations,
-          joinRequests: infrastructure.joinRequests,
-          plans: infrastructure.plans,
-          signals: infrastructure.signals,
+          invitations: members.invitations,
+          joinRequests: members.joinRequests,
+          plans: members.plans,
+          signals: members.signals,
           ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
         })
       : null;
-    application.#joinDoor = infrastructure.joinRequests
+    application.#joinDoor = members.joinRequests
       ? OrganizationJoinDoorService.create({
-          joinRequests: infrastructure.joinRequests,
-          directory: infrastructure.directory,
+          joinRequests: members.joinRequests,
+          directory: members.directory,
         })
       : null;
     application.#onboarding = OrganizationOnboardingService.create({
-      ceremony: infrastructure.ceremony,
-      signals: infrastructure.signals,
+      ceremony: members.ceremony,
+      signals: members.signals,
       createAndAssign: (input, by) => application.createAndAssign(input, by),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
@@ -427,7 +427,7 @@ export class ServerOrganizationApp implements OrganizationApi {
   // Assigned once by `create`, immediately after the constructor: the door
   // services close over the application itself, which the constructor cannot
   // hand them.
-  #infrastructure!: OrganizationInfrastructure;
+  #members!: OrganizationInfrastructure;
   #visibility!: OrganizationVisibilityService;
   #personalTeamScope!: PersonalTeamScopeService;
   #invitationDoor!: OrganizationInvitationDoorService | null;
@@ -610,7 +610,7 @@ export class ServerOrganizationApp implements OrganizationApi {
 
       const summary = await this.findProvisioningSummary(created.organization.id);
       if (!summary) {
-        // The slug is the natural key an infrastructure-as-code caller
+        // The slug is the natural key an members-as-code caller
         // stores; answering success with a blank one moves the failure far
         // from its cause.
         throw new Error(
@@ -627,7 +627,7 @@ export class ServerOrganizationApp implements OrganizationApi {
       try {
         await this.deleteProvisionedOrganization({ organizationId: created.organization.id });
       } catch (compensationError) {
-        this.#infrastructure.signals.reportError(
+        this.#members.signals.reportError(
           compensationError instanceof Error
             ? compensationError
             : new Error(String(compensationError)),
@@ -1128,7 +1128,7 @@ export class ServerOrganizationApp implements OrganizationApi {
 
     if (isOrganizationApiCustomRole(input.role)) {
       if (input.customRoleId) {
-        await this.#infrastructure.plans.assertCustomRolesAllowed({ organizationId });
+        await this.#members.plans.assertCustomRolesAllowed({ organizationId });
       }
     } else {
       await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
@@ -1146,7 +1146,7 @@ export class ServerOrganizationApp implements OrganizationApi {
     input: Parameters<OrganizationMembershipService["getAuditLogs"]>[0],
     by: OrganizationCaller,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
-    await this.#infrastructure.plans.assertAuditLogsAllowed({
+    await this.#members.plans.assertAuditLogsAllowed({
       organizationId: input.organizationId,
     });
 
@@ -1259,7 +1259,7 @@ export class ServerOrganizationApp implements OrganizationApi {
   async listGroupsWithScopeNames(
     input: Readonly<{ organizationId: string }>,
   ): Promise<GroupListItem[]> {
-    await this.#infrastructure.plans.assertScimAllowed(input);
+    await this.#members.plans.assertScimAllowed(input);
 
     const page = await this.listGroups({ ...input, ...GROUP_PAGE });
     const scopeNames = await this.resolveBindingScopeNames({
@@ -1307,7 +1307,7 @@ export class ServerOrganizationApp implements OrganizationApi {
     input: Omit<CreateOrganizationGroupInput, "actor">,
     by: OrganizationCaller,
   ): Promise<OrganizationGroup> {
-    await this.#infrastructure.plans.assertScimAllowed({ organizationId: input.organizationId });
+    await this.#members.plans.assertScimAllowed({ organizationId: input.organizationId });
 
     return this.createGroup(input, by);
   }
@@ -1439,7 +1439,7 @@ export class ServerOrganizationApp implements OrganizationApi {
   }): Promise<void> {
     if (!input.members.some((member) => isOrganizationApiCustomRole(member.role))) return;
 
-    await this.#infrastructure.plans.assertCustomRolesAllowed({
+    await this.#members.plans.assertCustomRolesAllowed({
       organizationId: input.organizationId,
     });
   }
@@ -1470,7 +1470,7 @@ export class ServerOrganizationApp implements OrganizationApi {
       throw new LiteMemberViewerOnlyError();
     }
 
-    await this.#infrastructure.plans.assertTeamRoleChangeWithinSeatLimits({
+    await this.#members.plans.assertTeamRoleChangeWithinSeatLimits({
       organizationId,
       teamId: input.teamId,
       userId: input.userId,

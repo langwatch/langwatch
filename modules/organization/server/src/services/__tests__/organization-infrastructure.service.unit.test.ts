@@ -25,7 +25,7 @@ import type {
   GroupIdentity,
   PersonalWorkspaceIdentity,
   TeamIdentity,
-} from "../../app/organization.infrastructure.ts";
+} from "../../app/organization.members.ts";
 import {
   OrganizationRepository,
   type PersonalWorkspaceFeatureProject,

@@ -249,7 +249,7 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
           tryGetWithTeam: async (id: string) => (id === projectId ? project : null),
         }),
       },
-      infrastructure: {
+      members: {
         execution: SuiteExecutionService.create({
           commands,
           ids: new RunIds(),

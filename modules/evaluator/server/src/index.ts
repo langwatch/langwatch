@@ -3,7 +3,7 @@ export { evaluatorServer } from "./evaluator.server.ts";
 
 /**
  * The module's application: the one typed thing its transports are given, its
- * infrastructure record, and the two rows-of-other-modules interfaces the
+ * members record, and the two rows-of-other-modules interfaces the
  * process supplies it with. Both doors reach the same object, so a rule
  * written on it is the rule both doors get.
  */

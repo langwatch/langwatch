@@ -89,7 +89,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     const { app } = createOpsTestApp({
       repositories: { bugReports: repository },
       ...(options.apiKeys ? { apiKeys: options.apiKeys } : {}),
-      infrastructure: {
+      members: {
         bugReportRateLimiter: options.rateLimiter ?? inMemoryRateLimiter(),
         bugReportNotifier: options.notifier ?? silentNotifier(),
       },

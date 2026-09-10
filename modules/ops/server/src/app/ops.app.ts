@@ -430,7 +430,7 @@ export interface OpsBadgeReading {
  *
  * Unreachable behind an authenticated procedure, and kept anyway: a guard
  * whose strictest branch is the one a missing session bypasses is fail-open in
- * shape, and this one stands in front of irreversible infrastructure work.
+ * shape, and this one stands in front of irreversible members work.
  */
 export class OpsOperatorSessionRequiredError extends HandledError {
   declare readonly code: "ops_operator_session_required";
@@ -449,7 +449,7 @@ export class OpsOperatorSessionRequiredError extends HandledError {
  *
  * The operator scope deliberately falls back to the impersonator's own grant,
  * so `ops:manage` is inherited by an impersonation session - and "acting as"
- * another user is the wrong posture for irreversible infrastructure surgery,
+ * another user is the wrong posture for irreversible members surgery,
  * because the audit trail would name the impersonated account.
  */
 export class OpsImpersonatedOperatorRefusedError extends HandledError {
@@ -548,34 +548,34 @@ export class OpsApp implements OpsApi {
   static readonly configSchema = void 0;
 
   static create(setup: OpsSetup): OpsApp {
-    const { infrastructure } = setup;
+    const { members } = setup;
 
     const inbox = BugReportInboxService.create({ reports: setup.repositories.bugReports });
 
     return new OpsApp({
-      ops: infrastructure.createCapability(setup.dependencies),
+      ops: members.createCapability(setup.dependencies),
       inbox,
       intake: BugReportIntakeService.create({
         reports: setup.repositories.bugReports,
-        rateLimiter: infrastructure.bugReportRateLimiter,
-        notifier: infrastructure.bugReportNotifier,
+        rateLimiter: members.bugReportRateLimiter,
+        notifier: members.bugReportNotifier,
       }),
       apiKeys: setup.dependencies.apiKeys,
-      featureFlags: infrastructure.featureFlags,
+      featureFlags: members.featureFlags,
       projects: setup.dependencies.projects,
       auditLog: setup.dependencies.auditLog,
-      eventingIntrospection: infrastructure.eventingIntrospection,
-      pipelines: infrastructure.pipelines,
-      eventLogWindow: infrastructure.eventLogWindow,
-      grafana: infrastructure.grafana,
-      systemMigrations: infrastructure.systemMigrations,
+      eventingIntrospection: members.eventingIntrospection,
+      pipelines: members.pipelines,
+      eventLogWindow: members.eventLogWindow,
+      grafana: members.grafana,
+      systemMigrations: members.systemMigrations,
       explain: OpsExplainService.create({
         repository: OpsExplainClickHouseRepository.create({
-          resolver: infrastructure.explainClients,
+          resolver: members.explainClients,
         }),
       }),
-      findOpsApiKey: () => infrastructure.findOpsApiKey(),
-      isProduction: infrastructure.isProduction,
+      findOpsApiKey: () => members.findOpsApiKey(),
+      isProduction: members.isProduction,
     });
   }
 

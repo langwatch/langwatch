@@ -41,7 +41,7 @@ export type SpanDedupRef = {
 };
 
 /**
- * Redis-backed deduplication is app infrastructure, not Trace domain state.
+ * Redis-backed deduplication is app members, not Trace domain state.
  *
  * Only the claim can answer "I don't know": it returns null when the store is
  * unreachable, and the caller ingests the span anyway rather than dropping a

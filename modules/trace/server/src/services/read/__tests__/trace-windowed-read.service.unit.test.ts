@@ -1,7 +1,7 @@
 import { TraceWindowedReadService } from "../trace-windowed-read.service.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PARTITION_WINDOW_MS, type WindowFragment } from "../trace-windowed-read.service.ts";
-import type { TraceWindowedReadOutcome } from "../../../app/trace.infrastructure.ts";
+import type { TraceWindowedReadOutcome } from "../../../app/trace.members.ts";
 
 const TABLE = "windowed_read_test";
 

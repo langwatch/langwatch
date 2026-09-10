@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
-import { type LedgerEventRow } from "../app/gateway.infrastructure.ts";
+import { type LedgerEventRow } from "../app/gateway.members.ts";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 
 function mockChRepoWithEvents(

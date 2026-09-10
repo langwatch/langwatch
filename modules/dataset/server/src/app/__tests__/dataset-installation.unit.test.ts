@@ -19,7 +19,7 @@ function process() {
     .withInfrastructure({})
     .withProvided(ExperimentApi, createDatasetTestExperiments())
     .withProvided(AuthzApi, createDatasetTestAuthz())
-    .withModule(datasetServer, { infrastructure: {} });
+    .withModule(datasetServer, { members: {} });
 }
 
 const projectId = "project-1";

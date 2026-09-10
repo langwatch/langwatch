@@ -7,7 +7,7 @@ import type {
   AutomationLogger,
   AutomationNotificationDelivery,
   AutomationProjectIdentityPort,
-} from "../../app/automation.infrastructure.ts";
+} from "../../app/automation.members.ts";
 import { PrismaCustomGraphRepository } from "./prisma.custom-graph.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "./prisma.graph-trigger-sent.repository.ts";
 import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";

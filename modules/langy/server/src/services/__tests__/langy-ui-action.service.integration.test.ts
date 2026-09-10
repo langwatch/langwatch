@@ -10,7 +10,7 @@ import { LangyUiActionService, type UiActionRedis, uiActionKeys } from "../langy
 import {
   LangyUiActionCatalog,
   type LangyUiActionDefinition,
-} from "../../app/langy.infrastructure.ts";
+} from "../../app/langy.members.ts";
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
 
 const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {

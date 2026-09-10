@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   ModelProviderCredentialCodec,
   type ModelProviderCredentialCipher,
-} from "../app/model-provider.infrastructure.ts";
+} from "../app/model-provider.members.ts";
 
 const logger = createLogger("langwatch:model-provider:credentials");
 

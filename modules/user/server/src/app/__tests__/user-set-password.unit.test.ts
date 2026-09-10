@@ -118,7 +118,7 @@ describe("setting a first password", () => {
   describe("given a deployment that federates", () => {
     it("refuses, because the password does not live here", async () => {
       const app = createUserTestApp({
-        infrastructure: {
+        members: {
           deployment: {
             authProvider: vi.fn(async () => "auth0"),
             offersPasskeys: () => false,

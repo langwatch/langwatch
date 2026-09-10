@@ -2,7 +2,7 @@
 
 import { OffboardIncompleteError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ScimSyncLifecycle } from "../../app/scim.infrastructure.ts";
+import { ScimSyncLifecycle } from "../../app/scim.members.ts";
 import { ScimDeprovisionService } from "../scim-deprovision.service.ts";
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 

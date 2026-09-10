@@ -2,7 +2,7 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import {
   type TraceEdgeMediaFailOpenReason,
   TraceEdgeMediaTelemetry,
-} from "../app/trace.infrastructure.ts";
+} from "../app/trace.members.ts";
 
 export const TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME =
   "langwatch_edge_media_extract_fail_open_total";

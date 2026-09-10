@@ -537,7 +537,7 @@ export interface TraceSpoolObjectStore {
 
 /**
  * Destination-agnostic storage for the trace spool, injected so the spool
- * service carries no env coupling and the tests run without infrastructure.
+ * service carries no env coupling and the tests run without members.
  *
  * This is the application's `SpoolStorage` interface as an abstract class. The
  * rename is the only difference: `port-modules` requires a runtime boundary in

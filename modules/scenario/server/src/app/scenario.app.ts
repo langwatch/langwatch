@@ -167,24 +167,24 @@ export class ScenarioApp implements ScenarioApi {
   ): ScenarioApp {
     const scenarios = ScenarioService.create({
       repository: setup.repositories.scenarios,
-      simulations: setup.infrastructure.simulations,
-      ids: setup.infrastructure.ids,
-      testSuiteIds: setup.infrastructure.testSuiteIds,
-      clock: setup.infrastructure.clock,
-      secretCipher: setup.infrastructure.secretCipher,
+      simulations: setup.members.simulations,
+      ids: setup.members.ids,
+      testSuiteIds: setup.members.testSuiteIds,
+      clock: setup.members.clock,
+      secretCipher: setup.members.secretCipher,
     });
 
     return new ScenarioApp({
-      agentTesting: setup.infrastructure.agentTesting,
+      agentTesting: setup.members.agentTesting,
       scenarios,
-      simulations: setup.infrastructure.simulations,
-      scenarioExecution: setup.infrastructure.scenarioExecution,
-      scenarioTabs: setup.infrastructure.scenarioTabs,
+      simulations: setup.members.simulations,
+      scenarioExecution: setup.members.scenarioExecution,
+      scenarioTabs: setup.members.scenarioTabs,
       users: setup.dependencies.users,
-      broadcast: setup.infrastructure.broadcast,
-      resultAtoms: setup.infrastructure.resultAtoms,
-      runConfigurations: setup.infrastructure.runConfigurations,
-      activity: setup.infrastructure.activity ?? new SilentScenarioActivity(),
+      broadcast: setup.members.broadcast,
+      resultAtoms: setup.members.resultAtoms,
+      runConfigurations: setup.members.runConfigurations,
+      activity: setup.members.activity ?? new SilentScenarioActivity(),
     });
   }
 

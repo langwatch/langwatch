@@ -5,7 +5,7 @@
 import type { MappingState } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluationSpanDigest } from "../../app/evaluation.infrastructure.ts";
+import type { EvaluationSpanDigest } from "../../app/evaluation.members.ts";
 import { EvaluationThreadMappingService } from "../evaluation-thread-mapping.service.ts";
 
 const spanDigest = {

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ModelCostProject } from "../../app/model-provider.infrastructure.ts";
+import type { ModelCostProject } from "../../app/model-provider.members.ts";
 import { PrismaModelCostRepository } from "./prisma.model-cost.repository.ts";
 import { ModelCostCatalogService } from "../../services/model-cost-catalog.service.ts";
 import { ModelProviderProjectScopeService } from "../../services/model-provider-project-scope.service.ts";

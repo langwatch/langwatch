@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ModelProviderCredentialCipher } from "../../app/model-provider.infrastructure.ts";
+import { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
 import { ModelProviderCredentialsMigrateTask } from "../model-provider-credentials-migrate.task.ts";
 import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules.ts";
 

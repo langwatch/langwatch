@@ -18,8 +18,8 @@ import {
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
-import type { GatewayAudit } from "../../app/gateway.infrastructure.ts";
-import type { GatewayChangeEvents } from "../../app/gateway.infrastructure.ts";
+import type { GatewayAudit } from "../../app/gateway.members.ts";
+import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
 import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository.ts";
 
 const wirePages = GatewayWirePaginationAdapter.create();

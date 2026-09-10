@@ -28,7 +28,7 @@
  * See specs/identity/scim-connection-sync.feature.
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { ScimSyncLifecycle } from "../app/scim.infrastructure.ts";
+import { ScimSyncLifecycle } from "../app/scim.members.ts";
 import { nowInstant } from "@langwatch/time";
 import {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,

@@ -203,12 +203,12 @@ describe.each(backends)("given the $name langy repositories", ({ create }) => {
 
 describe("given the langy repository registry", () => {
   describe("when the memory tier is selected", () => {
-    it("needs no infrastructure and hands back every row", () => {
+    it("needs no members and hands back every row", () => {
       expect(langyRepositories.definitions.memory.requires).toEqual([]);
 
       const repositories = instantiateRepositories(langyRepositories, {
         backend: "memory",
-        infrastructure: {},
+        members: {},
       });
 
       expect(Object.keys(repositories).sort()).toEqual([

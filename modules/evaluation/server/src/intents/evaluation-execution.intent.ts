@@ -6,7 +6,7 @@ import {
   executeEvaluationCommandDataSchema,
   type ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
-import { EvaluationExecutionIntent } from "../app/evaluation.infrastructure.ts";
+import { EvaluationExecutionIntent } from "../app/evaluation.members.ts";
 
 const schema = defineCommandSchema(
   EXECUTE_EVALUATION_COMMAND_TYPE,

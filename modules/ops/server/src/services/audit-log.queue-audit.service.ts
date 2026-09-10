@@ -34,7 +34,7 @@ export class QueueAuditAdapter extends QueueAuditSink {
     queueName: string;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
-    // Queues are cross-project worker infrastructure; there is no single
+    // Queues are cross-project worker members; there is no single
     // project to scope the act to, and inventing one would mislead.
     await this.auditLog.record({
       userId: entry.actorUserId,

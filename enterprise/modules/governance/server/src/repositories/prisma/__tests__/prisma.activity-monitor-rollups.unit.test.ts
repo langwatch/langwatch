@@ -4,7 +4,7 @@ import {
   GovernanceClickHouseClient,
   type GovernanceClickHouseResult,
   GovernanceClickHouseResolver,
-} from "../../../app/governance.infrastructure.ts";
+} from "../../../app/governance.members.ts";
 import {
   PrismaActivityMonitorRepository,
   type SortDir,

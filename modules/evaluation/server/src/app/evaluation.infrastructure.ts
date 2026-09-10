@@ -265,7 +265,7 @@ export interface EvaluationCostRecorder {
   }): Promise<string>;
 }
 
-/** Stores Evaluation-owned oversized input payloads behind durable infrastructure. */
+/** Stores Evaluation-owned oversized input payloads behind durable members. */
 export interface EvaluationInputStorage {
   store(input: {
     tenantId: string;

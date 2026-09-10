@@ -31,7 +31,7 @@ vi.mock("@langwatch/observability", () => ({
 import type { StoredObjectStorageRepository } from "../../repositories/stored-object-storage.repository.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
-import type { StoredObjectsTelemetry } from "../../app/stored-object.infrastructure.ts";
+import type { StoredObjectsTelemetry } from "../../app/stored-object.members.ts";
 import { StoredObjectsService } from "../stored-objects.service.ts";
 
 const PROJECT_ID = "proj-1";

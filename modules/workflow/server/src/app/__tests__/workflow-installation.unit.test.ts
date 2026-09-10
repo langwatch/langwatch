@@ -39,7 +39,7 @@ function process_() {
 }
 
 describe("workflow app installation", () => {
-  describe("given a process that supplies the module's infrastructure", () => {
+  describe("given a process that supplies the module's members", () => {
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
       const runtime = await process_().boot({ role });
 

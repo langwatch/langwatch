@@ -33,36 +33,36 @@ import { DefaultGovernancePersonalVirtualKeyService } from "../../services/gover
 import { PrismaPersonalVirtualKeyRepository } from "./prisma.governance-personal-key.repository.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../../services/governance-routing.service.ts";
 import { PrismaRoutingPolicyRepository } from "./prisma.governance-routing.repository.ts";
-import type { AdminWorkspaceViewOcsfChannel } from "../../app/governance.infrastructure.ts";
+import type { AdminWorkspaceViewOcsfChannel } from "../../app/governance.members.ts";
 import type { AiToolProviderCatalog, AiToolSlug } from "../ai-tool-catalog.repository.ts";
-import type { CliAdminContactReader } from "../../app/governance.infrastructure.ts";
-import type { CliTokenStore } from "../../app/governance.infrastructure.ts";
-import type { CliBudgetOverviewReader } from "../../app/governance.infrastructure.ts";
-import type { GovernanceDiagnosticsSink } from "../../app/governance.infrastructure.ts";
-import type { GovernanceEncryptor } from "../../app/governance.infrastructure.ts";
-import type { GovernanceEventingChannel } from "../../app/governance.infrastructure.ts";
-import type { GovernanceOcsfEventsReader } from "../../app/governance.infrastructure.ts";
-import type { GovernanceSetupActivityReader } from "../../app/governance.infrastructure.ts";
-import type { GovernanceClickHouseResolver } from "../../app/governance.infrastructure.ts";
+import type { CliAdminContactReader } from "../../app/governance.members.ts";
+import type { CliTokenStore } from "../../app/governance.members.ts";
+import type { CliBudgetOverviewReader } from "../../app/governance.members.ts";
+import type { GovernanceDiagnosticsSink } from "../../app/governance.members.ts";
+import type { GovernanceEncryptor } from "../../app/governance.members.ts";
+import type { GovernanceEventingChannel } from "../../app/governance.members.ts";
+import type { GovernanceOcsfEventsReader } from "../../app/governance.members.ts";
+import type { GovernanceSetupActivityReader } from "../../app/governance.members.ts";
+import type { GovernanceClickHouseResolver } from "../../app/governance.members.ts";
 import type {
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import type {
   IngestionKeyIssuer,
   IngestionKeyRepository,
-} from "../../app/governance.infrastructure.ts";
-import type { PersonalUsageReader } from "../../app/governance.infrastructure.ts";
-import type { PersonalVirtualKeyIssuer } from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
+import type { PersonalUsageReader } from "../../app/governance.members.ts";
+import type { PersonalVirtualKeyIssuer } from "../../app/governance.members.ts";
 import type {
   QuarantineTenantResolver,
   QuarantineTraceActivityReader,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { QuarantineFillEvaluatorService } from "../../services/quarantine-fill.service.ts";
 
 /**
  * The sole server-side installation boundary for Governance. The app supplies
- * infrastructure and neighbouring feature services; this adapter owns all
+ * members and neighbouring feature services; this adapter owns all
  * Governance repositories and collaborating service construction.
  */
 export type GovernanceInstallationOptions = {
@@ -112,7 +112,7 @@ import { DefaultGovernanceSetupStateService } from "../../services/governance-se
 import { IngestionSourceService } from "../../services/ingestion-source.service.ts";
 import { IngestionTemplateService } from "../../services/ingestion-template.service.ts";
 
-/** Builds the one process-owned GovernanceApi from injected infrastructure. */
+/** Builds the one process-owned GovernanceApi from injected members. */
 export class PrismaGovernanceInstallationRepository {
   private constructor(private readonly options: GovernanceInstallationOptions) {}
 

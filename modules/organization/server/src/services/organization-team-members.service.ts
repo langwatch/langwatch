@@ -39,7 +39,7 @@ import {
   type RemoveOrganizationTeamMemberInput,
   type UpdateOrganizationTeamWithMembersInput,
 } from "@langwatch/organization-contract";
-import type { TeamIdentity } from "../app/organization.infrastructure.ts";
+import type { TeamIdentity } from "../app/organization.members.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
 import {

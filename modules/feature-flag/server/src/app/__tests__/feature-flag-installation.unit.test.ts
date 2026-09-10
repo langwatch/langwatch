@@ -23,7 +23,7 @@ function process() {
     .withProvided(ProjectApi, createFeatureFlagTestProjects())
     .withProvided(OrganizationApi, TestOrganizations.create().api())
     .withModule(featureFlagServer, {
-      infrastructure: {
+      members: {
         cache: new MemoryFeatureFlagCache(),
         config: resolveFeatureFlagConfig({}),
       },

@@ -62,7 +62,7 @@ describe("shouldShowNoResponse()", () => {
     });
   });
 
-  describe("when the run failed with an infrastructure error", () => {
+  describe("when the run failed with an members error", () => {
     /** @scenario A run that errored does not show "No response" */
     it("does not show the no-response state (the error is surfaced instead)", () => {
       expect(

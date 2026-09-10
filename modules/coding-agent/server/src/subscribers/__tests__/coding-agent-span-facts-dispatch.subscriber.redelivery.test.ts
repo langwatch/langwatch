@@ -30,7 +30,7 @@ import {
   SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST,
   type SpanFactsLiftedPayload,
 } from "@langwatch/coding-agent-contract";
-import { CodingAgentTraceProcessing } from "../../app/coding-agent.infrastructure.ts";
+import { CodingAgentTraceProcessing } from "../../app/coding-agent.members.ts";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "../coding-agent-span-facts-dispatch.subscriber.ts";
 
 const TRACE_ID = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";

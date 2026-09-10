@@ -3,7 +3,7 @@ import {
   CodingAgentCallerScopeDirectory,
   CodingAgentScopePermissions,
   type CodingAgentScopeProject,
-} from "../../app/coding-agent.infrastructure.ts";
+} from "../../app/coding-agent.members.ts";
 import { CodingAgentCallerScopeService } from "../coding-agent-caller-scope.service.ts";
 
 const caller = { kind: "user", userId: "user-1" } as const;

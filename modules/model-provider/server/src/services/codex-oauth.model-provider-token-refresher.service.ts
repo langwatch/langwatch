@@ -6,7 +6,7 @@ import {
   type CodexTokenKeys,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { CodexTokenRefresher } from "../app/model-provider.infrastructure.ts";
+import { CodexTokenRefresher } from "../app/model-provider.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**

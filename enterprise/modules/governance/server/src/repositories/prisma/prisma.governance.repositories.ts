@@ -21,8 +21,8 @@ import { PrismaSpendSpikeAnomalyRepository } from "./prisma.spend-spike-anomaly.
 export class PostgresGovernanceRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create(infrastructure: Readonly<{ prisma: PrismaClient }>): GovernanceRepositories {
-    const { prisma } = infrastructure;
+  static create(members: Readonly<{ prisma: PrismaClient }>): GovernanceRepositories {
+    const { prisma } = members;
 
     return {
       adminWorkspaceViewAudit: PrismaAdminWorkspaceViewAuditRepository.create(prisma),

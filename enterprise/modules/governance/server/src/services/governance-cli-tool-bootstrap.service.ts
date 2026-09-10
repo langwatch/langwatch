@@ -9,7 +9,7 @@ import type {
   CliAdminContactReader,
   CliBudgetOverview,
   CliBudgetOverviewReader,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 
 type AiToolCliCatalogReader = {
   resolveCliCatalogForUser(input: CliBootstrapInput): Promise<AiToolCliCatalog>;

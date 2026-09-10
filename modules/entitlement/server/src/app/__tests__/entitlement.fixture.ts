@@ -12,8 +12,8 @@ import {
   USAGE_UNKNOWN,
   UsageCounter,
   type UsageCount,
-} from "../entitlement.infrastructure.ts";
-import { UsageWarning } from "../entitlement.infrastructure.ts";
+} from "../entitlement.members.ts";
+import { UsageWarning } from "../entitlement.members.ts";
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
 import { EntitlementApp, type EntitlementInfrastructure } from "../entitlement.app.ts";
@@ -72,17 +72,17 @@ export function createEntitlementTestUsers(): UserApi {
 export function createEntitlementTestApp(
   input: Readonly<{
     repositories?: EntitlementRepositories;
-    infrastructure: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
+    members: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
     dependencies?: Partial<{ users: UserApi }>;
   }>,
 ): EntitlementApp {
   return EntitlementApp.create({
     repositories: input.repositories ?? MemoryEntitlementRepositories.create(),
-    infrastructure: {
-      ...input.infrastructure,
-      counter: input.infrastructure.counter ?? TestUsageCounter.create(),
-      warnings: input.infrastructure.warnings ?? TestUsageWarnings.create(),
+    members: {
+      ...input.members,
+      counter: input.members.counter ?? TestUsageCounter.create(),
+      warnings: input.members.warnings ?? TestUsageWarnings.create(),
     },
     dependencies: { users: input.dependencies?.users ?? createEntitlementTestUsers() },
     config: void 0,

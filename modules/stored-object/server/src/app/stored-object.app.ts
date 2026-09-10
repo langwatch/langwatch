@@ -29,7 +29,7 @@ import type {
   StoredObjectDelivery,
   StoredObjectStorage,
   StoredObjectUploadTokenCodec,
-} from "./stored-object.infrastructure.ts";
+} from "./stored-object.members.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
 
@@ -82,15 +82,15 @@ export class StoredObjectApp implements StoredObjectApi {
     return new StoredObjectApp(
       StoredObjectService.create({
         records: setup.repositories.records,
-        storage: setup.infrastructure.storage,
-        delivery: setup.infrastructure.delivery,
-        uploadTokens: setup.infrastructure.uploadTokens,
-        idDeriver: setup.infrastructure.idDeriver,
-        maximumUploadBytes: setup.infrastructure.maximumUploadBytes,
-        uploadExpiryMs: setup.infrastructure.uploadExpiryMs,
+        storage: setup.members.storage,
+        delivery: setup.members.delivery,
+        uploadTokens: setup.members.uploadTokens,
+        idDeriver: setup.members.idDeriver,
+        maximumUploadBytes: setup.members.maximumUploadBytes,
+        uploadExpiryMs: setup.members.uploadExpiryMs,
       }),
-      setup.infrastructure.files,
-      setup.infrastructure.owners,
+      setup.members.files,
+      setup.members.owners,
     );
   }
 

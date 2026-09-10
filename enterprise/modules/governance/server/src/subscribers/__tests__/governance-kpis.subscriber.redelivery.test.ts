@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   GovernanceKpiContributionWriter,
   type GovernanceKpiContribution,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber.ts";
 import {
   governanceTraceContext,

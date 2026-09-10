@@ -1,6 +1,6 @@
 import { ClickHouseStoredObjectOwnerRepository } from "./clickhouse.stored-object-owner.repository.ts";
 import { StoredObjectOwnerLookupService } from "../../services/stored-object-owner-lookup.service.ts";
-import { StoredObjectOwnerLookupTelemetry } from "../../app/stored-object.infrastructure.ts";
+import { StoredObjectOwnerLookupTelemetry } from "../../app/stored-object.members.ts";
 import { StoredObjectOwnerInstanceDirectoryRepository } from "../stored-object-owner-instance-directory.repository.ts";
 import type { StoredObjectOwnerResolver } from "@langwatch/stored-object-contract";
 

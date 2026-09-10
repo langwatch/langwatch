@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { GovernanceSetupActivityReader } from "../../app/governance.infrastructure.ts";
+import { GovernanceSetupActivityReader } from "../../app/governance.members.ts";
 import {
   GovernanceSetupStateRepository,
   type GovernanceSetupCounts,

@@ -17,12 +17,12 @@ import {
   EvaluationRescore,
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
-} from "../../app/evaluation.infrastructure.ts";
+} from "../../app/evaluation.members.ts";
 import {
   EvaluationExecution,
   EvaluationInputsResolution,
   EvaluationRetentionFloor,
-} from "../evaluation.infrastructure.ts";
+} from "../evaluation.members.ts";
 import type { EvaluationClickHouseClient } from "../../repositories/clickhouse/evaluation-clickhouse-client.ts";
 import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
 import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.ts";
@@ -183,7 +183,7 @@ export function createEvaluationTestInfrastructure(
 
 export function createEvaluationTestApp(
   input: Readonly<{
-    infrastructure?: Partial<EvaluationInfrastructure>;
+    members?: Partial<EvaluationInfrastructure>;
     dependencies?: Partial<{
       workflows: WorkflowApi;
       traces: TraceApi;
@@ -193,7 +193,7 @@ export function createEvaluationTestApp(
 ): EvaluationApp {
   return EvaluationApp.create({
     repositories: MemoryEvaluationRepositories.create(),
-    infrastructure: createEvaluationTestInfrastructure(input.infrastructure ?? {}),
+    members: createEvaluationTestInfrastructure(input.members ?? {}),
     dependencies: {
       workflows: input.dependencies?.workflows ?? createApiFixture<WorkflowApi>(),
       traces: input.dependencies?.traces ?? createApiFixture<TraceApi>(),

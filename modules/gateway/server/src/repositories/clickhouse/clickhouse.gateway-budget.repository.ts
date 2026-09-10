@@ -16,12 +16,12 @@ import {
   parseSummedNanoUsd,
 } from "@langwatch/gateway-contract";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
-import type { GatewayClickHouseResolver } from "../../app/gateway.infrastructure.ts";
+import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
 import {
   budgetSpendTargetsFor,
   type GatewayBudgetSpend,
   type GatewayBudgetSpendRecord,
-} from "../../app/gateway.infrastructure.ts";
+} from "../../app/gateway.members.ts";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;

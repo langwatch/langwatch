@@ -57,7 +57,7 @@ import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { parseOtlpLogs, parseOtlpMetrics, parseOtlpTraces, readOtlpBody } from "@langwatch/otlp";
 import type { GovernanceDirectory } from "../../repositories/directory/governance-directory.repository.ts";
-import type { GovernanceProjectDirectory } from "../../app/governance.infrastructure.ts";
+import type { GovernanceProjectDirectory } from "../../app/governance.members.ts";
 import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,

@@ -7,7 +7,7 @@ import type {
   LangyGenerateTitleIntent,
   LangyProcessEventView,
   LangyWorkerDispatchIntent,
-} from "../app/langy.infrastructure.ts";
+} from "../app/langy.members.ts";
 import {
   LANGY_OUTBOX_LEASE_DURATION_MS,
   LANGY_PROCESS_INTENT_TYPES,

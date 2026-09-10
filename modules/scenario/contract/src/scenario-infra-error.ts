@@ -57,7 +57,7 @@ export const ScenarioInfraErrorCode = {
    * connected one.
    */
   AgentPayloadTooLarge: "agent_payload_too_large",
-  /** Anything else that failed at the infrastructure level. */
+  /** Anything else that failed at the members level. */
   Infra: "scenario_infra_error",
 } as const;
 

@@ -3,7 +3,7 @@ import type {
   GovernanceSubscriberDiagnosticsSink,
   GovernanceTraceContext,
   GovernanceTraceEvent,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 
 export class SilentSubscriberDiagnostics implements GovernanceSubscriberDiagnosticsSink {
   warn(): void {}

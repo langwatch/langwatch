@@ -8,7 +8,7 @@ import { parseBase64DataUri } from "@langwatch/trace-contract";
 import { isReadbackSafe } from "@langwatch/stored-object-contract";
 import { resolveRawPcmFormat, wrapRawPcmToWav } from "@langwatch/trace-contract";
 import { isInlineDataCarrier } from "@langwatch/trace-contract";
-import type { TraceMediaStore } from "../app/trace.infrastructure.ts";
+import type { TraceMediaStore } from "../app/trace.members.ts";
 import { z } from "zod";
 
 /**

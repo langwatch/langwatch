@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
-import type { CodingAgentProjectActivity } from "../app/coding-agent.infrastructure.ts";
-import type { CodingAgentClock } from "../app/coding-agent.infrastructure.ts";
+import type { CodingAgentProjectActivity } from "../app/coding-agent.members.ts";
+import type { CodingAgentClock } from "../app/coding-agent.members.ts";
 
 const logger = createLogger("langwatch:coding-agent-processing:session-seen-touch");
 export const CODING_AGENT_SESSION_SEEN_WINDOW_MS = 5 * 60 * 1000;

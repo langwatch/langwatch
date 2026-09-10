@@ -5,7 +5,7 @@ export {
   type PlatformUrl,
   type WorkbenchAccess,
   type WorkbenchCaller,
-} from "./app/dashboard.infrastructure.ts";
+} from "./app/dashboard.members.ts";
 export { dashboardRest } from "./transport/dashboard.rest.ts";
 export { dashboardTrpcTransport } from "./transport/dashboard.trpc.ts";
 export { graphRest } from "./transport/graph.rest.ts";

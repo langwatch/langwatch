@@ -11,10 +11,10 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
-import { AlertRedaction } from "../dashboard.infrastructure.ts";
-import { PlatformUrl } from "../dashboard.infrastructure.ts";
-import { WorkbenchAccess } from "../dashboard.infrastructure.ts";
-import { WorkbenchCaller } from "../dashboard.infrastructure.ts";
+import { AlertRedaction } from "../dashboard.members.ts";
+import { PlatformUrl } from "../dashboard.members.ts";
+import { WorkbenchAccess } from "../dashboard.members.ts";
+import { WorkbenchCaller } from "../dashboard.members.ts";
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
 import { DashboardApp, type DashboardInfrastructure } from "../dashboard.app.ts";
@@ -116,7 +116,7 @@ export function createDashboardTestInfrastructure(
 export function createDashboardTestApp(
   input: Readonly<{
     repositories?: DashboardRepositories;
-    infrastructure?: Partial<DashboardInfrastructure>;
+    members?: Partial<DashboardInfrastructure>;
     dependencies?: Partial<{
       analytics: AnalyticsApi;
       automation: AutomationApi;
@@ -126,7 +126,7 @@ export function createDashboardTestApp(
 ): DashboardApp {
   return DashboardApp.create({
     repositories: input.repositories ?? MemoryDashboardRepositories.create(),
-    infrastructure: createDashboardTestInfrastructure(input.infrastructure ?? {}),
+    members: createDashboardTestInfrastructure(input.members ?? {}),
     dependencies: {
       analytics: input.dependencies?.analytics ?? createDashboardTestAnalytics(),
       automation: input.dependencies?.automation ?? createDashboardTestAutomation(),

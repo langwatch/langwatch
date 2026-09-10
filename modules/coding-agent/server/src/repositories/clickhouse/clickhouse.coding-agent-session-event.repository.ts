@@ -7,7 +7,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   CodingAgentClickHouseClient,
   CodingAgentClickHouse,
-} from "../../app/coding-agent.infrastructure.ts";
+} from "../../app/coding-agent.members.ts";
 import { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
 import { nowInstant } from "@langwatch/time";
 import {

@@ -16,8 +16,8 @@ import type {
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
-import type { OrganizationDemoProject } from "../app/organization.infrastructure.ts";
-import type { OrganizationSettingsSecret } from "../app/organization.infrastructure.ts";
+import type { OrganizationDemoProject } from "../app/organization.members.ts";
+import type { OrganizationSettingsSecret } from "../app/organization.members.ts";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
 
 /**

@@ -8,9 +8,9 @@ import type {
   LangyDispatchOutcome,
   LangyWorkerMetrics,
   LangyWorker,
-} from "../app/langy.infrastructure.ts";
+} from "../app/langy.members.ts";
 
-export type { LangyDispatchOutcome } from "../app/langy.infrastructure.ts";
+export type { LangyDispatchOutcome } from "../app/langy.members.ts";
 
 const AGENT_WARM_TIMEOUT_MS = 3_000;
 const AGENT_PROBE_TIMEOUT_MS = 1_000;

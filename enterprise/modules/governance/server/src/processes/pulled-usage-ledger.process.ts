@@ -8,7 +8,7 @@ import {
   PulledUsageLedgerIntent,
   writePulledUsageSchema,
 } from "../intents/pulled-usage-ledger.intent.ts";
-import { PulledUsageLedgerRepository } from "../app/governance.infrastructure.ts";
+import { PulledUsageLedgerRepository } from "../app/governance.members.ts";
 
 export const PULLED_USAGE_LEDGER_PROCESS_NAME = "pulledUsageLedger" as const;
 

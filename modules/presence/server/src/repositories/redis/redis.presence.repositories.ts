@@ -5,7 +5,7 @@ import { RedisPresenceRepository } from "./redis.presence.repository.ts";
 export class RedisPresenceRepositories {
   static readonly requires = ["redis"] as const;
 
-  static create(infrastructure: { redis: RedisConnection }): PresenceRepositories {
-    return { sessions: RedisPresenceRepository.create(infrastructure.redis) };
+  static create(members: { redis: RedisConnection }): PresenceRepositories {
+    return { sessions: RedisPresenceRepository.create(members.redis) };
   }
 }

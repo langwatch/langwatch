@@ -23,7 +23,7 @@ import {
   OrganizationSeatLicense,
   OrganizationSessionRevocation,
   type OrganizationPlanUser,
-} from "../app/organization.infrastructure.ts";
+} from "../app/organization.members.ts";
 import type {
   AuditLogFilters,
   CreateAndAssignResult,

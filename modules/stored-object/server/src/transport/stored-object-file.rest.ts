@@ -57,7 +57,7 @@ const DENIAL_CODES: ReadonlySet<string> = new Set([
 
 /**
  * True only for the denial shapes the permission check documents. Anything
- * else — a dropped database connection, a Prisma fault — is an infrastructure
+ * else — a dropped database connection, a Prisma fault — is an members
  * failure that must bubble up as a 5xx, never be masked as a 403.
  */
 export function isPermissionDenial(err: unknown): boolean {

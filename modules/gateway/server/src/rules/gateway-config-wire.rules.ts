@@ -21,8 +21,8 @@ import {
 } from "@langwatch/gateway-contract";
 import type { LangyMirrorTier } from "@langwatch/langy-contract";
 import { modelProviders } from "@langwatch/model-provider-contract";
-import type { GatewayConfigAssembly } from "../app/gateway.infrastructure.ts";
-import type { GatewayModelProviderCredentials } from "../app/gateway.infrastructure.ts";
+import type { GatewayConfigAssembly } from "../app/gateway.members.ts";
+import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
 
 export type GuardrailWire = {
   id: string;

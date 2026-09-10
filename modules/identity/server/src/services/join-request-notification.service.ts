@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { JoinRequestAudience } from "../repositories/join-request-audience.repository.ts";
-import type { JoinRequestMail } from "../app/identity.infrastructure.ts";
+import type { JoinRequestMail } from "../app/identity.members.ts";
 
 const logger = createLogger("langwatch:identity:join-request-notification");
 

@@ -18,7 +18,7 @@ describe("given the memory-backed role repositories", () => {
     it("reads back the role it just saved", async () => {
       const repositories = instantiateRepositories(roleRepositories, {
         backend: "memory",
-        infrastructure: {},
+        members: {},
       });
 
       const now = new Date();
@@ -48,7 +48,7 @@ describe("given the memory-backed role repositories", () => {
     it("finds a role by name within an organization", async () => {
       const repositories = instantiateRepositories(roleRepositories, {
         backend: "memory",
-        infrastructure: {},
+        members: {},
       });
 
       const now = new Date();
@@ -74,7 +74,7 @@ describe("given the memory-backed role repositories", () => {
     it("finds custom roles assigned to an organization", async () => {
       const repositories = instantiateRepositories(roleRepositories, {
         backend: "memory",
-        infrastructure: {},
+        members: {},
       });
 
       const now = new Date();
@@ -102,7 +102,7 @@ describe("given the memory-backed role repositories", () => {
     it("counts assigned users for a role", async () => {
       const repositories = instantiateRepositories(roleRepositories, {
         backend: "memory",
-        infrastructure: {},
+        members: {},
       });
 
       repositories.roles.assign({ userId: "user-1", teamId: "team-1", customRoleId: ROLE_ID });

@@ -32,7 +32,7 @@ import type {
   OrganizationJoinRequests,
   OrganizationPlanGate,
   OrganizationSignals,
-} from "../app/organization.infrastructure.ts";
+} from "../app/organization.members.ts";
 
 /** What the ceremony needs beside the invitation service itself. */
 export interface OrganizationInvitationDoorDependencies {

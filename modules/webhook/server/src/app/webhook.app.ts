@@ -130,10 +130,10 @@ export class WebhookApp implements WebhookApiContract {
       }),
       health: WebhookHealthService.create({
         endpoints: input.repositories.endpoints,
-        processStore: input.infrastructure.processStore,
+        processStore: input.members.processStore,
       }),
-      assertEndpointsEntitled: input.infrastructure.assertEndpointsEntitled,
-      dispatch: input.infrastructure.dispatch,
+      assertEndpointsEntitled: input.members.assertEndpointsEntitled,
+      dispatch: input.members.dispatch,
     });
   }
 

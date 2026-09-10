@@ -1,5 +1,5 @@
 import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
-import { AutomationGraphDelivery } from "../app/automation.infrastructure.ts";
+import { AutomationGraphDelivery } from "../app/automation.members.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";

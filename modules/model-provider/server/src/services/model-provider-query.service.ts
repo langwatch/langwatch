@@ -11,7 +11,7 @@ import {
 import type {
   ModelProviderCatalog,
   ModelProviderCredentialPolicy
-} from "../app/model-provider.infrastructure.ts";
+} from "../app/model-provider.members.ts";
 import type {
   ModelProviderRepository
 } from "../repositories/model-provider.repository.ts";

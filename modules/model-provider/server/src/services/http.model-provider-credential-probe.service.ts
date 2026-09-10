@@ -11,7 +11,7 @@ import {
   ModelProviderCredentialProbe,
   type ModelProviderEgress,
   type ModelProviderEgressResponse,
-} from "../app/model-provider.infrastructure.ts";
+} from "../app/model-provider.members.ts";
 
 /**
  * The documented API root and default endpoint of every provider the probe

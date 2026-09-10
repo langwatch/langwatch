@@ -19,7 +19,7 @@ import {
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type {
   PersonalVirtualKeyIssuer,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 import { PersonalVirtualKeyRepository } from "../repositories/directory/personal-virtual-key.repository.ts";
 
 const DEFAULT_PERSONAL_KEY_LABEL = "default";

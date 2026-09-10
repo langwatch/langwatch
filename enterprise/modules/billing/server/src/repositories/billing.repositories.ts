@@ -16,7 +16,7 @@ import type { NurturingProfileRepository } from "./nurturing-profile.repository.
  *
  * The ClickHouse half (the billable-events reader and the meter's write) is
  * not part of the selection: both resolve a client per organization rather
- * than reading one the process holds, so there is no infrastructure key a tier
+ * than reading one the process holds, so there is no members key a tier
  * could require. They are listed as unfinished in the conversion report.
  */
 export interface BillingRepositories {

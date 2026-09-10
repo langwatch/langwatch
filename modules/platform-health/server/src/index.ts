@@ -16,7 +16,7 @@ export {
 export {
   type SubsystemProbe,
   type SubsystemProbeResult,
-} from "./app/platform-health.infrastructure.ts";
+} from "./app/platform-health.members.ts";
 export { httpStatusForReport, rollUpStatus } from "./rules/platform-health-report.rules.ts";
 export {
   platformHealthAuthorization,

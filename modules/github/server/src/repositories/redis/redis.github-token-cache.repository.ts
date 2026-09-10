@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { nowInstant } from "@langwatch/time";
 
 import type { GithubRedis } from "./github-redis.connection.ts";
-import type { GithubHost } from "../../app/github.infrastructure.ts";
+import type { GithubHost } from "../../app/github.members.ts";
 import { GithubTokenCacheRepository } from "../github-token-cache.repository.ts";
 
 const LOCK_TTL_SEC = 15;
@@ -11,7 +11,7 @@ const LOCK_MAX_WAIT_MS = 3_000;
 
 /**
  * The Redis tier. The connection is nullable because this module's Redis is
- * optional infrastructure: a process that opened none keeps every row absent,
+ * optional members: a process that opened none keeps every row absent,
  * which is the same answer a cold cache gives, so the App degrades to asking
  * GitHub every time rather than refusing to boot.
  */

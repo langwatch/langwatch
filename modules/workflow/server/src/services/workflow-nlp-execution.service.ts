@@ -51,7 +51,7 @@ const looseLlmConfigSchema = llmConfigSchema.passthrough();
 
 /**
  * Dispatches a version that WorkflowService already resolved through injected
- * process infrastructure. The executor never owns persistence or nlpgo setup.
+ * process members. The executor never owns persistence or nlpgo setup.
  */
 export class WorkflowNlpExecutionService {
   static create(options: WorkflowNlpExecutionServiceOptions): WorkflowNlpExecutionService {

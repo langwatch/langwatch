@@ -8,8 +8,8 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ATTR_KEYS, type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { DataPrivacyResolution } from "../../app/data-privacy.infrastructure.ts";
-import { PiiAnalysis } from "../../app/data-privacy.infrastructure.ts";
+import { DataPrivacyResolution } from "../../app/data-privacy.members.ts";
+import { PiiAnalysis } from "../../app/data-privacy.members.ts";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 
 /**

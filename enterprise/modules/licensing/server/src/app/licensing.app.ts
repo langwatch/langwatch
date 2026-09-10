@@ -21,11 +21,11 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { LicenseCryptography } from "./licensing.infrastructure.ts";
-import type { LicenseLogger } from "./licensing.infrastructure.ts";
-import type { LicenseRetention } from "./licensing.infrastructure.ts";
-import type { LicenseStorage } from "./licensing.infrastructure.ts";
-import type { LicenseUsage } from "./licensing.infrastructure.ts";
+import type { LicenseCryptography } from "./licensing.members.ts";
+import type { LicenseLogger } from "./licensing.members.ts";
+import type { LicenseRetention } from "./licensing.members.ts";
+import type { LicenseStorage } from "./licensing.members.ts";
+import type { LicenseUsage } from "./licensing.members.ts";
 import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import { fromDate, nowInstant, Temporal } from "@langwatch/time";
@@ -96,14 +96,14 @@ export class LicensingApp implements LicensingApiContract {
     this.#runtime = runtime;
   }
 
-  static create({ infrastructure, config }: LicensingSetup): LicensingApp {
+  static create({ members, config }: LicensingSetup): LicensingApp {
     const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: config.publicKey });
     const service = LicenseService.create({
-      repository: infrastructure.repository,
+      repository: members.repository,
       cryptography,
-      usage: infrastructure.usage,
-      retention: infrastructure.retention,
-      logger: infrastructure.logger,
+      usage: members.usage,
+      retention: members.retention,
+      logger: members.logger,
       configuration: LicenseServiceConfiguration.create(),
     });
     const {
@@ -112,7 +112,7 @@ export class LicensingApp implements LicensingApiContract {
       retention: _retention,
       logger: _logger,
       ...runtime
-    } = infrastructure;
+    } = members;
     return new LicensingApp(service, cryptography, runtime);
   }
 

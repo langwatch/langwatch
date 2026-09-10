@@ -4,12 +4,12 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "@langwatch/entitlement-contract";
-import { USAGE_UNKNOWN } from "../../app/entitlement.infrastructure.ts";
-import { UsageOrganization } from "../../app/entitlement.infrastructure.ts";
+import { USAGE_UNKNOWN } from "../../app/entitlement.members.ts";
+import { UsageOrganization } from "../../app/entitlement.members.ts";
 import {
   UsageVolumeCounter,
   type ProjectUsageCounts,
-} from "../../app/entitlement.infrastructure.ts";
+} from "../../app/entitlement.members.ts";
 import { UsageService } from "../usage-enforcement.service.ts";
 
 function plan(maxMessagesPerMonth: number): PlanInfo {

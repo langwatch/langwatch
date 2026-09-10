@@ -47,7 +47,7 @@ export class EnterpriseApiSso {
       .withProvided(UserApi, options.peers.users)
       .withProvided(AuditLogApi, options.peers.auditLog)
       .withModule(ssoServer, {
-        infrastructure: { connections: options.connections, logger: options.logger },
+        members: { connections: options.connections, logger: options.logger },
       })
       .boot({ role: "api", config: { sso: options.configuration } });
 

@@ -14,7 +14,7 @@ import {
 import {
   LangyUiActionCatalog,
   type LangyUiActionDefinition,
-} from "../../app/langy.infrastructure.ts";
+} from "../../app/langy.members.ts";
 
 const duplicateTargetSchema = z.object({ targetId: z.string() });
 const runSchema = z.object({});

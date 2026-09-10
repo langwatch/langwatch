@@ -54,13 +54,13 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     this.#key = key;
   }
 
-  static create({ infrastructure, config }: PlatformHealthSetup): PlatformHealthApp {
+  static create({ members, config }: PlatformHealthSetup): PlatformHealthApp {
     const probeApiKey = config.probeApiKey ?? "";
-    const probes = SubsystemProbeService.create({ collaborators: infrastructure });
+    const probes = SubsystemProbeService.create({ collaborators: members });
     const credential = {
       authToken: probeApiKey,
       resolveProjectId: async (): Promise<string | null> =>
-        (await infrastructure.resolveProjectByApiKey(probeApiKey))?.id ?? null,
+        (await members.resolveProjectByApiKey(probeApiKey))?.id ?? null,
     };
 
     return new PlatformHealthApp(

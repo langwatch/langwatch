@@ -10,7 +10,7 @@ import {
   ModelProviderConnectionRateLimiter,
   ModelTranslation,
   type ModelProviderIdService,
-} from "../app/model-provider.infrastructure.ts";
+} from "../app/model-provider.members.ts";
 import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";

@@ -18,7 +18,7 @@ import type {
   OrganizationDirectory,
   OrganizationJoinRequestState,
   OrganizationJoinRequests,
-} from "../app/organization.infrastructure.ts";
+} from "../app/organization.members.ts";
 
 /** Shown where the ledger knows a requester's id but nobody's name. */
 const UNNAMED_COLLEAGUE = "A colleague";

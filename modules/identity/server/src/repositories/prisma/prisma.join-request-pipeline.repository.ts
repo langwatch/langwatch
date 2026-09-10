@@ -1,5 +1,5 @@
 import { JoinRequestGuardsService } from "../../services/join-request-guards.service.ts";
-import type { JoinRequestMail } from "../../app/identity.infrastructure.ts";
+import type { JoinRequestMail } from "../../app/identity.members.ts";
 import { JoinRequestService } from "../../services/join-request.service.ts";
 import { PostgresJoinRequestNotificationAdapter } from "../../repositories/prisma/prisma.join-request-notification.repository.ts";
 import type { EventSourcing } from "@langwatch/eventing";

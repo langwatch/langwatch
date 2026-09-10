@@ -2,7 +2,7 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
-import type { TraceTenantBroadcast as TraceTenantBroadcast } from "../app/trace.infrastructure.ts";
+import type { TraceTenantBroadcast as TraceTenantBroadcast } from "../app/trace.members.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-update-broadcast");
 

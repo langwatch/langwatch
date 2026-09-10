@@ -24,7 +24,7 @@ import {
   ModelProviderConnectionRateLimiter,
   ModelProviderIdService,
   ModelTranslation,
-} from "../../app/model-provider.infrastructure.ts";
+} from "../../app/model-provider.members.ts";
 import type { ModelCostRepository } from "../../repositories/model-cost.repository.ts";
 import type {
   ModelDefaultConfigSaveInput,

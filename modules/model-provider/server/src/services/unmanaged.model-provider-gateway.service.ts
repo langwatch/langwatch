@@ -1,4 +1,4 @@
-import { ModelProviderManagedGateway } from "../app/model-provider.infrastructure.ts";
+import { ModelProviderManagedGateway } from "../app/model-provider.members.ts";
 
 /**
  * The managed-provider answer for a deployment that has none.

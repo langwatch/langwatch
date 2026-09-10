@@ -6,7 +6,7 @@ import {
   type LicenseData,
 } from "@langwatch/enterprise-licensing-contract";
 import { getPlanTemplate, quotedPlanLimits } from "@langwatch/plans";
-import type { LicenseCryptography } from "../app/licensing.infrastructure.ts";
+import type { LicenseCryptography } from "../app/licensing.members.ts";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
 /**

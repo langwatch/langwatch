@@ -7,7 +7,7 @@ import {
   TraceSpoolLegacyObject,
   TraceSpoolStorage,
   type TraceSpoolObjectStore,
-} from "../../app/trace.infrastructure.ts";
+} from "../../app/trace.members.ts";
 import {
   assertLegacySpoolKeyBelongsTo,
   buildSpoolObjectPath,

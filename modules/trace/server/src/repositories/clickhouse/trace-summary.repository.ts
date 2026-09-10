@@ -6,7 +6,7 @@ import {
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
-import type { TraceWindowedReadMetrics } from "../../app/trace.infrastructure.ts";
+import type { TraceWindowedReadMetrics } from "../../app/trace.members.ts";
 import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
 import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
 import {

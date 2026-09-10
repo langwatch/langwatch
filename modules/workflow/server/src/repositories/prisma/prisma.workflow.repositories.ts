@@ -19,9 +19,9 @@ export class PostgresWorkflowRepositories {
   static readonly requires = ["prisma"] as const;
 
   static create(
-    infrastructure: Readonly<{ prisma: WorkflowPrismaDatabase }>,
+    members: Readonly<{ prisma: WorkflowPrismaDatabase }>,
   ): WorkflowRepositories {
-    const database = infrastructure.prisma;
+    const database = members.prisma;
 
     return {
       workflows: PrismaWorkflowRepository.create({ database }),

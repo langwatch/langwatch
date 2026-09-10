@@ -11,12 +11,12 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "../services/eventing.deferred-origin.service.ts";
-import type { TraceEvaluationDispatch } from "../app/trace.infrastructure.ts";
+import type { TraceEvaluationDispatch } from "../app/trace.members.ts";
 import type {
   TraceEvaluationLoopBlockReason,
   TraceEvaluationLoopMetrics,
-} from "../app/trace.infrastructure.ts";
-import type { TraceEvaluationMonitor } from "../app/trace.infrastructure.ts";
+} from "../app/trace.members.ts";
+import type { TraceEvaluationMonitor } from "../app/trace.members.ts";
 import { MAX_PROCESSED_SPANS } from "../projections/trace-summary.projection.ts";
 import {
   defineOriginGuardedTraceSubscriber,

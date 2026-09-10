@@ -15,11 +15,11 @@ import {
 } from "./langy.service.ts";
 import { RedisLangyTurnRelayRepository, type LangyRelayRedis } from "../repositories/redis/redis.langy-turn-relay.repository.ts";
 import { LangyFeedbackPromptPolicy } from "./langy-feedback-prompt.service.ts";
-import type { LangyFeedbackPromptRedis } from "../app/langy.infrastructure.ts";
+import type { LangyFeedbackPromptRedis } from "../app/langy.members.ts";
 import { LangyConversationService } from "./langy-conversation.service.ts";
 import { LangyMessageService } from "./langy-message.service.ts";
 import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
-import { LangyBlockMetrics } from "../app/langy.infrastructure.ts";
+import { LangyBlockMetrics } from "../app/langy.members.ts";
 import { NullLangyBlockMetricsAdapter } from "./langy-block-metrics-null.service.ts";
 import { PrismaLangyConversationRepository } from "../repositories/prisma/prisma.langy-conversation.repository.ts";
 import { PrismaLangyMessageRepository } from "../repositories/prisma/prisma.langy-message.repository.ts";
@@ -37,7 +37,7 @@ import type {
   LangySessionKeyMintingService,
   LangyVirtualKeyService,
 } from "./langy-credential.service.ts";
-import type { LangySessionKeyMetrics } from "../app/langy.infrastructure.ts";
+import type { LangySessionKeyMetrics } from "../app/langy.members.ts";
 import { LangySessionKeyService } from "./langy-session-key.service.ts";
 import { PrismaLangySessionKeyRepository } from "../repositories/prisma/prisma.langy-session-key.repository.ts";
 import { LangyTurnService, type LangyTurnTechnicalMembers } from "./langy-turn.service.ts";

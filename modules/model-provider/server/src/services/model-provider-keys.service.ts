@@ -7,7 +7,7 @@ import {
   type ModelProviderDefinition,
 } from "@langwatch/model-provider-contract";
 import { z } from "zod";
-import { ModelProviderCredentialPolicy } from "../app/model-provider.infrastructure.ts";
+import { ModelProviderCredentialPolicy } from "../app/model-provider.members.ts";
 
 type Header = { key: string; value: string };
 

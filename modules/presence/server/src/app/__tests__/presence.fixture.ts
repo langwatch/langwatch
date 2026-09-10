@@ -71,7 +71,7 @@ export function createPresenceTestApp(
 ): PresenceApp {
   return PresenceApp.create({
     repositories: input.repositories ?? MemoryPresenceRepositories.create(),
-    infrastructure: {
+    members: {
       broadcast: input.broadcast ?? new RecordingPresenceBroadcast(),
       emitters: input.emitters ?? new TestPresenceEmitters(),
       diagnostics: input.diagnostics ?? new RecordingPresenceDiagnostics(),

@@ -16,7 +16,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ADMIN_WORKSPACE_VIEW_ACTION } from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { AdminWorkspaceViewOcsfChannel } from "../app/governance.infrastructure.ts";
+import { AdminWorkspaceViewOcsfChannel } from "../app/governance.members.ts";
 import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 

@@ -8,7 +8,7 @@ import {
 import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
+import type { AutomationProjectIdentityPort } from "../app/automation.members.ts";
 import { AutomationDatasetMapper } from "./automation-dataset-mapper.service.ts";
 import { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";

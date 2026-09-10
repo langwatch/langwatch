@@ -22,8 +22,8 @@ import {
 export class PostgresIdentityRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create(infrastructure: Readonly<{ prisma: PrismaClient }>): IdentityRepositories {
-    const database = infrastructure.prisma;
+  static create(members: Readonly<{ prisma: PrismaClient }>): IdentityRepositories {
+    const database = members.prisma;
 
     return {
       heads: PrismaIdentityHeadsRepository.create(database),

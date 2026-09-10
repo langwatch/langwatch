@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import type { ModelProviderCredentialCipher } from "#app/model-provider.infrastructure";
+import type { ModelProviderCredentialCipher } from "#app/model-provider.members";
 import { ModelProviderLegacyMigrationService } from "#services/model-provider-legacy-migration.service";
 import type {
   ModelProviderMigrationDatabase,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ModelProviderCredentialCipher } from "../../app/model-provider.infrastructure.ts";
+import { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
 import { ModelProviderLegacyMigrationService } from "../model-provider-legacy-migration.service.ts";
 
 const migrations = ModelProviderLegacyMigrationService.create();

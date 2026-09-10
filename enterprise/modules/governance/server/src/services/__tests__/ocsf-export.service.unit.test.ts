@@ -1,6 +1,6 @@
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import { GovernanceOcsfEventsReader } from "../../app/governance.infrastructure.ts";
+import { GovernanceOcsfEventsReader } from "../../app/governance.members.ts";
 import { GovernanceOcsfExportRepository } from "../../repositories/audit/governance-setup-state.repository.ts";
 import { DefaultGovernanceOcsfExportService } from "../ocsf-export.service.ts";
 

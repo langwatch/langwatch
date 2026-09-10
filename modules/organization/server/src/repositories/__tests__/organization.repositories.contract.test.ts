@@ -8,7 +8,7 @@
  * `../prisma/__tests__/prisma.organization-repositories.integration.test.ts`,
  * because complex membership writes with role binding ledger interaction need
  * a real database. This suite pins the memory twin to observable answers so
- * the app can be driven without database infrastructure for bootstrapping tests.
+ * the app can be driven without database members for bootstrapping tests.
  */
 import { vi, beforeEach, describe, expect, it } from "vitest";
 import {

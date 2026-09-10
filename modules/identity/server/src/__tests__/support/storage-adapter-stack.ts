@@ -9,7 +9,7 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
 import { deriveNewbornUserId } from "../../rules/identifier-hash.rules.ts";
 import { BetterAuthIdentityBirthAdapter } from "../../services/better-auth-identity-birth.service.ts";
-import { type IdentityBirth } from "../../app/identity.infrastructure.ts";
+import { type IdentityBirth } from "../../app/identity.members.ts";
 import {
   BetterAuthCeremonyBridgeAdapter,
   IdentityCeremoniesAdapter,

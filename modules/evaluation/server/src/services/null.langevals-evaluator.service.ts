@@ -1,5 +1,5 @@
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import { EvaluationLangevals } from "../app/evaluation.infrastructure.ts";
+import { EvaluationLangevals } from "../app/evaluation.members.ts";
 
 /** Null object used by self-hosted deployments without a Langevals endpoint. */
 export class NullLangevalsEvaluatorClient implements EvaluationLangevals {

@@ -5,7 +5,7 @@ import {
   TraceSpoolLegacyObject,
   TraceSpoolStorage,
   type TraceSpoolObjectStore,
-} from "../../../app/trace.infrastructure.ts";
+} from "../../../app/trace.members.ts";
 import { SPOOL_REF_V2 } from "../../../rules/trace-spool-location.rules.ts";
 import {
   MAX_SPOOL_BYTES,

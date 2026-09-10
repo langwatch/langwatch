@@ -6,7 +6,7 @@ import { ScimService } from "../scim.service.ts";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
-import type { ScimSyncLifecycle } from "../../app/scim.infrastructure.ts";
+import type { ScimSyncLifecycle } from "../../app/scim.members.ts";
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 

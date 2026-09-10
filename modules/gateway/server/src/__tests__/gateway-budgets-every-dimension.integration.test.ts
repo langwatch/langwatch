@@ -44,7 +44,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 
 import { budgetAppliesToProvider } from "@langwatch/gateway-contract";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
-import type { GatewayModelProviderCredentials } from "../app/gateway.infrastructure.ts";
+import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,

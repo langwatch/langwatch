@@ -21,7 +21,7 @@ import {
 } from "./better-auth-account-queries.service.ts";
 import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules.ts";
 import { BetterAuthIdentityBirthAdapter } from "./better-auth-identity-birth.service.ts";
-import type { IdentityBirth } from "../app/identity.infrastructure.ts";
+import type { IdentityBirth } from "../app/identity.members.ts";
 import { nowInstant } from "@langwatch/time";
 import type {
   IdentityAccountRow,

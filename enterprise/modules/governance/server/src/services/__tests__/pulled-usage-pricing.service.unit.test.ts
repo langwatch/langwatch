@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { PulledUsageRateReader } from "../../app/governance.infrastructure.ts";
+import { PulledUsageRateReader } from "../../app/governance.members.ts";
 import {
   PulledUsagePricingService,
   type PulledUsagePriceInput,

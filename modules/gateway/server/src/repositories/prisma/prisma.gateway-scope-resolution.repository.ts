@@ -1,6 +1,6 @@
 import { fromDate } from "@langwatch/time";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import type { GatewayPersistenceTransaction } from "../../app/gateway.infrastructure.ts";
+import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts";
 import {
   GatewayScopeResolutionRepository,
   type EligibleModelProvider,

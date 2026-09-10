@@ -1,4 +1,4 @@
-import type { GovernanceDiagnosticsSink } from "../../app/governance.infrastructure.ts";
+import type { GovernanceDiagnosticsSink } from "../../app/governance.members.ts";
 import { PrismaCostAttributionPolicyRepository } from "./prisma.cost-attribution-policy.repository.ts";
 import { PostgresGovernancePolicyService } from "../../services/governance-policy.service.ts";
 

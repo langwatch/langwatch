@@ -17,7 +17,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { EvaluationReport } from "../app/evaluation.infrastructure.ts";
+import type { EvaluationReport } from "../app/evaluation.members.ts";
 import { gatedVerdictFields, processTargets } from "../rules/evaluation-dispatch.rules.ts";
 
 const logger = createLogger("langwatch:evaluation:batch-log");

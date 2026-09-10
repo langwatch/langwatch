@@ -26,7 +26,7 @@ import {
   StoredObjectStorage,
   StoredObjectUploadTokenCodec,
   type StoredObjectStorageAddress,
-} from "../app/stored-object.infrastructure.ts";
+} from "../app/stored-object.members.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,

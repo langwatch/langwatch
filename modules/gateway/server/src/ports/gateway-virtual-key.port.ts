@@ -14,7 +14,7 @@ import type {
   GatewayVirtualKeyScope,
   ResourceMetadata,
 } from "@langwatch/gateway-contract";
-import type { GatewayPersistenceTransaction } from "../app/gateway.infrastructure.ts";
+import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 
 
 export type CreateGatewayVirtualKeyInput = {

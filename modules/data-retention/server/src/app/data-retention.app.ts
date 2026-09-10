@@ -26,8 +26,8 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
-import type { DataRetentionPlanResolver } from "./data-retention.infrastructure.ts";
-import type { StorageMeterClickHouseClient } from "./data-retention.infrastructure.ts";
+import type { DataRetentionPlanResolver } from "./data-retention.members.ts";
+import type { StorageMeterClickHouseClient } from "./data-retention.members.ts";
 import {
   ClickHouseRetroactiveRetentionRepository,
   type RetentionClickHouseClient,
@@ -182,16 +182,16 @@ export class DataRetentionApp implements DataRetentionApiContract {
 
   static create({
     repositories,
-    infrastructure,
+    members,
     dependencies,
     config,
   }: DataRetentionSetup): DataRetentionApp {
-    const resolveClient = infrastructure.resolveClickHouseClient;
+    const resolveClient = members.resolveClickHouseClient;
     const storageMeter = StorageMeterService.create({
       resolveClickHouseClient: resolveClient
         ? async (tenantId) => meterClient(await resolveClient(tenantId))
         : null,
-      redis: infrastructure.redis,
+      redis: members.redis,
     });
     const retention = DataRetentionService.create({
       policies: repositories.policies,
@@ -205,16 +205,16 @@ export class DataRetentionApp implements DataRetentionApiContract {
           })
         : null,
       cache: RedisDataRetentionCacheStore.create({
-        redis: infrastructure.redis,
-        ttlMs: infrastructure.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS,
+        redis: members.redis,
+        ttlMs: members.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS,
       }),
       storageMeter,
     });
     const permissions = RetentionPermissionsService.create({ authz: dependencies.permissions });
     const policy = DataRetentionPolicyService.create({
-      directory: infrastructure.directory,
+      directory: members.directory,
       permissions,
-      plans: infrastructure.plans,
+      plans: members.plans,
       administrators: dependencies.users,
     });
 
@@ -223,13 +223,13 @@ export class DataRetentionApp implements DataRetentionApiContract {
       policy,
       snapshots: DataRetentionSnapshotService.create({
         retention,
-        directory: infrastructure.directory,
+        directory: members.directory,
         permissions,
         policy,
       }),
       scopeMeter: StorageMeterScopeService.create({
         meter: storageMeter,
-        directory: infrastructure.directory,
+        directory: members.directory,
         permissions,
       }),
       users: dependencies.users,

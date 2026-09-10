@@ -12,7 +12,7 @@ import {
 } from "@langwatch/identity-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
-import { IdentityEventing } from "../../app/identity.infrastructure.ts";
+import { IdentityEventing } from "../../app/identity.members.ts";
 import { ScimSyncLedgerWriterAdapter } from "../eventing-scim-sync-ledger.service.ts";
 
 const ORGANIZATION = "org_acme";

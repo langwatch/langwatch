@@ -14,7 +14,7 @@ import type {
   TraceSpanCostEnrichment,
   TraceSpanPiiRedaction,
   TraceSpanTokenEstimation,
-} from "../../app/trace.infrastructure.ts";
+} from "../../app/trace.members.ts";
 
 function createSpan(attributes: OtlpSpan["attributes"]): OtlpSpan {
   return {

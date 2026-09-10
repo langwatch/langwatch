@@ -16,8 +16,8 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  */
 import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http-poller.service.ts";
-import type { GovernanceHttpClient } from "../app/governance.infrastructure.ts";
-import type { IngestionPullDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import type { GovernanceHttpClient } from "../app/governance.members.ts";
+import type { IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
 /**

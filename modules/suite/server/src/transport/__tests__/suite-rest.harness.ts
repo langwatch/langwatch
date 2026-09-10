@@ -441,7 +441,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
         tryGetOrganizationId: async () => TEST_PROJECT.organizationId,
       }),
     },
-    infrastructure: {
+    members: {
       execution: SuiteExecutionService.create({
         commands,
         ids: new SequentialRunIds(),

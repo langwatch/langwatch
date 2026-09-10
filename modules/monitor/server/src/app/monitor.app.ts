@@ -107,22 +107,22 @@ export class MonitorApp implements MonitorApi {
   private constructor(
     repositories: MonitorRepositories,
     dependencies: MonitorSetup["dependencies"],
-    infrastructure: MonitorAppInfrastructure,
+    members: MonitorAppInfrastructure,
   ) {
     this.#monitors = MonitorService.create({
       repository: repositories.monitors,
-      evaluators: infrastructure.evaluators,
-      generateId: infrastructure.generateId,
+      evaluators: members.evaluators,
+      generateId: members.generateId,
     });
     this.#catalogue = MonitorCatalogService.create({ repository: repositories.monitors });
     this.#permissions = dependencies.permissions;
-    this.#performance = infrastructure.performance;
-    this.#replication = infrastructure.replication;
-    this.#evaluators = infrastructure.evaluators;
+    this.#performance = members.performance;
+    this.#replication = members.replication;
+    this.#evaluators = members.evaluators;
   }
 
-  static create({ repositories, dependencies, infrastructure }: MonitorSetup): MonitorApp {
-    return new MonitorApp(repositories, dependencies, infrastructure);
+  static create({ repositories, dependencies, members }: MonitorSetup): MonitorApp {
+    return new MonitorApp(repositories, dependencies, members);
   }
 
   list(input: Readonly<{ projectId: string }>): Promise<MonitorWithEvaluator[]> {

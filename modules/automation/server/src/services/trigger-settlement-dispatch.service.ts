@@ -8,7 +8,7 @@ import type {
   PersistMatchIntent,
 } from "../intents/trigger-settlement.intent.ts";
 import { TRIGGER_SETTLEMENT_INTENT_TYPES } from "../intents/trigger-settlement.intent.ts";
-import type { AutomationClock } from "../app/automation.infrastructure.ts";
+import type { AutomationClock } from "../app/automation.members.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
@@ -17,7 +17,7 @@ import type { AutomationSettlementObservability } from "../services/automation-s
 import { AutomationSettlementExecutor } from "./automation-settlement-executor.service.ts";
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
-import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
+import type { AutomationProjectIdentityPort } from "../app/automation.members.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import type { AutomationPersistActionService } from "./persist-action.service.ts";
 import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service.ts";

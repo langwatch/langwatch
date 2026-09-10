@@ -23,9 +23,9 @@ import {
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 import { TestProjectApi } from "./test-project-api.ts";
-import { CodingAgentBillingPolicy } from "../../app/coding-agent.infrastructure.ts";
-import { CodingAgentClock } from "../../app/coding-agent.infrastructure.ts";
-import { CodingAgentClickHouse } from "../../app/coding-agent.infrastructure.ts";
+import { CodingAgentBillingPolicy } from "../../app/coding-agent.members.ts";
+import { CodingAgentClock } from "../../app/coding-agent.members.ts";
+import { CodingAgentClickHouse } from "../../app/coding-agent.members.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../../repositories/coding-agent-trace-session.repository.ts";

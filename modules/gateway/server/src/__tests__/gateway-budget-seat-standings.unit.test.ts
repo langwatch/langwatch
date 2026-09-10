@@ -7,7 +7,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { type BucketSpend } from "../app/gateway.infrastructure.ts";
+import { type BucketSpend } from "../app/gateway.members.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";

@@ -18,7 +18,7 @@ function process() {
     .withProvided(AuthzApi, createShareTestAuthz())
     .withProvided(DataRetentionApi, createShareTestDataRetention())
     .withProvided(ProjectApi, createShareTestProjects())
-    .withModule(shareServer, { infrastructure: { redis: null } });
+    .withModule(shareServer, { members: { redis: null } });
 }
 
 describe("share app installation", () => {

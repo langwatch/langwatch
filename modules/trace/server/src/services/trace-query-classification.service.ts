@@ -1,6 +1,6 @@
 import type { TraceQueryClassification } from "@langwatch/trace-contract";
 
-import { TraceQueryClassifier } from "../app/trace.infrastructure.ts";
+import { TraceQueryClassifier } from "../app/trace.members.ts";
 import { ClickhouseTraceQueryEvaluationRepository } from "../repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
 
 export class TraceQueryClassificationAdapter implements TraceQueryClassifier {

@@ -9,7 +9,7 @@ import {
   GithubRateLimitedError,
 } from "../app/github.app.ts";
 import type { GithubInstallationLookup } from "./github-installation-access.service.ts";
-import type { GithubHost } from "../app/github.infrastructure.ts";
+import type { GithubHost } from "../app/github.members.ts";
 import { Temporal, nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 import type {
   GithubPullRequestsRepository,

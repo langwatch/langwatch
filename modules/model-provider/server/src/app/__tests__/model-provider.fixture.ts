@@ -19,7 +19,7 @@ import { RegistryModelProviderCatalogAdapter } from "../../services/registry.mod
 import { UnmanagedModelProviderGatewayAdapter } from "../../services/unmanaged.model-provider-gateway.service.ts";
 import { VercelAiModelTranslationAdapter } from "../../services/vercel-ai.model-translation.service.ts";
 import { WindowedModelProviderConnectionRateLimiterAdapter } from "../../services/windowed.model-provider-connection-rate-limiter.service.ts";
-import type { ModelProviderCredentialProbe } from "../model-provider.infrastructure.ts";
+import type { ModelProviderCredentialProbe } from "../model-provider.members.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import { ModelProviderApp, type ModelProviderInfrastructure } from "../model-provider.app.ts";
@@ -89,7 +89,7 @@ export function createModelProviderTestInfrastructure(
 export function createModelProviderTestApp(
   input: Readonly<{
     repositories?: ModelProviderRepositories;
-    infrastructure?: Partial<ModelProviderInfrastructure>;
+    members?: Partial<ModelProviderInfrastructure>;
     dependencies?: Partial<{
       projects: ProjectApi;
       organizations: OrganizationApi;
@@ -99,7 +99,7 @@ export function createModelProviderTestApp(
 ): ModelProviderApp {
   return ModelProviderApp.create({
     repositories: input.repositories ?? MemoryModelProviderRepositories.create(),
-    infrastructure: createModelProviderTestInfrastructure(input.infrastructure ?? {}),
+    members: createModelProviderTestInfrastructure(input.members ?? {}),
     dependencies: {
       projects: input.dependencies?.projects ?? createModelProviderTestProjects(),
       organizations:

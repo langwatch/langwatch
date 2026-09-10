@@ -1,4 +1,4 @@
-import type { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
 import { PrismaGatewayBudgetRepository } from "../repositories/prisma/prisma.gateway-budget.repository.ts";
 import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service.ts";
 

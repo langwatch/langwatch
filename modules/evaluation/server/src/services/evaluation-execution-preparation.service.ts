@@ -11,7 +11,7 @@ import {
   EvaluationSettingsRecovery,
   type EvaluationMonitorLookup,
   type EvaluationTraceEvidence,
-} from "../app/evaluation.infrastructure.ts";
+} from "../app/evaluation.members.ts";
 import { EvaluationPreconditionService } from "./evaluation-precondition.service.ts";
 import {
   EvaluatorSettingsService,

@@ -7,7 +7,7 @@ import type { ModelProvider } from "@langwatch/gateway-contract";
 import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter.ts";
 
 const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
-import type { GatewayModelProviderCredentials } from "../app/gateway.infrastructure.ts";
+import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
 
 const geminiRow = (customKeys: Record<string, string>): ModelProvider =>
   ({

@@ -1,5 +1,5 @@
 import { CanonicalLogAdapter } from "../canonical-log.service.ts";
-import type { LogRedaction } from "../../app/log.infrastructure.ts";
+import type { LogRedaction } from "../../app/log.members.ts";
 import type { CanonicalLogRecordRepository } from "../../repositories/canonical-log-record.repository.ts";
 import { LogService } from "../log.service.ts";
 

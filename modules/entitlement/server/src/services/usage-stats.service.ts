@@ -10,7 +10,7 @@ import type {
   PlanProviderUser,
   UsageStats,
 } from "@langwatch/entitlement-contract";
-import { USAGE_UNKNOWN, UsageCounter } from "../app/entitlement.infrastructure.ts";
+import { USAGE_UNKNOWN, UsageCounter } from "../app/entitlement.members.ts";
 import type { UsageMembershipRepository } from "../repositories/usage-membership.repository.ts";
 
 /**

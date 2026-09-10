@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { PLATFORM_TOOL_POLICY_DEFAULTS } from "@langwatch/enterprise-governance-contract";
-import { CliAdminContactReader, CliBudgetOverviewReader } from "../../app/governance.infrastructure.ts";
+import { CliAdminContactReader, CliBudgetOverviewReader } from "../../app/governance.members.ts";
 import { DefaultGovernanceCliBootstrapService } from "../governance-cli-tool-bootstrap.service.ts";
 
 class MemoryCatalog {

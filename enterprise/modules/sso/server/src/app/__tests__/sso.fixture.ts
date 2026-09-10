@@ -9,8 +9,8 @@ import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import { SsoApp, type SsoInfrastructure } from "../sso.app.ts";
-import { SsoConnectionLedger } from "../sso.infrastructure.ts";
-import { SsoGateLogger } from "../sso.infrastructure.ts";
+import { SsoConnectionLedger } from "../sso.members.ts";
+import { SsoGateLogger } from "../sso.members.ts";
 
 /** The one operator on the staff list, exactly as `ADMIN_EMAILS` decides it. */
 export const SSO_TEST_STAFF_EMAIL = "olive@langwatch.ai";
@@ -101,7 +101,7 @@ export class RecordingSsoGateLogger implements SsoGateLogger {
 export function createSsoTestApp(
   input: Readonly<{
     config?: SsoConfiguration;
-    infrastructure?: Partial<SsoInfrastructure>;
+    members?: Partial<SsoInfrastructure>;
     dependencies?: Partial<{
       licensing: LicensingApi;
       operators: OpsApi;
@@ -118,9 +118,9 @@ export function createSsoTestApp(
       users: input.dependencies?.users ?? createSsoTestUsers(),
       auditLog: input.dependencies?.auditLog ?? createSsoTestAuditLog(),
     },
-    infrastructure: {
-      connections: input.infrastructure?.connections ?? RecordingSsoConnectionLedger.create(),
-      logger: input.infrastructure?.logger ?? RecordingSsoGateLogger.create(),
+    members: {
+      connections: input.members?.connections ?? RecordingSsoConnectionLedger.create(),
+      logger: input.members?.logger ?? RecordingSsoGateLogger.create(),
     },
     resources: new ResourceScope(),
   });

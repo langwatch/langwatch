@@ -1,4 +1,4 @@
-import { ModelProviderIdService } from "../app/model-provider.infrastructure.ts";
+import { ModelProviderIdService } from "../app/model-provider.members.ts";
 
 /**
  * The three id prefixes Model Provider's rows are read back by.

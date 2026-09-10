@@ -3,8 +3,8 @@ import {
   type TraceByIdInput,
   type TraceDerivedEventsInput,
 } from "@langwatch/trace-contract";
-import { TraceEventDerivation } from "./app/trace.infrastructure.ts";
-import { TraceQueryClassifier } from "./app/trace.infrastructure.ts";
+import { TraceEventDerivation } from "./app/trace.members.ts";
+import { TraceQueryClassifier } from "./app/trace.members.ts";
 import { TraceRecordRepository } from "./repositories/read/trace-record.repository.ts";
 import { TraceSummaryReaderRepository } from "./repositories/read/trace-summary-reader.repository.ts";
 import { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";

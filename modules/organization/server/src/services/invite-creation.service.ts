@@ -20,7 +20,7 @@ import {
 } from "@langwatch/organization-contract";
 import type { PlanProvider, PlanProviderUser } from "@langwatch/entitlement-contract";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
-import type { OrganizationInviteMail } from "../app/organization.infrastructure.ts";
+import type { OrganizationInviteMail } from "../app/organization.members.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
 import { InviteService } from "./invite.service.ts";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";

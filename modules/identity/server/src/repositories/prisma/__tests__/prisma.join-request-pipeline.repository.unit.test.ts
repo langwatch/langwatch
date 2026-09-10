@@ -1,4 +1,4 @@
-import { JoinRequestMail } from "../../../app/identity.infrastructure.ts";
+import { JoinRequestMail } from "../../../app/identity.members.ts";
 import { createTenantId, type EventSourcing, type StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import {

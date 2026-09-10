@@ -31,7 +31,7 @@ export interface CliHandledError {
   meta: Record<string, unknown>;
   /**
    * True when the platform answered with a structured domain failure — i.e. it understood the
-   * request and declined it. False for infrastructure failures, where the CLI is guessing and
+   * request and declined it. False for members failures, where the CLI is guessing and
    * the panel must not present it as the user's fault.
    */
   isHandled: boolean;
@@ -323,7 +323,7 @@ const TERMINAL_STATUSES = new Set([401, 402, 403, 404, 410]);
 
 /**
  * True when retrying is pointless — see {@link TERMINAL_STATUSES}. Only ever said of a failure
- * the platform NAMED. An infrastructure failure is ours and transient by default, and a status
+ * the platform NAMED. An members failure is ours and transient by default, and a status
  * we read off a proxy's error page is not a verdict the platform reached.
  */
 export const isTerminalFailure = (error: CliHandledError): boolean =>
@@ -384,7 +384,7 @@ export const parseHandledError = ({
     ...(parsed.suggestions ? { suggestions: parsed.suggestions } : {}),
     ...(parsed.docUrl ? { docUrl: parsed.docUrl } : {}),
     // The platform names its own failures; a 5xx names ours, whatever the body says. Trusting a
-    // 500's "code" would let an infrastructure outage present itself to the user as though they
+    // 500's "code" would let an members outage present itself to the user as though they
     // had done something wrong. With no status to go on, the code decides: the platform only
     // emits a generic code when it fell over, so anything more specific than that is a failure
     // it chose to name — which is exactly what a domain error is.

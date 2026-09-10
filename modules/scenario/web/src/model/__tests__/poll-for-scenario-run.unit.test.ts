@@ -121,7 +121,7 @@ describe("pollForScenarioRun", () => {
         // The judge reached a verdict, or the runner stopped it at its turn
         // budget — either way the run produced an outcome, which an execution
         // error never does. Telling the user execution errored would send them
-        // to debug infrastructure that never broke.
+        // to debug members that never broke.
         fetchBatchRunData.mockResolvedValue(
           batchWith({ runs: [makeRun({ status: ScenarioRunStatus.FAILED })] }),
         );

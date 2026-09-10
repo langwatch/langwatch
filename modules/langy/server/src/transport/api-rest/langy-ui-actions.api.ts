@@ -24,13 +24,13 @@ import type { LangyApp } from "#app/langy.app";
 import {
   LangyUiActionCatalog,
   type LangyUiActionDefinition,
-} from "#app/langy.infrastructure";
+} from "#app/langy.members";
 import {
   LangyUiActionService,
   type UiActionBackendRunner,
   type UiActionRedis,
 } from "#services/langy-ui-action.service";
-import { LANGY_UI_ACTIONS_FLAG } from "#app/langy.infrastructure";
+import { LANGY_UI_ACTIONS_FLAG } from "#app/langy.members";
 import {
   resolveLangyRestCaller,
   type LangyRestCredentialMembers,

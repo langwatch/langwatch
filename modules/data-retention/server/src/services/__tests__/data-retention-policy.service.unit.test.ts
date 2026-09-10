@@ -11,7 +11,7 @@ import {
 import {
   DataRetentionPlanResolver,
   type DataRetentionPlan,
-} from "../../app/data-retention.infrastructure.ts";
+} from "../../app/data-retention.members.ts";
 import { createDataRetentionTestAuthz } from "../../app/__tests__/data-retention.fixture.ts";
 import { DataRetentionPolicyService } from "../data-retention-policy.service.ts";
 import { RetentionPermissionsService } from "../retention-permissions.service.ts";

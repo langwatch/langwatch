@@ -7,7 +7,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { SubsystemProbe } from "../app/platform-health.infrastructure.ts";
+import type { SubsystemProbe } from "../app/platform-health.members.ts";
 import { rollUpStatus } from "../rules/platform-health-report.rules.ts";
 
 const logger = createLogger("langwatch:platform-health");

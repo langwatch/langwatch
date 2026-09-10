@@ -12,7 +12,7 @@ import {
   type EvaluationAnalyticsRow,
   EvaluationAnalyticsRowProjection,
 } from "../projections/evaluation-analytics-row.projection.ts";
-import { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.infrastructure.ts";
+import { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attributes.store.ts";
 
 /**

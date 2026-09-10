@@ -24,7 +24,7 @@ function process() {
     .withProvided(OrganizationApi, createApiFixture<OrganizationApi>())
     .withProvided(AuthzApi, createApiFixture<AuthzApi>())
     .withProvided(FeatureFlagApi, createApiFixture<FeatureFlagApi>())
-    .withModule(dataPrivacyServer, { infrastructure: dataPrivacyTestInfrastructure() });
+    .withModule(dataPrivacyServer, { members: dataPrivacyTestInfrastructure() });
 }
 
 describe("data privacy app installation", () => {

@@ -10,7 +10,7 @@ import { vi } from "vitest";
 import {
   DataRetentionPlanResolver,
   type DataRetentionPlan,
-} from "../data-retention.infrastructure.ts";
+} from "../data-retention.members.ts";
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
 import {
@@ -244,7 +244,7 @@ export function createDataRetentionTestInfrastructure(
 export function createDataRetentionTestApp(
   input: Readonly<{
     repositories?: DataRetentionRepositories;
-    infrastructure?: Partial<DataRetentionInfrastructure>;
+    members?: Partial<DataRetentionInfrastructure>;
     dependencies?: Partial<{
       projects: ProjectApi;
       organizations: OrganizationApi;
@@ -256,7 +256,7 @@ export function createDataRetentionTestApp(
 ): DataRetentionApp {
   return DataRetentionApp.create({
     repositories: input.repositories ?? MemoryDataRetentionRepositories.create(),
-    infrastructure: createDataRetentionTestInfrastructure(input.infrastructure ?? {}),
+    members: createDataRetentionTestInfrastructure(input.members ?? {}),
     dependencies: {
       projects: input.dependencies?.projects ?? createDataRetentionTestProjects(),
       organizations: input.dependencies?.organizations ?? createDataRetentionTestOrganizations(),

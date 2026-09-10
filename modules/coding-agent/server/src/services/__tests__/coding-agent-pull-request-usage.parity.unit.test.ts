@@ -9,7 +9,7 @@ import type {
   CodingAgentSessionBranchRecord,
 } from "@langwatch/coding-agent-contract";
 import type { GithubApi, GithubPullRequest } from "@langwatch/github-contract";
-import { CodingAgentBillingPolicy } from "../../app/coding-agent.infrastructure.ts";
+import { CodingAgentBillingPolicy } from "../../app/coding-agent.members.ts";
 import { CodingAgentFeatureService } from "../coding-agent.service.ts";
 import type { SessionModelTotalsRow } from "../../repositories/coding-agent-session-event.repository.ts";
 import {

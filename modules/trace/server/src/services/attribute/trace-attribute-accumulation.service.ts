@@ -3,7 +3,7 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
-} from "../../app/trace.infrastructure.ts";
+} from "../../app/trace.members.ts";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { parseJsonStringArray } from "../../rules/trace-summary-attributes.rules.ts";
 import { TraceOriginService } from "../read/trace-origin.service.ts";

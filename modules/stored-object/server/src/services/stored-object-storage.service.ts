@@ -9,7 +9,7 @@ import {
 import {
   StoredObjectStorage,
   type StoredObjectStorageAddress,
-} from "../app/stored-object.infrastructure.ts";
+} from "../app/stored-object.members.ts";
 import { StoredObjectStorageRuntimeAdapter } from "./stored-object-storage-runtime.service.ts";
 
 export class StoredObjectStoragePortAdapter extends StoredObjectStorage {

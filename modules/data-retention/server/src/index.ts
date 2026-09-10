@@ -16,5 +16,5 @@ export type {
 export {
   type DataRetentionPlan,
   type DataRetentionPlanResolver,
-} from "./app/data-retention.infrastructure.ts";
+} from "./app/data-retention.members.ts";
 export { PrismaDataRetentionDirectoryRepository } from "./repositories/prisma/prisma.data-retention-directory.repository.ts";

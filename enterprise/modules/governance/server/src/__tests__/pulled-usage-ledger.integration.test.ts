@@ -33,7 +33,7 @@ import {
 import {
   PulledUsageLedgerRepository,
   type PulledUsageLedgerRow,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

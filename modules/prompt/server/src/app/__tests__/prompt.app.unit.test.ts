@@ -59,7 +59,7 @@ function harness() {
       } as unknown as ProjectApi,
       permissions: {} as unknown as AuthzApi,
     },
-    infrastructure: {
+    members: {
       prompts: prompts as PromptService,
       afterPromptCreated: () => {},
     },

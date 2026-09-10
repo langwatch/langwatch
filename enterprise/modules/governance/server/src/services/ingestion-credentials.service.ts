@@ -1,4 +1,4 @@
-import type { GovernanceEncryptor } from "../app/governance.infrastructure.ts";
+import type { GovernanceEncryptor } from "../app/governance.members.ts";
 
 const ENCRYPTED_PREFIX = "enc:v1:";
 

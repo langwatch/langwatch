@@ -6,8 +6,8 @@
 import { type Instant, toDate } from "@langwatch/time";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
-import type { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
-import type { GatewayVirtualKeySpend } from "../app/gateway.infrastructure.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type { GatewayVirtualKeySpend } from "../app/gateway.members.ts";
 
 /**
  * The one project read these surfaces make: which tenants an org's gateway traces can land in.

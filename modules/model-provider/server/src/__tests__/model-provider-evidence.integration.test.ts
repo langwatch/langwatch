@@ -15,7 +15,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
 import { PostgresModelProviderEvidenceAdapter } from "../services/model-provider-evidence-service.composition.ts";
-import { ModelCostProject } from "../app/model-provider.infrastructure.ts";
+import { ModelCostProject } from "../app/model-provider.members.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

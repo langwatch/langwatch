@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AutomationClock } from "../../app/automation.infrastructure.ts";
+import type { AutomationClock } from "../../app/automation.members.ts";
 import type {
   AutomationSettlementBreach,
   AutomationSettlementPersistCap,

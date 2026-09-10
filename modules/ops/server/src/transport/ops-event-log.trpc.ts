@@ -127,7 +127,7 @@ export const opsEventLogTrpcTransport = defineTrpcRouter(OpsApi, opsEventLogTrpc
     } catch (err) {
       // Left as a raw TRPCError deliberately, and it is the one refusal on
       // this surface that is. The branch answers CONFLICT for EVERY failure,
-      // including infrastructure ones: "already running" is a nameable cause a
+      // including members ones: "already running" is a nameable cause a
       // caller can act on, and everything else is not. Splitting it needs an
       // error code this module cannot add, so it is reported rather than
       // taken here.

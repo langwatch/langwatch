@@ -24,12 +24,12 @@ import {
   type TopicClusteringRunnerDeps,
 } from "../../intents/topic-clustering-runner.intent.ts";
 import { LegacyImportTopicClusteringMigration } from "../../migrations/legacy-import.topic-clustering.migration.ts";
-import type { TopicClusteringClickHouseResolver } from "../../app/topic.infrastructure.ts";
+import type { TopicClusteringClickHouseResolver } from "../../app/topic.members.ts";
 import type {
   TopicClusteringLangevalsKind,
   TopicClusteringLangevals,
-} from "../../app/topic.infrastructure.ts";
-import type { TopicClusteringCommands } from "../../app/topic.infrastructure.ts";
+} from "../../app/topic.members.ts";
+import type { TopicClusteringCommands } from "../../app/topic.members.ts";
 import type { TopicClusteringDatabase } from "./prisma.topic-clustering.repository.ts";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./prisma.topic-clustering-run-history-projection.repository.ts";
 import { PrismaTopicClusteringRunProjectionRepository } from "./prisma.topic-clustering-run-projection.repository.ts";

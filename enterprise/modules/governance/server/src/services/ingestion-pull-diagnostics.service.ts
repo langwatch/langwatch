@@ -1,4 +1,4 @@
-import type { IngestionPullDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import type { IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
 
 export class NullIngestionPullDiagnosticsAdapter implements IngestionPullDiagnosticsSink {
   info(): void {}

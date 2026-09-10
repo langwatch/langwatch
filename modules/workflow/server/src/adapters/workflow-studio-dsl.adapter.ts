@@ -106,7 +106,7 @@ export class ModelProviderWorkflowStudioDslAdapter implements WorkflowStudioDsl 
         resolvedModel = resolved.model;
       } catch (error) {
         // Only "nothing configured at any scope" falls back to the registry
-        // flagship. An infrastructure failure must not silently pin a model.
+        // flagship. An members failure must not silently pin a model.
         if (!(error instanceof ModelNotConfiguredError)) throw error;
       }
       fallback = { model: resolvedModel ?? REGISTRY_FLAGSHIP_MODEL };

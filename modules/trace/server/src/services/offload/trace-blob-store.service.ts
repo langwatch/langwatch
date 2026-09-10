@@ -55,7 +55,7 @@ export interface SpoolObjectStore {
 
 /**
  * Destination-agnostic storage for the trace spool, injected so `TraceBlobStoreService`
- * carries no env coupling and the tests run without infrastructure.
+ * carries no env coupling and the tests run without members.
  */
 export interface SpoolStorage {
   /** Per-project so BYOC tenants resolve their own bucket and credentials. */

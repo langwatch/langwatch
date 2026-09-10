@@ -16,7 +16,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import { IdentityEventing } from "../app/identity.infrastructure.ts";
+import { IdentityEventing } from "../app/identity.members.ts";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
 import type { JoinRequestEvent } from "../projections/join-request-state.projection.ts";

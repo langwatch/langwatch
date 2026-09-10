@@ -53,7 +53,7 @@ import { CodingAgentFeatureService } from "../services/coding-agent.service.ts";
 import type {
   CodingAgentCallerScopeDirectory,
   CodingAgentScopePermissions,
-} from "./coding-agent.infrastructure.ts";
+} from "./coding-agent.members.ts";
 
 /**
  * The caller's permission cut over an organization: which of its projects they
@@ -153,9 +153,9 @@ export class CodingAgentApp implements CodingAgentApi {
     github: GithubApi,
   };
 
-  static create({ infrastructure, dependencies, repositories }: CodingAgentSetup): CodingAgentApp {
+  static create({ members, dependencies, repositories }: CodingAgentSetup): CodingAgentApp {
     const service =
-      infrastructure.service ??
+      members.service ??
       CodingAgentFeatureService.create({
         sessions: repositories.sessions,
         traceSessions: repositories.traceSessions,
@@ -163,12 +163,12 @@ export class CodingAgentApp implements CodingAgentApi {
         sessionEvents: repositories.sessionEvents,
         github: dependencies.github,
         projects: dependencies.projects,
-        billing: infrastructure.billing,
+        billing: members.billing,
         clock: SystemCodingAgentClockAdapter.create(),
       });
     const scopeService = CodingAgentCallerScopeService.create({
-      directory: infrastructure.scopeDirectory,
-      permissions: infrastructure.scopePermissions,
+      directory: members.scopeDirectory,
+      permissions: members.scopePermissions,
     });
     const scope: CodingAgentScopeMembers = {
       findOrganizationForProject: async (projectId: string) => {
@@ -180,7 +180,7 @@ export class CodingAgentApp implements CodingAgentApi {
       },
       resolveCallerProjectScope: (input) => scopeService.resolve(input),
     };
-    return new CodingAgentApp(service, dependencies.github, scope, infrastructure);
+    return new CodingAgentApp(service, dependencies.github, scope, members);
   }
 
   /**
@@ -206,13 +206,13 @@ export class CodingAgentApp implements CodingAgentApi {
     codingAgents: CodingAgentSessionService,
     github: GithubApi,
     scope: CodingAgentScopeMembers,
-    infrastructure: CodingAgentInfrastructure,
+    members: CodingAgentInfrastructure,
   ) {
     this.#codingAgents = codingAgents;
     this.#github = github;
     this.#scope = scope;
-    this.#visibility = infrastructure.visibility;
-    this.#audit = infrastructure.audit;
+    this.#visibility = members.visibility;
+    this.#audit = members.audit;
   }
 
   /** Pure derivation, no session store read: which log fields an event name captures. */

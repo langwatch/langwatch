@@ -3,7 +3,7 @@ import {
   EvaluationExecution,
   EvaluationInputsResolution,
   type EvaluationRetentionFloor,
-} from "../../app/evaluation.infrastructure.ts";
+} from "../../app/evaluation.members.ts";
 import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 import { ClickHouseEvaluationRepository } from "./evaluation.repository.ts";
 import { ClickHouseMonitorPerformanceRepository } from "./monitor-performance.repository.ts";

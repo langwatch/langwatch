@@ -7,7 +7,7 @@ import type { SignUpAccountDirectory } from "../../services/signup-verification.
  * and a case-twin beside one would leave two accounts answering for one person.
  *
  * Unregistered on purpose: the `User` table belongs to the user module, so this
- * read is the PROCESS's, composed into auth's infrastructure rather than
+ * read is the PROCESS's, composed into auth's members rather than
  * claimed by auth's repository registry (ADR-133).
  */
 export class PrismaSignUpAccountDirectoryRepository implements SignUpAccountDirectory {

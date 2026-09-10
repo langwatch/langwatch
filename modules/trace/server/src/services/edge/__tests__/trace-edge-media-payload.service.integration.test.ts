@@ -12,7 +12,7 @@ import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceMediaStore } from "../../../app/trace.infrastructure.ts";
+import type { TraceMediaStore } from "../../../app/trace.members.ts";
 import { TraceEdgeMediaPayloadService } from "../trace-edge-media-payload.service.ts";
 import { TraceEdgeSpoolService } from "../trace-edge-spool.service.ts";
 

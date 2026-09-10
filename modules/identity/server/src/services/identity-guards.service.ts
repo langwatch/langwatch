@@ -24,7 +24,7 @@ import {
   userErasureFacts,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
-import type { IdentifierIdentity } from "../app/identity.infrastructure.ts";
+import type { IdentifierIdentity } from "../app/identity.members.ts";
 import { computeIdentifierHash } from "../rules/identifier-hash.rules.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";

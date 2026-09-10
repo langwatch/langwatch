@@ -11,10 +11,10 @@ import { PrismaUsageMembershipRepository } from "./prisma.usage-membership.repos
 export class PostgresEntitlementRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create(infrastructure: Readonly<{ prisma: PrismaClient }>): EntitlementRepositories {
+  static create(members: Readonly<{ prisma: PrismaClient }>): EntitlementRepositories {
     return {
-      membership: PrismaUsageMembershipRepository.create(infrastructure.prisma),
-      spend: PrismaOrganizationSpendRepository.create(infrastructure.prisma),
+      membership: PrismaUsageMembershipRepository.create(members.prisma),
+      spend: PrismaOrganizationSpendRepository.create(members.prisma),
     };
   }
 }

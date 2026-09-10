@@ -7,7 +7,7 @@ import {
   type MetricRequestCollectionResult,
   MetricRequestCollectionService,
 } from "../metric-request-collection.service.ts";
-import type { MetricRedaction } from "../../app/metric.infrastructure.ts";
+import type { MetricRedaction } from "../../app/metric.members.ts";
 
 /** The request context below asks for no redaction, so the port never rewrites. */
 const disabledRedaction: MetricRedaction = { redactMetricAttributes: async () => {} };

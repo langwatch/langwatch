@@ -4,7 +4,7 @@ import {
   type GithubInstallStatePayload,
 } from "@langwatch/github-contract";
 
-import { GithubInstallState } from "../app/github.infrastructure.ts";
+import { GithubInstallState } from "../app/github.members.ts";
 import type { GithubInstallNonceRepository } from "../repositories/github-install-nonce.repository.ts";
 import { nowInstant } from "@langwatch/time";
 

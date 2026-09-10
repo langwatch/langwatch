@@ -10,7 +10,7 @@ import { EventUtils } from "@langwatch/eventing";
 
 import type { TraceClickHouseClient, TraceClickHouse } from "../trace-clickhouse-client.repository.ts";
 import { TraceFullRecordRepository } from "../read/trace-full-record.repository.ts";
-import type { TraceFullIo } from "../../app/trace.infrastructure.ts";
+import type { TraceFullIo } from "../../app/trace.members.ts";
 import type { TracePayloadReaderRepository } from "../read/trace-payload-reader.repository.ts";
 import {
   internalTraceFullReadProtections,

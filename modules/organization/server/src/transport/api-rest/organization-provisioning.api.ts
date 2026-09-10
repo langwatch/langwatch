@@ -214,7 +214,7 @@ export function createOrganizationsRestApp(options: {
 
       summary = await service_.findProvisioningSummary(created.organization.id);
       if (!summary) {
-        // The slug is the natural key an infrastructure-as-code caller stores;
+        // The slug is the natural key an members-as-code caller stores;
         // answering 201 with a blank one moves the failure far from its cause.
         throw new Error(
           `provisioned organization ${created.organization.id} could not be read back`,

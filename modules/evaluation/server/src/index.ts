@@ -33,7 +33,7 @@ export {
   EvaluationInputsOffload,
   EvaluationInputsResolution,
   EvaluationRetentionFloor,
-} from "./app/evaluation.infrastructure.ts";
+} from "./app/evaluation.members.ts";
 export {
   type EvaluationClickHouseResolver,
   type EvaluationClickHouseClient,
@@ -80,7 +80,7 @@ export {
   EvaluationRescore,
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
-} from "./app/evaluation.infrastructure.ts";
+} from "./app/evaluation.members.ts";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
 export {
   EvaluationPreconditionService,
@@ -115,7 +115,7 @@ export {
   EvaluationWorkflowExecutor,
   type EvaluationTraceProtections,
   type LangevalsEvaluateParams,
-} from "./app/evaluation.infrastructure.ts";
+} from "./app/evaluation.members.ts";
 export {
   HttpLangevalsEvaluatorAdapter,
   type LangevalsRuntimeConfig,

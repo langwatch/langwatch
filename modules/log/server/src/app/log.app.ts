@@ -34,10 +34,10 @@ export class LogApp implements LogApiContract {
     this.#service = service;
   }
 
-  static create({ dependencies, infrastructure, config }: LogSetup): LogApp {
-    const repository = infrastructure.resolveClient
+  static create({ dependencies, members, config }: LogSetup): LogApp {
+    const repository = members.resolveClient
       ? ClickHouseCanonicalLogRecordRepository.create({
-          resolveClient: infrastructure.resolveClient,
+          resolveClient: members.resolveClient,
           defaultRetentionDays: config.defaultRetentionDays,
           defaultReadLimit: config.defaultReadLimit,
         })

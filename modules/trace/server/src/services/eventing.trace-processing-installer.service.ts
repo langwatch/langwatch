@@ -8,10 +8,10 @@ import {
 import type { AssignTopicCommandData, ResolveOriginCommandData } from "@langwatch/trace-contract";
 import { EventingTraceTopicAssignment } from "./eventing.trace-topic-assignment.service.ts";
 import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "./eventing.deferred-origin.service.ts";
-import type { DeferredOriginPayload, TraceDeferredOriginScheduler } from "../app/trace.infrastructure.ts";
-import { TraceProcessingPipeline } from "../app/trace.infrastructure.ts";
-import { TraceProcessingInstaller } from "../app/trace.infrastructure.ts";
-import { TraceTopicAssignmentCommand } from "../app/trace.infrastructure.ts";
+import type { DeferredOriginPayload, TraceDeferredOriginScheduler } from "../app/trace.members.ts";
+import { TraceProcessingPipeline } from "../app/trace.members.ts";
+import { TraceProcessingInstaller } from "../app/trace.members.ts";
+import { TraceTopicAssignmentCommand } from "../app/trace.members.ts";
 
 const logger = createLogger("langwatch:trace-processing:installer");
 

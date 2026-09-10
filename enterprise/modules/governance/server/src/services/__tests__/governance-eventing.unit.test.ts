@@ -30,15 +30,15 @@ import {
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,
   type GatewaySpendProcessingEvent,
-} from "../../app/governance.infrastructure.ts";
-import type { GovernanceWebhookChannel, GovernanceWebhookSendBatch } from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
+import type { GovernanceWebhookChannel, GovernanceWebhookSendBatch } from "../../app/governance.members.ts";
 import {
   IngestionPullMetricsSink,
   IngestionPullOutcomeChannel,
   IngestionPullRunner,
   IngestionPullScheduler,
-} from "../../app/governance.infrastructure.ts";
-import type { PulledUsageLedgerRepository, PulledUsageLedgerRow } from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
+import type { PulledUsageLedgerRepository, PulledUsageLedgerRow } from "../../app/governance.members.ts";
 import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusEventingProjection,

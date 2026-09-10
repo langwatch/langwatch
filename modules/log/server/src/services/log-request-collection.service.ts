@@ -10,7 +10,7 @@ import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer"
 import { getLangWatchTracer } from "langwatch";
 import { piiRedactionLevelSchema } from "@langwatch/trace-contract";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
-import type { LogTraceIoExtractor } from "../app/log.infrastructure.ts";
+import type { LogTraceIoExtractor } from "../app/log.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**

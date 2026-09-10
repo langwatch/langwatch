@@ -25,7 +25,7 @@ class AzureDestination extends StoredObjectAzureDestination {
   }
 }
 
-describe("Stored Object storage infrastructure", () => {
+describe("Stored Object storage members", () => {
   it("keeps BYOC first and does not resolve inactive Azure configuration", async () => {
     const azure = new AzureDestination();
     const policy = StoredObjectDestinationPolicyAdapter.create({

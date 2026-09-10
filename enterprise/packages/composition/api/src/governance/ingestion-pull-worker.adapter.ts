@@ -42,7 +42,7 @@ import type { AppGovernanceOcsfEventsAdapter } from "./governance-ocsf-events.cl
 import {
   AppGovernanceEncryption,
   type GovernanceEncryption,
-} from "./governance-infrastructure.adapter.ts";
+} from "./governance-members.adapter.ts";
 
 const MAX_S3_FILES = 100;
 const MAX_S3_PAGES = 50;

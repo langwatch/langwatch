@@ -2,7 +2,7 @@
 
 import { GovernanceEncryptor } from "@langwatch/enterprise-governance-server";
 
-/** Encryption remains process infrastructure supplied by the API installer. */
+/** Encryption remains process members supplied by the API installer. */
 export type GovernanceEncryption = {
   encrypt(value: string): string;
   decrypt(value: string): string;

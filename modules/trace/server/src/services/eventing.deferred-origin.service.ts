@@ -7,7 +7,7 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
-import type { DeferredOriginPayload, TraceDeferredOriginScheduler } from "../app/trace.infrastructure.ts";
+import type { DeferredOriginPayload, TraceDeferredOriginScheduler } from "../app/trace.members.ts";
 
 const logger = createLogger("langwatch:trace-processing:origin-gate");
 

@@ -14,7 +14,7 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type {
   IngestionKeyIssuer,
   IngestionKeyRepository,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:ingestion-key");

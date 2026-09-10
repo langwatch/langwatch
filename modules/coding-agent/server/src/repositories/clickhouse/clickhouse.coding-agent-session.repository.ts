@@ -9,12 +9,12 @@ import { z } from "zod";
 import type {
   CodingAgentClickHouseClient,
   CodingAgentClickHouse,
-} from "../../app/coding-agent.infrastructure.ts";
-import type { CodingAgentClock } from "../../app/coding-agent.infrastructure.ts";
+} from "../../app/coding-agent.members.ts";
+import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
 import type {
   CodingAgentReadMetrics,
   CodingAgentSessionListReadOutcome,
-} from "../../app/coding-agent.infrastructure.ts";
+} from "../../app/coding-agent.members.ts";
 import type { CodingAgentSessionRepository as SessionRepository } from "../coding-agent-session.repository.ts";
 import { nowInstant } from "@langwatch/time";
 import {

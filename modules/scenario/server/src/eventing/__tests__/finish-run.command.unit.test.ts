@@ -199,7 +199,7 @@ describe("FinishRunCommand", () => {
     });
   });
 
-  describe("when an infrastructure caller supplies a bare error", () => {
+  describe("when an members caller supplies a bare error", () => {
     /** @scenario "The stall reason is recorded on the terminal event" */
     it("synthesizes failure results so the reason lands on the event", async () => {
       const handler = new FinishRunCommand(makeDeps());

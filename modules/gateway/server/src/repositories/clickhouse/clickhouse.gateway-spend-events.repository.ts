@@ -4,7 +4,7 @@ import { Temporal } from "@langwatch/time";
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { GatewayClickHouseResolver } from "../../app/gateway.infrastructure.ts";
+import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
 import type { GatewaySpendState } from "../../projections/gateway-spend.projection.ts";
 import type { SpendUsage } from "@langwatch/gateway-contract";
 import { EMPTY_SPEND_USAGE } from "../../processes/gateway-spend-commands.process.ts";

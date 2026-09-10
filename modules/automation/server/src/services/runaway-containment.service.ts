@@ -6,7 +6,7 @@ import {
 import { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
 import { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import { AutomationRunawaySignals } from "./automation-runaway-signals.service.ts";
-import { AutomationClock } from "../app/automation.infrastructure.ts";
+import { AutomationClock } from "../app/automation.members.ts";
 import { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 

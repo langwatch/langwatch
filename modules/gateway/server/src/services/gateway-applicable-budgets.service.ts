@@ -9,7 +9,7 @@ import type { ScopeInput } from "@langwatch/gateway-contract";
 import {
   type BudgetSpendTarget,
   GatewayBudgetSpend,
-} from "../app/gateway.infrastructure.ts";
+} from "../app/gateway.members.ts";
 import {
   budgetPeriodFloorMs,
   scopeTargetKey,

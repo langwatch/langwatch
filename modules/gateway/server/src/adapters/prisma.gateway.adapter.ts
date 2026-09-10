@@ -1,9 +1,9 @@
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { GatewayAudit } from "../app/gateway.infrastructure.ts";
-import type { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
-import type { GatewayChangeEvents } from "../app/gateway.infrastructure.ts";
+import type { GatewayAudit } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type { GatewayChangeEvents } from "../app/gateway.members.ts";
 import {
   PrismaGatewayBudgetRepository,
   type GatewayBudgetDatabase,

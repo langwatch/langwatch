@@ -20,8 +20,8 @@ import type { PricingModel } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
-import type { UsageCounter } from "./entitlement.infrastructure.ts";
-import type { UsageWarning } from "./entitlement.infrastructure.ts";
+import type { UsageCounter } from "./entitlement.members.ts";
+import type { UsageWarning } from "./entitlement.members.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
@@ -112,22 +112,22 @@ export class EntitlementApp implements EntitlementApiContract {
 
   private constructor(
     repositories: EntitlementRepositories,
-    infrastructure: EntitlementInfrastructure,
+    members: EntitlementInfrastructure,
     dependencies: EntitlementSetup["dependencies"],
   ) {
-    this.#plans = EntitlementService.create(infrastructure);
+    this.#plans = EntitlementService.create(members);
     this.#usage = UsageStatsService.create({
       membership: repositories.membership,
-      counter: infrastructure.counter,
+      counter: members.counter,
       plans: this.#plans,
     });
-    this.#warnings = infrastructure.warnings;
+    this.#warnings = members.warnings;
     this.#spend = repositories.spend;
     this.#users = dependencies.users;
   }
 
-  static create({ repositories, infrastructure, dependencies }: EntitlementSetup): EntitlementApp {
-    return new EntitlementApp(repositories, infrastructure, dependencies);
+  static create({ repositories, members, dependencies }: EntitlementSetup): EntitlementApp {
+    return new EntitlementApp(repositories, members, dependencies);
   }
 
   async getActivePlan(input: ResolvePlanInput): Promise<Plan> {

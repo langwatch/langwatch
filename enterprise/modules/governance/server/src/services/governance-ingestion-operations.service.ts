@@ -2,7 +2,7 @@
 
 import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { CanonicalCostExtractorService } from "./canonical-cost-extractor.service.ts";
-import type { GovernanceEventingChannel } from "../app/governance.infrastructure.ts";
+import type { GovernanceEventingChannel } from "../app/governance.members.ts";
 import type { IngestionKeyService } from "./ingestion-source-key.service.ts";
 import type { IngestionSourceService } from "./ingestion-source.service.ts";
 import type { IngestionTemplateService } from "./ingestion-template.service.ts";

@@ -39,7 +39,7 @@ import {
   ActivityMonitorRepository,
   type GovernanceClickHouseClient,
   type GovernanceClickHouseResolver,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 
 const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";

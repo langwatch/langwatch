@@ -87,7 +87,7 @@ export interface UsageVolumeCounter {
 /**
  * The approaching-limit mail. Sending it needs the deployment's gateway, its
  * public host and the billing ladder the message quotes a next step from, none
- * of which this feature holds, so the send arrives as infrastructure.
+ * of which this feature holds, so the send arrives as members.
  */
 export interface UsageWarning {
   /** Reports nothing sent when the reading crossed no threshold, or the window still holds. */

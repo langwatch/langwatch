@@ -82,7 +82,7 @@ function isAiSemanticCodingAgentSpan({
 }
 
 /**
- * Whether to drop this span as coding-agent infrastructure noise. Returns
+ * Whether to drop this span as coding-agent members noise. Returns
  * false (keep) for every span not emitted under a known noisy coding-agent
  * scope, so unrelated OTLP is untouched.
  */

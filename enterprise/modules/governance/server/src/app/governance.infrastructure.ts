@@ -244,7 +244,7 @@ export interface GatewayBudgetLedger {
  * remainder, once its repository interface moved to repositories/audit/, fell
  * under the twenty-line fragment-file floor on its own. All three are small
  * read-side signal ports the installation adapter takes as optional
- * infrastructure, so they sit together here rather than as three stubs.
+ * members, so they sit together here rather than as three stubs.
  */
 export interface GovernanceOcsfEventsReader {
   findAll(input: {

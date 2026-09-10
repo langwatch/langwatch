@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { ModelTranslation } from "../app/model-provider.infrastructure.ts";
+import { ModelTranslation } from "../app/model-provider.members.ts";
 import {
   ModelProviderExecutionHandleService,
   type ModelProviderExecutionHandleOptions,

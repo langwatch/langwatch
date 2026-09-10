@@ -15,7 +15,7 @@ export {
   type HostedMcpDependencies,
   type HostedMcpRedis,
   type McpToolServer,
-} from "./app/hosted-mcp-infrastructure.ts";
+} from "./app/hosted-mcp-members.ts";
 export {
   McpAuthorizationService,
   MCP_AUTHORIZE_PERMISSION,

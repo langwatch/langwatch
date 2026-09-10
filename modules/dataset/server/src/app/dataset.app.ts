@@ -93,9 +93,9 @@ export class DatasetApp implements DatasetApi {
   private constructor(
     repositories: DatasetRepositories,
     dependencies: DatasetSetup["dependencies"],
-    infrastructure: DatasetInfrastructure,
+    members: DatasetInfrastructure,
   ) {
-    const resolver = infrastructure.storageResolver;
+    const resolver = members.storageResolver;
 
     this.#normalization = resolver
       ? DatasetNormalizationService.create({
@@ -111,7 +111,7 @@ export class DatasetApp implements DatasetApi {
       repository: repositories.datasets,
       records: repositories.records,
       uploads:
-        infrastructure.storage ??
+        members.storage ??
         (resolver
           ? DatasetUploadAdapter.create({
               datasets: repositories.content,
@@ -119,9 +119,9 @@ export class DatasetApp implements DatasetApi {
               storageResolver: resolver,
             })
           : undefined),
-      queue: infrastructure.queue ?? this.#normalization ?? undefined,
+      queue: members.queue ?? this.#normalization ?? undefined,
       content:
-        infrastructure.content ??
+        members.content ??
         (resolver
           ? DatasetContentAdapter.create({
               datasets: repositories.content,
@@ -129,7 +129,7 @@ export class DatasetApp implements DatasetApi {
             })
           : undefined),
       storageResolver: resolver,
-      generateId: infrastructure.generateId,
+      generateId: members.generateId,
     });
 
     this.#batchEvaluations = repositories.batchEvaluations;
@@ -137,8 +137,8 @@ export class DatasetApp implements DatasetApi {
     this.#permissions = dependencies.permissions;
   }
 
-  static create({ repositories, dependencies, infrastructure }: DatasetSetup): DatasetApp {
-    return new DatasetApp(repositories, dependencies, infrastructure);
+  static create({ repositories, dependencies, members }: DatasetSetup): DatasetApp {
+    return new DatasetApp(repositories, dependencies, members);
   }
 
   // ── Datasets ─────────────────────────────────────────────────────────────

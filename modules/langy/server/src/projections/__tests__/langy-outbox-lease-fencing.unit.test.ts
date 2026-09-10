@@ -10,7 +10,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AGENT_DISPATCH_TIMEOUT_MS } from "@langwatch/langy-server";
 import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
-import type { LangyConversationProcessState } from "../../app/langy.infrastructure.ts";
+import type { LangyConversationProcessState } from "../../app/langy.members.ts";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_OUTBOX_LEASE_DURATION_MS,

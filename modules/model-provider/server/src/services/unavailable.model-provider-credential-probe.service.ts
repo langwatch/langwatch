@@ -1,5 +1,5 @@
 import type { ModelProviderApi, ModelProviderCredentialVerdict } from "@langwatch/model-provider-contract";
-import { ModelProviderCredentialProbe } from "../app/model-provider.infrastructure.ts";
+import { ModelProviderCredentialProbe } from "../app/model-provider.members.ts";
 
 /**
  * The probe a deployment with no guarded egress composes.

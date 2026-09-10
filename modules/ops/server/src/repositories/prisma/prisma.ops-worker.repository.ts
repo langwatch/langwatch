@@ -57,7 +57,7 @@ export interface OpsWorkerAdapterOptions {
   };
 }
 
-/** Composes the complete Ops worker graph from injected infrastructure. */
+/** Composes the complete Ops worker graph from injected members. */
 export class PrismaOpsWorkerRepository implements OpsWorker {
   private constructor(private readonly options: OpsWorkerAdapterOptions) {
   }

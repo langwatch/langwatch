@@ -481,7 +481,7 @@ describe("parseHandledError, given the `code` ↔ `kind` transition", () => {
 });
 
 describe("parseHandledError, given a failure the platform did NOT name", () => {
-  it("degrades an unrecognisable body to a status-coded infrastructure error", () => {
+  it("degrades an unrecognisable body to a status-coded members error", () => {
     const parsed = parseHandledError({ status: 502, body: "<html>Bad Gateway</html>" });
 
     expect(parsed).toMatchObject({
@@ -635,7 +635,7 @@ describe("handledErrorFromThrown", () => {
     });
   });
 
-  it("reports anything unrecognisable as infrastructure, not a claimed code", () => {
+  it("reports anything unrecognisable as members, not a claimed code", () => {
     const parsed = handledErrorFromThrown(new Error("fetch failed"));
 
     expect(parsed).toMatchObject({ isHandled: false, message: "fetch failed" });
@@ -687,7 +687,7 @@ describe("handledErrorFromThrown, given a transport failure fetch threw", () => 
         extra: { address: "127.0.0.1", port: 5560 },
       });
 
-    it("classifies a refused connection as infrastructure", () => {
+    it("classifies a refused connection as members", () => {
       const parsed = handledErrorFromThrown(refused());
 
       expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
@@ -715,7 +715,7 @@ describe("handledErrorFromThrown, given a transport failure fetch threw", () => 
   });
 
   describe("when DNS could not resolve the host", () => {
-    it("classifies an unresolvable host as infrastructure", () => {
+    it("classifies an unresolvable host as members", () => {
       const parsed = handledErrorFromThrown(
         systemError({
           message: "getaddrinfo ENOTFOUND app.langwatch.invalid",
@@ -729,7 +729,7 @@ describe("handledErrorFromThrown, given a transport failure fetch threw", () => 
       expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
     });
 
-    it("classifies a DNS timeout as infrastructure", () => {
+    it("classifies a DNS timeout as members", () => {
       const parsed = handledErrorFromThrown(
         systemError({
           message: "getaddrinfo EAI_AGAIN app.langwatch.ai",
@@ -744,7 +744,7 @@ describe("handledErrorFromThrown, given a transport failure fetch threw", () => 
   });
 
   describe("when TLS could not verify the certificate", () => {
-    it("classifies a self-signed certificate as infrastructure", () => {
+    it("classifies a self-signed certificate as members", () => {
       const parsed = handledErrorFromThrown(
         systemError({
           message: "self signed certificate in certificate chain",
@@ -757,7 +757,7 @@ describe("handledErrorFromThrown, given a transport failure fetch threw", () => 
       expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
     });
 
-    it("classifies an unverifiable leaf certificate as infrastructure", () => {
+    it("classifies an unverifiable leaf certificate as members", () => {
       const parsed = handledErrorFromThrown(
         systemError({
           message: "unable to verify the first certificate",
@@ -776,7 +776,7 @@ describe("handledErrorFromThrown, given a transport failure fetch threw", () => 
       ["ETIMEDOUT", -60, "connect ETIMEDOUT 10.0.0.1:443"],
       ["ECONNRESET", -54, "read ECONNRESET"],
       ["EPIPE", -32, "write EPIPE"],
-    ])("classifies %s as infrastructure", (code, errno, message) => {
+    ])("classifies %s as members", (code, errno, message) => {
       const parsed = handledErrorFromThrown(
         systemError({ message, code, errno, syscall: "connect" }),
       );

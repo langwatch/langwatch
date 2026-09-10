@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AutomationClock } from "../../app/automation.infrastructure.ts";
+import type { AutomationClock } from "../../app/automation.members.ts";
 import type { AutomationRepositories } from "../automation.repositories.ts";
 
 /** The client the automation rows live in, as a process hands it over. */
@@ -21,12 +21,12 @@ export class PostgresAutomationRepositories {
   static readonly requires = ["prisma", "clock"] as const;
 
   static create(
-    infrastructure: Readonly<{ prisma: PrismaClient; clock: AutomationClock }>,
+    members: Readonly<{ prisma: PrismaClient; clock: AutomationClock }>,
   ): AutomationRepositories {
-    const database = infrastructure.prisma;
+    const database = members.prisma;
 
     return {
-      triggers: PrismaTriggerRepository.create(database, infrastructure.clock),
+      triggers: PrismaTriggerRepository.create(database, members.clock),
       history: PrismaTriggerFireHistoryRepository.create(database),
       suppressions: PrismaEmailSuppressionRepository.create(database),
       names: PrismaEmailSuppressionNameRepository.create(database),

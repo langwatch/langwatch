@@ -15,8 +15,8 @@ import { MetricRedactionAdapter } from "./metric-redaction.service.ts";
 import {
   type MetricPreparation,
   type MetricPreparationInput,
-} from "../app/metric.infrastructure.ts";
-import type { MetricRedaction } from "../app/metric.infrastructure.ts";
+} from "../app/metric.members.ts";
+import type { MetricRedaction } from "../app/metric.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());

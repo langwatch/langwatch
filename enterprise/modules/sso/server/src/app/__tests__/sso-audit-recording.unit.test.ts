@@ -28,7 +28,7 @@ function harness() {
       auditLog: createApiFixture<AuditLogApi>({ record }),
       users: createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL, [CUSTOMER_ID]: null }),
     },
-    infrastructure: { connections },
+    members: { connections },
   });
 
   return { app, connections, record };

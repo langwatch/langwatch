@@ -5,7 +5,7 @@ import {
   CLAUDE_CODE_LLM_REQUEST_SPAN_NAME,
   CODEX_TURN_SPAN_NAME,
 } from "@langwatch/trace-contract";
-import type { TraceModelCostCatalog } from "../../app/trace.infrastructure.ts";
+import type { TraceModelCostCatalog } from "../../app/trace.members.ts";
 import { SpanModelNameService } from "./span-model-name.service.ts";
 
 /**

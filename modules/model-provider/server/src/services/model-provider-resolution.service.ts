@@ -17,7 +17,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import type {
   ModelProviderCatalog
-} from "../app/model-provider.infrastructure.ts";
+} from "../app/model-provider.members.ts";
 import type {
   ModelDefaultRepository
 } from "../repositories/model-default.repository.ts";

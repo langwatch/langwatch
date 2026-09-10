@@ -11,7 +11,7 @@ export type {
   OrganizationSessionRevocation,
   OrganizationPlanUser,
   OrganizationSeatDecision,
-} from "./app/organization.infrastructure.ts";
+} from "./app/organization.members.ts";
 export { OrganizationMembershipService } from "./services/organization-membership.service.ts";
 export { OrganizationGroupScopeService } from "./services/organization-group-scope.service.ts";
 export {
@@ -69,7 +69,7 @@ export type {
   OrganizationSettingsSecret,
   GroupIdentity,
   TeamIdentity,
-} from "./app/organization.infrastructure.ts";
+} from "./app/organization.members.ts";
 export {
   OrganizationRepository,
   type StoredOrganizationSettings,
@@ -111,7 +111,7 @@ export type {
   OrganizationJoinRequestState,
   OrganizationPlanGate,
   OrganizationSignals,
-} from "./app/organization.infrastructure.ts";
+} from "./app/organization.members.ts";
 export { groupsRest, groupsRestEnterpriseGate } from "./transport/group.rest.ts";
 export { createTeamRest } from "./transport/team.rest.ts";
 export { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
@@ -151,4 +151,4 @@ export {
   OrganizationInviteMail,
   OrganizationInviteRateLimit,
   OrganizationInviteSeatCensus,
-} from "./app/organization.infrastructure.ts";
+} from "./app/organization.members.ts";

@@ -16,8 +16,8 @@ export { LangyService } from "./services/langy.service.ts";
 export type { LangyInfrastructure } from "./app/langy.app.ts";
 export { langyServer } from "./langy.server.ts";
 export { LangyNavigateFallbackService } from "./services/langy-navigate-fallback.service.ts";
-export { LangyNavigateProject } from "./app/langy.infrastructure.ts";
-export { LangyNavigateResource } from "./app/langy.infrastructure.ts";
+export { LangyNavigateProject } from "./app/langy.members.ts";
+export { LangyNavigateResource } from "./app/langy.members.ts";
 export {
   LANGY_NAVIGATE_RESOURCE_KINDS,
   type LangyNavigateResourceKind,
@@ -30,7 +30,7 @@ export {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyService,
 } from "./services/langy-session-key.service.ts";
-export { LangySessionKeyMetrics } from "./app/langy.infrastructure.ts";
+export { LangySessionKeyMetrics } from "./app/langy.members.ts";
 export { LangySessionKeyReapService } from "./services/langy-session-key-reap.service.ts";
 export { LangySessionKeyReapRepository } from "./repositories/langy-session-key-reap.repository.ts";
 export {
@@ -84,14 +84,14 @@ export {
   type LangyUiActionBackendMode,
   LangyUiActionCatalog,
   type LangyUiActionDefinition,
-} from "./app/langy.infrastructure.ts";
+} from "./app/langy.members.ts";
 export {
   type LangyBackendActor,
   type LangyBackendRunResult,
   type LangyBackendSaveResult,
   type LangyBackendStateRead,
   LangyUiActionBackend,
-} from "./app/langy.infrastructure.ts";
+} from "./app/langy.members.ts";
 export { LangyUiActionBackendService } from "./services/langy-ui-action-backend.service.ts";
 
 // Application-facing Langy orchestration primitives. These are deliberately
@@ -128,13 +128,13 @@ export {
   LangyUiActionSurface,
   LangyWorkerMetrics,
   LangyWorker,
-} from "./app/langy.infrastructure.ts";
+} from "./app/langy.members.ts";
 export type {
   LangyWorkerCancelInput,
   LangyWorkerDispatchInput,
   LangyWorkerProbeInput,
   LangyWorkerWarmInput,
-} from "./app/langy.infrastructure.ts";
+} from "./app/langy.members.ts";
 export { FeatureFlagLangyUiActionSurfaceAdapter } from "./services/langy-ui-action-surface.service.ts";
 export { LangyConversationPipelineAdapter } from "./services/langy-conversation-pipeline.service.ts";
 export type { LangyConversationProcessingPipelineDeps } from "./services/langy-conversation-pipeline.service.ts";
@@ -173,9 +173,9 @@ export {
 } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 export { LangyAnalyticsEventSink } from "./repositories/langy-analytics-event.repository.ts";
 export type { LangyAnalyticsEventRecord } from "./repositories/langy-analytics-event.repository.ts";
-export type { LangyEffectMembers } from "./app/langy.infrastructure.ts";
-export type { LangyTitleGenerator } from "./app/langy.infrastructure.ts";
-export { LangyTitleModel } from "./app/langy.infrastructure.ts";
+export type { LangyEffectMembers } from "./app/langy.members.ts";
+export type { LangyTitleGenerator } from "./app/langy.members.ts";
+export { LangyTitleModel } from "./app/langy.members.ts";
 export {
   LANGY_TITLE_FEATURE_KEY,
   LangyTitleGeneratorService,
@@ -204,7 +204,7 @@ export type {
 export type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
-} from "./app/langy.infrastructure.ts";
+} from "./app/langy.members.ts";
 export { LangyFrameDedupRedisRepository } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
 export type { LangyFrameDedupRedis } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
 export type {

@@ -6,13 +6,13 @@ import {
 } from "@langwatch/automation-contract";
 import { handleEvaluationAlertTriggerMatch } from "../subscribers/evaluation-alert-trigger-match.subscriber.ts";
 import { handleGraphTriggerActivity } from "../subscribers/graph-trigger-activity.subscriber.ts";
-import type { AutomationGraphActivity } from "../app/automation.infrastructure.ts";
+import type { AutomationGraphActivity } from "../app/automation.members.ts";
 import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
 import {
   AutomationEvaluationTraceSummary,
   AutomationEvaluationTriggerFilter,
   AutomationTriggerMatchRecorder,
-} from "../app/automation.infrastructure.ts";
+} from "../app/automation.members.ts";
 
 /**
  * Process-lifetime Automation implementation of Evaluation's two terminal

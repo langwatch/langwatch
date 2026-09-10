@@ -19,7 +19,7 @@ import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-stor
 import { StoredObjectsService } from "#services/stored-objects.service";
 import type { StoredObject } from "#rules/stored-object-row.rules";
 import type { StoredObjectsRepository } from "#repositories/stored-objects.repository";
-import type { StoredObjectsTelemetry } from "#app/stored-object.infrastructure";
+import type { StoredObjectsTelemetry } from "#app/stored-object.members";
 
 const ACCOUNT = "lwacct";
 const CONTAINER = "stored-objects";

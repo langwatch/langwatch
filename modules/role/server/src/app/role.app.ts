@@ -95,19 +95,19 @@ export class RoleApp implements RoleApi {
   private constructor(
     repositories: RoleRepositories,
     dependencies: RoleSetup["dependencies"],
-    infrastructure: RoleInfrastructure,
+    members: RoleInfrastructure,
   ) {
     this.#roles = RoleService.create({ repository: repositories.roles });
     this.#permissions = dependencies.permissions;
     this.#organizations = dependencies.organizations;
     this.#users = dependencies.users;
-    this.#scope = infrastructure.scope;
-    this.#plan = infrastructure.plan;
-    this.#bindingIds = infrastructure.bindingIds;
+    this.#scope = members.scope;
+    this.#plan = members.plan;
+    this.#bindingIds = members.bindingIds;
   }
 
-  static create({ repositories, dependencies, infrastructure }: RoleSetup): RoleApp {
-    return new RoleApp(repositories, dependencies, infrastructure);
+  static create({ repositories, dependencies, members }: RoleSetup): RoleApp {
+    return new RoleApp(repositories, dependencies, members);
   }
 
   // ── custom roles ───────────────────────────────────────────────────────────

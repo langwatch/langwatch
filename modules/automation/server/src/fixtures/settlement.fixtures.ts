@@ -10,7 +10,7 @@ import {
 } from "@langwatch/trace-contract";
 import { AutomationSlackSecretsService } from "../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../services/automation-webhook-secrets.service.ts";
-import { AutomationClock } from "../app/automation.infrastructure.ts";
+import { AutomationClock } from "../app/automation.members.ts";
 import { AutomationEmailCapRepository } from "../repositories/automation-email-cap.repository.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import {

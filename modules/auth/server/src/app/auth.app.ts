@@ -11,7 +11,7 @@
  *
  * Nothing here reads ambient state. The process supplies the counter, the
  * sign-in router, the mail gateway, the account writes and the invitation
- * reads as infrastructure, because none of them is auth's to own: the `User`,
+ * reads as members, because none of them is auth's to own: the `User`,
  * `Organization` and `OrganizationInvite` tables belong to other modules, and
  * the module reaches them through their owner rather than around it.
  */
@@ -109,32 +109,32 @@ export class AuthApp implements AuthApiContract {
 
   readonly #sessions: BrowserSessionService;
   readonly #signUp: SignUpVerificationService | null;
-  readonly #infrastructure: AuthInfrastructure;
+  readonly #members: AuthInfrastructure;
 
   private constructor(
     sessions: BrowserSessionService,
     signUp: SignUpVerificationService | null,
-    infrastructure: AuthInfrastructure,
+    members: AuthInfrastructure,
   ) {
     this.#sessions = sessions;
     this.#signUp = signUp;
-    this.#infrastructure = infrastructure;
+    this.#members = members;
   }
 
   static create(setup: AuthSetup): AuthApp {
-    const { infrastructure, repositories, dependencies } = setup;
-    const now = infrastructure.now ?? nowInstant;
+    const { members, repositories, dependencies } = setup;
+    const now = members.now ?? nowInstant;
 
     return new AuthApp(
       BrowserSessionService.create({
         sessions: repositories.sessions,
-        cache: RedisAuthSessionCacheRepository.create({ redis: infrastructure.redis }),
-        identityEmails: infrastructure.identityEmails,
+        cache: RedisAuthSessionCacheRepository.create({ redis: members.redis }),
+        identityEmails: members.identityEmails,
         users: dependencies.users,
         now,
       }),
-      signUpVerification({ infrastructure, repositories, now, users: dependencies.users }),
-      infrastructure,
+      signUpVerification({ members, repositories, now, users: dependencies.users }),
+      members,
     );
   }
 
@@ -159,13 +159,13 @@ export class AuthApp implements AuthApiContract {
   async isWithinBudget(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<boolean> {
-    return (await this.#infrastructure.rateLimit(input)).allowed;
+    return (await this.#members.rateLimit(input)).allowed;
   }
 
   route(
     input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
   ): Promise<RoutingDecision> {
-    return this.#infrastructure.route(input);
+    return this.#members.route(input);
   }
 
   async addressIsRegistered(input: Readonly<{ email: string }>): Promise<boolean> {
@@ -191,7 +191,7 @@ export class AuthApp implements AuthApiContract {
   }
 
   resolveAuthProvider(): Promise<string> {
-    return this.#infrastructure.authProvider();
+    return this.#members.authProvider();
   }
 
   /** The ceremony, or the refusal that names why this process has none. */
@@ -200,7 +200,7 @@ export class AuthApp implements AuthApiContract {
       throw new AuthUnavailableError({
         capability:
           "mail gateway with a public base URL, so it cannot send a sign-up confirmation link",
-        processName: this.#infrastructure.processName,
+        processName: this.#members.processName,
       });
     }
 
@@ -208,12 +208,12 @@ export class AuthApp implements AuthApiContract {
   }
 
   private requireInvites(): AuthInviteDirectory {
-    const invites = this.#infrastructure.invites;
+    const invites = this.#members.invites;
     if (!invites) {
       throw new AuthUnavailableError({
         capability:
           "invitation service, so it cannot ask this organization's admins to reissue the invitation",
-        processName: this.#infrastructure.processName,
+        processName: this.#members.processName,
       });
     }
 
@@ -223,17 +223,17 @@ export class AuthApp implements AuthApiContract {
 
 /** The ceremony this process can run, or nothing where a collaborator is missing. */
 function signUpVerification({
-  infrastructure,
+  members,
   repositories,
   now,
   users,
 }: {
-  infrastructure: AuthInfrastructure;
+  members: AuthInfrastructure;
   repositories: AuthRepositories;
   now: () => Instant;
   users: UserApi;
 }): SignUpVerificationService | null {
-  const signUp = infrastructure.signUp;
+  const signUp = members.signUp;
   if (!signUp) return null;
 
   const accounts: SignUpAccountFactory = {

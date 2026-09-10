@@ -292,7 +292,7 @@ export function toAzureCredentials(
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task object-storage-migrate <plan|copy|finalize|verify>`. `migration` is a factory rather than a built instance:
  * `apps/tasks` composes every catalogue entry at boot, before a phase is known, so building the {@link ObjectStorageMigrationService} (via {@link createMigrationTask}) is
- * deferred to `run()`, the same way the process's other infrastructure-backed tasks defer `host.require*()`. This class is only the seam that reads the phase off `args[0]`.
+ * deferred to `run()`, the same way the process's other members-backed tasks defer `host.require*()`. This class is only the seam that reads the phase off `args[0]`.
  */
 export class ObjectStorageMigrateTask extends Task {
   readonly name = "object-storage-migrate";

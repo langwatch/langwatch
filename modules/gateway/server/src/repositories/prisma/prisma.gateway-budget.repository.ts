@@ -37,7 +37,7 @@ import {
 import type {
   BudgetBucketBoundary,
   GatewayBudgetSpend,
-} from "../../app/gateway.infrastructure.ts";
+} from "../../app/gateway.members.ts";
 import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository.ts";
 import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository.ts";
 import type { GatewayBudgetScopeReach } from "../gateway-budget.repository.ts";

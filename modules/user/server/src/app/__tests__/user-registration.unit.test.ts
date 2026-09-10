@@ -22,14 +22,14 @@ describe("registering a credential account", () => {
   describe("when registration succeeds", () => {
     /** @scenario Email-mode registration tracks the PostHog signed_up milestone exactly once */
     it("tracks the signed_up analytics event with the new account id", async () => {
-      const infrastructure = createUserTestInfrastructure();
-      const app = createUserTestApp({ infrastructure });
+      const members = createUserTestInfrastructure();
+      const app = createUserTestApp({ members });
 
       const created = await register(app);
 
       expect(created.id).toEqual(expect.any(String));
-      expect(infrastructure.analytics.trackServerEvent).toHaveBeenCalledTimes(1);
-      expect(infrastructure.analytics.trackServerEvent).toHaveBeenCalledWith({
+      expect(members.analytics.trackServerEvent).toHaveBeenCalledTimes(1);
+      expect(members.analytics.trackServerEvent).toHaveBeenCalledWith({
         userId: created.id,
         event: "signed_up",
       });
@@ -39,14 +39,14 @@ describe("registering a credential account", () => {
   describe("when the email is already registered", () => {
     /** @scenario A rejected registration tracks no PostHog signed_up milestone */
     it("refuses and tracks no signed_up analytics event", async () => {
-      const infrastructure = createUserTestInfrastructure();
-      const app = createUserTestApp({ infrastructure });
+      const members = createUserTestInfrastructure();
+      const app = createUserTestApp({ members });
 
       await register(app);
-      vi.mocked(infrastructure.analytics.trackServerEvent).mockClear();
+      vi.mocked(members.analytics.trackServerEvent).mockClear();
 
       await expect(register(app)).rejects.toBeInstanceOf(EmailAlreadyRegisteredError);
-      expect(infrastructure.analytics.trackServerEvent).not.toHaveBeenCalled();
+      expect(members.analytics.trackServerEvent).not.toHaveBeenCalled();
     });
   });
 
@@ -83,7 +83,7 @@ describe("registering a credential account", () => {
     /** @scenario "A fresh unlicensed deployment bootstraps via email signup" */
     it("registers the account through the signup form's own path", async () => {
       const app = createUserTestApp({
-        infrastructure: {
+        members: {
           deployment: {
             authProvider: vi.fn(async () => "email"),
             offersPasskeys: () => false,
@@ -102,7 +102,7 @@ describe("registering a credential account", () => {
     /** @scenario "A licensed deployment cannot mint password accounts" */
     it("refuses direct registration", async () => {
       const app = createUserTestApp({
-        infrastructure: {
+        members: {
           deployment: {
             authProvider: vi.fn(async () => "auth0"),
             offersPasskeys: () => false,

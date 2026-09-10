@@ -1,6 +1,6 @@
 /**
  * What a test hands the workflow module in place of a process: every
- * infrastructure member it declares, each one throwing when a test reaches it
+ * members member it declares, each one throwing when a test reaches it
  * without saying so first.
  */
 import type { DatasetApi } from "@langwatch/dataset-contract";
@@ -105,7 +105,7 @@ const silentSignals: WorkflowSignals = {
   failed: () => void 0,
 };
 
-/** The whole infrastructure, with any member a test cares about overridden. */
+/** The whole members, with any member a test cares about overridden. */
 export function createWorkflowTestInfrastructure(
   overrides: Partial<WorkflowInfrastructure> = {},
 ): WorkflowInfrastructure {

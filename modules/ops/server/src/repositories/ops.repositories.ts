@@ -5,7 +5,7 @@ import type { BugReportRepository } from "./admin/bug-report.repository.ts";
  *
  * One entry so far: the support inbox. Everything else the operator surface
  * reads lives in Redis, ClickHouse or the event store, and reaches the module
- * as infrastructure the process supplies rather than as a repository whose
+ * as members the process supplies rather than as a repository whose
  * backend is chosen at boot.
  */
 export interface OpsRepositories {

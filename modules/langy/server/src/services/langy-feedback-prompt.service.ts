@@ -1,5 +1,5 @@
 import { nowInstant } from "@langwatch/time";
-import type { LangyFeedbackPromptRedis } from "../app/langy.infrastructure.ts";
+import type { LangyFeedbackPromptRedis } from "../app/langy.members.ts";
 
 /**
  * Private policy for Langy's Redis-backed feedback cadence.

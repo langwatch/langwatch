@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { EmailJoinRequestNotifierAdapter } from "../join-request-notifier.service.ts";
-import { JoinRequestNotificationMail } from "../../app/identity.infrastructure.ts";
+import { JoinRequestNotificationMail } from "../../app/identity.members.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature

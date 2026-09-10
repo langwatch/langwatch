@@ -24,7 +24,7 @@ import {
   GatewayWindow,
   type GatewayBudgetWindow,
 } from "@langwatch/gateway-contract";
-import type { BudgetDebitRow } from "../app/gateway.infrastructure.ts";
+import type { BudgetDebitRow } from "../app/gateway.members.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,

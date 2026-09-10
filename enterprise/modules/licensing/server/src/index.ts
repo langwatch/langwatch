@@ -31,7 +31,7 @@ export {
   type OrganizationLicense,
   type OrganizationLicenseCandidate,
   type StoredLicense,
-} from "./app/licensing.infrastructure.ts";
+} from "./app/licensing.members.ts";
 export { LicenseGenerationService } from "./services/license-generation.service.ts";
 export {
   LicensePlanSourceService,

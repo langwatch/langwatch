@@ -17,12 +17,12 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
 
-import type { GovernanceDiagnosticsSink } from "../app/governance.infrastructure.ts";
-import { GovernanceEncryptor } from "../app/governance.infrastructure.ts";
+import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
+import { GovernanceEncryptor } from "../app/governance.members.ts";
 import type {
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";

@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordCapturedSpanInput, TraceApi } from "@langwatch/trace-contract";
 import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";
-import type { TraceSpanIngest } from "../trace.infrastructure.ts";
-import type { TraceLegacyRead } from "../trace.infrastructure.ts";
+import type { TraceSpanIngest } from "../trace.members.ts";
+import type { TraceLegacyRead } from "../trace.members.ts";
 
 const input: RecordCapturedSpanInput = {
   projectId: "project_1",

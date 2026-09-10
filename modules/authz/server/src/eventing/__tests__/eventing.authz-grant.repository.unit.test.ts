@@ -202,7 +202,7 @@ describe("given a replace whose broad grant has already gone", () => {
 });
 
 describe("given a write that failed for a reason the caller cannot act on", () => {
-  describe("when the writer raises an infrastructure error", () => {
+  describe("when the writer raises an members error", () => {
     it("passes it through untouched, so it degrades to unknown with its trace id", async () => {
       const { repository } = harness({
         attachBindings: vi.fn().mockRejectedValue(new Error("redis is down")),

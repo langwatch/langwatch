@@ -4,7 +4,7 @@ import {
   TraceIoExtraction,
   type TraceIoSide,
   type TraceIoValue,
-} from "../app/trace.infrastructure.ts";
+} from "../app/trace.members.ts";
 import { TraceIOExtractionService } from "./content/trace-io-extraction.service.ts";
 
 /**

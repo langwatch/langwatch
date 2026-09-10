@@ -14,7 +14,7 @@ import type {
   OrganizationInviteMail,
   OrganizationInviteSeatCensus,
   OrganizationInviteWorkspaceCensus,
-} from "../app/organization.infrastructure.ts";
+} from "../app/organization.members.ts";
 import type { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
 
 /**

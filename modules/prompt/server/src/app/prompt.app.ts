@@ -173,12 +173,12 @@ function asHandledTagError(error: unknown): never {
   throw error;
 }
 
-/** What every method below reads: the engine, the two peers and the infrastructure. */
+/** What every method below reads: the engine, the two peers and the members. */
 type PromptAppDependencies = Readonly<{
   prompts: PromptService;
   projects: ProjectApi;
   permissions: AuthzApi;
-  infrastructure: PromptInfrastructure;
+  members: PromptInfrastructure;
 }>;
 
 export class PromptApp implements PromptApi {
@@ -188,12 +188,12 @@ export class PromptApp implements PromptApi {
     permissions: AuthzApi,
   };
 
-  static create({ dependencies, infrastructure }: PromptSetup): PromptApp {
+  static create({ dependencies, members }: PromptSetup): PromptApp {
     return new PromptApp({
-      prompts: infrastructure.prompts,
+      prompts: members.prompts,
       projects: dependencies.projects,
       permissions: dependencies.permissions,
-      infrastructure,
+      members,
     });
   }
 
@@ -214,7 +214,7 @@ export class PromptApp implements PromptApi {
       prompts: input.prompts,
       projects: input.projects,
       permissions,
-      infrastructure: { prompts: input.prompts, afterPromptCreated: () => undefined },
+      members: { prompts: input.prompts, afterPromptCreated: () => undefined },
     });
   }
 
@@ -603,7 +603,7 @@ export class PromptApp implements PromptApi {
    * peer module creating one on the caller's behalf leaves no marketing trail.
    */
   announceCreated(input: { projectId: string; userId?: string | null }): void {
-    this.#dependencies.infrastructure.afterPromptCreated(input);
+    this.#dependencies.members.afterPromptCreated(input);
   }
 
   /**

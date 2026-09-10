@@ -3,7 +3,7 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { StoredObjectsClickHouse } from "../../app/stored-object.infrastructure.ts";
+import type { StoredObjectsClickHouse } from "../../app/stored-object.members.ts";
 import { StoredObjectsRepository } from "../stored-objects.repository.ts";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import { storedObjectSchema } from "../../rules/stored-object-row.rules.ts";

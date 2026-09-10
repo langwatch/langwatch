@@ -224,7 +224,7 @@ describe("presentLangyToolError", () => {
       expect(present(unknown, "Counting traces").code).toBe("clickhouse_unavailable");
     });
 
-    it("does not call an infrastructure failure terminal", () => {
+    it("does not call an members failure terminal", () => {
       expect(present(unknown, "Counting traces").terminal).toBeUndefined();
     });
   });

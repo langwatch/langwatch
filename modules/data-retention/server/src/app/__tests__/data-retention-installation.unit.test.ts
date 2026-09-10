@@ -27,7 +27,7 @@ function process() {
     .withProvided(AuthzApi, createDataRetentionTestAuthz())
     .withProvided(UserApi, createDataRetentionTestUsers())
     .withModule(dataRetentionServer, {
-      infrastructure: createDataRetentionTestInfrastructure(),
+      members: createDataRetentionTestInfrastructure(),
     });
 }
 

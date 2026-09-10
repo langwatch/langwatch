@@ -3,7 +3,7 @@ import type {
   IngestionPullOutcomeChannel,
   IngestionPullRun,
   IngestionPullRunner,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 
 export const INGESTION_PULL_MAX_ATTEMPTS = 3;
 export const INGESTION_PULL_LEASE_DURATION_MS = 10 * 60 * 1000;

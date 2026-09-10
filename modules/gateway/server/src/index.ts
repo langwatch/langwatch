@@ -39,14 +39,14 @@ export { GatewaySpendEventsService } from "./services/gateway-spend-events.servi
 export { GatewayEndUserCapsAdapter } from "./adapters/gateway-end-user-caps.adapter.ts";
 export { GatewayEndUserCapsService } from "./services/gateway-end-user-caps.service.ts";
 export * from "./services/gateway-usage.service.ts";
-export type { GatewayBudgetSpendRecord, BudgetBucketBoundary, BudgetSpendTarget, ScopeSpend, BucketSpend, LedgerEventRow, BudgetDebitRow, PulledUsageRow, PulledUsageTotals, GatewayBudgetSpend as GatewayBudgetSpend } from "./app/gateway.infrastructure.ts";
-export type { GatewayChangeEventKind, GatewayChangeEvent, AppendGatewayChangeEventInput, GatewayPersistenceTransaction, GatewayChangeEvents as GatewayChangeEvents } from "./app/gateway.infrastructure.ts";
-export type { GatewayAuditAction, GatewayAuditTargetKind, AppendGatewayAuditInput, GatewayAuditTransaction, GatewayAudit as GatewayAudit } from "./app/gateway.infrastructure.ts";
+export type { GatewayBudgetSpendRecord, BudgetBucketBoundary, BudgetSpendTarget, ScopeSpend, BucketSpend, LedgerEventRow, BudgetDebitRow, PulledUsageRow, PulledUsageTotals, GatewayBudgetSpend as GatewayBudgetSpend } from "./app/gateway.members.ts";
+export type { GatewayChangeEventKind, GatewayChangeEvent, AppendGatewayChangeEventInput, GatewayPersistenceTransaction, GatewayChangeEvents as GatewayChangeEvents } from "./app/gateway.members.ts";
+export type { GatewayAuditAction, GatewayAuditTargetKind, AppendGatewayAuditInput, GatewayAuditTransaction, GatewayAudit as GatewayAudit } from "./app/gateway.members.ts";
 export * from "./ports/gateway-virtual-key.port.ts";
-export type { GatewayClickHouseClient, GatewayClickHouseResolver, GatewayClickHouse as GatewayClickHouse } from "./app/gateway.infrastructure.ts";
-export type { GatewaySettlementPolicy } from "./app/gateway.infrastructure.ts";
+export type { GatewayClickHouseClient, GatewayClickHouseResolver, GatewayClickHouse as GatewayClickHouse } from "./app/gateway.members.ts";
+export type { GatewaySettlementPolicy } from "./app/gateway.members.ts";
 export * from "./ports/gateway-spend-events.port.ts";
-export type { GatewayVirtualKeySpendRow, GatewaySpendWindow, GatewayUsageBucket, GatewayTraceRow, GatewayVirtualKeySpend } from "./app/gateway.infrastructure.ts";
+export type { GatewayVirtualKeySpendRow, GatewaySpendWindow, GatewayUsageBucket, GatewayTraceRow, GatewayVirtualKeySpend } from "./app/gateway.members.ts";
 export * from "./adapters/fixed-gateway-settlement.adapter.ts";
 export * from "./adapters/gateway-virtual-key-spend.adapter.ts";
 export * from "./adapters/gateway-budget-ledger.adapter.ts";
@@ -179,18 +179,18 @@ export type {
 export type {
   GatewayGovernanceSignals,
   GatewayVirtualKeyLifecycleSignal,
-} from "./app/gateway.infrastructure.ts";
-export type { GatewayModelProviderCredentials } from "./app/gateway.infrastructure.ts";
+} from "./app/gateway.members.ts";
+export type { GatewayModelProviderCredentials } from "./app/gateway.members.ts";
 export type {
   GatewayScopePermissions,
   GatewayPermissionScope,
-} from "./app/gateway.infrastructure.ts";
-export type { GatewayConfigAssembly } from "./app/gateway.infrastructure.ts";
+} from "./app/gateway.members.ts";
+export type { GatewayConfigAssembly } from "./app/gateway.members.ts";
 export { GatewayConfigAssemblyAdapter } from "./adapters/postgres.gateway-config-assembly.adapter.ts";
-export type { GatewayVirtualKeyCrypto } from "./app/gateway.infrastructure.ts";
-export type { GatewaySpanIngestion } from "./app/gateway.infrastructure.ts";
-export type { GatewaySpendConfirmation } from "./app/gateway.infrastructure.ts";
-export type { GatewaySpendRating } from "./app/gateway.infrastructure.ts";
+export type { GatewayVirtualKeyCrypto } from "./app/gateway.members.ts";
+export type { GatewaySpanIngestion } from "./app/gateway.members.ts";
+export type { GatewaySpendConfirmation } from "./app/gateway.members.ts";
+export type { GatewaySpendRating } from "./app/gateway.members.ts";
 export {
   ModelCatalogGatewaySpendRatingAdapter,
   NANO_USD_PER_USD,

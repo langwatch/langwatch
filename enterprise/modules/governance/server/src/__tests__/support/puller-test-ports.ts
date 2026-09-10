@@ -19,7 +19,7 @@ import {
   type GovernanceObjectStorageCredentials,
   type GovernanceOcsfEventInput,
 } from "@langwatch/enterprise-governance-server";
-import type { PulledUsageRateInput } from "../../app/governance.infrastructure.ts";
+import type { PulledUsageRateInput } from "../../app/governance.members.ts";
 import { PullerRegistryService } from "../../services/puller-registry.service.ts";
 import { TestProjectApi as CompleteTestProjectService } from "./test-project-api.ts";
 

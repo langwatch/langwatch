@@ -21,7 +21,7 @@ import type {
   OrganizationPromptSeed,
   OrganizationSeatLicense,
   OrganizationSessionRevocation,
-} from "../app/organization.infrastructure.ts";
+} from "../app/organization.members.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

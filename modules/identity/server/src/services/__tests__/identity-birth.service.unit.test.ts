@@ -8,7 +8,7 @@ import { IdentityEngineUnavailableError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { IdentityEvent } from "../../projections/identity-state.projection.ts";
 import { IdentityBirthService } from "../identity-birth.service.ts";
-import type { IdentityBirthLedger } from "../../app/identity.infrastructure.ts";
+import type { IdentityBirthLedger } from "../../app/identity.members.ts";
 import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository.ts";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import { CryptoIdentifierIdentityAdapter } from "../crypto-identifier-identity.service.ts";

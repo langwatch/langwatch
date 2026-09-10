@@ -3,7 +3,7 @@ import { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 import { StoredObjectStoragePortAdapter } from "../stored-object-storage.service.ts";
-import type { StoredObjectStorageAddress } from "../../app/stored-object.infrastructure.ts";
+import type { StoredObjectStorageAddress } from "../../app/stored-object.members.ts";
 import {
   StoredObjectStorageRuntimeAdapter,
   StoredObjectProjectDestinationResolver,

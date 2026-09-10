@@ -1,7 +1,7 @@
 import {
   TraceWindowedReadMetrics,
   type TraceWindowedReadOutcome,
-} from "../../app/trace.infrastructure.ts";
+} from "../../app/trace.members.ts";
 
 /** Discards windowed-read outcomes where the process reports no metrics. */
 export class NullTraceWindowedReadMetricsAdapter implements TraceWindowedReadMetrics {

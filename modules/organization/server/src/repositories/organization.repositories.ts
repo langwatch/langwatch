@@ -21,7 +21,7 @@ export interface OrganizationRepositories {
   /**
    * Bound at app creation over the AuthZ peer: every accepted seat and role
    * change is a ledger fact (ADR-092), and the ledger is a module dependency,
-   * not persistence infrastructure, so it is not known when persistence is chosen.
+   * not persistence members, so it is not known when persistence is chosen.
    */
   readonly membership: (grants: AuthzGrantsService) => OrganizationMembershipRepository;
   readonly personalTeamScope: PersonalTeamScopeReader;

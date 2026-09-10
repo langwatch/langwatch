@@ -16,16 +16,16 @@ import {
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { TraceIoExtraction } from "../app/trace.infrastructure.ts";
-import { TraceMediaReferenceResolver } from "../app/trace.infrastructure.ts";
-import { TraceModelCost } from "../app/trace.infrastructure.ts";
-import { TraceSpanNormalization } from "../app/trace.infrastructure.ts";
+import { TraceIoExtraction } from "../app/trace.members.ts";
+import { TraceMediaReferenceResolver } from "../app/trace.members.ts";
+import { TraceModelCost } from "../app/trace.members.ts";
+import { TraceSpanNormalization } from "../app/trace.members.ts";
 import {
   TraceSpanContentDrop,
   TraceSpanCostEnrichment,
   TraceSpanPiiRedaction,
   TraceSpanTokenEstimation,
-} from "../app/trace.infrastructure.ts";
+} from "../app/trace.members.ts";
 import type { TraceAnalyticsData } from "../projections/trace-derived.projection.ts";
 import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projection.ts";
 import { EventingRecordSpanAdapter } from "./eventing.record-span.service.ts";

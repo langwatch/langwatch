@@ -15,7 +15,7 @@ import { governanceRepositories } from "../governance-repositories.registry.ts";
 function memoryTier() {
   return instantiateRepositories(governanceRepositories, {
     backend: "memory",
-    infrastructure: {},
+    members: {},
   });
 }
 
@@ -130,11 +130,11 @@ describe("given the memory-backed governance repositories", () => {
   });
 
   describe("when the postgres tier is selected without its store", () => {
-    it("refuses the selection by naming the infrastructure it needs", () => {
+    it("refuses the selection by naming the members it needs", () => {
       expect(() =>
         instantiateRepositories(governanceRepositories, {
           backend: "live",
-          infrastructure: {},
+          members: {},
         }),
       ).toThrow(/prisma/);
     });

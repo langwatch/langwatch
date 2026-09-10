@@ -5,7 +5,7 @@
  * between processes, so the cipher arrives with the connection.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ModelProviderCredentialCodec } from "../../app/model-provider.infrastructure.ts";
+import type { ModelProviderCredentialCodec } from "../../app/model-provider.members.ts";
 import type { ModelProviderRepositories } from "../model-provider.repositories.ts";
 import { PrismaModelCostRepository } from "./prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "./prisma.model-default.repository.ts";
@@ -16,19 +16,19 @@ export class PostgresModelProviderRepositories {
   static readonly requires = ["prisma", "credentials"] as const;
 
   static create(
-    infrastructure: Readonly<{
+    members: Readonly<{
       prisma: PrismaClient;
       credentials: ModelProviderCredentialCodec;
     }>,
   ): ModelProviderRepositories {
     return {
       providers: PrismaModelProviderRepository.create(
-        infrastructure.prisma,
-        infrastructure.credentials,
+        members.prisma,
+        members.credentials,
       ),
-      defaults: PrismaModelDefaultRepository.create(infrastructure.prisma),
-      costs: PrismaModelCostRepository.create(infrastructure.prisma),
-      evidence: PrismaModelProviderEvidenceRepository.create(infrastructure.prisma),
+      defaults: PrismaModelDefaultRepository.create(members.prisma),
+      costs: PrismaModelCostRepository.create(members.prisma),
+      evidence: PrismaModelProviderEvidenceRepository.create(members.prisma),
     };
   }
 }

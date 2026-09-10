@@ -10,7 +10,7 @@ export {
   CodingAgentCostEstimator,
   CodingAgentProjectActivity,
   CodingAgentPullRequestMapping,
-} from "./app/coding-agent.infrastructure.ts";
+} from "./app/coding-agent.members.ts";
 export {
   CodingAgentPullRequestMappingBackfillService,
   type CodingAgentBackfillProjects,
@@ -31,7 +31,7 @@ export { OtelCodingAgentCostMetricsAdapter } from "./services/coding-agent-cost-
 export {
   CodingAgentCostMetrics,
   CodingAgentTraceProcessing,
-} from "./app/coding-agent.infrastructure.ts";
+} from "./app/coding-agent.members.ts";
 export { createCodingAgentLogFactsDispatchSubscriber } from "./subscribers/coding-agent-log-facts-dispatch.subscriber.ts";
 export { createCodingAgentMetricFactsDispatchSubscriber } from "./subscribers/coding-agent-metric-facts-dispatch.subscriber.ts";
 export { createCodingAgentSpanFactsDispatchSubscriber } from "./subscribers/coding-agent-span-facts-dispatch.subscriber.ts";
@@ -40,7 +40,7 @@ export { NoopCodingAgentReadMetrics } from "./services/coding-agent-read-metrics
 export {
   CodingAgentReadMetrics,
   type CodingAgentSessionListReadOutcome,
-} from "./app/coding-agent.infrastructure.ts";
+} from "./app/coding-agent.members.ts";
 /**
  * The feature's application: the one typed thing its transports are given.
  * Both doors reach the same object, so a rule written on it is the rule both
@@ -58,7 +58,7 @@ export {
   type CodingAgentScopePermission,
   CodingAgentScopePermissions,
   type CodingAgentScopeProject,
-} from "./app/coding-agent.infrastructure.ts";
+} from "./app/coding-agent.members.ts";
 export {
   CodingAgentApp,
   CodingAgentUnavailableError,

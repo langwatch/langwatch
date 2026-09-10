@@ -30,7 +30,7 @@ import {
   VirtualKeyExpiryInPastError,
 } from "@langwatch/gateway-contract";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
-import type { GatewayPersistenceTransaction } from "../app/gateway.infrastructure.ts";
+import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 import type { GatewayVirtualKeys } from "../ports/gateway-virtual-key.port.ts";
 
 export const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;

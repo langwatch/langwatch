@@ -2,7 +2,7 @@ import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-cont
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import type { CodingAgentClickHouse } from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentClickHouse } from "../../app/coding-agent.members.ts";
 import {
   clickHouseMomentOf,
   parseClickHouseDateTimeMs,

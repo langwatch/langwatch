@@ -72,7 +72,7 @@ describe("judge transport: function tools and reasoning effort", () => {
 
     describe("when the judge grades with a model not on the known-incompatible list", () => {
       /** @scenario "A criteria-graded run reports the verdict its criteria produced" */
-      it("reaches a verdict through the judge factory instead of an infrastructure error", async () => {
+      it("reaches a verdict through the judge factory instead of an members error", async () => {
         endpoint = await startEndpoint("reject-tools-without-reasoning-off");
         // The production judge path: no preemptive default applies to an
         // unlisted model, so only the transport retry stands between the

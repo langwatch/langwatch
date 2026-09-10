@@ -23,15 +23,15 @@ export { TraceProcessingServerInstallerAdapter } from "./services/eventing.trace
 export type {
   TraceProcessingInstaller,
   TraceProcessingCommands,
-} from "./app/trace.infrastructure.ts";
+} from "./app/trace.members.ts";
 export {
   DEFERRED_ORIGIN_CHECK_DELAY_MS,
   ORIGIN_GATE_DEDUP_TTL_MS,
   ORIGIN_GATE_DELAY_MS,
   TraceDeferredOriginEventingAdapter,
 } from "./services/eventing.deferred-origin.service.ts";
-export type { TraceDeferredOriginScheduler } from "./app/trace.infrastructure.ts";
-export type { TraceProcessingPipeline } from "./app/trace.infrastructure.ts";
+export type { TraceDeferredOriginScheduler } from "./app/trace.members.ts";
+export type { TraceProcessingPipeline } from "./app/trace.members.ts";
 export {
   defineOriginGuardedTraceSubscriber,
   passesTraceOriginGuards,
@@ -89,11 +89,11 @@ export type {
 export type {
   TraceWindowedReadMetrics,
   TraceWindowedReadOutcome,
-} from "./app/trace.infrastructure.ts";
+} from "./app/trace.members.ts";
 export { TraceRecordRepository } from "./repositories/read/trace-record.repository.ts";
 
 export { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
-export type { TraceFullIo, TraceEventDerivation } from "./app/trace.infrastructure.ts";
+export type { TraceFullIo, TraceEventDerivation } from "./app/trace.members.ts";
 export { TraceQueryFieldValuesRepository } from "./repositories/read/query-field-values.repository.ts";
 
 export { TraceQueryClassificationAdapter } from "./services/trace-query-classification.service.ts";
@@ -122,8 +122,8 @@ export type {
   TraceSpanPiiRedaction,
   TraceSpanTokenEstimation,
   TraceSpanNormalization,
-} from "./app/trace.infrastructure.ts";
-export type { TraceSpanSpool, TraceSpanSpoolIdentity } from "./app/trace.infrastructure.ts";
+} from "./app/trace.members.ts";
+export type { TraceSpanSpool, TraceSpanSpoolIdentity } from "./app/trace.members.ts";
 export { TraceSpanStorageRepository } from "./repositories/span-storage-write.repository.ts";
 export { TraceSpanStorageClickHouseRepository } from "./repositories/clickhouse/trace-span-storage.repository.ts";
 export { TraceStoredSpanReaderRepository } from "./repositories/read/trace-stored-span-reader.repository.ts";
@@ -249,7 +249,7 @@ export type {
   TraceSpoolLegacyObject,
   TraceSpoolStorage,
   TraceSpoolObjectStore,
-} from "./app/trace.infrastructure.ts";
+} from "./app/trace.members.ts";
 export {
   MAX_SPOOL_BYTES,
   SpoolDestinationUnsupportedError,
@@ -269,8 +269,8 @@ export {
   ClickHouseTraceEventPayloadRepository,
   TRACE_PAYLOAD_AGGREGATE_TYPE,
 } from "./repositories/clickhouse/trace-event-payload.repository.ts";
-export type { TraceTokenCounter } from "./app/trace.infrastructure.ts";
-export type { TraceSpanIngest } from "./app/trace.infrastructure.ts";
+export type { TraceTokenCounter } from "./app/trace.members.ts";
+export type { TraceSpanIngest } from "./app/trace.members.ts";
 export {
   OtlpSpanTokenEstimationService,
   type OtlpSpanTokenEstimationServiceDependencies,
@@ -284,9 +284,9 @@ export type {
   TraceProductEvent,
   TraceEvaluationLoopMetrics,
   TraceEvaluationLoopBlockReason,
-} from "./app/trace.infrastructure.ts";
-export type { TraceTenantBroadcast } from "./app/trace.infrastructure.ts";
-export { TRACE_TENANT_BROADCAST_EVENT_TYPE } from "./app/trace.infrastructure.ts";
+} from "./app/trace.members.ts";
+export type { TraceTenantBroadcast } from "./app/trace.members.ts";
+export { TRACE_TENANT_BROADCAST_EVENT_TYPE } from "./app/trace.members.ts";
 export {
   EVALUATOR_LOOP_BLOCKED_METRIC_DESCRIPTION,
   EVALUATOR_LOOP_BLOCKED_METRIC_NAME,
@@ -295,7 +295,7 @@ export {
 } from "./services/otel.trace-evaluation-loop-metrics.service.ts";
 export { OtlpSpanCostEnrichmentService } from "./services/span/span-cost-enrichment.service.ts";
 export { TraceSpanCostEnrichmentAdapter } from "./services/trace-span-cost-enrichment-adapter.service.ts";
-export type { TraceEvaluationDispatch } from "./app/trace.infrastructure.ts";
+export type { TraceEvaluationDispatch } from "./app/trace.members.ts";
 export {
   createEvaluationTriggerSubscriber,
   detectCausalityLoop,
@@ -429,7 +429,7 @@ export type {
   TraceEdgeMediaTelemetry,
   TraceMediaStore,
   TraceEdgeMediaFailOpenReason,
-} from "./app/trace.infrastructure.ts";
+} from "./app/trace.members.ts";
 export { TraceContentArrayService } from "./services/content/trace-content-array.service.ts";
 export { binaryInputPartSchema } from "./rules/content-part-extraction.rules.ts";
 export { TraceContentExtractionService } from "./services/content/trace-content-extraction.service.ts";

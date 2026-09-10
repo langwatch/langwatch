@@ -1,4 +1,4 @@
-import type { AutomationClock } from "../../app/automation.infrastructure.ts";
+import type { AutomationClock } from "../../app/automation.members.ts";
 import {
   PrismaEmailSuppressionRepository,
   type EmailSuppressionDatabase,

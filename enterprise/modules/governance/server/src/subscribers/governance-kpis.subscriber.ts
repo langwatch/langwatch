@@ -8,7 +8,7 @@ import {
   type GovernanceKpiContribution,
   type GovernanceTraceContext,
   type GovernanceTraceEvent,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 import { Temporal } from "@langwatch/time";
 
 export const GOVERNANCE_KPIS_SYNC_WINDOW_MS = 30_000;

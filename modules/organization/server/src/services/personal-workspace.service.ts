@@ -25,7 +25,7 @@ import type {
 import type {
   PersonalWorkspaceDiagnostics,
   PersonalWorkspaceIdentity,
-} from "../app/organization.infrastructure.ts";
+} from "../app/organization.members.ts";
 
 const ALL_PERSONAL_FEATURES_DISABLED: PersonalFeatures = {
   evaluations: false,

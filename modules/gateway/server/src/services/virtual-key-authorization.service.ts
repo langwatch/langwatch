@@ -7,7 +7,7 @@ import {
   GuardrailAttachForbiddenError,
   VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
-import type { GatewayScopePermissions } from "../app/gateway.infrastructure.ts";
+import type { GatewayScopePermissions } from "../app/gateway.members.ts";
 import type { GuardrailAttachment } from "@langwatch/gateway-contract";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
 

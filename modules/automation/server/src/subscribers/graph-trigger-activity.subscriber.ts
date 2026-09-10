@@ -3,7 +3,7 @@ import type {
   AutomationEvaluationActivityContext,
   AutomationEvaluationSubscriberEvent,
 } from "@langwatch/automation-contract";
-import type { AutomationGraphActivity } from "../app/automation.infrastructure.ts";
+import type { AutomationGraphActivity } from "../app/automation.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automation:graph-trigger-activity-subscriber");

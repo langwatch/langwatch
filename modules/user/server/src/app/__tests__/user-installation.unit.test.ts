@@ -20,7 +20,7 @@ function process() {
     .withProvided(AuthApi, createUserTestAuth())
     .withProvided(OrganizationApi, createUserTestOrganizations())
     .withProvided(OpsApi, createUserTestOps())
-    .withModule(userServer, { infrastructure: createUserTestInfrastructure() });
+    .withModule(userServer, { members: createUserTestInfrastructure() });
 }
 
 describe("user app installation", () => {

@@ -26,35 +26,35 @@ export class PostgresTraceRepositories {
   static readonly requires = ["prisma", "clickhouse", "defaultRetentionDays"] as const;
 
   static create(
-    infrastructure: Readonly<{
+    members: Readonly<{
       prisma: PrismaClient;
       clickhouse: TraceClickHouseWriteResolver;
       defaultRetentionDays: number;
     }>,
   ): TraceRepositories {
     const storage = {
-      resolveClient: infrastructure.clickhouse,
-      defaultRetentionDays: infrastructure.defaultRetentionDays,
+      resolveClient: members.clickhouse,
+      defaultRetentionDays: members.defaultRetentionDays,
     };
 
     return {
-      editOverlay: PrismaTraceEditOverlayRepository.create(infrastructure.prisma),
+      editOverlay: PrismaTraceEditOverlayRepository.create(members.prisma),
       summaryProjection: TraceSummaryProjectionClickHouseRepository.create(storage),
       analyticsProjection: TraceAnalyticsClickHouseRepository.create(storage),
       analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create(storage),
-      spanStorage: SpanStorageClickHouseRepository.create(infrastructure.clickhouse),
+      spanStorage: SpanStorageClickHouseRepository.create(members.clickhouse),
       existence: ClickHouseTraceExistenceRepository.create({
-        resolveClient: infrastructure.clickhouse,
+        resolveClient: members.clickhouse,
       }),
       derivationSpans: TraceDerivationSpanClickHouseRepository.create({
-        resolveClient: infrastructure.clickhouse,
+        resolveClient: members.clickhouse,
       }),
       summary: TraceSummaryClickHouseRepository.create(storage),
-      logRecords: LogRecordStorageClickHouseRepository.create(infrastructure.clickhouse),
-      list: TraceListClickHouseRepository.create(infrastructure.clickhouse),
-      sessionGroups: SessionGroupsClickHouseRepository.create(infrastructure.clickhouse),
+      logRecords: LogRecordStorageClickHouseRepository.create(members.clickhouse),
+      list: TraceListClickHouseRepository.create(members.clickhouse),
+      sessionGroups: SessionGroupsClickHouseRepository.create(members.clickhouse),
       eventPayloads: ClickHouseTraceEventPayloadRepository.createResolved({
-        resolveClient: infrastructure.clickhouse,
+        resolveClient: members.clickhouse,
       }),
     };
   }

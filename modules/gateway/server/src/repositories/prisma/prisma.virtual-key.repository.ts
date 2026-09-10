@@ -14,7 +14,7 @@ import {
   type SetGatewayVirtualKeyDisabledInput,
   type UpdateGatewayVirtualKeyInput,
 } from "../../ports/gateway-virtual-key.port.ts";
-import type { GatewayPersistenceTransaction } from "../../app/gateway.infrastructure.ts";
+import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts";
 
 const wirePages = GatewayWirePaginationAdapter.create();
 /**

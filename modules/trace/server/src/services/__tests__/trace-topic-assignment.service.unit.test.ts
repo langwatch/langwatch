@@ -2,7 +2,7 @@ import type { AssignTopicCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { EventingTraceTopicAssignment } from "../eventing.trace-topic-assignment.service.ts";
-import { TraceTopicAssignmentCommand } from "../../app/trace.infrastructure.ts";
+import { TraceTopicAssignmentCommand } from "../../app/trace.members.ts";
 
 class Commands implements TraceTopicAssignmentCommand {
   input: AssignTopicCommandData | null = null;

@@ -21,8 +21,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/runtime-composition";
 
 import { ModelCatalogGatewaySpendRatingAdapter } from "../../../adapters/model-catalog.gateway-spend-rating.adapter.ts";
-import { GatewayModelProviderCredentials } from "../../../app/gateway.infrastructure.ts";
-import { GatewaySpendConfirmation } from "../../../app/gateway.infrastructure.ts";
+import { GatewayModelProviderCredentials } from "../../../app/gateway.members.ts";
+import { GatewaySpendConfirmation } from "../../../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../../../processes/gateway-spend-commands.process.ts";
 import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../../services/gateway-elevenlabs-credential.service.ts";
 import {
@@ -102,7 +102,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
   const runtime = await createApp({ name: "gateway-elevenlabs-integration" })
     .withInfrastructure({})
     .withModule(gatewayServer, {
-      infrastructure: {
+      members: {
         elevenLabsWebhook: {
           credentials: {
             providers: PrismaGatewayElevenLabsCredentialRepository.create({

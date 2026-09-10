@@ -50,7 +50,7 @@ import type {
   PullResult,
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceHttpClient } from "../app/governance.infrastructure.ts";
+import type { GovernanceHttpClient } from "../app/governance.members.ts";
 import { AdminUsageReportAdapter } from "./admin-usage-report.service.ts";
 import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 

@@ -5,7 +5,7 @@ import {
   type TraceFullRecord,
   type TraceFullThreadReadInput,
 } from "@langwatch/trace-contract";
-import { TraceEventDerivation } from "../../app/trace.infrastructure.ts";
+import { TraceEventDerivation } from "../../app/trace.members.ts";
 import { TraceFullRecordRepository } from "../../repositories/read/trace-full-record.repository.ts";
 import { TraceRecordRepository } from "../../repositories/read/trace-record.repository.ts";
 

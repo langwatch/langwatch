@@ -17,8 +17,8 @@ import {
   TraceSpanCostEnrichment,
   TraceSpanPiiRedaction,
   TraceSpanTokenEstimation,
-} from "../../app/trace.infrastructure.ts";
-import type { TraceSpanSpool as TraceSpanSpool, TraceSpanSpoolIdentity } from "../../app/trace.infrastructure.ts";
+} from "../../app/trace.members.ts";
+import type { TraceSpanSpool as TraceSpanSpool, TraceSpanSpoolIdentity } from "../../app/trace.members.ts";
 
 class PiiRedactionFake implements TraceSpanPiiRedaction {
   readonly redact = vi.fn(
@@ -203,7 +203,7 @@ describe("EventingRecordSpanAdapter", () => {
     });
   });
 
-  it("rejects a spool marker when spool infrastructure is absent", async () => {
+  it("rejects a spool marker when spool members is absent", async () => {
     const { handler } = harness();
     const queued = command(commandData({ spoolRef: "sha256:abc" }));
 

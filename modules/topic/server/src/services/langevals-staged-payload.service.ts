@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   LangevalsPayloadStaging,
   STAGED_PAYLOAD_HEADER,
-} from "../app/topic.infrastructure.ts";
+} from "../app/topic.members.ts";
 
 const logger = createLogger("langwatch:langevals:stagedFetch");
 

@@ -7,7 +7,7 @@ import { InviteNotFoundError } from "@langwatch/organization-contract";
 
 import { TeamUserRole } from "@langwatch/organization-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { OrganizationInviteMail } from "../app/organization.infrastructure.ts";
+import type { OrganizationInviteMail } from "../app/organization.members.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
 import {
   resolveInviteDisplayStatus,

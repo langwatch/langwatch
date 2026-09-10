@@ -1,4 +1,4 @@
-import { GithubHost } from "../app/github.infrastructure.ts";
+import { GithubHost } from "../app/github.members.ts";
 
 const GITHUB_DOT_COM = "github.com";
 

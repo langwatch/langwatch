@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   GovernanceOcsfEventWriter,
   type GovernanceOcsfEvent,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber.ts";
 import {
   governanceTraceContext,

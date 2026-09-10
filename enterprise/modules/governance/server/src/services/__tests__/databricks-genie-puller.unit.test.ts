@@ -6,7 +6,7 @@ import {
   DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_ROW_LIMIT,
 } from "../databricks-genie-puller.service.ts";
-import { GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
+import { GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.members.ts";
 
 const workspaceUrl = "https://workspace.example.test";
 const warehouseId = "warehouse-1";

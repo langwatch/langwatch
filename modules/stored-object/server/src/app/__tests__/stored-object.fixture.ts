@@ -16,7 +16,7 @@ import {
   StoredObjectUploadTokenCodec,
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
-} from "../stored-object.infrastructure.ts";
+} from "../stored-object.members.ts";
 import type { StoredObjectRepositories } from "../../repositories/stored-object.repositories.ts";
 import { MemoryStoredObjectRepositories } from "../../repositories/memory/memory.stored-object.repositories.ts";
 import {
@@ -148,12 +148,12 @@ export function createStoredObjectTestInfrastructure(
 export function createStoredObjectTestApp(
   input: Readonly<{
     repositories?: StoredObjectRepositories;
-    infrastructure?: Partial<StoredObjectInfrastructure>;
+    members?: Partial<StoredObjectInfrastructure>;
   }> = {},
 ): StoredObjectApp {
   return StoredObjectApp.create({
     repositories: input.repositories ?? MemoryStoredObjectRepositories.create(),
-    infrastructure: createStoredObjectTestInfrastructure(input.infrastructure ?? {}),
+    members: createStoredObjectTestInfrastructure(input.members ?? {}),
     dependencies: {},
     config: void 0,
     resources: new ResourceScope(),

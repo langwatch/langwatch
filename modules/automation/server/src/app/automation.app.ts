@@ -53,14 +53,14 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
-import type { AutomationClock } from "./automation.infrastructure.ts";
+import type { AutomationClock } from "./automation.members.ts";
 import type {
   AutomationDispatchError,
   AutomationGraphNotifier,
   AutomationHeartbeat,
   AutomationLogger,
   AutomationSlackBotTokenDecryptor,
-} from "./automation.infrastructure.ts";
+} from "./automation.members.ts";
 import type { AutomationWebhookStoredParams } from "../services/automation-webhook-secrets.service.ts";
 import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
@@ -85,7 +85,7 @@ export type { AutomationWebhookStoredParams };
 export type { AutomationProjectIdentity };
 
 // ---------------------------------------------------------------------------
-// The technical infrastructure the process supplies. None of it is automation's
+// The technical members the process supplies. None of it is automation's
 // own: a cipher, an HTTP client, a query compiler, a counter and an audit
 // ledger all belong to the deployment, and every one of them was a transport
 // port before - reachable from one door and invisible to the next.
@@ -189,7 +189,7 @@ export type AutomationInfrastructure = Readonly<{
   traceFilters: AutomationTraceFilterCompiler;
   limits: AutomationCallCounter;
   audit: AutomationAuditSink;
-  // Peer APIs are resolved from setup.dependencies; infrastructure contains technical ports only.
+  // Peer APIs are resolved from setup.dependencies; members contains technical ports only.
 }>;
 
 /** How often the unauthenticated unsubscribe pair may be asked, per caller. */
@@ -243,7 +243,7 @@ export class AutomationApp implements AutomationApi {
         paid: setup.config.persistDailyCapPaid,
         enterprise: setup.config.persistDailyCapEnterprise,
       },
-      redis: setup.infrastructure.redis,
+      redis: setup.members.redis,
     });
     const repositories = setup.repositories;
     const graph = AutomationGraphService.create({
@@ -251,14 +251,14 @@ export class AutomationApp implements AutomationApi {
       customGraphs: repositories.customGraphs,
       projects: setup.dependencies.projects,
       analytics: setup.dependencies.analytics,
-      notifier: setup.infrastructure.notifier,
+      notifier: setup.members.notifier,
       triggerSent: repositories.graphTriggerSent,
-      logger: setup.infrastructure.logger,
-      slackTokens: setup.infrastructure.slackTokens,
-      dispatchErrors: setup.infrastructure.dispatchErrors,
-      heartbeat: setup.infrastructure.heartbeat,
-      runaway: setup.infrastructure.runaway,
-      clock: setup.infrastructure.clock,
+      logger: setup.members.logger,
+      slackTokens: setup.members.slackTokens,
+      dispatchErrors: setup.members.dispatchErrors,
+      heartbeat: setup.members.heartbeat,
+      runaway: setup.members.runaway,
+      clock: setup.members.clock,
       baseHost: setup.config.baseHost,
     });
     const automation = AutomationService.create({
@@ -268,18 +268,18 @@ export class AutomationApp implements AutomationApi {
       names: repositories.names,
       customGraphs: repositories.customGraphs,
       webhookDeliveries: repositories.webhookDeliveries,
-      verifier: setup.infrastructure.verifier,
+      verifier: setup.members.verifier,
       reportSchedules: ReportScheduleService.create({
-        jobs: setup.infrastructure.jobs,
-        clock: setup.infrastructure.clock,
-        wake: setup.infrastructure.wake,
+        jobs: setup.members.jobs,
+        clock: setup.members.clock,
+        wake: setup.members.wake,
         triggers: repositories.triggers,
       }),
-      clock: setup.infrastructure.clock,
+      clock: setup.members.clock,
       graph,
       templates: AutomationTemplateService.create({
         baseHost: setup.config.baseHost,
-        delivery: setup.infrastructure.testFire,
+        delivery: setup.members.testFire,
       }),
       persistCaps,
     });
@@ -296,14 +296,14 @@ export class AutomationApp implements AutomationApi {
         automation,
         rules,
         monitors: setup.dependencies.monitors,
-        providers: setup.infrastructure.providers,
-        slackChannels: setup.infrastructure.slackChannels,
-        traceFilters: setup.infrastructure.traceFilters,
-        limits: setup.infrastructure.limits,
+        providers: setup.members.providers,
+        slackChannels: setup.members.slackChannels,
+        traceFilters: setup.members.traceFilters,
+        limits: setup.members.limits,
       }),
       monitors: setup.dependencies.monitors,
-      audit: setup.infrastructure.audit,
-      limits: setup.infrastructure.limits,
+      audit: setup.members.audit,
+      limits: setup.members.limits,
     });
   }
 

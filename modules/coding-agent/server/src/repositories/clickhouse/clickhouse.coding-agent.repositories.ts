@@ -1,8 +1,8 @@
 import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
-import type { CodingAgentReadMetrics } from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentReadMetrics } from "../../app/coding-agent.members.ts";
 import { SystemCodingAgentClockAdapter } from "../../services/coding-agent-clock.service.ts";
-import type { CodingAgentClickHouse } from "../../app/coding-agent.infrastructure.ts";
-import type { CodingAgentClock } from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentClickHouse } from "../../app/coding-agent.members.ts";
+import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
 import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
 import { CodingAgentSessionClickHouseRepository } from "./clickhouse.coding-agent-session.repository.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "./clickhouse.coding-agent-session-event.repository.ts";
@@ -23,13 +23,13 @@ export type ClickHouseCodingAgentInfrastructure = Readonly<{
 export class ClickHouseCodingAgentRepositories {
   static readonly requires = ["clickhouse", "defaultRetentionDays"] as const;
 
-  static create(infrastructure: ClickHouseCodingAgentInfrastructure): CodingAgentRepositories {
-    return ClickHouseCodingAgentRepositories.createWith(infrastructure);
+  static create(members: ClickHouseCodingAgentInfrastructure): CodingAgentRepositories {
+    return ClickHouseCodingAgentRepositories.createWith(members);
   }
 
   /**
    * The same tier with the read metrics and the clock named. The provider entry
-   * above takes infrastructure alone, because a boot selection carries only
+   * above takes members alone, because a boot selection carries only
    * what the process declared; a test that has to control time says so here.
    */
   static createWith(

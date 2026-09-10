@@ -9,8 +9,8 @@ import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import type {
   CodingAgentClickHouseClient,
   CodingAgentClickHouseQueryResult,
-} from "../../app/coding-agent.infrastructure.ts";
-import { CodingAgentClickHouse } from "../../app/coding-agent.infrastructure.ts";
+} from "../../app/coding-agent.members.ts";
+import { CodingAgentClickHouse } from "../../app/coding-agent.members.ts";
 import { parseClickHouseDateTimeMs } from "../clickhouse/clickhouse.mapper.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
 

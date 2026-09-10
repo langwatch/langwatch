@@ -110,18 +110,18 @@ export class ScimApp implements ScimApiContract {
   readonly #audit: ScimManagementAudit;
   readonly #webhook: ScimDirectoryStreamService;
 
-  private constructor(infrastructure: ScimInfrastructure) {
-    this.#scim = infrastructure.scim;
-    this.#plans = infrastructure.planProvider;
-    this.#audit = infrastructure.managementAudit;
+  private constructor(members: ScimInfrastructure) {
+    this.#scim = members.scim;
+    this.#plans = members.planProvider;
+    this.#audit = members.managementAudit;
     this.#webhook = ScimDirectoryStreamService.create({
-      scim: infrastructure.scim,
-      webhookSecret: infrastructure.webhookSecret,
+      scim: members.scim,
+      webhookSecret: members.webhookSecret,
     });
   }
 
-  static create({ infrastructure }: ScimSetup): ScimApp {
-    return new ScimApp(infrastructure);
+  static create({ members }: ScimSetup): ScimApp {
+    return new ScimApp(members);
   }
 
   // ── The organization's provisioning tokens ───────────────────────────────

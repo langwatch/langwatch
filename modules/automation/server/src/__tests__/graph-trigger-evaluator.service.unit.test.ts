@@ -13,7 +13,7 @@ import {
   type ProjectIdentity,
 } from "../services/trigger-evaluator.service.ts";
 import { GraphTriggerEvaluatorService } from "../services/graph-trigger-evaluator.service.ts";
-import type { GraphAlertDispatchResult } from "../app/automation.infrastructure.ts";
+import type { GraphAlertDispatchResult } from "../app/automation.members.ts";
 import {
   type GraphTriggerSentRepository,
   type OpenGraphTriggerSent,

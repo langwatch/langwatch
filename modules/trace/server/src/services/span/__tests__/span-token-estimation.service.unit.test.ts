@@ -1,7 +1,7 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { TraceTokenCounter } from "../../../app/trace.infrastructure.ts";
+import { TraceTokenCounter } from "../../../app/trace.members.ts";
 import { OtlpSpanTokenEstimationService } from "../span-token-estimation.service.ts";
 
 class CountingTokenizer implements TraceTokenCounter {

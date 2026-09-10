@@ -27,7 +27,7 @@ import type {
   ModelProviderConnectionRateLimiter,
   ModelProviderCredentialPolicy,
   ModelProviderIdService
-} from "../app/model-provider.infrastructure.ts";
+} from "../app/model-provider.members.ts";
 import type {
   ModelDefaultRepository
 } from "../repositories/model-default.repository.ts";

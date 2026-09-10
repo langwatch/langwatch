@@ -7,7 +7,7 @@ import {
 import {
   PiiAnalysisMetrics,
   type PiiAnalysisOutcome,
-} from "../app/data-privacy.infrastructure.ts";
+} from "../app/data-privacy.members.ts";
 
 /**
  * The three series names, and the evaluator label the two duration/status

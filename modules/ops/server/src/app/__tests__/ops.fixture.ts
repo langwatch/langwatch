@@ -1,6 +1,6 @@
 /**
  * A real `OpsApp` over memory repositories, fixture peers and a literal
- * infrastructure record. Every collaborator a test wants to watch is passed in
+ * members record. Every collaborator a test wants to watch is passed in
  * rather than reached for.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -38,7 +38,7 @@ class EmptyOpsIntrospection implements OpsEventingIntrospection {
 
 export type OpsTestAppOptions = Readonly<{
   capability?: Partial<OpsCapability>;
-  infrastructure?: Partial<OpsAppInfrastructure>;
+  members?: Partial<OpsAppInfrastructure>;
   auditLog?: AuditLogApi;
   apiKeys?: ApiKeyApi;
   projects?: ProjectApi;
@@ -47,7 +47,7 @@ export type OpsTestAppOptions = Readonly<{
 
 export type OpsTestApp = Readonly<{ app: OpsApp; repositories: OpsRepositories }>;
 
-/** The infrastructure record a process supplies, with nothing configured. */
+/** The members record a process supplies, with nothing configured. */
 export function createOpsTestInfrastructure(
   overrides: Partial<OpsAppInfrastructure> = {},
   capability: Partial<OpsCapability> = {},
@@ -85,7 +85,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
   const repositories = options.repositories ?? MemoryOpsRepositories.create();
 
   const app = OpsApp.create({
-    infrastructure: createOpsTestInfrastructure(options.infrastructure, options.capability),
+    members: createOpsTestInfrastructure(options.members, options.capability),
     dependencies: {
       users: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),

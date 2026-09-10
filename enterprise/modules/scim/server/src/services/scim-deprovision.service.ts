@@ -6,7 +6,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   ScimRemovalOperation,
   ScimSyncLifecycle,
-} from "../app/scim.infrastructure.ts";
+} from "../app/scim.members.ts";
 
 const logger = createLogger("langwatch:scim:deprovision");
 const SCIM_ACTOR = { type: "system", name: "scim" } as const;

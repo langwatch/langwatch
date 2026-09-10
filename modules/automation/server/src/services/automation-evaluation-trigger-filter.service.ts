@@ -1,5 +1,5 @@
-import type { AutomationEvaluationQueryClassification } from "../app/automation.infrastructure.ts";
-import { AutomationEvaluationTriggerFilter } from "../app/automation.infrastructure.ts";
+import type { AutomationEvaluationQueryClassification } from "../app/automation.members.ts";
+import { AutomationEvaluationTriggerFilter } from "../app/automation.members.ts";
 
 /**
  * Automation-owned answer to whether a trigger needs an evaluation-terminal

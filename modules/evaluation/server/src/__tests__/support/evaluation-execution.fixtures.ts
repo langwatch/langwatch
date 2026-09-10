@@ -38,7 +38,7 @@ import {
   EvaluationExecutionReceipt,
   EvaluationMonitorLookup,
   type ExecuteEvaluationCommandDeps,
-} from "../../app/evaluation.infrastructure.ts";
+} from "../../app/evaluation.members.ts";
 
 export function buildExecuteCommand(
   overrides: Partial<ExecuteEvaluationCommandData> = {},

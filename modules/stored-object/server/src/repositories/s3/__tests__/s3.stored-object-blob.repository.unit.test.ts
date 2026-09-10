@@ -9,7 +9,7 @@ import {
   ObjectNotFoundError,
   UnsupportedStorageSchemeError,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectS3TargetResolver } from "../../../app/stored-object.infrastructure.ts";
+import type { StoredObjectS3TargetResolver } from "../../../app/stored-object.members.ts";
 import { StoredObjectBlobS3Repository } from "#repositories/s3/s3.stored-object-blob.repository";
 
 // ---------------------------------------------------------------------------

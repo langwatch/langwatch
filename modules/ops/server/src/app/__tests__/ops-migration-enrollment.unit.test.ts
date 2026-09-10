@@ -59,7 +59,7 @@ const IMPERSONATING: OpsOperator = {
 const demandedPermissions = new Map<string, string>();
 
 function callerFor(operator: OpsOperator) {
-  const { app } = createOpsTestApp({ infrastructure: { systemMigrations: service } });
+  const { app } = createOpsTestApp({ members: { systemMigrations: service } });
   const admitOperator = app.admitOperator.bind(app);
   let current = "";
 

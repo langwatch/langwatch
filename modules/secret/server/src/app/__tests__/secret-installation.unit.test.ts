@@ -9,7 +9,7 @@ function process() {
     .withPersistence("memory", {})
     .withInfrastructure({})
     .withModule(secretServer, {
-      infrastructure: { encryption: new ReversibleTestSecretEncryption() },
+      members: { encryption: new ReversibleTestSecretEncryption() },
     });
 }
 

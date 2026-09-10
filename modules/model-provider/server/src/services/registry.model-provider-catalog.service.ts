@@ -11,7 +11,7 @@ import {
   ModelProviderCatalog,
   ModelProviderManagedGateway,
   type ModelProviderCredentialProbe,
-} from "../app/model-provider.infrastructure.ts";
+} from "../app/model-provider.members.ts";
 
 export type RegistryModelProviderCatalogOptions = {
   /**

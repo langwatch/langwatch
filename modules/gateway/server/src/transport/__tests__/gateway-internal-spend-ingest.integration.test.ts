@@ -15,7 +15,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { PrismaGatewayInternalStoreAdapter } from "../../adapters/postgres.gateway-internal-store.adapter.ts";
-import { GatewaySpendRating } from "../../app/gateway.infrastructure.ts";
+import { GatewaySpendRating } from "../../app/gateway.members.ts";
 import {
   mountGatewayInternalRest,
   signedGatewayRequest,

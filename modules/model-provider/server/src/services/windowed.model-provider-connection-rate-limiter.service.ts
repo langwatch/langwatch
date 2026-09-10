@@ -3,7 +3,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   ModelProviderConnectionRateLimiter,
   type ModelProviderRateLimit,
-} from "../app/model-provider.infrastructure.ts";
+} from "../app/model-provider.members.ts";
 
 /**
  * How often one organization may ask a provider whether its key still works.

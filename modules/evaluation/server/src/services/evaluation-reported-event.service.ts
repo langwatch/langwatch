@@ -7,7 +7,7 @@ import {
   type ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
-import { EvaluationInputsOffload } from "../app/evaluation.infrastructure.ts";
+import { EvaluationInputsOffload } from "../app/evaluation.members.ts";
 
 export type EvaluationReportedResult = {
   status: "processed" | "error" | "skipped";

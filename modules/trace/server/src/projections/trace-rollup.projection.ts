@@ -4,7 +4,7 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { type SpanReceivedEvent, spanReceivedEventSchema } from "@langwatch/trace-contract";
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
 import { SpanCostService } from "../services/span/span-cost.service.ts";
-import { TraceSpanNormalization } from "../app/trace.infrastructure.ts";
+import { TraceSpanNormalization } from "../app/trace.members.ts";
 
 /**
  * One row emitted to `trace_analytics_rollup` per SpanReceivedEvent.

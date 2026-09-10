@@ -84,13 +84,13 @@ export class SuiteApp implements SuiteApi {
   };
 
   static create(setup: SuiteSetup): SuiteApp {
-    const { infrastructure, dependencies, repositories } = setup;
+    const { members, dependencies, repositories } = setup;
     // The run projection is ClickHouse's, not this feature's persistence: a
     // process that composed no client folds into memory instead.
-    const runRepository = infrastructure.resolveClickHouseClient
+    const runRepository = members.resolveClickHouseClient
       ? ClickHouseSuiteRunRepository.create({
-          resolveClient: infrastructure.resolveClickHouseClient,
-          defaultRetentionDays: infrastructure.defaultRetentionDays,
+          resolveClient: members.resolveClickHouseClient,
+          defaultRetentionDays: members.defaultRetentionDays,
         })
       : MemorySuiteRunRepository.create();
 
@@ -100,12 +100,12 @@ export class SuiteApp implements SuiteApi {
       scenarios: dependencies.scenarios,
       agents: dependencies.agents,
       prompts: dependencies.prompts,
-      execution: infrastructure.execution,
-      ...(infrastructure.connectedPresence
-        ? { connectedPresence: infrastructure.connectedPresence }
+      execution: members.execution,
+      ...(members.connectedPresence
+        ? { connectedPresence: members.connectedPresence }
         : {}),
-      generateId: infrastructure.generateId,
-      now: infrastructure.now,
+      generateId: members.generateId,
+      now: members.now,
     });
 
     return new SuiteApp({ ...dependencies, suites });

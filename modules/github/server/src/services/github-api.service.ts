@@ -13,7 +13,7 @@ import {
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
 } from "../app/github.app.ts";
-import type { GithubHost } from "../app/github.infrastructure.ts";
+import type { GithubHost } from "../app/github.members.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:github:api");

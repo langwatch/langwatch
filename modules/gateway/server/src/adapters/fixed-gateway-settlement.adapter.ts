@@ -1,4 +1,4 @@
-import { GatewaySettlementPolicy } from "../app/gateway.infrastructure.ts";
+import { GatewaySettlementPolicy } from "../app/gateway.members.ts";
 
 export class FixedGatewaySettlementPolicyAdapter implements GatewaySettlementPolicy {
   private constructor(private readonly value: number) {

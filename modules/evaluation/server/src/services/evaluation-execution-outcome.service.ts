@@ -5,7 +5,7 @@ import type {
   ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import { verdictPassedOf, verdictScoreOf } from "@langwatch/evaluation-contract";
-import { EvaluationExecutionReceipt } from "../app/evaluation.infrastructure.ts";
+import { EvaluationExecutionReceipt } from "../app/evaluation.members.ts";
 import type { PreparedEvaluation } from "./evaluation-execution-preparation.service.ts";
 import {
   EvaluationReportedEventService,

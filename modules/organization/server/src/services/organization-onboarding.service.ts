@@ -20,7 +20,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type {
   OrganizationCeremony,
   OrganizationSignals,
-} from "../app/organization.infrastructure.ts";
+} from "../app/organization.members.ts";
 
 /**
  * The intent that ends on the personal portal rather than in a project.

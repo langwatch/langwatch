@@ -10,8 +10,8 @@ import {
   type LangyBackendSaveResult,
   type LangyBackendStateRead,
   LangyUiActionBackend,
-} from "../../app/langy.infrastructure.ts";
-import type { LangyUiActionDefinition } from "../../app/langy.infrastructure.ts";
+} from "../../app/langy.members.ts";
+import type { LangyUiActionDefinition } from "../../app/langy.members.ts";
 import { LangyUiActionBackendService } from "../langy-ui-action-backend.service.ts";
 
 /** A saved board with one column, small enough to read in a diff. */

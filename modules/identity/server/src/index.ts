@@ -5,7 +5,7 @@
  */
 export { identityServer } from "./identity.server.ts";
 export { IdentityApp } from "./app/identity.app.ts";
-export type { IdentityInfrastructure } from "./app/identity-infrastructure.ts";
+export type { IdentityInfrastructure } from "./app/identity-members.ts";
 export { PrismaIdentityReservationRepository } from "./repositories/prisma/prisma.identity-reservations.repository.ts";
 export { PrismaIdentitySecretCarryRepository } from "./repositories/prisma/prisma.identity-secret-carry.repository.ts";
 export { PrismaJoinRequestAudienceRepository } from "./repositories/prisma/prisma.join-request-audience.repository.ts";
@@ -17,7 +17,7 @@ export { CryptoIdentifierIdentityAdapter } from "./services/crypto-identifier-id
 export {
   type DeriveIdentifierIdInput,
   type IdentifierIdentity,
-} from "./app/identity.infrastructure.ts";
+} from "./app/identity.members.ts";
 export { computeIdentifierHash, deriveNewbornUserId } from "./rules/identifier-hash.rules.ts";
 export { s256Challenge } from "./rules/pkce.rules.ts";
 export { mintUserHashKey } from "./rules/user-hash-key.rules.ts";
@@ -160,7 +160,7 @@ export {
   type JoinRequestGuardsDeps,
 } from "./services/join-request-guards.service.ts";
 export { type JoinRequestAudience } from "./repositories/join-request-audience.repository.ts";
-export { type JoinRequestMail } from "./app/identity.infrastructure.ts";
+export { type JoinRequestMail } from "./app/identity.members.ts";
 export { JoinRequestNotificationService } from "./services/join-request-notification.service.ts";
 export {
   approveJoinCommandId,
@@ -221,8 +221,8 @@ export {
 // layer/identity/`: the Postgres repositories the guards and the fold read and write through, the
 // two ledger writers, the join-request orchestration around the event-sourced lifecycle, and the
 // instance's sign-in method policy.
-export { type IdentityEventing } from "./app/identity.infrastructure.ts";
-export { type PlatformOperator } from "./app/identity.infrastructure.ts";
+export { type IdentityEventing } from "./app/identity.members.ts";
+export { type PlatformOperator } from "./app/identity.members.ts";
 export {
   IDENTITY_CONVERGENCE_POLL_MS,
   IDENTITY_CONVERGENCE_TIMEOUT_MS,
@@ -239,7 +239,7 @@ export {
 } from "./services/join-request-ledger.service.ts";
 export { EmailJoinRequestNotifierAdapter } from "./services/join-request-notifier.service.ts";
 export { JoinRequestLifecycleDispatcherAdapter } from "./services/join-request-lifecycle-dispatcher.service.ts";
-export { type JoinRequestNotificationMail } from "./app/identity.infrastructure.ts";
+export { type JoinRequestNotificationMail } from "./app/identity.members.ts";
 export { InProcessBreakGlassLimiterAdapter } from "./services/in-process-break-glass-limiter.service.ts";
 export { LocalDoorBreakGlassBindingAdapter } from "./services/local-door-break-glass-binding.service.ts";
 export { PrismaIdentityVerificationRepository } from "./repositories/prisma/prisma.identity-verification.repository.ts";
@@ -298,7 +298,7 @@ export {
   IDENTITY_WRITE_GATE_TTL_MS,
   IdentityWriteGateService,
 } from "./services/identity-write-gate.service.ts";
-export { type IdentityWriteGateState } from "./app/identity.infrastructure.ts";
+export { type IdentityWriteGateState } from "./app/identity.members.ts";
 
 // better-auth's `database:` entry and its two account ceremonies (ADR-116 §1,
 // §5). Exported because the process that mounts better-auth composes them; a

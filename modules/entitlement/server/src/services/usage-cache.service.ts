@@ -1,4 +1,4 @@
-import type { UsageCache } from "../app/entitlement.infrastructure.ts";
+import type { UsageCache } from "../app/entitlement.members.ts";
 
 /** A cache that remembers nothing, for a process that composed none. */
 export class NoUsageCache implements UsageCache {

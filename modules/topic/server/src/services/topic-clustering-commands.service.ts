@@ -5,7 +5,7 @@ import type {
   TopicModelRecordSource,
 } from "@langwatch/topic-contract";
 import type { TopicClusteringOutcomeCommands } from "../intents/topic-clustering.intent.ts";
-import { TopicClusteringCommands } from "../app/topic.infrastructure.ts";
+import { TopicClusteringCommands } from "../app/topic.members.ts";
 
 type CommandSender<Input> = {
   send(input: Input): Promise<unknown>;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CanonicalLogAdapter } from "../canonical-log.service.ts";
-import type { LogPreparationInput } from "../../app/log.infrastructure.ts";
-import type { LogRedaction } from "../../app/log.infrastructure.ts";
+import type { LogPreparationInput } from "../../app/log.members.ts";
+import type { LogRedaction } from "../../app/log.members.ts";
 import type { AppendStore } from "@langwatch/eventing";
 import {
   DEFAULT_LOG_COMMAND_SHARDS,

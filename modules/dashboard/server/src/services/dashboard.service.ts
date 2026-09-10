@@ -23,7 +23,7 @@ import {
   type Graph,
   type GraphLayout,
 } from "@langwatch/dashboard-contract";
-import type { WorkbenchAccess } from "../app/dashboard.infrastructure.ts";
+import type { WorkbenchAccess } from "../app/dashboard.members.ts";
 import type {
   DashboardGraphKind,
   DashboardRepository,

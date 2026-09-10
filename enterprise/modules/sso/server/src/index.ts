@@ -6,7 +6,7 @@ export {
   type SsoConnectionLedgerOperator,
   type SsoConnectionTeardownRequest,
   type SsoGateLogger,
-} from "./app/sso.infrastructure.ts";
+} from "./app/sso.members.ts";
 export { SsoProviderMountInspector } from "./services/sso-gate.service.ts";
 export {
   BetterAuthSsoAdapter,

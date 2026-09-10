@@ -10,7 +10,7 @@ function process(schedule = UnscheduledTopicClustering.create()) {
   return createApp({ name: "topic-installation-test" })
     .withPersistence("memory", {})
     .withInfrastructure({})
-    .withModule(topicServer, { infrastructure: { schedule } });
+    .withModule(topicServer, { members: { schedule } });
 }
 
 describe("topic app installation", () => {

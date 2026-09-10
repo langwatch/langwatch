@@ -115,22 +115,22 @@ export class LangyApp implements LangyApiContract {
   static readonly configSchema = langyServerConfigSchema;
 
   static create(setup: LangySetup): LangyApp {
-    const adapter = PostgresLangyAdapter.create({ database: setup.infrastructure.database });
+    const adapter = PostgresLangyAdapter.create({ database: setup.members.database });
     const langy = adapter.build({
-      turns: setup.infrastructure.turns,
-      credentials: setup.infrastructure.credentials,
-      commands: setup.infrastructure.commands,
-      events: setup.infrastructure.events,
-      runtime: setup.infrastructure.runtime,
-      relay: setup.infrastructure.relay,
-      feedbackPromptRedis: setup.infrastructure.feedbackPromptRedis,
-      blockMetrics: setup.infrastructure.blockMetrics,
+      turns: setup.members.turns,
+      credentials: setup.members.credentials,
+      commands: setup.members.commands,
+      events: setup.members.events,
+      runtime: setup.members.runtime,
+      relay: setup.members.relay,
+      feedbackPromptRedis: setup.members.feedbackPromptRedis,
+      blockMetrics: setup.members.blockMetrics,
     });
     return new LangyApp({
       langy,
       repositories: setup.repositories,
-      redis: setup.infrastructure.redis,
-      broadcast: setup.infrastructure.broadcast,
+      redis: setup.members.redis,
+      broadcast: setup.members.broadcast,
     });
   }
 

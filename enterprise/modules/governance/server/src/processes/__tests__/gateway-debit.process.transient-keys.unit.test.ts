@@ -3,7 +3,7 @@ import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   type GatewayBudgetLedger,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { GatewayDebitProcess } from "../gateway-debit.process.ts";
 
 /**

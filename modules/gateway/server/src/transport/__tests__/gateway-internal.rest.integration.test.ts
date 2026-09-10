@@ -14,7 +14,7 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ModelCatalogGatewaySpendRatingAdapter } from "../../adapters/model-catalog.gateway-spend-rating.adapter.ts";
-import type { GatewayChangeEvents } from "../../app/gateway.infrastructure.ts";
+import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
 import type { GatewayInternalStore } from "../../ports/gateway-internal-store.port.ts";
 import {
   GatewayGuardrailRepository,

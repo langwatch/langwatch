@@ -37,7 +37,7 @@ function process() {
     .withProvided(OrganizationApi, createApiFixture<OrganizationApi>())
     .withProvided(UserApi, createApiFixture<UserApi>())
     .withModule(roleServer, {
-      infrastructure: {
+      members: {
         scope: new AllowingTestRoleScope(),
         plan: new AllowingTestRolePlan(),
         bindingIds: new CountingTestRoleBindingIds(),

@@ -97,16 +97,16 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
   }
 
   static create(setup: FeatureFlagSetup): FeatureFlagApp {
-    const now = setup.infrastructure.now ?? (() => nowInstant().epochMilliseconds);
+    const now = setup.members.now ?? (() => nowInstant().epochMilliseconds);
     const flags = FeatureFlagService.create({
       repository: setup.repositories.flags,
       experiments: setup.repositories.experiments,
       rows: CachedFeatureFlagRowAdapter.create({
         repository: setup.repositories.flags,
-        cache: setup.infrastructure.cache,
+        cache: setup.members.cache,
         now,
       }),
-      config: setup.infrastructure.config,
+      config: setup.members.config,
       registry: FEATURE_FLAG_REGISTRY,
       organizationAges: OrganizationCreatedAtCacheService.create({
         organizations: setup.dependencies.organizations,

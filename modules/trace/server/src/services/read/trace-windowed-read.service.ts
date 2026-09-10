@@ -1,7 +1,7 @@
 import {
   TraceWindowedReadMetrics,
   type TraceWindowedReadOutcome,
-} from "../../app/trace.infrastructure.ts";
+} from "../../app/trace.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**

@@ -35,7 +35,7 @@ export type PiiAnalysisOutcome = "processed" | "skipped" | "error";
 /**
  * What an operator can see about the external PII analysis calls.
  *
- * It is infrastructure because the two processes that make these calls export
+ * It is members because the two processes that make these calls export
  * differently: the application writes into its own `prom-client` registry,
  * and a worker composed from packages pushes over OTLP. Both write the same
  * three series, under the same names, with the same label values — a
@@ -54,7 +54,7 @@ export interface PiiAnalysisMetrics {
 /**
  * The external PII analysis capability, as this feature asks for it.
  *
- * It is infrastructure rather than an interface here because a process
+ * It is members rather than an interface here because a process
  * composes it: the application builds a Google DLP client and a Presidio
  * HTTP client inside its own runtime, and a worker composed from packages
  * builds its own. Neither belongs to this feature — one of them drags a gRPC

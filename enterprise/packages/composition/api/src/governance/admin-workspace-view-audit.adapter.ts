@@ -77,7 +77,7 @@ export class AppAdminWorkspaceViewOcsf extends AdminWorkspaceViewOcsf {
   }
 }
 
-/** App composition adapter for OCSF infrastructure and diagnostics. */
+/** App composition adapter for OCSF members and diagnostics. */
 export class AppAdminWorkspaceViewAuditAdapter {
   private constructor(private readonly deps: AdminWorkspaceViewAuditDeps) {}
 

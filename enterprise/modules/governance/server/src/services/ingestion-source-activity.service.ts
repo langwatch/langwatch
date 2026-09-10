@@ -12,7 +12,7 @@ import type {
   SpendOverTimeGroupBy,
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
-import type { ActivityMonitorRepository } from "../app/governance.infrastructure.ts";
+import type { ActivityMonitorRepository } from "../app/governance.members.ts";
 
 export class ActivityMonitorService {
   private constructor(private readonly repository: ActivityMonitorRepository) {}

@@ -42,7 +42,7 @@ function harness() {
     // Nothing below is reached: assembling the envelope reads only its
     // argument and the run capability. A reach for any of them throws on the
     // missing property, which is the loud failure we want.
-    infrastructure: {
+    members: {
       agentTesting: createApiFixture<AgentTestService>(),
       simulations: simulations as SimulationService,
       scenarioExecution: {} as ScenarioExecutionService,

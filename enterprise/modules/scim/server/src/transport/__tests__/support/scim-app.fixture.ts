@@ -46,7 +46,7 @@ export function scimTestApp(
     dependencies: {},
     config: void 0,
     resources: { own: () => void 0, ownService: () => void 0 },
-    infrastructure: {
+    members: {
       scim,
       planProvider: {
         getActivePlan: () => Promise.resolve({ type: options.planType ?? "ENTERPRISE" }),

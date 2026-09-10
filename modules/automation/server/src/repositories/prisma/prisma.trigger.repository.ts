@@ -8,7 +8,7 @@ import {
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { TriggerRepository, type ReportScheduleTarget } from "../trigger.repository.ts";
 import { mapTriggerRow } from "./prisma.trigger.mapper.ts";
-import type { AutomationClock } from "../../app/automation.infrastructure.ts";
+import type { AutomationClock } from "../../app/automation.members.ts";
 
 function toPrismaJsonValue(value: unknown): Prisma.InputJsonValue | null {
   if (value === null) return null;

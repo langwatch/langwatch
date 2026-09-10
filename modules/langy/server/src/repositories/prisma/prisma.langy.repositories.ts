@@ -17,8 +17,8 @@ import { LangyTurnHandoffRedisRepository } from "../redis/redis.langy-turn-hando
 export class PostgresLangyRepositories {
   static readonly requires = ["redis"] as const;
 
-  static create(infrastructure: Readonly<{ redis: RedisConnection }>): LangyRepositories {
-    const redis = infrastructure.redis;
+  static create(members: Readonly<{ redis: RedisConnection }>): LangyRepositories {
+    const redis = members.redis;
 
     return {
       turnAccess: LangyTurnAccessRedisRepository.create({ redis }),

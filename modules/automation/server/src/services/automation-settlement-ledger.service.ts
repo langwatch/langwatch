@@ -5,7 +5,7 @@ import type {
   WebhookDeliveryInput,
 } from "@langwatch/automation-contract";
 import { type Instant, fromDate } from "@langwatch/time";
-import type { AutomationClock } from "../app/automation.infrastructure.ts";
+import type { AutomationClock } from "../app/automation.members.ts";
 import {
   AutomationSettlementLedger,
   type AutomationSettlementBreach,

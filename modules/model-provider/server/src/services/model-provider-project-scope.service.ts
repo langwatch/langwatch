@@ -1,6 +1,6 @@
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
 import { fromDate, type Instant } from "@langwatch/time";
-import type { ModelCostProject } from "../app/model-provider.infrastructure.ts";
+import type { ModelCostProject } from "../app/model-provider.members.ts";
 
 export type ModelProviderProjectSystemContext = {
   scopes: ModelDefaultScope[];

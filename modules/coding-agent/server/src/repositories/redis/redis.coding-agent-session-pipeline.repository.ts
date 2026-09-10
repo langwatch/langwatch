@@ -7,11 +7,11 @@ import {
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
-import type { CodingAgentClock } from "../../app/coding-agent.infrastructure.ts";
-import type { CodingAgentCostEstimator } from "../../app/coding-agent.infrastructure.ts";
-import type { CodingAgentCostMetrics } from "../../app/coding-agent.infrastructure.ts";
-import type { CodingAgentProjectActivity } from "../../app/coding-agent.infrastructure.ts";
-import type { CodingAgentPullRequestMapping } from "../../app/coding-agent.infrastructure.ts";
+import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
+import type { CodingAgentCostEstimator } from "../../app/coding-agent.members.ts";
+import type { CodingAgentCostMetrics } from "../../app/coding-agent.members.ts";
+import type { CodingAgentProjectActivity } from "../../app/coding-agent.members.ts";
+import type { CodingAgentPullRequestMapping } from "../../app/coding-agent.members.ts";
 import type { CodingAgentSessionContextMemoRepository } from "../session-context-memo.repository.ts";
 import { RedisSessionContextMemoRepository } from "./redis.session-context-memo.repository.ts";
 import { createCodingAgentCostDriftSubscriber } from "../../subscribers/coding-agent-cost-drift.subscriber.ts";

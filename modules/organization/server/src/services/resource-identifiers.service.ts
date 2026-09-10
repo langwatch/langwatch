@@ -5,7 +5,7 @@ import {
   GroupIdentity,
   PersonalWorkspaceIdentity,
   TeamIdentity,
-} from "../app/organization.infrastructure.ts";
+} from "../app/organization.members.ts";
 import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
 
 /**

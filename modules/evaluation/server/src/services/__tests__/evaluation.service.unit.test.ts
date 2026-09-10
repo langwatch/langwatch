@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { type ArchiveWorkflowCommand, type CopyWorkflowCommand, type CreateWorkflowCommand, type PublishWorkflowCommand, type RunWorkflowCommand, type SaveWorkflowVersionCommand, type StudioClientEvent, type UpdateWorkflowCommand, type Workflow, type WorkflowEvaluatorFields, type WorkflowVersion, type WorkflowVersionHistoryEntry, type WorkflowVersionHistoryMode, type WorkflowWithVersion } from "@langwatch/workflow-contract";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import { EvaluationService } from "../evaluation.service.ts";
-import { EvaluationExecution, EvaluationInputsResolution } from "../../app/evaluation.infrastructure.ts";
+import { EvaluationExecution, EvaluationInputsResolution } from "../../app/evaluation.members.ts";
 import { EvaluationRunRepository } from "../../repositories/evaluation.repository.ts";
 import {
   MonitorPerformanceRepository,

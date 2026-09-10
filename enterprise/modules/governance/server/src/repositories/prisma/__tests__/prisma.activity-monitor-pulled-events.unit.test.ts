@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const query = vi.fn();
 
-import { GovernanceClickHouseResolver } from "../../../app/governance.infrastructure.ts";
+import { GovernanceClickHouseResolver } from "../../../app/governance.members.ts";
 import { PrismaActivityMonitorRepository } from "../prisma.ingestion-source-activity.repository.ts";
 
 class FakeClickHouseResolver implements GovernanceClickHouseResolver {

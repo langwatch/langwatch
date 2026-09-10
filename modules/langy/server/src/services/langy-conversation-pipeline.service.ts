@@ -14,7 +14,7 @@ import type {
 import { LANGY_CONVERSATION_PROCESSING_EVENT_TYPES } from "@langwatch/langy-contract";
 import { langyConversationProcess } from "../processes/langy-conversation.process.ts";
 import { LANGY_CONVERSATION_PROCESS_NAME } from "../processes/langy-conversation-process.types.ts";
-import type { LangyEffectMembers } from "../app/langy.infrastructure.ts";
+import type { LangyEffectMembers } from "../app/langy.members.ts";
 import {
   AcceptAgentTurnCommand,
   ArchiveConversationCommand,

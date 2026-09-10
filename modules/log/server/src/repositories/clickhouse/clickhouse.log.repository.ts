@@ -1,6 +1,6 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { LogApi, LogProcessingEvent } from "@langwatch/log-contract";
-import type { LogRedaction } from "../../app/log.infrastructure.ts";
+import type { LogRedaction } from "../../app/log.members.ts";
 import { CanonicalLogAdapter } from "../../services/canonical-log.service.ts";
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../../services/log-processing.service.ts";
 import { LogService } from "../../services/log.service.ts";

@@ -11,8 +11,8 @@
  * the gateway to drop its cached bundle.
  */
 import { describe, expect, it } from "vitest";
-import type { GatewayAudit } from "../../../app/gateway.infrastructure.ts";
-import type { GatewayChangeEvents } from "../../../app/gateway.infrastructure.ts";
+import type { GatewayAudit } from "../../../app/gateway.members.ts";
+import type { GatewayChangeEvents } from "../../../app/gateway.members.ts";
 import {
   PrismaGatewayCacheRuleRepository,
   type GatewayCacheRuleDatabase,

@@ -32,7 +32,7 @@ function process(connections = RecordingSsoConnectionLedger.create()) {
     .withProvided(UserApi, createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL }))
     .withProvided(AuditLogApi, createSsoTestAuditLog())
     .withModule(ssoServer, {
-      infrastructure: { connections, logger: RecordingSsoGateLogger.create() },
+      members: { connections, logger: RecordingSsoGateLogger.create() },
     });
 }
 

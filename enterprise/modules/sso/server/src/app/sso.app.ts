@@ -36,8 +36,8 @@ import { BetterAuthSsoProviderMount } from "../services/better-auth-sso.service.
 import type {
   SsoConnectionLedgerOperator,
   SsoConnectionLedger,
-} from "./sso.infrastructure.ts";
-import type { SsoGateLogger } from "./sso.infrastructure.ts";
+} from "./sso.members.ts";
+import type { SsoGateLogger } from "./sso.members.ts";
 import { SsoGateService } from "../services/sso-gate.service.ts";
 
 /** What the process composes this feature's application over. */
@@ -89,15 +89,15 @@ export class SsoApp implements SsoApiContract {
     this.#auditLog = dependencies.auditLog;
   }
 
-  static create({ dependencies, infrastructure, config }: SsoSetup): SsoApp {
+  static create({ dependencies, members, config }: SsoSetup): SsoApp {
     return new SsoApp(
       SsoGateService.create({
         configuration: config,
         licensing: dependencies.licensing,
-        logger: infrastructure.logger,
+        logger: members.logger,
         providerMountInspector: BetterAuthSsoProviderMount.create(),
       }),
-      infrastructure.connections,
+      members.connections,
       dependencies,
     );
   }

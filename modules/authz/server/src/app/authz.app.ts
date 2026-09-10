@@ -59,7 +59,7 @@ export class AuthzApp implements AuthzApi {
   }
   static create(setup: AuthzSetup): AuthzApp {
     const built = PostgresAuthzAdapter.create({
-      ...setup.infrastructure,
+      ...setup.members,
       repositories: setup.repositories,
     }).build();
     return new AuthzApp(built.authz, built.grants);

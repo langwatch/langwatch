@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   GovernanceWebhookChannel,
   type GovernanceWebhookEnvelope,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 
 export const governanceWebhookEnvelopeSchema = z.object({
   id: z.string(),

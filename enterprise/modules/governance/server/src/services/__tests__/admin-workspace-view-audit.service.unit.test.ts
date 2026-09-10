@@ -1,6 +1,6 @@
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AdminWorkspaceViewOcsfChannel } from "../../app/governance.infrastructure.ts";
+import { AdminWorkspaceViewOcsfChannel } from "../../app/governance.members.ts";
 import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceTarget,

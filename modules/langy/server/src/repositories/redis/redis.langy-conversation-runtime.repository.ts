@@ -13,8 +13,8 @@ import type {
 import { RedisLangyEffectRepository } from "./redis.langy-effect.repository.ts";
 import { LangyConversationPipelineAdapter } from "../../services/langy-conversation-pipeline.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "../../projections/langy-analytics-event.projection.ts";
-import type { LangyTitleGenerator } from "../../app/langy.infrastructure.ts";
-import type { LangyWorker } from "../../app/langy.infrastructure.ts";
+import type { LangyTitleGenerator } from "../../app/langy.members.ts";
+import type { LangyWorker } from "../../app/langy.members.ts";
 import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
 import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";

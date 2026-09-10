@@ -363,45 +363,45 @@ export class UserApp implements UserApi {
     ops: typeof OpsApi;
   } = { auth: AuthApi, organizations: OrganizationApi, ops: OpsApi };
 
-  static create({ infrastructure, dependencies, repositories }: UserSetup): UserApp {
-    const now = infrastructure.now;
+  static create({ members, dependencies, repositories }: UserSetup): UserApp {
+    const now = members.now;
 
     return new UserApp(
       UserService.create({
         repository: repositories.users,
         organizations: dependencies.organizations,
-        avatarStorage: infrastructure.avatarStorage,
-        credentialIssuer: infrastructure.credentialIssuer,
+        avatarStorage: members.avatarStorage,
+        credentialIssuer: members.credentialIssuer,
         ...(now ? { now: () => toDate(now()) } : {}),
       }),
       UserCredentialService.create({
         repository: repositories.credentials,
-        passwords: infrastructure.passwords,
+        passwords: members.passwords,
       }),
       {
         auth: dependencies.auth,
         ops: dependencies.ops,
         organizations: dependencies.organizations,
       },
-      infrastructure,
+      members,
     );
   }
 
   readonly #users: UserService;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
-  readonly #infrastructure: UserInfrastructure;
+  readonly #members: UserInfrastructure;
 
   private constructor(
     users: UserService,
     credentials: UserCredentialService,
     dependencies: UserAppDependencies,
-    infrastructure: UserInfrastructure,
+    members: UserInfrastructure,
   ) {
     this.#users = users;
     this.#credentials = credentials;
     this.#account = UserAccountService.create(dependencies);
-    this.#infrastructure = infrastructure;
+    this.#members = members;
   }
 
   /** Resolves the caller allowed to read a personal workspace. */
@@ -519,7 +519,7 @@ export class UserApp implements UserApi {
     // typed is one sign-in can never find, no matter the password.
     const email = input.email.toLowerCase();
 
-    const emailMode = (await this.#infrastructure.deployment.authProvider()) === "email";
+    const emailMode = (await this.#members.deployment.authProvider()) === "email";
 
     if (!emailMode) throw new UserRegistrationNotAvailableError();
 
@@ -537,10 +537,10 @@ export class UserApp implements UserApi {
     const created = await this.#users.createCredentialUser({
       name: input.name,
       email,
-      passwordHash: await this.#infrastructure.passwords.hash({ password: input.password }),
+      passwordHash: await this.#members.passwords.hash({ password: input.password }),
     });
 
-    this.#infrastructure.analytics.trackServerEvent({ userId: created.id, event: "signed_up" });
+    this.#members.analytics.trackServerEvent({ userId: created.id, event: "signed_up" });
 
     return created;
   }
@@ -572,7 +572,7 @@ export class UserApp implements UserApi {
 
     // Email mode only. Under a federated provider the password lives in that
     // tenant and this row is not where it would go.
-    const emailMode = (await this.#infrastructure.deployment.authProvider()) === "email";
+    const emailMode = (await this.#members.deployment.authProvider()) === "email";
 
     if (!emailMode) throw new UserPasswordAuthUnavailableError();
 
@@ -584,7 +584,7 @@ export class UserApp implements UserApi {
 
     const result = await this.#users.setFirstPassword({
       id: input.userId,
-      passwordHash: await this.#infrastructure.passwords.hash({ password: input.password }),
+      passwordHash: await this.#members.passwords.hash({ password: input.password }),
     });
 
     if (result === "already_set") throw new UserPasswordAlreadySetError();
@@ -600,7 +600,7 @@ export class UserApp implements UserApi {
    * session could brute-force `currentPassword`.
    */
   async changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void> {
-    const provider = await this.#infrastructure.deployment.authProvider();
+    const provider = await this.#members.deployment.authProvider();
 
     // A denied SSO deployment is coerced to email mode (ADR-027), and a person
     // who recovered through the password-reset path owns a credential account
@@ -648,7 +648,7 @@ export class UserApp implements UserApi {
    * and asking them to make another is a nag with no upside.
    */
   async getPasskeyOffer(input: UserIdInput): Promise<UserPasskeyOffer> {
-    const offersPasskeys = this.#infrastructure.deployment.offersPasskeys();
+    const offersPasskeys = this.#members.deployment.offersPasskeys();
 
     if (!offersPasskeys) return { offer: false };
 
@@ -747,7 +747,7 @@ export class UserApp implements UserApi {
 
     await this.#users.deactivate({ id: userId });
     await this.#account.revokeAllBrowserSessions({ userId });
-    await this.#infrastructure.cliCredentials.revokeForUser({ userId });
+    await this.#members.cliCredentials.revokeForUser({ userId });
   }
 
   /** Restoring is an operator's call alone. */
@@ -778,7 +778,7 @@ export class UserApp implements UserApi {
    * name the personal workspace the same way.
    */
   async setOwnAvatar(input: SetOwnAvatarInput): Promise<UserAvatarResult> {
-    const allowance = await this.#infrastructure.rateLimit({
+    const allowance = await this.#members.rateLimit({
       key: `user.setAvatar:${input.userId}`,
       ...AVATAR_UPLOAD_BUDGET,
     });
@@ -844,7 +844,7 @@ export class UserApp implements UserApi {
       displayName: profile?.name ?? null,
       displayEmail: profile?.email ?? null,
     });
-    const policy = await this.#infrastructure.gateway.findDefaultRoutingPolicy({
+    const policy = await this.#members.gateway.findDefaultRoutingPolicy({
       organizationId,
       personalTeamId: workspace.team.id,
     });
@@ -871,7 +871,7 @@ export class UserApp implements UserApi {
 
     if (!workspace) return { status: "ok" };
 
-    const keys = await this.#infrastructure.gateway.listPersonalVirtualKeys({
+    const keys = await this.#members.gateway.listPersonalVirtualKeys({
       userId,
       organizationId,
     });
@@ -879,7 +879,7 @@ export class UserApp implements UserApi {
     // that matches no key-scoped budget keeps them on the principal scope,
     // which is what `principalUserId` resolves regardless.
     const virtualKeyId = keys[0]?.id ?? `_ingestion_:user:${userId}`;
-    const decision = await this.#infrastructure.gateway.checkBudget({
+    const decision = await this.#members.gateway.checkBudget({
       organizationId,
       teamId: workspace.team.id,
       projectId: workspace.project.id,
@@ -898,7 +898,7 @@ export class UserApp implements UserApi {
       limitUsd: topScope.limitUsd,
       period: topScope.window.toLowerCase(),
       ...this.#requestIncreaseUrl(topScope),
-      adminEmail: await this.#infrastructure.organizations.findSupportContact({ organizationId }),
+      adminEmail: await this.#members.organizations.findSupportContact({ organizationId }),
     };
   }
 
@@ -910,16 +910,16 @@ export class UserApp implements UserApi {
   async requestBudgetIncrease(
     input: UserApiRequestBudgetIncreaseInput & { userId: string },
   ): Promise<UserBudgetIncreaseRequested> {
-    const to = await this.#infrastructure.organizations.getBudgetIncreaseRecipient({
+    const to = await this.#members.organizations.getBudgetIncreaseRecipient({
       organizationId: input.organizationId,
     });
     const [organizationName, requester] = await Promise.all([
-      this.#infrastructure.organizations.findName({ organizationId: input.organizationId }),
+      this.#members.organizations.findName({ organizationId: input.organizationId }),
       this.#users.tryFindById({ id: input.userId }),
     ]);
 
     try {
-      await this.#infrastructure.budgetRequests.sendBudgetIncreaseRequest({
+      await this.#members.budgetRequests.sendBudgetIncreaseRequest({
         to,
         requesterEmail: requester?.email ?? "",
         ...(requester?.name ? { requesterName: requester.name } : {}),
@@ -958,7 +958,7 @@ export class UserApp implements UserApi {
   }): Promise<UserHomePagePickerState> {
     const [lastHomePath, firstProjectSlug] = await Promise.all([
       this.#users.tryGetLastHomePath({ id: userId }),
-      this.#infrastructure.organizations.findFirstProjectSlug({ organizationId, userId }),
+      this.#members.organizations.findFirstProjectSlug({ organizationId, userId }),
     ]);
 
     return { lastHomePath, firstProjectSlug };
@@ -974,7 +974,7 @@ export class UserApp implements UserApi {
   async completeEmailVerification(
     input: CompleteUserVerificationInput,
   ): Promise<UserVerificationCompleted> {
-    await this.#infrastructure.verification.completeEmailVerification(input);
+    await this.#members.verification.completeEmailVerification(input);
 
     return { verified: true };
   }
@@ -1004,10 +1004,10 @@ export class UserApp implements UserApi {
       (credential.kind === "apiKey" ? credential.organizationId : null) ??
       (await this.#account.findOrganizationIdByTeamId({ teamId: project.teamId }));
     const tenant = organizationId
-      ? await this.#infrastructure.projects.findGovernanceProject({ organizationId })
+      ? await this.#members.projects.findGovernanceProject({ organizationId })
       : null;
 
-    return this.#infrastructure.personalUsage.personalUsage({
+    return this.#members.personalUsage.personalUsage({
       personalProjectId: project.id,
       userId: ownerUserId,
       ...(tenant ? { ingestionTenantId: tenant.id } : {}),
@@ -1047,7 +1047,7 @@ export class UserApp implements UserApi {
     // to a bucket every caller would share.
     if (!key) throw new Error("the avatar door resolved neither an API key nor a person");
 
-    return this.#infrastructure.rateLimit({
+    return this.#members.rateLimit({
       key: `user-avatar:caller:${key}`,
       windowSeconds,
       max,
@@ -1056,13 +1056,13 @@ export class UserApp implements UserApi {
 
   /** One avatar's row and, when the bytes are there, a stream of them. */
   readAvatarObject(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead> {
-    return this.#infrastructure.avatarObjects.findById(input);
+    return this.#members.avatarObjects.findById(input);
   }
 
   // -- private -------------------------------------------------------------
 
   #nowMs(): number {
-    const now = this.#infrastructure.now;
+    const now = this.#members.now;
 
     return (now ? now() : nowInstant()).epochMilliseconds;
   }
@@ -1076,7 +1076,7 @@ export class UserApp implements UserApi {
     budget: { windowSeconds: number; max: number };
     refuse: () => Error;
   }): Promise<void> {
-    const allowance = await this.#infrastructure.rateLimit({ key, ...budget });
+    const allowance = await this.#members.rateLimit({ key, ...budget });
 
     if (!allowance.allowed) throw refuse();
   }
@@ -1092,7 +1092,7 @@ export class UserApp implements UserApi {
   }
 
   async #changeFederatedPassword(input: ChangeOwnPasswordInput): Promise<void> {
-    const account = await this.#infrastructure.federatedPasswords.findDatabaseAccount({
+    const account = await this.#members.federatedPasswords.findDatabaseAccount({
       userId: input.userId,
     });
 
@@ -1104,7 +1104,7 @@ export class UserApp implements UserApi {
     // they can send avoids it, so it degrades to the generic failure.
     if (!profile?.email) throw new Error("the authenticated account carries no email address");
 
-    const result = await this.#infrastructure.federatedPasswords.changePassword({
+    const result = await this.#members.federatedPasswords.changePassword({
       email: profile.email,
       providerUserId: account.providerAccountId,
       currentPassword: input.currentPassword,
@@ -1126,7 +1126,7 @@ export class UserApp implements UserApi {
    * theirs", which is what keeps a personal rollup inside their own tenant.
    */
   async #assertMember(input: { userId: string; organizationId: string }): Promise<void> {
-    const member = await this.#infrastructure.organizations.isMember(input);
+    const member = await this.#members.organizations.isMember(input);
 
     if (member) return;
 
@@ -1134,7 +1134,7 @@ export class UserApp implements UserApi {
   }
 
   async #requireProject({ projectId }: { projectId: string }): Promise<UserKeyProject> {
-    const project = await this.#infrastructure.projects.findById({ projectId });
+    const project = await this.#members.projects.findById({ projectId });
 
     if (!project) throw new Error(`no project row for the credential's project "${projectId}"`);
 
@@ -1147,7 +1147,7 @@ export class UserApp implements UserApi {
     limitUsd: string;
     spentUsd: string;
   }): { requestIncreaseUrl?: string } {
-    const baseUrl = this.#infrastructure.deployment.findBaseUrl();
+    const baseUrl = this.#members.deployment.findBaseUrl();
 
     if (!baseUrl) return {};
 

@@ -10,7 +10,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { ModelProviderCredentialCipher } from "../../app/model-provider.infrastructure.ts";
+import { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
 import { EncryptedModelProviderCredentialAdapter } from "../encrypted.model-provider-api-key-credential.service.ts";
 
 /**

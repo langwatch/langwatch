@@ -105,7 +105,7 @@ describe("entitlement app installation", () => {
     it("looks the impersonator's address up before the sources see it", async () => {
       const seen: Array<string | null | undefined> = [];
       const app = createEntitlementTestApp({
-        infrastructure: {
+        members: {
           baseline: free,
           authorization: {
             resolve: (user) => {
@@ -150,7 +150,7 @@ describe("entitlement app installation", () => {
         sentAt,
       });
       const app = createEntitlementTestApp({
-        infrastructure: { baseline: free, warnings },
+        members: { baseline: free, warnings },
       });
 
       await expect(
@@ -164,7 +164,7 @@ describe("entitlement app installation", () => {
       expect(warnings.sent).toHaveLength(1);
 
       const quiet = createEntitlementTestApp({
-        infrastructure: { baseline: free, warnings: TestUsageWarnings.create() },
+        members: { baseline: free, warnings: TestUsageWarnings.create() },
       });
 
       await expect(
@@ -207,7 +207,7 @@ describe("entitlement app installation", () => {
           membership: MemoryUsageMembershipRepository.create({ memory: database }),
           spend: MemoryOrganizationSpendRepository.create({ memory: database }),
         },
-        infrastructure: { baseline: free },
+        members: { baseline: free },
       });
 
       await expect(
@@ -239,7 +239,7 @@ describe("entitlement app installation", () => {
           }),
           spend,
         },
-        infrastructure: { baseline: free },
+        members: { baseline: free },
       });
 
       const now = Date.now();

@@ -92,7 +92,7 @@ import type {
   ModelProviderConnectionRateLimiter,
   ModelProviderCredentialProbe,
   ModelTranslation,
-} from "./model-provider.infrastructure.ts";
+} from "./model-provider.members.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
@@ -113,7 +113,7 @@ const TRANSLATE_FEATURE_KEY = "translate.text";
 export type SpanReader = unknown;
 
 /**
- * The technical infrastructure this module asks the process for. Every member
+ * The technical members this module asks the process for. Every member
  * is a deployment's own answer - its provider registry, its egress fence, its
  * identifier format, its OAuth issuer, its counters, its span reader - and
  * none of them is another module's service.
@@ -184,9 +184,9 @@ export class ModelProviderApp implements ModelProviderApi {
   static create({
     repositories,
     dependencies,
-    infrastructure,
+    members,
   }: ModelProviderSetup): ModelProviderApp {
-    return new ModelProviderApp(repositories, dependencies, infrastructure);
+    return new ModelProviderApp(repositories, dependencies, members);
   }
 
   /** The registry's ceilings, read from the catalogue this package ships. */
@@ -217,7 +217,7 @@ export class ModelProviderApp implements ModelProviderApi {
   private constructor(
     repositories: ModelProviderRepositories,
     dependencies: ModelProviderSetup["dependencies"],
-    infrastructure: ModelProviderInfrastructure,
+    members: ModelProviderInfrastructure,
   ) {
     this.#modelProviders = ModelProviderGateway.create({
       repository: repositories.providers,
@@ -227,18 +227,18 @@ export class ModelProviderApp implements ModelProviderApi {
       organizations: dependencies.organizations,
       authorization: dependencies.permissions,
       credentialPolicy: ModelProviderKeysService.create(),
-      catalog: infrastructure.catalog,
-      translation: infrastructure.translation,
-      ids: infrastructure.ids,
-      codexTokenRefresher: infrastructure.codexTokenRefresher,
-      connectionRateLimiter: infrastructure.connectionRateLimiter,
+      catalog: members.catalog,
+      translation: members.translation,
+      ids: members.ids,
+      codexTokenRefresher: members.codexTokenRefresher,
+      connectionRateLimiter: members.connectionRateLimiter,
     });
     this.#providerAuthorization = ModelProviderWriteAuthorizationService.create(
       ModelProviderAuthorizationService.create(dependencies.permissions),
     );
-    this.#credentialProbe = infrastructure.credentialProbe;
-    this.#codexAccounts = infrastructure.codexAccounts;
-    this.#spans = infrastructure.spans;
+    this.#credentialProbe = members.credentialProbe;
+    this.#codexAccounts = members.codexAccounts;
+    this.#spans = members.spans;
   }
 
   // ── providers ──────────────────────────────────────────────────────────────

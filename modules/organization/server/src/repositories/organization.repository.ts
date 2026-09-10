@@ -26,7 +26,7 @@ export type PersonalWorkspaceFeatureProject = {
 
 /**
  * The stored settings row, before decryption: `tryFindSettings` is the
- * service's, over this raw read, since encryption is an infrastructure
+ * service's, over this raw read, since encryption is an members
  * concern the repository does not hold.
  */
 export type StoredOrganizationSettings = {

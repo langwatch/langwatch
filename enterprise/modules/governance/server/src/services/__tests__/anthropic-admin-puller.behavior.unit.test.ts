@@ -9,14 +9,14 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-088 (Decisions 6 and 7).
  */
-import type { PulledUsageRateInput } from "../../app/governance.infrastructure.ts";
+import type { PulledUsageRateInput } from "../../app/governance.members.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.service.ts";
 import {
   GovernanceHttpClient,
   type GovernanceHttpResponse,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 import { Temporal } from "@langwatch/time";

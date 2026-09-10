@@ -1,4 +1,4 @@
-/** Exercises the declaration on its in-memory runtime without external infrastructure. */
+/** Exercises the declaration on its in-memory runtime without external members. */
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";

@@ -4,7 +4,7 @@ import type {
   AutomationEvaluationTraceSummary,
   AutomationEvaluationTriggerFilter,
   AutomationTriggerMatchRecorder,
-} from "../app/automation.infrastructure.ts";
+} from "../app/automation.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 const NOTIFY_TRIGGER_ACTIONS = new Set(["SEND_EMAIL", "SEND_SLACK_MESSAGE", "SEND_WEBHOOK"]);

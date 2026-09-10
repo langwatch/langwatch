@@ -2,7 +2,7 @@ import { LANGY_SESSION_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-c
 import type { AuthzService } from "@langwatch/authz-contract";
 import { langyCandidatePermissions, type LangyCredentialSession } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { LangySessionKey, type LangySessionKeyMetrics } from "../app/langy.infrastructure.ts";
+import { LangySessionKey, type LangySessionKeyMetrics } from "../app/langy.members.ts";
 import { LangySessionKeyScopeError } from "./langy-session-key-scope.error.ts";
 import type { LangySessionKeyRepository } from "../repositories/langy-session-key.repository.ts";
 import { LangySessionKeyReapService } from "./langy-session-key-reap.service.ts";

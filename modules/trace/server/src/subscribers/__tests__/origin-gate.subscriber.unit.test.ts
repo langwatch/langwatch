@@ -6,7 +6,7 @@ import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import type {
   DeferredOriginPayload,
   TraceDeferredOriginScheduler,
-} from "../../app/trace.infrastructure.ts";
+} from "../../app/trace.members.ts";
 
 function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {

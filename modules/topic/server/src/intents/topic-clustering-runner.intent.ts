@@ -15,12 +15,12 @@ import { z } from "zod";
 import type {
   TopicClusteringClickHouse,
   TopicClusteringClickHouseResolver,
-} from "../app/topic.infrastructure.ts";
-import type { TopicClusteringCommands } from "../app/topic.infrastructure.ts";
+} from "../app/topic.members.ts";
+import type { TopicClusteringCommands } from "../app/topic.members.ts";
 import type {
   TopicClusteringLangevalsKind,
   TopicClusteringLangevals,
-} from "../app/topic.infrastructure.ts";
+} from "../app/topic.members.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
 import {

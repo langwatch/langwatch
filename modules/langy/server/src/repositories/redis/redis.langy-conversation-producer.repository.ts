@@ -10,7 +10,7 @@ import type {
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
 import type { LangyAnalyticsEventProjectionRecord } from "../../projections/langy-analytics-event.projection.ts";
-import type { LangyTitleGenerator } from "../../app/langy.infrastructure.ts";
+import type { LangyTitleGenerator } from "../../app/langy.members.ts";
 import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
 import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";

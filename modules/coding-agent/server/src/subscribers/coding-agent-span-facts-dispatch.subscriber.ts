@@ -25,7 +25,7 @@ import {
   resolveSpanConversationKey,
 } from "@langwatch/coding-agent-contract";
 import { CodingAgentSessionSpanProjection } from "../projections/coding-agent-session-span.projection.ts";
-import type { CodingAgentTraceProcessing } from "../app/coding-agent.infrastructure.ts";
+import type { CodingAgentTraceProcessing } from "../app/coding-agent.members.ts";
 import { z } from "zod";
 
 const logger = createLogger("langwatch:coding-agent-processing:span-facts-dispatch");

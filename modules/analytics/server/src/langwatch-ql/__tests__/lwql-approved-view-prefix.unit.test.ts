@@ -15,7 +15,7 @@ const postgresViews = LangWatchQLPostgresViewsService.create();
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 /**
- * The prefix the infrastructure bootstrap's grant predicate matches
+ * The prefix the members bootstrap's grant predicate matches
  * (`viewname LIKE 'lwql\_%'`). Held here as a literal because the contract is
  * with a repository this one cannot import.
  */

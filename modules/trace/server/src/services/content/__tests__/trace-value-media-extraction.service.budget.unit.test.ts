@@ -16,7 +16,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { TraceMediaStore } from "../../../app/trace.infrastructure.ts";
+import type { TraceMediaStore } from "../../../app/trace.members.ts";
 import { MAX_MEDIA_PARTS_PER_SPAN } from "../trace-value-media-extraction.service.ts";
 
 interface StoredCall {

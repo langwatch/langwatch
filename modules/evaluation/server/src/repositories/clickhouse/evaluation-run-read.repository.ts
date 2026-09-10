@@ -9,7 +9,7 @@ import {
   type EvaluationSummary,
   type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
-import type { EvaluationRetentionFloor } from "../../app/evaluation.infrastructure.ts";
+import type { EvaluationRetentionFloor } from "../../app/evaluation.members.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseResolver,

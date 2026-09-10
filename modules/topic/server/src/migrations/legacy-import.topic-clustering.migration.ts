@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import type { TopicClusteringCommands } from "../app/topic.infrastructure.ts";
+import type { TopicClusteringCommands } from "../app/topic.members.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
 import { nowInstant } from "@langwatch/time";
 

@@ -147,7 +147,7 @@ function harness({
     monitors,
     app: ExperimentApp.create({
       dependencies: {},
-      infrastructure: {
+      members: {
         experiments: experimentService,
         runLookup,
         workflows: workflowService,

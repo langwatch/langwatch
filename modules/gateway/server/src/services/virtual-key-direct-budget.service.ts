@@ -6,7 +6,7 @@
 import { type Instant, nowInstant } from "@langwatch/time";
 import type { GatewayBudget } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
-import { budgetSpendTargetsFor } from "../app/gateway.infrastructure.ts";
+import { budgetSpendTargetsFor } from "../app/gateway.members.ts";
 import type { VirtualKeyDirectBudgetRepository } from "../repositories/gateway-virtual-key-direct-budget.repository.ts";
 import { GatewayWindow } from "@langwatch/gateway-contract";
 

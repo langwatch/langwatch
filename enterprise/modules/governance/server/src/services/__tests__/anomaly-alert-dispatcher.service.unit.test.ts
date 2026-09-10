@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AnomalyAlertHttpClient,
   type AnomalyAlertHttpResponse,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 
 type Call = {

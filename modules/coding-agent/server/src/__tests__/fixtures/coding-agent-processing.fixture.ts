@@ -9,7 +9,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import Redis from "ioredis";
 import { EventingCodingAgentProcessingAdapter } from "../../repositories/redis/redis.coding-agent-session-pipeline.repository.ts";
 import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
-import { CodingAgentCostMetrics } from "../../app/coding-agent.infrastructure.ts";
+import { CodingAgentCostMetrics } from "../../app/coding-agent.members.ts";
 import { TestClock, TestProjectService } from "./coding-agent.fixture.ts";
 
 class NoopCostMetrics implements CodingAgentCostMetrics {

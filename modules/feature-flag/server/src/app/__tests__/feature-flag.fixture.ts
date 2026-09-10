@@ -142,7 +142,7 @@ export function createFeatureFlagTestApp(
 ): FeatureFlagApp {
   return FeatureFlagApp.create({
     repositories: input.repositories ?? MemoryFeatureFlagRepositories.create(),
-    infrastructure: {
+    members: {
       cache: input.cache ?? new MemoryFeatureFlagCache(),
       config: input.config ?? resolveFeatureFlagConfig({}),
     },

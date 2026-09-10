@@ -1,7 +1,7 @@
 import type { GithubPullRequestEvent } from "@langwatch/github-contract";
 import { z } from "zod";
 
-import { GithubPullRequestEventParser } from "../app/github.infrastructure.ts";
+import { GithubPullRequestEventParser } from "../app/github.members.ts";
 
 const githubPullRequestEventSchema = z.object({
   action: z.string(),

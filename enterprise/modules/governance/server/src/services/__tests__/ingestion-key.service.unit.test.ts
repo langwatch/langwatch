@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import { IngestionKeyIssuer, IngestionKeyRepository } from "../../app/governance.infrastructure.ts";
+import { IngestionKeyIssuer, IngestionKeyRepository } from "../../app/governance.members.ts";
 import { IngestionKeyService } from "../ingestion-source-key.service.ts";
 import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 

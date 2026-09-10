@@ -1,4 +1,4 @@
-import type { GatewayClickHouseResolver } from "../app/gateway.infrastructure.ts";
+import type { GatewayClickHouseResolver } from "../app/gateway.members.ts";
 import type { GatewaySpendEvents } from "../ports/gateway-spend-events.port.ts";
 import { GatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 

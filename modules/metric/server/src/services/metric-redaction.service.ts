@@ -3,7 +3,7 @@ import { MetricSerializationAdapter } from "./metric-serialization.service.ts";
 const { isRecord } = MetricSerializationAdapter;
 
 import type { MetricPiiRedactionLevel } from "@langwatch/metric-contract";
-import type { MetricRedaction } from "../app/metric.infrastructure.ts";
+import type { MetricRedaction } from "../app/metric.members.ts";
 
 type StringRef = {
   owner: UnknownRecord;

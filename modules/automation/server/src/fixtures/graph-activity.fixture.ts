@@ -1,5 +1,5 @@
-import { AutomationClock } from "../app/automation.infrastructure.ts";
-import { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
+import { AutomationClock } from "../app/automation.members.ts";
+import { AutomationProjectIdentityPort } from "../app/automation.members.ts";
 import {
   AutomationDispatchError,
   AutomationLogger,

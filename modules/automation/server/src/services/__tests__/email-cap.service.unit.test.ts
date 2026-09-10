@@ -7,7 +7,7 @@ import {
 import type { AutomationEmailCapRepository } from "../../repositories/automation-email-cap.repository.ts";
 import { Temporal } from "@langwatch/time";
 
-// The package accepts the infrastructure connection explicitly. This holder
+// The package accepts the members connection explicitly. This holder
 // keeps the test's Redis-vs-memory choice local without a process-global App.
 const redisMock = vi.hoisted(() => ({
   connection: undefined as AutomationEmailCapRepository | undefined,

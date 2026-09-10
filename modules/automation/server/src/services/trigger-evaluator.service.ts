@@ -6,14 +6,14 @@ import type {
 } from "@langwatch/automation-contract";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";
-import type { AutomationProjectIdentityPort } from "../app/automation.infrastructure.ts";
+import type { AutomationProjectIdentityPort } from "../app/automation.members.ts";
 import type {
   AutomationDispatchError,
   AutomationGraphNotifier,
   AutomationLogger,
   AutomationSlackBotTokenDecryptor,
-} from "../app/automation.infrastructure.ts";
-import type { AutomationClock } from "../app/automation.infrastructure.ts";
+} from "../app/automation.members.ts";
+import type { AutomationClock } from "../app/automation.members.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";

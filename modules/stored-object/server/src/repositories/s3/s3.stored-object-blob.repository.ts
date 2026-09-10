@@ -17,7 +17,7 @@ const { parseS3Uri } = S3UriRules;
 import type {
   StoredObjectS3Target,
   StoredObjectS3TargetResolver,
-} from "../../app/stored-object.infrastructure.ts";
+} from "../../app/stored-object.members.ts";
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 
 /**

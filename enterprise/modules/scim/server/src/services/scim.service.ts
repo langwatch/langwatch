@@ -25,7 +25,7 @@ import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type {
   ScimSyncLifecycle,
   ScimUserPushOperation,
-} from "../app/scim.infrastructure.ts";
+} from "../app/scim.members.ts";
 import { ScimDirectoryService } from "./scim-directory.service.ts";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";

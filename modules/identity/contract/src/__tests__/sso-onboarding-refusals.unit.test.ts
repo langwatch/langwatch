@@ -84,7 +84,7 @@ describe("refusals on the single sign-on onboarding surfaces", () => {
   describe("when a step fails for a reason nobody anticipated", () => {
     /** @scenario "A failure we cannot name degrades honestly and stays traceable" */
     it("says it did not work, invents no cause, and leaves something to quote", () => {
-      // A plain Error is what an unanticipated failure is — an infrastructure
+      // A plain Error is what an unanticipated failure is — an members
       // fault dressed up as a handled one would promise the reader an action
       // they do not have.
       const unanticipated = new Error("connect ECONNREFUSED 10.0.3.14:5432 while appending");

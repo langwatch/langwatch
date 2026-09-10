@@ -146,7 +146,7 @@ function buildApp(overrides: { scenarios?: Partial<ScenarioApi> } = {}) {
   const app = SuiteApp.create({
     repositories: createSuiteTestRepositories(),
     dependencies: { scenarios, agents: agentApi, prompts: promptApi, projects: projectApi },
-    infrastructure: {
+    members: {
       execution,
       resolveClickHouseClient: null,
       defaultRetentionDays: 30,

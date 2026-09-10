@@ -8,7 +8,7 @@ import { TraceContentExtractionService } from "../trace-content-extraction.servi
 import { containsMediaMarkers, collectMediaParts } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceMediaStore } from "../../../app/trace.infrastructure.ts";
+import type { TraceMediaStore } from "../../../app/trace.members.ts";
 import {
   EXTRACTABLE_PART_EXAMPLES,
   NON_EXTRACTABLE_PART_EXAMPLES,

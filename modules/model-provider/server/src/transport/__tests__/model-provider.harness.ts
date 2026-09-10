@@ -19,7 +19,7 @@ import {
   type CodexDeviceCode,
   type CodexPollResult,
 } from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
-import { ModelProviderCredentialProbe } from "../../app/model-provider.infrastructure.ts";
+import { ModelProviderCredentialProbe } from "../../app/model-provider.members.ts";
 
 /** What a mount reads off the request: who is calling. */
 export type ModelProviderTrpcTestContext = { actor: { id: string } };
@@ -153,7 +153,7 @@ export function mountableModelProviderApp(options: {
         }),
       }),
     },
-    infrastructure: {
+    members: {
       credentialProbe: probe,
       spans: options.spans ?? {},
       ...(options.codexAccounts ? { codexAccounts: options.codexAccounts } : {}),

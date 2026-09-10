@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { IdentityLedgerWriterAdapter } from "../../services/identity-ledger.service.ts";
 import { PostgresIdentityGuardsAdapter } from "../../repositories/prisma/prisma.identity-guards.repository.ts";
-import type { IdentityEventing } from "../../app/identity.infrastructure.ts";
+import type { IdentityEventing } from "../../app/identity.members.ts";
 import { PrismaIdentityNewbornRepository } from "./prisma.identity-newborn.repository.ts";
 import { PrismaIdentityProjectionRepository } from "./prisma.identity-projection.repository.ts";
 import { IdentityNewbornReconciliationService } from "../../services/identity-newborn-reconciliation.service.ts";

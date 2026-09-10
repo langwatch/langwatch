@@ -13,7 +13,7 @@ import {
   EvaluationLangevals,
   type EvaluationExecutionTelemetry,
   type LangevalsEvaluateParams,
-} from "../app/evaluation.infrastructure.ts";
+} from "../app/evaluation.members.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AutomationClock } from "../../app/automation.infrastructure.ts";
+import { AutomationClock } from "../../app/automation.members.ts";
 import { AutomationScheduledJobRepository, type ScheduledJobRecord } from "../../repositories/automation-scheduled-job.repository.ts";
 import { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
 import type {

@@ -6,8 +6,8 @@ import { ModelCatalogCostEstimatorAdapter } from "../../../services/model-catalo
 import type { CodingAgentProcessingPipeline } from "../redis.coding-agent-session-pipeline.repository.ts";
 import { type CodingAgentSessionState } from "../../../projections/coding-agent-session.projection.ts";
 import { CodingAgentSessionStateProjection } from "../../../projections/coding-agent-session-state.projection.ts";
-import { CodingAgentProjectActivity } from "../../../app/coding-agent.infrastructure.ts";
-import { CodingAgentPullRequestMapping } from "../../../app/coding-agent.infrastructure.ts";
+import { CodingAgentProjectActivity } from "../../../app/coding-agent.members.ts";
+import { CodingAgentPullRequestMapping } from "../../../app/coding-agent.members.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.

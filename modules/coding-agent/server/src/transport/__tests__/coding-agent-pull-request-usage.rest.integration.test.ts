@@ -163,7 +163,7 @@ function mount({
 
   const app = CodingAgentApp.create({
     dependencies: { github: new GithubForRest(), projects: new ProjectForRest() },
-    infrastructure: {
+    members: {
       clickHouse: null,
       defaultTraceRetentionDays: 30,
       billing: new TestBillingPolicy(),

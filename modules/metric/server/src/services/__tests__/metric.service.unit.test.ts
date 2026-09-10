@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   MetricPreparation,
   type MetricPreparationInput,
-} from "../../app/metric.infrastructure.ts";
+} from "../../app/metric.members.ts";
 import { MetricService } from "../metric.service.ts";
 
 class RecordingPreparation implements MetricPreparation {

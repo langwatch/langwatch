@@ -1,4 +1,4 @@
-import { EvaluationCostRecorder } from "../app/evaluation.infrastructure.ts";
+import { EvaluationCostRecorder } from "../app/evaluation.members.ts";
 import {
   EvaluationCostAlreadyRecordedError,
   type EvaluationCostRepository,

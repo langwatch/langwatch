@@ -62,7 +62,7 @@ export function createSuiteTestApp(
           tryGetOrganizationId: async () => "organization-1",
         }),
     },
-    infrastructure: {
+    members: {
       execution: input.execution ?? new RecordingSuiteExecution(),
       resolveClickHouseClient: null,
       defaultRetentionDays: 30,

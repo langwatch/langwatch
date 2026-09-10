@@ -15,11 +15,11 @@ import type {
   AutomationLogger,
   AutomationHeartbeat,
   AutomationSlackBotTokenDecryptor,
-} from "../app/automation.infrastructure.ts";
+} from "../app/automation.members.ts";
 import { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
 import { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import { AutomationRunawaySignals } from "./automation-runaway-signals.service.ts";
-import { AutomationClock } from "../app/automation.infrastructure.ts";
+import { AutomationClock } from "../app/automation.members.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
 import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service.ts";
 import { RunawayContainmentService } from "./runaway-containment.service.ts";

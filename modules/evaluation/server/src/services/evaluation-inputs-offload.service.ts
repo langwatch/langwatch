@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { EvaluationInputStorage } from "../app/evaluation.infrastructure.ts";
+import type { EvaluationInputStorage } from "../app/evaluation.members.ts";
 
 export const STORED_OBJECT_MARKER_KEY = "__lw_stored_object" as const;
 

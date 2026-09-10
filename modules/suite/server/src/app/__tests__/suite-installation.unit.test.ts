@@ -32,7 +32,7 @@ function process() {
       createApiFixture<ProjectApi>({ tryGetOrganizationId: async () => "organization-1" }),
     )
     .withModule(suiteServer, {
-      infrastructure: {
+      members: {
         execution: new RecordingSuiteExecution(),
         resolveClickHouseClient: null,
         defaultRetentionDays: 30,

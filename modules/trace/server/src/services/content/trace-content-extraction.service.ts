@@ -10,7 +10,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { visitContentPartAsync } from "@langwatch/trace-contract";
 
-import type { TraceMediaStore } from "../../app/trace.infrastructure.ts";
+import type { TraceMediaStore } from "../../app/trace.members.ts";
 import {
   extractBareImagePart,
   extractBinaryPart,

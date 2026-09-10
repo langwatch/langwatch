@@ -13,8 +13,8 @@ import {
 import { normalizeOtlpAttributeMap } from "@langwatch/otlp";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { LogPreparer, type LogPreparationInput } from "../app/log.infrastructure.ts";
-import type { LogRedaction } from "../app/log.infrastructure.ts";
+import { LogPreparer, type LogPreparationInput } from "../app/log.members.ts";
+import type { LogRedaction } from "../app/log.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 type UnknownRecord = Record<string, unknown>;

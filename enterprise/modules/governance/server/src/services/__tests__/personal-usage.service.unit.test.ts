@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PersonalUsageReader } from "../../app/governance.infrastructure.ts";
+import type { PersonalUsageReader } from "../../app/governance.members.ts";
 import { DefaultGovernancePersonalUsageService } from "../personal-usage.service.ts";
 
 class StubPersonalUsageReader implements PersonalUsageReader {

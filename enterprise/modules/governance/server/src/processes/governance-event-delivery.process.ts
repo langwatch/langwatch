@@ -12,7 +12,7 @@ import {
   type GovernanceEventsProcessingEvent,
   type GovernanceVkLifecycleData,
   type GovernanceWebhookEnvelope,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 import { Temporal } from "@langwatch/time";
 
 export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as const;

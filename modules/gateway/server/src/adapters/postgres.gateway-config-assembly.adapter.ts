@@ -5,10 +5,10 @@ import { createHash } from "node:crypto";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ModelProvider } from "@langwatch/gateway-contract";
-import type { GatewayModelProviderCredentials } from "../app/gateway.infrastructure.ts";
+import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
 import { llmModels, toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { GatewayConfigAssembly } from "../app/gateway.infrastructure.ts";
+import { GatewayConfigAssembly } from "../app/gateway.members.ts";
 
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";

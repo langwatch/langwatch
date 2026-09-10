@@ -48,8 +48,8 @@ export class TopicApp implements TopicApi {
     return new TopicApp(
       TopicService.create({
         repository: setup.repositories.topics,
-        schedule: setup.infrastructure.schedule,
-        now: setup.infrastructure.now,
+        schedule: setup.members.schedule,
+        now: setup.members.now,
       }),
     );
   }

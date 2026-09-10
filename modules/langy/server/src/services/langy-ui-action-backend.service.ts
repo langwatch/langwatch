@@ -3,11 +3,11 @@ import {
   LangyUiExperimentRequiredError,
   LangyUiHandlerFailedError,
 } from "@langwatch/langy-contract";
-import type { LangyUiActionDefinition } from "../app/langy.infrastructure.ts";
+import type { LangyUiActionDefinition } from "../app/langy.members.ts";
 import {
   type LangyBackendActor,
   LangyUiActionBackend,
-} from "../app/langy.infrastructure.ts";
+} from "../app/langy.members.ts";
 import { tryReadTransformRefusalCode } from "../rules/langy-ui-action-refusal.rules.ts";
 
 /**

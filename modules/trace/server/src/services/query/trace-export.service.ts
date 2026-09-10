@@ -12,7 +12,7 @@ import { enrichTracesWithEvaluations } from "../../rules/trace-evaluation-enrich
 // The PORT rather than the concrete legacy service: the export reads one
 // method, and typing it at the port lets a process hand over whatever it
 // composed its legacy read as.
-import type { TraceLegacyRead } from "../../app/trace.infrastructure.ts";
+import type { TraceLegacyRead } from "../../app/trace.members.ts";
 import {
   CSV_NEWLINE,
   serializeTracesToFullCsv,

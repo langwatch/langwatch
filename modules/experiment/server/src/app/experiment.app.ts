@@ -163,7 +163,7 @@ export class ExperimentApp implements ExperimentApi {
   static create(
     setup: FeatureSetup<Readonly<Record<never, never>>, ExperimentAppDependencies, undefined>,
   ): ExperimentApp {
-    return new ExperimentApp(setup.infrastructure);
+    return new ExperimentApp(setup.members);
   }
 
   #dependencies: ExperimentAppDependencies;

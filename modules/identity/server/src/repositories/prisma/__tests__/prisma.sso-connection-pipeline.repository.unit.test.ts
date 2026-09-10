@@ -15,7 +15,7 @@ import {
   PostgresSsoConnectionPipelineAdapter,
   type SsoConnectionPipelineDatabase,
 } from "../prisma.sso-connection-pipeline.repository.ts";
-import { PlatformOperator } from "../../../app/identity.infrastructure.ts";
+import { PlatformOperator } from "../../../app/identity.members.ts";
 
 /** The models the connection graph reads, none of them touched at composition time. */
 function testDatabase(): SsoConnectionPipelineDatabase {

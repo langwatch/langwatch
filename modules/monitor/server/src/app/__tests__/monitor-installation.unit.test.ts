@@ -24,7 +24,7 @@ function process() {
       createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
     )
     .withModule(monitorServer, {
-      infrastructure: {
+      members: {
         evaluators: new FakeMonitorEvaluators(),
         performance: new FakeMonitorPerformance(),
         replication: new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null }),

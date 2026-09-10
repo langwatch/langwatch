@@ -13,7 +13,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { describe, expect, it } from "vitest";
-import { GatewayAudit } from "../app/gateway.infrastructure.ts";
+import { GatewayAudit } from "../app/gateway.members.ts";
 
 class FakeBudgetRepository extends GatewayBudgetRepository {
   input: GatewayBudgetCheckReadInput | null = null;

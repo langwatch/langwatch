@@ -24,8 +24,8 @@ import {
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
-import type { GithubProjectActivity } from "./github.infrastructure.ts";
-import type { GithubHost } from "./github.infrastructure.ts";
+import type { GithubProjectActivity } from "./github.members.ts";
+import type { GithubHost } from "./github.members.ts";
 import { RedisGithubAppTokenCache } from "./redis-github-app-token-cache.ts";
 import { GithubHostService } from "../services/github-host.service.ts";
 import { GithubInstallResponseRules } from "../rules/github-install-response.rules.ts";
@@ -36,8 +36,8 @@ import {
   RedisGithubAdapter,
   type GithubRedisConnection,
 } from "../repositories/redis/github-redis.connection.ts";
-import { GithubBranchDemand } from "./github.infrastructure.ts";
-import type { GithubBranchMaintenance } from "./github.infrastructure.ts";
+import { GithubBranchDemand } from "./github.members.ts";
+import type { GithubBranchMaintenance } from "./github.members.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";
 import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service.ts";
@@ -379,11 +379,11 @@ export class GithubApp implements GithubApiContract {
     this.#service = service;
   }
 
-  static create({ repositories, infrastructure, config, dependencies }: GithubSetup): GithubApp {
+  static create({ repositories, members, config, dependencies }: GithubSetup): GithubApp {
     return new GithubApp(
       composeGithubApi({
         repositories,
-        redis: infrastructure.redis,
+        redis: members.redis,
         organization: dependencies.organizations,
         project: dependencies.projects,
         config: {
@@ -391,7 +391,7 @@ export class GithubApp implements GithubApiContract {
           privateKey: config.privateKey ?? "",
           appSlug: config.appSlug ?? "",
           webhookSecret: config.webhookSecret ?? "",
-          signingKey: infrastructure.signingKey,
+          signingKey: members.signingKey,
         },
         ...(config.host === undefined ? {} : { hostConfig: { host: config.host } }),
       }),

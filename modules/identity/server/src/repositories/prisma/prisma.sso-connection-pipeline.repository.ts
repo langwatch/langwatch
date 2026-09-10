@@ -2,7 +2,7 @@ import {
   AdminEmailPlatformOperatorsRepository,
   type PrismaSsoPlatformOperatorDatabase,
 } from "./prisma.sso-platform-operators.repository.ts";
-import type { PlatformOperator } from "../../app/identity.infrastructure.ts";
+import type { PlatformOperator } from "../../app/identity.members.ts";
 import { LocalDoorBreakGlassBindingAdapter } from "../../services/local-door-break-glass-binding.service.ts";
 import { SsoConnectionGuardsService } from "../../services/sso-connection-guards.service.ts";
 import { SsoConnectionService } from "../../services/sso-connection.service.ts";

@@ -35,7 +35,7 @@ function buildCaller(options: { manageable: readonly string[] }) {
         getApiKeyProjectDecision: async () => ({ outcome: "denied" }),
       } as unknown as AuthzApi,
     },
-    infrastructure: {
+    members: {
       prompts: {} as unknown as PromptService,
       afterPromptCreated: () => undefined,
     },

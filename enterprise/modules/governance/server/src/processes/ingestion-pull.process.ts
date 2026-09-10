@@ -14,7 +14,7 @@ import {
   IngestionPullIntent,
   ingestionPullRunIntentSchema,
 } from "../intents/ingestion-pull.intent.ts";
-import type { IngestionPullScheduler } from "../app/governance.infrastructure.ts";
+import type { IngestionPullScheduler } from "../app/governance.members.ts";
 import {
   INGESTION_PULL_CONCURRENCY,
   INGESTION_PULL_LEASE_DURATION_MS,

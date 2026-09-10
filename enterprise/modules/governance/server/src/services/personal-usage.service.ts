@@ -9,7 +9,7 @@ import {
 import type {
   IngestionPrincipalSummaryRow,
   PersonalUsageReader,
-} from "../app/governance.infrastructure.ts";
+} from "../app/governance.members.ts";
 import { Temporal } from "@langwatch/time";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;

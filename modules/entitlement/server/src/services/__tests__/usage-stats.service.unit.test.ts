@@ -5,7 +5,7 @@
  */
 import { usageStatsSchema, type Plan, type PlanProvider } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
-import { UsageCounter, type UsageCount } from "../../app/entitlement.infrastructure.ts";
+import { UsageCounter, type UsageCount } from "../../app/entitlement.members.ts";
 import type { UsageMembershipRepository } from "../../repositories/usage-membership.repository.ts";
 import { UNCAPPED_MONTHLY_USAGE_LIMIT, UsageStatsService } from "../usage-stats.service.ts";
 

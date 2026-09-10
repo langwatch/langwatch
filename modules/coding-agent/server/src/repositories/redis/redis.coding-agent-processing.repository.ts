@@ -12,9 +12,9 @@ import { OtelCodingAgentCostMetricsAdapter } from "../../services/coding-agent-c
 import {
   CodingAgentClickHouse,
   type CodingAgentClickHouseClient,
-} from "../../app/coding-agent.infrastructure.ts";
-import type { CodingAgentProjectActivity } from "../../app/coding-agent.infrastructure.ts";
-import type { CodingAgentPullRequestMapping } from "../../app/coding-agent.infrastructure.ts";
+} from "../../app/coding-agent.members.ts";
+import type { CodingAgentProjectActivity } from "../../app/coding-agent.members.ts";
+import type { CodingAgentPullRequestMapping } from "../../app/coding-agent.members.ts";
 
 /** Binds the feature's ClickHouse port to a process's tenant-keyed resolver. */
 class ResolvedCodingAgentClickHouse implements CodingAgentClickHouse {

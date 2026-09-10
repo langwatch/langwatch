@@ -8,7 +8,7 @@ import {
 import {
   TraceMediaReferenceResolver,
   type TraceMediaReference,
-} from "../app/trace.infrastructure.ts";
+} from "../app/trace.members.ts";
 
 /**
  * The compact media references the trace summary strips render, over the one

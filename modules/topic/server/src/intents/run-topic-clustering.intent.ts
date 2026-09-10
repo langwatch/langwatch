@@ -1,4 +1,4 @@
-import type { TopicClusteringCommands } from "../app/topic.infrastructure.ts";
+import type { TopicClusteringCommands } from "../app/topic.members.ts";
 
 /** A manual trigger enters Topic through its durable Eventing command. */
 export class RequestTopicClusteringTask {

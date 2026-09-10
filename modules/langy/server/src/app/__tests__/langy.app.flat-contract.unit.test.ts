@@ -75,7 +75,7 @@ function createApp(): LangyApp {
   };
   return LangyApp.create({
     dependencies: {},
-    infrastructure: {
+    members: {
       database: undefined!,
       commands,
       turns,

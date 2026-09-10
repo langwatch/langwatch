@@ -1,16 +1,16 @@
 import { createLogger } from "@langwatch/observability";
 import type { PlanInfo, UsageUnit } from "@langwatch/entitlement-contract";
-import { USAGE_UNKNOWN, type UsageCount } from "../app/entitlement.infrastructure.ts";
-import type { UsageCache } from "../app/entitlement.infrastructure.ts";
+import { USAGE_UNKNOWN, type UsageCount } from "../app/entitlement.members.ts";
+import type { UsageCache } from "../app/entitlement.members.ts";
 import { NoUsageCache } from "./usage-cache.service.ts";
 import {
   type UsageMeterReading,
   type UsageOrganization,
-} from "../app/entitlement.infrastructure.ts";
+} from "../app/entitlement.members.ts";
 import {
   type ProjectUsageCounts,
   type UsageVolumeCounter,
-} from "../app/entitlement.infrastructure.ts";
+} from "../app/entitlement.members.ts";
 import { UsageMeterPolicyService } from "./usage-meter-policy.service.ts";
 import { UsageLimitMessageService, type UsageDeployment } from "./usage-limit-message.service.ts";
 

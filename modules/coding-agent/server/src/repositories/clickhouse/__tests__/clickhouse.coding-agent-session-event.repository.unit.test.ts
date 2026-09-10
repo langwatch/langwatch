@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { CodingAgentClickHouse } from "../../../app/coding-agent.infrastructure.ts";
+import { CodingAgentClickHouse } from "../../../app/coding-agent.members.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 import { TestClickHouseEndpoint } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 

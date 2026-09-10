@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { GatewayPersistenceTransaction } from "../app/gateway.infrastructure.ts";
-import { GatewayTransaction } from "../app/gateway.infrastructure.ts";
+import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
+import { GatewayTransaction } from "../app/gateway.members.ts";
 
 /** The one client slice a transaction needs. */
 export type GatewayTransactionDatabase = Pick<PrismaClient, "$transaction">;

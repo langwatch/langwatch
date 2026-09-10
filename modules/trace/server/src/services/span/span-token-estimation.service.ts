@@ -1,6 +1,6 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import type { TraceTokenCounter } from "../../app/trace.infrastructure.ts";
+import type { TraceTokenCounter } from "../../app/trace.members.ts";
 import { SpanModelNameService } from "./span-model-name.service.ts";
 
 /**

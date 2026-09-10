@@ -18,9 +18,9 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type { GovernanceHttpClient, GovernanceHttpResponse } from "../app/governance.infrastructure.ts";
+import type { GovernanceHttpClient, GovernanceHttpResponse } from "../app/governance.members.ts";
 import { nowInstant } from "@langwatch/time";
-import type { IngestionPullDiagnosticsSink } from "../app/governance.infrastructure.ts";
+import type { IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
 import { NullIngestionPullDiagnosticsAdapter } from "./ingestion-pull-diagnostics.service.ts";
 
 import type {

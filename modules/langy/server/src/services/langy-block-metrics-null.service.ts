@@ -1,4 +1,4 @@
-import { LangyBlockMetrics } from "../app/langy.infrastructure.ts";
+import { LangyBlockMetrics } from "../app/langy.members.ts";
 import type { LangyBlockCounter } from "./langy-final-parts.service.ts";
 
 /** The default: a deployment composed no block-metrics collector publishes nothing. */

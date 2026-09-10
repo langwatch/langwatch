@@ -11,7 +11,7 @@ import {
   type SignedLicense,
   type ValidationResult,
 } from "@langwatch/enterprise-licensing-contract";
-import { LicenseCryptography } from "../app/licensing.infrastructure.ts";
+import { LicenseCryptography } from "../app/licensing.members.ts";
 import { nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 
 /**

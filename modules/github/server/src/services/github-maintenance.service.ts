@@ -17,7 +17,7 @@ import {
   runGithubBranchRecheck,
   runGithubRetentionPrune,
 } from "../intents/github-branch-recheck.intent.ts";
-import type { GithubBranchMaintenance } from "../app/github.infrastructure.ts";
+import type { GithubBranchMaintenance } from "../app/github.members.ts";
 
 export interface GithubMaintenancePipelineDeps {
   /**

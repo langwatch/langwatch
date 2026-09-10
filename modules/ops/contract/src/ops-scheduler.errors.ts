@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 
-/** Stable operator-action refusals; infrastructure failures remain unhandled. */
+/** Stable operator-action refusals; members failures remain unhandled. */
 
 export class ScheduleNotFoundError extends HandledError {
   declare readonly code: "schedule_not_found";

@@ -1,4 +1,4 @@
-import type { GatewayClickHouseClient } from "../../app/gateway.infrastructure.ts";
+import type { GatewayClickHouseClient } from "../../app/gateway.members.ts";
 import {
   GatewayOpenAdmissions,
   type OpenAdmission,

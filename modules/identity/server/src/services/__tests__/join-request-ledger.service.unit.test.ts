@@ -18,7 +18,7 @@ import type {
 } from "@langwatch/eventing";
 import type { JoinRequestFoldState } from "../../projections/join-request-state.projection.ts";
 import { describe, expect, it, vi } from "vitest";
-import { IdentityEventing } from "../../app/identity.infrastructure.ts";
+import { IdentityEventing } from "../../app/identity.members.ts";
 import { JoinRequestLedgerWriterAdapter } from "../join-request-ledger.service.ts";
 
 const ORGANIZATION = "org_acme";

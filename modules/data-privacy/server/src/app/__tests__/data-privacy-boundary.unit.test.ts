@@ -52,7 +52,7 @@ async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacy
     .withProvided(AuthzApi, permittedAuthz)
     .withProvided(FeatureFlagApi, createApiFixture<FeatureFlagApi>())
     .withModule(dataPrivacyServer, {
-      infrastructure: dataPrivacyTestInfrastructure(directory),
+      members: dataPrivacyTestInfrastructure(directory),
     })
     .boot({ role: "api" });
 

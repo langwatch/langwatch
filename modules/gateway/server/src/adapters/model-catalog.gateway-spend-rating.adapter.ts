@@ -7,7 +7,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { GatewaySpendRating } from "../app/gateway.infrastructure.ts";
+import { GatewaySpendRating } from "../app/gateway.members.ts";
 import type { SpendUsage } from "@langwatch/gateway-contract";
 
 /**

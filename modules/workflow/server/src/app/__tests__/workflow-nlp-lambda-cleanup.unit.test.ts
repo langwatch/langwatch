@@ -16,9 +16,9 @@ import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
  * it cares about rather than booting a process to reach one method.
  */
 function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
-  const infrastructure = createWorkflowTestInfrastructure(fleet ? { nlpLambdaFleet: fleet } : {});
+  const members = createWorkflowTestInfrastructure(fleet ? { nlpLambdaFleet: fleet } : {});
 
-  return WorkflowApp.create({ infrastructure } as Parameters<typeof WorkflowApp.create>[0]);
+  return WorkflowApp.create({ members } as Parameters<typeof WorkflowApp.create>[0]);
 }
 
 describe("the studio's NLP Lambda sweep", () => {

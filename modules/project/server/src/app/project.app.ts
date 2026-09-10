@@ -79,7 +79,7 @@ export class ProjectApp implements ProjectApiContract {
     this.#operations = operations;
   }
 
-  static create({ infrastructure, dependencies, repositories }: ProjectSetup): ProjectApp {
+  static create({ members, dependencies, repositories }: ProjectSetup): ProjectApp {
     const projects = ProjectApplicationService.create({
       repository: repositories.projects,
       credentials: ProjectCredentialsService.create(),
@@ -90,8 +90,8 @@ export class ProjectApp implements ProjectApiContract {
       apiKeys: dependencies.apiKeys,
       share: dependencies.share,
       topics: dependencies.topics,
-      topicClustering: infrastructure.topicClustering,
-      now: infrastructure.now ?? (() => nowInstant().epochMilliseconds),
+      topicClustering: members.topicClustering,
+      now: members.now ?? (() => nowInstant().epochMilliseconds),
     });
     return new ProjectApp(projects, operations);
   }

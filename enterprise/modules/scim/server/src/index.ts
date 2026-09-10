@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The installer, the transport declarations a process mounts, and the two
- * adapters that build what the installer's infrastructure asks for.
+ * adapters that build what the installer's members asks for.
  */
 export {
   scimServer,
@@ -22,7 +22,7 @@ export type {
   ScimSyncLifecycle,
   ScimRemovalOperation,
   ScimUserPushOperation,
-} from "./app/scim.infrastructure.ts";
+} from "./app/scim.members.ts";
 export { ScimDirectoryIdentityService } from "./services/scim-directory-identity.service.ts";
 export type { ScimUserProvisioning } from "./services/scim-provisioning.service.ts";
 

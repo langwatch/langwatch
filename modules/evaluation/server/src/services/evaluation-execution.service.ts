@@ -24,7 +24,7 @@ import {
   type EvaluationTraceProtections,
   type EvaluationTraceRead,
   type EvaluationWorkflowExecutor,
-} from "../app/evaluation.infrastructure.ts";
+} from "../app/evaluation.members.ts";
 import { type EvaluatorInstallEnvironment } from "./evaluator-availability.service.ts";
 import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service.ts";
 import { EvaluationDataService } from "./evaluation-data.service.ts";

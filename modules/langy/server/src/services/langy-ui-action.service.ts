@@ -12,7 +12,7 @@ import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.reposi
 import type {
   LangyUiActionCatalog,
   LangyUiActionDefinition,
-} from "../app/langy.infrastructure.ts";
+} from "../app/langy.members.ts";
 
 /**
  * The agent-to-page action channel (specs/langy/langy-ui-actions.feature).

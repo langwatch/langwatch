@@ -1,7 +1,7 @@
 import { modelCostListInputSchema, type ModelCost } from "@langwatch/model-provider-contract";
 import type {
   ModelCostProjectScope
-} from "../app/model-provider.infrastructure.ts";
+} from "../app/model-provider.members.ts";
 import type {
   ModelCostRepository
 } from "../repositories/model-cost.repository.ts";

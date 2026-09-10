@@ -228,7 +228,7 @@ function enterpriseAccessItems(): SettingsMenuItem[] {
 
 function aiInfrastructureGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
   return {
-    id: "settings-ai-infrastructure",
+    id: "settings-ai-members",
     label: "AI Infrastructure",
     items: [
       {

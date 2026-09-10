@@ -96,7 +96,7 @@ export function createEvaluatorTestApp(
       auditLog: createApiFixture<AuditLogApi>({ listEntityHistory: async () => [] }),
       users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
     },
-    infrastructure: {
+    members: {
       workflows: createApiFixture<WorkflowService>({ assertInProject: async () => void 0 }),
       graph,
       nlp: createApiFixture<EvaluatorNlpDispatcher>(),

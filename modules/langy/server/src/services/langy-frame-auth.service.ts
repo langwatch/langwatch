@@ -3,7 +3,7 @@ import type {
   LangyFrameEnvelope,
   LangyFrameIdentity,
   LangyFrameSigned,
-} from "../app/langy.infrastructure.ts";
+} from "../app/langy.members.ts";
 
 /**
  * Langy authenticated frame contract. This module IS the contract's home; the

@@ -36,7 +36,7 @@ vi.mock("langwatch", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { StoredObjectsClickHouse } from "../../../app/stored-object.infrastructure.ts";
+import { StoredObjectsClickHouse } from "../../../app/stored-object.members.ts";
 import type { StoredObject } from "../../../rules/stored-object-row.rules.ts";
 import { ClickHouseStoredObjectsRepository } from "../stored-objects.repository.ts";
 

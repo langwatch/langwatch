@@ -10,7 +10,7 @@ const STATUSES: readonly string[] = ["open", "draft", "merged", "closed"];
 
 /**
  * The Redis tier. The connection is nullable because this module's Redis is
- * optional infrastructure: a process that opened none misses every read, which
+ * optional members: a process that opened none misses every read, which
  * is what a cold cache does anyway.
  */
 export class GithubPullRequestStatusCacheRedisRepository extends GithubPullRequestStatusCacheRepository {

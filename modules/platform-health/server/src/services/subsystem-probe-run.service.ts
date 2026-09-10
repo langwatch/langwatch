@@ -1,6 +1,6 @@
 import type { PlatformHealthCheckName } from "@langwatch/platform-health-contract";
 
-import { SubsystemProbe, type SubsystemProbeResult } from "../app/platform-health.infrastructure.ts";
+import { SubsystemProbe, type SubsystemProbeResult } from "../app/platform-health.members.ts";
 import type {
   SubsystemProbeOutcome,
   SubsystemProbeReason,

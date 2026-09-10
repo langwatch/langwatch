@@ -2,7 +2,7 @@ import type { AppendStore } from "@langwatch/eventing";
 import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { type SpanReceivedEvent, spanReceivedEventSchema } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { TraceSpanNormalization } from "../app/trace.infrastructure.ts";
+import { TraceSpanNormalization } from "../app/trace.members.ts";
 import { SpanCostService } from "../services/span/span-cost.service.ts";
 import {
   spanStorageMapGroupKey,

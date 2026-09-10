@@ -71,7 +71,7 @@ export {
   StoredObjectUploadTokenCodec,
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
-} from "./app/stored-object.infrastructure.ts";
+} from "./app/stored-object.members.ts";
 export { StoredObjectLegacyLocation } from "./repositories/stored-object-legacy-location.repository.ts";
 export {
   StoredObjectLegacySource,
@@ -87,20 +87,20 @@ export {
 export {
   type StoredObjectOwnerLookupTelemetry,
   type StoredObjectOwnerLookupSpan,
-} from "./app/stored-object.infrastructure.ts";
+} from "./app/stored-object.members.ts";
 /**
  * The CONTENT-ADDRESSED store, moved here whole from the platform application.
  */
 export {
   type StoredObjectsClickHouse,
   type StoredObjectsClickHouseClient,
-} from "./app/stored-object.infrastructure.ts";
-export { type StoredObjectsTelemetry } from "./app/stored-object.infrastructure.ts";
+} from "./app/stored-object.members.ts";
+export { type StoredObjectsTelemetry } from "./app/stored-object.members.ts";
 export {
   type StoredObjectS3TargetResolver,
   type StoredObjectS3Credentials,
   type StoredObjectS3Target,
-} from "./app/stored-object.infrastructure.ts";
+} from "./app/stored-object.members.ts";
 export { storedObjectSchema, type StoredObject } from "./rules/stored-object-row.rules.ts";
 export {
   StoredObjectsService,

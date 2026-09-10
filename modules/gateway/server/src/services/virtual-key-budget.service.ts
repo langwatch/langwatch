@@ -10,9 +10,9 @@ import {
   type GatewayBudget,
 } from "@langwatch/gateway-contract";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-import { GatewayAudit } from "../app/gateway.infrastructure.ts";
-import { GatewayChangeEvents } from "../app/gateway.infrastructure.ts";
-import type { GatewayPersistenceTransaction } from "../app/gateway.infrastructure.ts";
+import { GatewayAudit } from "../app/gateway.members.ts";
+import { GatewayChangeEvents } from "../app/gateway.members.ts";
+import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 import type {
   GatewayKeyBudgetRepository,
   GatewayKeyBudgetScope,

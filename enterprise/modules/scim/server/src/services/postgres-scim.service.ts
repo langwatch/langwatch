@@ -6,7 +6,7 @@ import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { ScimService as ScimServiceContract } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { UserApi } from "@langwatch/user-contract";
-import type { ScimSyncLifecycle } from "../app/scim.infrastructure.ts";
+import type { ScimSyncLifecycle } from "../app/scim.members.ts";
 import { PrismaScimRepository } from "../repositories/prisma/prisma.scim.repository.ts";
 import { ScimService } from "./scim.service.ts";
 

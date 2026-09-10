@@ -15,12 +15,12 @@ import { TraceCanonicalisationService } from "../../canonicalisers/trace-canonic
 import {
   TraceMediaReferenceResolver,
   type TraceMediaReference,
-} from "../../../app/trace.infrastructure.ts";
+} from "../../../app/trace.members.ts";
 import {
   TraceIoExtraction,
   type TraceIoSide,
   type TraceIoValue,
-} from "../../../app/trace.infrastructure.ts";
+} from "../../../app/trace.members.ts";
 import { OUTPUT_SOURCE, TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
 
 type Extracted = { rich?: TraceIoValue | null; fallback?: TraceIoValue | null };

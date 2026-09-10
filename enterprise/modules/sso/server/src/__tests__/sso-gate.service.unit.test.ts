@@ -9,7 +9,7 @@ import {
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BetterAuthSsoAdapter } from "../services/better-auth-sso.service.ts";
-import { SsoGateLogger } from "../app/sso.infrastructure.ts";
+import { SsoGateLogger } from "../app/sso.members.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 
 class FakeLicensingService extends LicensingService {

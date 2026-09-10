@@ -12,7 +12,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { GithubHost } from "../../app/github.infrastructure.ts";
+import { GithubHost } from "../../app/github.members.ts";
 import type { BranchMappingTarget } from "../github-branch-mapping.service.ts";
 import { GithubBranchDemandService } from "../github-branch-demand.service.ts";
 import { TestProjectService } from "./fixtures/github-services.fixture.ts";

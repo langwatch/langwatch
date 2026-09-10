@@ -5,7 +5,7 @@ import type {
   OtlpSpan,
   TraceCanonicalisationService,
 } from "@langwatch/trace-contract";
-import { TraceSpanNormalization } from "../app/trace.infrastructure.ts";
+import { TraceSpanNormalization } from "../app/trace.members.ts";
 import { SpanNormalizationPipelineService } from "./span/span-normalization.service.ts";
 
 /**

@@ -6,8 +6,8 @@ import {
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
 } from "../data-privacy.app.ts";
-import { DataPrivacyResolution } from "../data-privacy.infrastructure.ts";
-import { PiiAnalysis } from "../data-privacy.infrastructure.ts";
+import { DataPrivacyResolution } from "../data-privacy.members.ts";
+import { PiiAnalysis } from "../data-privacy.members.ts";
 
 /** The policy source the redaction cases drive their PII cases over. */
 export class DataPrivacyResolutionFake implements DataPrivacyResolution {

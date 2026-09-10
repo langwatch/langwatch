@@ -17,7 +17,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { PiiAnalysis } from "./data-privacy.infrastructure.ts";
+import type { PiiAnalysis } from "./data-privacy.members.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
@@ -50,7 +50,7 @@ export type DataPrivacyOrganizationDirectory = Readonly<{
  *
  * Four other verticals' rows — organizations, departments, teams and projects —
  * read for one purpose: to say which organization owns a scope target and what
- * a scope is called. That is why they arrive as infrastructure rather than as
+ * a scope is called. That is why they arrive as members rather than as
  * those verticals' services: this package must not gain a write graph, an
  * authz service and three identity ports to print a team's name beside a rule.
  */
@@ -136,33 +136,33 @@ export class DataPrivacyApp implements DataPrivacyApi {
     this.#projects = services.projects;
   }
 
-  static create({ repositories, infrastructure, dependencies }: DataPrivacySetup): DataPrivacyApp {
+  static create({ repositories, members, dependencies }: DataPrivacySetup): DataPrivacyApp {
     const privacy = DataPrivacyService.create({
       repository: repositories.policies,
       projects: dependencies.projects,
       organizations: dependencies.organizations,
-      ...(infrastructure.ttlMs === undefined ? {} : { ttlMs: infrastructure.ttlMs }),
-      ...(infrastructure.now === undefined ? {} : { now: infrastructure.now }),
+      ...(members.ttlMs === undefined ? {} : { ttlMs: members.ttlMs }),
+      ...(members.now === undefined ? {} : { now: members.now }),
     });
     const permissions = DataPrivacyPermissionsService.create({ authz: dependencies.permissions });
 
     return new DataPrivacyApp({
       privacy,
       redaction:
-        "pii" in infrastructure
+        "pii" in members
           ? OtlpSpanPiiRedactionService.create({
-              ...infrastructure.pii,
+              ...members.pii,
               dataPrivacy: privacy,
               featureFlags: dependencies.featureFlags,
             })
-          : infrastructure.redaction,
+          : members.redaction,
       snapshots: DataPrivacySnapshotService.create({
         policies: privacy,
-        directory: infrastructure.directory,
+        directory: members.directory,
         permissions,
       }),
       scopeAuthorization: DataPrivacyScopeAuthorizationService.create({
-        directory: infrastructure.directory,
+        directory: members.directory,
         permissions,
       }),
       contentDrop: ContentDropPolicyService.create(),

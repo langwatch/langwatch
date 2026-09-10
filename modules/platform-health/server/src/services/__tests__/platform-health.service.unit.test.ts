@@ -5,7 +5,7 @@ import {
   SubsystemProbeAdapter,
   type SubsystemProbeRunner,
 } from "../subsystem-probe-run.service.ts";
-import { SubsystemProbe, type SubsystemProbeResult } from "../../app/platform-health.infrastructure.ts";
+import { SubsystemProbe, type SubsystemProbeResult } from "../../app/platform-health.members.ts";
 import { PlatformHealthService } from "../platform-health.service.ts";
 import type { SubsystemProbeOutcome } from "../subsystem-probe.service.ts";
 

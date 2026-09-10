@@ -3,7 +3,7 @@
 import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { ActivityMonitorService } from "./ingestion-source-activity.service.ts";
 import type { DefaultGovernancePersonalUsageService } from "./personal-usage.service.ts";
-import type { CliBudgetOverviewReader } from "../app/governance.infrastructure.ts";
+import type { CliBudgetOverviewReader } from "../app/governance.members.ts";
 
 /** Private cohesive collaborator for the activity operation set. */
 export class GovernanceActivityOperationsService {

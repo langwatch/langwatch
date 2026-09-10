@@ -3,7 +3,7 @@ import {
   getStaticModelCostRates,
   type ModelCostEstimateInput,
 } from "@langwatch/model-provider-contract";
-import { CodingAgentCostEstimator } from "../app/coding-agent.infrastructure.ts";
+import { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
 
 /**
  * Session cost priced from the platform's immutable model catalog.

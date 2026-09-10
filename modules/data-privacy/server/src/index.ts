@@ -18,7 +18,7 @@ export {
   type PiiAnalysisOutcome,
   type PIICheckOptions,
   type PiiAnalysis,
-} from "./app/data-privacy.infrastructure.ts";
+} from "./app/data-privacy.members.ts";
 export {
   PrismaDataPrivacyDirectoryRepository,
   type DataPrivacyDirectoryDatabase,

@@ -1,7 +1,7 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
-import type { GithubBranchMaintenance } from "../app/github.infrastructure.ts";
+import type { GithubBranchMaintenance } from "../app/github.members.ts";
 import { GITHUB_BRANCH_RECHECK_PROCESS_NAME } from "../processes/github-branch-recheck.process.ts";
 import { nowInstant } from "@langwatch/time";
 

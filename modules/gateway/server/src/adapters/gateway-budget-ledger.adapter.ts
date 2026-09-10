@@ -1,5 +1,5 @@
-import type { GatewayClickHouseResolver } from "../app/gateway.infrastructure.ts";
-import type { GatewayBudgetSpend } from "../app/gateway.infrastructure.ts";
+import type { GatewayClickHouseResolver } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 
 /** Binds Gateway's ClickHouse ledger implementation to its technical port. */

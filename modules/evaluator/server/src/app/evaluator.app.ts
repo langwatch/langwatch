@@ -142,25 +142,25 @@ export class EvaluatorApp implements EvaluatorApi {
   };
 
   static create(setup: EvaluatorSetup): EvaluatorApp {
-    const { dependencies, infrastructure, repositories } = setup;
+    const { dependencies, members, repositories } = setup;
 
     return new EvaluatorApp({
       evaluators: EvaluatorRuntimeService.create({
         repository: repositories.evaluators,
-        workflows: infrastructure.workflows,
+        workflows: members.workflows,
         history: EvaluatorHistoryService.create({
           auditLog: dependencies.auditLog,
           users: dependencies.users,
         }),
-        ...(infrastructure.fallbackModels
-          ? { fallbackModels: infrastructure.fallbackModels }
+        ...(members.fallbackModels
+          ? { fallbackModels: members.fallbackModels }
           : {}),
-        codeExecution: EvaluatorCodeExecutionService.create(infrastructure.nlp),
-        generateId: infrastructure.generateId,
+        codeExecution: EvaluatorCodeExecutionService.create(members.nlp),
+        generateId: members.generateId,
       }),
-      modelProviders: infrastructure.modelProviders,
+      modelProviders: members.modelProviders,
       permissions: dependencies.permissions,
-      graph: infrastructure.graph,
+      graph: members.graph,
     });
   }
 

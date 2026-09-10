@@ -60,7 +60,7 @@ import type {
   PersonalWorkspaceDiagnostics,
   PersonalWorkspaceIdentity,
   TeamIdentity,
-} from "../app/organization.infrastructure.ts";
+} from "../app/organization.members.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type { OrganizationRepository } from "../repositories/organization.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";

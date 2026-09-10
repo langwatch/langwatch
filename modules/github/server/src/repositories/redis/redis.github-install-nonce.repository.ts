@@ -3,7 +3,7 @@ import { GithubInstallNonceRepository } from "../github-install-nonce.repository
 
 /**
  * The Redis tier. The connection is nullable because this module's Redis is
- * optional infrastructure: a process that opened none answers null, and the
+ * optional members: a process that opened none answers null, and the
  * installation flow reads that as "replay cannot be judged here" rather than
  * refusing every install.
  */

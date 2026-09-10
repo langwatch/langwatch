@@ -51,14 +51,14 @@ export {
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
 export * from "./services/governance-events.service.ts";
-export * from "./app/governance.infrastructure.ts";
+export * from "./app/governance.members.ts";
 export * from "./repositories/audit/admin-workspace-view-audit.repository.ts";
 export * from "./repositories/ai-tool-catalog.repository.ts";
 export * from "./repositories/policy/anomaly-rule.repository.ts";
 export * from "./repositories/directory/department.repository.ts";
 export * from "./services/governance-diagnostics.service.ts";
 export * from "./repositories/audit/governance-setup-state.repository.ts";
-export * from "./app/governance.infrastructure.ts";
+export * from "./app/governance.members.ts";
 export * from "./repositories/ingestion-pull-lifecycle.repository.ts";
 export * from "./services/ingestion-pull-diagnostics.service.ts";
 export * from "./repositories/ingestion-source.repository.ts";

@@ -2,7 +2,7 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import {
   type LangyDispatchOutcome,
   LangyWorkerMetrics,
-} from "../app/langy.infrastructure.ts";
+} from "../app/langy.members.ts";
 
 export const LANGY_DISPATCH_METRIC_NAME = "langwatch_langy_dispatch_total";
 

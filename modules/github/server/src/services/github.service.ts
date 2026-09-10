@@ -12,10 +12,10 @@ import type {
   GithubInstallStatePayload,
   GithubAppConfig,
 } from "@langwatch/github-contract";
-import type { GithubHost } from "../app/github.infrastructure.ts";
-import type { GithubInstallResponse } from "../app/github.infrastructure.ts";
-import type { GithubInstallState } from "../app/github.infrastructure.ts";
-import type { GithubPullRequestEventParser } from "../app/github.infrastructure.ts";
+import type { GithubHost } from "../app/github.members.ts";
+import type { GithubInstallResponse } from "../app/github.members.ts";
+import type { GithubInstallState } from "../app/github.members.ts";
+import type { GithubPullRequestEventParser } from "../app/github.members.ts";
 
 import { GithubConnectionService } from "./github-connection.service.ts";
 import { GithubInstallationsService } from "./github-installations.service.ts";

@@ -16,7 +16,7 @@ import {
 import type {
   ModelCostProject,
   ModelProviderCodexHandle,
-} from "../app/model-provider.infrastructure.ts";
+} from "../app/model-provider.members.ts";
 
 /**
  * Returns a Vercel AI SDK model handle for the given project + feature.

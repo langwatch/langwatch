@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { TraceClickHouse, type TraceClickHouseClient } from "../../trace-clickhouse-client.repository.ts";
 import { TracePayloadReaderRepository } from "../../read/trace-payload-reader.repository.ts";
-import { TraceFullIo } from "../../../app/trace.infrastructure.ts";
+import { TraceFullIo } from "../../../app/trace.members.ts";
 import { ClickHouseTraceFullRecordRepository } from "../trace-full-record.repository.ts";
 
 class TenantClickHouseResolver extends TraceClickHouse {

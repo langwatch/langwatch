@@ -1,5 +1,5 @@
 import type { DataPrivacyPolicy, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyProject } from "../app/data-privacy.infrastructure.ts";
+import type { DataPrivacyProject } from "../app/data-privacy.members.ts";
 import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
 import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service.ts";
 

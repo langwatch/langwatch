@@ -8,7 +8,7 @@ import {
   IngestionKeyIssuer,
   IngestionKeyRepository,
   type StoredIngestionKey,
-} from "../../app/governance.infrastructure.ts";
+} from "../../app/governance.members.ts";
 import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 import { IngestionKeyService } from "../ingestion-source-key.service.ts";
 

@@ -4,7 +4,7 @@
  */
 
 import type { PiiLevel, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyResolution } from "../app/data-privacy.infrastructure.ts";
+import type { DataPrivacyResolution } from "../app/data-privacy.members.ts";
 import type { TenantId } from "@langwatch/eventing";
 import { STRICT_ONLY_PII_ENTITIES } from "@langwatch/redaction";
 import {
@@ -12,7 +12,7 @@ import {
   compilePolicySecretPatterns,
   nativePiiEntitiesForPolicy,
 } from "@langwatch/redaction/pii";
-import { type PIICheckOptions, PiiAnalysis } from "../app/data-privacy.infrastructure.ts";
+import { type PIICheckOptions, PiiAnalysis } from "../app/data-privacy.members.ts";
 
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
