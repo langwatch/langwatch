@@ -291,6 +291,32 @@ describe("pull outcome metrics (ADR-054)", () => {
       );
     });
 
+    /**
+     * The abandonment write is what closes the replaced run. If it is the call
+     * that failed, the outbox redelivers this handler at a higher attempt, and
+     * a first-attempt-only guard would mean the replaced run is never closed at
+     * all -- a source that reads as still working forever.
+     */
+    /** @scenario "A run replaced before it finished records that it was abandoned" */
+    it("still records the abandonment when the outbox redelivers the intent", async () => {
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: {
+          run: vi.fn().mockResolvedValue({ nextCursor: "c2", eventCount: 0 }),
+        },
+        commands: () => commandsStub({ recordRunFailed }),
+        clock: () => 200,
+      });
+
+      await handler(replacing, context(2));
+
+      expect(recordRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({ runId: "run-1", errorCode: "run_abandoned" }),
+      );
+    });
+
     it("records nothing about an abandonment on a run that replaced nothing", async () => {
       const recordRunFailed = vi.fn();
       const handler = createIngestionPullRunHandler({

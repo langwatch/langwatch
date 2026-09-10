@@ -537,7 +537,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
      * run's own pages rather than off the cursor: a window already being read
      * undivided is not this run's news to report.
      */
-    let lostKeyAttribution = false;
+    let hasLostKeyAttribution = false;
 
     /**
      * What an unfinished run persists as its resume point. With a page token
@@ -547,23 +547,35 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
      */
     const resumeStart = () => (page === null ? cursor.storedStart : startingAt);
 
+    /**
+     * What a run that stopped before draining the window returns.
+     *
+     * Both ways out of the loop — the deadline and the page cap — leave the
+     * same thing behind: every event read so far, a cursor pointing at where
+     * to resume, and no error, because nothing failed. `truncated` is the part
+     * that must not be forgotten at either exit; a half-read window that says
+     * nothing is recorded as complete.
+     */
+    const stoppedShort = (): PullResult => ({
+      events,
+      cursor: encodeCursor({
+        startingAt: resumeStart(),
+        page,
+        query,
+        watermark,
+        hasKeyGrouping,
+        keyGroupingUpgrade: false,
+      }),
+      errorCount: 0,
+      completeness: "truncated",
+      ...runNotices(hasLostKeyAttribution),
+    });
+
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
       if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
         // Everything read so far is kept and the cursor says where to resume,
         // so a deadline costs latency rather than a window.
-        return {
-          events,
-          cursor: encodeCursor({
-            startingAt: resumeStart(),
-            page,
-            query,
-            watermark,
-            hasKeyGrouping,
-            keyGroupingUpgrade: false,
-          }),
-          errorCount: 0,
-          ...runNotices(lostKeyAttribution),
-        };
+        return stoppedShort();
       }
 
       const read = await this.readPage({
@@ -578,7 +590,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         return { events, cursor: options.cursor, errorCount: 1 };
       }
       events.push(...read.events);
-      if (!read.hasKeyGrouping) lostKeyAttribution = true;
+      if (!read.hasKeyGrouping) hasLostKeyAttribution = true;
       hasKeyGrouping = read.hasKeyGrouping;
       watermark = laterOf(watermark, read.watermark);
 
@@ -594,7 +606,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
             }),
           ),
           errorCount: 0,
-          ...runNotices(lostKeyAttribution),
+          ...runNotices(hasLostKeyAttribution),
         };
       }
       page = read.nextPage;
@@ -604,19 +616,8 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       { adapter: this.id },
       "openai admin hit MAX_PAGES_PER_RUN; the next run resumes from the cursor",
     );
-    return {
-      events,
-      cursor: encodeCursor({
-        startingAt: resumeStart(),
-        page,
-        query,
-        watermark,
-        hasKeyGrouping,
-        keyGroupingUpgrade: false,
-      }),
-      errorCount: 0,
-      ...runNotices(lostKeyAttribution),
-    };
+    // A page token still in hand means the window was not drained.
+    return stoppedShort();
   }
 
   /**
@@ -999,8 +1000,8 @@ export const PER_KEY_ATTRIBUTION_UNAVAILABLE =
  * adapter that reported no notices from one that reports none because it does
  * not know how.
  */
-function runNotices(lostKeyAttribution: boolean): { notices?: string[] } {
-  return lostKeyAttribution
+function runNotices(hasLostKeyAttribution: boolean): { notices?: string[] } {
+  return hasLostKeyAttribution
     ? { notices: [PER_KEY_ATTRIBUTION_UNAVAILABLE] }
     : {};
 }

@@ -1504,6 +1504,7 @@ describe("given a subscription billing both AI services and unrelated infrastruc
         pricedThroughDay: string | null;
         heldSinceMs: number | null;
         readAtMs: number | null;
+        deepReadDay: string | null;
       };
     }): Promise<{ events: Array<{ target: string }> }>;
   }
@@ -1546,11 +1547,14 @@ describe("given a subscription billing both AI services and unrelated infrastruc
             billingClientSecret: "billing-client-secret",
           },
         },
-        // Never read before, so this run is due to ask.
+        // Never read before, so this run is due to ask — and no deep read has
+        // finished either, which is a state production reaches and the omitted
+        // fourth one (a caller that does no deep reads at all) is not.
         previous: {
           pricedThroughDay: null,
           heldSinceMs: null,
           readAtMs: null,
+          deepReadDay: null,
         },
       });
 

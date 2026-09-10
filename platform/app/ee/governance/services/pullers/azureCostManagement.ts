@@ -382,11 +382,13 @@ export function azureCostReadWindow({
    * has not been read, and stamping it when the request went out would lose it.
    */
   deepReadDay?: string | null;
-}): { fromDay: string; toDay: string; deep: boolean } {
+}): { fromDay: string; toDay: string; isDeepRead: boolean } {
   const toDay = utcDay(nowMs);
   // The first run of each day reaches a month back; the rest keep to the week.
-  const deep = deepReadDay !== undefined && deepReadDay !== toDay;
-  const reachDays = deep ? AZURE_COST_DEEP_READ_DAYS : AZURE_COST_REREAD_DAYS;
+  const isDeepRead = deepReadDay !== undefined && deepReadDay !== toDay;
+  const reachDays = isDeepRead
+    ? AZURE_COST_DEEP_READ_DAYS
+    : AZURE_COST_REREAD_DAYS;
   const trailingStartMs = nowMs - (reachDays - 1) * ONE_DAY_MS;
 
   const pricedThroughMs = pricedThroughDay
@@ -396,7 +398,11 @@ export function azureCostReadWindow({
     ? pricedThroughMs + ONE_DAY_MS
     : Number.POSITIVE_INFINITY;
 
-  return { fromDay: utcDay(Math.min(trailingStartMs, resumeMs)), toDay, deep };
+  return {
+    fromDay: utcDay(Math.min(trailingStartMs, resumeMs)),
+    toDay,
+    isDeepRead,
+  };
 }
 
 /**

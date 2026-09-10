@@ -803,6 +803,15 @@ interface TranscriptWalk {
   events: NormalizedPullEvent[];
   errorCount: number;
   last: Cursor | null;
+  /**
+   * Whether the walk stopped at a limit with pages still waiting.
+   *
+   * Not an error and not a failure — the rows already read are kept and the
+   * position still advances over them. It is the only thing that separates an
+   * environment permanently stuck on a fraction of its conversations from a
+   * quiet one, and without it both leave through the same exit.
+   */
+  isTruncated: boolean;
 }
 
 /**
@@ -998,7 +1007,12 @@ export class CopilotStudioDataversePuller
     options: PullRunOptions,
     config: CopilotStudioDataverseConfig,
   ): Promise<PullResult> {
-    const walk: TranscriptWalk = { events: [], errorCount: 0, last: null };
+    const walk: TranscriptWalk = {
+      events: [],
+      errorCount: 0,
+      last: null,
+      isTruncated: false,
+    };
     const previous = parseCursor(options.cursor);
 
     // Both money reads happen BEFORE the environment is signed in to, and the
@@ -1044,6 +1058,21 @@ export class CopilotStudioDataversePuller
 
       await this.walkTranscriptPages({ walk, options, config, token, bots });
     } catch (error) {
+      // A provider asking for silence leaves by the error path, and only it.
+      // The wait it named reaches the connection off the thrown error, so
+      // absorbing it into an error count strands the one number saying when it
+      // is safe to come back — and on a walk that read some pages the run
+      // would then report partial success and the next wake would ask again
+      // inside the window just closed. Nothing is lost by leaving here: the
+      // cursor is never persisted on a throw, so the bill, the licences and
+      // the directory above are read again by the run that follows.
+      if (error instanceof DispatchError) {
+        logger.warn(
+          { retryAfterMs: error.retryAfterMs },
+          "copilot studio dataverse: the environment asked for fewer requests; ending the run with its wait",
+        );
+        throw error;
+      }
       walk.errorCount += 1;
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
@@ -1084,6 +1113,7 @@ export class CopilotStudioDataversePuller
         ? encodeCursor(next)
         : options.cursor,
       errorCount: walk.errorCount,
+      ...(walk.isTruncated ? { completeness: "truncated" as const } : {}),
     };
   }
 
@@ -1206,7 +1236,7 @@ export class CopilotStudioDataversePuller
         nowMs,
         previous,
         outcome: "priced",
-        wasDeepRead: window.deep,
+        wasDeepRead: window.isDeepRead,
       });
       return {
         events: azureCostEvents({ days: aiDays, subscriptionId }),
@@ -1696,7 +1726,12 @@ export class CopilotStudioDataversePuller
 
     while (url && pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
-      if (runIsOver(options)) break;
+      if (runIsOver(options)) {
+        // A link still in hand and no time left to follow it: the same
+        // half-read window the page cap leaves, reached the other way.
+        walk.isTruncated = true;
+        break;
+      }
 
       const page = await this.fetchPage({ url, token, signal: options.signal });
       readPageRows({ page, walk, bots });
@@ -1715,6 +1750,7 @@ export class CopilotStudioDataversePuller
     }
 
     if (url && pageCount >= MAX_PAGES_PER_RUN) {
+      walk.isTruncated = true;
       logger.warn(
         { pageCount },
         "copilot studio dataverse hit the page cap; the next run resumes from the cursor",

@@ -90,13 +90,13 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     const client = this.makeClient({ config, options });
     const cursor = options.cursor;
 
-    const { keys: listed, truncated } = await this.listKeys({
+    const { keys: listed, isTruncated } = await this.listKeys({
       client,
       config,
       startAfter: cursor ?? undefined,
       signal: options.signal,
     });
-    let completeness: "complete" | "truncated" = truncated
+    let completeness: "complete" | "truncated" = isTruncated
       ? "truncated"
       : "complete";
     if (listed.length === 0) {
@@ -245,7 +245,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     /**
      * The keys to read, and whether the store held more than this run may take.
      *
-     * `truncated` is returned rather than inferred by the caller from
+     * `isTruncated` is returned rather than inferred by the caller from
      * `keys.length`: a listing that happens to hold exactly the cap is
      * indistinguishable from one cut short by it, and the caller would have
      * to re-derive a rule that already lives here.
@@ -257,7 +257,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
      * already gathered are kept and the cursor still advances — so the answer
      * rides beside `errorCount` rather than raising it.
      */
-  }): Promise<{ keys: string[]; truncated: boolean }> {
+  }): Promise<{ keys: string[]; isTruncated: boolean }> {
     const keys: string[] = [];
     let continuationToken: string | undefined;
     let pages = 0;
@@ -282,12 +282,12 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
         : undefined;
       if (keys.length >= MAX_FILES_PER_RUN) {
         // Safety cap — the cursor will pick up the rest on the next run
-        return { keys: keys.slice(0, MAX_FILES_PER_RUN), truncated: true };
+        return { keys: keys.slice(0, MAX_FILES_PER_RUN), isTruncated: true };
       }
     } while (continuationToken && pages < 50);
     // A token still in hand means the page cap above stopped the walk, which
     // leaves the store just as half-read as the file cap does.
-    return { keys, truncated: continuationToken !== undefined };
+    return { keys, isTruncated: continuationToken !== undefined };
   }
 
   private async readObject({

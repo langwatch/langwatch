@@ -271,6 +271,58 @@ describe("given a run that was replaced before the wait it was told about had pa
   });
 });
 
+/**
+ * The wait a provider named starts when the provider named it. Measuring it
+ * from the moment we get round to reading the refusal stretches it by however
+ * far the subscriber is behind, and re-reading an old refusal during a replay
+ * would park a live source on a wait that expired long ago.
+ */
+describe("given a refusal read long after the provider gave it", () => {
+  const LATE_BY = 30 * 60 * 1000;
+
+  /** @scenario "A provider answering that too many requests were made has its wait read" */
+  it("ends the wait an hour after the refusal, not an hour after it was read", () => {
+    const booted = boot(T0).state;
+
+    const refused = evolve({
+      previousState: {
+        ...booted,
+        currentRun: { runId: "run-1", scheduledFor: T0, startedAt: T0 },
+      },
+      input: {
+        kind: "event",
+        event: runFailed({ at: T0, runId: "run-1", retryAfterMs: ONE_HOUR }),
+        now: T0 + LATE_BY,
+      },
+    });
+
+    expect(refused.state.cooldownUntil).toBe(T0 + ONE_HOUR);
+  });
+
+  /** @scenario "A provider answering that too many requests were made has its wait read" */
+  it("does not re-arm a wait that had already passed by the time it was read", () => {
+    const booted = boot(T0).state;
+    // Read a full day late: the hour the provider asked for is long gone.
+    const readAt = T0 + 24 * ONE_HOUR;
+
+    const refused = evolve({
+      previousState: {
+        ...booted,
+        currentRun: { runId: "run-1", scheduledFor: T0, startedAt: T0 },
+      },
+      input: {
+        kind: "event",
+        event: runFailed({ at: T0, runId: "run-1", retryAfterMs: ONE_HOUR }),
+        now: readAt,
+      },
+    });
+
+    // The next wake is the ordinary cadence off the present, with no wait
+    // standing between the source and its provider.
+    expect(refused.nextWakeAt).toBe(readAt + 15 * 60 * 1000);
+  });
+});
+
 describe("given a run that has been going longer than it is allowed to", () => {
   const STALE_BY = 31 * 60 * 1000;
 

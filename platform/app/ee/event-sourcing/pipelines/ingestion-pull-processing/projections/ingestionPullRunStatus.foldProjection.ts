@@ -172,6 +172,17 @@ const ingestionPullEvents = [
  *
  * Absent means the two stay at whatever the row already held, so a producer
  * that has not been taught to report yet cannot erase what an earlier one did.
+ *
+ * An explicit `readThroughAt: null` is held the same way, and that is a
+ * decision rather than an oversight. `LastReadThroughAt` is how far this
+ * SOURCE has been read, not how far its most recent run got, and a run that
+ * reached nowhere read nothing back out of the source. Two ordinary runs
+ * report null: a paused or archived source, which completes without asking the
+ * provider anything, and a truncated run that emitted no readable event.
+ * Clearing on either would turn a known read-through point into "unknown" —
+ * which is exactly the state the field's own doc reserves for a source nobody
+ * has read yet, and which would drop the truncation notice off the stuck
+ * sources it exists to mark.
  */
 function readThroughOf(event: IngestionPullRunCompletedEvent): {
   LastReadThroughAt?: number;

@@ -43,7 +43,18 @@ const PERIOD = ["2026-01-13", "2026-01-14", "2026-01-15"] as const;
 const PROVIDER_DAILY_NANO_USD = 1_000_000_000;
 
 const SUBSCRIPTION_ID = "sub_test_0000";
+/** When the read that stopped halfway looked. */
 const OBSERVED_AT = new Date("2026-01-16T09:00:00.000Z");
+/**
+ * When the restarted read looked — LATER, and that is the point.
+ *
+ * The fold ranks an observation against the one an item already holds and
+ * declines anything not newer. A second pass stamped with the same instant is
+ * therefore a re-delivery of the first, which proves the log collapses
+ * duplicates and says nothing at all about a genuinely later run covering the
+ * period again.
+ */
+const RESTARTED_AT = new Date("2026-01-16T11:00:00.000Z");
 
 let ch: ClickHouseClient;
 let repo: GovernanceCostRollupClickHouseRepository;
@@ -64,7 +75,13 @@ function billFor(day: string): AzureDailyCost {
  * One read of a span of days, all the way through the real ingest seam:
  * adapter events, then the priced record each becomes, then the fold.
  */
-async function readDays(days: readonly string[]): Promise<void> {
+async function readDays({
+  days,
+  observedAt,
+}: {
+  days: readonly string[];
+  observedAt: Date;
+}): Promise<void> {
   const events = azureCostEvents({
     days: days.map(billFor),
     subscriptionId: SUBSCRIPTION_ID,
@@ -80,7 +97,7 @@ async function readDays(days: readonly string[]): Promise<void> {
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
       },
       governanceProjectId: tenantId,
-      observedAt: OBSERVED_AT,
+      observedAt,
     });
     if (!record) throw new Error("test bug: the bill produced no usage record");
     await foldThroughExecutor({
@@ -147,9 +164,11 @@ describe("given a read that recorded part of a period and then failed", () => {
     /** @scenario "Restarting after a read that stopped halfway does not record the spend twice" */
     it("counts each day once, at the figure the provider reported", async () => {
       // The read that stopped halfway: it reached the first two days.
-      await readDays(PERIOD.slice(0, 2));
-      // The restart: the whole period again, from its start.
-      await readDays(PERIOD);
+      await readDays({ days: PERIOD.slice(0, 2), observedAt: OBSERVED_AT });
+      // The restart: the whole period again, from its start, and looking at a
+      // later moment — which is what makes the second pass a restarted run
+      // rather than a re-delivery of the first.
+      await readDays({ days: PERIOD, observedAt: RESTARTED_AT });
 
       for (const day of PERIOD) {
         expect(await amountFor(day)).toBe(PROVIDER_DAILY_NANO_USD);

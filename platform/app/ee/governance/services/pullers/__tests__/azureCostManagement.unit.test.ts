@@ -332,7 +332,7 @@ describe("reading an Azure Cost Management daily reply", () => {
       });
 
       expect(window.fromDay).toBe("2026-08-01");
-      expect(window.deep).toBe(true);
+      expect(window.isDeepRead).toBe(true);
     });
 
     /** @scenario "Once a day the cost read reaches a month back" */
@@ -344,7 +344,7 @@ describe("reading an Azure Cost Management daily reply", () => {
       });
 
       expect(window.fromDay).toBe("2026-08-24");
-      expect(window.deep).toBe(false);
+      expect(window.isDeepRead).toBe(false);
     });
 
     /** @scenario "Once a day the cost read reaches a month back" */
@@ -391,7 +391,7 @@ describe("reading an Azure Cost Management daily reply", () => {
         pricedThroughDay: "2026-08-29",
       });
 
-      expect(window.deep).toBe(false);
+      expect(window.isDeepRead).toBe(false);
       expect(window.fromDay).toBe("2026-08-24");
     });
   });

@@ -917,7 +917,8 @@ export class AnthropicAdminPuller
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
       if (hasSpentDeadline(options.deadlineMs)) {
         // Everything read so far is kept and the cursor says where to resume,
-        // so a deadline costs latency rather than a window.
+        // so a deadline costs latency rather than a window. It is still a
+        // window left half-read, and saying nothing reads as complete.
         return {
           events,
           cursor: encodeCursor({
@@ -931,6 +932,7 @@ export class AnthropicAdminPuller
             watermark,
           }),
           errorCount: 0,
+          completeness: "truncated",
         };
       }
 
@@ -992,6 +994,8 @@ export class AnthropicAdminPuller
         watermark,
       }),
       errorCount: 0,
+      // A page token still in hand means the window was not drained.
+      completeness: "truncated",
     };
   }
 

@@ -129,6 +129,14 @@ async function refuseIfRateLimited({
  * reports success, so the next run walks back into the window this one was
  * refused in. Leaving by the error path is the only way it reaches the
  * connection that has to honour it.
+ *
+ * Every `DispatchError`, not only one that named a wait. A 429 with no
+ * `Retry-After` — or one this build cannot read as a length of time — is still
+ * a provider asking for silence, and absorbing it relabels the run's recorded
+ * reason as an ordinary transport failure, which is what an administrator then
+ * reads on the source. The cadence is unchanged either way: the connection
+ * takes the longer of its own backoff and the named wait, and there is no
+ * named wait here. This is also what the two sibling pullers already do.
  */
 function rethrowIfRateLimited({
   error,
@@ -139,9 +147,7 @@ function rethrowIfRateLimited({
   adapter: string;
   url: string;
 }): void {
-  if (!(error instanceof DispatchError) || error.retryAfterMs === undefined) {
-    return;
-  }
+  if (!(error instanceof DispatchError)) return;
   logger.warn(
     { adapter, url, retryAfterMs: error.retryAfterMs },
     "HttpPollingPullerAdapter: provider asked for fewer requests; ending the run with its wait",
@@ -173,7 +179,15 @@ export class HttpPollingPullerAdapter
           { adapter: this.id, pageCount, cursor },
           "Deadline reached mid-pagination, returning cursor for next run",
         );
-        return { events: allEvents, cursor, errorCount: 0 };
+        // Pages are still waiting. Saying nothing here reads as "complete",
+        // which is how a source permanently stuck on a fraction of its data
+        // looked exactly like a healthy quiet one.
+        return {
+          events: allEvents,
+          cursor,
+          errorCount: 0,
+          completeness: "truncated",
+        };
       }
 
       let response: FetchResponse;
@@ -220,7 +234,12 @@ export class HttpPollingPullerAdapter
       },
       "HttpPollingPullerAdapter: hit MAX_PAGES_PER_RUN safety cap",
     );
-    return { events: allEvents, cursor, errorCount: 0 };
+    return {
+      events: allEvents,
+      cursor,
+      errorCount: 0,
+      completeness: "truncated",
+    };
   }
 
   private async fetchPage({

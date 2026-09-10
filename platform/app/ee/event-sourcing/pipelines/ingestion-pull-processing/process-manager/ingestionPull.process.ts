@@ -60,17 +60,24 @@ function nextWake({ cron, after }: { cron: string; after: number }): number {
  * That answer used to be handed straight to the part that works out the next
  * run, which rejects what it cannot read — so one provider answering strangely
  * stopped every scheduled connection rather than the one it answered.
+ *
+ * `refusedAt` is the instant the provider said it, never the instant we got
+ * round to reading it. The provider named a length of time starting from its
+ * own answer, so the deadline it asked for is an absolute one; measuring from
+ * the handling instant instead would stretch the wait by however far the
+ * subscriber was behind, and a replay of an old refusal would re-arm a wait
+ * that expired weeks ago and park a live money source all over again.
  */
 export function cooldownUntilFrom({
   retryAfterMs,
-  now,
+  refusedAt,
 }: {
   retryAfterMs: number | null | undefined;
-  now: number;
+  refusedAt: number;
 }): number | null {
   if (retryAfterMs == null || !Number.isFinite(retryAfterMs)) return null;
   if (retryAfterMs <= 0) return null;
-  return now + Math.min(retryAfterMs, INGESTION_PULL_MAX_COOLDOWN_MS);
+  return refusedAt + Math.min(retryAfterMs, INGESTION_PULL_MAX_COOLDOWN_MS);
 }
 
 /**
@@ -241,7 +248,8 @@ export const handlePullRunFailed: EventHandler<
   // used to die with it.
   const told = cooldownUntilFrom({
     retryAfterMs: view.retryAfterMs,
-    now: ctx.now,
+    // The failure's own time, not the handling time: see `cooldownUntilFrom`.
+    refusedAt: ctx.at,
   });
   return settle({
     state: {

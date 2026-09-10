@@ -226,10 +226,13 @@ function providerRetryAfterMs(error: unknown): number | null {
  * run that started and no run that ended, which reads on every screen as a
  * source still working.
  *
- * The first attempt only. A redelivery re-enters the handler, and while the
- * command's idempotency key is built from the abandoned run and would settle a
- * second write onto the first, not making the call at all is cheaper and says
- * the intent plainly.
+ * On EVERY delivery, not only the first. The command's idempotency key is
+ * built from the abandoned run, so a redelivery settles onto the write that
+ * already happened and costs one deduplicated call. Skipping later attempts
+ * saved that call and paid for it with the case that matters: if this write is
+ * the thing that failed, the outbox redelivers at a higher attempt and a
+ * first-attempt-only guard would never write the abandonment at all, leaving
+ * the replaced run open forever.
  */
 async function recordAbandonmentIfReplacing({
   commands,
@@ -243,7 +246,6 @@ async function recordAbandonmentIfReplacing({
   occurredAt: number;
 }): Promise<void> {
   if (payload.abandonedRunId === undefined) return;
-  if (intentContext.attempt !== 1) return;
   await commands.recordRunFailed({
     tenantId: intentContext.projectId,
     occurredAt,
