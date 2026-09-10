@@ -7,7 +7,7 @@
 // project that owns the session is what keeps it safe.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { HostedMcpRedis } from "../../../index.ts";
+import type { HostedMcpRedis } from "../../index.ts";
 import {
   connectTestRedis,
   initializeBody,

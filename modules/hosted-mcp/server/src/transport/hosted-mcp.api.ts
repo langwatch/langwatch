@@ -21,10 +21,10 @@ import { createLogger } from "@langwatch/observability";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import type { HostedMcpRedis } from "../../ports/hosted-mcp.port.ts";
-import type { HostedMcpDependencies } from "../../ports/hosted-mcp.port.ts";
-import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service.ts";
-import { McpRateLimitService } from "../../services/mcp-rate-limit.service.ts";
+import type { HostedMcpRedis } from "../ports/hosted-mcp.port.ts";
+import type { HostedMcpDependencies } from "../ports/hosted-mcp.port.ts";
+import { McpOAuthClientRegistryService } from "../services/mcp-oauth-client-registry.service.ts";
+import { McpRateLimitService } from "../services/mcp-rate-limit.service.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:mcp");
@@ -1325,7 +1325,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     });
 
     // Runtime assertion: verify the internal structure hasn't changed
-    const transportAny = transport as unknown as Record<string, unknown>;
+    const transportAny: Record<string, unknown> = Object(transport);
     if (
       !transportAny._webStandardTransport ||
       typeof transportAny._webStandardTransport !== "object"
@@ -1545,7 +1545,11 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
     if (sessionId && sessions.has(sessionId)) {
-      const session = sessions.get(sessionId)!;
+      const session = sessions.get(sessionId);
+      if (!session) {
+        sendJson(res, 404, { error: "Session not found" });
+        return;
+      }
 
       const token = extractBearerToken(req);
       if (!token) {

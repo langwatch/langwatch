@@ -24,7 +24,7 @@ import {
   McpSessionGrantPort,
   type HostedMcpRedis,
   type McpHandler,
-} from "../../../index.ts";
+} from "../../index.ts";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -1408,7 +1408,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // from the main app (~/server/db, ~/server/app-layer, etc.)
       const mcpServerDir = resolve(
         import.meta.dirname,
-        "../../../../../../../..",
+        "../../../../../../..",
         "mcp/typescript/src",
       );
       const createMcpServerSrc = readFileSync(join(mcpServerDir, "create-mcp-server.ts"), "utf-8");

@@ -43,7 +43,7 @@ import {
   McpProjectLookupPort,
   McpSessionGrantPort,
   type McpHandler,
-} from "../../../index.ts";
+} from "../../index.ts";
 
 class LoggingProjectLookup extends McpProjectLookupPort {
   tryFindLiveProjectByApiKey({

@@ -11,7 +11,7 @@ import {
   McpApiKeyCipherPort,
   McpProjectLookupPort,
   McpSessionGrantPort,
-} from "../../../index.ts";
+} from "../../index.ts";
 
 class NoProjects extends McpProjectLookupPort {
   tryFindLiveProjectByApiKey(): Promise<{ id: string; teamId: string } | null> {

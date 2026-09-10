@@ -4,7 +4,7 @@ export {
   hostedMcpRoutePolicies,
   registerHostedMcpRoutePolicies,
   type McpHandler,
-} from "./transport/api-mcp/hosted-mcp.api.ts";
+} from "./transport/hosted-mcp.api.ts";
 export { HeaderMcpClientAddressAdapter } from "./adapters/header.mcp-client-address.adapter.ts";
 export {
   McpApiKeyCipherPort,

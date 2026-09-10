@@ -6,7 +6,7 @@
 // every `POST /messages?sessionId=…` is a fresh connection to any replica.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { HostedMcpRedis } from "../../../index.ts";
+import type { HostedMcpRedis } from "../../index.ts";
 import {
   connectTestRedis,
   handshake,
