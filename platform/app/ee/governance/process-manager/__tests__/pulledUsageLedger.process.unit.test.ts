@@ -28,8 +28,8 @@ import {
   type ProcessDefinition,
   ProcessManagerService,
 } from "~/server/event-sourcing/process-manager";
-import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager/outbox/outboxDispatcherService";
 import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
+import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager/outbox/outboxDispatcherService";
 import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager/processManager.types";
 import {
   buildIntentHandlers,
