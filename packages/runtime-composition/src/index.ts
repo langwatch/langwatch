@@ -35,6 +35,12 @@ export {
   type TokenMap,
   tokenName,
 } from "./dependency-token.ts";
+export {
+  assertInfrastructure,
+  MissingInfrastructureError,
+  type MissingNeeds,
+  type NeedsResult,
+} from "./infrastructure-needs.ts";
 export { moduleApi, ModuleApiToken } from "./module-api-token.ts";
 export { LocalFeatureApis } from "./local-feature-api.ts";
 export {
@@ -42,6 +48,7 @@ export {
   type AppDefinition,
   type AppDefinitionWithoutConfig,
   defineModule,
+  defineServerModule,
   type FeatureTransportDescriptor,
   type FeatureSetup,
   type FeatureInstallArguments,

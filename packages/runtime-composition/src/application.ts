@@ -32,6 +32,7 @@ import {
   type FeatureTransportHosts,
   type MountedTransports,
 } from "./transport-mounting.ts";
+import { assertInfrastructure } from "./infrastructure-needs.ts";
 import { ResourceScope } from "./resource-scope.ts";
 import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
 import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
@@ -164,6 +165,8 @@ interface DeclaredFeature {
   readonly transportDependencies: TokenMap;
   readonly providers: readonly FeatureProvider<never>[];
   readonly contributesWorkerWork: boolean;
+  /** The pool members this module named, read off the pool before any create. */
+  readonly requiredInfrastructure: readonly string[];
   readonly install: (args: FeatureInstallArguments<unknown>) => InstalledFeatureState;
 }
 
@@ -232,6 +235,15 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
     return this.addFeature(declaration, featureInfrastructure, options);
   }
 
+  /**
+   * Every module this process installs. A module whose Infrastructure names a
+   * member this pool lacks is not assignable, so the list fails to compile.
+   */
+  withModules(modules: readonly InstallableServerFeature<Infrastructure>[]): this {
+    for (const module of modules) this.withModule(module);
+    return this;
+  }
+
   /** Selects one persistence backend for repository-aware feature installers. */
   withPersistence<Backend extends string>(
     backend: Backend,
@@ -259,6 +271,7 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
       transportDependencies: declaration.transportDependencies,
       providers: declaration.providers,
       contributesWorkerWork: declaration.contributesWorkerWork,
+      requiredInfrastructure: declaration.requiredInfrastructure ?? [],
       install: (args) => declaration.install({ ...args, infrastructure: featureInfrastructure }),
     });
     return this;
@@ -291,6 +304,13 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
     const persistence = this.state.persistence;
 
     const declarations = this.state.features;
+    for (const declaration of declarations) {
+      assertInfrastructure({
+        module: declaration.name,
+        members: declaration.requiredInfrastructure ?? [],
+        infrastructure: this.infrastructure,
+      });
+    }
     assertRepositoryBackend(declarations, persistence);
     assertRepositoryOwnership(
       declarations.map((declaration) => ({

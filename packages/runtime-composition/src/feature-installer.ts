@@ -7,6 +7,7 @@ import type {
   TokenMap,
 } from "./dependency-token.ts";
 import type { ModuleName, PublicNamespace } from "./module-namespace.ts";
+import type { NeedsResult } from "./infrastructure-needs.ts";
 import { publicNamespace, publicNamespaceFromUnknown } from "./module-namespace.ts";
 import type { ResourceOwnership } from "./resource-scope.ts";
 import { FeatureConfigError } from "./boot-errors.ts";
@@ -185,6 +186,11 @@ export interface InstallableServerFeature<Infrastructure> {
   readonly transportDependencies: TokenMap;
   readonly providers: readonly FeatureProvider<never>[];
   readonly contributesWorkerWork: boolean;
+  /**
+   * The pool members this module named with `needs`. Types erase, so this is
+   * what boot reads to refuse a process whose pool supplies one as undefined.
+   */
+  readonly requiredInfrastructure?: readonly string[];
   readonly install: (args: FeatureInstallArguments<Infrastructure>) => InstalledFeatureState;
 }
 
@@ -656,8 +662,38 @@ export function defineModule<const Name extends ModuleName>(
   return new DefinedFeatureBuilder(name);
 }
 
+/**
+ * Names a module's server half. The canonical name for `defineModule`, which
+ * keeps answering until every module is repointed at this one.
+ */
+export function defineServerModule<const Name extends ModuleName>(
+  name: Name,
+): DefinedFeatureBuilder<Name> {
+  publicNamespaceFromUnknown(name);
+  return new DefinedFeatureBuilder(name);
+}
+
 class DefinedFeatureBuilder<Name extends ModuleName> {
-  constructor(private readonly name: Name) {}
+  constructor(
+    private readonly name: Name,
+    private readonly declaredNeeds: readonly string[] = [],
+  ) {}
+
+  /**
+   * The pool members this module reads, named. The interface is explicit and
+   * the tuple infers, so an incomplete tuple resolves to a type that names
+   * what is missing and carries no further builder methods.
+   */
+  needs<Infrastructure extends object>() {
+    return <const Members extends readonly (keyof Infrastructure & string)[]>(
+      ...members: Members
+    ): NeedsResult<Infrastructure, Members, DefinedFeatureBuilder<Name>> =>
+      new DefinedFeatureBuilder(this.name, members) as NeedsResult<
+        Infrastructure,
+        Members,
+        DefinedFeatureBuilder<Name>
+      >;
+  }
 
   withRepositories<
     Definitions extends Record<
@@ -667,7 +703,7 @@ class DefinedFeatureBuilder<Name extends ModuleName> {
   >(
     repositories: RepositoryRegistry<Definitions>,
   ): RepositoryDefinedFeatureBuilder<Name, Definitions> {
-    return new RepositoryDefinedFeatureBuilder(this.name, repositories);
+    return new RepositoryDefinedFeatureBuilder(this.name, repositories, this.declaredNeeds);
   }
 
   withApp<Dependencies extends TokenMap, Infrastructure, Config, App>(
@@ -684,9 +720,9 @@ class DefinedFeatureBuilder<Name extends ModuleName> {
     | ConfiguredAppBuilder<Name, TokenMap, unknown, unknown, unknown>
     | UnconfiguredAppBuilder<Name, TokenMap, unknown, unknown> {
     if ("configSchema" in app) {
-      return new ConfiguredAppBuilder(this.name, app);
+      return new ConfiguredAppBuilder(this.name, app, this.declaredNeeds);
     }
-    return new UnconfiguredAppBuilder(this.name, app);
+    return new UnconfiguredAppBuilder(this.name, app, this.declaredNeeds);
   }
 }
 
@@ -728,6 +764,7 @@ class RepositoryDefinedFeatureBuilder<
   constructor(
     private readonly name: Name,
     private readonly repositories: RepositoryRegistry<Definitions>,
+    private readonly needs: readonly string[] = [],
   ) {}
 
   withApp<Dependencies extends TokenMap, Infrastructure extends object, Config, App>(
@@ -764,9 +801,9 @@ class RepositoryDefinedFeatureBuilder<
         >,
   ) {
     if ("configSchema" in app) {
-      return new RepositoryAppBuilder(this.name, this.repositories, app);
+      return new RepositoryAppBuilder(this.name, this.repositories, app, this.needs);
     }
-    return new RepositoryUnconfiguredAppBuilder(this.name, this.repositories, app);
+    return new RepositoryUnconfiguredAppBuilder(this.name, this.repositories, app, this.needs);
   }
 }
 
@@ -791,6 +828,7 @@ class RepositoryAppBuilder<
       RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
       App
     >,
+    protected readonly needs: readonly string[] = [],
   ) {}
 
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
@@ -836,6 +874,7 @@ class RepositoryAppBuilder<
       .build();
     return {
       ...setup,
+      requiredInfrastructure: this.needs,
       repositoryRegistry: registry,
       ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
     };
@@ -861,21 +900,27 @@ class RepositoryUnconfiguredAppBuilder<
       RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
       App
     >,
+    needs: readonly string[] = [],
   ) {
     // Named member by member: an app is usually a class, and spreading a class
     // drops its static methods (`create` is not enumerable).
-    super(name, repositories, {
-      contract: app.contract,
-      dependencies: app.dependencies,
-      configSchema: { parse: () => void 0 },
-      create: (setup) => app.create(setup),
-    } as RepositoryAppDefinition<
-      Dependencies,
-      Infrastructure,
-      undefined,
-      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
-      App
-    >);
+    super(
+      name,
+      repositories,
+      {
+        contract: app.contract,
+        dependencies: app.dependencies,
+        configSchema: { parse: () => void 0 },
+        create: (setup) => app.create(setup),
+      } as RepositoryAppDefinition<
+        Dependencies,
+        Infrastructure,
+        undefined,
+        RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+        App
+      >,
+      needs,
+    );
   }
 }
 
@@ -889,6 +934,7 @@ class ConfiguredAppBuilder<
   constructor(
     private readonly name: Name,
     private readonly app: AppDefinition<Dependencies, Infrastructure, Config, App>,
+    private readonly needs: readonly string[] = [],
   ) {}
 
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
@@ -901,7 +947,7 @@ class ConfiguredAppBuilder<
     App,
     Transports
   > {
-    return new ConfiguredAppWithTransportsBuilder(this.name, this.app, transports);
+    return new ConfiguredAppWithTransportsBuilder(this.name, this.app, transports, this.needs);
   }
 
   build(): ServerFeatureDeclaration<
@@ -932,6 +978,7 @@ class ConfiguredAppBuilder<
     return {
       ...declaration,
       repositories: snapshotRepositories(app.repositories),
+      requiredInfrastructure: this.needs,
       ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
     };
   }
@@ -946,12 +993,13 @@ class UnconfiguredAppBuilder<
   constructor(
     private readonly name: Name,
     private readonly app: AppDefinitionWithoutConfig<Dependencies, Infrastructure, App>,
+    private readonly needs: readonly string[] = [],
   ) {}
 
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
   ): UnconfiguredAppWithTransportsBuilder<Name, Dependencies, Infrastructure, App, Transports> {
-    return new UnconfiguredAppWithTransportsBuilder(this.name, this.app, transports);
+    return new UnconfiguredAppWithTransportsBuilder(this.name, this.app, transports, this.needs);
   }
 
   build(): ServerFeatureDeclaration<
@@ -982,6 +1030,7 @@ class UnconfiguredAppBuilder<
     return {
       ...declaration,
       repositories: snapshotRepositories(app.repositories),
+      requiredInfrastructure: this.needs,
       ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
     };
   }
@@ -999,6 +1048,7 @@ class ConfiguredAppWithTransportsBuilder<
     private readonly name: Name,
     private readonly app: AppDefinition<Dependencies, Infrastructure, Config, App>,
     private readonly transports: Transports,
+    private readonly needs: readonly string[] = [],
   ) {}
 
   build(): ServerFeatureDeclaration<
@@ -1012,7 +1062,7 @@ class ConfiguredAppWithTransportsBuilder<
     undefined,
     undefined
   > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> } {
-    const declaration = new ConfiguredAppBuilder(this.name, this.app).build();
+    const declaration = new ConfiguredAppBuilder(this.name, this.app, this.needs).build();
     return {
       ...declaration,
       transports: this.transports,
@@ -1032,6 +1082,7 @@ class UnconfiguredAppWithTransportsBuilder<
     private readonly name: Name,
     private readonly app: AppDefinitionWithoutConfig<Dependencies, Infrastructure, App>,
     private readonly transports: Transports,
+    private readonly needs: readonly string[] = [],
   ) {}
 
   build(): ServerFeatureDeclaration<
@@ -1045,7 +1096,7 @@ class UnconfiguredAppWithTransportsBuilder<
     undefined,
     undefined
   > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> } {
-    const declaration = new UnconfiguredAppBuilder(this.name, this.app).build();
+    const declaration = new UnconfiguredAppBuilder(this.name, this.app, this.needs).build();
     return {
       ...declaration,
       transports: this.transports,
