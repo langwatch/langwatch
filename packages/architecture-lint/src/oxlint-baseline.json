@@ -8771,6 +8771,54 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "no-runtime-reflection|apps/api/src/features/api-key/api-key-trpc.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|apps/api/src/features/trace/trace.composition.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|enterprise/modules/governance/web/src/testing.tsx",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|enterprise/modules/scim/server/src/services/scim-cost-center.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|modules/automation/contract/src/templating/engine.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|modules/coding-agent/server/src/app/coding-agent.app.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|modules/identity/server/src/adapters/producer.identity-pipelines.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|modules/identity/server/src/repositories/memory/memory.sso-connection.repositories.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|modules/scenario/contract/src/http-template-engine.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|modules/trace/contract/src/trace-otel-ids.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|modules/webhook/server/src/adapters/sqs.webhook-destination.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-runtime-reflection|modules/webhook/server/src/services/webhook-batch-send.service.ts",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "plan-literals|apps/api/src/app/api-usage.composition.ts",
       "measured": "2026-09-07"
     },
@@ -9885,6 +9933,18 @@
     {
       "key": "temporal-only|sdks/typescript/src/observability-sdk/logger/implementation.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "transport-middleware-is-a-gate|modules/ops/server/src/transport/ops-bug-report.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "transport-middleware-is-a-gate|modules/organization/server/src/transport/organization-management.rest.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "transport-middleware-is-a-gate|modules/organization/server/src/transport/organizations.rest.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "unbounded-loop|enterprise/modules/billing/server/src/tasks/stripe-prices-sync.task.ts",

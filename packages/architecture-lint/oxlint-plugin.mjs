@@ -19,8 +19,11 @@ import {
   featureSourceFilenameRule,
   featureSourceLayoutRule,
   featureSourceSubjectRule,
+  featureSideHoldsNoAppRule,
   handledErrorOutsideContractRule,
   layerClassRule,
+  noRuntimeReflectionRule,
+  transportMiddlewareIsAGateRule,
   logicalStatementSpacingRule,
   maxStatementsPerLineRule,
   namespaceClassRule,
@@ -81,6 +84,9 @@ export const rules = {
   "awaited-return-chain": awaitedReturnChainRule,
   "web-imports-server-shaped-value": webImportsServerShapedValueRule,
   "zod-object-composition": zodObjectCompositionRule,
+  "feature-side-holds-no-app": featureSideHoldsNoAppRule,
+  "no-runtime-reflection": noRuntimeReflectionRule,
+  "transport-middleware-is-a-gate": transportMiddlewareIsAGateRule,
 };
 
 // "nested-ternary" (superseded by the built-in no-nested-ternary) and

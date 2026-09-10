@@ -44,7 +44,10 @@
     "langwatch/service-dependencies": "error",
     "langwatch/namespace-class": "error",
     "langwatch/unbounded-loop": "error",
-    "langwatch/id-generation-origin": "error"
+    "langwatch/id-generation-origin": "error",
+    "langwatch/no-runtime-reflection": "error",
+    "langwatch/feature-side-holds-no-app": "error",
+    "langwatch/transport-middleware-is-a-gate": "error"
   },
   "overrides": [
     {

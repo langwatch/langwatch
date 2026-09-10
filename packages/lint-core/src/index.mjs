@@ -32,7 +32,10 @@ export { featureModuleClassesRule } from "./rules/feature-module-classes.rule.mj
 export { featureSourceFilenameRule } from "./rules/feature-source-filename.rule.mjs";
 export { featureSourceLayoutRule } from "./rules/feature-source-layout.rule.mjs";
 export { featureSourceSubjectRule } from "./rules/feature-source-subject.rule.mjs";
+export { featureSideHoldsNoAppRule } from "./rules/feature-side-holds-no-app.rule.mjs";
 export { handledErrorOutsideContractRule } from "./rules/handled-error-outside-contract.rule.mjs";
+export { noRuntimeReflectionRule } from "./rules/no-runtime-reflection.rule.mjs";
+export { transportMiddlewareIsAGateRule } from "./rules/transport-middleware-is-a-gate.rule.mjs";
 export { logicalStatementSpacingRule } from "./rules/logical-statement-spacing.rule.mjs";
 export { maxStatementsPerLineRule } from "./rules/max-statements-per-line.rule.mjs";
 export { namespaceClassRule } from "./rules/namespace-class.rule.mjs";
