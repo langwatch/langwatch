@@ -97,6 +97,7 @@ vi.mock(
     // here, so they are the functions themselves, not factories returning one.
     deploymentIsFederationCapable: () => false,
     resolveSignInMethodPolicy: async () => ({}),
+    priorSession: () => ({}),
     signInDomainRoutingPort: () => ({}),
     signInRouter: () => ({}),
     decideLocalSignUp: async () => ({}),
