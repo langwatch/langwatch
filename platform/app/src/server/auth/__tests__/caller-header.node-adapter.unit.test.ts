@@ -73,6 +73,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // `close()` alone waits for keep-alive sockets, and `fetch` leaves them open.
+  // The unit lane runs files in a shared worker (`isolate: false`), so a
+  // teardown that waits here does not just hang this file — it holds the worker
+  // and starves whatever runs next.
+  server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
 });
 
