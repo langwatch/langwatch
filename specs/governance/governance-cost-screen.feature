@@ -541,6 +541,15 @@ Feature: One cost screen, three honest lanes
     And beside it says how many requests carry no dollar amount
 
   @integration
+  Scenario: A window of only requests with no dollar amount still shows the metered lane
+    Given a window whose every gateway request carries no dollar amount
+    And nothing billed and no seats reported
+    When a permitted viewer opens the cost screen
+    Then the metered lane is shown with no dollar figure
+    And beside it says how many requests carry no dollar amount
+    And the screen does not say nothing was recorded
+
+  @integration
   Scenario: A failed gateway ledger read never renders the metered lane as zero
     # The ledger read failing while the rollup read succeeds still rejects
     # the whole summary, per the rule at the top of the service.
