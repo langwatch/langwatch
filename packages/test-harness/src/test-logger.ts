@@ -8,8 +8,15 @@ export interface TestLogLine {
 }
 
 export interface TestLogLines extends Array<TestLogLine> {
-  /** The first line at `levelName` whose `msg` contains `msgIncludes`. */
-  find(levelName: string, msgIncludes: string): TestLogLine | undefined;
+  /**
+   * The first line at `levelName` whose `msg` contains `msgIncludes`.
+   *
+   * Named `first` rather than `find` because this is an `Array` subtype: a
+   * two-argument `find` does not satisfy `Array.prototype.find`, so declaring
+   * one made the whole interface unassignable (TS2430) and took the package's
+   * declaration build down with it.
+   */
+  first(levelName: string, msgIncludes: string): TestLogLine | undefined;
 }
 
 const LEVEL_NUMBERS: Record<string, number> = {
@@ -24,7 +31,7 @@ const LEVEL_NUMBERS: Record<string, number> = {
 /**
  * A real pino logger that writes synchronously into an in-memory array
  * instead of stdout, for the tests that assert on logging rather than
- * silencing it. `lines.find` reads back one record by level name and a
+ * silencing it. `lines.first` reads back one record by level name and a
  * substring of its message.
  */
 export function createTestLogger(): { logger: PinoLogger; lines: TestLogLines } {
@@ -37,7 +44,7 @@ export function createTestLogger(): { logger: PinoLogger; lines: TestLogLines } 
     }) as TestLogLine | undefined;
   };
   const lines = Object.assign(backing, {
-    find: findByLevelAndMessage,
+    first: findByLevelAndMessage,
   }) as unknown as TestLogLines;
 
   const destination = {

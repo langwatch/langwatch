@@ -113,7 +113,7 @@ describe("given a process that composed the writer with no queue behind it", () 
 
       await writer.commit({ command, facts });
 
-      const line = lines.find("error", "scim-sync");
+      const line = lines.first("error", "scim-sync");
       expect(line).toMatchObject({
         scimSyncId: SYNC,
         connectionId: CONNECTION,

@@ -180,7 +180,7 @@ describe("PostgresIdentityEmailAdapter", () => {
 
       await emails.tryResolveEmail({ userId: "user-1" });
 
-      const line = lines.find("warn", "identifier backfill");
+      const line = lines.first("warn", "identifier backfill");
       expect(line).toBeDefined();
       expect(line).toHaveProperty("error");
     });
