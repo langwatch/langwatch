@@ -131,7 +131,7 @@ const READS: Array<{
 ];
 
 describe("ActivityMonitorSpendClickHouseRepository query bounds", () => {
-  describe("when a spend read is issued (#8072 step 2: open upper bound)", () => {
+  describe("when a spend read is issued (#8072 step 2: closed upper bound)", () => {
     for (const read of READS) {
       it(`${read.name} binds the upper end of the time range`, async () => {
         const { repo, query } = makeRepo();
@@ -158,7 +158,7 @@ describe("ActivityMonitorSpendClickHouseRepository query bounds", () => {
     }
   });
 
-  describe("when a spend read is issued (#8072 step 3: no query ceiling)", () => {
+  describe("when a spend read is issued (#8072 step 3: query execution ceiling)", () => {
     for (const read of READS) {
       it(`${read.name} caps execution time and thread count`, async () => {
         const { repo, query } = makeRepo();
