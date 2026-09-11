@@ -8,10 +8,11 @@ import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
  * on this package already owns.
  *
  * Every one of them was an inline `prisma.<model>.<verb>` inside a route
- * handler in the retired application. They are a port here for the reason the
- * layering rule gives — a transport calls services, never a database — and
- * they are ONE port rather than four because they are one caller: the internal
- * family, whose six methods are exactly what its five routes read.
+ * handler in the retired application. They are one repository here for the
+ * reason the layering rule gives — a transport calls services, never a
+ * database — and they are ONE repository rather than four because they are
+ * one caller: the internal family, whose six methods are exactly what its
+ * five routes read.
  *
  * The shapes are the reads as they were, not narrowed: `tryFindVirtualKeyForConfig`
  * returns the record the config materialiser is typed against, including the

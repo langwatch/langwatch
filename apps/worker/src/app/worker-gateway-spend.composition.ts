@@ -29,8 +29,8 @@ import {
   ClickHouseGatewayOpenAdmissionsAdapter,
   EventingGatewaySpendAdapter,
   GatewayBudgetChangeDedupeService,
-  GatewayBudgetLedgerAdapter,
-  GatewaySpendEventsClickHouseAdapter,
+  GatewayBudgetClickHouseRepository,
+  GatewaySpendEventsRepository,
   PostgresGatewayBudgetResolutionAdapter,
   RedisGatewayBudgetChangeDedupeRepository,
   settlementGraceMs,
@@ -147,7 +147,7 @@ export function createWorkerGatewaySpend(
   };
 
   const spend = EventingGatewaySpendAdapter.create({
-    spendEvents: GatewaySpendEventsClickHouseAdapter.create(
+    spendEvents: GatewaySpendEventsRepository.create(
       options.resolveClickHouseClient as never,
     ),
     cacheStore: (inner) => cachedSpendFold(inner, options),
@@ -161,7 +161,7 @@ export function createWorkerGatewaySpend(
       applier: AppGatewayDebitAdapter.create(
         AppGatewayGovernance.create(
           options.database as unknown as PrismaClient,
-          GatewayBudgetLedgerAdapter.create(options.resolveClickHouseClient as never),
+          GatewayBudgetClickHouseRepository.create(options.resolveClickHouseClient as never),
           PostgresGatewayBudgetResolutionAdapter.create({ database: options.database }),
           PrismaGatewayChangeEventsRepository.create(options.database),
           // Without this the advisory BUDGET_UPDATED fires on EVERY debit, so a

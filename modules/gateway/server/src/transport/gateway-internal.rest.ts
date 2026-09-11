@@ -59,7 +59,7 @@ import type {
   GatewayChangeEvents,
   GatewaySpendRating,
 } from "../app/gateway.members.ts";
-import type { GatewayInternalStore } from "../ports/gateway-internal-store.port.ts";
+import type { GatewayInternalStore } from "../repositories/gateway-internal-store.repository.ts";
 import {
   admitSpendWireSchema,
   confirmSpendWireSchema,

@@ -48,10 +48,13 @@ export type { GatewaySettlementPolicy } from "./app/gateway.members.ts";
 export * from "./ports/gateway-spend-events.port.ts";
 export type { GatewayVirtualKeySpendRow, GatewaySpendWindow, GatewayUsageBucket, GatewayTraceRow, GatewayVirtualKeySpend } from "./app/gateway.members.ts";
 export * from "./adapters/fixed-gateway-settlement.adapter.ts";
-export * from "./adapters/gateway-virtual-key-spend.adapter.ts";
-export * from "./adapters/gateway-budget-ledger.adapter.ts";
+export {
+  GatewayBudgetClickHouseRepository,
+} from "./repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 export * from "./intents/gateway-spend.intent.ts";
-export * from "./adapters/gateway-spend-events-clickhouse.adapter.ts";
+export {
+  GatewaySpendEventsRepository,
+} from "./repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 export * from "./adapters/gateway-spend-cursor.adapter.ts";
 export * from "./adapters/gateway-budget-dto.adapter.ts";
 export * from "./adapters/gateway-virtual-key-dto.adapter.ts";
@@ -109,8 +112,9 @@ export {
   type GatewayVirtualKeyBudgetInput,
   type GatewayVirtualKeyOperations,
 } from "./app/gateway.app.ts";
-export { GatewayInternalStore } from "./ports/gateway-internal-store.port.ts";
-export { PrismaGatewayInternalStoreAdapter } from "./adapters/postgres.gateway-internal-store.adapter.ts";
+export { GatewayInternalStore } from "./repositories/gateway-internal-store.repository.ts";
+export { PrismaGatewayInternalStoreRepository } from "./repositories/prisma/prisma.gateway-internal-store.repository.ts";
+export { MemoryGatewayInternalStoreRepository } from "./repositories/memory/memory.gateway-internal-store.repository.ts";
 
 /**
  * The gateway control plane: virtual keys, budgets, guardrail evaluation, realtime voice
@@ -205,7 +209,9 @@ export {
   type LegacyVirtualKeyConfig,
   type VirtualKeyConfigBackfillOutcome,
 } from "./tasks/virtual-key-config-backfill.task.ts";
-export { PostgresGatewayVirtualKeyConfigBackfillAdapter } from "./adapters/postgres.gateway-virtual-key-config-backfill.adapter.ts";
+export {
+  PrismaGatewayVirtualKeyConfigBackfillRepository,
+} from "./repositories/prisma/prisma.gateway-virtual-key-config-backfill.repository.ts";
 export type {
   GatewayVirtualKeyConfigBackfillRepository,
   VirtualKeyRow,
@@ -220,7 +226,9 @@ export {
   type TraceDestinationReport,
   type TraceDestinationResolution,
 } from "./tasks/trace-destination-report.task.ts";
-export { PostgresGatewayTraceDestinationReportAdapter } from "./adapters/postgres.gateway-trace-destination-report.adapter.ts";
+export {
+  PrismaGatewayTraceDestinationReportRepository,
+} from "./repositories/prisma/prisma.gateway-trace-destination-report.repository.ts";
 export type {
   GatewayTraceDestinationReportRepository,
   TraceDestinationKeyRow,

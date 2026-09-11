@@ -5,9 +5,9 @@ import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
 import { WebhookSignatureVectorsTask } from "@langwatch/egress";
 import {
   TraceDestinationReportTask,
-  PostgresGatewayTraceDestinationReportAdapter,
+  PrismaGatewayTraceDestinationReportRepository,
   VirtualKeyConfigBackfillTask,
-  PostgresGatewayVirtualKeyConfigBackfillAdapter,
+  PrismaGatewayVirtualKeyConfigBackfillRepository,
 } from "@langwatch/gateway-server";
 import { GroupQueueReapStrandedGroupsTask } from "@langwatch/group-queue/operational";
 import {
@@ -79,11 +79,11 @@ export function buildTasksCatalogue({
     }),
     VirtualKeyConfigBackfillTask.create({
       repository: () =>
-        PostgresGatewayVirtualKeyConfigBackfillAdapter.create({ database: host.requirePrisma() }),
+        PrismaGatewayVirtualKeyConfigBackfillRepository.create({ database: host.requirePrisma() }),
     }),
     TraceDestinationReportTask.create({
       repository: () =>
-        PostgresGatewayTraceDestinationReportAdapter.create({ database: host.requirePrisma() }),
+        PrismaGatewayTraceDestinationReportRepository.create({ database: host.requirePrisma() }),
     }),
     GroupQueueReapStrandedGroupsTask.create({ redis: () => host.requireRedis() }),
     StripePricesSyncTask.create({ secretKey: () => process.env.STRIPE_SECRET_KEY }),

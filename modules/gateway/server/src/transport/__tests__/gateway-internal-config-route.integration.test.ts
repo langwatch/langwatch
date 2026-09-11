@@ -17,7 +17,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import { PrismaGatewayAdapter } from "../../adapters/prisma.gateway.adapter.ts";
-import { PrismaGatewayInternalStoreAdapter } from "../../adapters/postgres.gateway-internal-store.adapter.ts";
+import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import type { GatewayModelProviderCredentials } from "../../app/gateway.members.ts";
 import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
@@ -120,7 +120,7 @@ function buildApp(): void {
     credentials,
     assembly: GatewayConfigAssemblyAdapter.create({ prisma }),
   });
-  const store = PrismaGatewayInternalStoreAdapter.create({ database: prisma });
+  const store = PrismaGatewayInternalStoreRepository.create({ database: prisma });
   virtualKeys = createVirtualKeyServiceForTest(prisma, projects);
   app = mountGatewayInternalRest(
     { virtualKeys, projects, store, config: materialiser, budgetSpend: undefined },

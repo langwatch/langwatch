@@ -1,22 +1,22 @@
 import { fromDate, type Instant, toDate } from "@langwatch/time";
-import { toGatewayBudgetRow } from "../repositories/prisma/prisma.gateway-budget.repository.ts";
+import { toGatewayBudgetRow } from "./prisma.gateway-budget.repository.ts";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { GatewayBudget, GatewayBudgetBucketBoundary } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { GatewayInternalStore } from "../ports/gateway-internal-store.port.ts";
+import { GatewayInternalStore } from "../gateway-internal-store.repository.ts";
 
-import { gatewayRoutingPolicySelect } from "../ports/gateway-virtual-key.port.ts";
+import { gatewayRoutingPolicySelect } from "../../ports/gateway-virtual-key.port.ts";
 
 const logger = createLogger("langwatch:gateway:internal-store");
 
 /**
  * Every query below is transcribed from the route handler it replaced, include/select clauses intact — those clauses ARE the contract (e.g. the config read's routingPolicy selection carries model aliases and deny rules; losing it would serve a bundle with neither).
  */
-export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStore {
-  static create(options: { database: PrismaClient }): PrismaGatewayInternalStoreAdapter {
-    return new PrismaGatewayInternalStoreAdapter(options.database);
+export class PrismaGatewayInternalStoreRepository extends GatewayInternalStore {
+  static create(options: { database: PrismaClient }): PrismaGatewayInternalStoreRepository {
+    return new PrismaGatewayInternalStoreRepository(options.database);
   }
 
   private constructor(private readonly database: PrismaClient) {

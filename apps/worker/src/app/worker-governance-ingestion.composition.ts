@@ -19,7 +19,7 @@ import {
   type IngestionPullRunProjectionDatabase,
   type IngestionSourceDatabase,
 } from "@langwatch/enterprise-governance-server";
-import { GatewayBudgetLedgerAdapter } from "@langwatch/gateway-server";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
 import { createSsrfUrlValidator, fetchValidatedDestination } from "@langwatch/egress";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -93,9 +93,9 @@ export function createWorkerGovernanceIngestion(
           >[0],
         ),
       }).build(),
-      GatewayBudgetLedgerAdapter.create(
+      GatewayBudgetClickHouseRepository.create(
         options.resolveClickHouseClient as unknown as Parameters<
-          typeof GatewayBudgetLedgerAdapter.create
+          typeof GatewayBudgetClickHouseRepository.create
         >[0],
       ),
       OtelGovernanceIngestionPullMetrics.create(),

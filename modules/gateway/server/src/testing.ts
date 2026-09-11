@@ -6,7 +6,9 @@
 export { GatewayUsageService } from "./services/gateway-usage.service.ts";
 export type { GatewayService } from "./services/gateway.service.ts";
 export { PostgresVirtualKeyAdapter } from "./adapters/postgres.virtual-key.adapter.ts";
-export { GatewayBudgetLedgerAdapter } from "./adapters/gateway-budget-ledger.adapter.ts";
+export {
+  GatewayBudgetClickHouseRepository,
+} from "./repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 export {
   PrismaGatewayAdapter,
   type GatewayPersistence,

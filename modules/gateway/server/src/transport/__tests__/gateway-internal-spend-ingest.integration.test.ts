@@ -14,7 +14,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { PrismaGatewayInternalStoreAdapter } from "../../adapters/postgres.gateway-internal-store.adapter.ts";
+import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { GatewaySpendRating } from "../../app/gateway.members.ts";
 import {
   mountGatewayInternalRest,
@@ -60,11 +60,11 @@ class FlatRating implements GatewaySpendRating {
   }
 }
 
-let store: PrismaGatewayInternalStoreAdapter;
+let store: PrismaGatewayInternalStoreRepository;
 let app: ReturnType<typeof mountGatewayInternalRest>;
 
 function buildApp(): void {
-  store = PrismaGatewayInternalStoreAdapter.create({ database: prisma });
+  store = PrismaGatewayInternalStoreRepository.create({ database: prisma });
   const record = (into: Array<Record<string, unknown>>) => ({
     sendBatch: (payloads: unknown[]) => {
       into.push(...(payloads as Array<Record<string, unknown>>));

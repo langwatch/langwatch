@@ -7,7 +7,7 @@
  */
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
 import {
-  GatewayBudgetLedgerAdapter,
+  GatewayBudgetClickHouseRepository,
   PrismaGatewayAdapter,
   TestProjectApi,
   type GatewayBudgetSpend,
@@ -287,7 +287,7 @@ describe.skipIf(!databaseUrl)(
         },
       });
 
-      budgets = GatewayBudgetLedgerAdapter.create(async () => clickhouse as never);
+      budgets = GatewayBudgetClickHouseRepository.create(async () => clickhouse as never);
       gateway = PrismaGatewayAdapter.create({
         database: prisma,
         projects: new SuiteProjectService(),
