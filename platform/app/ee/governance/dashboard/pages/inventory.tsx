@@ -2259,9 +2259,10 @@ export function SourceEditDrawer({
   // a source disabled before its first run never minted one.
   const hasPulled = source?.hasPollerCursor ?? false;
 
-  // Misses for a type this deploy has no entry for, which is why the title
-  // below carries a fallback rather than reading the label straight off.
-  const editMeta = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType);
+  // Misses for a type this deploy has no entry for — a row written by a newer
+  // one — so the title falls back to the generic word rather than to
+  // "Edit undefined".
+  const editLabel = SOURCE_TYPE_LABEL[sourceType] ?? "source";
   const lockNotes = editSourceNotes({
     hasPulled,
     report: form.parserConfig.report,
@@ -2316,7 +2317,7 @@ export function SourceEditDrawer({
               <SourceTypeIconGlyph sourceType={sourceType} size="24px" />
             )}
             <Heading as="h2" size="md">
-              Edit {editMeta?.label ?? "source"}
+              Edit {editLabel}
             </Heading>
             {/* Why a setting is locked, behind the (i) rather than printed
                 above the fields it describes. Rendered only when something
