@@ -536,7 +536,12 @@ function buildPhoneAgentAdapter(
           reason && reason.length > 0 ? reason : undefined,
         );
       }
-      span.setAttribute("voice.twilio.stream_base_url", resolvedBaseUrl.value);
+      // Record only the URL origin in telemetry and logs — never the full
+      // resolved URL, which may carry credentials or query parameters (CWE-532
+      // sensitive-data exposure). The functional value handed to Twilio below
+      // stays complete.
+      const streamBaseUrlOrigin = new URL(resolvedBaseUrl.value).origin;
+      span.setAttribute("voice.twilio.stream_base_url", streamBaseUrlOrigin);
       span.setAttribute(
         "voice.twilio.stream_base_url_source",
         resolvedBaseUrl.source,
@@ -547,7 +552,7 @@ function buildPhoneAgentAdapter(
       logger.info(
         {
           agentId,
-          streamBaseUrl: resolvedBaseUrl.value,
+          streamBaseUrl: streamBaseUrlOrigin,
           streamBaseUrlSource: resolvedBaseUrl.source,
         },
         "resolved Twilio media-stream base URL for outbound call",
