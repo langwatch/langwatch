@@ -48,15 +48,15 @@ export {
   type NlpInvokeStagingConfig,
 } from "./channels/workflow-nlp-lambda.channel.ts";
 export {
-  NlpLambdaInvoke,
-  NlpPayloadStaging,
+  type NlpLambdaInvoke,
+  type NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type NlpLambdaInvokeResult,
   type StagedNlpPayload,
 } from "./app/workflow.app.ts";
 export {
-  NlpLambdaArnResolver,
-  NlpLambdaFunctionReader,
+  type NlpLambdaArnResolver,
+  type NlpLambdaFunctionReader,
   type NlpLambdaArnEntry,
 } from "./app/workflow.app.ts";
 export {
@@ -108,23 +108,23 @@ export {
   type WorkflowRestDeclaration,
 } from "./transport/workflow.rest.ts";
 export {
-  WorkflowAgentMapping,
-  WorkflowDslMigration,
-  WorkflowLlmParameters,
-  WorkflowProjectEnvironment,
-  WorkflowExecution,
-  WorkflowId,
-  WorkflowNlpRuntime,
-  WorkflowStudioStream,
-  WorkflowStudioDsl,
+  type WorkflowAgentMapping,
+  type WorkflowDslMigration,
+  type WorkflowLlmParameters,
+  type WorkflowProjectEnvironment,
+  type WorkflowExecution,
+  type WorkflowId,
+  type WorkflowNlpRuntime,
+  type WorkflowStudioStream,
+  type WorkflowStudioDsl,
   type WorkflowExecutionInput,
   type WorkflowLlmParameterResolution,
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
 } from "./app/workflow.app.ts";
 export {
-  WorkflowAiCall,
-  WorkflowCommitMessageModel,
+  type WorkflowAiCall,
+  type WorkflowCommitMessageModel,
   type WorkflowAiCallFeature,
 } from "./app/workflow.app.ts";
 export { WorkflowCommitMessageService } from "./services/workflow-commit-message.service.ts";
@@ -170,7 +170,7 @@ export {
   type StudioLambdaFleetFields,
 } from "./rules/nlp-lambda-config.rules.ts";
 export {
-  NlpLambdaStreamInvoke,
+  type NlpLambdaStreamInvoke,
   type NlpLambdaStreamChunk,
 } from "./app/workflow.app.ts";
 export { AwsNlpLambdaStreamInvokeAdapter } from "./channels/aws.nlp-lambda-stream-invoke.channel.ts";

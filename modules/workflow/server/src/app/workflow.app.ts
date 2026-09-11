@@ -45,6 +45,8 @@ import {
   type WorkflowVersionHistoryMode,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
+import type { LanguageModel } from "ai";
+import type { ModelRole } from "@langwatch/model-provider-contract";
 import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
 import type { WorkflowService } from "../services/workflow.service.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";

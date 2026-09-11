@@ -22,7 +22,7 @@ import {
   type FunctionConfiguration,
 } from "@aws-sdk/client-lambda";
 import type { Logger } from "@langwatch/observability";
-import { NlpLambdaArnResolver } from "../app/workflow.app.ts";
+import { type NlpLambdaArnResolver } from "../app/workflow.app.ts";
 import {
   LAMBDA_INVOCATION_TIMEOUT_SECONDS,
   NLP_LAMBDA_MEMORY_SIZE_MB,

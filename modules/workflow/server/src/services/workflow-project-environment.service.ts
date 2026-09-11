@@ -7,7 +7,7 @@
  * that composes its own cipher hands it in here instead, and neither can
  * silently become the other.
  */
-import { WorkflowProjectEnvironment } from "../app/workflow.app.ts";
+import type { WorkflowProjectEnvironment } from "../app/workflow.app.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../repositories/workflow-project-environment.repository.ts";
 
 /** The stored-secret cipher, as this service asks it. */

@@ -5,7 +5,7 @@
  */
 import { InvokeWithResponseStreamCommand, type LambdaClient } from "@aws-sdk/client-lambda";
 import {
-  NlpLambdaStreamInvoke,
+  type NlpLambdaStreamInvoke,
   type NlpLambdaStreamChunk,
 } from "../app/workflow.app.ts";
 

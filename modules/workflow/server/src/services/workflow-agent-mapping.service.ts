@@ -3,7 +3,7 @@ import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { getMappingSurfaceInputs, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { z } from "zod";
-import { WorkflowAgentMapping } from "../app/workflow.app.ts";
+import { type WorkflowAgentMapping } from "../app/workflow.app.ts";
 
 const identifiedFieldSchema = z.object({ identifier: z.string() });
 const mappingsSchema = z.record(z.string(), z.unknown());
