@@ -35,6 +35,10 @@ if (!file || !fs.existsSync(file)) {
 }
 const label = flag("label", "unlabelled");
 const outPath = flag("out", "agent-usage-card.json");
+// Opt-in. Reads your own prompt text LOCALLY to score frustration markers and
+// emits rates only — no text, no matched words, nothing quotable. Off unless
+// you ask for it, because every other number here is derived from counts alone.
+const wantFrustration = args.includes("--frustration");
 
 // ---------------------------------------------------------------- utilities
 const hash = (s) => crypto.createHash("sha256").update(String(s)).digest("hex").slice(0, 12);
@@ -91,6 +95,7 @@ const trace = (r) => {
     writes: num(m.cache_creation_input_tokens),
     ctx: num(m.context_size_tokens),
     errored: r.error != null && r.error !== false,
+    text: wantFrustration ? (typeof r.input === "object" ? (r.input?.value ?? null) : r.input ?? null) : null,
   };
 };
 const T = rows.map(trace).filter((t) => t.t > 0);
@@ -282,6 +287,104 @@ const checkpointing = [150e3, 200e3, 300e3, 500e3].map(checkpointAt);
 const heavy = T.filter((t) => t.cost >= 0.01);
 const light = T.filter((t) => t.cost < 0.01);
 
+// --------------------------------------------- 8b. frustration (opt-in)
+// Scores prompt text for two lexicons and emits RATES ONLY. No text, no
+// matched words, no quotable fragment ever reaches the card. Off unless
+// --frustration is passed.
+//
+// Two findings this is testing, from one account — see Part 8:
+//   - within a session, frustration roughly doubles from first third to last;
+//   - profanity LEADS a context reset while aimed repetition LAGS it.
+const LEX_SWEAR =
+  /\b(?:fuck\w*|cunt\w*|motherfuck\w*|shit\w*|bollocks|wank\w*|twat\w*|bastard\w*|arsehole\w*|pissed|pissing|damn\w*|crap\w*|bloody|bugger\w*|arse|sodding)\b/i;
+const LEX_TOLD =
+  /\b(?:as i (?:said|told you|asked)|i (?:said|told you|asked you)|like i said|i already|you (?:keep|still|again)|stop doing|i didn'?t (?:say|ask|want)|that'?s not what)\b/i;
+const STRIP_TAGS = [
+  /<system-reminder>[\s\S]*?<\/system-reminder>/g,
+  /<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g,
+  /<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g,
+  /<command-(?:name|message|args)>[\s\S]*?<\/command-(?:name|message|args)>/g,
+  /```[\s\S]*?```/g,
+];
+
+const frustration = (() => {
+  if (!wantFrustration) return null;
+  const scored = [];
+  for (const t of T) {
+    if (typeof t.text !== "string" || !t.text.trim()) continue;
+    let txt = t.text;
+    for (const rx of STRIP_TAGS) txt = txt.replace(rx, " ");
+    if (!txt.trim()) continue;
+    scored.push({ ...t, swear: LEX_SWEAR.test(txt), told: LEX_TOLD.test(txt) });
+  }
+  if (scored.length < 50) return { prompts_with_text: scored.length, note: "too few prompts to score" };
+
+  const r = (sel, k) => (sel.length ? pct(sel.filter((x) => x[k]).length, sel.length) : 0);
+
+  // within-session: first third vs last third
+  const bySess = new Map();
+  for (const s of scored) {
+    if (!s.sid) continue;
+    if (!bySess.has(s.sid)) bySess.set(s.sid, []);
+    bySess.get(s.sid).push(s);
+  }
+  const firstT = [], lastT = [];
+  for (const ms of bySess.values()) {
+    if (ms.length < 6) continue;
+    ms.sort((a, b) => a.t - b.t);
+    const k = Math.floor(ms.length / 3);
+    firstT.push(...ms.slice(0, k));
+    lastT.push(...ms.slice(-k));
+  }
+
+  // around a context reset: K prompts either side, same session
+  const K = 5;
+  const before = [], after = [];
+  for (const s of sessions) {
+    const ordered = s.traces.slice().sort((a, b) => a.t - b.t);
+    const scoredIds = new Set(scored.map((x) => x.t));
+    for (let i = 1; i < ordered.length; i++) {
+      if (!(ordered[i].ctx && ordered[i - 1].ctx && ordered[i].ctx < ordered[i - 1].ctx * 0.75)) continue;
+      let got = 0;
+      for (let j = i - 1; j >= 0 && got < K; j--) {
+        if (!scoredIds.has(ordered[j].t)) continue;
+        const m = scored.find((x) => x.t === ordered[j].t);
+        if (m) { before.push(m); got++; }
+      }
+      got = 0;
+      for (let j = i; j < ordered.length && got < K; j++) {
+        if (!scoredIds.has(ordered[j].t)) continue;
+        const m = scored.find((x) => x.t === ordered[j].t);
+        if (m) { after.push(m); got++; }
+      }
+    }
+  }
+
+  return {
+    prompts_with_text: scored.length,
+    baseline_profanity_pct: r(scored, "swear"),
+    baseline_aimed_repetition_pct: r(scored, "told"),
+    profanity_events: scored.filter((x) => x.swear).length,
+    within_session: {
+      sessions_used: [...bySess.values()].filter((m) => m.length >= 6).length,
+      n_per_group: firstT.length,
+      first_third_profanity_pct: r(firstT, "swear"),
+      last_third_profanity_pct: r(lastT, "swear"),
+      first_third_aimed_repetition_pct: r(firstT, "told"),
+      last_third_aimed_repetition_pct: r(lastT, "told"),
+    },
+    around_reset: {
+      n_before: before.length,
+      n_after: after.length,
+      profanity_before_pct: r(before, "swear"),
+      profanity_after_pct: r(after, "swear"),
+      aimed_repetition_before_pct: r(before, "told"),
+      aimed_repetition_after_pct: r(after, "told"),
+    },
+    note: "rates only; no text or matched words are stored or emitted",
+  };
+})();
+
 // ------------------------------------------------------------------ 9. card
 const card = {
   probe_version: PROBE_VERSION,
@@ -358,6 +461,7 @@ const card = {
     },
   },
   trace_error_rate_pct: pct(T.filter((t) => t.errored).length, T.length),
+  ...(frustration ? { frustration } : {}),
 };
 
 fs.writeFileSync(outPath, JSON.stringify(card, null, 2));
@@ -402,5 +506,13 @@ for (const k of c.checkpoint_counterfactual.by_threshold) {
   console.log(
     `  cap at ${String(k.threshold_tokens / 1000 + "k").padEnd(8)} ${String(k.checkpoints_implied).padStart(5)} checkpoints  ${String(k.read_tokens_saved_pct).padStart(6)}% of read tokens  ~$${k.est_cost_saved_usd}`,
   );
+}
+if (frustration && frustration.within_session) {
+  const f = frustration;
+  console.log(`\n  frustration signal (opt-in; rates only, no text retained)`);
+  console.log(`  ${f.prompts_with_text.toLocaleString()} prompts with text, ${f.profanity_events} profanity events, baseline ${f.baseline_profanity_pct}%`);
+  console.log(`  within session   first third ${f.within_session.first_third_profanity_pct}% → last third ${f.within_session.last_third_profanity_pct}%  (n=${f.within_session.n_per_group} each)`);
+  console.log(`  around a reset   profanity ${f.around_reset.profanity_before_pct}% before → ${f.around_reset.profanity_after_pct}% after`);
+  console.log(`                   repetition ${f.around_reset.aimed_repetition_before_pct}% before → ${f.around_reset.aimed_repetition_after_pct}% after`);
 }
 console.log(`\n  card written to ${outPath}\n`);

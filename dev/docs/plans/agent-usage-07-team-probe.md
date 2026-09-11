@@ -131,7 +131,16 @@ this in order and do not skip ahead to the comparison.
      --out my-card.json
    ```
 
-5. Sanity-check the corpus before you trust anything downstream, and tell me
+5. **Optional, and entirely your call** — add `--frustration` to that command.
+   It scores your own prompt text against two word lists (profanity, and
+   "I already told you"-style repetition) and puts **rates only** in the card:
+   no text, no matched words, nothing quotable. It is testing a specific claim
+   — that frustration roughly doubles between the first and last third of a
+   session, and that profanity rises *before* a compaction while repetition
+   rises *after* it. Skip it without explanation if you would rather not; the
+   rest of the card is unaffected.
+
+6. Sanity-check the corpus before you trust anything downstream, and tell me
    what you found:
    - Does `total_cost_usd` look roughly like what you actually spent? If it is
      wildly off, the export is incomplete or the window is wrong — stop and say
@@ -220,6 +229,16 @@ above tells them when to open it.
 | compaction is not rare | **764** context resets across **28.2%** of sessions | near-zero resets |
 | **no long-context premium** | realised rate **falls** with context: $0.92/M at 50–100k → $0.65/M above 700k; within a single model, $0.81/M → $0.57/M | a rate that *rises* with context on your models |
 | **checkpointing is the largest lever** | capping context at 300k ≈ **42%** of read tokens (~$14.0k); at 200k ≈ **54%** (~$17.7k). Upper bound — quality loss not modelled | a much smaller share, i.e. your sessions already stay short |
+
+If you ran `--frustration`, these too (5,467 prompts, 83 profanity events —
+small, so treat direction as the claim and magnitude as noise):
+
+| finding | baseline | what would falsify it |
+|---|---|---|
+| frustration rises through a session | first third **1.02%** → last third **2.17%** (2.1×, p=0.009); aimed repetition 0.24% → 0.90% (3.8×, p=0.011) | flat or falling across thirds |
+| profanity **leads** a compaction | **2.38%** in the 5 prompts before a reset → **1.23%** in the 5 after (p=0.003) | higher after than before |
+| repetition **lags** a compaction | **0.56%** before → **1.43%** after (2.5×, p=0.002) | higher before than after |
+| it is *not* about context size | within one session cohort, splitting by context instead of position reverses the effect | a clean context correlation that survives a within-session control |
 
 ## 7. How we read the results
 
