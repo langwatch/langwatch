@@ -367,3 +367,29 @@ targetRules = ["generic-api-key"]
 paths = [
   '''^platform/app/ee/governance/dashboard/components/toolCatalog/toolCards\.ts$''',
 ]
+
+# `dGhlIHNhbXBsZSBub25jZQ==`, the `Sec-WebSocket-Key` in the raw upgrade
+# requests the voice listener tests write onto a socket. A `Sec-WebSocket-Key`
+# is not a credential by construction: RFC 6455 defines it as a nonce the
+# CLIENT invents per handshake, sent in the clear, whose only purpose is to
+# prove the response came from a server that understood the upgrade. The server
+# echoes a hash of it back and then forgets it. It authorizes nothing and
+# survives nothing.
+#
+# This particular value is the example printed in RFC 6455 section 1.3 itself:
+# base64 for the ASCII words `the sample nonce`. It is issued by nobody and
+# there is nothing to revoke.
+#
+# gitleaks' `generic-api-key` rule fires on the `...Key: <value>` shape and
+# cannot tell a handshake nonce from a credential.
+#
+# Scoped by VALUE and ANCHORED, the stronger of the two axes: any OTHER
+# high-entropy string in these tests is still reported, and every
+# provider-specific rule still applies to them. Anchoring matters for the usual
+# reason — a gitleaks allowlist regex is a substring match, so an unanchored
+# pattern would also permit a real credential that merely starts with these
+# characters.
+[[allowlists]]
+description = "RFC 6455 sample Sec-WebSocket-Key in the voice listener handshake tests, a client-invented nonce"
+targetRules = ["generic-api-key"]
+regexes = ['''^dGhlIHNhbXBsZSBub25jZQ==$''']

@@ -66,6 +66,7 @@ async function bootStorageStatsCollection(
 // never execute on this pod.
 async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
+  options?: { voiceWorkerOnly?: boolean },
 ): Promise<void> {
   const { getScenarioExecutionPool } = await import(
     "~/server/app-layer/presets"
@@ -85,11 +86,18 @@ async function bootScenarioProcessor(
   const { voiceRunsMaxConcurrent } = await import(
     "~/server/scenarios/voice/voice-limits"
   );
+  const { isVoiceJob } = await import(
+    "~/server/scenarios/execution/voice-worker-only"
+  );
   const scenarioPool = new ScenarioExecutionPool({
     concurrency: SCENARIO_WORKER.CONCURRENCY,
     // A voice run holds an ElevenLabs socket for the length of a call, so cap
     // how many a project runs at once; the rest wait in the queue.
     voiceGate: new VoiceConcurrencyGate({ max: voiceRunsMaxConcurrent() }),
+    // A voice worker (VOICE_WORKER_ONLY) runs only voice jobs; a non-voice job
+    // submitted here is refused and retried on another pod. Absent otherwise,
+    // so a normal worker runs every job as before.
+    ...(options?.voiceWorkerOnly ? { acceptJob: isVoiceJob } : {}),
   });
   getScenarioExecutionPool()?.set(scenarioPool);
   const scenarioProcessor = await startScenarioProcessor({
@@ -155,6 +163,28 @@ async function bootRealtimeSessionPoller(
   const poller = startRealtimeSessionPoller();
   shutdownHandles.push(() => poller.stop());
   logger.info("realtime voice session poller ready");
+}
+
+// The Twilio media listener: its own HTTP+WS server on VOICE_WS_PORT, booted
+// only on a voice worker (VOICE_WORKER_ONLY). It authenticates the per-call
+// nonce and hands the raw upgrade socket to the scenario child that owns the
+// call. Inert in every default deployment, since the stage is absent from the
+// non-voice boot plan.
+async function bootVoiceListener(
+  shutdownHandles: ShutdownHandles,
+  voiceEnv: { voiceWsPort: number; voicePublicBaseUrl: string | undefined },
+): Promise<void> {
+  const { getVoiceNonceRegistry } = await import(
+    "~/server/scenarios/voice/voice-nonce-registry"
+  );
+  const { bootVoiceWsListener } = await import("./voice-ws-listener");
+  const { close, address } = await bootVoiceWsListener({
+    port: voiceEnv.voiceWsPort,
+    publicBaseUrl: voiceEnv.voicePublicBaseUrl,
+    registry: getVoiceNonceRegistry(),
+  });
+  shutdownHandles.push(() => close());
+  logger.info(`voice media listener ready on port ${address.port}`);
 }
 
 // Self-hosted daily usage telemetry (no-op on SaaS or when
@@ -525,28 +555,70 @@ export async function startWorkers(
   await assertRedisReady();
   await verifyDatabaseReady();
 
+  // Read the voice worker env FIRST: VOICE_WORKER_ONLY chooses the boot plan,
+  // and this throws (refuses to start) when it is on without VOICE_PUBLIC_BASE_URL.
+  const { readVoiceWorkerEnv } = await import(
+    "~/server/scenarios/voice/voice-worker-env"
+  );
+  const voiceEnv = readVoiceWorkerEnv();
+
+  const { resolveWorkerBootPlan } = await import("./worker-boot-plan");
+  const plan = resolveWorkerBootPlan({
+    voiceWorkerOnly: voiceEnv.voiceWorkerOnly,
+    shouldStartMetricsServer,
+  });
+  logger.info(
+    { voiceWorkerOnly: voiceEnv.voiceWorkerOnly, plan },
+    "worker boot plan",
+  );
+
   try {
     // Ingestion pulls self-drive through durable process wakes and the
     // transactional process outbox; there is no separate queue worker to boot.
     // Topic clustering self-drives (ADR-051): the process wake worker and
     // process outbox in the event-sourcing runtime own scheduling and
     // execution; there is no separate queue worker to boot.
-    await bootStorageStatsCollection(shutdownHandles);
-    await bootScenarioProcessor(shutdownHandles);
-    await bootNlpFetchDispatcherTeardown(shutdownHandles);
+    //
     // Langy turns self-drive: the process outbox dispatches to the Go manager,
     // which pushes signed frames to the relay. No in-process pool/executor to
     // boot; heartbeat recovery belongs to the direct liveness subscriber.
-    await bootAnomalyWorker(shutdownHandles);
-    await bootSpendSpikeAnomalyWorker(shutdownHandles);
-    await bootUsageStatsWorker(shutdownHandles);
-    await bootRealtimeSessionPoller(shutdownHandles);
+    //
     // One-time in-place data migrations (ADR-092 stage B and successors) are
     // NOT booted here: they are a worker-only background loop like the
     // scheduler, so the app layer starts them and the App's graceful
     // closeables stop them (see presets.ts).
-    if (shouldStartMetricsServer) {
-      await bootMetricsServer(shutdownHandles);
+    for (const stage of plan) {
+      switch (stage) {
+        case "storage-stats":
+          await bootStorageStatsCollection(shutdownHandles);
+          break;
+        case "scenario-processor":
+          await bootScenarioProcessor(shutdownHandles, {
+            voiceWorkerOnly: voiceEnv.voiceWorkerOnly,
+          });
+          break;
+        case "nlp-fetch-teardown":
+          await bootNlpFetchDispatcherTeardown(shutdownHandles);
+          break;
+        case "anomaly":
+          await bootAnomalyWorker(shutdownHandles);
+          break;
+        case "spend-spike-anomaly":
+          await bootSpendSpikeAnomalyWorker(shutdownHandles);
+          break;
+        case "usage-stats":
+          await bootUsageStatsWorker(shutdownHandles);
+          break;
+        case "realtime-session-poller":
+          await bootRealtimeSessionPoller(shutdownHandles);
+          break;
+        case "voice-ws-listener":
+          await bootVoiceListener(shutdownHandles, voiceEnv);
+          break;
+        case "metrics":
+          await bootMetricsServer(shutdownHandles);
+          break;
+      }
     }
   } catch (error) {
     // A later stage failed after earlier stages already registered live
