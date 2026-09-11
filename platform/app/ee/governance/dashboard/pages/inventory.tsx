@@ -50,7 +50,6 @@ import {
   PULL_ADAPTER_FOR_SOURCE,
   PULL_SCHEDULE_DEFAULTS,
   recommendedPullSchedule,
-  SOURCE_BACKFILL_MONTHS,
 } from "@ee/governance/dashboard/logic/pullCadence";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
@@ -2156,36 +2155,30 @@ function PullConfigEditFields({
    */
   destinationField?: ReactNode;
 }) {
-  const isStartLocked = isBackfillStartLocked({
-    hasPulled,
-    report: parserConfig.report,
-  });
   const lockedKeys = lockedParserKeys({
     hasPulled,
     report: parserConfig.report,
   });
   return (
-    <>
-      <ParserConfigFields
-        sourceType={sourceType}
-        values={parserConfig}
-        onChange={onParserConfigChange}
-        mode="edit"
-        readOnlyKeys={lockedKeys.length > 0 ? lockedKeys : undefined}
-        // Same group, same order as the create drawer: the two forms edit the
-        // same source and must not disagree about where a setting lives.
-        advancedExtras={
-          <>
-            <PullCadenceField
-              sourceType={sourceType}
-              value={pullSchedule}
-              onChange={onPullScheduleChange}
-            />
-            {destinationField}
-          </>
-        }
-      />
-    </>
+    <ParserConfigFields
+      sourceType={sourceType}
+      values={parserConfig}
+      onChange={onParserConfigChange}
+      mode="edit"
+      readOnlyKeys={lockedKeys.length > 0 ? lockedKeys : undefined}
+      // Same group, same order as the create drawer: the two forms edit the
+      // same source and must not disagree about where a setting lives.
+      advancedExtras={
+        <>
+          <PullCadenceField
+            sourceType={sourceType}
+            value={pullSchedule}
+            onChange={onPullScheduleChange}
+          />
+          {destinationField}
+        </>
+      }
+    />
   );
 }
 
