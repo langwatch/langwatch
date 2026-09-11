@@ -231,6 +231,81 @@ describe("the governance gateway spend read", () => {
     });
   });
 
+  describe("given a request whose latest version moved its start out of the window", () => {
+    /** @scenario "A request written into two months is counted once" */
+    it("contributes nothing to a window the request left", async () => {
+      const requestId = `req-left-${nanoid(8)}`;
+      // Version 1 started inside the window; version 2, the one the ledger
+      // now holds as the request, moved the start two hours before it. A
+      // window filter on the raw rows keeps version 1 alone — the version
+      // 2 row fails it — and counts a request that is no longer in the
+      // window, at a cost the ledger has since replaced.
+      await insert([
+        spendRow({
+          tenantId: projectA,
+          gatewayRequestId: requestId,
+          status: "confirmed",
+          costNanoUsd: 5 * NANO,
+          occurredAtMs: Date.parse("2026-08-01T10:00:00.000Z"),
+          eventTimestampOverride: 10,
+        }),
+        spendRow({
+          tenantId: projectA,
+          gatewayRequestId: requestId,
+          status: "confirmed",
+          costNanoUsd: 7 * NANO,
+          occurredAtMs: Date.parse("2026-07-31T22:00:00.000Z"),
+          eventTimestampOverride: 20,
+        }),
+      ]);
+
+      const days = await repo.sumDaysForOrganizationProjects({
+        tenantIds: [projectA],
+        ...WINDOW,
+      });
+
+      const total = days.reduce((sum, day) => sum + day.amountNanoUsd, 0);
+      const requests = days.reduce((sum, day) => sum + day.requestCount, 0);
+      expect(total).toBe(0);
+      expect(requests).toBe(0);
+    });
+  });
+
+  describe("given a request whose latest version moved its start into the window", () => {
+    /** @scenario "A request written into two months is counted once" */
+    it("counts the request once, at the cost its latest version carries", async () => {
+      const requestId = `req-entered-${nanoid(8)}`;
+      await insert([
+        spendRow({
+          tenantId: projectA,
+          gatewayRequestId: requestId,
+          status: "confirmed",
+          costNanoUsd: 5 * NANO,
+          occurredAtMs: Date.parse("2026-07-31T22:00:00.000Z"),
+          eventTimestampOverride: 10,
+        }),
+        spendRow({
+          tenantId: projectA,
+          gatewayRequestId: requestId,
+          status: "confirmed",
+          costNanoUsd: 7 * NANO,
+          occurredAtMs: Date.parse("2026-08-01T10:00:00.000Z"),
+          eventTimestampOverride: 20,
+        }),
+      ]);
+
+      const days = await repo.sumDaysForOrganizationProjects({
+        tenantIds: [projectA],
+        ...WINDOW,
+      });
+
+      expect(days).toHaveLength(1);
+      expect(days[0]?.day).toBe("2026-08-01");
+      expect(days[0]?.amountNanoUsd).toBe(7 * NANO);
+      expect(days[0]?.requestCount).toBe(1);
+    });
+  });
+
   describe("given a stream admitted before midnight whose answer finished after", () => {
     /** @scenario "A stream crossing midnight belongs to the day it started" */
     it("places the whole amount on the day the request started", async () => {

@@ -130,19 +130,34 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
       expect(query).not.toContain("EndUserId");
     });
 
-    it("prunes partitions on the admission time and buckets days in UTC", async () => {
+    it("applies the window to the collapsed request, not to its versions", async () => {
       const { client, repo } = repositoryOver([]);
       await read(repo, WINDOW);
 
       const call = callOf(client);
-      expect(call.query).toContain(
-        "OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})",
+      // The raw rows are prefiltered on OccurredAt so partitions still prune,
+      // but the lower bound is widened by a day: a request's latest version
+      // may have moved its start time out of the window while an older
+      // version's start still sits inside it, and a WHERE on the raw rows
+      // would keep the stale version alone and count it.
+      expect(call.query).toMatch(
+        /WHERE[\s\S]*\sOccurredAt >= fromUnixTimestamp64Milli\(\{prefilterFromMs:Int64\}\)/,
       );
-      expect(call.query).toContain(
-        "OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})",
+      expect(call.query).toMatch(
+        /WHERE[\s\S]*\sOccurredAt < fromUnixTimestamp64Milli\(\{toMs:Int64\}\)/,
+      );
+      expect(call.query).not.toMatch(
+        /\sOccurredAt >= fromUnixTimestamp64Milli\(\{fromMs:Int64\}\)/,
+      );
+      // The window itself is decided AFTER argMax, on the surviving version.
+      expect(call.query).toMatch(
+        /HAVING\s+RequestOccurredAt >= fromUnixTimestamp64Milli\(\{fromMs:Int64\}\)\s+AND RequestOccurredAt < fromUnixTimestamp64Milli\(\{toMs:Int64\}\)/,
       );
       expect(call.query_params.fromMs).toBe(
         Date.parse("2026-08-01T00:00:00.000Z"),
+      );
+      expect(call.query_params.prefilterFromMs).toBe(
+        Date.parse("2026-07-31T00:00:00.000Z"),
       );
       // Inclusive of the last day: midnight AFTER it, exclusive.
       expect(call.query_params.toMs).toBe(

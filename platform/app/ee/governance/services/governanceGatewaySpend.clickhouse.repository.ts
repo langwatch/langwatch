@@ -27,6 +27,15 @@
  * SELECT's WHERE, so `argMax(OccurredAt, EventTimestamp) AS OccurredAt` would
  * put an aggregate in the WHERE clause and the read would fail.
  *
+ * THE WINDOW IS APPLIED TO THE REQUEST, NOT TO ITS VERSIONS. For the same
+ * reason, the window cannot be a plain WHERE on the raw rows: if an older
+ * version's start time sits inside the window and the latest version moved it
+ * outside, a raw filter keeps the stale version alone and counts a request
+ * that has left the window, at a cost the ledger has since replaced. The raw
+ * rows are only PREFILTERED on `OccurredAt` — wide enough that every version
+ * of any request in the window survives to the collapse — and the window is
+ * decided in a HAVING on the collapsed `RequestOccurredAt`.
+ *
  * NO PERSON COLUMN is ever selected. The ledger sits outside erasure, so a
  * `PrincipalUserId` or `EndUserId` read from it would outlive a deletion the
  * rest of the product honoured. The lane groups by model and by virtual key
@@ -62,10 +71,29 @@ const METERED_READ_MAX_EXECUTION_SECONDS = 20;
 const CHARGED_STATUSES = "('confirmed', 'failed')";
 
 /**
+ * How far below the window's lower bound the raw prefilter reaches, so that a
+ * request's older version inside the window never survives the collapse
+ * without its latest version outside it.
+ *
+ * Only the lower bound needs widening. The upper bound is midnight after the
+ * last day of a frame that ends today, so no version lies beyond it. Below,
+ * a start time can only move by the request's own duration — the gap between
+ * its outcome being recorded and its admission arriving — which the gateway
+ * bounds far under a day. One day of slack therefore covers every version of
+ * every request the window can hold, and the partition key (the month the
+ * row started in) still prunes on it.
+ */
+const WINDOW_PREFILTER_SLACK_MS = 86_400_000;
+
+/**
  * One request collapsed to its surviving version, named apart from the columns
- * it aggregates so no alias leaks into the WHERE. The window filter lives in
- * the WHERE of this inner query; a request straddling the window boundary is
- * counted once either way, which is acceptable at the edge.
+ * it aggregates so no alias leaks into the WHERE.
+ *
+ * The WHERE only prefilters the raw rows, on `OccurredAt` widened below by
+ * `WINDOW_PREFILTER_SLACK_MS`, so partitions prune and every version of a
+ * request in the window reaches the collapse. The window itself is the
+ * HAVING on `RequestOccurredAt`: the start time the ledger currently holds
+ * for the request, not the one some older version of it carried.
  */
 const LATEST_REQUEST_SUBQUERY = `
   SELECT
@@ -82,9 +110,11 @@ const LATEST_REQUEST_SUBQUERY = `
     argMax(TokensReasoning, EventTimestamp)  AS RequestTokensReasoning
   FROM ${TABLE}
   WHERE TenantId IN {tenantIds:Array(String)}
-    AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+    AND OccurredAt >= fromUnixTimestamp64Milli({prefilterFromMs:Int64})
     AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
   GROUP BY TenantId, GatewayRequestId
+  HAVING RequestOccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+    AND RequestOccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
 `;
 
 /**
@@ -262,6 +292,7 @@ export class GovernanceGatewaySpendClickHouseRepository {
     },
   ): Promise<Record<string, unknown>[]> {
     const client = await this.resolveClient(input.tenantIds[0]!);
+    const fromMs = dayStartMs(input.fromDay);
     const result = await client.query({
       query: `
         SELECT
@@ -273,7 +304,10 @@ export class GovernanceGatewaySpendClickHouseRepository {
       `,
       query_params: {
         tenantIds: input.tenantIds,
-        fromMs: dayStartMs(input.fromDay),
+        fromMs,
+        // The raw-row prefilter reaches a day below the window; the window
+        // itself is decided on the collapsed request.
+        prefilterFromMs: fromMs - WINDOW_PREFILTER_SLACK_MS,
         // Inclusive of the last day: midnight AFTER it, exclusive.
         toMs: dayStartMs(input.toDay) + 86_400_000,
       },
