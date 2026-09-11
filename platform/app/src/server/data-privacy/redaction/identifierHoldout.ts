@@ -126,6 +126,22 @@ const MIN_DIGITS_IN_OPAQUE_RUN = 2;
  * digits marks it as something a person wrote. Hex runs are exempt from the
  * digit count because a sixteen-character identifier drawn entirely from a-f
  * happens about once in eighty thousand, and no name is spelled in hex.
+ *
+ * THE RULE IS WRONG IN BOTH DIRECTIONS, KNOWINGLY.
+ *
+ * It withholds a name run together with a number: "MariaSchmidt1972" is a
+ * sixteen-character run carrying four digits and is indistinguishable, by this
+ * rule, from a user id — which is what it usually is. Widening the rule to
+ * catch it means dropping the digit count, and that puts every name back in
+ * scope of being withheld, so the residual is accepted rather than traded.
+ *
+ * It fails to withhold a fair number of genuinely random tokens, because two
+ * digits is a real bar at short lengths and because `-` and `_` split a run:
+ * around 40% of nanoids and 17% of 32-character base64 tokens are submitted.
+ * Those are the analysis service's problem, not this rule's, and they are no
+ * worse off than before this rule existed. Counting `-` and `_` as part of a
+ * run would fix most of it, and would also start withholding
+ * "Jean-Claude-1963" — the same trade, refused for the same reason.
  */
 export function isOpaqueIdentifierValue(value: string): boolean {
   if (value.length > MAX_IDENTIFIER_LENGTH) return false;

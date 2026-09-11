@@ -114,6 +114,7 @@ function luhnValid(raw: string): boolean {
 const UATP_LENGTH = 15;
 const MASTERCARD_SERIES_FIRST = 2221;
 const MASTERCARD_SERIES_LAST = 2720;
+const MASTERCARD_SERIES_LENGTH = 16;
 
 /**
  * Whether a card scheme could have issued this number AT THIS LENGTH.
@@ -125,8 +126,13 @@ const MASTERCARD_SERIES_LAST = 2720;
  * and nothing else — so length, not the leading digit, is what separates the
  * two, and gating on length keeps UATP cards redacted.
  *
- * The 2-series is Mastercard's and stops at 2720, which also happens to close
- * the door on the timestamps of the 2030s before they arrive.
+ * The 2-series is Mastercard's, and it is gated on BOTH the 2221-2720 window
+ * and a length of sixteen, which is the only length Mastercard issues there.
+ * The window alone would expire: from about June 2040 a millisecond timestamp
+ * is thirteen digits starting `22`, and the microsecond and nanosecond widths
+ * follow, so this exact defect would come back by the calendar with no code
+ * change. Pinning the length closes the thirteen- and nineteen-digit widths
+ * permanently.
  *
  * Everything else is accepted, on purpose. A range excluded here is a real card
  * number stored in the clear and that is the worse failure by a wide margin, so
@@ -141,6 +147,7 @@ function issuedCardRange(digits: string): boolean {
   const first = digits.charCodeAt(0) - 48;
   if (first === 1) return digits.length === UATP_LENGTH;
   if (first === 2) {
+    if (digits.length !== MASTERCARD_SERIES_LENGTH) return false;
     const series = Number(digits.slice(0, 4));
     return (
       series >= MASTERCARD_SERIES_FIRST && series <= MASTERCARD_SERIES_LAST

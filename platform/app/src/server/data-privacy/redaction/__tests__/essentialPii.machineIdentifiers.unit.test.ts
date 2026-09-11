@@ -183,5 +183,25 @@ describe("the native essential-PII engine on machine identifiers", () => {
 
       expect(redactEssentialPiiInText({ text }).text).toBe(text);
     });
+
+    // From about June 2040 a millisecond timestamp starts `22`, and the wider
+    // units follow, so the 2221-2720 window alone would let this defect back in
+    // by the calendar. Mastercard issues sixteen digits there and nothing else,
+    // so the thirteen- and nineteen-digit widths are closed on length.
+    /** @scenario "A timestamp from the 2040s is not read as a card number" */
+    it.each([
+      ["thirteen digits", "2221000123455"],
+      ["nineteen digits", "2221000123456789015"],
+    ])("keeps a Luhn-valid number in the Mastercard window at %s", (_width, number) => {
+      const text = `at ${number} ok`;
+
+      expect(redactEssentialPiiInText({ text }).text).toBe(text);
+    });
+
+    it("still redacts a Mastercard two-series number at its own length", () => {
+      expect(
+        redactEssentialPiiInText({ text: "card 2221000123456781 ok" }).text,
+      ).toBe("card [CREDIT_CARD] ok");
+    });
   });
 });

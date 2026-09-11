@@ -231,6 +231,12 @@ Feature: Redacting personal data from traces
     Then the stored input still contains every timestamp
 
   @unit
+  Scenario: A timestamp from the 2040s is not read as a card number
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds a Luhn passing number inside the Mastercard range at a width Mastercard does not issue
+    Then the stored input still contains the number
+
+  @unit
   Scenario: Every card scheme in circulation is still redacted
     Given the resolved PII level for "web-app" is essential
     When a trace is ingested whose input holds one valid card number from each scheme
@@ -283,6 +289,18 @@ Feature: Redacting personal data from traces
     Given the resolved PII level for "web-app" is strict
     When a trace is ingested with attributes holding hex identifiers, dashed uuids and prefixed ULIDs
     Then the analysis service received none of them
+
+  @unit
+  Scenario: A corpus of short opaque tokens is almost never sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with twelve hundred short hex span identifiers and prefixed ULIDs
+    Then the analysis service received fewer than one in a hundred of them
+
+  @unit
+  Scenario: A corpus of written names is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with two thousand generated names as attribute values
+    Then the analysis service received every one of them
 
   @unit
   Scenario: Prose that holds a name is still sent for analysis
