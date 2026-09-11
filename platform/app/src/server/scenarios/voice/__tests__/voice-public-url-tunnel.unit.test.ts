@@ -4,6 +4,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  defaultOpenTunnel,
   openVoicePublicUrlTunnel,
   tunnelHostFromUrl,
   VoiceTunnelNotReadyError,
@@ -11,6 +12,20 @@ import {
 } from "../voice-public-url-tunnel";
 
 const FAST = { timeoutMs: 30, pollIntervalMs: 5 };
+
+describe("the fallback tunnel opener", () => {
+  /**
+   * Every other test in this file injects `openTunnel`, so none of them touch
+   * the real SDK helper. That left room for a genuine production defect: the
+   * SDK exports the voice barrel as a namespace (`export * as voice`), so a
+   * flat named import type checks against the .d.ts but is `undefined` at
+   * runtime. Nothing caught it until a worker actually tried to boot a tunnel.
+   */
+  /** @scenario "A voice worker opens a quick tunnel when no public base URL is configured" */
+  it("binds a real, callable helper from the SDK", () => {
+    expect(typeof defaultOpenTunnel).toBe("function");
+  });
+});
 
 describe("tunnelHostFromUrl", () => {
   /** @scenario "A voice worker opens a quick tunnel when no public base URL is configured" */
