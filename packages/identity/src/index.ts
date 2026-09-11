@@ -168,6 +168,7 @@ export {
   SsoConnectionCommandRefusedError,
   SsoConnectionDomainTakenError,
   SsoConnectionInvalidTransitionError,
+  SsoConnectionIssuerNotPublicError,
   SsoConnectionOperatorActRequiredError,
   SsoConnectionStringEditRetiredError,
   SsoConnectionTeardownStrandsUsersError,

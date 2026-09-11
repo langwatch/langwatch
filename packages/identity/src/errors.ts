@@ -236,6 +236,30 @@ export class SsoConnectionOperatorActRequiredError extends SsoConnectionCommandR
 }
 
 /**
+ * An issuer that does not resolve to a public address.
+ *
+ * The issuer an operator types becomes a URL this process later dials for the
+ * provider's OpenID configuration, so a string naming a link-local or private
+ * address turns a settings form into a request we make to ourselves. Refused
+ * where it is typed, which is the one moment a person is present to correct
+ * it.
+ *
+ * The words name no address, interface or internal service: what was rejected
+ * is the operator's own input, and describing our network back to them tells
+ * a prober more than it tells an administrator.
+ */
+export class SsoConnectionIssuerNotPublicError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "sso_connection_issuer_not_public",
+      "sso_connection_issuer_not_public",
+      { httpStatus: 422, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoConnectionIssuerNotPublicError";
+  }
+}
+
+/**
  * A SAML connection registered through a self-serve surface. Refused by name
  * rather than accepted and left dark: D05 is OIDC only, the aggregate is
  * protocol-agnostic on purpose, and which engine terminates SAML is a
