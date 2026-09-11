@@ -2,6 +2,7 @@ import { auditLog } from "@ee/audit-log/auditLog";
 import { normalizeIdentifierValue } from "@langwatch/identity";
 import { z } from "zod";
 import { identityLookup } from "~/server/app-layer/identity/runtime";
+import { rateLimit } from "~/server/rateLimit";
 import { adminSurfaceHidden } from "../../../../ee/admin/adminSurfaceHidden";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -218,6 +219,28 @@ export interface RecordedOperator {
 }
 
 /**
+ * How much of the trail one refused caller may write, in a window.
+ *
+ * A minute holds far more attempts than a mistake produces and far fewer than
+ * a script does, which is the whole job: the trail keeps the evidence that
+ * somebody tried, without the surface becoming a way to grow the table. The
+ * limiter is shared with the other unauthenticated write paths and fails open
+ * to a per-process budget, so a Redis outage narrows the bound rather than
+ * removing the record.
+ */
+const REFUSED_ATTEMPT_WINDOW_SECONDS = 60;
+const REFUSED_ATTEMPT_BUDGET = 10;
+
+async function refusedAttemptBudget(userId: string): Promise<boolean> {
+  const { allowed } = await rateLimit({
+    key: `identity-lookup-attempt:${userId}`,
+    windowSeconds: REFUSED_ATTEMPT_WINDOW_SECONDS,
+    max: REFUSED_ATTEMPT_BUDGET,
+  });
+  return allowed;
+}
+
+/**
  * Record the act, then decide whether it was allowed.
  *
  * The order is the point. Every other back-office procedure gates first and
@@ -249,18 +272,32 @@ async function recorded({
   targetId?: string;
 }): Promise<RecordedOperator> {
   const user = ctx.session.user.impersonator ?? ctx.session.user;
-  await auditLog({
-    userId: user.id,
-    action: `identityLookup.${action}`,
-    args,
-    targetKind: "identityLookup",
-    targetId,
-  });
+  const isOperator = checkIsAdmin(user);
+
   // THE RECORD FIRST. This cross-organization lookup is itself the act, and
   // the refused attempt is the one the trail most needs to keep. The gate
   // still runs before any identity service read, so the caller learns
   // nothing about the address or even that this surface exists.
-  if (!checkIsAdmin(user)) throw adminSurfaceHidden();
+  //
+  // A record written before the gate is also a row anybody signed in can
+  // cause, carrying `args` they chose. So the attempts the gate is about to
+  // refuse spend a budget: enough of them are kept that somebody pointed at
+  // this surface who should not be is legible in the trail, and no more.
+  // An OPERATOR IS NEVER THROTTLED — a support case is a burst of real
+  // lookups, and a trail missing half of them is the thing this surface
+  // exists to prevent.
+  if (isOperator || (await refusedAttemptBudget(user.id))) {
+    await auditLog({
+      userId: user.id,
+      action: `identityLookup.${action}`,
+      args,
+      targetKind: "identityLookup",
+      targetId,
+    });
+  }
+  // The refusal reads the same whether or not this attempt was one the budget
+  // kept: being throttled tells a prober nothing the first refusal did not.
+  if (!isOperator) throw adminSurfaceHidden();
   // Looking and repairing are one grant today. They are two fields because
   // they are two questions, and the surface asks the second one before it
   // renders a control rather than after somebody presses it.

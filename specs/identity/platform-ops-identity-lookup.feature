@@ -69,6 +69,20 @@ Feature: The platform operator identity lookup - the end of database surgery
     And the attempt is recorded with who made it
 
   @unit
+  Scenario: A stranger cannot fill the trail with their own attempts
+    Given "mallory" holds no platform operator access
+    When "mallory" requests the lookup over and over
+    Then the first attempts are recorded against "mallory"
+    And the ones past that are refused without adding to the trail
+    And every refusal reads to "mallory" exactly like the first
+
+  @unit
+  Scenario: An operator working a support case is never throttled out of the trail
+    When "olive" resolves many addresses in quick succession
+    Then every one of them is recorded
+    And no lookup she made is missing from what operators have done recently
+
+  @unit
   Scenario: Without platform operator access the surface is not there at all
     Given "mallory" holds no platform operator access
     When "mallory" opens the lookup address directly
