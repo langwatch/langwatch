@@ -417,14 +417,11 @@ export function SourceTypeIconGlyph({
   const icon = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.icon;
   if (!icon) return null;
   return (
-    // The mark carries no text, so a test asserting a header shows the vendor
-    // has nothing else to find it by.
-    <span data-testid="source-type-icon">
-      <IconGlyph
-        icon={icon}
-        monochrome={MONOCHROME_SOURCE_ICONS.has(sourceType)}
-        size={size}
-      />
-    </span>
+    <IconGlyph
+      icon={icon}
+      monochrome={MONOCHROME_SOURCE_ICONS.has(sourceType)}
+      size={size}
+      testId="source-type-icon"
+    />
   );
 }
