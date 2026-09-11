@@ -17,6 +17,12 @@ and the coordinator will return it.
 
 Status: <ready | in_progress | partial | blocked | review | complete | abandoned>
 Manifest: .claude/manifests/<task-id>.md
+Model: <what you are actually running as, your effort, and where each figure came
+from: `read` (you can see it), `as-launched` (you were told at spawn) or
+`best-effort` (your own inference). e.g. `opus / effort unknown (as-launched)`.
+Never copy this from the manifest: the manifest says what was ASKED for, this says
+what RAN, and a spawn that dropped the model is only visible here. Vocabulary in
+`.claude/skills/core/handoff-rules.md` section 8.>
 Updated: <YYYY-MM-DD HH:MM>
 
 ## 1. Identity

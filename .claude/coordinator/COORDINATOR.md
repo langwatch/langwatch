@@ -87,6 +87,42 @@ and handoff paths filled in. Passing the model is the whole of enforcement - a
 manifest that says `sonnet` and a spawn that omits it runs on whatever the
 default is, and nobody notices until the bill.
 
+**Name it so the panel says what it's running.** The live subagent panel shows
+only `name` + current action - it has no field for model or effort, and no hook
+can add one after the fact (checked; the panel is internal harness state). Bake
+both into the `description` passed to the Agent call instead:
+`<manifest-slug>-<model>[-<effort>]`, e.g. `worker-tenancy-sonnet` or
+`api-migration-opus-xhigh`. That is the only place this ever becomes visible at
+a glance, so an omitted model in the label is as good as an omitted one at
+spawn - name it every time.
+
+**What you can actually set, as against what you can only label.** The Agent tool
+takes `model`. It takes no effort and no context-size parameter, so a lane's
+effort is whatever the harness gives that model, and an effort suffix in the
+`description` is a *statement of intent*, not a setting. Write it anyway - it
+records what the task was judged to need - but never report a lane as "running at
+xhigh" on the strength of its own label. If a task genuinely needs an effort you
+cannot set, the way to get it is a stronger model or a narrower manifest, not a
+suffix.
+
+**Everyone says what they are, and how sure they are of it.** A lane declares its
+model and effort in its handoff header and in its closing summary, tagged `read`,
+`as-launched` or `best-effort` - the vocabulary is in
+`.claude/skills/core/handoff-rules.md` section 8. You declare yours in your report
+the same way.
+
+The reason is asymmetry of evidence: a manifest saying `sonnet` and a spawn that
+dropped the model look identical from outside, and the difference only shows up on
+the bill weeks later. A lane that reports its own model turns that into a line you
+can check the moment it stops.
+
+The tag matters as much as the value. A run can normally see its model but not its
+effort, so most honest lines read `effort unknown (as-launched)` - and since you
+are the one who launched it, `as-launched` means *your* intent came back to you
+unchanged, which is worth knowing but is not independent confirmation. Only `read`
+is that. Treat a `best-effort` effort figure as prose, not data, and never
+aggregate it into a cost claim.
+
 `lane` is the agent defined in `.claude/agents/lane.md`. It pins no model on
 purpose, so yours always wins, and it carries a restricted tool list: a lane gets
 Read, Write, Edit, Bash, Grep, Glob and Skill, and **no Agent tool**. That makes
@@ -231,6 +267,13 @@ it drift and this question has no answer except what one session remembers,
 which is the failure the whole protocol exists to remove.
 
 ## 10. Reporting
+
+Open your report with what you are: the model, the effort, and the tag saying
+where each came from - `read`, `as-launched` or `best-effort`. One line, before the
+counters. You are asking every lane to do it and the same reason applies to you: a
+coordinator quietly running on a different model than the drive assumes is exactly
+as invisible, and exactly as expensive. If you cannot read your own effort, say
+so in those words rather than reaching for the number the drive document implies.
 
 Report on events, not on a timer: after each committed slice, and whenever the
 picture changes. One line of counters beside the previous one with a verdict of

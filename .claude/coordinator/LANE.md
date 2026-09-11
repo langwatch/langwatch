@@ -139,10 +139,11 @@ Do two things before you finish.
 a log. Under 150 lines, no pasted diffs, no command output, no narrative.
 `Exact next action` must be performable by an agent that has read nothing else.
 
-**End your run with this summary**, exactly these seven headings:
+**End your run with this summary**, exactly these eight headings:
 
 ```text
 Status:                <ready | in_progress | partial | blocked | review | complete | abandoned>
+Model:                 <model> / effort <value | unknown> (<read | as-launched | best-effort>)
 Files changed:         <paths, grouped by package>
 Checks passed:         <command -> result>
 Failures:              <none, or the exact failing line>

@@ -127,10 +127,11 @@ Write the handoff when any of these happen, and stop:
 ## 8. The lane's closing summary
 
 Separate from the handoff file, a lane ends its run with a fixed summary to its
-caller. Same facts, seven headings, no prose around them:
+caller. Same facts, eight headings, no prose around them:
 
 ```text
 Status:                <one of the seven>
+Model:                 <model> / effort <value | unknown> (<read | as-launched | best-effort>)
 Files changed:         <paths, grouped by package>
 Checks passed:         <command -> result>
 Failures:              <none, or the exact failing line>
@@ -141,3 +142,23 @@ Exact next action:     <one concrete action>
 
 This is what the coordinator reads first. It reads the diff second, and only for
 what the summary named.
+
+`Model:` is the one line that is not about the work. It is there because a
+manifest naming `sonnet` and a spawn that forgot to pass it are indistinguishable
+from the outside, and the bill arrives much later than the handoff. State what you
+actually are, never what the manifest asked for; if the two differ, that is the
+most useful sentence in the summary.
+
+**Say where the figure came from.** A run usually knows its model for certain and
+its effort only sometimes, and a reader cannot tell a measured value from a
+plausible one unless you mark it. One of three words, in brackets, meaning:
+`read`, you can actually see it from inside this run; `as-launched`, you were told
+it at spawn or it is what your caller passed, which is correct unless the harness
+overrode it and you cannot see whether it did; `best-effort`, your own inference
+from how the run feels or from what the manifest asked for.
+
+So: `Model: opus / effort unknown (as-launched)`, or `Model: sonnet / effort high
+(read)`. If you know the model for certain and the effort only by inference, the
+weaker word governs the line and you say which half is which - one clause is
+enough. `best-effort` is an honest answer and costs nothing; an unmarked guess
+reads as measured, which is the failure this line exists to prevent.

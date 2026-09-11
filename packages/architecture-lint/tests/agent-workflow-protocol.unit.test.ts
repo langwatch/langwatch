@@ -66,6 +66,18 @@ describe("every status named anywhere in the protocol is one of the seven", () =
    * "Status: <a | b | c>" line - never from running prose, where "review" and
    * "complete" are ordinary English words.
    */
+  /**
+   * Every status token the protocol names, swept from the three places one can
+   * appear: a table row, a `Lane reports \`x\`` line, and a `Status: <a | b>`
+   * placeholder.
+   *
+   * The table sweep is deliberately broad - it takes EVERY backticked lowercase
+   * token in any `|` row, because narrowing it to a table that looks like the
+   * status table is how a status added to some other table would escape. The
+   * cost is that a protocol table listing any other backticked lowercase
+   * vocabulary fails this test by design. Write that vocabulary as prose instead;
+   * prose backticks are not swept.
+   */
   function statusTokensIn(text: string): string[] {
     const found: string[] = [];
     for (const line of text.split("\n")) {
