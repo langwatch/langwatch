@@ -9,7 +9,7 @@ import { prisma } from "~/server/db";
 
 const migrationFile = join(
   process.cwd(),
-  "prisma/migrations/20260907120007_identity_auth/migration.sql",
+  "prisma/migrations/20260907120013_identity_auth/migration.sql",
 );
 
 function impersonationRevokeStatement(): string {
