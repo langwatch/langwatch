@@ -73,15 +73,32 @@ vi.mock("~/components/LoadingScreen", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     governanceCost: {
-      // The spender panel is its own read with its own tests; here it
-      // answers nothing so these tests stay about their own subject.
+      // The spender panel and the day split are their own reads with their
+      // own tests; here they answer nothing so these tests stay about their
+      // own subject.
       spenders: { useQuery: () => ({ data: undefined }) },
+      dailyByProvider: { useQuery: () => ({ data: undefined }) },
+      spendByModel: { useQuery: () => ({ data: undefined }) },
       summary: {
         useQuery: () => ({
           data: {
             unavailableReason: null,
-            billed: { amountUsd: 123.45, cellsWithoutAmount: 0 },
-            gateway: { amountUsd: 67.89, cellsWithoutAmount: 0 },
+            billed: {
+              amountUsd: 123.45,
+              cellsWithoutAmount: 0,
+              currenciesWithoutUsdAmount: [],
+              currencyTotals: [
+                { currencyCode: "USD", amount: 123.45, cellsWithoutAmount: 0 },
+              ],
+            },
+            gateway: {
+              amountUsd: 67.89,
+              cellsWithoutAmount: 0,
+              currenciesWithoutUsdAmount: [],
+              currencyTotals: [
+                { currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 },
+              ],
+            },
             seats: { status: "awaiting_data" },
             series: [
               { day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 },

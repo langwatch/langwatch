@@ -15,7 +15,43 @@ import {
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { normalizeEmail } from "../logic/identityEvidence";
+import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
 import type { NormalizedPullEvent } from "./pullerAdapter";
+
+/**
+ * The amount this event carries and the currency it is denominated in.
+ *
+ * The export is read by a customer's own SIEM, which takes the field names at
+ * face value: `cost_usd` says dollars, so a euro amount placed there is read
+ * as dollars and totalled with real ones. The pair below is the amount under a
+ * name that admits its currency, at the top of the extension rather than
+ * folded inside one adapter's hint bag — which is where the currency used to
+ * be the only copy, reachable only by a reader who knew that adapter.
+ *
+ * The event's own fields win when it sets them. The hint is the fallback for
+ * the adapters that carried the pair there before the port had a place for it,
+ * so no adapter has to be rewritten for the export to stop lying.
+ */
+function ocsfMoneyFields(event: NormalizedPullEvent): {
+  cost_amount?: string;
+  cost_currency?: string;
+} {
+  const hint = event.extra?.[PULLED_USAGE_HINT_KEY] as
+    | { costUsd?: unknown; currency?: unknown }
+    | undefined;
+
+  const amount =
+    event.cost_amount ??
+    (typeof hint?.costUsd === "string" ? hint.costUsd : undefined);
+  const currency =
+    event.cost_currency ??
+    (typeof hint?.currency === "string" ? hint.currency : undefined);
+
+  // Neither alone: an amount with no currency is the same guess this pair
+  // exists to remove, and a currency with no amount denominates nothing.
+  if (amount === undefined || currency === undefined) return {};
+  return { cost_amount: amount, cost_currency: currency };
+}
 
 /**
  * Where one provider's actor string belongs among the OCSF actor fields.
@@ -97,15 +133,23 @@ export function mapToOcsfRow({
     metadata: {
       product: { name: "LangWatch", vendor_name: "LangWatch" },
       extension: {
+        // The adapter's own bag goes FIRST so the canonical fields below win a
+        // name collision. `extra` is an open record — for the config-driven
+        // adapters it is whatever key an administrator typed — and spread last
+        // it could replace `cost_currency` while leaving `cost_amount`, which
+        // exports a euro figure labelled as dollars. No shipped adapter names
+        // one of these keys, so nothing here changes for them; what changes is
+        // that a future one cannot.
+        ...(event.extra ?? {}),
         uid: "langwatch.governance",
         source_type: sourceType,
         source_id: ingestionSourceId,
         ingest_mode: "pull",
         cost_usd: event.cost_usd,
+        ...ocsfMoneyFields(event),
         tokens_input: event.tokens_input,
         tokens_output: event.tokens_output,
         raw_event: event.raw_payload,
-        ...(event.extra ?? {}),
       },
     },
   });

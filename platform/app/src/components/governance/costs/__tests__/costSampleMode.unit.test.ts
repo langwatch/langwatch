@@ -16,11 +16,13 @@ function summary(
       amountUsd: null,
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
+      currencyTotals: [],
     },
     gateway: {
       amountUsd: null,
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
+      currencyTotals: [],
     },
     seats: { status: "awaiting_data" },
     ...overrides,
@@ -50,6 +52,9 @@ describe("reading the headline summary as a real-data read", () => {
             amountUsd: 123.45,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 123.45, cellsWithoutAmount: 0 },
+            ],
           },
         }),
       );
@@ -65,6 +70,31 @@ describe("reading the headline summary as a real-data read", () => {
             amountUsd: null,
             cellsWithoutAmount: 4,
             currenciesWithoutUsdAmount: ["EUR"],
+            currencyTotals: [
+              { currencyCode: "USD", amount: null, cellsWithoutAmount: 4 },
+            ],
+          },
+        }),
+      );
+      expect(read?.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("given a bill billed only in a currency nobody converted", () => {
+    it("counts the euro total as real data even with no dollar figure and no unpriced cells", () => {
+      // Every cell holds an amount, in euros, and none was ever converted:
+      // the dollar figure is null and NOTHING is unpriced. The lane reported
+      // — the money has a total of its own — so the screen must not fall
+      // back to invented figures over the top of a real bill.
+      const read = summaryAsRead(
+        summary({
+          billed: {
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "EUR", amount: 40, cellsWithoutAmount: 0 },
+            ],
           },
         }),
       );

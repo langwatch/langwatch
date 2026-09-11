@@ -199,7 +199,10 @@ describe("the Azure cost read inside the Dataverse source", () => {
     it("records a day per meter category alongside the conversations", async () => {
       const result = await runPull({ azureSubscriptionId: SUBSCRIPTION_ID });
 
-      expect(costEvents(result.events)).toHaveLength(44);
+      // Six is the AI subset of a forty-four row bill: the fixture's only
+      // AI meter category is Foundry Models, and the other thirty-eight rows
+      // are the subscription's networking and storage.
+      expect(costEvents(result.events)).toHaveLength(6);
       expect(conversationEvents(result.events)).toHaveLength(1);
       expect(result.errorCount).toBe(0);
     });
@@ -331,7 +334,10 @@ describe("the Azure cost read inside the Dataverse source", () => {
       expect(decodeURIComponent(transcriptCall?.url ?? "")).toContain(
         "2026-08-20T10:00:00.000Z",
       );
-      expect(costEvents(result.events)).toHaveLength(44);
+      // Six is the AI subset of a forty-four row bill: the fixture's only
+      // AI meter category is Foundry Models, and the other thirty-eight rows
+      // are the subscription's networking and storage.
+      expect(costEvents(result.events)).toHaveLength(6);
     });
   });
 

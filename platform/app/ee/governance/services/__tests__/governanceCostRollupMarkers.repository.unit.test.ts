@@ -22,7 +22,10 @@ import { describe, expect, it, vi } from "vitest";
 import { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
 
 function makeClient(rows: unknown[]) {
-  return { query: vi.fn().mockResolvedValue({ json: async () => rows }) };
+  return {
+    query: vi.fn().mockResolvedValue({ json: async () => rows }),
+    insert: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 function repositoryOver(rows: unknown[]) {
@@ -196,6 +199,103 @@ describe("GovernanceCostRollupClickHouseRepository", () => {
         previousAmountNanoUsd: 12_340_000_000,
         cellsWithoutPreviousAmount: 0,
         lastObservedAt: 1_754_625_600,
+      });
+    });
+  });
+});
+
+describe("where a restatement key currently sits", () => {
+  /**
+   * The index that makes a reissue recognisable (settlement 9).
+   *
+   * Migration `00094` creates it: a `ReplacingMergeTree(EventTimestamp)`
+   * ordered by `(TenantId, RestatementKey)` carrying the cell each key was
+   * first filed under, and `recordRestatementKeys` writes it in the same
+   * `upsert` as the cell.
+   *
+   * Spelled out rather than imported from the repository's own constant on
+   * purpose. What is asserted below is that the rows land in THIS table, and
+   * a name read out of the code under test would follow it through a rename
+   * and go on passing against a table nothing else knows about.
+   */
+  const RESTATEMENT_INDEX_TABLE = "governance_cost_rollup_restatement_index";
+
+  /** One stored cell of a euro bill, carrying the key that identifies it. */
+  function euroCellRow() {
+    return {
+      TenantId: CELL.tenantId,
+      Day: CELL.day,
+      CostSource: CELL.costSource,
+      IngestionSourceId: CELL.ingestionSourceId,
+      Provider: CELL.provider,
+      Model: CELL.model,
+      AgentId: CELL.agentId,
+      CurrencyCode: "EUR",
+      RawActorId: CELL.rawActorId,
+      OrganizationId: "org_acme",
+      ExactOrEstimate: "exact",
+      AmountNanoUsd: null,
+      AmountNanoMinor: 10_000_000_000,
+      TokensInput: 1_000,
+      TokensOutput: 200,
+      TokensCacheRead: 0,
+      TokensCacheWrite: 0,
+      RequestCount: 1,
+      RevisionCount: 0,
+      PreviousAmountNanoUsd: null,
+      RevisedAt: null,
+      LastObservedAt: 1_754_625_600,
+      PulledItemsJson: JSON.stringify({
+        "bucket-hash": {
+          amountNanoMinor: 10_000_000_000,
+          amountNanoUsd: null,
+          observedAtMs: 1_754_625_600_000,
+          tokensInput: 1_000,
+          tokensOutput: 200,
+          tokensCacheRead: 0,
+          tokensCacheWrite: 0,
+          exactOrEstimate: "exact",
+        },
+      }),
+      Version: "2026-08-28",
+      AppliedEventIds: [],
+      CreatedAt: 1_754_625_600_000,
+      LastEventOccurredAt: 1_754_625_600_000,
+      EventTimestamp: 1_754_625_600_001,
+    };
+  }
+
+  describe("when a cell holding a provider item is written", () => {
+    /** @scenario "A bill reissued in another currency reads as a revision, not as new spend" */
+    it("records the cell the key sits in, so the reissue can be matched to it", async () => {
+      const { client, repo } = repositoryOver([]);
+
+      await repo.upsert(euroCellRow() as never);
+
+      // Written in the SAME write as the cell and derived from the same
+      // event, so a rebuild from history reproduces it. Held only in memory
+      // it would be lost by every restart; looked for by scanning the day it
+      // would mean reading every row of that day on every correction.
+      const indexWrite = client.insert.mock.calls.find(
+        (call) => call[0]?.table === RESTATEMENT_INDEX_TABLE,
+      );
+      expect(indexWrite).toBeDefined();
+      expect(indexWrite![0].values).toHaveLength(1);
+      // Every dimension the key is NOT part of has to be here, because that
+      // is what the reissue is compared against: without the currency and the
+      // spender the index cannot tell a reissue from the charge it replaces,
+      // and the day reads as new spend on top of the old figure.
+      expect(indexWrite![0].values[0]).toMatchObject({
+        TenantId: CELL.tenantId,
+        RestatementKey: "bucket-hash",
+        Day: CELL.day,
+        CostSource: CELL.costSource,
+        IngestionSourceId: CELL.ingestionSourceId,
+        Provider: CELL.provider,
+        Model: CELL.model,
+        AgentId: CELL.agentId,
+        CurrencyCode: "EUR",
+        RawActorId: CELL.rawActorId,
       });
     });
   });

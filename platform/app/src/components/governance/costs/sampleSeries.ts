@@ -21,6 +21,20 @@ export interface RankRow {
   key: string;
   label: string;
   value: number;
+  /**
+   * The figure is WITHHELD — some cell behind this row holds no US-dollar
+   * amount — so `value` is a placeholder and must not be read as money.
+   *
+   * A flag beside the number rather than a nullable `value`, because every
+   * caller of this type and every arithmetic that touches it would otherwise
+   * have to answer a question only the ranked list asks. The list draws no
+   * bar and prints no figure for such a row; it still LISTS it, because the
+   * money was billed and a list that omits it reports a smaller bill than
+   * the provider sent.
+   */
+  unpriced?: boolean;
+  /** How many cells behind the row hold no amount. Explains `unpriced`. */
+  unpricedCells?: number;
 }
 
 export interface DailyPoint {

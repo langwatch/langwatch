@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
-import { type ReactNode, useMemo } from "react";
+import { type ReactElement, type ReactNode, useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -11,6 +11,8 @@ import {
   Legend,
   Pie,
   PieChart,
+  Rectangle,
+  type RectangleProps,
   ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
@@ -148,20 +150,101 @@ export interface RankBar extends RankRow {
  * obvious guard against that collapses a panel of nothing but credits to
  * nothing at all.
  *
+ * A row whose figure is WITHHELD draws no bar and does not set the scale.
+ * There is no bar length that means "we do not know", and its placeholder
+ * `value` is not a measurement — letting it into the scale would size every
+ * other bar against a number nobody measured.
+ *
  * Extracted from the panel because the width lands in a generated class name
  * that jsdom cannot resolve, which leaves the arithmetic untestable through
  * the rendered output.
  */
 export function rankBarGeometry(rows: RankRow[]): RankBar[] {
   const scale = rows.reduce(
-    (max, row) => Math.max(max, Math.abs(row.value)),
+    (max, row) => (row.unpriced ? max : Math.max(max, Math.abs(row.value))),
     0,
   );
   return rows.map((row) => ({
     ...row,
-    widthPct: scale > 0 ? (Math.abs(row.value) / scale) * 100 : 0,
-    isCredit: row.value < 0,
+    widthPct:
+      row.unpriced || scale <= 0 ? 0 : (Math.abs(row.value) / scale) * 100,
+    isCredit: !row.unpriced && row.value < 0,
   }));
+}
+
+/**
+ * The bar half of a ranked row.
+ *
+ * Its own component for the reason `CostSpenderPanel` splits `SpenderBar` out:
+ * the branch on a credit touches five properties, and inlined it buries the
+ * row's shape under styling the row does not decide.
+ */
+function RankBarCell({ row }: { row: RankBar }) {
+  return (
+    <Box
+      flex="1"
+      height="14px"
+      borderRadius="sm"
+      backgroundColor="bg.muted"
+      overflow="hidden"
+    >
+      <Box
+        height="100%"
+        borderRadius="sm"
+        width={`${row.widthPct}%`}
+        // The same number, readable without resolving styling — the width
+        // above lands in a generated class name. `MeterBar` does the same for
+        // the same reason.
+        data-width-pct={row.widthPct}
+        data-credit={row.isCredit ? "true" : undefined}
+        // A credit is drawn as an outline rather than a fill, so a refund and
+        // a charge of the same size do not read alike.
+        backgroundColor={
+          row.isCredit ? "transparent" : getHexColorForString(row.label)
+        }
+        borderWidth={row.isCredit ? "2px" : undefined}
+        borderColor={row.isCredit ? getHexColorForString(row.label) : undefined}
+      />
+    </Box>
+  );
+}
+
+/**
+ * The figure half of a ranked row, or the dash that stands in for one.
+ *
+ * A WITHHELD figure prints no number. Formatting its placeholder would put
+ * "$0" where the screen means "we hold rows we cannot price", and the two
+ * readings are not close enough for a reader to tell apart.
+ */
+function RankFigure({
+  row,
+  format,
+}: {
+  row: RankBar;
+  format: (value: number) => string;
+}) {
+  return (
+    <Text
+      flex="0 0 18%"
+      textAlign="right"
+      fontVariantNumeric="tabular-nums"
+      // Readable without resolving styling, as `data-width-pct` is: an em dash
+      // alone cannot tell a test which of the two things it means, and the
+      // reason is what a reader is owed here.
+      data-unpriced={row.unpriced ? "true" : undefined}
+      color={row.unpriced ? "fg.muted" : undefined}
+      // The word the dash stands for, since the column is too narrow to print
+      // it. Same sentence the spender panel uses for the same withholding, so
+      // the two panels do not explain it differently.
+      title={
+        row.unpriced
+          ? `unpriced — ${row.unpricedCells ?? 0} of this row's cells hold no US-dollar figure, so no total is shown`
+          : undefined
+      }
+    >
+      {row.unpriced ? "—" : format(row.value)}
+    </Text>
+  );
 }
 
 /**
@@ -185,9 +268,19 @@ export function CostRankList({
   const shown = useMemo(
     // Copied before sorting: these rows can be a query cache, and sorting in
     // place would reorder what every other reader of that cache sees.
+    //
+    // WITHHELD rows sort last whatever their placeholder value says. Ranking
+    // them by it would file a row nobody could price among the figures, and
+    // its stand-in zero would land it above every credit on the panel.
     () =>
       rankBarGeometry(
-        [...(rows ?? [])].sort((a, b) => b.value - a.value).slice(0, maxRows),
+        [...(rows ?? [])]
+          .sort(
+            (a, b) =>
+              Number(a.unpriced ?? false) - Number(b.unpriced ?? false) ||
+              b.value - a.value,
+          )
+          .slice(0, maxRows),
       ),
     [rows, maxRows],
   );
@@ -209,40 +302,8 @@ export function CostRankList({
           <Text flex="0 0 50%" minWidth={0} truncate title={row.label}>
             {row.label}
           </Text>
-          <Box
-            flex="1"
-            height="14px"
-            borderRadius="sm"
-            backgroundColor="bg.muted"
-            overflow="hidden"
-          >
-            <Box
-              height="100%"
-              borderRadius="sm"
-              width={`${row.widthPct}%`}
-              // The same number, readable without resolving styling — the
-              // width above lands in a generated class name. `MeterBar` does
-              // the same for the same reason.
-              data-width-pct={row.widthPct}
-              data-credit={row.isCredit ? "true" : undefined}
-              // A credit is drawn as an outline rather than a fill, so a
-              // refund and a charge of the same size do not read alike.
-              backgroundColor={
-                row.isCredit ? "transparent" : getHexColorForString(row.label)
-              }
-              borderWidth={row.isCredit ? "2px" : undefined}
-              borderColor={
-                row.isCredit ? getHexColorForString(row.label) : undefined
-              }
-            />
-          </Box>
-          <Text
-            flex="0 0 18%"
-            textAlign="right"
-            fontVariantNumeric="tabular-nums"
-          >
-            {format(row.value)}
-          </Text>
+          <RankBarCell row={row} />
+          <RankFigure row={row} format={format} />
         </HStack>
       ))}
     </VStack>
@@ -253,14 +314,26 @@ export function CostRankList({
  * Donut with the breakdown listed beside it. The list carries the figures, so
  * the ring itself needs no labels.
  */
-export function CostDonut({ rows }: { rows: RankRow[] }) {
+export function CostDonut({
+  rows,
+  empty,
+}: {
+  rows: RankRow[] | null;
+  /** This panel's own empty state. See `costPanelEmpty`. */
+  empty?: (unanswered: boolean) => ReactNode;
+}) {
   const shown = useMemo(
-    () => [...rows].sort((a, b) => b.value - a.value).slice(0, 8),
+    () => [...(rows ?? [])].sort((a, b) => b.value - a.value).slice(0, 8),
     [rows],
   );
   const total = shown.reduce((sum, row) => sum + row.value, 0);
 
-  if (total === 0) return <EmptyPanel height="220px" unanswered={false} />;
+  if (rows === null)
+    return <EmptyPanel height="220px" unanswered empty={empty} />;
+  // A ring of nothing is not a ring. Zero total covers both no rows at all
+  // and rows that all came to zero, and neither draws.
+  if (total === 0)
+    return <EmptyPanel height="220px" unanswered={false} empty={empty} />;
 
   return (
     <HStack align="center" gap={4}>
@@ -349,6 +422,144 @@ function seriesKeysOf(buckets: DailyBucket[]): Array<{
   return [...labelByKey.entries()].map(([key, label]) => ({ key, label }));
 }
 
+/**
+ * A bucket that may say its bar is not the whole figure.
+ *
+ * `withheld` is optional so the invented series and the panels whose figures
+ * are always whole need not say so; a bucket that omits it is drawn as whole.
+ * The chart does not decide what "short" means — the fold that built the
+ * bucket does, since only it saw the rows — it only draws what it is told.
+ */
+export type StackedBucket = DailyBucket & { withheld?: boolean };
+
+/**
+ * The slate ink for a quantity that is NOT a measurement of what happened.
+ *
+ * Two marks on this screen mean that, and they share it on purpose: the
+ * forecast's projected span, and the edge of a bar whose period holds a figure
+ * we do not have. A hex rather than a token because the chart palette has no
+ * hue for "not a measurement" — every palette hue carries a figure, and a
+ * figure is the one thing neither of these marks is — and no Chakra semantic
+ * token names the idea either; `fg.muted` is an ink for text, which the
+ * mark-colour guard rightly refuses on a drawn shape. `CHART_SEAT_CONTRACT_FILL`
+ * in `chartTheme` is the same slate for the same reason.
+ */
+const PROJECTION_INK = "#94a3b8";
+/** Stroke on a bar whose period holds a figure we do not have. */
+const WITHHELD_STROKE = PROJECTION_INK;
+/** How much of the series colour a short bar keeps. */
+const WITHHELD_FILL = 0.45;
+/**
+ * The dash a short bar's edge is drawn in. The cue that is not a colour: a
+ * faded fill alone disappears under greyscale and under most colour-blindness,
+ * and a mark that means "not the whole figure" cannot be one only some readers
+ * can see.
+ */
+const WITHHELD_DASH = "3 2";
+/**
+ * The height, in pixels, of the mark drawn where a bar would be when the period
+ * has NO figure at all — every day withheld, nothing to add up. Tall enough to
+ * carry the dash, short enough not to read as a small amount.
+ */
+const WITHHELD_EMPTY_HEIGHT = 6;
+
+/** The words a short bar's tooltip adds after the period's name. */
+export const WITHHELD_TOOLTIP_NOTE = "part of this period has no dollar figure";
+/** What a screen reader says on a bar that is short. */
+export const WITHHELD_BAR_LABEL =
+  "Amount withheld: part of this period has no dollar figure";
+/** What a screen reader says where a bar would be, when the whole period is withheld. */
+export const WITHHELD_EMPTY_BAR_LABEL =
+  "Amount withheld: no dollar figure for this period";
+
+/**
+ * Which periods the chart must draw as short, and which of those it must draw
+ * a stand-in for because there is no bar to mark.
+ */
+export type WithheldMarks = {
+  /** Periods holding some figure we do not have: the bar is drawn short. */
+  withheldDays: ReadonlySet<string>;
+  /**
+   * Periods holding NO figure at all: recharts draws nothing for a bar of
+   * height zero, so a mark stands in for the bar. A single-provider tenant
+   * with one unanswered bill used to get an empty slot here, indistinguishable
+   * from a period nobody spent anything in — the exact reading a withheld
+   * figure exists to prevent.
+   */
+  emptyDays: ReadonlySet<string>;
+  /**
+   * Whether this series draws the stand-in. Exactly one series per chart
+   * does: every series in a stack is handed the same zero-height rectangle at
+   * the same spot, and N of them drawing N marks on top of one another is one
+   * mark to the eye and N to a screen reader.
+   */
+  drawsEmptyMark: boolean;
+};
+
+/**
+ * The geometry recharts hands a bar's shape, and the row the bar was drawn
+ * from. Narrower than recharts' own `BarShapeProps` so a test can build one
+ * by hand for the zero-height case that jsdom cannot lay out.
+ */
+export type WithheldBarShapeProps = RectangleProps & {
+  payload?: { day?: unknown };
+};
+
+/**
+ * One bar, drawn as recharts would unless its period is short.
+ *
+ * A short bar keeps recharts' own rectangle — so it still answers to
+ * `.recharts-rectangle` and to the click that opens a period — faded and
+ * dash-edged, wrapped in a group that says why to a screen reader. A period
+ * with nothing to draw gets the stand-in instead. Handed to `<Bar shape>`
+ * rather than done with `<Cell>`s because a cell can only restyle a
+ * rectangle recharts decided to draw, and for a height of zero it decides
+ * not to; a custom shape is called for every bar, zero-height ones included.
+ */
+export function withheldBarShape(
+  props: WithheldBarShapeProps,
+  marks: WithheldMarks,
+): ReactElement | null {
+  const day = typeof props.payload?.day === "string" ? props.payload.day : null;
+  if (day === null || !marks.withheldDays.has(day)) {
+    return <Rectangle {...props} />;
+  }
+  if (marks.emptyDays.has(day)) {
+    if (!marks.drawsEmptyMark) return null;
+    const { x = 0, y = 0, width = 0 } = props;
+    return (
+      <g role="img" aria-label={WITHHELD_EMPTY_BAR_LABEL} data-withheld="empty">
+        <title>{WITHHELD_EMPTY_BAR_LABEL}</title>
+        <rect
+          x={x}
+          // Up from the baseline, where the bar would have started.
+          y={y - WITHHELD_EMPTY_HEIGHT}
+          width={width}
+          height={WITHHELD_EMPTY_HEIGHT}
+          fill="none"
+          stroke={WITHHELD_STROKE}
+          strokeDasharray={WITHHELD_DASH}
+        />
+      </g>
+    );
+  }
+  // A series with nothing in this period, stacked on one that has: recharts
+  // would draw nothing for it, and a labelled group around nothing is a
+  // second "withheld" a screen reader would read out for one bar.
+  if (!props.height || !props.width) return null;
+  return (
+    <g role="img" aria-label={WITHHELD_BAR_LABEL} data-withheld="short">
+      <title>{WITHHELD_BAR_LABEL}</title>
+      <Rectangle
+        {...props}
+        fillOpacity={WITHHELD_FILL}
+        stroke={WITHHELD_STROKE}
+        strokeDasharray={WITHHELD_DASH}
+      />
+    </g>
+  );
+}
+
 function widenBuckets(
   buckets: DailyBucket[],
   keys: Array<{ key: string; label: string }>,
@@ -386,6 +597,42 @@ function ChartLegend({
 }
 
 /**
+ * The days a stacked chart has to mark, kept beside the rows rather than
+ * widened into them: a row is a bag of series values and a flag in it would be
+ * one more key for recharts to try to draw as a series.
+ *
+ * `emptyDays` is the subset with nothing in it at all: no series holds a
+ * figure, so there is no bar for the dash to sit on, and a mark stands in for
+ * one.
+ */
+function withheldDaysOf(buckets: StackedBucket[]): {
+  withheldDays: Set<string>;
+  emptyDays: Set<string>;
+} {
+  const withheld = buckets.filter((b) => b.withheld);
+  return {
+    withheldDays: new Set(withheld.map((b) => b.day)),
+    emptyDays: new Set(
+      withheld
+        .filter((b) => b.points.every((p) => p.value === 0))
+        .map((b) => b.day),
+    ),
+  };
+}
+
+/**
+ * A series' bar shape, only when some period is short: a custom shape makes
+ * recharts hand over zero-height bars it would otherwise skip, and a chart
+ * with nothing to mark has no use for them.
+ */
+function withheldShapeFor(
+  marks: WithheldMarks,
+): ((props: WithheldBarShapeProps) => ReactElement | null) | undefined {
+  if (marks.withheldDays.size === 0) return undefined;
+  return (props) => withheldBarShape(props, marks);
+}
+
+/**
  * Stacked bars over the time axis — the shape the cost-evolution panels want.
  *
  * `grouped` puts the series side by side instead of on top of one another, for
@@ -403,8 +650,17 @@ export function CostStackedBars({
   grouped = false,
   colorFor,
   empty,
+  onSelectSeries,
 }: {
-  buckets: DailyBucket[] | null;
+  /**
+   * Null while unanswered. A bucket flagged `withheld` is drawn faded with a
+   * dashed edge and its tooltip says why: its bar is the sum of the days that
+   * held a figure, which is short by however much was left out, and a short
+   * bar drawn like a whole one reads as a cheap period. A withheld bucket
+   * with no figure at all gets a dashed stand-in where its bar would be, so
+   * it is never an empty slot. See `withheldBarShape`.
+   */
+  buckets: StackedBucket[] | null;
   height?: string;
   format?: (value: number) => string;
   showLegend?: boolean;
@@ -425,11 +681,25 @@ export function CostStackedBars({
   colorFor?: (key: string) => string | undefined;
   /** This panel's own empty state. See `costPanelEmpty`. */
   empty?: (unanswered: boolean) => ReactNode;
+  /**
+   * Called with a series key and a bucket when a reader clicks that series in
+   * that bucket. Unset on every panel that has nothing to open, which is most
+   * of them, and the bars then carry no pointer and no handler at all.
+   *
+   * The bar is the target rather than a row of controls under the chart: a
+   * reader chasing a bucket that stands out is already pointing at it, and a
+   * control row under a chart is a shape nothing else on this screen has.
+   */
+  onSelectSeries?: (key: string, bucket: string) => void;
 }) {
   const keys = useMemo(() => seriesKeysOf(buckets ?? []), [buckets]);
   const rows = useMemo(
     () => widenBuckets(buckets ?? [], keys),
     [buckets, keys],
+  );
+  const { withheldDays, emptyDays } = useMemo(
+    () => withheldDaysOf(buckets ?? []),
+    [buckets],
   );
 
   if (buckets === null)
@@ -461,13 +731,18 @@ export function CostStackedBars({
               format(Number(value)),
               keys.find((k) => k.key === String(name))?.label ?? String(name),
             ]}
-            labelFormatter={(label) => formatDayTick(label as string, interval)}
+            labelFormatter={(label) => {
+              const period = formatDayTick(label as string, interval);
+              return withheldDays.has(label as string)
+                ? `${period} · ${WITHHELD_TOOLTIP_NOTE}`
+                : period;
+            }}
             contentStyle={CHART_TOOLTIP_CONTENT}
             labelStyle={CHART_TOOLTIP_LABEL}
             cursor={CHART_TOOLTIP_CURSOR}
           />
           {showLegend && ChartLegend({ keys })}
-          {keys.map((k) => (
+          {keys.map((k, index) => (
             <Bar
               key={k.key}
               dataKey={k.key}
@@ -477,6 +752,28 @@ export function CostStackedBars({
               stackId={grouped ? undefined : "cost"}
               fill={colorFor?.(k.key) ?? getHexColorForString(k.label)}
               isAnimationActive={false}
+              shape={withheldShapeFor({
+                withheldDays,
+                emptyDays,
+                drawsEmptyMark: index === 0,
+              })}
+              cursor={onSelectSeries ? "pointer" : undefined}
+              onClick={
+                onSelectSeries
+                  ? (data) => {
+                      // The widened row rides along as `payload`, so the
+                      // bucket comes off the row itself rather than out of an
+                      // index into `rows` — an index would silently point at
+                      // the wrong bucket the moment a series is missing from
+                      // one. Read through a cast because recharts types the
+                      // payload as the chart's own row shape, which is a
+                      // string-keyed bag it cannot narrow for us.
+                      const day = (data as { payload?: { day?: unknown } })
+                        ?.payload?.day;
+                      if (typeof day === "string") onSelectSeries(k.key, day);
+                    }
+                  : undefined
+              }
             />
           ))}
         </BarChart>
@@ -489,8 +786,6 @@ export function CostStackedBars({
 const MEASURED_FILL = 0.42;
 /** Opacity of the same series over the months still to come. */
 const PROJECTED_FILL = 0.07;
-/** The projected span's own wash, over the top of the faded series. */
-const PROJECTION_INK = "#94a3b8";
 
 /**
  * Where the projection begins: the LAST MEASURED bucket, and its position as a
@@ -641,30 +936,61 @@ function ForecastDefs({
  * a category axis spaces its points evenly, so the split sits at a known
  * fraction of the plot's width whatever the interval folds the months into.
  */
+/**
+ * One stacked area per series, each painted from the gradients `ForecastDefs`
+ * laid down for it.
+ *
+ * Returns the ARRAY rather than a fragment, and is called as a plain function
+ * rather than rendered as `<ForecastAreas />`. Recharts inspects the type of
+ * each child of a chart to decide what it is; an array it walks through, but
+ * a fragment or a wrapper component is not an `Area` as far as that
+ * inspection is concerned, and the series silently vanish.
+ */
+function forecastAreas(keys: Array<{ key: string; label: string }>) {
+  return keys.map((k) => (
+    <Area
+      key={k.key}
+      type="monotone"
+      dataKey={k.key}
+      stackId="cost"
+      stroke={`url(#${defsId("cost-forecast-line", k.key)})`}
+      strokeWidth={1.5}
+      fill={`url(#${defsId("cost-forecast-fill", k.key)})`}
+      fillOpacity={1}
+      isAnimationActive={false}
+    />
+  ));
+}
+
 export function CostForecastArea({
   buckets,
   projectedFromDay,
   height = "220px",
   interval,
+  empty,
 }: {
-  buckets: DailyBucket[];
+  /** Null is a read that never answered; empty is one that found nothing. */
+  buckets: DailyBucket[] | null;
   projectedFromDay: string | null;
   height?: string;
   /** The bucket width in view, which the time axis is ticked by. */
   interval?: TimeInterval;
+  /** This panel's own empty state. See `costPanelEmpty`. */
+  empty?: (unanswered: boolean) => ReactNode;
 }) {
-  const keys = useMemo(() => seriesKeysOf(buckets), [buckets]);
-  const rows = useMemo(() => widenBuckets(buckets, keys), [buckets, keys]);
-  const lastDay = rows[rows.length - 1]?.day;
-
+  const drawn = buckets ?? [];
+  const keys = useMemo(() => seriesKeysOf(drawn), [drawn]);
+  const rows = useMemo(() => widenBuckets(drawn, keys), [drawn, keys]);
   const projection = useMemo(
     () => projectionSpan(rows, projectedFromDay),
     [projectedFromDay, rows],
   );
+  const lastDay = rows[rows.length - 1]?.day;
   const splitAt = projection?.at ?? null;
-
-  if (rows.length === 0 || keys.length === 0)
-    return <EmptyPanel height={height} unanswered={false} />;
+  if (buckets === null || rows.length === 0 || keys.length === 0)
+    return (
+      <EmptyPanel height={height} unanswered={buckets === null} empty={empty} />
+    );
 
   return (
     <Box height={height}>
@@ -714,91 +1040,7 @@ export function CostForecastArea({
               }}
             />
           )}
-          {keys.map((k) => (
-            <Area
-              key={k.key}
-              type="monotone"
-              dataKey={k.key}
-              stackId="cost"
-              stroke={`url(#${defsId("cost-forecast-line", k.key)})`}
-              strokeWidth={1.5}
-              fill={`url(#${defsId("cost-forecast-fill", k.key)})`}
-              fillOpacity={1}
-              isAnimationActive={false}
-            />
-          ))}
-        </AreaChart>
-      </ResponsiveContainer>
-    </Box>
-  );
-}
-
-/**
- * The shape of a lane's window, at card size.
- *
- * A lane card states one figure, and one figure cannot say whether it is the
- * end of a climb, a spike already over, or a flat month. The cards used to
- * carry that question in a blank middle; this answers it in the same space.
- *
- * No axes, no grid, no legend — a sparkline that carried them would be a
- * chart, and the card already has a chart's worth of explanation underneath
- * it. The tooltip stays, because the one thing a reader wants from a shape
- * they have spotted is which period it was.
- *
- * Days with no figure are gaps rather than zeroes (ADR-128 §21): a withheld
- * amount drawn on the floor is a claim that nothing was spent that day.
- */
-export function LaneSparkline({
-  points,
-  interval,
-  height = "40px",
-}: {
-  points: Array<{ day: string; value: number | null }>;
-  /** The bucket width in view, which the tooltip's heading is read in. */
-  interval?: TimeInterval;
-  height?: string;
-}) {
-  if (points.length < 2) return null;
-  return (
-    <Box height={height} width="full" marginTop={1}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
-          data={points}
-          margin={{ top: 2, right: 0, bottom: 0, left: 0 }}
-        >
-          <defs>
-            <linearGradient id="cost-lane-spark" x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="0%"
-                stopColor={CHART_SPARK_STROKE}
-                stopOpacity={0.32}
-              />
-              <stop
-                offset="100%"
-                stopColor={CHART_SPARK_STROKE}
-                stopOpacity={0.02}
-              />
-            </linearGradient>
-          </defs>
-          <YAxis hide domain={["dataMin", "dataMax"]} />
-          <Tooltip
-            formatter={(value) => [fmtMoney(Number(value)), "Spend"]}
-            labelFormatter={(label) => formatDayTick(label as string, interval)}
-            contentStyle={CHART_TOOLTIP_CONTENT}
-            labelStyle={CHART_TOOLTIP_LABEL}
-            cursor={CHART_TOOLTIP_CURSOR}
-          />
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke={CHART_SPARK_STROKE}
-            strokeWidth={1.5}
-            fill="url(#cost-lane-spark)"
-            fillOpacity={1}
-            connectNulls={false}
-            isAnimationActive={false}
-            dot={false}
-          />
+          {forecastAreas(keys)}
         </AreaChart>
       </ResponsiveContainer>
     </Box>

@@ -18,8 +18,10 @@ const logger = createLogger("langwatch:clickhouse:connection-pool");
  * size is derived from that budget. Without it a pod cannot know how many
  * siblings it has, so the historical fixed default stands — clamped to what
  * one process alone may claim when `CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES`
- * states the server's cap (haven exports it; a 32-query dev server must not
- * meet a 64-connection pool).
+ * states the server's cap (haven exports it next to `CLICKHOUSE_URL`, from the
+ * value it renders into the shared container's config, so a 32-query dev
+ * server never meets a 64-connection pool; a deployment that manages its own
+ * server has to state the cap itself).
  *
  * This is the socket ceiling, not the working limit. A process has one
  * construction site against a given server (`./managedClient.ts`), and what

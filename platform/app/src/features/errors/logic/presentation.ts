@@ -2279,6 +2279,22 @@ const presentations = {
     describe: () =>
       "Archive one you no longer use, or upgrade your plan to raise the limit.",
   },
+  agent_listing_unavailable: {
+    // fault: platform, and the copy is written to match. Nothing reached a
+    // provider here — the ask could not be recorded at all — so there is no
+    // outcome landing later, no half-finished sync, and nothing already on
+    // the page is affected.
+    //
+    // It deliberately does not say "try again". Both causes are settings of
+    // the install rather than moments: this deployment does not run the
+    // pipeline that carries listings, or the organization has no governance
+    // project for the request to be tenanted to. Pressing the button a second
+    // time changes neither, and copy that implied otherwise would send an
+    // admin round a loop that cannot end.
+    title: "Agent sync isn't switched on for this organization",
+    describe: () =>
+      "Your providers weren't asked, so no agent list is on the way. Ask your administrator to switch it on, or contact support — trying again won't help until they do.",
+  },
 
   // ---- datasets ----
   dataset_name_taken: {

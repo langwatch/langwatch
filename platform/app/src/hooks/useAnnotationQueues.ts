@@ -44,7 +44,6 @@ const queueReadInput = ({
     ? { queueIds: options.queueIds }
     : {}),
   showQueueAndUser: options.showQueueAndUser ?? false,
-  allQueueItems: options.allQueueItems ?? false,
   ...dateRangeInput(options),
 });
 
@@ -54,7 +53,6 @@ interface UseAnnotationQueuesOptions {
   /** The reviewer's pick of queues to read. Empty or absent reads them all. */
   queueIds?: string[];
   showQueueAndUser?: boolean;
-  allQueueItems?: boolean;
   /** Narrows the read to items queued inside this range. */
   startDate?: Date;
   endDate?: Date;
@@ -66,15 +64,23 @@ export function useAnnotationQueues(
   options: UseAnnotationQueuesOptions = {
     selectedAnnotations: "pending",
     showQueueAndUser: false,
-    allQueueItems: false,
   },
 ) {
   const { enabled = true } = options;
   const { project } = useOrganizationTeamProject();
 
   const router = useRouter();
-  const pageOffset = parseInt(router.query.pageOffset as string) || 0;
-  const pageSize = parseInt(router.query.pageSize as string) || 25;
+  // Both arrive from the URL, so both are whatever the address bar says.
+  // Clamped to the range the procedure accepts: an out-of-range page is worth
+  // a smaller list, not a failed request.
+  const pageOffset = Math.max(
+    0,
+    parseInt(router.query.pageOffset as string) || 0,
+  );
+  const pageSize = Math.min(
+    100,
+    Math.max(1, parseInt(router.query.pageSize as string) || 25),
+  );
 
   const optimizedData = api.annotation.getOptimizedAnnotationQueues.useQuery(
     queueReadInput({

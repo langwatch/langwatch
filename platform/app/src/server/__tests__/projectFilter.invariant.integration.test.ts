@@ -27,6 +27,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { OrganizationConnectedAgentRepository } from "@ee/governance/repositories/governanceAgentInventory.repository";
 import { DepartmentService } from "@ee/governance/services/department/department.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -227,6 +228,26 @@ const surfaces: ListingSurface[] = [
       return projects.map((p) => p.id);
     },
   },
+  {
+    // The one surface whose read hands back agents rather than projects, so
+    // the project ids it exposed are recovered from the rows it returned.
+    // Driving it any other way would assert about a query this screen does
+    // not run.
+    name: "the governance agents inventory",
+    module: "ee/governance/repositories/governanceAgentInventory.repository.ts",
+    ids: async () => {
+      const agents =
+        await new OrganizationConnectedAgentRepository().listByOrganization(
+          prisma,
+          { organizationId },
+        );
+      const rows = await prisma.agent.findMany({
+        where: { id: { in: agents.map((a) => a.id) } },
+        select: { projectId: true },
+      });
+      return [...new Set(rows.map((r) => r.projectId))];
+    },
+  },
 ];
 
 /**
@@ -396,6 +417,20 @@ beforeAll(async () => {
     })),
   });
 
+  // The agents inventory lists only `connected` agents that are still
+  // present, so both projects need one or its exclusion would prove nothing.
+  // `lastSeenAt: null` is never stale (only a connected agent writes the
+  // column), which keeps the fixture off the clock.
+  await prisma.agent.createMany({
+    data: [applicationProjectId, governanceProjectId].map((projectId) => ({
+      projectId,
+      name: `leak gate ${projectId}`,
+      type: "connected",
+      config: {},
+      lastSeenAt: null,
+    })),
+  });
+
   caller = appRouter.createCaller(
     createInnerTRPCContext({
       session: { user: { id: userId }, expires: "1" },
@@ -407,6 +442,10 @@ afterAll(async () => {
   await cleanupTestRows(prisma, [
     [
       "cost",
+      { projectId: { in: [applicationProjectId, governanceProjectId] } },
+    ],
+    [
+      "agent",
       { projectId: { in: [applicationProjectId, governanceProjectId] } },
     ],
     ["roleBinding", { organizationId }],

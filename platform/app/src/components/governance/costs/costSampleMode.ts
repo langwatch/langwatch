@@ -19,7 +19,16 @@ export function isRefusedRead(
   return code === "FORBIDDEN" || code === "UNAUTHORIZED";
 }
 
-/** Count lanes holding money, unpriced cells or reported seats. */
+/**
+ * Count lanes holding money, unpriced cells, a total in any currency, or
+ * reported seats.
+ *
+ * A lane billed ONLY in a currency nobody converted has a null dollar figure
+ * and no unpriced cell at all — every cell holds an amount, in euros — so the
+ * first two tests both say "nothing". The currency totals are the third way a
+ * lane reports, and the one this used to miss: a real euro bill read as no
+ * bill, and the screen fell back to invented figures over the top of it.
+ */
 export function summaryAsRead(
   data: SummaryForSampleDecision | undefined,
 ): { length: number } | null {
@@ -28,7 +37,11 @@ export function summaryAsRead(
   const laneReported = (lane: {
     amountUsd: number | null;
     cellsWithoutAmount: number;
-  }) => lane.amountUsd !== null || lane.cellsWithoutAmount > 0;
+    currencyTotals: readonly unknown[];
+  }) =>
+    lane.amountUsd !== null ||
+    lane.cellsWithoutAmount > 0 ||
+    lane.currencyTotals.length > 0;
   const reported =
     (laneReported(data.billed) ? 1 : 0) +
     (laneReported(data.gateway) ? 1 : 0) +
