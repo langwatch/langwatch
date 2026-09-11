@@ -2,6 +2,7 @@
 
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
 import { createInnerTRPCContext } from "../../trpc";
 import { identityLookupRouter } from "../identityLookup";
 
@@ -47,6 +48,10 @@ describe("platform operator identity lookup authorization", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The refused-attempt budget lives in process memory when there is no
+    // Redis, which is every unit run — one case's spending would otherwise
+    // be the next one's starting point.
+    _resetMemoryRateLimitStore();
     activityRows.length = 0;
     process.env.ADMIN_EMAILS = "olive@langwatch.ai";
     mockAuditLog.mockImplementation(async (...args: unknown[]) => {
@@ -172,6 +177,52 @@ describe("platform operator identity lookup authorization", () => {
         }),
       );
       expect(mockLookup.resolve).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A stranger cannot fill the trail with their own attempts" */
+    it("keeps a bounded number of one stranger's attempts and refuses all of them", async () => {
+      const caller = callerFor({
+        id: "user_mallory",
+        email: "mallory@acme.com",
+      });
+
+      const attempts = 25;
+      for (let i = 0; i < attempts; i++) {
+        await expect(
+          caller.resolve({ address: `sam+${i}@acme.com` }),
+        ).rejects.toMatchObject({ code: "NOT_FOUND", message: "Not found" });
+      }
+
+      // Counted by ACTION, because a refused call also reaches the generic
+      // error-audit middleware every protected procedure carries. What this
+      // surface owns is the `identityLookup.*` row, and that is what the
+      // budget bounds: enough attempts are kept to show somebody tried, and
+      // the rest add nothing to the trail.
+      const ownRows = mockAuditLog.mock.calls.filter(
+        ([entry]) =>
+          (entry as { action?: string } | undefined)?.action ===
+          "identityLookup.resolve",
+      );
+      expect(ownRows.length).toBeGreaterThan(0);
+      expect(ownRows.length).toBeLessThan(attempts);
+      expect(mockLookup.resolve).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An operator working a support case is never throttled out of the trail" */
+    it("records every lookup an operator makes in quick succession", async () => {
+      const caller = callerFor({ id: "user_olive", email: "olive@langwatch.ai" });
+
+      const lookups = 25;
+      for (let i = 0; i < lookups; i++) {
+        await caller.resolve({ address: `sam+${i}@acme.com` });
+      }
+
+      const ownRows = mockAuditLog.mock.calls.filter(
+        ([entry]) =>
+          (entry as { action?: string } | undefined)?.action ===
+          "identityLookup.resolve",
+      );
+      expect(ownRows).toHaveLength(lookups);
     });
 
     /** @scenario "Without platform operator access the surface is not there at all" */
