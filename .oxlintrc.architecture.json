@@ -15,6 +15,7 @@
     "complexity": ["error", { "max": 25 }],
     "langwatch/cognitive-complexity": ["error", { "max": 15 }],
     "langwatch/condition-shape": "error",
+    "langwatch/legacy-monolith-path": "error",
     "no-nested-ternary": "error",
     "langwatch/api-context-services": "error",
     "langwatch/comment-block-size": "error",

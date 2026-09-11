@@ -11,6 +11,7 @@ export { conditionalTypeDepthRule } from "./rules/conditional-type-depth.rule.mj
 export { conditionShape, conditionShapeRule } from "./rules/condition-shape.rule.mjs";
 export { layerClassRule } from "./rules/layer-class.rule.mjs";
 export { resetOverengineeringBaselineCache } from "./rules/overengineering.mjs";
+export { legacyMonolithPathRule } from "./rules/legacy-monolith-path.rule.mjs";
 export { overloadByLiteralRule } from "./rules/overload-by-literal.rule.mjs";
 export { apiContextServicesRule } from "./rules/api-context-services.rule.mjs";
 export { awaitedReturnChainRule } from "./rules/awaited-return-chain.rule.mjs";
