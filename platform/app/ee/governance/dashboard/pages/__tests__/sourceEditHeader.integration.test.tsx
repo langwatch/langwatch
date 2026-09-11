@@ -203,7 +203,7 @@ describe("given a source with settings its adapter can no longer change", () => 
     // three notes never all apply at once: a fixed start and a start worth
     // moving are the two halves of one condition.
     expect(notes).toMatch(/restate|re-read/i);
-    expect(notes).not.toMatch(/start date can no longer/i);
+    expect(notes).not.toMatch(/start date is fixed/i);
   });
 
   /** @scenario "A source with nothing locked shows no marker at all" */

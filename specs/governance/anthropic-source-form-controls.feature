@@ -182,3 +182,41 @@ Feature: Choose Anthropic adapter settings instead of typing them
       When the admin picks a backfill start of "2026-08-01"
       And saves the form
       Then the submitted backfill start is a timezone-carrying instant
+
+  Rule: Which notes the edit drawer owes an admin is decided before it is drawn
+
+    The marker beside the edit title shows whatever the note list holds, so
+    what that list holds for a given source is the whole of the behaviour.
+    Deciding it in a pure function lets all four combinations be pinned at
+    once, rather than one drawer render at a time.
+
+    @unit
+    Scenario: A source that has never pulled is owed no note on either report
+      Given a source that has not yet pulled
+      When the notes for its edit drawer are worked out
+      Then there are none, whichever report it is set to
+      # Nothing is locked before a cursor exists, and a marker opening onto
+      # an empty popover invites a click that answers nothing.
+
+    @unit
+    Scenario: A pulled usage source is owed the two notes that lock it
+      Given a source on the usage report that has already pulled
+      When the notes for its edit drawer are worked out
+      Then they are the report note and the start-date note, in that order
+      And the note about restating cost history is not among them
+
+    @unit
+    Scenario: A pulled cost source is owed the report note and the restate note
+      Given a source on the cost report that has already pulled
+      When the notes for its edit drawer are worked out
+      Then they are the report note and the restate note, in that order
+      And the note saying the start date is fixed is not among them
+      # On a cost source the start is not fixed: moving it is the lever that
+      # repairs the figures, so calling it fixed would be a lie.
+
+    @unit
+    Scenario: No source is ever owed all three notes
+      When the notes are worked out for every combination of pulled and report
+      Then no combination yields more than two
+      # A fixed start and a start worth moving are the two halves of one
+      # condition, and the report decides which half applies.
