@@ -55,6 +55,9 @@ modules/annotation/
 │   ├── repositories/*.repository.ts interfaces · annotation.repositories.ts (the bundle) · annotation-repositories.registry.ts
 │   ├── repositories/prisma/         prisma.*.repository.ts + prisma.annotation.repositories.ts
 │   ├── repositories/memory/         memory.*.repository.ts + memory.annotation.repositories.ts
+│   ├── channels/*.channel.ts        interfaces for messages the module does not own · annotation-channels.registry.ts
+│   ├── channels/eventing/           eventing.*.channel.ts (the bus); channels/{redis,http,sqs,ses,slack}/ likewise
+│   ├── channels/memory/             memory.*.channel.ts, the twin of every live channel
 │   └── transport/annotation.rest.ts · annotation.trpc.ts · annotation-score.trpc.ts
 └── web/src/
     ├── annotations.ts · annotation-card.ts · annotation-form.ts · …   flat public entries
@@ -116,6 +119,17 @@ Read the one that matches the layer you are about to touch. Each is short.
   through `defineRepositories({ postgres, memory })`. No `adapters/postgres.*.adapter.ts`
   (`feature-shape: persistence-adapter`, `postgres-without-memory`,
   `unregistered-repositories`).
+- A collaborator the module does not own is a channel, not a service. Messages to or
+  from the event bus, Redis pub/sub, a vendor over HTTP, a queue, email, Slack or a
+  browser over SSE go through `channels/<subject>.channel.ts` with implementations in
+  `channels/<tier>/<tier>.<subject>.channel.ts` (`eventing`, `redis`, `http`, `sqs`,
+  `ses`, `slack`), a memory twin beside them, and both offered through
+  `channels/<f>-channels.registry.ts` with `defineChannels({ live, memory })`. A file
+  under `services/` that imports the bus, pub/sub or an HTTP client is refused
+  (`service-does-not-open-a-channel`); a live channel with no twin or no registry entry
+  is `feature-shape: unregistered-channels`. Repository is state the module owns,
+  channel is messages it does not, service is behaviour over both, and a pool member is
+  the raw client a channel wraps.
 - A tRPC procedure is declared once, in the contract (`<f>.trpc.ts`,
   `defineTrpcContract`: name, kind, input, output); the server's `transport/<f>.trpc.ts`
   binds permission and handler with `defineTrpcRouter(<F>Api, <f>Trpc)` and repeats

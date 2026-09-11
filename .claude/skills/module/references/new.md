@@ -105,6 +105,10 @@ src/repositories/prisma/prisma.<name>.repository.ts   extends PrismaRepository.f
 src/repositories/prisma/prisma.<name>.repositories.ts prismaRepositories({ <entity>: Prisma<Entity>Repository })
 src/repositories/memory/memory.<name>.repository.ts   the memory twin, same observable behaviour
 src/repositories/memory/memory.<name>.repositories.ts static requires = [] as const; static create(): <Name>Repositories
+src/channels/<subject>.channel.ts                     an interface per subject the module does not own the state of
+src/channels/<name>-channels.registry.ts              defineChannels({ live: Http<Name>Channels, memory: Memory<Name>Channels })
+src/channels/<tier>/<tier>.<subject>.channel.ts       one live implementation per tier: eventing, redis, http, sqs, ses, slack
+src/channels/memory/memory.<subject>.channel.ts       the twin every test asserts against
 src/transport/<name>.rest.ts                          defineRestRouter(<Name>Api).withNamespace("<name>s").withVersion(MANAGEMENT_API_VERSION)….build()   (public REST, optional)
 src/transport/<name>.trpc.ts                          defineTrpcRouter(<Name>Api, <name>Trpc).procedure(name).withPermission(…).handle(…)….build()      (browser)
 src/tasks/<name>.task.ts                              a one-shot program, if any
@@ -118,6 +122,13 @@ in `packages/prisma-client/prisma/schema.prisma` with a migration under
 `pnpm start:prepare:files` after. Identifiers come from `@langwatch/ksuid`. Never
 `as PrismaClient`; never `try*`/`require*`; no `adapters/postgres.*`, `fixtures/` or
 `testing.ts` (`feature-shape`).
+
+Messages to or from something the module does not own - the event bus, Redis pub/sub, a
+vendor over HTTP, a queue, email, Slack, a browser over SSE - are a channel, not a
+service member: declare the interface in `channels/`, put the conduit in
+`channels/<tier>/` beside its memory twin, and register both with `defineChannels`. A
+service that imports the bus, pub/sub or an HTTP client is refused by
+`service-does-not-open-a-channel`.
 
 Tests: `app/__tests__/<name>-installation.unit.test.ts` boots the installer with
 `createApp(...).withPersistence("memory", {}).withProvided(PeerApi, fixture).withModule(<name>Server).boot({ role })`

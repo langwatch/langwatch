@@ -91,7 +91,8 @@ For each `adapters/postgres.<x>.adapter.ts` (and each repository the adapter wir
    `static create(): <F>Repositories`) and
    `repositories/<f>-repositories.registry.ts` (`defineRepositories({ postgres, memory })`).
 5. Delete the adapter and the `ports/` file it implemented. A Redis, eventing or
-   object-storage client is not persistence: the module names what it needs as a member of
+   object-storage client is not persistence: it is either a channel (step 2b) or, when the
+   module wants the raw client itself, a member of
    `<F>Infrastructure` (a plain `interface`, declared beside the app in `app/<f>.app.ts`,
    never an abstract class in a `ports/` folder) and the process that owns that client
    supplies an object satisfying it through `withInfrastructure`. A finished module has no
@@ -99,6 +100,29 @@ For each `adapters/postgres.<x>.adapter.ts` (and each repository the adapter wir
 
 Annotation's memory twins are the contract of "same behaviour": `MemoryAnnotationScoreRepository`
 parses with the same contract schema the Prisma one returns rows through.
+
+## 2b. Channels: the messages the module does not own
+
+A repository is state the module owns. A **channel** is messages to or from something it
+does not own, in either direction, with no owned state: the event bus, Redis pub/sub,
+HTTP to a vendor, a queue, email, Slack, a browser over SSE. `go run ./tools/shapemod
+channels modules/<f>` lists every file under `services/` and `adapters/` whose imports or
+calls give one away, with the signal that fired.
+
+The shape mirrors step 2 exactly:
+
+1. `channels/<x>.channel.ts`: the interface, in the module's own message types
+   (`publishRunFinished(run)`, not `publish(topic, buffer)`).
+2. `channels/<tier>/<tier>.<x>.channel.ts`: one implementation per tier, the folder and
+   the filename's first qualifier the same word. `<tier>` is `eventing`, `redis`, `http`,
+   `sqs`, `ses` or `slack`.
+3. `channels/memory/memory.<x>.channel.ts`: the twin every test asserts against - it
+   records what was sent and replays what is received.
+4. `channels/<f>-channels.registry.ts`: `defineChannels({ live, memory })`.
+
+The service then takes the channel interface and imports no bus, no pub/sub and no HTTP
+client (`service-does-not-open-a-channel`). A live channel with no twin, or one missing
+from `defineChannels`, is `feature-shape: unregistered-channels`.
 
 ## 3. Services: one class per entity
 
@@ -111,6 +135,7 @@ that is **not** that moves up into the app in step 4:
 - calling a peer module (users, projects, organizations, authz, traces),
 - calling another service of this module,
 - reading a port,
+- opening a conduit the module does not own (that becomes a channel, step 2b),
 - logging a decision or emitting an event.
 
 Ten services that each wrap one method are not ten entities. Merge by aggregate:
@@ -179,10 +204,10 @@ moves to the app first. The web package's hand-written map for these namespaces 
 replaced by `ContractApiMap<typeof apiKeyTrpc>`. REST becomes `transport/<f>.rest.ts` with
 `defineRestRouter(<F>Api).withNamespace("<f>s").withVersion(MANAGEMENT_API_VERSION)…build()`,
 same paths, same operation ids (`withDocs`), same schemas, mounted with `createRestRuntime`
-(see `references/extend.md` section 6.3 for the current mount shape; the older
+(see `references/transport.md` section 1.3 for the current mount shape; the older
 `security.createServiceVersionedApp` / `mountProjectTransport` builders are deleted; a
 mount file that still names them is `legacy-transport-runtime`, not a pattern). Delete the
-`api-trpc/` and `api-rest/` folders. `references/extend.md` sections 6 and 7 hold the
+`api-trpc/` and `api-rest/` folders. `references/transport.md` sections 1 and 2 hold the
 builder details and the browser side.
 
 ## 7. Composition: boot the installer

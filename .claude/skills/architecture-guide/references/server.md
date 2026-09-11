@@ -37,6 +37,10 @@ repositories/prisma/prisma.<f>.repositories.ts        prismaRepositories({ … }
 repositories/memory/memory.<name>.repository.ts       the memory twin of every Prisma repository
 repositories/memory/memory.<f>.repositories.ts        the memory bundle (static requires = [], static create())
 repositories/memory/memory.<name>.database.ts         shared in-memory tables, when several twins share rows
+channels/<name>.channel.ts                             an interface per subject the module does not own
+channels/<f>-channels.registry.ts                     defineChannels({ live, memory })
+channels/eventing/eventing.<name>.channel.ts          the event bus; redis/, http/, sqs/, ses/, slack/ likewise
+channels/memory/memory.<name>.channel.ts              the memory twin of every live channel
 transport/<f>.rest.ts                                 defineRestRouter(<F>Api).withNamespace("<f>s").withVersion(…).get(…)….build()
 transport/<f>.trpc.ts · transport/<f>-<part>.trpc.ts  defineTrpcRouter(<F>Api, <f>Trpc).procedure(name).withPermission(…).handle(…)….build(), one file per namespace
 ports/<name>.port.ts                                  abstract class …Port for TECHNICAL infrastructure only
@@ -61,7 +65,14 @@ Lower-case kebab. Dots separate architectural qualifiers, hyphens stay inside a 
 Qualifiers (`SERVER_ARCHITECTURAL_QUALIFIERS`): `clickhouse, eventing, in-memory, ledger,
 memory, postgres, prisma, redis, routed`. Artifacts (`CANONICAL_ARTIFACTS`): `adapter,
 api, app, commands, errors, events, intent, migration, port, process, projection, queries,
-repository, rules, service, store, subscriber, task`.
+repository, rules, service, store, subscriber, task`, plus `channel`.
+
+Inside `channels/<tier>/` the filename rule is `<tier>.<subject>.channel.ts`, with the
+folder and the first dot-qualifier the same word, over the tiers `CHANNEL_TIERS` lists
+(`eventing`, `http`, `memory`, `redis`, `ses`, `slack`, `sqs`):
+`channels/http/http.webhook.channel.ts`,
+`channels/eventing/eventing.run-finished.channel.ts`,
+`channels/memory/memory.webhook.channel.ts`.
 
 - `prisma.annotation-queue.repository.ts` yes; `prisma-annotation-queue.repository.ts` no.
 - `memory.annotation-queue.database.ts`, `annotation-repositories.registry.ts`,
@@ -226,6 +237,31 @@ app's `FeatureSetup` infrastructure parameter, provided by the process with
 implementation that production always supplies is over-abstraction; take the concrete
 dependency.
 
+**`channels/`**: messages to or from something the module does not own, in either
+direction, with no owned state. The event bus, Redis pub/sub, a vendor over HTTP, a
+queue, email, Slack, a browser over SSE. The shape mirrors repositories: one interface
+per subject at `channels/<name>.channel.ts`, written in the module's own message types;
+one implementation per tier at `channels/<tier>/<tier>.<name>.channel.ts` for `eventing`,
+`redis`, `http`, `sqs`, `ses`, `slack`; a memory twin under `channels/memory/`; and both
+offered through `channels/<f>-channels.registry.ts`:
+
+```ts
+export const webhookChannels = defineChannels({
+  live: HttpWebhookChannels,
+  memory: MemoryWebhookChannels,
+});
+```
+
+A channel may import `@langwatch/eventing`, `ioredis`, `undici`, `fetch`, `axios`,
+`got`, `@aws-sdk/*`, `resend`, `@slack/*` or `nodemailer`; a service may not
+(`service-does-not-open-a-channel`), and takes the channel interface instead. A live
+channel with no memory twin, or one missing from `defineChannels`, is
+`feature-shape: unregistered-channels`. The distinction against the neighbouring layers:
+a repository is state the module owns, a service is behaviour over repositories and
+channels, and a pool member (`needs`) is the raw client a channel wraps with the
+module's message types. `go run ./tools/shapemod channels modules/<f>` lists the files
+still on the wrong side of that line.
+
 **`rules/`**: a pure module of functions and constants, no `new Date()`, no client, no
 collaborator. `PURE_VALUE_CONSTRUCTORS` in `feature-layout-policy.mjs` lists the
 built-ins it may construct.
@@ -278,8 +314,8 @@ export const annotationRest = defineRestRouter(AnnotationApi)
 Handlers receive `{ input, app, actor, scope, signal }`: `input` is the merged, parsed
 params/query/body; `scope` is the authorized target (`{ tier: "project", id }`); `actor`
 is the authenticated principal. Input and output schemas are mandatory; a no-content
-route declares no output and returns `void`. `.claude/skills/module/references/extend.md`
-sections 6 and 7 are the recipes; `references/config-composition.md` says how a process
+route declares no output and returns `void`. `.claude/skills/module/references/transport.md`
+sections 1 and 2 are the recipes; `references/config-composition.md` says how a process
 mounts a declaration.
 
 **`tasks/`**: a one-shot program extending `Task` from `@langwatch/task`, listed in
