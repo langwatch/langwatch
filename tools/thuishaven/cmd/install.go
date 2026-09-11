@@ -8,6 +8,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/installtui"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -47,7 +50,7 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 		if len(inv.args) > 0 {
 			return fmt.Errorf("haven install --list reports on every prerequisite and installs none of them — drop %s, or drop --list to install it", strings.Join(inv.args, " "))
 		}
-		printPrereqReport(os.Stdout, d.orch.CheckPrereqs(ctx))
+		printPrereqReportStyled(os.Stdout, d.orch.CheckPrereqs(ctx), painterFor(d.isAgent))
 		return nil
 	}
 
@@ -68,18 +71,27 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 	// the interactive one used to end at "nothing selected; nothing
 	// installed" — which, as the last line of `make haven install` on a
 	// healthy machine, reads as the target having failed to do anything.
+	//
+	// Where the PATH note goes is deliberate in each branch: after a report,
+	// because it is a footnote to it; before the picker, because the picker
+	// takes the whole screen and a question asked underneath it would never
+	// be seen.
 	if !anyActionable(report) {
-		printPrereqReport(os.Stdout, report)
+		printPrereqReportStyled(os.Stdout, report, painterFor(d.isAgent))
+		reportHavenPath(ctx, d, os.Stdout)
 		return nil
 	}
 	if inv.has("--yes") {
+		reportHavenPath(ctx, d, os.Stdout)
 		return installAuto(ctx, d, report)
 	}
 	if !installCanAsk(d.isAgent, stdoutIsTTY(), stdinIsTTY()) {
-		printPrereqReport(os.Stdout, report)
+		printPrereqReportStyled(os.Stdout, report, painterFor(d.isAgent))
+		reportHavenPath(ctx, d, os.Stdout)
 		printNonInteractiveHint(os.Stdout, report)
 		return nil
 	}
+	reportHavenPath(ctx, d, os.Stdout)
 	return installInteractive(ctx, d, report)
 }
 
@@ -166,17 +178,84 @@ func resetPrereqSkips(d deps) error {
 // that lists only problems leaves you unable to tell "fine" from "not looked
 // at", which is the question you came with.
 func printPrereqReport(w io.Writer, report []domain.PrereqStatus) {
-	fmt.Fprintln(w, "What haven needs on this machine:")
+	printPrereqReportStyled(w, report, plainPainter)
+}
+
+// printPrereqReportStyled is the report with a painter, so a terminal gets
+// colour and an agent or a pipe gets the same words with none.
+func printPrereqReportStyled(w io.Writer, report []domain.PrereqStatus, paint painter) {
+	fmt.Fprintln(w, paint(havenui.Title, "haven install"))
+	fmt.Fprintln(w, paint(havenui.Muted, "  what this machine has"))
 	fmt.Fprintln(w)
 	for _, st := range report {
 		// The requirement is on every line, not only the missing ones: it is
 		// what turns "missing" from a fact into a decision, and reading it off
 		// a legend at the bottom is one lookup too many.
-		fmt.Fprintf(w, "  %-9s %-18s %-12s %s\n", st.State, st.Key, st.Requirement, prereqDetail(st))
+		fmt.Fprintf(w, "  %s %s%s%s\n",
+			paint(stateStyle(st.State), stateGlyph(st.State)),
+			havenui.Pad(st.Key, 19),
+			paint(havenui.Muted, havenui.Pad(st.Requirement.String(), 13)),
+			prereqDetail(st))
 	}
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, domain.ReadyLine(report))
+	verdict := domain.ReadyLine(report)
+	style := havenui.Good
+	if strings.HasPrefix(verdict, "not ready") {
+		style = havenui.Warn
+	}
+	fmt.Fprintln(w, "  "+paint(style, verdict))
 	printSkippedNote(w, report)
+}
+
+// stateGlyph is one mark per meaning, the same marks every haven screen uses.
+func stateGlyph(state domain.PrereqState) string {
+	switch state {
+	case domain.PrereqSatisfied:
+		return havenui.Yes
+	case domain.PrereqSkipped:
+		return havenui.Skip
+	case domain.PrereqNotApplicable:
+		return havenui.Bullet
+	default:
+		return havenui.No
+	}
+}
+
+func stateStyle(state domain.PrereqState) lipgloss.Style {
+	switch state {
+	case domain.PrereqSatisfied:
+		return havenui.Good
+	case domain.PrereqOutdated:
+		return havenui.Aging
+	case domain.PrereqSkipped:
+		return havenui.Absent
+	case domain.PrereqNotApplicable:
+		return havenui.Muted
+	default:
+		return havenui.Warn
+	}
+}
+
+// painter renders text in a style, or leaves it alone. haven's convention is
+// that an agent and a pipe get plain, token-free output; a terminal gets the
+// design language.
+type painter func(lipgloss.Style, string) string
+
+func plainPainter(_ lipgloss.Style, text string) string { return text }
+
+func styledPainter(s lipgloss.Style, text string) string { return s.Render(text) }
+
+// painterFor picks one from the invocation.
+func painterFor(isAgent bool) painter {
+	if isAgent || !stdoutIsTTY() {
+		return plainPainter
+	}
+	return styledPainter
+}
+
+// style is painterFor applied once, for the one-off lines outside the report.
+func style(d deps, s lipgloss.Style, text string) string {
+	return painterFor(d.isAgent)(s, text)
 }
 
 // prereqDetail is the right-hand column: what was found, or the command that

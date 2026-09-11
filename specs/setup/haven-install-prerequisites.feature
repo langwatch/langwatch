@@ -149,6 +149,20 @@ Feature: haven install checks the machine's prerequisites
       And no installer is run for it
       And the run stops there rather than failing on the formulae below it
 
+  Rule: The picker asks the question and nothing else
+
+    Scenario: The picker lists what needs deciding, not the whole inventory
+      Given seven prerequisites are installed and two are missing
+      When the picker opens
+      Then it lists the two that are missing
+      And it names the seven on one line underneath
+      # Nine rows to ask one question buries the question in the answers.
+
+    Scenario: Every column lines up, including the highlighted row
+      Given the cursor is on a row
+      When the list is rendered
+      Then that row's columns start where every other row's columns start
+
   Rule: The picker chooses; the installing happens after it closes
 
     Scenario: Installs run with the terminal to themselves

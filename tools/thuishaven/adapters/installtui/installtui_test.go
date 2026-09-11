@@ -1,10 +1,12 @@
 package installtui
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -165,21 +167,53 @@ func TestTheRuntimeChoiceCyclesAndTravelsWithTheResult(t *testing.T) {
 	t.Error("the ticked runtime must come back in the result")
 }
 
-// A satisfied entry is listed but not landed on: there is no key that does
-// anything there, and a cursor that stops on one reads as the picker hanging.
-// @scenario "Everything present reports ready and installs nothing"
-func TestTheCursorSkipsEntriesThereIsNothingToDecideAbout(t *testing.T) {
+// The list is the decisions, and only those. Everything already installed
+// used to be a row of its own, so a machine one thing short of ready showed
+// nine rows to ask one question — and the satisfied majority dominated a
+// screen whose whole purpose was the minority.
+// @scenario "The picker lists what needs deciding, not the whole inventory"
+func TestTheListHoldsOnlyTheThingsThatNeedAnswering(t *testing.T) {
 	found := map[string]domain.Found{"brew": {Present: true}, "node": {Present: true}}
 	m := newModel(domain.PlanPrereqs(found, nil, "darwin"))
-	if m.rows[m.cursor].st.Key == "brew" || m.rows[m.cursor].st.Key == "node" {
-		t.Errorf("the cursor starts on %q, which is already satisfied", m.rows[m.cursor].st.Key)
-	}
-	// Walking to the top must not land on them either.
-	for i := 0; i < len(m.rows); i++ {
-		m = press(m, "k")
-		if !m.rows[m.cursor].actionable() {
-			t.Fatalf("cursor landed on the non-actionable %q", m.rows[m.cursor].st.Key)
+	for _, r := range m.rows {
+		if !r.st.State.Actionable() {
+			t.Errorf("%q is on the list with nothing to decide about it", r.st.Key)
 		}
+		if r.st.Key == "brew" || r.st.Key == "node" {
+			t.Errorf("%q is installed — it belongs in the line underneath, not the list", r.st.Key)
+		}
+	}
+	// …and they are still named, so their absence is never a question.
+	if len(m.installed) != 2 {
+		t.Errorf("installed = %v, want the two that are there", m.installed)
+	}
+	view := m.View()
+	for _, name := range []string{"Homebrew", "Node.js"} {
+		if !strings.Contains(view, name) {
+			t.Errorf("the view should still name %q as already here", name)
+		}
+	}
+	if !strings.Contains(view, "already here") {
+		t.Errorf("the view should say what it is not asking about, got:\n%s", view)
+	}
+}
+
+// Every row is missing — that is what puts it on the screen — so the cursor
+// can move freely and needs no skipping rule.
+// @scenario "The picker lists what needs deciding, not the whole inventory"
+func TestTheCursorMovesFreelyAcrossTheList(t *testing.T) {
+	m := newModel(missingEverything())
+	for range m.rows {
+		m = press(m, "j")
+	}
+	if m.cursor != len(m.rows)-1 {
+		t.Errorf("cursor = %d, want it to stop at the last row (%d)", m.cursor, len(m.rows)-1)
+	}
+	for range m.rows {
+		m = press(m, "k")
+	}
+	if m.cursor != 0 {
+		t.Errorf("cursor = %d, want it back at the top", m.cursor)
 	}
 }
 
@@ -190,22 +224,66 @@ func TestAPickerIsNotShownWhenThereIsNothingToDecide(t *testing.T) {
 		everything[p.Candidates[0].Key] = domain.Found{Present: true}
 	}
 	m := newModel(domain.PlanPrereqs(everything, nil, "darwin"))
-	if m.hasActionable() {
-		t.Error("a machine with everything installed has nothing to pick")
+	if len(m.rows) != 0 {
+		t.Errorf("a machine with everything installed has nothing to pick, got %d rows", len(m.rows))
 	}
 }
 
-// The view is the whole point of the command, so it is worth pinning that it
-// renders every entry and says what will happen on enter.
+// The regression that made the list look broken. lipgloss wraps styled text
+// in escape codes, and fmt's `%-22s` counted those as characters — so the one
+// row the cursor was on lost its padding and every column after it jumped,
+// at exactly the place the eye was already looking.
+// @scenario "Every column lines up, including the highlighted row"
+func TestTheHighlightedRowKeepsItsColumns(t *testing.T) {
+	m := newModel(missingEverything())
+	m.cursor = 3
+
+	var columns []int
+	for i := range m.rows {
+		plain := stripANSI(m.renderRow(i, m.rows[i]))
+		at := strings.Index(plain, m.rows[i].st.Requirement.String())
+		if at < 0 {
+			t.Fatalf("row %d does not name its requirement: %q", i, plain)
+		}
+		// The DISPLAY column, not the byte offset: the cursor glyph is three
+		// bytes wide and one column wide, and it is the cursor row this test
+		// is about.
+		columns = append(columns, lipgloss.Width(plain[:at]))
+	}
+	for i, at := range columns {
+		if at != columns[0] {
+			t.Errorf("row %d starts its requirement column at %d, the first row at %d — styling must not change a column's width",
+				i, at, columns[0])
+		}
+	}
+}
+
+// A row that is satisfied is not on the screen, so nothing on the screen
+// should offer to change something already settled. The runtime used to
+// print "→ colima + docker CLI (←/→ to change)" against an installed colima.
+// @scenario "The picker lists what needs deciding, not the whole inventory"
+func TestNothingOffersAChoiceThatIsAlreadySettled(t *testing.T) {
+	found := map[string]domain.Found{"colima": {Present: true}}
+	view := newModel(domain.PlanPrereqs(found, nil, "darwin")).View()
+	if strings.Contains(view, "←/→") {
+		t.Errorf("the runtime is installed — nothing should offer to pick between runtimes:\n%s", view)
+	}
+}
+
+// The view is the whole point of the command, so it is worth pinning what it
+// says: every decision, and what enter will do.
 // @scenario "Installs run with the terminal to themselves"
-func TestViewListsEveryEntryWithItsState(t *testing.T) {
+func TestViewNamesEveryDecisionAndWhatEnterDoes(t *testing.T) {
 	view := newModel(missingEverything()).View()
 	for _, p := range domain.Prereqs {
 		if !strings.Contains(view, p.Name) {
-			t.Errorf("the view omits %q — the list is the same list every time", p.Name)
+			t.Errorf("the view omits %q — on a fresh machine every entry is a decision", p.Name)
 		}
 	}
-	for _, want := range []string{"not ready", "space tick", "never ask again", "enter install"} {
+	if !strings.Contains(view, "npm install -g") {
+		t.Errorf("a ticked row should say what it will run, got:\n%s", view)
+	}
+	for _, want := range []string{"space tick", "never ask again", "enter install"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("the view should mention %q", want)
 		}
@@ -213,10 +291,10 @@ func TestViewListsEveryEntryWithItsState(t *testing.T) {
 }
 
 // @scenario "Installs run with the terminal to themselves"
-func TestBulkKeysTickAndUntickEverythingActionable(t *testing.T) {
+func TestBulkKeysTickAndUntickEverything(t *testing.T) {
 	m := press(newModel(missingEverything()), "a")
 	for _, r := range m.rows {
-		if r.actionable() && !r.ticked {
+		if !r.ticked {
 			t.Errorf("a must tick %q too", r.st.Key)
 		}
 	}
@@ -230,3 +308,9 @@ func TestBulkKeysTickAndUntickEverythingActionable(t *testing.T) {
 		t.Error("confirming with nothing ticked installs nothing")
 	}
 }
+
+// ansiRE matches the colour escapes lipgloss wraps its output in, so a test
+// can measure a row the way a terminal renders it rather than in bytes.
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string { return ansiRE.ReplaceAllString(s, "") }

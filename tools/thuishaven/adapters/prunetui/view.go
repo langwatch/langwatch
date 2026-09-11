@@ -6,18 +6,23 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
+
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// Drawn from haven's one palette (adapters/havenui) rather than declared
+// again here. styleLive and styleGood were already the same colour twice
+// over, which is what a second copy of a palette does to it.
 var (
-	accent     = lipgloss.AdaptiveColor{Light: "#ed8926", Dark: "#f59e3f"}
-	styleTitle = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	styleDim   = lipgloss.NewStyle().Faint(true)
-	styleSel   = lipgloss.NewStyle().Foreground(accent).Bold(true)
-	styleLive  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	styleWarn  = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
-	styleGood  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	styleGone  = lipgloss.NewStyle().Foreground(lipgloss.Color("213"))
+	accent     = havenui.Accent
+	styleTitle = havenui.Title
+	styleDim   = havenui.Muted
+	styleSel   = havenui.Selected
+	styleLive  = havenui.Good
+	styleWarn  = havenui.Warn
+	styleGood  = havenui.Good
+	styleGone  = havenui.Absent
 )
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}

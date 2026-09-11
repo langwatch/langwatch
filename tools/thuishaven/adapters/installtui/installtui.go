@@ -1,6 +1,13 @@
 // Package installtui is the picker `haven install` shows a developer with a
-// terminal: every prerequisite haven checked, what the machine answered, and
-// a tick next to the ones it is about to install.
+// terminal: what this machine is missing, and a tick beside the ones it is
+// about to install.
+//
+// It shows the DECISIONS, not the inventory. The first version listed all
+// nine catalogue entries with their state against each, which meant reading
+// nine rows to find the one that needed answering — the satisfied majority
+// dominating a screen whose whole purpose was the minority. What is already
+// installed is one line at the bottom, and the full per-entry report is what
+// `haven install --list` is for.
 //
 // It chooses and nothing more. The installs run AFTER it closes, with the
 // terminal to themselves — an installer that asks for a password cannot do
@@ -16,20 +23,16 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-var (
-	accent      = lipgloss.AdaptiveColor{Light: "#ed8926", Dark: "#f59e3f"}
-	styleTitle  = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	styleDim    = lipgloss.NewStyle().Faint(true)
-	styleSel    = lipgloss.NewStyle().Foreground(accent).Bold(true)
-	styleGood   = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	styleWarn   = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
-	styleNever  = lipgloss.NewStyle().Foreground(lipgloss.Color("213"))
-	styleDetail = lipgloss.NewStyle().Faint(true).PaddingLeft(2)
+// Column widths, padded as plain text and styled afterwards — see
+// havenui.Pad for why that order is not a preference.
+const (
+	nameWidth        = 22
+	requirementWidth = 13
 )
 
 // Result is what the developer decided.
@@ -45,15 +48,12 @@ type Result struct {
 	Confirmed bool
 }
 
-// Run shows the picker over the full report and returns the decision. Only
-// actionable entries can be ticked; the satisfied ones are still listed,
-// because a check that silently omits what it checked is not a check anyone
-// can trust.
+// Run shows the picker over the full report and returns the decision.
 func Run(ctx context.Context, report []domain.PrereqStatus) (Result, error) {
 	m := newModel(report)
-	if !m.hasActionable() {
-		// Nothing to decide. Showing a picker with no choices in it would be
-		// a worse way of saying "you are ready" than saying it.
+	if len(m.rows) == 0 {
+		// Nothing to decide. A picker with no choices in it would be a worse
+		// way of saying "you are ready" than saying it.
 		return Result{Confirmed: true}, nil
 	}
 	out, err := tea.NewProgram(m, tea.WithAltScreen(), tea.WithContext(ctx)).Run()
@@ -66,7 +66,7 @@ func Run(ctx context.Context, report []domain.PrereqStatus) (Result, error) {
 	return out.(model).result(), nil
 }
 
-// row is one catalogue entry as the picker holds it.
+// row is one entry that needs an answer.
 type row struct {
 	st domain.PrereqStatus
 	// ticked: install it when the picker is confirmed.
@@ -78,54 +78,50 @@ type row struct {
 	candidate int
 }
 
-func (r row) actionable() bool { return r.st.State.Actionable() }
-
 type model struct {
-	rows      []row
+	// rows are the actionable entries and only those: this screen is a
+	// question, so everything on it is part of the question.
+	rows []row
+	// installed and skipped are what needed no answer, kept for the line
+	// under the list — so their absence from it never has to be wondered at.
+	installed []string
+	skipped   []string
+
 	cursor    int
 	confirmed bool
 	note      string // a one-line refusal, shown until the next keypress
 	width     int
-	height    int
 }
 
 func newModel(report []domain.PrereqStatus) model {
 	m := model{}
 	for _, st := range report {
-		r := row{st: st}
-		// Pre-ticked: what haven itself needs. An optional prerequisite is a
-		// convenience, and pre-ticking a convenience is how a tool ends up
-		// installing things nobody asked for.
-		r.ticked = st.State.Actionable() && st.Requirement != domain.PrereqOptional
-		// A satisfied entry starts on whichever candidate satisfied it, so the
-		// list says what you have rather than what haven would have picked.
-		for i, c := range st.Candidates {
-			if c.Key == st.Via {
-				r.candidate = i
-			}
+		switch {
+		case st.State.Actionable():
+			m.rows = append(m.rows, newRow(st))
+		case st.State == domain.PrereqSkipped:
+			m.skipped = append(m.skipped, st.Name)
+		case st.State == domain.PrereqSatisfied:
+			m.installed = append(m.installed, st.Name)
 		}
-		m.rows = append(m.rows, r)
+		// Not-applicable entries are left out entirely: on a machine that
+		// cannot have them, they are not news.
 	}
-	m.cursor = m.firstActionable()
 	return m
 }
 
-func (m model) firstActionable() int {
-	for i, r := range m.rows {
-		if r.actionable() {
-			return i
+func newRow(st domain.PrereqStatus) row {
+	r := row{st: st}
+	// Pre-ticked: what haven itself needs. An optional prerequisite is a
+	// convenience, and pre-ticking a convenience is how a tool ends up
+	// installing things nobody asked for.
+	r.ticked = st.Requirement != domain.PrereqOptional
+	for i, c := range st.Candidates {
+		if c.Key == st.Via {
+			r.candidate = i
 		}
 	}
-	return 0
-}
-
-func (m model) hasActionable() bool {
-	for _, r := range m.rows {
-		if r.actionable() {
-			return true
-		}
-	}
-	return false
+	return r
 }
 
 func (m model) Init() tea.Cmd { return nil }
@@ -133,7 +129,7 @@ func (m model) Init() tea.Cmd { return nil }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width, m.height = msg.Width, msg.Height
+		m.width = msg.Width
 		return m, nil
 	case tea.KeyMsg:
 		return m.onKey(msg)
@@ -150,9 +146,13 @@ func (m model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.confirmed = true
 		return m, tea.Quit
 	case "down", "j":
-		m.cursor = m.move(1)
+		if m.cursor < len(m.rows)-1 {
+			m.cursor++
+		}
 	case "up", "k":
-		m.cursor = m.move(-1)
+		if m.cursor > 0 {
+			m.cursor--
+		}
 	case " ":
 		return m.toggleTick(), nil
 	case "n":
@@ -169,23 +169,8 @@ func (m model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// move walks to the next row in a direction, stopping at the ends. Satisfied
-// rows are skipped: they are shown for completeness, and landing on one with
-// no key that does anything reads as the picker being stuck.
-func (m model) move(delta int) int {
-	for i := m.cursor + delta; i >= 0 && i < len(m.rows); i += delta {
-		if m.rows[i].actionable() {
-			return i
-		}
-	}
-	return m.cursor
-}
-
 func (m model) toggleTick() model {
 	r := &m.rows[m.cursor]
-	if !r.actionable() {
-		return m
-	}
 	r.ticked = !r.ticked
 	if r.ticked {
 		r.never = false
@@ -195,9 +180,6 @@ func (m model) toggleTick() model {
 
 func (m model) toggleNever() model {
 	r := &m.rows[m.cursor]
-	if !r.actionable() {
-		return m
-	}
 	if r.st.Requirement == domain.PrereqRequired {
 		// Silencing a required prerequisite only moves the failure to the
 		// first `haven up`, with nothing left to explain it.
@@ -219,13 +201,10 @@ func (m model) cycleCandidate(delta int) model {
 	return m
 }
 
-// tickAll ticks or unticks every actionable row, leaving the "never" marks
-// alone: a bulk tick is about this run, and never-ask-again is not.
+// tickAll ticks or unticks every row, leaving the "never" marks alone: a bulk
+// tick is about this run, and never-ask-again is not.
 func (m model) tickAll(on bool) model {
 	for i := range m.rows {
-		if !m.rows[i].actionable() {
-			continue
-		}
 		m.rows[i].ticked = on
 		if on {
 			m.rows[i].never = false
@@ -241,7 +220,7 @@ func (m model) result() Result {
 	res := Result{Confirmed: true}
 	for _, r := range m.rows {
 		switch {
-		case r.ticked && r.actionable():
+		case r.ticked:
 			res.Install = append(res.Install, domain.Chosen{
 				Key:       r.st.Key,
 				Candidate: r.st.Candidates[r.candidate].Key,
@@ -260,143 +239,114 @@ func (m model) View() string {
 	for i, r := range m.rows {
 		b.WriteString(m.renderRow(i, r))
 	}
+	b.WriteString(m.renderSettled())
 	b.WriteString(m.renderDetail())
 	b.WriteString(m.renderFooter())
-	return clampLines(b.String(), m.width)
-}
-
-// clampLines cuts every line to the terminal width, so one long row (the
-// runtime's two candidate labels, a `brew install --cask` line) soft-wraps
-// nowhere and the layout cannot shift under it.
-func clampLines(s string, width int) string {
-	if width <= 0 {
-		return s
-	}
-	lines := strings.Split(s, "\n")
-	for i, line := range lines {
-		if lipgloss.Width(line) > width {
-			lines[i] = lipgloss.NewStyle().MaxWidth(width).Render(line)
-		}
-	}
-	return strings.Join(lines, "\n")
+	return havenui.Clamp(b.String(), m.width)
 }
 
 func (m model) renderHeader() string {
-	verdict := domain.ReadyLine(m.reportView())
-	style := styleGood
-	if strings.HasPrefix(verdict, "not ready") {
-		style = styleWarn
+	missing := fmt.Sprintf("%d things this machine is missing", len(m.rows))
+	if len(m.rows) == 1 {
+		missing = "one thing this machine is missing"
 	}
-	return styleTitle.Render("haven install — what this machine has") + "\n" +
-		styleDim.Render("  nothing is installed unless it is ticked") + "\n" +
-		"  " + style.Render(verdict) + "\n\n"
+	return havenui.Title.Render("haven install") + "\n" +
+		havenui.Muted.Render("  "+missing+" — nothing is installed unless it is ticked") + "\n\n"
 }
 
-func (m model) reportView() []domain.PrereqStatus {
-	out := make([]domain.PrereqStatus, 0, len(m.rows))
-	for _, r := range m.rows {
-		out = append(out, r.st)
-	}
-	return out
-}
-
+// renderRow is cursor, checkbox, name, requirement, and what will happen to
+// it. Not what STATE it is in: every row here is missing, which is why it is
+// on the screen, so repeating that against each one is nine words that
+// distinguish nothing.
 func (m model) renderRow(i int, r row) string {
 	cursor := "  "
+	name := havenui.Pad(r.st.Name, nameWidth)
 	if i == m.cursor {
-		cursor = styleSel.Render("▸ ")
+		cursor = havenui.Selected.Render(havenui.Cursor + " ")
+		name = havenui.Selected.Render(name)
 	}
-	name := r.st.Name
-	if i == m.cursor {
-		name = styleSel.Render(name)
-	}
-	line := fmt.Sprintf("%s%s %-22s %s", cursor, m.box(r), name, m.state(r))
-	if choice := m.choiceLabel(r); choice != "" {
-		line += " " + styleDim.Render(choice)
-	}
-	return line + "\n"
+	return cursor + m.box(r) + " " + name +
+		havenui.Muted.Render(havenui.Pad(r.st.Requirement.String(), requirementWidth)) +
+		m.outcome(r) + "\n"
 }
 
-// box is the row's answer at a glance: what will happen when enter is pressed.
+// box is the row's answer at a glance: what happens when enter is pressed.
 func (m model) box(r row) string {
 	switch {
-	case !r.actionable():
-		return styleDim.Render("   ")
 	case r.never:
-		return styleNever.Render("[–]")
+		return havenui.Absent.Render("[" + havenui.Skip + "]")
 	case r.ticked:
-		return styleSel.Render("[x]")
+		return havenui.Selected.Render("[x]")
 	default:
 		return "[ ]"
 	}
 }
 
-func (m model) state(r row) string {
-	switch r.st.State {
-	case domain.PrereqSatisfied:
-		observed := r.st.Observed
-		if observed == "" {
-			observed = "installed"
-		}
-		return styleGood.Render("✓ " + observed)
-	case domain.PrereqOutdated:
-		return styleWarn.Render("outdated " + r.st.Observed)
-	case domain.PrereqSkipped:
-		return styleNever.Render("skipped earlier")
-	case domain.PrereqNotApplicable:
-		return styleDim.Render("not applicable here")
-	default:
-		return styleWarn.Render("missing") + " " + styleDim.Render("("+r.st.Requirement.String()+")")
+// outcome is the consequence of this row's current answer, in the words of
+// what will actually run.
+func (m model) outcome(r row) string {
+	if r.never {
+		return havenui.Absent.Render("never ask again")
 	}
+	// An upgrade is the one case where the state is news: the thing is there,
+	// and installing it replaces it rather than adding it.
+	prefix := ""
+	if r.st.State == domain.PrereqOutdated {
+		prefix = havenui.Aging.Render("have "+r.st.Observed) + havenui.Muted.Render(" "+havenui.Bullet+" ")
+	}
+	command, _ := r.st.Candidates[r.candidate].InstallOn(runtime.GOOS)
+	switch {
+	case command == "":
+		return prefix + havenui.Muted.Render("install it yourself")
+	case !r.ticked:
+		return prefix + havenui.Muted.Render("not now")
+	case len(r.st.Candidates) > 1:
+		return prefix + command + havenui.Muted.Render("  ←/→")
+	}
+	return prefix + command
 }
 
-// choiceLabel names the candidate for an entry that offers more than one, so
-// the pick is visible without opening anything.
-func (m model) choiceLabel(r row) string {
-	if len(r.st.Candidates) < 2 {
-		return ""
+// renderSettled names what needed no answer. One line, quiet, and never a
+// list of rows: it is reassurance, not a decision.
+func (m model) renderSettled() string {
+	var b strings.Builder
+	if len(m.installed) > 0 {
+		b.WriteString("\n" + havenui.Muted.Render("  "+havenui.Yes+" already here: "+strings.Join(m.installed, ", ")) + "\n")
 	}
-	return "→ " + r.st.Candidates[r.candidate].Label + "  (←/→ to change)"
+	if len(m.skipped) > 0 {
+		b.WriteString(havenui.Muted.Render("  "+havenui.Skip+" not asking about: "+strings.Join(m.skipped, ", ")) + "\n")
+	}
+	return b.String()
 }
 
-// renderDetail is the pane under the list: what the highlighted entry is for,
-// and the exact command that would install it. The command is shown because
-// "what is this thing about to run on my machine" is the question a picker
-// that installs software has to answer before it is trusted with an enter.
+// renderDetail is the pane under the list: what the highlighted entry is for.
+// The command is already on its row, so this is the why, not the how.
 func (m model) renderDetail() string {
 	if m.cursor >= len(m.rows) {
 		return ""
 	}
 	r := m.rows[m.cursor]
+	detail := havenui.Muted.PaddingLeft(6)
+
 	var b strings.Builder
-	b.WriteString("\n" + styleDetail.Render(r.st.Summary) + "\n")
+	b.WriteString("\n" + detail.Render(r.st.Summary) + "\n")
 	// The catalogue indents its continuation lines for the plain-text
 	// listings; here the padding is the style's job, so undo it rather than
-	// have the two stack up.
+	// let the two stack up.
 	if para := strings.ReplaceAll(r.st.Prereq.Detail, "\n    ", "\n"); para != "" {
-		b.WriteString(styleDetail.Render(para) + "\n")
+		b.WriteString(detail.Render(para) + "\n")
 	}
-	if cmd := m.commandLine(r); cmd != "" {
-		b.WriteString("\n" + styleDetail.Render(cmd) + "\n")
+	if command, manual := r.st.Candidates[r.candidate].InstallOn(runtime.GOOS); command == "" {
+		b.WriteString("\n" + detail.Render("haven will not run this one for you:\n"+manual) + "\n")
 	}
 	return b.String()
 }
 
-func (m model) commandLine(r row) string {
-	if !r.actionable() || len(r.st.Candidates) == 0 {
-		return ""
-	}
-	command, manual := r.st.Candidates[r.candidate].InstallOn(runtime.GOOS)
-	if command == "" {
-		return "haven will not run this one for you:\n" + manual
-	}
-	return "will run: " + command
-}
-
 func (m model) renderFooter() string {
 	if m.note != "" {
-		return "\n" + styleWarn.Render("  "+m.note) + "\n"
+		return "\n" + havenui.Warn.Render("  "+m.note) + "\n"
 	}
-	return "\n" + styleDim.Render(
-		"  space tick · n never ask again · ←/→ choose · a all · d none · enter install · q quit",
+	return "\n" + havenui.Keys(
+		"space tick", "n never ask again", "a all", "d none", "enter install", "q quit",
 	) + "\n"
 }
