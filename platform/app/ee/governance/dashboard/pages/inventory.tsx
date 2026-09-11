@@ -3547,8 +3547,8 @@ export function buildClaudeCompliancePullConfig(
  * key with an empty one and break the source on its next run.
  *
  * Every other check stays shared. Forking a second builder for the edit form
- * is how the two paths would drift into disagreeing about what a valid bucket
- * width is.
+ * is how the two paths would drift into disagreeing about which reports the
+ * adapter accepts, or which start dates it can read.
  */
 export function buildAnthropicAdminPullConfig(
   c: ComposerState,
