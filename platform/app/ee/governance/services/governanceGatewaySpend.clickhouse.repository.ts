@@ -50,9 +50,10 @@ const TABLE = "gateway_spend" as const;
  * (`CLICKHOUSE_REQUEST_TIMEOUT_MS` in `clickhouse/managedClient.ts`). A query
  * deadline at or past that limit is one nothing ever reaches — the client
  * abandons the request first and the screen hangs where it should have shown
- * its error state. This read is a single grouped scan over at most a month of
- * one organization's requests, so 20 s is generous headroom and still leaves
- * the wire limit as the real ceiling.
+ * its error state. This read is a single grouped scan over at most a year of
+ * one organization's requests — the screen's frame is clamped to a 365-day
+ * ceiling — so 20 s is generous headroom and still leaves the wire limit as
+ * the real ceiling.
  */
 const METERED_READ_MAX_EXECUTION_SECONDS = 20;
 
@@ -243,8 +244,10 @@ export class GovernanceGatewaySpendClickHouseRepository {
    * disagree about what a metered figure is.
    *
    * The client is resolved by the FIRST tenant, matching every other multi-
-   * tenant read on this schema (`spendScope` orders projects so this is stable):
-   * one organization's projects route to the same ClickHouse.
+   * tenant read on this schema. The caller hands the ids in the order
+   * `ProjectRepository.findAllIdsByOrganization` returns them — ascending by
+   * id — so the first is the same project on every read: one organization's
+   * projects route to the same ClickHouse.
    */
   private async run(
     input: GovernanceGatewaySpendWindow,
