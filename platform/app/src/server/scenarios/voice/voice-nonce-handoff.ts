@@ -187,7 +187,7 @@ export function handleVoiceNonceRegisterMessage(params: {
 /** Shared settlement guard across the listener, timer, and send callback of
  *  one in-flight registration wait — ensures exactly one of them acts. */
 interface NonceRegistrationSettlement {
-  settled: boolean;
+  isSettled: boolean;
 }
 
 /**
@@ -207,8 +207,8 @@ function createNonceAckListener(params: {
   return (message: unknown): void => {
     if (!isVoiceNonceRegisterAckMessage(message)) return;
     if (message.requestId !== params.requestId) return;
-    if (params.settlement.settled) return;
-    params.settlement.settled = true;
+    if (params.settlement.isSettled) return;
+    params.settlement.isSettled = true;
     params.onSettle();
     if (message.ok) {
       params.resolve();
@@ -245,7 +245,7 @@ export function requestNonceRegistration(params: {
       return;
     }
 
-    const settlement: NonceRegistrationSettlement = { settled: false };
+    const settlement: NonceRegistrationSettlement = { isSettled: false };
     let timer: NodeJS.Timeout;
     const listener = createNonceAckListener({
       requestId,
@@ -259,8 +259,8 @@ export function requestNonceRegistration(params: {
     });
 
     timer = setTimeout(() => {
-      if (settlement.settled) return;
-      settlement.settled = true;
+      if (settlement.isSettled) return;
+      settlement.isSettled = true;
       proc.off("message", listener);
       reject(new VoiceNonceRegistrationTimeoutError(timeoutMs));
     }, timeoutMs);
@@ -273,8 +273,8 @@ export function requestNonceRegistration(params: {
       nonce: params.nonce,
     };
     proc.send(message, (error) => {
-      if (error && !settlement.settled) {
-        settlement.settled = true;
+      if (error && !settlement.isSettled) {
+        settlement.isSettled = true;
         clearTimeout(timer);
         proc.off("message", listener);
         reject(error);

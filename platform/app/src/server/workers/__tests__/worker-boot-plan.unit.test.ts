@@ -12,15 +12,28 @@ describe("resolveWorkerBootPlan", () => {
 
     expect(plan).toEqual([
       "storage-stats",
+      "voice-ws-listener",
       "scenario-processor",
       "nlp-fetch-teardown",
-      "voice-ws-listener",
       "anomaly",
       "spend-spike-anomaly",
       "usage-stats",
       "realtime-session-poller",
       "metrics",
     ]);
+  });
+
+  describe("given the scenario processor claims jobs as soon as it boots", () => {
+    it("binds the voice media listener before the scenario processor", () => {
+      // A voice job claimed in the gap between the two stages would build
+      // TwiML naming a media socket nothing is listening on yet, and the
+      // inbound call would fail on connect. The listener has to win the race.
+      const plan = resolveWorkerBootPlan({ shouldStartMetricsServer: true });
+
+      expect(plan.indexOf("voice-ws-listener")).toBeLessThan(
+        plan.indexOf("scenario-processor"),
+      );
+    });
   });
 
   describe("given metrics are served elsewhere", () => {

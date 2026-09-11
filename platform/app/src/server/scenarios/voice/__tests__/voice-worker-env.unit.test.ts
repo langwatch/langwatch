@@ -41,12 +41,25 @@ describe("readVoiceWorkerEnv", () => {
     });
 
     /** @scenario "A public base URL must be an https origin" */
-    it("rejects a non-https public base URL", () => {
-      expect(() =>
-        readVoiceWorkerEnv({
-          VOICE_PUBLIC_BASE_URL: "http://voice.example.com",
-        }),
-      ).toThrowError(/https/);
+    it("rejects a non-https public base URL without throwing", () => {
+      // Rejected means "not adopted", not "crash the process": startWorkers
+      // reads this before the boot-stage try block that makes voice failures
+      // non-fatal, so a throw here would kill eight healthy subsystems over a
+      // voice typo. The worker falls back to the tunnel path instead.
+      const env = readVoiceWorkerEnv({
+        VOICE_PUBLIC_BASE_URL: "http://voice.example.com",
+      });
+
+      expect(env.voicePublicBaseUrl).toBeUndefined();
+    });
+
+    /** @scenario "A public base URL must be an https origin" */
+    it("rejects a public base URL that is not a URL at all, without throwing", () => {
+      const env = readVoiceWorkerEnv({
+        VOICE_PUBLIC_BASE_URL: "voice.example.com:8443",
+      });
+
+      expect(env.voicePublicBaseUrl).toBeUndefined();
     });
 
     /** @scenario "An explicit public base URL always wins over the tunnel fallback" */
@@ -58,6 +71,17 @@ describe("readVoiceWorkerEnv", () => {
 
       expect(env.voicePublicBaseUrl).toBe("https://voice.example.com");
       expect(env.voiceTunnelEnabled).toBe(true);
+    });
+  });
+
+  describe("given a malformed VOICE_WS_PORT", () => {
+    /** @scenario "The voice worker reads its infrastructure environment variables" */
+    it("falls back to the default port instead of throwing", () => {
+      for (const value of ["abc", "0", "-1", "70000", "3300.5"]) {
+        expect(readVoiceWorkerEnv({ VOICE_WS_PORT: value }).voiceWsPort).toBe(
+          VOICE_WS_PORT_DEFAULT,
+        );
+      }
     });
   });
 

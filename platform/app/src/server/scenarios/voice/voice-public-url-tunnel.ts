@@ -71,13 +71,28 @@ export function tunnelHostFromUrl(url: string): string {
 }
 
 /**
+ * How long one DNS-over-HTTPS probe may take before it is abandoned.
+ *
+ * Without this the probe inherits fetch's default of waiting for as long as
+ * the peer keeps the socket open. `waitUntilTunnelResolvable` re-reads its own
+ * deadline only BETWEEN probes, so a resolver that accepts the connection and
+ * then stalls would park worker boot forever rather than failing at the
+ * 300-second mark. An answer slower than this is useless to us anyway: the
+ * next poll asks again.
+ */
+const DOH_REQUEST_TIMEOUT_MS = 5_000;
+
+/**
  * Ask one DNS-over-HTTPS endpoint for `host`'s A record. Returns true only on a
  * NOERROR response that actually carries an answer.
  */
 async function dohHasAnswer(endpoint: string, host: string): Promise<boolean> {
   const res = await fetch(
     `${endpoint}?name=${encodeURIComponent(host)}&type=A`,
-    { headers: { accept: "application/dns-json" } },
+    {
+      headers: { accept: "application/dns-json" },
+      signal: AbortSignal.timeout(DOH_REQUEST_TIMEOUT_MS),
+    },
   );
   if (!res.ok) return false;
   const data = (await res.json()) as {
@@ -186,7 +201,9 @@ export async function openVoicePublicUrlTunnel(params: {
       pollIntervalMs: params.pollIntervalMs,
     });
   } catch (error) {
-    await tunnel.close();
+    // Best-effort teardown. An unguarded rejection here would escape in place
+    // of the readiness error, which is the one naming the URL and the timeout.
+    await tunnel.close().catch(() => undefined);
     throw error;
   }
   return { url: tunnel.url, close: () => tunnel.close() };

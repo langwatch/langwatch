@@ -67,7 +67,7 @@ describe("VoiceNonceRegistry", () => {
     });
   });
 
-  describe("the default TTL against the SDK's own connect-wait window", () => {
+  describe("given the default TTL is derived from the SDK's connect-wait window", () => {
     /**
      * This is the bug that shipped: a nonce registered before `placeCall`
      * must survive at least as long as the SDK is willing to wait for the

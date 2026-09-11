@@ -10,11 +10,16 @@
  *                           An explicit value here always wins and is
  *                           validated as an https origin - this is the
  *                           stable-hostname production path. When it is
- *                           unset, the worker falls back to the tunnel below
- *                           (or, if that is disabled, comes up with no public
- *                           URL and its voice tunnel/listener boot is skipped
- *                           for this process rather than failing the whole
- *                           worker).
+ *                           unset, the worker falls back to the tunnel below.
+ *                           If that is disabled too, the worker comes up with
+ *                           no public URL: tunnel provisioning is skipped, but
+ *                           the media listener still boots and still binds
+ *                           VOICE_WS_PORT - `voice-ws-listener` is an
+ *                           unconditional stage of every worker's boot plan.
+ *                           Only inbound reachability is lost, so voice runs
+ *                           on this process fail rather than the whole worker.
+ *                           A port conflict therefore still surfaces here, on
+ *                           a worker that has no public URL at all.
  *   - VOICE_TUNNEL          the literal "false" (case-insensitive) turns off
  *                           the quick-tunnel fallback below; anything else,
  *                           including unset, leaves it on. Defaults ON
@@ -70,20 +75,42 @@ const publicBaseUrlSchema = z
   .optional();
 
 /**
- * Parse and validate the voice worker env. Never throws — every worker now
- * boots voice, so a misconfigured or absent public URL must degrade the
+ * Parse and validate the voice worker env. **Never throws**, on any input —
+ * every worker now boots voice, so a misconfigured value must degrade the
  * voice subsystem for this process rather than kill the whole worker (see
  * {@link ../../workers/startWorkers}'s non-fatal tunnel/listener boot).
+ *
+ * That guarantee has to hold here rather than at the call site, because
+ * `startWorkers` reads this BEFORE it enters the boot-stage `try` that makes
+ * voice failures non-fatal. A throwing parse would take down a worker whose
+ * other eight subsystems are healthy, over a typo in a voice port.
+ *
+ * So each malformed value falls back to its documented default and the worker
+ * carries on:
+ *
+ *   - a VOICE_WS_PORT that is not a positive integer under 65536 falls back
+ *     to {@link VOICE_WS_PORT_DEFAULT};
+ *   - a VOICE_PUBLIC_BASE_URL that is not an https origin falls back to
+ *     undefined, which sends the worker down the tunnel path exactly as if it
+ *     had been left unset.
  */
 export function readVoiceWorkerEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): VoiceWorkerEnv {
-  const voiceWsPort = portSchema.parse(env.VOICE_WS_PORT);
+  const port = portSchema.safeParse(env.VOICE_WS_PORT);
+  const voiceWsPort = port.success
+    ? (port.data as number)
+    : VOICE_WS_PORT_DEFAULT;
+
   const rawPublicBaseUrl =
     env.VOICE_PUBLIC_BASE_URL?.trim() === ""
       ? undefined
       : env.VOICE_PUBLIC_BASE_URL;
-  const voicePublicBaseUrl = publicBaseUrlSchema.parse(rawPublicBaseUrl);
+  const publicBaseUrl = publicBaseUrlSchema.safeParse(rawPublicBaseUrl);
+  const voicePublicBaseUrl = publicBaseUrl.success
+    ? publicBaseUrl.data
+    : undefined;
+
   const voiceTunnelEnabled =
     (env.VOICE_TUNNEL ?? "").trim().toLowerCase() !== "false";
 
