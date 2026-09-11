@@ -218,7 +218,7 @@ Meanwhile `repositories/` itself holds exactly one 3-line file
 (`repositories/cost-attribution-policy.repository.ts`).
 
 The cost is recorded in the lint baseline. Six governance files are waived in
-`packages/architecture-lint/src/port-module-baseline.json` for
+`packages/architecture-enforcer/src/port-module-baseline.json` for
 `strict-port-module` (which requires a `*.port.ts` to export an abstract class
 ending in `Port`):
 
@@ -290,7 +290,7 @@ Also unhandled and knowable: `AiToolEntryNotFoundError`
 `services/puller-databricks-warehouse-cost.service.ts` — **373 comment lines
 against 380 code lines**, the worst ratio of any feature-server file in the
 repo, and already waived in
-`packages/architecture-lint/src/service-quality-baseline.json` at 753 module
+`packages/architecture-enforcer/src/service-quality-baseline.json` at 753 module
 lines. Lines 3-34 and 78-92 are a measurement narrative, not an explanation of
 the code: "Validated against a live workspace at 13.3% of warehouse compute",
 "the two bounds were in conflict until this was measured", the reasoning behind

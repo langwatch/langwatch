@@ -274,8 +274,8 @@ policy.
 ### P8 — Five of seven files in `ports/` export no port (R4, `strict-port-module`)
 
 `ports/*.port.ts` must export an abstract class whose name ends in `Port`. Five
-do not, and all five are on the architecture-lint baseline
-(`packages/architecture-lint/src/port-module-baseline.json:21-25`):
+do not, and all five are on the architecture-enforcer baseline
+(`packages/architecture-enforcer/src/port-module-baseline.json:21-25`):
 
 | file                                       | lines | what it actually holds                                             |
 | ------------------------------------------ | ----- | ------------------------------------------------------------------ |
@@ -312,7 +312,7 @@ structurally.
 ### P9 — Comment blocks past the ceiling, and 19.5% of the server is prose (R7)
 
 2,950 of 15,111 server lines are comment. Two blocks exceed the 60-line ceiling
-`packages/architecture-lint/src/comment-blocks.ts:9` enforces:
+`packages/architecture-enforcer/src/comment-blocks.ts:9` enforces:
 
 - **`services/langy-conversation-memory.service.ts:1-68`** — 68 lines. Opens
   with a verbatim incident transcript ("Langy created a scenario … the user had
@@ -847,7 +847,7 @@ Seven commits, smallest risk first, each leaving the suite green.
    `services/langy-cli-envelope.service.ts:27`; trim `index.ts` to the 35 symbols
    with external consumers (P10). Mechanical, reviewable file by file, and it
    clears five entries from
-   `packages/architecture-lint/src/port-module-baseline.json`.
+   `packages/architecture-enforcer/src/port-module-baseline.json`.
 
 ## 6. Blast radius
 
@@ -878,7 +878,7 @@ platform/app/src/runtime/app/features/langy-session-key-metrics.adapter.ts
 platform/app/src/runtime/app/features/langy-analytics-event.clickhouse.adapter.ts
 platform/app/src/features/langy/logic/langyChatTransport.ts
 platform/app/src/features/langy/stores/langyDevLog.ts
-packages/architecture-lint/src/test-colocation.ts
+packages/architecture-enforcer/src/test-colocation.ts
 ```
 
 Plus three route files that reach the service through `LangyApp.langyService`

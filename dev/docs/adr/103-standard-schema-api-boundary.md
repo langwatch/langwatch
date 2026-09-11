@@ -6,7 +6,7 @@
 
 **Related:** [ADR-101: feature package surfaces](./101-feature-package-surfaces.md),
 [ADR-102: runtime composition roots](./102-runtime-composition-roots.md),
-[strict feature layout](../../../packages/architecture-lint/adrs/002-versioned-strict-feature-layout.md),
+[strict feature layout](../../../packages/architecture-enforcer/adrs/002-versioned-strict-feature-layout.md),
 and [Agents package boundary](../../../modules/agent/adrs/001-package-boundary.md).
 
 ## Context

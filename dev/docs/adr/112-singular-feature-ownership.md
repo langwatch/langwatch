@@ -5,7 +5,7 @@
 **Status:** Accepted
 
 **Supersedes:** The local `feature.json` ownership-expansion mechanism in
-architecture-lint ADR-001 and Governance ADR-001. It also relocates the
+architecture-enforcer ADR-001 and Governance ADR-001. It also relocates the
 accepted Admin package-boundary decision from its temporary Enterprise root
 without changing its behavioural contract. SaaS remains in the Enterprise
 source-license tree. ADR-101 is
@@ -20,9 +20,9 @@ from those decisions remain in force.
 [ADR-101: feature package surfaces](./101-feature-package-surfaces.md),
 [ADR-102: runtime composition roots](./102-runtime-composition-roots.md),
 [ADR-111: physical application workspaces](./111-physical-application-workspaces.md),
-[feature-package boundary ADR](../../../packages/architecture-lint/adrs/001-feature-package-boundaries.md),
+[feature-package boundary ADR](../../../packages/architecture-enforcer/adrs/001-feature-package-boundaries.md),
 and
-[strict source-layout ADR](../../../packages/architecture-lint/adrs/002-versioned-strict-feature-layout.md).
+[strict source-layout ADR](../../../packages/architecture-enforcer/adrs/002-versioned-strict-feature-layout.md).
 
 ## Context
 

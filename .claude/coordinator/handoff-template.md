@@ -82,7 +82,7 @@ If the work is complete, say what the coordinator should verify.>
   apps/api/src/app-rest/api-rest.doors.ts
     add: installApiTraceExport,   (after installApiTrace, line 34)
 
-  packages/architecture-lint/src/feature-shape-baseline.json
+  packages/architecture-enforcer/src/feature-shape-baseline.json
     drop: "trace|nested-transport"
 
 `none` if there are none.>

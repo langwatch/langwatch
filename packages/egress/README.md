@@ -23,7 +23,7 @@ Three layers, bottom up:
 
 Three callers owe the same answer — the graph-alert half of Automation running
 in a background process, the Enterprise webhook endpoints platform, and any
-transport that wants the same fence. `architecture-lint`'s `cross-feature`
+transport that wants the same fence. `architecture-enforcer`'s `cross-feature`
 policy forbids one feature's server package from depending on another's, so no
 feature home is reachable by all three. This is a shared non-feature package for
 that reason, and because the fence is egress policy rather than any one

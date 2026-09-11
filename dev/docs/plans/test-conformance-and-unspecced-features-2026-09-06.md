@@ -200,7 +200,7 @@ flagging the 16 redundant-but-harmless cases).
 
 Custom resolution script (`check-vimock-stale.sh` in the tmp dir) checked every relative
 `vi.mock()` argument against the filesystem. Of 29 raw hits: 18 are deliberate fixtures
-inside the linter/test-harness's own test suite (`packages/architecture-lint/tests/
+inside the linter/test-harness's own test suite (`packages/architecture-enforcer/tests/
 test-quality.test.ts`, `test-colocation.test.ts`; `packages/test-harness/src/__tests__/
 mock-specifier-scan.unit.test.ts`, `integration-module-graph.unit.test.ts` — these
 intentionally reference non-existent paths like `./widget`, `./x` as synthetic scanner
@@ -293,17 +293,17 @@ unmeasured.
 
 ### 2.1 What already exists to build on
 
-- `packages/architecture-lint/src/feature-catalogue.ts` reads
+- `packages/architecture-enforcer/src/feature-catalogue.ts` reads
   `modules/catalogue.json` — 53 entries, each `{ id, root, classification:
   core|enterprise, subjects: string[] }`. This is the canonical feature list.
-- `packages/architecture-lint/src/check-feature-parity.ts` (1,890 lines) already solves
+- `packages/architecture-enforcer/src/check-feature-parity.ts` (1,890 lines) already solves
   "does this scenario have a test": discovers `.feature` files, parses scenarios + tags,
   finds `@scenario "<title>"` annotations above test declarations across TS/Go/Python/
   bats/shell, indexes bindings by title, and reports bound vs. unbound per file. It uses an
   enforce-all-by-default model with a shrinking `LEGACY_UNBOUND` deny-list and an
   `@unimplemented` escape hatch for tracked gaps. **Per project memory, its authoritative
   output is the `✗ THIS RUN FAILS: <reasons>` summary line — not a `grep -c` count.**
-- `packages/architecture-lint/src/boundary-edge-baseline.json` is the existing precedent for
+- `packages/architecture-enforcer/src/boundary-edge-baseline.json` is the existing precedent for
   a *ratchet* baseline: `{ version, edges: [{ kind, from, to, expires }] }` — exactly the
   shape a stage-2 unspecced-surfaces baseline should reuse.
 - **Nothing today answers the reverse direction** — "does this code have a scenario." The
@@ -353,7 +353,7 @@ visibility for gradual catch-up, not a strict gate.
 `@scenario`-to-test binding graph as a second, higher-confidence signal (a scenario whose
 prose doesn't mention a surface's literal name, but whose *bound test* calls that surface,
 should still count as specced). The prototype stayed dependency-free; a real implementation
-inside `packages/architecture-lint` should import `discoverFeatureFiles` and
+inside `packages/architecture-enforcer` should import `discoverFeatureFiles` and
 `findScenarioAnnotations` directly rather than re-parsing specs from scratch.
 
 ### 2.4 Real counts (prototype run)
@@ -441,11 +441,11 @@ coverage — see limitations below.
 ### 2.6 Proposed rollout — three stages, all starting after this release
 
 1. **CLI report, advisory, never fails.** `pnpm check:unspecced-features` (new script in
-   `packages/architecture-lint`, sibling to `check:feature-parity`) prints the per-feature
+   `packages/architecture-enforcer`, sibling to `check:feature-parity`) prints the per-feature
    table and top-N unspecced surfaces. Exit code always 0. Pure visibility — run manually or
    as a non-blocking CI step.
 2. **Ratchet baseline.** A checked-in `unspecced-surfaces-baseline.json` under
-   `packages/architecture-lint/src/`, in the same shape as `boundary-edge-baseline.json`
+   `packages/architecture-enforcer/src/`, in the same shape as `boundary-edge-baseline.json`
    (`{ version, surfaces: [{ feature, kind, name, file, expires }] }`). Every
    currently-unspecced surface gets an entry with an expiry date. CI fails only when: (a) a
    *new* unspecced surface appears in a package touched by the PR that isn't already in the

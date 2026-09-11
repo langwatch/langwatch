@@ -130,7 +130,7 @@ const threeComponents = [
   "sdks/typescript/src/index.ts",
 ];
 
-const rootShim = ".release-please-shim";
+const rootShim = "dev/.release-please-shim";
 const pythonShim = "sdks/python/.release-please-shim";
 const typescriptShim = "sdks/typescript/.release-please-shim";
 
@@ -513,7 +513,7 @@ describe("breaking-change scope guard", () => {
     // `multi-component-major` label, which asserted three majors nobody wanted.
     const files = [
       ".github/workflows/gateway-matrix.yaml",
-      ".release-please-shim",
+      "dev/.release-please-shim",
       "docs/ai-gateway/api/errors.mdx",
       "docs/ai-gateway/billing-events.mdx",
       "docs/ai-gateway/cookbooks/metering-and-rebilling.mdx",
@@ -555,7 +555,7 @@ describe("breaking-change scope guard", () => {
     ];
 
     const shims = {
-      ".release-please-shim": "release-please shadow marker (v5), next: 3.11.0",
+      "dev/.release-please-shim": "release-please shadow marker (v5), next: 3.11.0",
       "sdks/python/.release-please-shim": "release-please shadow marker (v4), next: 1.2.1",
       "sdks/typescript/.release-please-shim": "release-please shadow marker (v6), next: 1.5.0",
     };
@@ -618,7 +618,7 @@ describe("breaking-change scope guard", () => {
     // filed under its changelog, release PR #6787 stalled on that major, and
     // the #6842 Helm chart fix waited behind it.
     const files = [
-      ".release-please-shim",
+      "dev/.release-please-shim",
       "platform/app/src/server/app-layer/traces/canonicalisation/extractors/genAi.ts",
       "platform/app/src/server/event-sourcing/pipelines/trace-processing/subscribers/trackedEventSync.subscriber.ts",
       "sdks/go/instrumentation/openai/middleware.go",
@@ -638,7 +638,7 @@ describe("breaking-change scope guard", () => {
         checkout({
           files,
           messages,
-          shims: { ".release-please-shim": shimSaying("3.13.0") },
+          shims: { "dev/.release-please-shim": shimSaying("3.13.0") },
         }),
       );
 
@@ -652,7 +652,7 @@ describe("breaking-change scope guard", () => {
         checkout({
           files,
           messages,
-          shims: { ".release-please-shim": shimSaying("3.13.0") },
+          shims: { "dev/.release-please-shim": shimSaying("3.13.0") },
         }),
       );
 

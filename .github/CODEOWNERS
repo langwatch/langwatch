@@ -1,5 +1,5 @@
 # Seams: a mistake here is systemic, not local, so a human owner reviews every
-# change. Everything else is held by the machines (oxlint, architecture-lint,
+# change. Everything else is held by the machines (oxlint, architecture-enforcer,
 # the parity gate, per-package tests). See dev/docs/plans/strict-feature-layout.md
 # section 6, "The seam review method".
 
@@ -18,8 +18,8 @@
 /modules/identity/server/                  @0xdeafcafe
 
 # The rules encode the design; a wrong rule blesses a wrong pattern everywhere.
-/packages/architecture-lint/                         @0xdeafcafe
-/.oxlintrc.architecture.json                         @0xdeafcafe
+/packages/architecture-enforcer/                         @0xdeafcafe
+/.oxlintrc.jsonc                         @0xdeafcafe
 /tsconfig.base.json                                  @0xdeafcafe
 
 # Schema is immutable history once deployed.

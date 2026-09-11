@@ -5,7 +5,7 @@
 **Behavioural contract:** [Metric processing](../specs/metric-processing.feature)
 
 **Related:** [Singular feature ownership](../../../../dev/docs/adr/112-singular-feature-ownership.md),
-and [feature package boundaries](../../../architecture-lint/adrs/001-feature-package-boundaries.md).
+and [feature package boundaries](../../../architecture-enforcer/adrs/001-feature-package-boundaries.md).
 
 ## Context
 

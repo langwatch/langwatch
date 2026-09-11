@@ -2,7 +2,7 @@ Feature: The oxlint baseline replaces the hand-written per-file registers
   Debt for cognitive-complexity, condition-shape, max-depth and complexity
   used to live as ~2,400 hand-edited filenames spread across oxlint config
   overrides, with no mechanical shrink-only check. It now lives in one file,
-  packages/architecture-lint/src/oxlint-baseline.json, keyed `rule|file` with
+  packages/architecture-enforcer/src/oxlint-baseline.json, keyed `rule|file` with
   a `measured` date. A `defineRule` plugin rule (cognitive-complexity,
   condition-shape) consults it directly and reports nothing for a baselined
   file; the two native rules that cannot read it (max-depth, complexity)

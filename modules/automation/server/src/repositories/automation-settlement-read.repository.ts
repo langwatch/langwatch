@@ -13,7 +13,7 @@ import type {
  * `TraceService` is twelve methods over span trees, full records, threads,
  * evaluation spans and an ingest-wait cache; settlement reaches four. Naming
  * the whole service meant a process that wanted to settle a match had to
- * compose the trace read path entire — and `architecture-lint`'s `cross-feature`
+ * compose the trace read path entire — and `architecture-enforcer`'s `cross-feature`
  * policy forbids this package from importing Trace's server anyway, so the port
  * is where the two features meet. The published `TraceService` satisfies it
  * structurally.

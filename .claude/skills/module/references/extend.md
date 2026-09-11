@@ -12,7 +12,7 @@ assumes sections 0 to 5 here were walked first; do not treat it as a separate ta
 ```bash
 grep -n '"<subject>"' modules/catalogue.json        # who owns it
 find modules/<f> -maxdepth 4 -type d | grep -v node_modules
-grep -n '"<f>"' packages/architecture-lint/src/feature-shape-baseline.json   # what it still carries from the older shape
+grep -n '"<f>"' packages/architecture-enforcer/src/feature-shape-baseline.json   # what it still carries from the older shape
 ```
 
 Read the contract's `<f>.api.ts`, the app, the repository interfaces, the transport

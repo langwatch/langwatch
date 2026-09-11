@@ -65,10 +65,10 @@ Run every item; each has bitten a previous move.
   `grep -rn "vi.mock(" <touched test dirs>` and repoint to the new specifier.
 - **Source-reading guards**: tests that `readFileSync` a path by string (boundary scans,
   parity checkers, comment scanners) die with ENOENT or, worse, pass against nothing.
-  `grep -rn "readFileSync\|existsSync" packages/architecture-lint/src packages/architecture-lint/tests apps/*/tests | grep <old dir>`.
-  Path lists inside data files count too: `packages/architecture-lint/src/comment-block-roots.json`
-  and every `packages/architecture-lint/src/*-baseline.json` (one shape, keyed rows; see
-  `packages/architecture-lint/README.md`).
+  `grep -rn "readFileSync\|existsSync" packages/architecture-enforcer/src packages/architecture-enforcer/tests apps/*/tests | grep <old dir>`.
+  Path lists inside data files count too: `packages/architecture-enforcer/src/comment-block-roots.json`
+  and every `packages/architecture-enforcer/src/*-baseline.json` (one shape, keyed rows; see
+  `packages/architecture-enforcer/README.md`).
 - **TS2304 half-reverts**: after moving, `pnpm --filter <pkg> typecheck` on every touched
   package plus `@langwatch/platform-api`, `@langwatch/worker`, `@langwatch/ui`. A
   `TS2304: Cannot find name` means a use survived and its declaration moved without an

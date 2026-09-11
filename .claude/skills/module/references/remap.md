@@ -57,7 +57,7 @@ error in a file you touched is yours.
 ## 5. Lint: the rule you are serving, counted
 
 ```bash
-npx oxlint -c .oxlintrc.architecture.json modules/<f>/contract/src modules/<f>/server/src | grep -c <rule-name>
+npx oxlint -c .oxlintrc.jsonc modules/<f>/contract/src modules/<f>/server/src | grep -c <rule-name>
 ```
 
 Before and after. The count for the rule goes to zero for `try*`; a remaining hit is

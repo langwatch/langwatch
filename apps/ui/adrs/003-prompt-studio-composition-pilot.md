@@ -5,7 +5,7 @@
 **Status:** Accepted
 
 **Related:**
-[Frontend feature boundary ADR](../../../packages/architecture-lint/adrs/004-frontend-feature-boundaries.md),
+[Frontend feature boundary ADR](../../../packages/architecture-enforcer/adrs/004-frontend-feature-boundaries.md),
 [Prompt service boundary](../../../modules/prompt/adrs/001-prompt-service-boundary.md),
 [ADR-001: UI composition boundary](./001-ui-composition-boundary.md),
 and [the one plan](../../../dev/docs/plans/strict-feature-layout.md).

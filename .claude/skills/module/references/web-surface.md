@@ -86,7 +86,7 @@ package, with the scenario bound. Then:
 ```bash
 pnpm --filter @langwatch/<owner>-web test && pnpm --filter @langwatch/<owner>-web typecheck
 pnpm --filter @langwatch/ui typecheck
-pnpm --filter @langwatch/architecture-lint lint
+pnpm --filter @langwatch/architecture-enforcer lint
 ```
 
 and the rest of `.claude/skills/architecture-guide/references/gates.md`.

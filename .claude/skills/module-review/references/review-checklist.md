@@ -7,13 +7,13 @@ Owned by the `module-review` skill (`.claude/skills/module-review/SKILL.md`), wh
 ```bash
 F=<module>; P=modules/$F
 find $P -maxdepth 4 -type d | grep -v node_modules | grep -v __tests__
-grep -n "\"$F\"" packages/architecture-lint/src/feature-shape-baseline.json      # what it still carries
-pnpm --filter @langwatch/architecture-lint lint 2>&1 | grep -E "$P|apps/(api|worker|ui)/src/features/$F" > /tmp/audit-lint.txt; wc -l < /tmp/audit-lint.txt
-pnpm exec oxlint --config .oxlintrc.architecture.json $P
-pnpm --filter @langwatch/architecture-lint check:feature-parity 2>&1 | grep -A6 "$P/specs"
+grep -n "\"$F\"" packages/architecture-enforcer/src/feature-shape-baseline.json      # what it still carries
+pnpm --filter @langwatch/architecture-enforcer lint 2>&1 | grep -E "$P|apps/(api|worker|ui)/src/features/$F" > /tmp/audit-lint.txt; wc -l < /tmp/audit-lint.txt
+pnpm exec oxlint --config .oxlintrc.jsonc $P
+pnpm --filter @langwatch/architecture-enforcer check:feature-parity 2>&1 | grep -A6 "$P/specs"
 for pkg in contract server web; do pnpm --filter @langwatch/$F-$pkg typecheck; done
 for pkg in contract server web; do pnpm --filter @langwatch/$F-$pkg test 2>&1 | grep -E "Tests |Test Files"; done
-pnpm --filter @langwatch/architecture-lint test:unit tests/frontend-boundary.unit.test.ts 2>&1 | grep -E "Tests |$P"
+pnpm --filter @langwatch/architecture-enforcer test:unit tests/frontend-boundary.unit.test.ts 2>&1 | grep -E "Tests |$P"
 
 # over-abstraction detectors: identity functions, same-name delegation, with file:line
 uvx --from ast-grep-cli==0.42.3 ast-grep scan -c dev/lint/ast-grep/sgconfig.yml \

@@ -36,7 +36,7 @@ const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
  * TypeScript 7 does not expose. They move when a `.d.ts` bundler speaks the
  * 7 API.
  *
- * `packages/architecture-lint` drives that API directly, and far more of it:
+ * `packages/architecture-enforcer` drives that API directly, and far more of it:
  * 19 rule modules and ~726 call sites, including `createProgram`,
  * `createPrinter`, `createScanner`, `preProcessFile`, `parseJsonText`,
  * `readConfigFile` and `sys`, none of which `typescript/unstable/*` offers.
@@ -48,7 +48,7 @@ const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
  * when the unstable API grows a program, a printer and a scanner, or when the
  * rules are restructured to parse the whole tree in one exchange.
  */
-const HELD_ON_SIX = new Set(["sdks/typescript", "mcp/typescript", "packages/architecture-lint"]);
+const HELD_ON_SIX = new Set(["sdks/typescript", "mcp/typescript", "packages/architecture-enforcer"]);
 
 /**
  * Where the workspace's own package manifests live, relative to the root.

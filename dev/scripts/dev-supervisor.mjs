@@ -76,7 +76,7 @@
  * script.
  *
  * It watches its own directory tree plus `../../packages` (every workspace
- * package apps/api and apps/worker are allowed to import — architecture-lint
+ * package apps/api and apps/worker are allowed to import — architecture-enforcer
  * already forbids either from importing a `web`/`apps/ui` package, so this is
  * a safe superset with nothing to keep in sync by hand) via `fs.watch`
  * (native, recursive on macOS/Windows; degrades to unwatched with a warning
@@ -166,7 +166,7 @@ const WATCH_FLAG = "--watch";
  */
 const DEFAULT_WATCH_DEBOUNCE_MS = 750;
 /** Default watch roots, relative to cwd: the package's own source, plus every
- * workspace package (architecture-lint already forbids api/worker code from
+ * workspace package (architecture-enforcer already forbids api/worker code from
  * reaching a web/ui package, so this needs no per-app allowlist). */
 const DEFAULT_WATCH_DIRS = ["src", "../../packages"];
 /** Never worth a restart: tests, build output, generated code, watcher noise. */
@@ -629,7 +629,7 @@ async function runWatchSupervisor(rawArgv, env) {
   /**
    * Rebuilds the dev bundle when one is configured; a no-op (always ok)
    * otherwise. The import is deliberately dynamic and deliberately scoped to
-   * only this branch: packages/architecture-lint/tests/dev-supervisor.test.ts
+   * only this branch: packages/architecture-enforcer/tests/dev-supervisor.test.ts
    * copies this whole file to a scratch directory and runs the copy in
    * isolation to provoke failures that cannot be triggered from the outside
    * (see its `supervisorWith` helper) — an invariant its own comment states
@@ -1114,7 +1114,7 @@ function exitCodeFor(childResult) {
 // the moment either path crosses a symlink (macOS's /tmp -> /private/tmp is
 // exactly this: `argv[1]` keeps the invoked, symlinked path while
 // `import.meta.url` already reports the resolved one), which read as "never
-// run" everywhere packages/architecture-lint/tests/dev-supervisor.test.ts
+// run" everywhere packages/architecture-enforcer/tests/dev-supervisor.test.ts
 // copies this file into a scratch tmp dir and executes the copy.
 function isMainModule() {
   if (!process.argv[1]) return false;

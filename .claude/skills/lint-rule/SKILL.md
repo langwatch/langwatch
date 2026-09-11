@@ -1,22 +1,22 @@
 ---
 name: lint-rule
-description: "Add or change a langwatch oxlint rule: the defineRule declaration in packages/lint-core, its fixture-first unit test, its specs/tooling scenario, the one-line registration in the plugin registry and the config, the generated reference in dev/docs/lint-rules.md, and the measurement that says whether it ships at error or on the baseline. Use when a lint message is unclear or wrong, a rule fires where it should not, a new house rule is wanted, a baseline entry must be added or paid down, or someone asks why the plugin is slow."
+description: "Add or change a langwatch oxlint rule: the defineRule declaration in packages/oxlint, its fixture-first unit test, its specs/tooling scenario, the one-line registration in the plugin registry and the config, the generated reference in dev/docs/lint-rules.md, and the measurement that says whether it ships at error or on the baseline. Use when a lint message is unclear or wrong, a rule fires where it should not, a new house rule is wanted, a baseline entry must be added or paid down, or someone asks why the plugin is slow."
 user-invocable: true
 argument-hint: "<rule name or the message that fired>"
 ---
 
 # Add or change a langwatch lint rule
 
-Every rule lives in `packages/lint-core/src/rules/<rule>.rule.mjs`, is registered once in
-`packages/architecture-lint/oxlint-plugin.mjs`, and is enabled once in
-`.oxlintrc.architecture.json`. `dev/docs/lint-rules.md` is generated from those
+Every rule lives in `packages/oxlint/src/rules/<rule>.rule.mjs`, is registered once in
+`packages/architecture-enforcer/oxlint-plugin.mjs`, and is enabled once in
+`packages/architecture-enforcer/oxlint.architecture.jsonc`. `dev/docs/lint-rules.md` is generated from those
 declarations — read it before writing a new rule, so you extend the house grammar.
 
 ## 1. Decide the instrument first
 
 - **A rule** when the fact is per-file, syntactic, and the fix is mechanical enough to
   state in one sentence.
-- **A CLI graph check** (`packages/architecture-lint/src/*.ts`) when it needs the import
+- **A CLI graph check** (`packages/architecture-enforcer/src/*.ts`) when it needs the import
   graph, package manifests or a shrink-only inventory.
 - **A test in the owning package** when only one module must hold the property.
 - **A doc in `dev/docs/best_practices/`** when the rule cannot name a fix. Do not lint taste.
@@ -29,7 +29,7 @@ Put the rule at `error` in a scratch config under `$TMPDIR`, never in the repo:
 cat > "$TMPDIR/one-rule.json" <<EOF
 {
   "plugins": [],
-  "jsPlugins": [{ "name": "langwatch", "specifier": "$PWD/packages/architecture-lint/oxlint-plugin.mjs" }],
+  "jsPlugins": [{ "name": "langwatch", "specifier": "$PWD/packages/architecture-enforcer/oxlint-plugin.mjs" }],
   "rules": { "langwatch/<rule>": "error" }
 }
 EOF
@@ -55,7 +55,7 @@ A message is `what` + `fix`, joined. `why` is documentation and the linter never
 
 ## 4. Write it fixture-first
 
-1. `packages/lint-core/tests/rules/<rule>.unit.test.mjs`, one `describe("when …")` per
+1. `packages/oxlint/tests/rules/<rule>.unit.test.mjs`, one `describe("when …")` per
    message id, valid and invalid:
 
    ```js
@@ -71,14 +71,14 @@ A message is `what` + `fix`, joined. `why` is documentation and the linter never
    `{ version, features: [{ id, subjects }] }`; pass `files` for anything else.
    `afterAll(() => workspace.cleanup())`.
 
-2. Run it: `pnpm --filter @langwatch/lint-core test:unit tests/rules/<rule>.unit.test.mjs`.
-3. Write `packages/lint-core/src/rules/<rule>.rule.mjs` with `defineRule`. Gate on
+2. Run it: `pnpm --filter @langwatch/oxlint test:unit tests/rules/<rule>.unit.test.mjs`.
+3. Write `packages/oxlint/src/rules/<rule>.rule.mjs` with `defineRule`. Gate on
    `classify(context)` through the `applies` predicate — never parse the filename yourself,
    and never re-derive what `classify` already computed.
-4. Register in `packages/architecture-lint/oxlint-plugin.mjs` (one line) and in
-   `.oxlintrc.architecture.json` `rules` (one line, no filename lists).
+4. Register in `packages/architecture-enforcer/oxlint-plugin.mjs` (one line) and in
+   `packages/architecture-enforcer/oxlint.architecture.jsonc` `rules` (one line, no filename lists).
 5. Regenerate the reference and commit it:
-   `pnpm --filter @langwatch/architecture-lint docs`.
+   `pnpm --filter @langwatch/architecture-enforcer docs`.
 
 ## 5. Spec and binding
 
@@ -87,18 +87,18 @@ A message is `what` + `fix`, joined. `why` is documentation and the linter never
 enforces nothing — see `.claude/skills/spec-bind/SKILL.md`. Verify:
 
 ```bash
-pnpm --filter @langwatch/architecture-lint check:feature-parity 2>&1 | grep -A3 lint-<rule>
+pnpm --filter @langwatch/architecture-enforcer check:feature-parity 2>&1 | grep -A3 lint-<rule>
 ```
 
 ## 6. Baselines: when to record and when to fix
 
-Existing debt lives in `packages/architecture-lint/src/oxlint-baseline.json` as
+Existing debt lives in `packages/architecture-enforcer/src/oxlint-baseline.json` as
 `rule|file` with a `measured` date — not as filename lists in the config. Baseline a file
 only when the fix does not belong in this change; otherwise fix it, which is usually a few
 lines. Adding an entry:
 
 ```bash
-pnpm --filter @langwatch/architecture-lint lint   # the shrink-only check must pass
+pnpm --filter @langwatch/architecture-enforcer lint   # the shrink-only check must pass
 ```
 
 The register may only shrink against the merge base, so **renaming a file that carries an
@@ -118,11 +118,11 @@ be fixed now.
 
   ```bash
   # cold import of the whole plugin graph
-  node -e "const t=performance.now();import('./packages/architecture-lint/oxlint-plugin.mjs').then(()=>console.log(\`\${(performance.now()-t).toFixed(0)} ms\`))"
+  node -e "const t=performance.now();import('./packages/architecture-enforcer/oxlint-plugin.mjs').then(()=>console.log(\`\${(performance.now()-t).toFixed(0)} ms\`))"
   # one rule over the governed paths, before and after
   time pnpm -s exec oxlint --disable-nested-config -c "$TMPDIR/one-rule.json" apps packages
   # the whole config, one file (the fast edit loop, ~1 s)
-  time pnpm -s exec oxlint --disable-nested-config -c .oxlintrc.architecture.json <file>
+  time pnpm -s exec oxlint --disable-nested-config -c .oxlintrc.jsonc <file>
   ```
 
 `pnpm lint` takes a machine-wide slot, so run it once and never beside a typecheck.

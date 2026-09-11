@@ -1,7 +1,7 @@
 # 2026-09-08: the builder these scenarios were bound through is deleted (dev/docs/plans/api-legacy-delete.md).
 # The behaviour is still the requirement. Each scenario is @unimplemented until the new runtime
 # (defineRestRouter + createRestRuntime) earns it again with a bound test; then retag and remove
-# the file from LEGACY_INERT in packages/architecture-lint/src/check-feature-parity.ts.
+# the file from LEGACY_INERT in packages/architecture-enforcer/src/check-feature-parity.ts.
 # See ../adrs/001-rpc-first-fluent-registration.md (its RPC half is withdrawn)
 # See ../../specs/features/domain-error-contract.feature (the error-event
 # payload contract this transport adopts for mid-stream handled failures)

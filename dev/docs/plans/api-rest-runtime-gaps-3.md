@@ -95,7 +95,7 @@ Original item 13 text follows.
 
 Rules: Opus; Read/Edit/Write only, read before delete; `packages/api/**` only (specs included); never root
 typecheck/lint/format; allowed `pnpm typecheck:one packages/api`, `pnpm --filter @langwatch/api test:unit`, `npx oxlint
-<files>` (counts on `runtime.ts`/`access.ts` must not grow past HEAD's), `pnpm --filter @langwatch/architecture-lint
+<files>` (counts on `runtime.ts`/`access.ts` must not grow past HEAD's), `pnpm --filter @langwatch/architecture-enforcer
 check:feature-parity` (`packages/api/specs` lines). No git writes, no baselines, no `.env*`, no re-exports, no `as
 unknown as`, no `try*`, no inline `import()`, comments ≤5 lines, `HandledError` codes for knowable failures.
 Report: each item one paragraph with public names and the pinning test; the exact consumer lines (stored-object `/api/files`,

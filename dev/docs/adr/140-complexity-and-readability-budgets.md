@@ -52,7 +52,7 @@ rewritten. Both go stale, and neither is read at the moment it matters.
 | `langwatch/logical-statement-spacing` | plugin | One blank line around control flow, around a multi-line statement, and between chain groups. |
 | `langwatch/service-member-spacing` | plugin | One blank line between consecutive service methods, constructors and accessors. Fixable. Enabled nowhere today. |
 | `langwatch/max-statements-per-line` | plugin | Two statements on one line in a service module. Enabled nowhere today. |
-| `service-ceilings` | architecture-lint | A service module or method past its line, statement, complexity or line-length ceiling. |
+| `service-ceilings` | architecture-enforcer | A service module or method past its line, statement, complexity or line-length ceiling. |
 
 `max-depth` (maximum 4) is enabled the same way, scoped by an `overrides`
 block rather than workspace-wide, and carries one baseline entry.

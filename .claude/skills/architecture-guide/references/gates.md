@@ -24,7 +24,7 @@ Every workspace package declares `typecheck`, `test` and `test:unit`. Use the sc
 whole-tree `tsc` reached any other way. Package names: `@langwatch/<f>-contract`,
 `-server`, `-web`; `@langwatch/platform-api` (apps/api), `@langwatch/worker`,
 `@langwatch/ui`, `@langwatch/tasks`, `@langwatch/api`, `@langwatch/runtime-composition`,
-`@langwatch/architecture-lint`.
+`@langwatch/architecture-enforcer`.
 
 Never `npx vitest`, never a hand-rolled vitest config, never `--maxWorkers=1`. After an
 interrupted run, sweep with `pkill -f "vitest/dist/workers"`.
@@ -32,13 +32,13 @@ interrupted run, sweep with `pkill -f "vitest/dist/workers"`.
 ## Boundaries and specs
 
 ```bash
-pnpm --filter @langwatch/architecture-lint lint
-pnpm --filter @langwatch/architecture-lint check:feature-parity
-pnpm --filter @langwatch/architecture-lint test:unit tests/frontend-boundary.unit.test.ts
+pnpm --filter @langwatch/architecture-enforcer lint
+pnpm --filter @langwatch/architecture-enforcer check:feature-parity
+pnpm --filter @langwatch/architecture-enforcer test:unit tests/frontend-boundary.unit.test.ts
 ```
 
-`lint` runs the CLI in `packages/architecture-lint/src/cli.ts`; the oxlint half runs
-separately over `.oxlintrc.architecture.json`. Filter the CLI output to your module
+`lint` runs the CLI in `packages/architecture-enforcer/src/cli.ts`; the oxlint half runs
+separately over `.oxlintrc.jsonc`. Filter the CLI output to your module
 (`grep "modules/<f>"`) and to the policies you care about; the full output is
 thousands of lines while the burn-down is in progress. Read `check:feature-parity`'s
 `✗ THIS RUN FAILS: …` banner, never a `grep -c`: a `✓ all bound` under one `▸` heading is
@@ -56,7 +56,7 @@ pnpm --filter @langwatch/runtime-composition typecheck      # regenerates nothin
 ## Style, on the files you changed only
 
 ```bash
-pnpm exec oxlint --config .oxlintrc.architecture.json <files>
+pnpm exec oxlint --config .oxlintrc.jsonc <files>
 pnpm exec oxfmt --write --disable-nested-config <files>
 ```
 
@@ -65,7 +65,7 @@ A comment block over five lines is flagged for review; keep comments short.
 
 ## Baselines
 
-`*-baseline.json` in `packages/architecture-lint/src` (`boundary-edge`,
+`*-baseline.json` in `packages/architecture-enforcer/src` (`boundary-edge`,
 `composed-exports`, `feature-shape`, `oxlint`, `source-folder-shape`, plus
 `comment-block-roots.json`; one shape, `{ version, policy, entries[{ key, measured }] }`) record pre-existing violations
 and may only shrink. A new violation in a file you touched is yours to fix, not to add. Lanes never

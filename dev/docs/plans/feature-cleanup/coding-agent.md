@@ -72,7 +72,7 @@ backfillPullRequestMappings(input) { return this.collaborators.mappingBackfill.b
 linkTraceSessionsToPullRequests(input) { return this.collaborators.tracePullRequests.link(input); } // :154-158
 ```
 
-Already baselined at `packages/architecture-lint/src/overengineering-baseline.json:13`.
+Already baselined at `packages/architecture-enforcer/src/overengineering-baseline.json:13`.
 The class holds no rule of its own; its only real content is the 47-line wiring
 block in `create` (`:45-102`), which is composition-root work.
 
@@ -514,7 +514,7 @@ Five commits, smallest risk first, each leaving the suite green:
 4. **P1.** Delete `services/coding-agent.service.ts`; `CodingAgentApp` composes the
    four collaborators and implements `CodingAgentService` itself. Delete the two
    dead app methods. Remove the baseline entry at
-   `packages/architecture-lint/src/overengineering-baseline.json:13`.
+   `packages/architecture-enforcer/src/overengineering-baseline.json:13`.
 5. **P2 + P3 + P6 + P7.** Delete `CodingAgentProjectionPersistence`, the persistence
    adapter, both `WeakMap`s and the runtime throw; point the eventing adapters at
    the repositories. Make `readMetrics` and `clock` required, threading the process

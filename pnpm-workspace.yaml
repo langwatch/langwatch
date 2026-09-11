@@ -32,7 +32,7 @@ packages:
   - "tools/*/runner"
   # The contributor-only backend launcher: the API and worker applications in
   # one local process (ADR-004, amendment 2026-09-07). Private, never shipped,
-  # and the one package architecture-lint lets combine both runtimes.
+  # and the one package architecture-enforcer lets combine both runtimes.
   - "tools/dev-runtime"
   - "skills"
   - "dev/tests/agentic-e2e"
@@ -209,13 +209,13 @@ catalog:
 # `"dep": "catalog:<name>"`.
 #
 # sdk-toolchain: the published SDK (sdks/typescript), the MCP server
-# (mcp/typescript) and architecture-lint all pin TypeScript ^6.0.3 rather than
+# (mcp/typescript) and architecture-enforcer all pin TypeScript ^6.0.3 rather than
 # the app's ^7.0.2. The SDK and the MCP server are published packages and must
-# not force TS7 on their consumers; architecture-lint imports the classic
+# not force TS7 on their consumers; architecture-enforcer imports the classic
 # `typescript` compiler API directly (`import ts from "typescript"` across its
 # policies and tools), which TS7 no longer exposes from its root export (see
 # CLAUDE.md's TypeScript table and ADR-099 — static scans elsewhere go through
-# `src/test-utils/tsAst.ts`, which owns the one TS7 API session; architecture-lint
+# `src/test-utils/tsAst.ts`, which owns the one TS7 API session; architecture-enforcer
 # predates that seam and still needs the real compiler).
 catalogs:
   sdk-toolchain:

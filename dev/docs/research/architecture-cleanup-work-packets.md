@@ -73,7 +73,7 @@ export class AuditLogApp implements AuditLogApiContract {
 
 New packets must follow that declaration/factory/private-service shape, rather than importing a feature transport from an API process list.
 
-The current transport framework accepts handler facts such as `input`, `app`, `actor`, `scope`, and `signal` (`packages/architecture-lint/src/api-transport-framework.ts:48-61`). Its raw-context guard is the accepted boundary: handlers must consume only those parser/policy-produced facts.
+The current transport framework accepts handler facts such as `input`, `app`, `actor`, `scope`, and `signal` (`packages/architecture-enforcer/src/api-transport-framework.ts:48-61`). Its raw-context guard is the accepted boundary: handlers must consume only those parser/policy-produced facts.
 
 No raw `ctx`, `context`, `req`, `request`, `session`, headers, or response object belongs in that callback. Keep validation and authorization at the transport boundary; handlers receive the resulting typed facts.
 
@@ -269,7 +269,7 @@ backlog clusters, not permission for wholesale rewrites. For each new packet:
 read the exact lint diagnostic, trace endpoint/worker flow, move one vertical
 slice, delete displaced production code, then run focused package checks,
 relevant integration tests, Oxfmt, Oxc, architecture lint,
-`pnpm --filter @langwatch/architecture-lint review:test-quality` for changed
+`pnpm --filter @langwatch/architecture-enforcer review:test-quality` for changed
 tests, and `git diff --check`. Report unrelated workspace failures verbatim;
 never call them green.
 

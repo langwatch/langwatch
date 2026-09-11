@@ -95,8 +95,18 @@ export const bumpedComponents = (
   });
 };
 
+/**
+ * Where a component's pin marker lives: beside the component, except for the
+ * root component, whose path is the whole tree and so needs a home chosen for
+ * it. That home is `dev/` rather than the tidier-looking `.github/`, because
+ * `.github` is one of the root component's `exclude-paths` in
+ * release-please-config.json — a shim there would be a pin release-please
+ * never sees change.
+ */
+export const rootShimPath = "dev/.release-please-shim";
+
 export const shimPath = (component: ReleaseComponent): string =>
-  component.path === rootPath ? ".release-please-shim" : `${component.path}/.release-please-shim`;
+  component.path === rootPath ? rootShimPath : `${component.path}/.release-please-shim`;
 
 /** Every `Release-As:` footer version the pull request carries, in order. */
 export const releaseAsVersions = (messages: string[]): string[] =>

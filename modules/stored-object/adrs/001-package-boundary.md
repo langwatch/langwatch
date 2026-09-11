@@ -11,7 +11,7 @@
 [ADR-101: feature package surfaces](../../../../dev/docs/adr/101-feature-package-surfaces.md),
 [ADR-102: runtime composition roots](../../../../dev/docs/adr/102-runtime-composition-roots.md),
 [ADR-103: Standard Schema API boundary](../../../../dev/docs/adr/103-standard-schema-api-boundary.md),
-[strict feature source layout](../../../architecture-lint/adrs/002-versioned-strict-feature-layout.md),
+[strict feature source layout](../../../architecture-enforcer/adrs/002-versioned-strict-feature-layout.md),
 [RPC-first API registration](../../../api/adrs/101-rpc-first-fluent-registration.md),
 [system migrations](../../../system-migrations/README.md),
 [mandatory API authorization](../../../../specs/security/api-endpoint-authorization.feature),

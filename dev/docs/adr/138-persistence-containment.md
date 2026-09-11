@@ -38,9 +38,9 @@ through costs nothing and removes the cast entirely.
 | `langwatch/prisma-containment` | plugin | Generated Prisma may be imported only by a repository under `server/src/repositories/prisma/` or by `server/src/adapters/postgres.<subject>.adapter.ts`; a module may not own Prisma connection or lifecycle services. |
 | `langwatch/typed-prisma-seam` | plugin | No `as PrismaClient`, and no `database: object` in a `.create(` argument list. |
 | `langwatch/service-dependencies` | plugin | A service may not import a database client, another subject's repository, or the global application graph. |
-| `prisma-table-ownership` | architecture-lint | Code outside a module's own Prisma repository may not reach that module's tables. |
-| `prisma-migration-access` | architecture-lint | The raw and scoped Prisma client capabilities are for a `SystemMigration` and its owning repository only. |
-| `clickhouse-table-ownership` | architecture-lint | One module writes a ClickHouse table; every other module reads it through that module's api. |
+| `prisma-table-ownership` | architecture-enforcer | Code outside a module's own Prisma repository may not reach that module's tables. |
+| `prisma-migration-access` | architecture-enforcer | The raw and scoped Prisma client capabilities are for a `SystemMigration` and its owning repository only. |
+| `clickhouse-table-ownership` | architecture-enforcer | One module writes a ClickHouse table; every other module reads it through that module's api. |
 
 The three plugin rules are per-import and per-signature, so one file is enough
 to decide. The three policies need the schema and the whole catalogue at

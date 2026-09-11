@@ -23,7 +23,7 @@ import type {
  *
  * A feature package writes a plain nested map of these — no tRPC types — and
  * this package turns the map into a router type. That split is not stylistic:
- * `packages/architecture-lint/oxlint-plugin.mjs` rejects `@trpc/server` from
+ * `packages/architecture-enforcer/oxlint-plugin.mjs` rejects `@trpc/server` from
  * both the `web` and the `contract` role, and the rule fires on the import
  * declaration without checking `importKind`, so `import type` is rejected too.
  * A feature package therefore cannot name `AnyRouter`, `TRPCQueryProcedure` or
