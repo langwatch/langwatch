@@ -5,6 +5,7 @@
 import type { Socket } from "node:net";
 import { AgentRole } from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
+import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../../voice-public-url-env";
 import type {
   ReceivedVoiceSocket,
   VoiceSocketReceiver,
@@ -695,6 +696,37 @@ describe("phoneTransport", () => {
         ).toThrow(VoicePublicBaseUrlMissingError);
         expect(factoryOptions).toHaveLength(0);
         expect(adapter.placeCallArgs).toHaveLength(0);
+      });
+    });
+
+    describe("when the worker recorded why its tunnel mint failed", () => {
+      /** @scenario "A phone run's missing-URL error names the worker's tunnel failure reason" */
+      it("names that reason in the run's error instead of a generic message", () => {
+        const adapter = fakeAdapter();
+        const { transport } = buildTransport({
+          adapter,
+          processEnv: {
+            [VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV]:
+              "cloudflared tunnel binary unavailable: spawn cloudflared ENOENT",
+          },
+        });
+
+        let thrown: unknown;
+        try {
+          transport.createAgentAdapter({
+            agentId: TARGET,
+            credential: TWILIO_CREDENTIAL,
+            maxCallSeconds: 120,
+          });
+        } catch (error) {
+          thrown = error;
+        }
+
+        expect(thrown).toBeInstanceOf(VoicePublicBaseUrlMissingError);
+        // The specific cause the worker recorded flows into the run error.
+        expect((thrown as Error).message).toContain("spawn cloudflared ENOENT");
+        // The base guidance is still present.
+        expect((thrown as Error).message).toContain("VOICE_PUBLIC_BASE_URL");
       });
     });
   });

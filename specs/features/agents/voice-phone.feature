@@ -311,3 +311,71 @@ Feature: Voice agents: reach an agent by phone
     And a nonce registered to that child
     When an upgrade arrives on that nonce's media path
     Then the child receives the socket handle and the bytes read during the upgrade
+
+  # ---------------------------------------------------------------------------
+  # Cloudflared binary on PATH (the SDK spawns a bare `cloudflared`)
+  # ---------------------------------------------------------------------------
+  # The scenario SDK opens its quick tunnel with a bare-command spawn, a PATH
+  # lookup. Before the worker opens a tunnel it makes the cloudflared binary
+  # reachable on PATH, downloading it only as a fallback, and surfaces any
+  # failure so the run error names the real cause.
+
+  @unit
+  Scenario: cloudflared already on PATH is used as-is
+    Given a cloudflared binary is already reachable on PATH
+    When the worker ensures cloudflared is available
+    Then it uses the one on PATH and downloads nothing
+
+  @unit
+  Scenario: A present cloudflared binary is put on PATH without downloading
+    Given no cloudflared is on PATH but its binary is already present on disk
+    When the worker ensures cloudflared is available
+    Then it makes that binary reachable on PATH without downloading
+
+  @unit
+  Scenario: A missing cloudflared binary is downloaded then put on PATH
+    Given no cloudflared is on PATH and its binary is missing from disk
+    When the worker ensures cloudflared is available
+    Then it downloads the binary and makes it reachable on PATH
+
+  @unit
+  Scenario: A cloudflared download failure surfaces as a tunnel binary error
+    Given no cloudflared is on PATH and the fallback download fails
+    When the worker ensures cloudflared is available
+    Then it fails with a tunnel binary error naming the underlying cause
+
+  @unit
+  Scenario: A cloudflared download that hangs is abandoned
+    Given no cloudflared is on PATH and the fallback download never completes
+    When the worker ensures cloudflared is available
+    Then it abandons the download after the timeout and fails with a tunnel binary error
+
+  @unit
+  Scenario: An unresolvable cloudflared package surfaces as a tunnel binary error
+    Given the cloudflared package cannot be resolved
+    When the worker ensures cloudflared is available
+    Then it fails with a tunnel binary error naming the resolution failure
+
+  @unit
+  Scenario: A voice worker puts cloudflared on PATH before opening its quick tunnel
+    Given a voice worker about to open its quick tunnel
+    When it opens the tunnel
+    Then it makes cloudflared reachable on PATH before spawning the tunnel
+
+  @unit
+  Scenario: A voice worker's tunnel fails to open when the cloudflared binary is unavailable
+    Given cloudflared cannot be made reachable on PATH
+    When a voice worker tries to open its quick tunnel
+    Then it never spawns the tunnel and the open fails
+
+  @unit
+  Scenario: A failed voice tunnel boot records its reason for the phone run error
+    Given a voice worker whose quick tunnel fails to open
+    When the worker boots
+    Then it records why the tunnel failed for a later phone run to read
+
+  @unit
+  Scenario: A phone run's missing-URL error names the worker's tunnel failure reason
+    Given the worker recorded why its public URL tunnel failed to open
+    When the phone transport builds the outbound adapter with no public base URL
+    Then the run error names that recorded reason rather than a generic message

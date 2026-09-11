@@ -1,10 +1,12 @@
 import { Worker } from "node:worker_threads";
 import { createLogger } from "@langwatch/observability";
+import { SpanStatusCode } from "@opentelemetry/api";
 import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
 import { register } from "prom-client";
 import { assertRedisReady } from "~/server/app-layer/redis-readiness";
 import { getWorkerMetricsPort, isMetricsAuthorized } from "~/server/metrics";
+import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "~/server/scenarios/voice/voice-public-url-env";
 
 const logger = createLogger("langwatch:workers");
 
@@ -188,24 +190,51 @@ export async function bootVoicePublicUrlTunnel(
   ) {
     return voiceEnv.voicePublicBaseUrl;
   }
-  try {
-    const { openVoicePublicUrlTunnel } = await import(
-      "~/server/scenarios/voice/voice-public-url-tunnel"
-    );
-    const tunnel = await openVoicePublicUrlTunnel({
-      port: voiceEnv.voiceWsPort,
-    });
-    process.env.VOICE_PUBLIC_BASE_URL = tunnel.url;
-    shutdownHandles.push(() => tunnel.close());
-    logger.info({ url: tunnel.url }, "voice public URL tunnel ready");
-    return tunnel.url;
-  } catch (error) {
-    logger.error(
-      { error },
-      "voice public URL tunnel failed to open; voice runs on this worker will fail until it restarts",
-    );
-    return undefined;
-  }
+  // Trace the tunnel-mint boot so a failure lands as a recorded exception on a
+  // span, and thread the specific reason into the child's env — the eventual
+  // phone-run error then names the real cause (e.g. "spawn cloudflared ENOENT")
+  // instead of a generic "no public media URL". Lazy import to keep this file's
+  // env-load ordering intact (see startWorkers' doc comment).
+  const { getLangWatchTracer } = await import("langwatch");
+  const tracer = getLangWatchTracer("langwatch.workers.voice");
+  return tracer.withActiveSpan(
+    "voice.public_url_tunnel.boot",
+    { attributes: { "voice.ws_port": voiceEnv.voiceWsPort } },
+    async (span): Promise<string | undefined> => {
+      try {
+        const { openVoicePublicUrlTunnel } = await import(
+          "~/server/scenarios/voice/voice-public-url-tunnel"
+        );
+        const tunnel = await openVoicePublicUrlTunnel({
+          port: voiceEnv.voiceWsPort,
+        });
+        process.env.VOICE_PUBLIC_BASE_URL = tunnel.url;
+        // A prior failed boot may have left a stale reason; clear it now that a
+        // tunnel is live so a later run reads no misleading cause.
+        delete process.env[VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV];
+        shutdownHandles.push(() => tunnel.close());
+        logger.info({ url: tunnel.url }, "voice public URL tunnel ready");
+        return tunnel.url;
+      } catch (error) {
+        // Non-fatal: voice boots on EVERY worker now, so one Cloudflare/binary
+        // hiccup must not down the whole fleet's job processing. Record the
+        // cause on the span and stash it for the child so the phone-run error
+        // can name it — then continue with no public URL (voice runs on this
+        // process fail individually).
+        const reason = error instanceof Error ? error.message : String(error);
+        span.recordException(
+          error instanceof Error ? error : new Error(reason),
+        );
+        span.setStatus({ code: SpanStatusCode.ERROR, message: reason });
+        process.env[VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV] = reason;
+        logger.error(
+          { error },
+          "voice public URL tunnel failed to open; voice runs on this worker will fail until it restarts",
+        );
+        return undefined;
+      }
+    },
+  );
 }
 
 // The Twilio media listener: its own HTTP+WS server on VOICE_WS_PORT, booted

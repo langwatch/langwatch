@@ -31,6 +31,7 @@ import {
   raceAgainstUpgradeRefusal,
   requestNonceRegistration,
 } from "../voice-nonce-handoff";
+import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../voice-public-url-env";
 import {
   createVoiceSocketReceiver,
   type VoiceSocketReceiver,
@@ -235,14 +236,20 @@ export class VoicePublicBaseUrlInvalidError extends Error {
  * matching {@link VoicePublicBaseUrlInvalidError} directly above.
  */
 export class VoicePublicBaseUrlMissingError extends Error {
-  constructor(source: PublicBaseUrlSource | "none") {
+  constructor(source: PublicBaseUrlSource | "none", reason?: string) {
+    // When the worker recorded WHY it minted no tunnel (its cloudflared tunnel
+    // boot failed), name that real cause — otherwise the run error is a generic
+    // "no public media URL" that hides a "spawn cloudflared ENOENT" behind it.
+    const reasonSuffix = reason
+      ? ` The worker's public URL tunnel failed to open: ${reason}`
+      : "";
     super(
       `No public media URL for the outbound phone call (VOICE_PUBLIC_BASE_URL ` +
         `unset, resolved source: ${source}). The app's BASE_HOST runs no voice ` +
         `media listener, so Twilio would dial a URL nothing answers and the ` +
         `call would fail with error 31920 after a 120s timeout. Set ` +
         `VOICE_PUBLIC_BASE_URL, or ensure cloudflared is installed so the ` +
-        `worker can mint a tunnel at boot.`,
+        `worker can mint a tunnel at boot.${reasonSuffix}`,
     );
     this.name = "VoicePublicBaseUrlMissingError";
   }
@@ -514,11 +521,20 @@ function buildPhoneAgentAdapter(
       // rather than dial into a 120s timeout.
       if (!resolvedBaseUrl || resolvedBaseUrl.source === "BASE_HOST") {
         const source = resolvedBaseUrl?.source ?? "none";
+        // The worker threads WHY its tunnel mint failed through this env var
+        // (set at boot, forwarded by child-environment.ts), read from the same
+        // env the base URL was resolved from so a test's injected env is honored.
+        const reason = (deps.processEnv ?? process.env)[
+          VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV
+        ]?.trim();
         logger.error(
-          { agentId, streamBaseUrlSource: source },
+          { agentId, streamBaseUrlSource: source, reason },
           "no voice public base URL for outbound call; refusing to dial",
         );
-        throw new VoicePublicBaseUrlMissingError(source);
+        throw new VoicePublicBaseUrlMissingError(
+          source,
+          reason && reason.length > 0 ? reason : undefined,
+        );
       }
       span.setAttribute("voice.twilio.stream_base_url", resolvedBaseUrl.value);
       span.setAttribute(
