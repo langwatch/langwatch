@@ -309,6 +309,12 @@ func (m model) outcome(r row) string {
 	case len(r.st.Candidates) > 1:
 		return prefix + command + havenui.Muted.Render("  ←/→")
 	}
+	// A missing entry's Observed is empty for everything probed by looking,
+	// so this only ever carries the extra a self-answered row needs — the
+	// shell config the PATH row is about to append one line to.
+	if r.st.Observed != "" {
+		return prefix + command + havenui.Muted.Render("  "+r.st.Observed)
+	}
 	return prefix + command
 }
 

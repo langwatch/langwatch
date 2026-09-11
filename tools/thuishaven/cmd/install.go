@@ -78,20 +78,16 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 	// be seen.
 	if !anyActionable(report) {
 		printPrereqReportWithPosture(os.Stdout, report, resolvedPosture(ctx, d), painterFor(d.isAgent))
-		reportHavenPath(ctx, d, os.Stdout)
 		return nil
 	}
 	if inv.has("--yes") {
-		reportHavenPath(ctx, d, os.Stdout)
 		return installAuto(ctx, d, report)
 	}
 	if !installCanAsk(d.isAgent, stdoutIsTTY(), stdinIsTTY()) {
 		printPrereqReportWithPosture(os.Stdout, report, resolvedPosture(ctx, d), painterFor(d.isAgent))
-		reportHavenPath(ctx, d, os.Stdout)
 		printNonInteractiveHint(os.Stdout, report)
 		return nil
 	}
-	reportHavenPath(ctx, d, os.Stdout)
 	return installInteractive(ctx, d, report)
 }
 
@@ -310,6 +306,12 @@ func prereqCommand(st domain.PrereqStatus) string {
 		// A choice reported as one command would hide the alternative, and
 		// this is the only place a pipe reader ever sees it.
 		return command + "   (or: haven install " + st.Key + "=" + otherCandidate(st.Prereq, candidate) + ")"
+	}
+	// Only a self-answered row carries an Observed while still missing — the
+	// shell config the PATH row would append to. Naming it is the difference
+	// between an instruction and a hint.
+	if st.Observed != "" {
+		return command + " in " + st.Observed
 	}
 	return command
 }

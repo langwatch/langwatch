@@ -69,6 +69,11 @@ type Candidate struct {
 	// redis-server as installed — and then `haven up` fails with "redis is
 	// not installed", which is the contradiction this check exists to prevent.
 	FormulaIsAuthority bool
+	// Internal marks a candidate haven installs ITSELF rather than by running
+	// a command — adding a line to a shell config, say. Install then reads as
+	// a description of what will happen, not as a shell command, and the app
+	// layer routes it by key the way it routes portless through the proxy.
+	Internal bool
 	// Declines marks a candidate that is an answer rather than a thing to
 	// install — "none, keep this machine container-free". Choosing it records
 	// a decision and settles the prerequisite, so the question stops being
@@ -100,6 +105,11 @@ type Candidate struct {
 func (c Candidate) InstallOn(goos string) (command, manual string) {
 	if c.Install == "" {
 		return "", c.Manual
+	}
+	// An internal candidate is haven's own work, so no platform can be
+	// missing the tool for it.
+	if c.Internal {
+		return c.Install, ""
 	}
 	if goos != "darwin" && strings.HasPrefix(c.Install, "brew ") {
 		return "", "install " + c.Label + " with your platform's package manager (haven's own command, `" + c.Install + "`, is macOS's)"
@@ -142,6 +152,26 @@ func (p Prereq) Manual() bool {
 // pins it — because OrderPrereqs sorts by it rather than re-deriving a
 // topological sort at runtime.
 var Prereqs = []Prereq{{
+	// Being able to RUN haven is the prerequisite none of the others can
+	// express, and it used to be reported as a dim line under the report —
+	// which read as a remark rather than something you could act on. It is a
+	// row like the rest now, and ticking it does the thing.
+	Key:         "haven-path",
+	Name:        "haven on PATH",
+	Summary:     "run `haven` from anywhere, instead of `make haven …` from the repo",
+	Requirement: PrereqRecommended,
+	Detail: "`go install` puts the binary in the Go bin directory (GOBIN, or\n" +
+		"    GOPATH/bin). If that directory is not on your PATH the name `haven`\n" +
+		"    resolves to nothing, and every command has to go through make from\n" +
+		"    inside the repo. Ticking this appends one attributed line to your\n" +
+		"    shell's config; it changes nothing else, and you can delete it.",
+	Candidates: []Candidate{{
+		Key:      "haven-path",
+		Label:    "add the line to your shell config",
+		Internal: true,
+		Install:  "add haven to PATH",
+	}},
+}, {
 	Key:         "brew",
 	Name:        "Homebrew",
 	Summary:     "the package manager haven installs and runs everything else through",

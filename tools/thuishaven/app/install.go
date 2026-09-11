@@ -66,6 +66,9 @@ func (o *Orchestrator) probeCandidate(ctx context.Context, c domain.Candidate) d
 	if c.Key == "portless" {
 		return o.probePortless()
 	}
+	if c.Key == "haven-path" {
+		return o.probeHavenPath(ctx)
+	}
 	if c.FormulaIsAuthority {
 		// haven starts this one with `brew services`, so brew's answer is the
 		// only one that predicts whether it can. A binary on PATH from
@@ -100,6 +103,27 @@ func (o *Orchestrator) probeFormula(ctx context.Context, c domain.Candidate) dom
 	}
 	name, ok := o.prereqTools().FormulaInstalled(ctx, c.Formula)
 	return domain.Found{Present: ok, Detail: name}
+}
+
+// probeHavenPath answers whether `haven` resolves by name, in the
+// present/absent shape the catalogue speaks.
+//
+// The unknown-shell case reports PRESENT, deliberately. haven cannot edit a
+// shell it does not know the syntax of, so offering a row that ticking
+// cannot satisfy would be a question with no answer; that case keeps its
+// printed instruction instead.
+func (o *Orchestrator) probeHavenPath(ctx context.Context) domain.Found {
+	p := o.CheckHavenPath(ctx)
+	switch p.State {
+	case domain.HavenPathReady:
+		return domain.Found{Present: true, Detail: p.BinDir}
+	case domain.HavenPathPending:
+		return domain.Found{Present: true, Detail: "restart your shell — " + p.RCPath + " already adds it"}
+	case domain.HavenPathManual:
+		return domain.Found{Present: true, Detail: "add it by hand: " + p.Line}
+	default:
+		return domain.Found{Detail: p.RCPath}
+	}
 }
 
 // probePortless folds the proxy's two questions — is one resolvable, and is
@@ -232,6 +256,9 @@ func (o *Orchestrator) runPrereqInstall(ctx context.Context, p domain.Prereq, co
 		}
 		return o.proxy.Install()
 	}
+	if p.Key == "haven-path" {
+		return o.AddHavenPath(o.CheckHavenPath(ctx))
+	}
 	return o.prereqTools().Install(ctx, command)
 }
 
@@ -354,6 +381,14 @@ func AutoPrereqs(report []domain.PrereqStatus) []domain.Chosen {
 		candidate := st.Via
 		if candidate == "" {
 			candidate = domain.DefaultChoice(st.Prereq)
+		}
+		// An internal entry is haven editing the developer's own files — the
+		// PATH line in a shell config. Installing software because nobody
+		// said no is one thing; rewriting someone's .zshrc from a script
+		// with no terminal attached is another, and the spec has always
+		// refused it. It stays a tick, or an explicitly named argument.
+		if c, ok := domain.LookupCandidate(st.Prereq, candidate); ok && c.Internal {
+			continue
 		}
 		chosen = append(chosen, domain.Chosen{Key: st.Key, Candidate: candidate})
 	}

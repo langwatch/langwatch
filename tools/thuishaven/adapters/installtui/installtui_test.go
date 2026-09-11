@@ -92,12 +92,34 @@ func TestConfirmingReturnsTheTickedEntriesInInstallOrder(t *testing.T) {
 	if len(res.Install) == 0 {
 		t.Fatal("the pre-ticked entries must come back")
 	}
-	if res.Install[0].Key != "brew" {
-		t.Errorf("first install = %q, want brew — the picker returns install order", res.Install[0].Key)
+	order := map[string]int{}
+	for i, c := range res.Install {
+		order[c.Key] = i
+	}
+	for _, after := range []string{"node", "pnpm", "redis"} {
+		if order["brew"] > order[after] {
+			t.Errorf("brew must come before %s — the picker returns install order, got %v", after, res.Install)
+		}
 	}
 	for _, c := range res.Install {
 		if c.Key == "clickhouse-client" {
 			t.Error("an unticked optional entry must not be installed")
+		}
+	}
+}
+
+// Declining the PATH row is simply not ticking it. Nothing about the
+// developer's shell config is touched by a run they did not ask for.
+// @scenario "Go bin dir missing from PATH, user declines"
+func TestAnUntickedPathRowChangesNothing(t *testing.T) {
+	m := cursorTo(t, newModel(missingEverything()), "haven-path")
+	if !rowFor(t, m, "haven-path").ticked {
+		t.Fatal("the PATH row should start ticked — it is the one the developer just made necessary")
+	}
+	m = press(m, " ") // untick it
+	for _, c := range press(m, "enter").result().Install {
+		if c.Key == "haven-path" {
+			t.Error("an unticked PATH row must not edit anything")
 		}
 	}
 }

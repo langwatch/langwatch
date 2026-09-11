@@ -252,9 +252,10 @@ func TestCandidateKeysAreUnique(t *testing.T) {
 func TestEveryCandidateIsProbeable(t *testing.T) {
 	for _, p := range Prereqs {
 		for _, c := range p.Candidates {
-			if c.Declines {
-				// A declining candidate is an answer, not a thing to find.
-				// It is settled by being chosen, never by being probed.
+			if c.Declines || c.Internal {
+				// A declining candidate is an answer, not a thing to find,
+				// and an internal one is probed by haven's own code rather
+				// than by looking for a binary.
 				continue
 			}
 			if len(c.Binaries) == 0 && c.Formula == "" && p.Key != "portless" {
