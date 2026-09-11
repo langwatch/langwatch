@@ -446,3 +446,180 @@ the product should default to as well.
 The output of that pass should be: which thresholds survive contact with more
 data, which signals turn out to be one person's habit, and what shows up that is
 not in section 4 at all.
+
+---
+
+## 11. Follow-up: one month, 16,980 turns, 240 sessions
+
+Section 10 said every threshold above was a guess wearing a real number. So the
+sample was widened: **every coding-agent trace on this account for 31 days** —
+16,980 of 16,983, 11 Aug to 11 Sep, **$31,918.86**. Carry ratio holds at
+**406:1**, and cache reads are **98.3%** of all input tokens. Five of the six
+signal families survive. The headline does not.
+
+### 11.1 Spend is a power law, and one session was 42% of the month
+
+| | sessions | share of spend |
+|---|---:|---:|
+| top 1% | 2 | **48.7%** |
+| top 5% | 12 | 62.9% |
+| top 10% | 24 | 73.4% |
+| top 25% | 60 | 87.3% |
+
+Median session: **$25.31**. Largest single session: **$13,529.07** — 42% of the
+month, on its own. Median turn: $0.20. Largest turn: $85.65.
+
+### 11.2 The dominant pattern is sessions that never end
+
+| session wall-clock | sessions | share of spend |
+|---|---:|---:|
+| under 1h | 96 (40.0%) | 2.6% |
+| 1–8h | 93 (38.8%) | 22.5% |
+| 8–24h | 28 (11.7%) | 17.5% |
+| 1–3 days | 13 (5.4%) | 5.9% |
+| **over 3 days** | **10 (4.2%)** | **51.5%** |
+
+Ten sessions, four percent of the population, hold more than half the spend.
+
+The $13,529 session ran from 28 Aug to 10 Sep — **fourteen days**, 6,161 turns,
+637 errors, seven models. Day by day it cost between $298 and $1,699. **No single
+day looks alarming. Only the total does.** That is precisely why a human never
+catches it, and it is the strongest argument in this document for background
+detection.
+
+It also breaks the obvious detector. Its context peaked at **985.8k** on day 3 —
+against a 1M window — and then *fell back to about 560k and stayed there* for
+eleven more days as compaction did its job. A context-growth alarm would have
+fired once, been satisfied, and gone quiet while the session spent another
+$11,000. **`context.unbounded_growth` is necessary and nowhere near sufficient.**
+
+### 11.3 The single most actionable number in the whole analysis
+
+A plain per-session cumulative spend threshold:
+
+| threshold | fires on | those sessions hold | spend accrued *past* the line |
+|---|---:|---:|---:|
+| $50 | 87 (36.3%) | 92.9% | $25,299 |
+| $100 | 48 (20.0%) | 83.9% | $21,996 |
+| **$250** | **20 (8.3%)** | **70.6%** | **$17,530** |
+| $500 | 8 (3.3%) | 57.7% | $14,432 |
+| $1,000 | 2 (0.8%) | 46.0% | $12,696 |
+
+At $250 it fires twenty times in a month — roughly five a week, entirely
+reasonable — and $17,530 of this month's spend happened after those sessions
+crossed it. No modelling, no inference, no new capture. A running total and a
+number.
+
+### 11.4 Peak context predicts cost better than anything else measured
+
+| peak context | sessions | share of spend |
+|---|---:|---:|
+| over 900k | 7 | **46.1%** |
+| 700–900k | 13 | 14.0% |
+| 500–700k | 38 | 24.0% |
+| 300–500k | 58 | 11.6% |
+| under 300k | 124 | 4.3% |
+
+Half the population never passes 300k and accounts for one twenty-third of the
+bill. Three sessions hit `prompt is too long: 1,000,497 tokens > 1,000,000` —
+they ran the window to its literal ceiling.
+
+### 11.5 The "turn" is the wrong unit, and it is hiding the real one
+
+The trace population is sharply bimodal:
+
+| | n | median duration | median output | median cost | share of spend |
+|---|---:|---:|---:|---:|---:|
+| heavy (>60s or >5k output) | 3,318 | — | — | — | **92.6%** |
+| light | 13,662 | 4s | 77 tokens | $0.07 | 7.4% |
+
+Four fifths of what the product calls a trace is a sub-agent call, a permission
+classifier or a one-line reply. **The entire month reduces to 2,013 heavy Opus
+turns costing $19,811 — 62% of everything.** Any per-turn average computed over
+the whole population is meaningless, and any UI that lists "turns" without
+separating these is showing noise at 80% density.
+
+### 11.6 A warning: do not build a signal on the trace error field
+
+11% of turns carry an error, and they hold 64.6% of spend — which looks
+spectacular and means almost nothing:
+
+| | median duration | median output | median cache-read |
+|---|---:|---:|---:|
+| errored | 528s | 37,950 | 12.35M |
+| clean | 4s | 77 | 0.21M |
+
+The error field marks *long agentic turns*, because a multi-minute turn almost
+always contains at least one failing command somewhere in it. It is confounded
+with turn size. A detector built on it would measure length and call it waste.
+
+That said, the composition is worth reading on its own terms: **1,064 shell
+command failures and 614 worktree-guard refusals** in a month. Those are turns
+where our own local tooling blocked the agent. The guard refusal is not
+hypothetical — it blocked every `git` call in this very session until the binary
+was invoked by absolute path.
+
+### 11.7 Cache rebuild after an idle gap is real, and it is 11.6×
+
+Mean cache **write** on a turn, bucketed by the gap before it:
+
+| gap before the turn | turns | mean cache write |
+|---|---:|---:|
+| under 1 min | 6,230 | 25.7k |
+| 1–5 min | 2,149 | 98.9k |
+| 5–60 min | 2,405 | 96.7k |
+| **over 60 min** | **137** | **298.7k** |
+
+The cache expires, so walking away and coming back means paying to rebuild the
+prefix. `context.idle_hold` now has a price.
+
+### 11.8 Nobody is watching, and the spend does not care
+
+Spend by hour of day is nearly flat: low of $739 at 07:00 UTC, high of $1,884 at
+12:00. Roughly **35% of the month's spend lands between midnight and 08:00 UTC**.
+These agents run around the clock. A recommendation that only reaches a human
+during working hours misses a third of the problem, which is the argument for
+delivering into the agent's own context rather than a dashboard.
+
+### 11.9 The verification tier would already have something to report
+
+| week | spend | carry ratio | Opus share |
+|---|---:|---:|---:|
+| 10 Aug | $4,667 | 410:1 | 43.4% |
+| 17 Aug | $6,940 | 425:1 | 53.1% |
+| 24 Aug | $7,083 | 476:1 | 83.2% |
+| 31 Aug | $9,204 | 392:1 | 70.2% |
+| 7 Sep | $4,025 | **333:1** | 64.4% |
+
+Opus share fell from 83.2% to 64.4% and carry ratio from 476:1 to 333:1 across
+the last three weeks, as Sonnet and Fable took a growing share. The behaviour
+change is already visible in the data. Nothing in the product says so, and
+nobody would know the protocol worked without running this analysis by hand —
+which is the whole thesis.
+
+### 11.10 What changes in the design
+
+- **Add a family, `spend.*`, and lead with it.** Cumulative session spend,
+  session lifetime, and burn rate per hour. On this month it beats every
+  behavioural signal for both simplicity and yield.
+- **`context.unbounded_growth` is demoted.** Keep it, but peak context is better
+  used as a *cohort* marker than an alarm, and it is blind to the plateau case
+  that cost the most.
+- **Separate heavy turns from light calls everywhere** — in signals, in
+  aggregates and in the UI.
+- **Do not use the trace error field as a waste signal.** Use tool-span
+  `success` instead, which is not confounded with turn length.
+- **Add local tooling friction as a cost centre.** 1,678 turns hit a shell
+  failure or a local guard this month.
+- **Per-turn cost does not compound; sessions do.** Turn 1 averages $5.70 and
+  turn 128+ averages $1.30. The compounding is in session length and count.
+
+### 11.11 Still outstanding
+
+This is still **one person, one project**. Cross-project and per-teammate
+comparison needs an organization API key — the device login carries a project
+key, and `projects list` refuses it with *"This endpoint needs an organization
+API key"*. Given one, the same two scripts run unchanged
+(`analyse.mjs`, `analyse2.mjs`) and would answer the question this pass cannot:
+which of the eleven patterns above are LangWatch-wide, and which are one
+person's habits.
