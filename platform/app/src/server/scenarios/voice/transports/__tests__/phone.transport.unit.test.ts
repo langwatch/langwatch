@@ -20,6 +20,7 @@ import {
   type TwilioAdapterLike,
   type TwilioAgentFactory,
   VoicePhoneTransportUnavailableError,
+  VoicePublicBaseUrlMissingError,
 } from "../phone.transport";
 
 const twilioAgentMock = vi.hoisted(() => vi.fn());
@@ -565,8 +566,11 @@ describe("phoneTransport", () => {
     });
 
     describe("when VOICE_PUBLIC_BASE_URL is unset", () => {
-      /** @scenario "VOICE_PUBLIC_BASE_URL is optional and falls back to the app's public base host" */
-      it("falls back to the app's own base host", () => {
+      // The resolver HELPER still reports BASE_HOST (and its source), which is
+      // how the phone transport detects and then refuses it — see the
+      // "no public media URL" fail-fast block below. This asserts the helper's
+      // reporting behavior, not that a real call is allowed to use it.
+      it("still reports the app's own base host from the resolver helper", () => {
         expect(
           resolvePublicBaseUrl({ BASE_HOST: "https://app.example.com" }),
         ).toBe("https://app.example.com");
@@ -642,6 +646,59 @@ describe("phoneTransport", () => {
     });
   });
 
+  describe("given a phone target but no public media URL the worker answers", () => {
+    describe("when only the app's BASE_HOST is set", () => {
+      /** @scenario "A phone run fails fast when only the app's base host is available" */
+      it("refuses to build the adapter, naming VOICE_PUBLIC_BASE_URL and the cloudflared remedy, and never dials", () => {
+        const adapter = fakeAdapter();
+        const { transport, factoryOptions } = buildTransport({
+          adapter,
+          processEnv: { BASE_HOST: "https://app.langwatch.ai" },
+        });
+
+        let thrown: unknown;
+        try {
+          transport.createAgentAdapter({
+            agentId: TARGET,
+            credential: TWILIO_CREDENTIAL,
+            maxCallSeconds: 120,
+          });
+        } catch (error) {
+          thrown = error;
+        }
+
+        expect(thrown).toBeInstanceOf(VoicePublicBaseUrlMissingError);
+        expect((thrown as Error).message).toContain("VOICE_PUBLIC_BASE_URL");
+        expect((thrown as Error).message).toContain("cloudflared");
+        // The adapter was never built, so the SDK factory never ran and no dial
+        // could have gone out against the app's own host.
+        expect(factoryOptions).toHaveLength(0);
+        expect(adapter.placeCallArgs).toHaveLength(0);
+      });
+    });
+
+    describe("when neither VOICE_PUBLIC_BASE_URL nor BASE_HOST is set", () => {
+      /** @scenario "A phone run fails fast when no public base URL is available at all" */
+      it("refuses to build the adapter rather than dialling a URL nothing answers", () => {
+        const adapter = fakeAdapter();
+        const { transport, factoryOptions } = buildTransport({
+          adapter,
+          processEnv: {},
+        });
+
+        expect(() =>
+          transport.createAgentAdapter({
+            agentId: TARGET,
+            credential: TWILIO_CREDENTIAL,
+            maxCallSeconds: 120,
+          }),
+        ).toThrow(VoicePublicBaseUrlMissingError);
+        expect(factoryOptions).toHaveLength(0);
+        expect(adapter.placeCallArgs).toHaveLength(0);
+      });
+    });
+  });
+
   describe("given the child's SDK adapter http port", () => {
     describe("when the phone transport builds the SDK adapter", () => {
       /** @scenario "A phone call's scenario child never binds the worker's media port" */
@@ -675,6 +732,7 @@ describe("phoneTransport", () => {
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
         const transport = createPhoneTransport({
+          processEnv: { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
           registerNonce: autoAckRegisterNonce,
           raceUpgradeRefusal: identityRaceUpgradeRefusal,
         });
@@ -698,6 +756,7 @@ describe("phoneTransport", () => {
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
         const transport = createPhoneTransport({
+          processEnv: { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
           registerNonce: autoAckRegisterNonce,
           raceUpgradeRefusal: identityRaceUpgradeRefusal,
         });
@@ -724,6 +783,7 @@ describe("phoneTransport", () => {
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
         const transport = createPhoneTransport({
+          processEnv: { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
           registerNonce: autoAckRegisterNonce,
           raceUpgradeRefusal: identityRaceUpgradeRefusal,
         });
@@ -757,6 +817,7 @@ describe("phoneTransport", () => {
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
         const transport = createPhoneTransport({
+          processEnv: { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
           registerNonce: autoAckRegisterNonce,
           raceUpgradeRefusal: identityRaceUpgradeRefusal,
         });

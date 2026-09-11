@@ -99,10 +99,16 @@ Feature: Voice agents: reach an agent by phone
     Then it returns nothing and the drawer shows no whole-call player
 
   @unit
-  Scenario: VOICE_PUBLIC_BASE_URL is optional and falls back to the app's public base host
-    Given VOICE_PUBLIC_BASE_URL is not set
-    When the runner resolves the public base URL
-    Then it uses the app's own public base host, and a set VOICE_PUBLIC_BASE_URL overrides it
+  Scenario: A phone run fails fast when only the app's base host is available
+    Given VOICE_PUBLIC_BASE_URL is not set but the app's BASE_HOST is
+    When the phone transport builds the outbound adapter
+    Then it refuses to build the adapter and fails the run, naming the missing VOICE_PUBLIC_BASE_URL and the cloudflared tunnel remedy rather than dialling the app's own host, which runs no voice media listener
+
+  @unit
+  Scenario: A phone run fails fast when no public base URL is available at all
+    Given neither VOICE_PUBLIC_BASE_URL nor BASE_HOST is set
+    When the phone transport builds the outbound adapter
+    Then it refuses to build the adapter and fails the run rather than dialling a URL nothing answers
 
   @unit
   Scenario: A phone call's scenario child never binds the worker's media port
