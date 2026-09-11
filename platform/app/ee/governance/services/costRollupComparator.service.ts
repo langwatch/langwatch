@@ -19,6 +19,7 @@ import {
   governanceCostRollupKey,
   governanceCostRollupTotals,
 } from "../projections/governanceCostRollup.foldProjection";
+import type { ComparedCostSource } from "./costRollupComparatorSchedule";
 import type {
   GovernanceCostRollupClickHouseRepository,
   GovernanceCostRollupRow,
@@ -31,15 +32,19 @@ const logger = createLogger("langwatch:governance:cost-rollup:comparator");
 export const COST_ROLLUP_COMPARATOR_TARGET_TYPE =
   "governanceCostRollupComparator" as const;
 
-/** Which events each lane is derived from. */
+/**
+ * Which events each compared lane is derived from.
+ *
+ * Keyed by `ComparedCostSource` rather than by every lane the table knows:
+ * the compiler then refuses a lane that gets an entry but no events, and a
+ * lane with events but no entry, so the schedule and the check cannot drift
+ * apart. The metered lane is absent on purpose — the summary is never written
+ * with its cells, so there is nothing to hold its events against.
+ */
 export const COST_SOURCE_EVENT_TYPES: Record<
-  GovernanceCostSource,
+  ComparedCostSource,
   readonly string[]
 > = {
-  [GOVERNANCE_COST_SOURCE.GATEWAY]: [
-    "lw.gateway.spend.confirmed",
-    "lw.gateway.spend.failed",
-  ],
   // The retraction is here for the same reason the observation is: the check
   // re-derives a day by folding the events that fall inside it, and a fold
   // that never sees the retraction re-derives the amount the retraction
@@ -71,7 +76,7 @@ export interface CostRollupCellMismatch {
 
 export interface CostRollupComparison {
   day: string;
-  costSource: GovernanceCostSource;
+  costSource: ComparedCostSource;
   mismatches: CostRollupCellMismatch[];
   lagMs: number;
 }
@@ -101,7 +106,7 @@ export class CostRollupComparatorService {
   }: {
     tenantId: string;
     day: string;
-    costSource: GovernanceCostSource;
+    costSource: ComparedCostSource;
   }): Promise<CostRollupComparison> {
     const eventTypes = COST_SOURCE_EVENT_TYPES[costSource];
 

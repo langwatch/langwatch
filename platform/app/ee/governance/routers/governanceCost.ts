@@ -91,6 +91,8 @@ export const governanceCostRouter = createTRPCRouter({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
+        gatewaySpend: getApp().governance.gatewaySpend,
+        projects: getApp().governance.projects,
       });
       return await service.summary({
         organizationId: input.organizationId,
@@ -119,6 +121,8 @@ export const governanceCostRouter = createTRPCRouter({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
+        gatewaySpend: getApp().governance.gatewaySpend,
+        projects: getApp().governance.projects,
       });
       return await service.dailyByProvider({
         organizationId: input.organizationId,
@@ -147,6 +151,8 @@ export const governanceCostRouter = createTRPCRouter({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
+        gatewaySpend: getApp().governance.gatewaySpend,
+        projects: getApp().governance.projects,
       });
       return await service.spendByModel({
         organizationId: input.organizationId,
@@ -196,6 +202,8 @@ export const governanceCostRouter = createTRPCRouter({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
+        gatewaySpend: getApp().governance.gatewaySpend,
+        projects: getApp().governance.projects,
       });
       return await service.periodRecords({
         organizationId: input.organizationId,
@@ -224,6 +232,8 @@ export const governanceCostRouter = createTRPCRouter({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
+        gatewaySpend: getApp().governance.gatewaySpend,
+        projects: getApp().governance.projects,
       });
       return await service.spenderBreakdown({
         organizationId: input.organizationId,

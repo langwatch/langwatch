@@ -12,13 +12,47 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { describe, expect, it, vi } from "vitest";
+import type { ProjectRepository } from "~/server/app-layer/projects/repositories/project.repository";
 import { GovernanceCostService } from "../governanceCost.service";
 import type { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
+import type { GovernanceGatewaySpendClickHouseRepository } from "../governanceGatewaySpend.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../governanceOcsfEvents.clickhouse.repository";
 
 type LaneRow = Awaited<
   ReturnType<GovernanceCostRollupClickHouseRepository["sumDaysByLane"]>
 >[number];
+
+type GatewayDayRow = Awaited<
+  ReturnType<
+    GovernanceGatewaySpendClickHouseRepository["sumDaysForOrganizationProjects"]
+  >
+>[number];
+
+/** One metered day, priced and complete unless said otherwise. */
+function gatewayDay(overrides: Partial<GatewayDayRow> = {}): GatewayDayRow {
+  return {
+    day: "2026-08-01",
+    amountNanoUsd: 0,
+    requestCount: 0,
+    requestsWithoutAmount: 0,
+    ...overrides,
+  };
+}
+
+/**
+ * The metered-lane ledger read, absent unless a test supplies days. Defaults
+ * to no metered spend, which is the shape of every test that says nothing
+ * about the gateway.
+ */
+function gatewayReturning(
+  days: GatewayDayRow[] = [],
+): GovernanceGatewaySpendClickHouseRepository {
+  return {
+    sumDaysForOrganizationProjects: vi.fn().mockResolvedValue(days),
+    sumWindowByModel: vi.fn().mockResolvedValue([]),
+    sumWindowByVirtualKey: vi.fn().mockResolvedValue([]),
+  } as unknown as GovernanceGatewaySpendClickHouseRepository;
+}
 
 /**
  * One currency's window total for a lane, as the per-currency read answers it.
@@ -102,13 +136,38 @@ function ocsfReturning(rows: SeatRow[]) {
   } as unknown as GovernanceOcsfEventsClickHouseRepository;
 }
 
-/** The service with the seat read absent unless a test supplies one. */
+/**
+ * The project repository, answering the organization's project ids — the
+ * scope of the metered ledger read. Defaults to two projects, so a test that
+ * says nothing about scope still exercises the multi-project fan-out. Only the
+ * one method the service calls is stubbed.
+ */
+function projectsReturning(
+  organizationProjectIds: string[] = ["proj-a", "proj-b"],
+): ProjectRepository {
+  return {
+    findAllIdsByOrganization: vi.fn().mockResolvedValue(organizationProjectIds),
+  } as unknown as ProjectRepository;
+}
+
+/**
+ * The service with the seat read absent unless a test supplies one, and the
+ * metered ledger defaulting to no spend. A test that only cares about the
+ * billed lane gets an empty gateway read for free.
+ */
 function createService(deps: {
   prisma: Parameters<typeof GovernanceCostService.create>[0]["prisma"];
   costRollup: GovernanceCostRollupClickHouseRepository | undefined;
   ocsfEvents?: GovernanceOcsfEventsClickHouseRepository | undefined;
+  gatewaySpend?: GovernanceGatewaySpendClickHouseRepository | undefined;
+  projects?: ProjectRepository;
 }) {
-  return GovernanceCostService.create({ ocsfEvents: undefined, ...deps });
+  return GovernanceCostService.create({
+    ocsfEvents: undefined,
+    gatewaySpend: deps.costRollup ? gatewayReturning() : undefined,
+    projects: projectsReturning(),
+    ...deps,
+  });
 }
 
 /**
@@ -321,15 +380,22 @@ describe("GovernanceCostService.summary", () => {
   describe("given both lanes reporting different totals", () => {
     describe("when requesting the summary", () => {
       it("keeps each lane's figure in its own lane", async () => {
+        // The billed lane comes from the rollup; the metered lane comes from
+        // the gateway's own ledger, NOT the rollup. A gateway row left in the
+        // rollup must never reach the metered figure.
         const rollup = rollupReturning({
-          rows: [
-            laneRow({ costSource: "pulled", amountNanoUsd: 12 * NANO }),
-            laneRow({ costSource: "gateway", amountNanoUsd: 7 * NANO }),
-          ],
+          rows: [laneRow({ costSource: "pulled", amountNanoUsd: 12 * NANO })],
         });
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollup,
+          gatewaySpend: gatewayReturning([
+            gatewayDay({
+              day: "2026-08-01",
+              amountNanoUsd: 7 * NANO,
+              requestCount: 1,
+            }),
+          ]),
         });
 
         const result = await service.summary({
@@ -384,10 +450,13 @@ describe("GovernanceCostService.summary", () => {
           now: new Date("2026-08-10T00:00:00.000Z"),
         });
 
+        // Pulled only: the billed day series must never count a gateway row
+        // the retired fold left in the rollup.
         expect(rollup.sumDaysByLane).toHaveBeenCalledWith({
           tenantId: "gov-1",
           fromDay: "2026-08-04",
           toDay: "2026-08-10",
+          costSource: "pulled",
         });
       });
     });
@@ -516,11 +585,6 @@ describe("GovernanceCostService.summary", () => {
                 amountNanoUsd: 60 * NANO,
                 cellsWithoutAmount: 2,
               }),
-              laneRow({
-                day: "2026-08-01",
-                costSource: "gateway",
-                amountNanoUsd: 7 * NANO,
-              }),
               // The same shape of day under the new rule: every cell carries
               // an amount, some of them in euros. The dollar figure is real
               // and stands, and the day says the euros are not in it.
@@ -533,6 +597,15 @@ describe("GovernanceCostService.summary", () => {
               }),
             ],
           }),
+          // The metered lane's day, from the ledger — a complete point that
+          // keeps its figure while the billed day beside it is gapped.
+          gatewaySpend: gatewayReturning([
+            gatewayDay({
+              day: "2026-08-01",
+              amountNanoUsd: 7 * NANO,
+              requestCount: 1,
+            }),
+          ]),
         });
 
         const result = await service.summary({
@@ -763,6 +836,135 @@ describe("GovernanceCostService.summary", () => {
           day.billedByCurrency.map((line) => line.previousAmount),
         ).not.toContain(22);
       });
+    });
+  });
+
+  describe("given metered spend recorded in the gateway ledger", () => {
+    /** @scenario "The metered lane counts gateway spend from every project of the organization" */
+    it("reads the ledger across every project tenant of the organization", async () => {
+      const gateway = gatewayReturning([
+        gatewayDay({
+          day: "2026-08-01",
+          amountNanoUsd: 3 * NANO,
+          requestCount: 1,
+        }),
+        gatewayDay({
+          day: "2026-08-02",
+          amountNanoUsd: 4 * NANO,
+          requestCount: 1,
+        }),
+      ]);
+      const projects = projectsReturning(["proj-a", "proj-b"]);
+      const service = createService({
+        prisma: prismaWithGovProject("gov-1"),
+        costRollup: rollupReturning({ rows: [] }),
+        gatewaySpend: gateway,
+        projects,
+      });
+
+      const result = await service.summary({
+        organizationId: "org-1",
+        windowDays: 7,
+        now: new Date("2026-08-07T12:00:00.000Z"),
+      });
+
+      // The lane is the sum of the ledger's days, across the org's projects —
+      // NOT the governance tenant the rollup reads under. The ids come from
+      // the project repository, never from Prisma in this layer.
+      expect(result.gateway.amountUsd).toBe(7);
+      expect(projects.findAllIdsByOrganization).toHaveBeenCalledWith({
+        organizationId: "org-1",
+      });
+      expect(gateway.sumDaysForOrganizationProjects).toHaveBeenCalledWith({
+        tenantIds: ["proj-a", "proj-b"],
+        fromDay: "2026-08-01",
+        toDay: "2026-08-07",
+      });
+      // Both lanes keep their own figure in their own place.
+      expect(result.series).toEqual([
+        expect.objectContaining({ day: "2026-08-01", gatewayUsd: 3 }),
+        expect.objectContaining({ day: "2026-08-02", gatewayUsd: 4 }),
+      ]);
+    });
+
+    /** @scenario "Requests with no dollar amount are counted beside the metered total, not inside it" */
+    it("shows the priced total and counts the requests with no dollar amount beside it", async () => {
+      const service = createService({
+        prisma: prismaWithGovProject("gov-1"),
+        costRollup: rollupReturning({ rows: [] }),
+        gatewaySpend: gatewayReturning([
+          gatewayDay({
+            day: "2026-08-01",
+            amountNanoUsd: 10 * NANO,
+            requestCount: 3,
+            requestsWithoutAmount: 2,
+          }),
+        ]),
+      });
+
+      const result = await service.summary({
+        organizationId: "org-1",
+        windowDays: 30,
+        now: new Date("2026-08-01T12:00:00.000Z"),
+      });
+
+      // The total is the priced requests only. The count rides beside it,
+      // never inside it, and the metered lane still shows its total when the
+      // count is above zero — the deliberate deviation from the billed lane's
+      // withhold rule.
+      expect(result.gateway.amountUsd).toBe(10);
+      expect(result.gateway.requestsWithoutAmount).toBe(2);
+      // The gateway never withholds a currency total, so it names no unpriced
+      // cells and no foreign currency.
+      expect(result.gateway.cellsWithoutAmount).toBe(0);
+      expect(result.gateway.currenciesWithoutUsdAmount).toEqual([]);
+    });
+
+    it("holds no total for a metered lane whose every request carries no dollar amount", async () => {
+      const service = createService({
+        prisma: prismaWithGovProject("gov-1"),
+        costRollup: rollupReturning({ rows: [] }),
+        gatewaySpend: gatewayReturning([
+          gatewayDay({
+            day: "2026-08-01",
+            amountNanoUsd: 0,
+            requestCount: 0,
+            requestsWithoutAmount: 3,
+          }),
+        ]),
+      });
+
+      const result = await service.summary({
+        organizationId: "org-1",
+        windowDays: 30,
+        now: new Date("2026-08-01T12:00:00.000Z"),
+      });
+
+      // No charged request, so no figure — null, never $0.00, which would be a
+      // claim that nothing was spent when the truth is we do not know.
+      expect(result.gateway.amountUsd).toBeNull();
+      expect(result.gateway.requestsWithoutAmount).toBe(3);
+    });
+
+    /** @scenario "A failed gateway ledger read never renders the metered lane as zero" */
+    it("rejects the whole summary when the ledger read fails while the rollup resolves", async () => {
+      const gateway = gatewayReturning();
+      vi.mocked(gateway.sumDaysForOrganizationProjects).mockRejectedValue(
+        new Error("gateway ledger is down"),
+      );
+      const service = createService({
+        prisma: prismaWithGovProject("gov-1"),
+        costRollup: rollupReturning({
+          rows: [laneRow({ costSource: "pulled", amountNanoUsd: 12 * NANO })],
+        }),
+        gatewaySpend: gateway,
+      });
+
+      // A metered read that swallowed its failure would render an absence as a
+      // measurement. It fails the summary, exactly as the rollup read does.
+      await expect(
+        service.summary({ organizationId: "org-1", windowDays: 30 }),
+      ).rejects.toThrow("gateway ledger is down");
     });
   });
 
@@ -1443,10 +1645,11 @@ describe("GovernanceCostService.summary trust markers", () => {
   /** Unix seconds, the unit both `DateTime` markers arrive in. */
   const seconds = (iso: string) => Math.floor(Date.parse(iso) / 1000);
 
-  async function seriesFor(rows: LaneRow[]) {
+  async function seriesFor(rows: LaneRow[], gatewayDays: GatewayDayRow[] = []) {
     const service = createService({
       prisma: prismaWithGovProject("gov-1"),
       costRollup: rollupReturning({ rows }),
+      gatewaySpend: gatewayReturning(gatewayDays),
     });
     const result = await service.summary({
       organizationId: "org-1",
@@ -1520,13 +1723,19 @@ describe("GovernanceCostService.summary trust markers", () => {
   describe("given a gateway day metered a moment ago", () => {
     /** @scenario "Gateway days never claim they might change" */
     it("never marks it as able to still change", async () => {
-      const [day] = await seriesFor([
-        laneRow({
-          costSource: "gateway",
-          amountNanoUsd: 7 * NANO,
-          lastObservedAt: seconds("2026-08-31T11:00:00.000Z"),
-        }),
-      ]);
+      // The metered day comes from the ledger now. It carries no §15 markers
+      // at all — we metered it ourselves and nobody restates it — so the day's
+      // billed markers stay null and it is never provisional.
+      const [day] = await seriesFor(
+        [],
+        [
+          gatewayDay({
+            day: "2026-08-31",
+            amountNanoUsd: 7 * NANO,
+            requestCount: 1,
+          }),
+        ],
+      );
 
       // We metered these ourselves and nobody restates them. Left in the
       // general rule they would carry "can still move" for thirty days on the

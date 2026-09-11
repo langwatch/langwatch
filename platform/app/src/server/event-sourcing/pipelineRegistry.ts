@@ -1102,7 +1102,6 @@ export class PipelineRegistry {
         // committed events through its transactional inbox.
         webhookDelivery: this.deps.webhookDelivery,
         gatewayDebits: this.deps.gatewayDebits,
-        costRollupStore: this.deps.governanceCostRollupStore,
         settlement: {
           // Lazy: the pipeline is being built by this very call, so the
           // sweeper resolves the command sender at execution time.

@@ -138,28 +138,6 @@ function inMemoryPrisma() {
   } as unknown as PrismaClient;
 }
 
-/** One priced gateway outcome, keyed on whoever spent the money. */
-function spendEvent(principalUserId: string) {
-  return {
-    type: "lw.gateway.spend.confirmed",
-    tenantId: TENANT,
-    data: {
-      occurred_at: Date.UTC(2026, 7, 20),
-      model: "openai/gpt-5-mini",
-      model_provider_id: "openai",
-      principal_user_id: principalUserId,
-      end_user_id: "",
-    } as Record<string, unknown>,
-  };
-}
-
-/** The actor id the real fold would address a money row under. */
-function actorTheFoldWouldWrite(principalUserId: string): string {
-  return decodeGovernanceCostRollupKey(
-    governanceCostRollupKey(spendEvent(principalUserId)),
-  ).rawActorId;
-}
-
 /** One priced pulled item naming its spender (ADR-129). */
 function pulledSpendEvent(rawActorId: string) {
   return {
@@ -180,11 +158,13 @@ function pulledSpendEvent(rawActorId: string) {
 }
 
 /**
- * Same question, pulled lane. The two lanes substitute through one helper, but
- * only these lines prove the pulled branch actually calls it — the gateway
- * cases above would stay green if it silently wrote `""` or the raw id.
+ * The actor id the real fold would address a money row under.
+ *
+ * The pulled lane is the only lane this fold writes: the metered lane is read
+ * straight off its own per-request ledger and never reaches a rollup row, so
+ * the substitution has exactly one branch to prove.
  */
-function actorThePulledFoldWouldWrite(rawActorId: string): string {
+function actorTheFoldWouldWrite(rawActorId: string): string {
   return decodeGovernanceCostRollupKey(
     governanceCostRollupKey(pulledSpendEvent(rawActorId)),
   ).rawActorId;
@@ -248,20 +228,18 @@ describe("given an erasure that has to change what the money fold writes", () =>
     });
 
     /** @scenario "Pulled spend is erased by the same substitution as gateway spend" */
-    it("substitutes on the pulled lane too, and leaves blank pulled rows blank", async () => {
+    it("leaves blank pulled rows blank", async () => {
       const prisma = inMemoryPrisma();
       installGovernanceSuppressionSnapshot(prisma);
 
-      const outcome = await buildErasure(prisma).erase({
+      await buildErasure(prisma).erase({
         organizationId: ORG,
         discoveredPersonId: PERSON,
       });
 
-      expect(actorThePulledFoldWouldWrite(ERASED)).toBe(outcome.pseudonym);
-      expect(actorThePulledFoldWouldWrite(STAYS)).toBe(STAYS);
       // Blank is "provider named nobody", not an identifier; a pseudonym for
       // it would sweep every unattributed row into one fake person.
-      expect(actorThePulledFoldWouldWrite("")).toBe("");
+      expect(actorTheFoldWouldWrite("")).toBe("");
     });
 
     /** @scenario "The rebuild the erasure asks for cannot re-derive the identifier" */

@@ -8,12 +8,6 @@ import {
   readPulledUsageMoney,
 } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
 import {
-  type GatewaySpendConfirmedEvent,
-  type GatewaySpendFailedEvent,
-  gatewaySpendConfirmedEventSchema,
-  gatewaySpendFailedEventSchema,
-} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/events";
-import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
@@ -29,18 +23,16 @@ import {
 } from "./governanceCostRollup.constants";
 
 /**
- * The events that carry money.
+ * The events that carry money: the pulled lane's observation and the
+ * retraction that withdraws one.
  *
- * `admitted` and `settled` are deliberately absent. Neither carries a cost —
- * admission is a request, settlement is the admission of not knowing — and
- * their dimensions are PRE-resolution: the gateway only settles model and
- * provider after dispatch, so grouping an admission by its requested model
- * would file it under a cell its own outcome never joins, leaving a permanent
- * amount-less row beside the real one.
+ * No gateway event, deliberately. The metered lane is read straight off
+ * `gateway_spend`, the per-request ledger its own pipeline projects, so a
+ * rollup half for it summarized cells the cost screen never read. Adding one
+ * back here would put the fold on two pipelines again and file gateway money
+ * under the trace project's tenant, which is where the unread cells went.
  */
 const governanceCostRollupEvents = [
-  gatewaySpendConfirmedEventSchema,
-  gatewaySpendFailedEventSchema,
   PulledUsageObservedEventSchema,
   PulledUsageRetractedEventSchema,
 ] as const;
@@ -122,25 +114,15 @@ export interface GovernanceCostRollupState {
   exactOrEstimate: "" | "exact" | "estimate";
 
   /**
-   * The gateway lane's running total. Gateway outcomes are never restated —
-   * one priced outcome per request, which is the same assumption the shipped
-   * budget ledger makes (`gatewayDebits` mints one debit per outcome) — so the
-   * lane is pure accumulation, made safe against redelivery by the store's
-   * applied-event-id watermark rather than by a per-request ledger.
-   */
-  gatewayAmountNanoMinor: number;
-  gatewayTokensInput: number;
-  gatewayTokensOutput: number;
-  gatewayTokensCacheRead: number;
-  gatewayTokensCacheWrite: number;
-  gatewayRequestCount: number;
-
-  /**
-   * The pulled lane's newest observation per provider item. This is what makes
-   * a restatement REPLACE rather than add. Bounded by the number of distinct
+   * The newest observation per provider item. This is what makes a
+   * restatement REPLACE rather than add. Bounded by the number of distinct
    * provider items sharing this one day x dimension cell — one, for the
    * bucketed admin-API pullers wave 1 ships, whose restatement key hashes the
    * same coordinates this cell is keyed by.
+   *
+   * The only money the cell holds. There is no second, accumulating lane
+   * beside it: the metered lane never reaches this fold (see the event list),
+   * so every figure the row carries is derived from this map.
    */
   pulledItems: Record<string, PulledContribution>;
 
@@ -322,43 +304,25 @@ function dimensionsOf(event: {
       // parses these events on the way in, so a legacy event would otherwise
       // put `undefined` in the key.
       //
-      // Routed through the erasure substitution exactly like the gateway
-      // branch below, and for the same reason: this tuple is the row's key,
-      // and a replay that re-derived an erased original would write it back
-      // beside the pseudonymized row and double the amount.
+      // Substituted for a pseudonym when this identifier has been erased
+      // (ADR-128 §9 step 5). It has to happen HERE rather than at the store,
+      // because this tuple is also the row's key: erasure removes the old
+      // rows and replays the days, and a replay that re-derived the original
+      // would write it back beside the pseudonymized row and double the
+      // amount.
       rawActorId: actorIdForRollupWrite({
         tenantId: event.tenantId,
         rawActorId: d.rawActorId ?? "",
       }),
     };
   }
-  const d = event.data as unknown as GatewaySpendConfirmedEvent["data"];
-  return {
-    tenantId: event.tenantId,
-    day: utcDayOf(d.occurred_at),
-    costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
-    ingestionSourceId: "",
-    provider: d.model_provider_id,
-    model: d.model,
-    // Honestly blank, not a stub (#7881): the gateway spend event carries no
-    // agent field, so this lane has nothing to report until it does.
-    agentId: "",
-    // The gateway prices every outcome off its own dollar-denominated rate
-    // table, so this lane has one currency and it is not read off the event.
-    currencyCode: GOVERNANCE_COST_CURRENCY_USD,
-    // The spender is the key's principal; the caller's own end user is the
-    // fallback for a key with no resolved principal.
-    //
-    // Substituted for a pseudonym when this identifier has been erased
-    // (ADR-128 §9 step 5). It has to happen HERE rather than at the store,
-    // because this tuple is also the row's key: erasure removes the old rows
-    // and replays the days, and a replay that re-derived the original would
-    // write it back beside the pseudonymized row and double the amount.
-    rawActorId: actorIdForRollupWrite({
-      tenantId: event.tenantId,
-      rawActorId: d.principal_user_id || d.end_user_id,
-    }),
-  };
+  // Loud rather than a guessed cell. The only way an undeclared type reaches
+  // this is a caller folding events the projection does not subscribe to (the
+  // comparator's re-derivation, say); addressing a row for it would write
+  // money under a cell nothing else can account for.
+  throw new Error(
+    `governance cost rollup cannot address a cell for a ${event.type} event`,
+  );
 }
 
 /** The dimension tuple a rollup key addresses. */
@@ -470,10 +434,10 @@ export function decodeGovernanceCostRollupKey(
  *
  * Three cases, and the order matters. A cell nothing has contributed to has no
  * figure at all. A cell billed in dollars needs no conversion — the amount IS
- * the dollar amount, for either lane. A cell billed in anything else can only
- * be stated in dollars by the BILLER, so it is the sum of the biller's own
- * per-item figures, and only when every item carries one: a partial sum reads
- * as the day's whole spend while silently omitting the part nobody converted.
+ * the dollar amount. A cell billed in anything else can only be stated in
+ * dollars by the BILLER, so it is the sum of the biller's own per-item
+ * figures, and only when every item carries one: a partial sum reads as the
+ * day's whole spend while silently omitting the part nobody converted.
  *
  * No rate is applied here or anywhere else (ADR-128 §3). Null, never 0: zero
  * is a real amount and charts as free usage, while the absence of a figure is
@@ -482,21 +446,16 @@ export function decodeGovernanceCostRollupKey(
 function amountNanoUsdOf({
   state,
   amountNanoMinor,
-  contributed,
 }: {
   state: GovernanceCostRollupState;
   amountNanoMinor: number;
-  contributed: boolean;
 }): number | null {
-  if (!contributed) return null;
+  const items = Object.values(state.pulledItems);
+  if (items.length === 0) return null;
   if (state.currencyCode === GOVERNANCE_COST_CURRENCY_USD) {
     return amountNanoMinor;
   }
-  // Below here the cell is not in dollars. The gateway lane never is, so a
-  // gateway contribution in a non-dollar cell is a cell we cannot state.
-  if (state.gatewayRequestCount > 0) return null;
 
-  const items = Object.values(state.pulledItems);
   let total = 0;
   for (const item of items) {
     const billerUsd = item.amountNanoUsd ?? null;
@@ -507,7 +466,7 @@ function amountNanoUsdOf({
 }
 
 /**
- * The cell's figures, derived from the two lanes' contributions.
+ * The cell's figures, derived from the items it holds.
  *
  * `amountNanoUsd` is NULL, never 0, when the cell holds no USD figure — see
  * `amountNanoUsdOf` for the three cases.
@@ -522,46 +481,42 @@ export function governanceCostRollupTotals(state: GovernanceCostRollupState): {
   requestCount: number;
 } {
   const items = Object.values(state.pulledItems);
-  const amountNanoMinor =
-    state.gatewayAmountNanoMinor +
-    items.reduce((sum, item) => sum + item.amountNanoMinor, 0);
-  const contributed = state.gatewayRequestCount > 0 || items.length > 0;
+  const amountNanoMinor = items.reduce(
+    (sum, item) => sum + item.amountNanoMinor,
+    0,
+  );
   return {
-    amountNanoUsd: amountNanoUsdOf({ state, amountNanoMinor, contributed }),
+    amountNanoUsd: amountNanoUsdOf({ state, amountNanoMinor }),
     amountNanoMinor,
-    tokensInput:
-      state.gatewayTokensInput +
-      items.reduce((sum, item) => sum + item.tokensInput, 0),
-    tokensOutput:
-      state.gatewayTokensOutput +
-      items.reduce((sum, item) => sum + item.tokensOutput, 0),
-    tokensCacheRead:
-      state.gatewayTokensCacheRead +
-      items.reduce((sum, item) => sum + item.tokensCacheRead, 0),
-    tokensCacheWrite:
-      state.gatewayTokensCacheWrite +
-      items.reduce((sum, item) => sum + item.tokensCacheWrite, 0),
-    requestCount: state.gatewayRequestCount + items.length,
+    tokensInput: items.reduce((sum, item) => sum + item.tokensInput, 0),
+    tokensOutput: items.reduce((sum, item) => sum + item.tokensOutput, 0),
+    tokensCacheRead: items.reduce((sum, item) => sum + item.tokensCacheRead, 0),
+    tokensCacheWrite: items.reduce(
+      (sum, item) => sum + item.tokensCacheWrite,
+      0,
+    ),
+    requestCount: items.length,
   };
 }
 
 /**
  * The daily cost rollup fold (ADR-128 wave 1).
  *
- * Registered on TWO pipelines — gateway spend and pulled usage — because the
- * customer's question ("what did this day cost") spans both lanes and a rollup
- * per pipeline would answer half of it. The two can never contend for a row:
- * `costSource` is part of the key, so a gateway cell and a pulled cell are
- * different cells by construction.
+ * Registered on the pulled-usage pipeline alone. It once sat on the gateway
+ * spend pipeline too, but the cost screen reads the metered lane straight off
+ * `gateway_spend`, so the gateway cells it wrote were never read — and were
+ * filed under the trace project's tenant besides. `costSource` stays in the
+ * key because rows from that time are still on disk and the read side filters
+ * on it.
  *
  * The trace lane is RESERVED and excluded: ADR-128 keeps trace cost a separate
  * per-request system, and no pipeline carrying it registers this fold, so no
  * row can carry trace cost under any label.
  *
- * Money is copied, never recomputed: both lanes price once at their own ingest
- * seam and carry an integer nano-USD figure, which this fold sums. Re-pricing
- * is a rebuild against the log, never a side effect of whichever consumer ran
- * after a catalog deploy.
+ * Money is copied, never recomputed: the puller prices once at its own ingest
+ * seam and carries an integer nano-minor figure, which this fold sums.
+ * Re-pricing is a rebuild against the log, never a side effect of whichever
+ * consumer ran after a catalog deploy.
  */
 export class GovernanceCostRollupFoldProjection
   extends AbstractFoldProjection<
@@ -647,37 +602,12 @@ export class GovernanceCostRollupFoldProjection
       rawActorId: "",
       organizationId: "",
       exactOrEstimate: "",
-      gatewayAmountNanoMinor: 0,
-      gatewayTokensInput: 0,
-      gatewayTokensOutput: 0,
-      gatewayTokensCacheRead: 0,
-      gatewayTokensCacheWrite: 0,
-      gatewayRequestCount: 0,
       pulledItems: {},
       revisionCount: 0,
       previousAmountNanoUsd: null,
       revisedAt: null,
       lastObservedAt: 0,
     };
-  }
-
-  handleGatewaySpendConfirmed(
-    event: GatewaySpendConfirmedEvent,
-    state: GovernanceCostRollupState,
-  ): GovernanceCostRollupState {
-    return this.addGatewayOutcome(event, state);
-  }
-
-  /**
-   * A failure that already consumed tokens is real spend on several providers,
-   * and the shipped budget ledger charges for it. Counting it here keeps the
-   * rollup and the ledger stating the same money.
-   */
-  handleGatewaySpendFailed(
-    event: GatewaySpendFailedEvent,
-    state: GovernanceCostRollupState,
-  ): GovernanceCostRollupState {
-    return this.addGatewayOutcome(event, state);
   }
 
   handlePulledUsageObserved(
@@ -925,37 +855,5 @@ export class GovernanceCostRollupFoldProjection
     }).amountNanoUsd;
 
     return { ...state, revisedAt, previousAmountNanoUsd: before };
-  }
-
-  private addGatewayOutcome(
-    event: GatewaySpendConfirmedEvent | GatewaySpendFailedEvent,
-    state: GovernanceCostRollupState,
-  ): GovernanceCostRollupState {
-    const d = event.data;
-    const usage = d.usage;
-    return {
-      ...state,
-      ...dimensionsOf(event as never),
-      organizationId: d.organization_id || state.organizationId,
-      // A gateway outcome is the provider's own charge for a served request:
-      // there is no later invoice to reconcile it against.
-      exactOrEstimate: "exact",
-      gatewayAmountNanoMinor: state.gatewayAmountNanoMinor + d.cost_nano_usd,
-      gatewayTokensInput: state.gatewayTokensInput + usage.input_tokens,
-      gatewayTokensOutput: state.gatewayTokensOutput + usage.output_tokens,
-      gatewayTokensCacheRead:
-        state.gatewayTokensCacheRead + usage.cache_read_input_tokens,
-      gatewayTokensCacheWrite:
-        state.gatewayTokensCacheWrite + usage.cache_creation_input_tokens,
-      gatewayRequestCount: state.gatewayRequestCount + 1,
-      // We metered this as we served it, so serving time IS observation time
-      // for this lane — same column, same meaning, no clock read. It never
-      // makes a gateway day render provisional: nothing restates a gateway
-      // outcome, so the read side exempts the lane outright rather than
-      // relying on the arithmetic to come out right (§15).
-      lastObservedAt: Math.max(state.lastObservedAt, d.occurred_at),
-      // `revisedAt`, `revisionCount` and `previousAmountNanoUsd` stay
-      // untouched: one priced outcome per request, never restated.
-    };
   }
 }

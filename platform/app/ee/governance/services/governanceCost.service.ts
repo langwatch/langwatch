@@ -34,6 +34,10 @@
 import { DiscoveredPersonRepository } from "@ee/governance/repositories/governanceIdentity.repository";
 import type { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
 import type {
+  GovernanceGatewaySpendClickHouseRepository,
+  GovernanceGatewaySpendDayRow,
+} from "@ee/governance/services/governanceGatewaySpend.clickhouse.repository";
+import type {
   GovernanceOcsfEventsClickHouseRepository,
   GovernanceSeatReportRow,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
@@ -41,6 +45,7 @@ import { resolveGovProjectId } from "@ee/governance/services/govProject";
 import { noDataSinceNotice } from "@ee/governance/services/pullers/sourceHealth";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { ProjectRepository } from "~/server/app-layer/projects/repositories/project.repository";
 import {
   nanoMinorToDecimalString,
   nanoUsdToDecimalString,
@@ -114,6 +119,19 @@ export interface GovernanceCostLaneDto {
    * nobody was charged (ADR-128 §3).
    */
   currencyTotals: GovernanceCostCurrencyTotalDto[];
+  /**
+   * The METERED LANE ONLY: how many requests over the window carry no dollar
+   * amount — priced at zero with tokens consumed (free or unpriced, the ledger
+   * cannot tell which), or settled with the cost never confirmed.
+   *
+   * Optional because it is a gateway-only concept and the other lanes never
+   * set it. Unlike the billed lane's `cellsWithoutAmount`, a count here does
+   * NOT withhold the total: the metered lane marks instead of withholding
+   * (ADR-128), so `amountUsd` still states the priced requests and this rides
+   * beside it. The screen renders "N requests with no dollar amount" when N is
+   * above zero.
+   */
+  requestsWithoutAmount?: number;
 }
 
 /**
@@ -487,6 +505,19 @@ export class GovernanceCostService {
        * what awaiting says.
        */
       ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
+      /**
+       * The metered lane's source: the gateway's own per-request ledger.
+       * `undefined` on the same deployment the rollup is absent from, and the
+       * metered lane then holds no figure — the screen is already UNAVAILABLE
+       * for want of a cost store, so the lane never has to stand on its own.
+       */
+      gatewaySpend: GovernanceGatewaySpendClickHouseRepository | undefined;
+      /**
+       * Where the metered lane's tenant scope comes from: every project of
+       * the organization, since `gateway_spend.TenantId` is the traffic's own
+       * project id rather than the hidden governance tenant.
+       */
+      projects: ProjectRepository;
     },
   ) {}
 
@@ -494,12 +525,22 @@ export class GovernanceCostService {
     prisma,
     costRollup,
     ocsfEvents,
+    gatewaySpend,
+    projects,
   }: {
     prisma: PrismaClient;
     costRollup: GovernanceCostRollupClickHouseRepository | undefined;
     ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
+    gatewaySpend: GovernanceGatewaySpendClickHouseRepository | undefined;
+    projects: ProjectRepository;
   }): GovernanceCostService {
-    return new GovernanceCostService({ prisma, costRollup, ocsfEvents });
+    return new GovernanceCostService({
+      prisma,
+      costRollup,
+      ocsfEvents,
+      gatewaySpend,
+      projects,
+    });
   }
 
   /**
@@ -517,7 +558,7 @@ export class GovernanceCostService {
     windowDays: number;
     now?: Date;
   }): Promise<GovernanceCostSummaryDto> {
-    const { costRollup, prisma } = this.deps;
+    const { costRollup, prisma, projects } = this.deps;
     if (!costRollup) {
       return unavailable({ reason: "no_cost_store", windowDays });
     }
@@ -528,6 +569,16 @@ export class GovernanceCostService {
     if (!tenantId) {
       return unavailable({ reason: "no_governance_project", windowDays });
     }
+
+    // The metered lane reads the gateway's per-request ledger, which is keyed
+    // by the traffic's own PROJECT tenant, not the hidden governance tenant
+    // the rollup reads under. So it is scoped to every project of the
+    // organization, archived ones included — the one place the two lanes'
+    // tenant scopes differ, and the whole reason the metered lane used to
+    // read empty.
+    const gatewayTenantIds = await projects.findAllIdsByOrganization({
+      organizationId,
+    });
 
     const toDay = utcDay(now);
     const fromDay = utcDay(
@@ -544,6 +595,7 @@ export class GovernanceCostService {
     // measurement.
     const [
       rows,
+      gatewayDays,
       seats,
       staleSources,
       azureBilling,
@@ -551,7 +603,17 @@ export class GovernanceCostService {
       providers,
       billedCurrencies,
     ] = await Promise.all([
-      costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
+      // PULLED ONLY. The metered lane no longer lives in the rollup, and the
+      // fold's leftover gateway rows must be read by nothing — so the billed
+      // day series asks for pulled rows by predicate, not by a filter the
+      // caller could forget.
+      costRollup.sumDaysByLane({
+        tenantId,
+        fromDay,
+        toDay,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      }),
+      this.readGatewayDays({ tenantIds: gatewayTenantIds, fromDay, toDay }),
       this.readSeats({ tenantId }),
       this.readStaleSources({ organizationId }),
       this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
@@ -588,14 +650,43 @@ export class GovernanceCostService {
         provider: row.provider,
         ...spenderFigure([row]),
       })),
-      gateway: totalFor(rows, GOVERNANCE_COST_SOURCE.GATEWAY),
+      gateway: gatewayLaneFrom(gatewayDays),
       azureBilling,
       seats,
-      series: seriesFrom(rows, now),
+      series: seriesFrom(rows, gatewayDays, now),
       windowDays,
       staleSources,
       unpricedWindow,
     };
+  }
+
+  /**
+   * The metered lane's days from the gateway ledger, or none when the ledger
+   * store is absent.
+   *
+   * A broken ledger read fails here, not silently: the metered lane is money,
+   * and a lane that swallowed its own failure would render an absence as a
+   * measurement — the same rule the pulled read at the top of `summary` obeys.
+   * The absent-store case is different: no gateway repository means no cost
+   * store at all, and the screen is already UNAVAILABLE for that reason, so
+   * this simply reports no metered days rather than inventing a zero.
+   */
+  private async readGatewayDays({
+    tenantIds,
+    fromDay,
+    toDay,
+  }: {
+    tenantIds: string[];
+    fromDay: string;
+    toDay: string;
+  }): Promise<GovernanceGatewaySpendDayRow[]> {
+    const { gatewaySpend } = this.deps;
+    if (!gatewaySpend) return [];
+    return gatewaySpend.sumDaysForOrganizationProjects({
+      tenantIds,
+      fromDay,
+      toDay,
+    });
   }
 
   /**
@@ -1371,44 +1462,6 @@ function currencyTotalsFrom(
 }
 
 /**
- * A lane's per-currency window totals folded from its own DAY rows.
- *
- * Used for the gateway lane, whose headline is folded from the same rows, so
- * the lines and the figure over them describe one snapshot. The billed lane
- * takes its lines from the window read instead, for exactly the same reason —
- * see the comment on that read in `summary`.
- */
-function currencyTotalsFoldedFrom(
-  rows: readonly LaneRow[],
-): GovernanceCostCurrencyTotalDto[] {
-  const byCode = new Map<
-    string,
-    { amountNanoMinor: number | null; cellsWithoutAmount: number }
-  >();
-  for (const row of rows) {
-    for (const line of row.byCurrency) {
-      const held = byCode.get(line.currencyCode) ?? {
-        amountNanoMinor: null,
-        cellsWithoutAmount: 0,
-      };
-      byCode.set(line.currencyCode, {
-        amountNanoMinor:
-          line.amountNanoMinor === null
-            ? held.amountNanoMinor
-            : (held.amountNanoMinor ?? 0) + line.amountNanoMinor,
-        cellsWithoutAmount: held.cellsWithoutAmount + line.cellsWithoutAmount,
-      });
-    }
-  }
-  return currencyTotalsFrom(
-    [...byCode.entries()].map(([currencyCode, held]) => ({
-      currencyCode,
-      ...held,
-    })),
-  );
-}
-
-/**
  * The billed day's currency lines, and what each held before its revision.
  *
  * A day whose read answers no currency lines at all falls back to the single
@@ -1450,28 +1503,63 @@ function dayCurrencyLinesFrom(
 }
 
 /**
- * One lane's window total.
+ * A day's metered figure, or null when the day charged nothing.
  *
- * A lane with no rows at all, a lane whose every row holds no figure, and a
- * lane holding a mix all come back null; `cellsWithoutAmount` is what tells
- * the three apart, and the currencies say what the unpriced part was billed
- * in.
+ * Null when no confirmed or failed request landed on the day — a day of only
+ * settled requests has an unknown cost, and $0.00 would claim it was free.
+ * When a request DID charge, the sum stands even at zero (a refund day), and
+ * the requests carrying no dollar amount are the marker beside it, never a
+ * reason to withhold it.
  */
-function totalFor(
-  rows: readonly LaneRow[],
-  costSource: string,
+function gatewayDayUsd(day: GovernanceGatewaySpendDayRow): number | null {
+  if (day.requestCount === 0) return null;
+  return Number(nanoUsdToDecimalString(BigInt(day.amountNanoUsd)));
+}
+
+/**
+ * The metered lane's window total, from the gateway ledger's days.
+ *
+ * DELIBERATE DEVIATION from the billed lane's withhold rule (ADR-128): a
+ * request with no dollar amount is COUNTED beside the total, never allowed to
+ * withhold it. The ledger names exactly what is left out — the count is the
+ * caveat — where the billed lane's unpriced cell hides an unknown share of a
+ * bill and so withholds. So `cellsWithoutAmount` is always 0 here (the gateway
+ * withholds nothing) and `requestsWithoutAmount` carries the count instead.
+ *
+ * `amountUsd` is null only when no charged request landed at all — a window of
+ * only settled requests has an unknown cost, not a zero one.
+ */
+function gatewayLaneFrom(
+  days: readonly GovernanceGatewaySpendDayRow[],
 ): GovernanceCostLaneDto {
-  const lane = rows.filter((row) => row.costSource === costSource);
+  const requestCount = days.reduce((n, day) => n + day.requestCount, 0);
+  const requestsWithoutAmount = days.reduce(
+    (n, day) => n + day.requestsWithoutAmount,
+    0,
+  );
+  // Summed in BigInt, per ADR-128 §3, so a window past 2^53 nano-USD keeps
+  // every digit.
+  const totalNanoUsd = days.reduce(
+    (sum, day) => sum + BigInt(day.amountNanoUsd),
+    0n,
+  );
+  const amountUsd =
+    requestCount > 0 ? Number(nanoUsdToDecimalString(totalNanoUsd)) : null;
   return {
-    amountUsd: figureFor(lane),
-    cellsWithoutAmount: lane.reduce(
-      (count, row) => count + row.cellsWithoutAmount,
-      0,
-    ),
-    currenciesWithoutUsdAmount: [
-      ...new Set(lane.flatMap((row) => row.currenciesWithoutUsdAmount)),
-    ].sort(),
-    currencyTotals: currencyTotalsFoldedFrom(lane),
+    amountUsd,
+    cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
+    currencyTotals:
+      amountUsd === null
+        ? []
+        : [
+            {
+              currencyCode: GOVERNANCE_COST_CURRENCY_USD,
+              amount: amountUsd,
+              cellsWithoutAmount: 0,
+            },
+          ],
+    requestsWithoutAmount,
   };
 }
 
@@ -1489,12 +1577,15 @@ function totalFor(
  */
 function seriesFrom(
   rows: readonly LaneRow[],
+  gatewayDays: readonly GovernanceGatewaySpendDayRow[],
   now: Date,
 ): GovernanceCostDayDto[] {
   const byDay = new Map<string, GovernanceCostDayDto>();
-  for (const row of rows) {
-    const entry = byDay.get(row.day) ?? {
-      day: row.day,
+  const entryFor = (day: string): GovernanceCostDayDto => {
+    const existing = byDay.get(day);
+    if (existing) return existing;
+    const fresh: GovernanceCostDayDto = {
+      day,
       billedUsd: null,
       gatewayUsd: null,
       billedCellsWithoutAmount: 0,
@@ -1504,33 +1595,44 @@ function seriesFrom(
       billedCurrenciesWithoutUsdAmount: [],
       billedProvisional: false,
     };
-    if (row.costSource === GOVERNANCE_COST_SOURCE.PULLED) {
-      entry.billedUsd = figureFor([row]);
-      entry.billedCellsWithoutAmount = row.cellsWithoutAmount;
-      entry.billedRevisedAt =
-        row.revisedAt === null ? null : row.revisedAt * 1000;
-      entry.billedByCurrency = dayCurrencyLinesFrom(row);
-      entry.billedCurrenciesWithoutUsdAmount = row.currenciesWithoutUsdAmount;
-      // The settling window is per SOURCE, and this row spans every source the
-      // billed lane holds that day. Every source runs on the default today —
-      // only Anthropic's window has been measured, and the rest are provisional
-      // constants until they are — so the default is exactly right here rather
-      // than an approximation. It stops being so the day a source is measured
-      // to differ, and that is the day this read has to group by source.
-      entry.billedProvisional = isWithinSettlingWindow({
-        lastObservedAtSeconds: row.lastObservedAt,
-        windowDays: GOVERNANCE_SETTLING_WINDOW_DAYS,
-        now,
-      });
-    } else if (row.costSource === GOVERNANCE_COST_SOURCE.GATEWAY) {
-      entry.gatewayUsd = figureFor([row]);
-      entry.gatewayCellsWithoutAmount = row.cellsWithoutAmount;
-      // The gateway lane is EXEMPT from both markers (§15). We metered these
-      // rows ourselves in real time and no provider restates them, so "can
-      // still move" on the product's most-viewed and most-final numbers would
-      // be a warning about a thing that cannot happen.
-    }
-    byDay.set(row.day, entry);
+    byDay.set(day, fresh);
+    return fresh;
+  };
+
+  // The billed lane, from the pulled rollup. The read is already pulled-only,
+  // so a leftover gateway row cannot reach here — but the guard stays, so a
+  // future unfiltered caller cannot quietly fold gateway money into the billed
+  // series.
+  for (const row of rows) {
+    if (row.costSource !== GOVERNANCE_COST_SOURCE.PULLED) continue;
+    const entry = entryFor(row.day);
+    entry.billedUsd = figureFor([row]);
+    entry.billedCellsWithoutAmount = row.cellsWithoutAmount;
+    entry.billedRevisedAt =
+      row.revisedAt === null ? null : row.revisedAt * 1000;
+    entry.billedByCurrency = dayCurrencyLinesFrom(row);
+    entry.billedCurrenciesWithoutUsdAmount = row.currenciesWithoutUsdAmount;
+    // The settling window is per SOURCE, and this row spans every source the
+    // billed lane holds that day. Every source runs on the default today —
+    // only Anthropic's window has been measured, and the rest are provisional
+    // constants until they are — so the default is exactly right here rather
+    // than an approximation. It stops being so the day a source is measured to
+    // differ, and that is the day this read has to group by source.
+    entry.billedProvisional = isWithinSettlingWindow({
+      lastObservedAtSeconds: row.lastObservedAt,
+      windowDays: GOVERNANCE_SETTLING_WINDOW_DAYS,
+      now,
+    });
   }
+
+  // The metered lane, from the gateway ledger. EXEMPT from both §15 markers:
+  // we metered these ourselves in real time and no provider restates them, so
+  // "can still move" on the product's most-viewed and most-final numbers would
+  // be a warning about a thing that cannot happen. The lane never withholds a
+  // day's figure, so `gatewayCellsWithoutAmount` stays zero.
+  for (const day of gatewayDays) {
+    entryFor(day.day).gatewayUsd = gatewayDayUsd(day);
+  }
+
   return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
 }

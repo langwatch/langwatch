@@ -40,6 +40,7 @@ export function CostLanePanel({
   currenciesWithoutUsdAmount,
   currencyTotals,
   laneNote,
+  belowTotalNote,
   trendPct,
   sample = false,
   testId,
@@ -72,6 +73,15 @@ export function CostLanePanel({
    * copy about money, it shows what the read side decided to say.
    */
   laneNote?: string | null;
+  /**
+   * A note pinned UNDER THE TOTAL, on the face of the card — the metered
+   * lane's "N requests with no dollar amount". Distinct from `laneNote`, which
+   * lives behind the (i): this is a caveat on the figure beside it and a reader
+   * needs it in front of them, not on a hover. Shown only when the lane states
+   * a figure it does not withhold (`cellsWithoutAmount` is zero); a withheld
+   * lane's own note takes the slot.
+   */
+  belowTotalNote?: string | null;
   /**
    * Which way this lane is running, already measured. Measured by the caller
    * on the UNFOLDED series, not derived from anything drawn here: a calendar
@@ -179,6 +189,18 @@ export function CostLanePanel({
             data-testid={`${testId}-note`}
           >
             {laneWithheldTotalNote()}
+          </Text>
+        ) : belowTotalNote ? (
+          // A stated figure with a caveat beside it — the metered lane's count
+          // of requests carrying no dollar amount. Not a withheld total: the
+          // figure above it stands.
+          <Text
+            fontSize="xs"
+            color="fg.subtle"
+            marginTop="auto"
+            data-testid={`${testId}-note`}
+          >
+            {belowTotalNote}
           </Text>
         ) : null}
       </VStack>

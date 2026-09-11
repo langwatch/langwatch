@@ -17,6 +17,7 @@
  * Decision: ADR-128 §14 / ADR-129.
  */
 import { describe, expect, it, vi } from "vitest";
+import { NullProjectRepository } from "~/server/app-layer/projects/repositories/project.repository";
 
 import { GovernanceCostService } from "../governanceCost.service";
 import type { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
@@ -76,6 +77,8 @@ function serviceOver(rows: SpenderRow[], people: PersonRow[] = []) {
     prisma: prismaWith("gov-1", people),
     costRollup: rollupReturning(rows),
     ocsfEvents: undefined,
+    gatewaySpend: undefined,
+    projects: new NullProjectRepository(),
   });
 }
 
@@ -308,6 +311,8 @@ describe("GovernanceCostService.spenderBreakdown", () => {
         prisma: prismaWith("gov-1"),
         costRollup: undefined,
         ocsfEvents: undefined,
+        gatewaySpend: undefined,
+        projects: new NullProjectRepository(),
       });
 
       const result = await service.spenderBreakdown({

@@ -48,100 +48,26 @@ let repo: GovernanceCostRollupClickHouseRepository;
 let comparator: CostRollupComparatorService;
 let tenantId: string;
 
-function confirmedData({
-  costNanoUsd,
-  requestId,
-  occurredAt = DAY_MS,
-}: {
-  costNanoUsd: number;
-  requestId: string;
-  occurredAt?: number;
-}) {
-  return {
-    gateway_request_id: requestId,
-    occurred_at: occurredAt,
-    tenantId,
-    organization_id: "org_acme",
-    virtual_key_id: "vk_1",
-    principal_user_id: "user_ada",
-    end_user_id: "",
-    trace_id: "",
-    request_type: "chat",
-    labels: [],
-    metadata: "",
-    admitted_at: occurredAt,
-    team_id: "",
-    model: "openai/gpt-5-mini",
-    model_provider_id: "openai",
-    usage: {
-      input_tokens: 100,
-      output_tokens: 20,
-      cache_read_input_tokens: 0,
-      cache_creation_input_tokens: 0,
-      reasoning_tokens: 0,
-      input_audio_tokens: 0,
-      output_audio_tokens: 0,
-      input_chars: 0,
-    },
-    rate_version: "registry@2026-08-01",
-    duration_ms: 120,
-    cost_nano_usd: costNanoUsd,
-  };
-}
-
 /**
- * Puts one gateway outcome on the durable log, the way the ingest seam does.
- *
- * `EventOccurredAt` is set to the same value as the payload's `occurred_at`
- * because that is what the write path does: spendCommands.ts passes
- * `occurredAt: data.occurred_at` into every spend event, and
- * eventStoreUtils.ts:71 writes that envelope field to the column verbatim. The
- * append clock lands on `EventTimestamp` instead. Seeding these two apart
- * would be testing a system we do not have.
+ * Writes the day's summary at whatever figure the test wants it to claim, by
+ * folding one dollar-billed observation through the real projection.
  */
-async function appendConfirmed({
-  costNanoUsd,
-  occurredAt = DAY_MS,
-}: {
-  costNanoUsd: number;
-  occurredAt?: number;
-}): Promise<void> {
-  const requestId = `gwreq-${nanoid()}`;
-  await ch.insert({
-    table: "event_log",
-    values: [
-      {
-        TenantId: tenantId,
-        IdempotencyKey: `idem-${requestId}`,
-        AggregateType: "gateway_request",
-        AggregateId: requestId,
-        EventId: `evt-${nanoid()}`,
-        EventType: "lw.gateway.spend.confirmed",
-        EventVersion: "2026-07-29",
-        EventTimestamp: Date.now(),
-        EventPayload: JSON.stringify(
-          confirmedData({ costNanoUsd, requestId, occurredAt }),
-        ),
-        EventOccurredAt: occurredAt,
-      },
-    ],
-    format: "JSONEachRow",
-    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-  });
-}
-
-/** Writes the day's summary at whatever figure the test wants it to claim. */
 async function writeSummary(amountNanoUsd: number): Promise<void> {
   const projection = new GovernanceCostRollupFoldProjection({
     store: { store: async () => undefined, get: async () => null },
   });
   const state: GovernanceCostRollupState = projection.apply(projection.init(), {
     id: `evt-${nanoid()}`,
-    type: "lw.gateway.spend.confirmed",
+    type: "lw.obs.pulled_usage.observed",
     tenantId,
     aggregateId: "seed",
     occurredAt: DAY_MS,
-    data: confirmedData({ costNanoUsd: amountNanoUsd, requestId: "seed" }),
+    data: observedData({
+      costNanoMinor: amountNanoUsd,
+      currencyCode: "USD",
+      observedAtMs: DAY_MS,
+      restatementKey: "seed",
+    }),
   } as never);
   await repo.upsert(
     projectGovernanceCostRollupStateToRow({
@@ -153,16 +79,25 @@ async function writeSummary(amountNanoUsd: number): Promise<void> {
   );
 }
 
-/** One pulled observation's payload, as the puller worker writes it. */
+/**
+ * One pulled observation's payload, as the puller worker writes it.
+ *
+ * `occurredAtMs` is the provider's business time, which is what the fold
+ * buckets the item by; the envelope time the comparator selects by is set
+ * separately in `appendPulled`, and the two only agree because every test
+ * here passes the same instant to both.
+ */
 function observedData({
   costNanoMinor,
   currencyCode,
   observedAtMs,
+  occurredAtMs = DAY_MS,
   restatementKey = "bucket-hash",
 }: {
   costNanoMinor: number;
   currencyCode: string;
   observedAtMs: number;
+  occurredAtMs?: number;
   restatementKey?: string;
 }) {
   return {
@@ -185,9 +120,38 @@ function observedData({
     rateVersion: "registry@2026-08-01",
     costBasis: "computed",
     costStatus: "estimate",
-    occurredAtMs: DAY_MS,
+    occurredAtMs,
     observedAtMs,
   };
+}
+
+/**
+ * Puts one dollar-billed observation on the durable log, dated to the day
+ * its business time falls in: the puller sets the envelope's `occurredAt` to
+ * the item's own `occurredAtMs` (pullerWorker.ts), and the store writes that
+ * envelope field to `EventOccurredAt` verbatim. Seeding the two apart would
+ * be testing a system we do not have.
+ */
+async function appendObserved({
+  costNanoMinor,
+  occurredAtMs = DAY_MS,
+  restatementKey = `bucket-${nanoid(6)}`,
+}: {
+  costNanoMinor: number;
+  occurredAtMs?: number;
+  restatementKey?: string;
+}): Promise<void> {
+  await appendPulled({
+    type: "lw.obs.pulled_usage.observed",
+    data: observedData({
+      costNanoMinor,
+      currencyCode: "USD",
+      observedAtMs: occurredAtMs,
+      occurredAtMs,
+      restatementKey,
+    }),
+    occurredAt: occurredAtMs,
+  });
 }
 
 /**
@@ -317,10 +281,26 @@ async function mismatchCount(): Promise<number> {
   const values = (await metric!.get()).values;
   return values
     .filter(
-      (value) => value.labels.cost_source === GOVERNANCE_COST_SOURCE.GATEWAY,
+      (value) => value.labels.cost_source === GOVERNANCE_COST_SOURCE.PULLED,
     )
     .reduce((sum, value) => sum + value.value, 0);
 }
+
+describe("COST_SOURCE_EVENT_TYPES", () => {
+  // The comparator checks the billed lane alone. The metered lane is read
+  // straight off its own per-request ledger and never reaches a rollup row,
+  // so a gateway entry here would re-derive cells the summary is never
+  // written with and report drift that is entirely its own.
+  it("covers the billed lane and no gateway event", () => {
+    expect(Object.keys(COST_SOURCE_EVENT_TYPES)).toEqual([
+      GOVERNANCE_COST_SOURCE.PULLED,
+    ]);
+    const gatewayTypes = Object.values(COST_SOURCE_EVENT_TYPES)
+      .flat()
+      .filter((type) => type.startsWith("lw.gateway."));
+    expect(gatewayTypes).toEqual([]);
+  });
+});
 
 describe("CostRollupComparatorService", () => {
   beforeAll(() => {
@@ -342,8 +322,8 @@ describe("CostRollupComparatorService", () => {
   describe("given a summary row that no longer matches the sum of its events", () => {
     /** @scenario "The comparator counts a summary that drifted from its events" */
     it("counts the mismatch on the drift metric and names both figures in the log", async () => {
-      await appendConfirmed({ costNanoUsd: 5_000_000_000 });
-      await appendConfirmed({ costNanoUsd: 7_340_000_000 });
+      await appendObserved({ costNanoMinor: 5_000_000_000 });
+      await appendObserved({ costNanoMinor: 7_340_000_000 });
       // The summary claims a figure the events do not add up to.
       await writeSummary(9_999_000_000);
 
@@ -351,7 +331,7 @@ describe("CostRollupComparatorService", () => {
       const comparison = await comparator.compareDay({
         tenantId,
         day: DAY,
-        costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
       });
 
       expect(await mismatchCount()).toBe(before + 1);
@@ -364,13 +344,13 @@ describe("CostRollupComparatorService", () => {
     });
 
     it("leaves the drifted row exactly as it found it", async () => {
-      await appendConfirmed({ costNanoUsd: 5_000_000_000 });
+      await appendObserved({ costNanoMinor: 5_000_000_000 });
       await writeSummary(9_999_000_000);
 
       await comparator.compareDay({
         tenantId,
         day: DAY,
-        costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
       });
 
       const cells = await repo.findCellsForDay({ tenantId, day: DAY });
@@ -382,15 +362,15 @@ describe("CostRollupComparatorService", () => {
     // The counter has to be quiet on the healthy path, or the alerting it
     // exists for is noise from the first day.
     it("counts nothing", async () => {
-      await appendConfirmed({ costNanoUsd: 5_000_000_000 });
-      await appendConfirmed({ costNanoUsd: 7_340_000_000 });
+      await appendObserved({ costNanoMinor: 5_000_000_000 });
+      await appendObserved({ costNanoMinor: 7_340_000_000 });
       await writeSummary(12_340_000_000);
 
       const before = await mismatchCount();
       const comparison = await comparator.compareDay({
         tenantId,
         day: DAY,
-        costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
       });
 
       expect(comparison.mismatches).toEqual([]);
@@ -401,13 +381,12 @@ describe("CostRollupComparatorService", () => {
   describe("given two events either side of midnight", () => {
     /**
      * The comparator selects its events by `event_log.EventOccurredAt` while
-     * the fold buckets them by the payload's own `occurred_at`. That is only
-     * safe while the two carry the same value, and today they do: every spend
-     * command sets `occurredAt: data.occurred_at`
-     * (spendCommands.ts:81/129/177/224) and the store writes the envelope
-     * field to the column unchanged (eventStoreUtils.ts:71), with the append
-     * clock going to `EventTimestamp` instead. The puller lane matches
-     * (pullerWorker.ts:753).
+     * the fold buckets them by the payload's own `occurredAtMs`. That is only
+     * safe while the two carry the same value, and today they do: the puller
+     * sets the envelope's `occurredAt` to the item's business time
+     * (pullerWorker.ts) and the store writes the envelope field to the column
+     * unchanged (eventStoreUtils.ts:71), with the append clock going to
+     * `EventTimestamp` instead.
      *
      * So this is a pin, not a repair. A producer that ever set the envelope to
      * wall-clock time would put an event in one query's day and the other's
@@ -417,10 +396,13 @@ describe("CostRollupComparatorService", () => {
     it("assigns each to the day its own business time falls in", async () => {
       const lastMs = Date.parse(`${DAY}T23:59:59.999Z`);
       const firstMsNextDay = Date.parse("2026-08-02T00:00:00.000Z");
-      await appendConfirmed({ costNanoUsd: 5_000_000_000, occurredAt: lastMs });
-      await appendConfirmed({
-        costNanoUsd: 7_340_000_000,
-        occurredAt: firstMsNextDay,
+      await appendObserved({
+        costNanoMinor: 5_000_000_000,
+        occurredAtMs: lastMs,
+      });
+      await appendObserved({
+        costNanoMinor: 7_340_000_000,
+        occurredAtMs: firstMsNextDay,
       });
 
       // The summary for DAY claims only the event whose business day is DAY.
@@ -429,7 +411,7 @@ describe("CostRollupComparatorService", () => {
       const sameDay = await comparator.compareDay({
         tenantId,
         day: DAY,
-        costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
       });
       // The 00:00:00.000 event next door was not pulled into this day.
       expect(sameDay.mismatches).toEqual([]);
@@ -439,7 +421,7 @@ describe("CostRollupComparatorService", () => {
       const nextDay = await comparator.compareDay({
         tenantId,
         day: "2026-08-02",
-        costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
       });
       expect(nextDay.mismatches).toHaveLength(1);
       expect(nextDay.mismatches[0]!.derivedNanoMinor).toBe(7_340_000_000);
@@ -457,7 +439,7 @@ describe("CostRollupComparatorService", () => {
       const comparison = await comparator.compareDay({
         tenantId,
         day: DAY,
-        costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
       });
 
       expect(comparison.mismatches).toHaveLength(1);
@@ -468,12 +450,12 @@ describe("CostRollupComparatorService", () => {
 
   describe("when the comparator runs", () => {
     it("measures how far the summary is behind the log", async () => {
-      await appendConfirmed({ costNanoUsd: 5_000_000_000 });
+      await appendObserved({ costNanoMinor: 5_000_000_000 });
 
       const comparison = await comparator.compareDay({
         tenantId,
         day: DAY,
-        costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
       });
 
       // Nothing summarized, one event at 09:30 on the sampled day: the summary

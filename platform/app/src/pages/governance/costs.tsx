@@ -33,6 +33,7 @@ import {
 import {
   azureBillingNoteSentence,
   laneTrendPct,
+  meteredRequestsWithoutAmountNote,
 } from "~/components/governance/costLaneFormat";
 import {
   CostDonut,
@@ -830,6 +831,9 @@ function CostLanes({
           cellsWithoutAmount={data.gateway.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.gateway.currenciesWithoutUsdAmount}
           currencyTotals={data.gateway.currencyTotals}
+          belowTotalNote={meteredRequestsWithoutAmountNote(
+            data.gateway.requestsWithoutAmount,
+          )}
           trendPct={trendPctOf((day) => day.gatewayUsd)}
           sample={sample}
         />

@@ -224,6 +224,24 @@ export function laneWithheldTotalNote(): string {
 }
 
 /**
+ * The metered lane's note: how many requests carry no dollar amount.
+ *
+ * DELIBERATELY BESIDE the total, not in place of it. Unlike the billed lane,
+ * the metered lane marks rather than withholds — the gateway priced every
+ * request it could and this counts the rest (free or unpriced, or settled with
+ * the cost never confirmed), so the total still stands and this rides under it.
+ * Null below one, so a lane with nothing left out says nothing. "request" is
+ * spelled out, singular at one.
+ */
+export function meteredRequestsWithoutAmountNote(
+  count: number | undefined,
+): string | null {
+  if (!count || count <= 0) return null;
+  const noun = count === 1 ? "request" : "requests";
+  return `${count} ${noun} with no dollar amount`;
+}
+
+/**
  * One currency total's digits, with the currency named rather than symbolised.
  *
  * The code, not a symbol: a symbol table is a thing that has to be exhaustive
