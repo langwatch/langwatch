@@ -152,7 +152,6 @@ server.log
 # thuishaven (portless local dev)
 .langwatch-slug
 .haven.json
-/bin/haven
 **/dev.log
 .claude/tmp/
 
@@ -160,6 +159,13 @@ server.log
 # binary here (packages/test-harness/src/nlpgo-subprocess.ts). It used to sit
 # inside the application package, whose own ignore file covered it.
 /.vitest-tmp/
+
+# Every binary this repository builds locally, one directory per binary:
+# .bin/<name>/<name> (haven, the Go services under `make service-watch`, the
+# bun-compiled langy-worker and langwatch CLIs). Release pipelines still pass
+# their own --outfile; this is the default so a stray build can never be
+# committed the way a 9.8 MB `apidiff` once was.
+/.bin/
 
 # apidiff scratch: worktrees, instance logs, generated compose overrides
 .apidiff/

@@ -1,5 +1,6 @@
-// Command visualdiff renders every route and every flow in visualdiff.yaml on
-// two refs of this repository and reports every screen that differs.
+// Command visualdiff renders every route and every flow in
+// tools/visualdiff/visualdiff.yaml on two refs of this repository and reports
+// every screen that differs.
 package main
 
 import (

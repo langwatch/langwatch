@@ -23,6 +23,10 @@
 **/.venv
 
 dist
+# Host-built binaries (.bin/<name>/<name>). A macOS build of haven or the langy
+# worker is both useless in a Linux image and tens of megabytes of build
+# context; the image builds its own with an explicit --outfile.
+.bin
 sdks/python/dist
 sdks/python/.ipynb_checkpoints
 sdks/python/.pytest_cache

@@ -11,7 +11,7 @@ and quietly lost the endpoint behind it.
 
 ```text
 visualdiff run [-base REF] [-candidate REF] [-routes-only] [-flows a,b]
-               [-viewport 1440x900] [-config visualdiff.yaml] [-root DIR]
+               [-viewport 1440x900] [-config PATH] [-root DIR]
                [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                [-dry-run] [-keep] [-agent] [-no-haven]
 ```
@@ -225,7 +225,7 @@ stream reports each comparison as it completes" rule for the bound scenarios.
 
 ## Adding a route
 
-Add the path to `routes:` in `visualdiff.yaml`. `{slug}` is substituted with
+Add the path to `routes:` in `tools/visualdiff/visualdiff.yaml`. `{slug}` is substituted with
 the run's project slug.
 
 ## Adding a flow
@@ -277,7 +277,7 @@ tools/visualdiff/recapture.go        `visualdiff recapture`: replays named route
 tools/havenrun/                      what visualdiff and apidiff share to boot through haven
 cmd/visualdiff/main.go               the entry point
 tools/visualdiff/runner/             @langwatch/visual-diff-runner: Playwright capture + pixel diff
-visualdiff.yaml                      what gets rendered - the only file most changes touch
+tools/visualdiff/visualdiff.yaml     what gets rendered - the only file most changes touch
 specs/tooling/visual-diff.feature
 specs/tooling/visualdiff-on-haven.feature
 ```

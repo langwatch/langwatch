@@ -393,7 +393,7 @@ describe("plan-langy-lane.sh", () => {
         const r = plan({ appDir });
 
         expect(r.command).toMatch(
-          /LANGY_PI_WORKER_BINARY_PATH="\$\{LANGY_PI_WORKER_BINARY_PATH:-.*services\/langyworker\/out\/langy-worker\}"/,
+          /LANGY_PI_WORKER_BINARY_PATH="\$\{LANGY_PI_WORKER_BINARY_PATH:-.*\.bin\/langy-worker\/langy-worker\}"/,
         );
       });
 
@@ -514,7 +514,7 @@ describe("plan-langy-lane.sh", () => {
 
         expect(r.summary).toContain("harness=pi");
         expect(r.summary).toContain(`url=${r.agentUrl}`);
-        expect(r.summary).toContain("/services/langyworker/out/langy-worker");
+        expect(r.summary).toContain("/.bin/langy-worker/langy-worker");
       });
 
       /** @scenario "The launcher names the harness, the address and the worker binary" */

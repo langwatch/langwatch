@@ -366,7 +366,16 @@ sdks/typescript/     # TypeScript SDK
 sdks/go/             # Go SDK
 mcp/typescript/      # MCP server
 specs/               # BDD feature specs
+.bin/<name>/<name>   # Every locally built binary, ignored (see below)
 ```
+
+Nothing this repository builds locally lands anywhere but `.bin/<name>/<name>`:
+`make haven` writes `.bin/haven/haven`, `make service-watch svc=X` writes
+`.bin/X/X`, and the two bun-compiled CLIs default to `.bin/langy-worker/` and
+`.bin/langwatch/`. The directory is ignored wholesale by git and by Docker, so
+a stray build can never be committed the way a 9.8 MB `apidiff` once was.
+Release pipelines and image builds are unaffected — each passes its own
+explicit `--outfile`.
 
 ## Key References
 

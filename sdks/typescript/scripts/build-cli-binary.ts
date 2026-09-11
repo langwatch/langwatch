@@ -17,9 +17,10 @@
  *
  * Usage:
  *   bun run build:binary                      # host platform
- *   bun run build:binary -- --target=bun-linux-arm64 --outfile dist/bin/langwatch
+ *   bun run build:binary -- --target=bun-linux-arm64 --outfile=dist/bin/langwatch
  */
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import packageJson from "../package.json" with { type: "json" };
 
 const args = process.argv.slice(2);
@@ -29,11 +30,17 @@ const flag = (name: string): string | undefined => {
 };
 
 const target = flag("target");
-const outfile = flag("outfile") ?? "dist/bin/langwatch";
+// Every binary this repository builds locally lands in <root>/.bin/<name>/<name>,
+// which is ignored wholesale. Resolved from this script rather than the working
+// directory so the path is the same whoever invokes it; the release workflow
+// passes its own --outfile under dist/bin, which packaging already excludes.
+const outfile =
+  flag("outfile") ?? resolve(import.meta.dir, "../../..", ".bin/langwatch/langwatch");
 
 // `bun build --compile` refuses to overwrite a running/existing binary cleanly
 // on some platforms; remove it first so repeat builds are deterministic.
 rmSync(outfile, { force: true });
+mkdirSync(dirname(outfile), { recursive: true });
 
 const result = await Bun.build({
   entrypoints: ["./src/cli/index.ts"],
@@ -54,7 +61,7 @@ const result = await Bun.build({
   // domain-error / card contract). It must be inlined, exactly as tsup does
   // via `noExternal`, or the binary cannot resolve it at runtime. Bun bundles
   // all imports by default, so this is implicit — verify a fresh binary with
-  // `dist/bin/langwatch --version` after building.
+  // `.bin/langwatch/langwatch --version` after building.
   throw: true,
 });
 

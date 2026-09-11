@@ -21,7 +21,7 @@
  *
  * Flags:
  *   --runs N    wall-time repetitions for the median (default 10)
- *   --binary    also time dist/bin/langwatch (skipped gracefully if absent;
+ *   --binary    also time .bin/langwatch/langwatch (skipped gracefully if absent;
  *               the bun binary is never rebuilt from here — it takes minutes)
  *   --label L   output file prefix (default: the argv joined with '-')
  *
@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 
 const SDK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CLI_ENTRY = path.join(SDK_ROOT, "dist", "cli", "index.js");
-const BINARY = path.join(SDK_ROOT, "dist", "bin", "langwatch");
+const BINARY = path.join(SDK_ROOT, "..", "..", ".bin", "langwatch", "langwatch");
 const HOOK = path.join(SDK_ROOT, "scripts", "startup-require-hook.cjs");
 const OUT_DIR = path.join(SDK_ROOT, ".startup-profile");
 
@@ -250,10 +250,10 @@ wallText += `startup above node boot: ${(nodeWall.median - bootWall.median).toFi
 if (useBinary) {
   if (fs.existsSync(BINARY)) {
     const binWall = timeRuns(BINARY, cliArgs);
-    wallText += `dist/bin/langwatch ${cliArgs.join(" ")}\n`;
+    wallText += `.bin/langwatch/langwatch ${cliArgs.join(" ")}\n`;
     wallText += `  median ${binWall.median.toFixed(1)}ms  (min ${binWall.min.toFixed(1)}, max ${binWall.max.toFixed(1)})\n`;
   } else {
-    wallText += `dist/bin/langwatch: not present, skipped (not rebuilt — that takes minutes)\n`;
+    wallText += `.bin/langwatch/langwatch: not present, skipped (not rebuilt — that takes minutes)\n`;
   }
 }
 

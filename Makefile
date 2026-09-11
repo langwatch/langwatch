@@ -157,11 +157,11 @@ service-watch:
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
-		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
-			--build.bin "./tmp/$(svc) $(svc) $(args)" \
+		air --build.cmd "mkdir -p .bin/$(svc) && go build -o .bin/$(svc)/$(svc) ./cmd/service" \
+			--build.bin ".bin/$(svc)/$(svc) $(svc) $(args)" \
 			--build.include_ext "go" \
 			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750} \
-			--build.exclude_dir "tmp,vendor,node_modules"
+			--build.exclude_dir ".bin,tmp,vendor,node_modules"
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`
 # (interactive) or `./dev/scripts/dev.sh <preset>` directly. Preset list:

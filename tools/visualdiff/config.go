@@ -15,9 +15,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ConfigFile is the repository-root configuration the tool reads. Extending
-// the coverage is editing this file, not the tool.
-const ConfigFile = "visualdiff.yaml"
+// ConfigFile is the configuration the tool reads, relative to the repository
+// root. It sits beside the tool it configures rather than at the root, which
+// is why this is a path and not a bare name. Extending the coverage is editing
+// that file, not the tool.
+const ConfigFile = "tools/visualdiff/visualdiff.yaml"
 
 // Viewport is one browser viewport, given on the command line or in the
 // configuration as WIDTHxHEIGHT.
