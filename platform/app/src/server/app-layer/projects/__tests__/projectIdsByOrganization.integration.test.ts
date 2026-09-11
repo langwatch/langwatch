@@ -110,10 +110,14 @@ describe("ProjectRepository.findAllIdsByOrganization", () => {
       // The organization's three, whatever their state or kind.
       const mine = seeded.slice(0, 3);
       expect(ids).toEqual([...mine].sort());
-      // Ordered by id ascending so downstream client routing by the first
-      // tenant is stable, the way `spendScope` orders them.
+      // Ordered by id ascending — this repository's own `orderBy`, not a
+      // property of the caller — so the metered lane's ledger read, which
+      // resolves its ClickHouse client by the FIRST id, routes one
+      // organization's reads to the same client every time.
       expect(ids).toEqual([...ids].sort());
-      // The other organization's project is not in reach at all.
+      // This is the tenancy boundary. The metered lane's ledger read takes
+      // these ids as its whole scope, so an id leaking across organizations
+      // here is a cross-organization money read there.
       expect(ids).not.toContain(seeded[3]);
     });
   });
