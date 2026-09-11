@@ -22,6 +22,45 @@ const silentLogger = {
   error: () => undefined,
 } as unknown as Logger;
 
+/**
+ * Wait for one IPC message matching `matches`, but also reject on an early
+ * `exit` or `error` so a dead child hangs the wait until the Vitest timeout
+ * instead of failing loud. Removes every listener it attached once settled.
+ */
+function waitForChildMessage<T>(
+  child: ChildProcess,
+  matches: (message: T) => boolean,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onMessage = (message: T): void => {
+      if (matches(message)) {
+        cleanup();
+        resolve(message);
+      }
+    };
+    const onExit = (code: number | null, signal: string | null): void => {
+      cleanup();
+      reject(
+        new Error(
+          `child exited before sending the expected message (code=${code}, signal=${signal})`,
+        ),
+      );
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = (): void => {
+      child.off("message", onMessage);
+      child.off("exit", onExit);
+      child.off("error", onError);
+    };
+    child.on("message", onMessage);
+    child.on("exit", onExit);
+    child.on("error", onError);
+  });
+}
+
 // A minimal child that installs the receiver shape by hand (the real receiver
 // lives in TS the child cannot import), reads the head, and reports back.
 const CHILD_SOURCE = `
@@ -53,12 +92,10 @@ describe("voice media socket handoff to a real child process", () => {
     });
     const theChild = child;
 
-    await new Promise<void>((resolve, reject) => {
-      theChild.once("error", reject);
-      theChild.on("message", (msg: { ready?: boolean }) => {
-        if (msg.ready) resolve();
-      });
-    });
+    await waitForChildMessage<{ ready?: boolean }>(
+      theChild,
+      (msg) => !!msg.ready,
+    );
 
     const registry = new VoiceNonceRegistry();
     listener = await bootVoiceWsListener({
@@ -70,14 +107,11 @@ describe("voice media socket handoff to a real child process", () => {
     const port = (listener.address as AddressInfo).port;
     registry.register({ nonce: "handoff", child: theChild });
 
-    const received = new Promise<{ nonce: string; head: string }>((resolve) => {
-      theChild.on(
-        "message",
-        (msg: { received?: boolean; nonce: string; head: string }) => {
-          if (msg.received) resolve({ nonce: msg.nonce, head: msg.head });
-        },
-      );
-    });
+    const received = waitForChildMessage<{
+      received?: boolean;
+      nonce: string;
+      head: string;
+    }>(theChild, (msg) => !!msg.received);
 
     // Write the upgrade request plus extra bytes after the header block, so
     // the head buffer the child must receive is non-empty.

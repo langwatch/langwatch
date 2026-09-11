@@ -45,14 +45,40 @@ export interface VoiceMediaSocketMessage {
   headBase64: string;
 }
 
-/** Narrows an arbitrary IPC message to the voice handoff message. */
+/** True when every header value is a string, a string array, or undefined. */
+function isVoiceMediaSocketHeaders(
+  value: unknown,
+): value is Record<string, string | string[] | undefined> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  return Object.values(value).every(
+    (headerValue) =>
+      typeof headerValue === "string" ||
+      headerValue === undefined ||
+      (Array.isArray(headerValue) &&
+        headerValue.every((entry) => typeof entry === "string")),
+  );
+}
+
+/**
+ * Narrows an arbitrary IPC message to the voice handoff message. Validates
+ * every required field, not just the discriminator - a message with the right
+ * `type` but a missing or malformed `headBase64` would otherwise reach
+ * `Buffer.from`, which throws and can kill the scenario child.
+ */
 export function isVoiceMediaSocketMessage(
   message: unknown,
 ): message is VoiceMediaSocketMessage {
+  if (typeof message !== "object" || message === null) return false;
+  const candidate = message as Record<string, unknown>;
   return (
-    typeof message === "object" &&
-    message !== null &&
-    (message as { type?: unknown }).type === VOICE_MEDIA_SOCKET_MESSAGE
+    candidate.type === VOICE_MEDIA_SOCKET_MESSAGE &&
+    typeof candidate.nonce === "string" &&
+    typeof candidate.url === "string" &&
+    typeof candidate.method === "string" &&
+    typeof candidate.headBase64 === "string" &&
+    isVoiceMediaSocketHeaders(candidate.headers)
   );
 }
 
