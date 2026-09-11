@@ -186,3 +186,4 @@ packages/prisma-client/src/generated/
 !.claude/handoffs/README.md
 .claude/manifests/*
 !.claude/manifests/README.md
+.claude/coordinator/LANES.md

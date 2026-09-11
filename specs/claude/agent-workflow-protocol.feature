@@ -183,3 +183,17 @@ Feature: The coordinator and lane protocol holds when a real agent runs under it
     When the coordinator starts that lane
     Then the spawn carries that model
     And a manifest naming a cheap model never produces a lane running on an expensive one
+
+  @unit
+  Scenario: The live-lane roster is runtime state and is never committed
+    Given the coordinator records every lane it spawns
+    When a drive writes the roster
+    Then version control ignores it the way it ignores the manifests and handoffs
+    And no checkout's roster is ever tracked in the repository
+
+  @unit
+  Scenario: Spawning a lane is tied to recording it
+    Given a coordinator about to start a lane
+    When it reads its own spawn instructions
+    Then it is told to record the lane before the spawn call and not after
+    And the condition for replacing a coordinator is a roster with no active lanes

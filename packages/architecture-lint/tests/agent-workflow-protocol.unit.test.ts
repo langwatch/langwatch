@@ -198,3 +198,31 @@ describe("every cross-reference in the protocol resolves", () => {
     expect(checked).toBeGreaterThan(0);
   });
 });
+
+describe("the live-lane roster", () => {
+  const ROSTER = `${COORDINATOR_DIR}/LANES.md`;
+
+  /** @scenario "The live-lane roster is runtime state and is never committed" */
+  it("is ignored by version control like the manifests and handoffs beside it", () => {
+    const ignore = readFileSync(join(root, ".gitignore"), "utf8")
+      .split("\n")
+      .map((line) => line.trim());
+
+    expect(ignore).toContain(ROSTER);
+    expect(ignore).toContain(".claude/manifests/*");
+    expect(ignore).toContain(".claude/handoffs/*");
+  });
+
+  /** @scenario "Spawning a lane is tied to recording it" */
+  it("is written before the spawn call, and an empty one is what frees the coordinator", () => {
+    const coordinator = protocolText(`${COORDINATOR_DIR}/COORDINATOR.md`);
+
+    const recordsBeforeSpawning = coordinator.indexOf("LANES.md` **before** the Agent call");
+    expect(recordsBeforeSpawning).toBeGreaterThan(-1);
+
+    const spawnCall = coordinator.indexOf("`subagent_type` `lane`");
+    expect(spawnCall).toBeGreaterThan(recordsBeforeSpawning);
+
+    expect(coordinator).toContain("no `active` rows");
+  });
+});

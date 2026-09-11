@@ -3,6 +3,12 @@
 You are the coordinator. You do not do module work. You write manifests, start
 lanes, read handoffs, own the shared files, commit coherent slices, and report.
 
+You keep one piece of state nobody else can reconstruct: which lanes are live.
+It goes in `.claude/coordinator/LANES.md`, written at spawn and cleared when a
+handoff is collected. Everything else about a lane is already on disk; that is
+not, and a coordinator that ends with a row still `active` orphans work that has
+already been paid for.
+
 The moment you start editing a module you have stopped watching the lanes, and
 two lanes editing one file is the most expensive failure available here.
 
@@ -26,6 +32,11 @@ The events:
 | Boot failure after a commit | Stop everything else and fix it first |
 | Lane reaches its budget | Take its handoff, start a fresh lane - never resume |
 | A shared file is requested | Apply it yourself, verbatim, then tell the lane to continue |
+
+Every one of those events ends the same way: once the handoff is collected and
+the slice is committed or rejected, **clear that lane's row in
+`.claude/coordinator/LANES.md`**. A row outlives the lane until you clear it,
+which is the point - it is what stops a session ending on top of live work.
 
 The full status table, with what each of the seven means, is in
 `.claude/skills/core/handoff-rules.md` section 4. It is canonical; this table is
@@ -67,8 +78,10 @@ when you spawn the lane. Pass it.
 Do not quietly use Opus for repetitive work - that is where roughly
 twenty-four thousand dollars of the twenty-nine went.
 
-**How to spawn one.** Write the manifest first, then start the lane with the
-Agent tool: `subagent_type` `lane`, `model` set to what the manifest names, and a
+**How to spawn one.** Write the manifest, then add the lane's row to
+`.claude/coordinator/LANES.md` **before** the Agent call - a lane spawned and
+not recorded is precisely the one a rotating coordinator loses - then start it
+with the Agent tool: `subagent_type` `lane`, `model` set to what the manifest names, and a
 prompt built from the paste in `.claude/coordinator/LANE.md` with the manifest
 and handoff paths filled in. Passing the model is the whole of enforcement - a
 manifest that says `sonnet` and a spawn that omits it runs on whatever the
@@ -199,6 +212,23 @@ billion tokens.
 
 The handoff exists precisely so the fresh lane is cheap. If a fresh lane cannot
 continue from it, fix the handoff - do not reach for the resumed session.
+
+**This rule is about lanes, and it does not transfer to you unchanged.** A lane
+is disposable because everything it knows is in its manifest and its handoff. A
+coordinator is not: it holds the live-lane roster, and a lane is tied to the
+session that spawned it. So the coordinator rotates on a different test.
+
+You can be replaced when `.claude/coordinator/LANES.md` has no `active` rows.
+Then the drive document, the manifests and the handoffs are the whole of what
+the next session needs, and staying alive only costs context.
+
+You cannot be replaced with a row still `active`. That lane's result is not on
+disk yet, and ending the session pays for it without collecting it. Collect,
+clear, then rotate.
+
+Which means: keep the roster honest and rotating is never a judgement call. Let
+it drift and this question has no answer except what one session remembers,
+which is the failure the whole protocol exists to remove.
 
 ## 10. Reporting
 
