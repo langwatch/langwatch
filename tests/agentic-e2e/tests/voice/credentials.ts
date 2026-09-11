@@ -93,12 +93,19 @@ async function ensureProviderKey(
   const projectId = findProjectIdForSlug(data, projectSlug);
 
   const updateEndpoint = "/api/trpc/modelProvider.update";
+  // This request body carries real provider credentials (`customKeys`).
+  // Playwright's default `maxRedirects` (20) would silently re-send that
+  // body — including the credentials — to wherever a 3xx pointed, before
+  // `assertRequestOk` below ever gets a chance to inspect the response.
+  // `maxRedirects: 0` refuses to follow any redirect, so one surfaces as a
+  // request-shape bug to fix, never as a credential leak to a second origin.
   const updateResponse = await page.request.post(`${updateEndpoint}?batch=1`, {
     data: {
       "0": {
         json: { projectId, provider, enabled: true, customKeys },
       },
     },
+    maxRedirects: 0,
   });
   await assertRequestOk(updateResponse, updateEndpoint);
 }

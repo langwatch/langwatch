@@ -35,6 +35,7 @@ import { test } from "@playwright/test";
 import {
   CALL_START_TIMEOUT_MS,
   CALL_VERDICT_TIMEOUT_MS,
+  MAX_AUDIO_PARTS_BUDGETED,
   TRACE_INGESTION_TIMEOUT_MS,
   WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS,
   elevenLabsCredsFromEnv,
@@ -63,9 +64,10 @@ import {
 
 /**
  * UI settle time not covered by any single phase constant below: page
- * navigation, scenario authoring, provider setup, and the run dialog. Named
- * rather than folded into one of the phase constants, so a future phase
- * change doesn't have to hunt for where the slack was hiding.
+ * navigation, scenario authoring, provider setup, the run dialog, and the
+ * trace drawer's own short (5-15s) internal waits. Named rather than folded
+ * into one of the phase constants, so a future phase change doesn't have to
+ * hunt for where the slack was hiding.
  */
 const SETUP_MARGIN_MS = 60_000;
 
@@ -86,15 +88,32 @@ test.describe("Voice agent simulation contract", () => {
   test("simulates a call against a voice agent reachable by phone number", async ({
     page,
   }) => {
-    // Each phase below waits up to its own named ceiling; this test's budget
-    // is their sum plus the setup margin, so it cannot drift below what its
-    // own steps can legitimately take: place the call, wait for the verdict,
-    // wait for the recording to publish, then wait for the trace to ingest.
+    // Each phase below waits up to its own named ceiling, and this test's
+    // budget is the honest sum of every sequential await downstream that can
+    // legitimately need its full ceiling — not just one occurrence of each
+    // constant:
+    //   CALL_START_TIMEOUT_MS               x1  thenTheCallIsPlaced
+    //   CALL_VERDICT_TIMEOUT_MS              x1  thenASimulatedUserTalksToTheAgent
+    //   CALL_VERDICT_TIMEOUT_MS              x1  thenTheRunIsJudgedAgainstCriteria
+    //   CALL_VERDICT_TIMEOUT_MS              x1  thenTheyCanListenToTheWholeCall
+    //                                              (audio element visible)
+    //   WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS     x1  thenTheyCanListenToTheWholeCall
+    //                                              (recording-publish poll)
+    //   CALL_VERDICT_TIMEOUT_MS              x1  thenEachTurnHasAudio
+    //                                              (first part visible)
+    //   CALL_VERDICT_TIMEOUT_MS  x MAX_AUDIO_PARTS_BUDGETED  thenEachTurnHasAudio
+    //                                              (per-part waits, bounded —
+    //                                              not an unbounded sum)
+    //   TRACE_INGESTION_TIMEOUT_MS           x3  whenTheyFollowTheTracesLink,
+    //                                              thenTheCallIsOneTrace,
+    //                                              thenTheTracesCarryTheAudio
+    //                                              (via reopenTheOneTrace)
+    //   SETUP_MARGIN_MS                      x1  everything else
     test.setTimeout(
       CALL_START_TIMEOUT_MS +
-        CALL_VERDICT_TIMEOUT_MS +
+        CALL_VERDICT_TIMEOUT_MS * (4 + MAX_AUDIO_PARTS_BUDGETED) +
         WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS +
-        TRACE_INGESTION_TIMEOUT_MS +
+        TRACE_INGESTION_TIMEOUT_MS * 3 +
         SETUP_MARGIN_MS,
     );
 
@@ -161,12 +180,29 @@ test.describe("Voice agent simulation contract", () => {
     page,
   }) => {
     // This journey has no separate call-placement phase (no queued state to
-    // leave before ElevenLabs joins), so its budget omits CALL_START_TIMEOUT_MS
-    // — see the phone test above for the full derivation rationale.
+    // leave before ElevenLabs joins), so its budget omits CALL_START_TIMEOUT_MS,
+    // and it never calls thenTheCallIsOneTrace, so it only pays
+    // TRACE_INGESTION_TIMEOUT_MS twice, not three times — everything else is
+    // the same sequential sum as the phone test above:
+    //   CALL_VERDICT_TIMEOUT_MS              x1  thenASimulatedUserTalksToTheAgent
+    //   CALL_VERDICT_TIMEOUT_MS              x1  thenTheRunIsJudgedAgainstCriteria
+    //   CALL_VERDICT_TIMEOUT_MS              x1  thenTheyCanListenToTheWholeCall
+    //                                              (audio element visible)
+    //   WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS     x1  thenTheyCanListenToTheWholeCall
+    //                                              (recording-publish poll)
+    //   CALL_VERDICT_TIMEOUT_MS              x1  thenEachTurnHasAudio
+    //                                              (first part visible)
+    //   CALL_VERDICT_TIMEOUT_MS  x MAX_AUDIO_PARTS_BUDGETED  thenEachTurnHasAudio
+    //                                              (per-part waits, bounded —
+    //                                              not an unbounded sum)
+    //   TRACE_INGESTION_TIMEOUT_MS           x2  whenTheyFollowTheTracesLink,
+    //                                              thenTheTracesCarryTheAudio
+    //                                              (via reopenTheOneTrace)
+    //   SETUP_MARGIN_MS                      x1  everything else
     test.setTimeout(
-      CALL_VERDICT_TIMEOUT_MS +
+      CALL_VERDICT_TIMEOUT_MS * (4 + MAX_AUDIO_PARTS_BUDGETED) +
         WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS +
-        TRACE_INGESTION_TIMEOUT_MS +
+        TRACE_INGESTION_TIMEOUT_MS * 2 +
         SETUP_MARGIN_MS,
     );
 

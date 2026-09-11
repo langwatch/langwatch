@@ -22,8 +22,27 @@ export const CALL_START_TIMEOUT_MS = 60_000;
 /** How long to keep retrying a `404` while the provider finishes publishing the recording. */
 export const WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS = 120_000;
 
-/** Delay between polls of the whole-call audio endpoint. */
+/**
+ * The provider publishes the whole-call recording asynchronously after the
+ * call ends, so a `404` is expected right after a run settles. Five seconds
+ * gives the provider real processing time between retries — polling faster
+ * just burns requests against an endpoint that has not finished yet.
+ */
 export const WHOLE_CALL_AUDIO_POLL_INTERVAL_MS = 5_000;
+
+/**
+ * Upper bound on how many rendered conversation parts `thenEachTurnHasAudio`
+ * budgets a full `CALL_VERDICT_TIMEOUT_MS` wait for, when the test's overall
+ * `test.setTimeout` sums up its steps' worst-case waits. The per-part loop
+ * itself has no hard cap — it iterates every part the call actually
+ * rendered — but the timeout budget must be a finite, named sum rather than
+ * "however many parts show up," so this is the number of parts the budget
+ * accounts for. A real voice-agent scenario in this suite renders only a
+ * handful of turns, so this comfortably covers the expected case; a call
+ * that legitimately renders more parts than this is expected to fail on the
+ * test's overall timeout rather than silently understating the budget.
+ */
+export const MAX_AUDIO_PARTS_BUDGETED = 3;
 
 /**
  * How long to wait for a just-finished call's trace(s) to ingest and appear,

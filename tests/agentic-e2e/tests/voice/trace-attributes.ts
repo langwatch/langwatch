@@ -117,8 +117,34 @@ export async function thenTheTracesCarryTheAudio(page: Page) {
   await showTraceConversation(page);
 
   const dialog = page.getByRole("dialog");
-  const audio = dialog.getByTestId("media-part-audio");
-  await expect(audio.first()).toBeVisible({ timeout: 30_000 });
+  const audio = dialog.getByTestId("media-part-audio").first();
+  await expect(audio).toBeVisible({ timeout: 30_000 });
+
+  const src = await audio.getAttribute("src");
+  expect(src, "media-part-audio has no src").toBeTruthy();
+
+  // `MediaPart` mounts the `<audio>` element as soon as it has a non-empty
+  // src, before the browser has fetched or decoded any bytes — visibility
+  // alone proves a tag exists, not that the audio is genuinely playable.
+  // Poll the element's own `readyState` so this only passes once the browser
+  // has decoded real data (`HAVE_CURRENT_DATA`, readyState >= 2). If the src
+  // instead errors, `MediaPart` unmounts the `<audio>` element in favor of a
+  // `media-part-error` placeholder — the `.catch(() => -1)` below turns that
+  // vanished-element read into a value that never satisfies the assertion,
+  // so an errored/empty recording fails this step instead of passing on a
+  // mounted-but-unplayable tag.
+  await expect
+    .poll(
+      () =>
+        audio
+          .evaluate((el) => (el as HTMLAudioElement).readyState)
+          .catch(() => -1),
+      {
+        timeout: 30_000,
+        message: "media-part-audio never reached HAVE_CURRENT_DATA (readyState >= 2)",
+      },
+    )
+    .toBeGreaterThanOrEqual(2);
 }
 
 /**
@@ -129,11 +155,11 @@ export async function thenTheTracesCarryTheAudio(page: Page) {
 export async function thenTheTraceCarriesTwilioMetadata(page: Page) {
   await openTheOneTrace(page);
   const attributeText = "voice.twilio.call_sid";
-  const found = await selectSpanExposingAttribute(page, {
+  const hasAttribute = await selectSpanExposingAttribute(page, {
     nameMatch: /voice\.adapter\.dial|voice\.adapter\.connect/,
     attributeText,
   });
-  expect(found).toBe(true);
+  expect(hasAttribute).toBe(true);
   await expect(
     page.getByRole("dialog").getByText(attributeText),
   ).toBeVisible({ timeout: 10_000 });
@@ -150,22 +176,22 @@ export async function thenTheTraceCarriesCallMetadata(page: Page) {
   await openTheOneTrace(page);
   const nameMatch = /voice\.adapter\.dial|voice\.adapter\.connect|elevenlabs/i;
 
-  const foundConversationId = await selectSpanExposingAttribute(page, {
+  const hasConversationId = await selectSpanExposingAttribute(page, {
     nameMatch,
     attributeText: "voice.elevenlabs.conversation_id",
   });
-  if (foundConversationId) {
+  if (hasConversationId) {
     await expect(
       page.getByRole("dialog").getByText("voice.elevenlabs.conversation_id"),
     ).toBeVisible({ timeout: 10_000 });
     return;
   }
 
-  const foundAny = await selectSpanExposingAttribute(page, {
+  const hasAnyVoiceAttribute = await selectSpanExposingAttribute(page, {
     nameMatch,
     attributeText: /^voice\./,
   });
-  expect(foundAny).toBe(true);
+  expect(hasAnyVoiceAttribute).toBe(true);
   await expect(
     page.getByRole("dialog").getByText(/^voice\./).first(),
   ).toBeVisible({ timeout: 10_000 });
