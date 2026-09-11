@@ -189,11 +189,15 @@ function defaultResolveModule(): CloudflaredModule {
 }
 
 /** Reject once `ms` elapses, so a hung download cannot park worker boot. */
-function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  message: string,
-): Promise<T> {
+function withTimeout<T>({
+  promise,
+  ms,
+  message,
+}: {
+  promise: Promise<T>;
+  ms: number;
+  message: string;
+}): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), ms);
     promise.then(
@@ -210,7 +214,13 @@ function withTimeout<T>(
 }
 
 /** Prepend `dir` to `env.PATH`, unless it is already the leading entry. */
-function prependToPath(env: NodeJS.ProcessEnv, dir: string): void {
+function prependToPath({
+  env,
+  dir,
+}: {
+  env: NodeJS.ProcessEnv;
+  dir: string;
+}): void {
   const current = env.PATH ?? "";
   if (current.split(path.delimiter)[0] === dir) return;
   env.PATH = current ? `${dir}${path.delimiter}${current}` : dir;
@@ -222,18 +232,22 @@ function prependToPath(env: NodeJS.ProcessEnv, dir: string): void {
  * Throws {@link VoiceTunnelBinaryError} on a failed/timed-out download, or when
  * the download reports success yet leaves no binary.
  */
-async function ensureBinaryPresent(
-  mod: CloudflaredModule,
-  binaryExists: (binPath: string) => boolean,
-  installTimeoutMs: number,
-): Promise<void> {
+async function ensureBinaryPresent({
+  mod,
+  binaryExists,
+  installTimeoutMs,
+}: {
+  mod: CloudflaredModule;
+  binaryExists: (binPath: string) => boolean;
+  installTimeoutMs: number;
+}): Promise<void> {
   if (binaryExists(mod.bin)) return;
   try {
-    await withTimeout(
-      mod.install(mod.bin),
-      installTimeoutMs,
-      `cloudflared install timed out after ${installTimeoutMs}ms`,
-    );
+    await withTimeout({
+      promise: mod.install(mod.bin),
+      ms: installTimeoutMs,
+      message: `cloudflared install timed out after ${installTimeoutMs}ms`,
+    });
   } catch (error) {
     throw new VoiceTunnelBinaryError(
       `failed to install the cloudflared binary to ${mod.bin}`,
@@ -280,6 +294,6 @@ export async function ensureCloudflaredOnPath(
     );
   }
 
-  await ensureBinaryPresent(mod, binaryExists, installTimeoutMs);
-  prependToPath(env, path.dirname(mod.bin));
+  await ensureBinaryPresent({ mod, binaryExists, installTimeoutMs });
+  prependToPath({ env, dir: path.dirname(mod.bin) });
 }
