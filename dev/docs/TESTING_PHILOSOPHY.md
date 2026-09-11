@@ -253,7 +253,7 @@ noise. It is a parity check you run against a branch, not a suite that runs in
 CI, and its own behaviour is specified in `specs/tooling/visual-diff.feature`
 and bound by Go and runner unit tests. Start with
 `go run ./cmd/visualdiff run -dry-run`; the routes and flows it renders live in
-`visualdiff.yaml` at the repository root, so widening the coverage is editing
+`tools/visualdiff/visualdiff.yaml`, so widening the coverage is editing
 YAML. See `tools/visualdiff/README.md`.
 
 ## Workflow

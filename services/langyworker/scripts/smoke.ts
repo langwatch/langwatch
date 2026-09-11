@@ -8,7 +8,7 @@
  *
  * Usage:
  *   bun run scripts/smoke.ts                          # spawns `node dist/src/main.js` (run `pnpm build` first)
- *   bun run scripts/smoke.ts --bin=./out/langy-worker # spawns a compiled binary
+ *   bun run scripts/smoke.ts --bin=../../.bin/langy-worker/langy-worker # a compiled binary
  */
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";

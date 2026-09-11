@@ -8,7 +8,7 @@ import { defineRule } from "../define-rule.mjs";
  * The measured cost is not hypothetical. `better-auth/react` in one browser
  * module put 576 declaration files into `apps/ui`, 251 of them kysely: a SQL
  * query builder, in the program for a page. The trimmed contract in
- * `types/browser/` is why the two client entrypoints below stay allowed —
+ * `packages/browser-types/` is why the two client entrypoints below stay allowed —
  * everything else on this list has no browser half at all.
  */
 
@@ -24,7 +24,7 @@ const SERVER_SHAPED = [
 
 /**
  * The browser entrypoints of an otherwise server-shaped package. `paths` in
- * the browser tsconfigs points the checker at `types/browser/` for these, so
+ * the browser tsconfigs points the checker at `packages/browser-types/` for these, so
  * naming one costs the program nothing.
  */
 const BROWSER_ENTRYPOINTS = new Set([

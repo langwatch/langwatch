@@ -3,7 +3,7 @@ import { passkeyClient } from "@better-auth/passkey/client";
 import { createAuthClient } from "better-auth/react";
 
 /**
- * The browser programs read `types/browser/better-auth-react.d.ts` instead of
+ * The browser programs read `packages/browser-types/better-auth-react.d.ts` instead of
  * better-auth's own declarations, which reach a SQL query builder. This suite
  * runs against the REAL package — vitest resolves it normally — so a method
  * the contract promises and the library has dropped fails here rather than in

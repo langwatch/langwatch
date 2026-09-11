@@ -13,8 +13,8 @@
     // See the same entries in `apps/ui/tsconfig.json`: the checker reads the
     // trimmed browser contract, the bundler still resolves the real package.
     "paths": {
-      "better-auth/react": ["../../../types/browser/better-auth-react.d.ts"],
-      "@better-auth/passkey/client": ["../../../types/browser/better-auth-passkey-client.d.ts"]
+      "better-auth/react": ["../../../packages/browser-types/better-auth-react.d.ts"],
+      "@better-auth/passkey/client": ["../../../packages/browser-types/better-auth-passkey-client.d.ts"]
     },
 
     "rewriteRelativeImportExtensions": false

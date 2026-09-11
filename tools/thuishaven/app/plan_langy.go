@@ -122,7 +122,7 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 	laRoot := filepath.Join(o.cfg.Home, "langyagent", st.Slug)
 	_ = os.MkdirAll(filepath.Join(laRoot, "sessions"), 0o755)
 	_ = os.MkdirAll(filepath.Join(laRoot, "workspace"), 0o755)
-	piWorkerPath := filepath.Join(opts.RepoRoot, "services", "langyworker", "out", "langy-worker")
+	piWorkerPath := filepath.Join(opts.RepoRoot, ".bin", "langy-worker", "langy-worker")
 	// A missing wrapper binary fails every worker spawn with exec-not-found,
 	// which reads as a bug rather than a setup gap. Say so at startup, once,
 	// while the operator is still looking at the terminal.
