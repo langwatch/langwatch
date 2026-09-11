@@ -269,3 +269,19 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     When they change the connection
     Then the change is a guarded command with the actor recorded
     And no raw table edit exists on the surface
+
+  # --- The issuer is an address we will dial -------------------------------
+  #
+  # The string an operator types becomes the URL this process later fetches
+  # the provider's OpenID configuration from, so the form is a way to ask us
+  # to make a request. It is checked where it is typed, which is the one
+  # moment somebody is present to correct it.
+
+  @unit
+  Scenario: An issuer that only answers on a private network is refused
+    Given an operator registering a connection
+    When the issuer they give resolves to an address inside our own network
+    Then the connection is not registered
+    And they are told to give the issuer URL their provider publishes
+    And nothing in the answer describes our network back to them
+

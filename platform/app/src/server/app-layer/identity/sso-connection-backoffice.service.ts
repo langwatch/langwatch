@@ -1,4 +1,5 @@
 import {
+  SsoConnectionIssuerNotPublicError,
   type SsoConnectionLifecycleState,
   type SsoConnectionState,
   type SsoDomainVerification,
@@ -10,6 +11,11 @@ import {
   newSsoConnectionId,
 } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
+import {
+  type HostResolver,
+  publicHopFor,
+  systemHostResolver,
+} from "./public-egress";
 import { rowToConnection } from "./repositories/sso-connection-projection.prisma.repository";
 
 /**
@@ -69,6 +75,9 @@ export class SsoConnectionBackofficeService {
     private readonly deps: {
       prisma: PrismaClient;
       connections: () => SsoConnectionService;
+      /** How an issuer's hostname is resolved before it is accepted. Injected
+       *  so the refusal can be tested without a resolver on the network. */
+      resolveHost?: HostResolver;
     },
   ) {}
 
@@ -149,6 +158,7 @@ export class SsoConnectionBackofficeService {
         `connection type ${type} is not registrable through a self-serve surface`,
       );
     }
+    await this.refuseIssuerWeWouldDialOurselves(issuer);
     const connectionId = newSsoConnectionId();
     await this.deps.connections().registerConnection({
       ...this.command({ organizationId, connectionId, operator }),
@@ -163,6 +173,37 @@ export class SsoConnectionBackofficeService {
       allowsJit,
     });
     return { connectionId };
+  }
+
+  /**
+   * Refuses an issuer that does not resolve to a public address.
+   *
+   * The string typed here is not inert: it becomes the URL this process later
+   * dials for the provider's OpenID configuration, so accepting one that
+   * answers `127.0.0.1` or a link-local metadata address makes a settings
+   * form into a request we make to ourselves. This is the one moment a person
+   * is present to correct it.
+   *
+   * It is a check at the door, not the pinned dial `fetchFollowingPublicHosts`
+   * performs — the discovery request itself is made inside better-auth, which
+   * takes no dispatcher from us, so a name that answers publicly now and
+   * privately later is not stopped here. Closing that needs this application
+   * to own discovery rather than hand over a URL, which is a larger change
+   * than a guard. Refusing what is plainly private at the door is worth
+   * having in the meantime and costs an operator nothing.
+   */
+  private async refuseIssuerWeWouldDialOurselves(
+    issuer: string | null,
+  ): Promise<void> {
+    if (issuer === null || issuer.length === 0) return;
+    const hop = await publicHopFor({
+      url: issuer,
+      resolveHost: this.deps.resolveHost ?? systemHostResolver,
+    });
+    if (hop.ok) return;
+    throw new SsoConnectionIssuerNotPublicError(
+      `issuer refused before registration: ${hop.refusal}`,
+    );
   }
 
   async claimDomain(args: DomainCommandArgs): Promise<void> {

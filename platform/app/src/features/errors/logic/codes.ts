@@ -396,6 +396,7 @@ export const APP_ERROR_CODES = [
   "sso_connection_activation_blocked",
   "sso_connection_domain_taken",
   "sso_connection_invalid_transition",
+  "sso_connection_issuer_not_public",
   "sso_connection_operator_act_required",
   "sso_connection_string_edit_retired",
   "sso_connection_teardown_strands_users",

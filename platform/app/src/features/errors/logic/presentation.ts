@@ -2300,6 +2300,14 @@ const presentations = {
     describe: () =>
       "Approving a domain claim and vouching for a domain are LangWatch's to do. Prove the domain by publishing the record we give you, or contact support.",
   },
+  sso_connection_issuer_not_public: {
+    title: "That issuer address cannot be reached from the internet",
+    // Says what to do and nothing about our network: the rejected string is
+    // the reader's own, and describing what it resolved to would tell a
+    // prober more than it tells an administrator.
+    describe: () =>
+      "Enter the issuer URL your identity provider publishes, starting with https. An address that only works inside a private network cannot be used here.",
+  },
   sso_saml_not_self_serve: {
     title: "SAML connections are set up with us",
     describe: () =>
