@@ -33,6 +33,12 @@ project as the *home* of every pulled row and separates "home" from
 > resolved **at read time** from three **dated identity tables** this
 > document defines — in **two waves**: money first, people second.
 
+> **[REVISED — see revision v3.16.]** "Folds into one daily rollup" holds
+> for the provider bills alone. Gateway traffic no longer folds into the
+> rollup: the metered lane is read straight off the gateway's own
+> per-request ledger, `gateway_spend`, and the rollup holds the pulled lane
+> only. The rest of the line stands.
+
 ## Context
 
 Customers running AI across providers (Anthropic, OpenAI, Azure/Copilot,
@@ -271,10 +277,11 @@ flowchart LR
   W["Pull run, bounded<br/>page cap, chunk cap,<br/>watermark, settling re-read"]
   G["AI Gateway<br/>request metering"]
   EL[("event_log")]
-  FP["GovernanceCostRollupFoldProjection<br/>registered on BOTH money pipelines"]
-  R[("governance_cost_rollup_1d<br/>CostSource: pulled or gateway")]
+  FP["GovernanceCostRollupFoldProjection<br/>registered on the pulled-usage pipeline ONLY (v3.16)"]
+  R[("governance_cost_rollup_1d<br/>CostSource: pulled<br/>(gateway rows written before v3.16<br/>remain and are read by nothing)")]
   OE[("governance_ocsf_events<br/>audit rows and seat reports")]
-  GS[("gateway_spend and budget ledger<br/>sibling projections")]
+  GS[("gateway_spend<br/>one row per request, latest status —<br/>the metered lane's own store (v3.16)")]
+  BL[("budget ledger<br/>sibling projection")]
   PG[("Postgres<br/>IngestionSource run history,<br/>DiscoveredPerson")]
 
   P --> W
@@ -282,29 +289,34 @@ flowchart LR
   W -->|"priced usage event<br/>(omitted when a read yields no row)"| EL
   W -->|"run outcome: errorCount,<br/>lastSuccessAt, unpriced window"| PG
   G --> EL
-  EL --> FP
-  EL --> GS
+  EL -->|"pulled-usage events only"| FP
+  EL -->|"gateway-spend events"| GS
+  EL --> BL
   FP --> R
 ```
 
-*Write path: bounded pull runs and gateway metering both append events; one
-fold projection registered on both money pipelines writes one daily rollup.*
+*Write path: bounded pull runs and gateway metering both append events. The
+fold projection is registered on the pulled-usage pipeline alone and writes
+the billed lane's daily rollup; gateway events reach the per-request ledger
+and never the rollup (v3.16).*
 
 ```mermaid
 flowchart LR
   R[("governance_cost_rollup_1d")]
+  GS[("gateway_spend")]
   OE[("governance_ocsf_events")]
   PG[("Postgres")]
   S["GovernanceCostService"]
   B["Billed card<br/>every provider's own reported total,<br/>summed across the window"]
-  M["Metered card<br/>gateway total"]
+  M["Metered card<br/>gateway total, per UTC start day,<br/>'N requests with no dollar amount' beside it"]
   ST["Seat card<br/>counts only, never money"]
   N["Notices: sources with failing pulls,<br/>unpriced window, Azure bill note"]
   SP["Spender breakdown<br/>(provider, rawActorId, agent)"]
 
   R -->|"sumDaysByLane: CostSource = pulled"| S
-  R -->|"sumDaysByLane: CostSource = gateway"| S
   R -->|"sumWindowBySpender: pulled lane only"| S
+  GS -->|"sumDaysForOrganizationProjects (v3.16):<br/>every project of the organization,<br/>one row per request, confirmed + failed,<br/>window on the request's own start day"| S
+  PG -->|"every project id of the organization<br/>(the metered lane's tenant scope)"| S
   OE -->|"findLatestSeatReports"| S
   PG -->|"run history, then deriveSourceHealth<br/>read-time, never written to status"| S
   PG -->|"DiscoveredPerson display text"| S
@@ -315,15 +327,19 @@ flowchart LR
   S --> SP
 ```
 
-*Read path: one service, four stores, three lanes that are labeled separately
-and never summed into one figure.*
+*Read path: one service, five stores, three lanes that are labeled separately
+and never summed into one figure. The billed lane reads the rollup; the
+metered lane reads the gateway's per-request ledger (v3.16).*
 
-The rollup projection consumes the **events** (gateway-spend and
-pulled-usage events on the log) — the `gateway_spend` table and the
-budget ledger are *sibling projection outputs* of those same streams,
-not the rollup's inputs. Projections register per-pipeline, so this is
-two registrations (one on each money pipeline) writing one table; replay
-means replaying both aggregates from the log.
+The rollup projection consumes the **pulled-usage events** on the log and
+nothing else (v3.16). The `gateway_spend` table and the budget ledger are
+*sibling projection outputs* of the gateway-spend stream, and `gateway_spend`
+is the metered lane's read store, not a rollup input. One registration, on
+the pulled-usage pipeline, writes the rollup; replay means replaying that one
+aggregate from the log. Until v3.16 the fold was also registered on the
+gateway-spend pipeline and wrote gateway cells under the traffic's own project
+tenant, where the screen — reading under the governance tenant — never found
+them; those rows remain in the table and every read filters them out.
 
 - **`governance_cost_rollup_1d`** — one row per tenant × day × ingestion
   source × cost_source × provider × model × agent × currency ×
@@ -2047,6 +2063,61 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3.16 (2026-09-11).** The metered lane reads the gateway's own
+  per-request ledger; the rollup's gateway half is removed. One decision is
+  revised: the "one daily rollup" of the one-line summary now holds the pulled
+  lane alone. Tracking issue langwatch-saas #1228; implementation PR #8080.
+  - **Why.** The fold wrote gateway cells under the tenant of the project whose
+    traffic it was, while the cost screen read the rollup under the hidden
+    governance project's tenant. Nothing ever landed where the screen looked,
+    so the metered lane read empty for every real organization and only
+    fixtures ever filled it. The comparator's gateway half looked under the
+    same tenant, found nothing on both sides, and passed every night. Two
+    writers on one table made the mismatch possible, so the gateway writer is
+    removed rather than repaired.
+  - **Write side.** The fold is no longer registered on the gateway-spend
+    pipeline (`gateway-spend-processing/pipeline.ts:82`); its gateway handlers,
+    the gateway branch of its cell addressing and its gateway state fields are
+    deleted, and addressing an undeclared event type throws. The comparator
+    compares the pulled lane only (`costRollupComparatorSchedule.ts:67`); an
+    active scheduled row for the retired gateway check is switched off at boot
+    and never recreated (`:76-86`), and a retired row that fires anyway settles
+    without comparing (`costRollupComparator.service.ts:265`). Gateway rows the
+    old fold wrote stay in the rollup; every rollup read carries a pulled-only
+    predicate and an integration test proves they count nowhere.
+  - **Read side.** `GovernanceGatewaySpendClickHouseRepository` reads
+    `gateway_spend` for every project of the organization, archived ones
+    included (`governanceCost.service.ts:579`), because the ledger's tenant is
+    the traffic's own project. One row per request first — `argMax` over
+    `(TenantId, GatewayRequestId)` — then the sum
+    (`governanceGatewaySpend.clickhouse.repository.ts:97`): the ledger is
+    partitioned by the month a request started in and an outcome that lands
+    before its admission leaves the same request in two partitions, which a
+    plain `FINAL` sum counts twice. The window is the read's only time
+    predicate and applies to the collapsed request's start day (`:113`), never
+    to its versions, since a late admission moves the start time back by a gap
+    nothing bounds; the tenant-led sort key keeps the scan to one organization.
+    Confirmed and failed requests are charged; the day is the request's UTC
+    start day; the read carries its own 20-second cap (`:77`). Groupings are
+    model and virtual key only — the ledger sits outside §9's erasure, so no
+    person column is ever selected.
+  - **Marked, not withheld.** The metered lane deviates from §3's withhold rule
+    on purpose: a request the ledger holds no dollar amount for — priced at zero
+    with tokens consumed, or settled with its cost never confirmed — is counted
+    beside the total as "N requests with no dollar amount", never inside it and
+    never as a reason to blank the figure. The figure stands when at least one
+    request was priced, or when requests were charged and none lacks an amount;
+    otherwise the day and the window read null, never $0.00
+    (`governanceCost.service.ts:1523`, `:136`). A window of only such requests
+    still renders the lane, with a dash and the count
+    (`costSampleMode.ts:55-59`).
+  - **Diagrams.** The §4 write-path diagram shows one registration; the
+    read-path diagram gains the ledger as the metered lane's store and the
+    project-id scope from Postgres.
+  - **Deferred, tracked separately.** Erasure coverage of `gateway_spend`
+    (which is why the metered lane has no per-person grouping); cleanup of the
+    old gateway rows in the rollup; the by-model and by-key ledger reads exist
+    and are tested but no screen calls them yet.
 - **v3.15 (2026-09-09).** Documentation caught up with the code, plus one
   correction. No new decision is taken; what changes is that §15's prose
   stopped describing what ships.
