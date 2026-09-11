@@ -131,7 +131,10 @@ export type TwilioAgentFactory = (options: {
   /** The account's OWN Twilio number (the "from"), NOT the destination. */
   phoneNumber: string;
   publicBaseUrl?: string;
-  /** The port the SDK's local media-stream server binds. See {@link resolveHttpPort}. */
+  /** The port the SDK's local media-stream server binds. Always `0`
+   *  (OS-assigned) at the call site: the parent worker owns the public media
+   *  port, and the child only ever receives an already-upgraded socket over
+   *  IPC, so this field never needs to be reachable. */
   httpPort?: number;
   allowedCallees: readonly string[];
   /** The target under test is the agent; the synthetic caller is the user. */
@@ -285,22 +288,6 @@ export function resolvePublicBaseUrlWithSource(
   }
 
   return undefined;
-}
-
-/**
- * The port the SDK's local media-stream server binds. `VOICE_WS_PORT` when it
- * is a valid port number, otherwise `0` (OS-assigned), the SDK's own default.
- * A fixed port lets an operator route a public HTTPS origin to the child in a
- * single-worker deployment; slice 3's listener handoff supersedes it.
- */
-export function resolveHttpPort(
-  processEnv: NodeJS.ProcessEnv = process.env,
-): number {
-  const raw = processEnv.VOICE_WS_PORT?.trim();
-  if (!raw) return 0;
-  const port = Number(raw);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) return 0;
-  return port;
 }
 
 /**
@@ -506,7 +493,11 @@ export function createPhoneTransport(
         authToken: twilio.authToken,
         phoneNumber: twilio.fromNumber,
         publicBaseUrl: resolvedBaseUrl?.value,
-        httpPort: resolveHttpPort(deps.processEnv),
+        // Always OS-assigned: the parent worker owns the public media port
+        // and hands the child an already-upgraded socket over IPC (below), so
+        // the child's own SDK server never needs a reachable port. Binding a
+        // fixed port here would race the parent for the same listener.
+        httpPort: 0,
         // Only the dialled target is allowlisted, so the SDK's deny-by-default
         // a-leg guard passes for exactly this number and nothing else. There is
         // no user-facing allowlist; this guard is internal to the SDK.

@@ -15,7 +15,6 @@ import {
   PHONE_CONNECT_REJECTED_PREFIX,
   PHONE_NO_BROWSER_CALL_MESSAGE,
   phoneTransport,
-  resolveHttpPort,
   resolvePublicBaseUrl,
   TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
   type TwilioAdapterLike,
@@ -643,35 +642,10 @@ describe("phoneTransport", () => {
     });
   });
 
-  describe("given the http port is resolved", () => {
-    describe("when VOICE_WS_PORT is a valid port", () => {
-      it("uses it", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: "5564" })).toBe(5564);
-      });
-    });
-
-    describe("when VOICE_WS_PORT is unset", () => {
-      it("falls back to the OS-assigned port", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: undefined })).toBe(0);
-      });
-    });
-
-    describe("when VOICE_WS_PORT is not a number", () => {
-      it("falls back to the OS-assigned port", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: "not-a-port" })).toBe(0);
-      });
-    });
-
-    describe("when VOICE_WS_PORT is out of range", () => {
-      it("falls back to the OS-assigned port", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: "0" })).toBe(0);
-        expect(resolveHttpPort({ VOICE_WS_PORT: "65536" })).toBe(0);
-        expect(resolveHttpPort({ VOICE_WS_PORT: "-1" })).toBe(0);
-      });
-    });
-
+  describe("given the child's SDK adapter http port", () => {
     describe("when the phone transport builds the SDK adapter", () => {
-      it("passes the resolved http port to the factory", () => {
+      /** @scenario "A phone call's scenario child never binds the worker's media port" */
+      it("always passes an OS-assigned port, even when VOICE_WS_PORT is set in the environment", () => {
         const { transport, factoryOptions } = buildTransport({
           processEnv: {
             VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
@@ -683,7 +657,7 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 120,
         });
-        expect(factoryOptions[0]?.httpPort).toBe(5564);
+        expect(factoryOptions[0]?.httpPort).toBe(0);
       });
     });
   });

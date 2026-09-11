@@ -104,6 +104,12 @@ Feature: Voice agents: reach an agent by phone
     When the runner resolves the public base URL
     Then it uses the app's own public base host, and a set VOICE_PUBLIC_BASE_URL overrides it
 
+  @unit
+  Scenario: A phone call's scenario child never binds the worker's media port
+    Given the parent worker's own VOICE_WS_PORT is set in the environment
+    When the phone transport builds the SDK adapter
+    Then the adapter is always given an OS-assigned port, never the worker's own port
+
   # ---------------------------------------------------------------------------
   # Phone run failures
   # ---------------------------------------------------------------------------
