@@ -97,8 +97,10 @@ jobs:
       # It also fixes the draft case, which was silently wrong: a draft got
       # `shards: [1]` and still ran `--shard=1/4`, so it executed a quarter of
       # its files while reporting a pass over all of them.
-      unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
-      unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
+      # At 602 files per shard, healthy runs hit the four-minute hard floor.
+      # Five shards give the full suite headroom without weakening that floor.
+      unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5]' || '[1]' }}
+      unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '5' || '1' }}
       # Six became four when the component lane took the files that never
       # needed a datastore. 540 of the 1017 integration files declare jsdom and
       # name no database, queue or cache; they now run on `test-component`
@@ -672,6 +674,7 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/langyworker run typecheck
 
+<<<<<<< HEAD
       # The share feature (ADR-057 / share ADR-001) owns trace-link minting,
       # token resolution, audience and expiry, the view budget and the
       # share-safe payload cache. Its suites live under packages/, so the app's
@@ -709,6 +712,9 @@ jobs:
         run: pnpm --filter @langwatch/share-web run typecheck
 
       - name: Run @langwatch/${{ matrix.app }} tests
+=======
+      - name: Run unit tests (shard ${{ matrix.shard }}/${{ needs.changes.outputs.unit-shard-count }})
+>>>>>>> origin/main
         id: unit-tests
         run: |
           COV=""

@@ -1,14 +1,15 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError } from "../../utils/errorOutput";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { commandValidationError } from "../../utils/errorOutput.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 export const updateWorkflowCommand = async (
   id: string,
   options: { name?: string; icon?: string; description?: string },
@@ -35,14 +36,17 @@ export const updateWorkflowCommand = async (
       process.exit(1);
     }
 
-    const response = await fetch(`${endpoint}/api/v1/workflows/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+    const response = await langwatchFetch(
+      `${endpoint}/api/v1/workflows/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey }),
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);

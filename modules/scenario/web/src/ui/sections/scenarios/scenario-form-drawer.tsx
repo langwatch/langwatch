@@ -30,7 +30,10 @@ import { useRunScenario } from "../use-run-scenario.ts";
 import { useScenarioTarget } from "../use-scenario-target.ts";
 import type { CustomComponentConfig } from "@langwatch/workflow-contract";
 import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
-import { parseScenarioParameterDefinitions } from "@langwatch/scenario-contract";
+import {
+  parseCallerVoiceConfig,
+  parseScenarioParameterDefinitions,
+} from "@langwatch/scenario-contract";
 import {
   ScenarioForm,
   type ScenarioFormController,
@@ -569,6 +572,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       return {
         ...scenario,
         parameters: parseScenarioParameterDefinitions(scenario.parameters),
+        // Stored as JSON (null on a scenario that never set one); read through
+        // the tolerant parser so the form always has a full config to bind.
+        callerVoice: parseCallerVoiceConfig(
+          (scenario as { callerVoice?: unknown }).callerVoice,
+        ),
       };
     }
     // A new scenario made from inside a test suite starts filed in it.

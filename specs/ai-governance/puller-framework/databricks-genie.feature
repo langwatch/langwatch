@@ -7,8 +7,9 @@ Feature: Databricks AI/BI Genie puller
   Genie charges nothing per message. The warehouse compute that answers the
   question does, and that spend is billed to the customer whether or not anyone
   attributes it. So a source that names a warehouse gets each question's share
-  of that compute; a source that names none carries a cost of zero and must
-  never invent one.
+  of that compute; a source that names none carries no amount at all and must
+  never invent one — not even zero, which the ledger would read as a figure the
+  bill backs.
 
   Background:
     Given an IngestionSource of type `databricks_genie`
@@ -34,13 +35,15 @@ Feature: Databricks AI/BI Genie puller
     # account's own, and nothing anywhere reports a failure.
 
   @integration
-  Scenario: A question costs nothing when no warehouse is named
+  Scenario: A question carries no amount when no warehouse is named
     Given a Genie source configured without a warehouse
     When the puller records a message
-    Then the recorded cost is zero
+    Then the question is recorded with no amount
     And the puller does not ask the workspace about billing
     # Genie itself bills nothing per message. Naming the warehouse is what
-    # opts a source into attributing the compute behind the question.
+    # opts a source into attributing the compute behind the question. With
+    # none named there is no bill to back a figure, and no figure is what is
+    # recorded — never a zero, which reads on the ledger as a measurement.
 
   Rule: A named warehouse turns each question's share of compute into cost
 
@@ -106,7 +109,7 @@ Feature: Databricks AI/BI Genie puller
     Scenario: A question whose SQL has not reached the billing tables yet
       Given a message whose generated SQL is too recent to appear in query history
       When the puller records it
-      Then the record carries a cost of zero
+      Then the record carries no amount
       And the message is recorded for visibility regardless
 
     @integration
@@ -139,7 +142,7 @@ Feature: Databricks AI/BI Genie puller
     Scenario: A question that ran no SQL is charged nothing
       Given a message Genie answered without running a query
       When the puller records it
-      Then the recorded cost is zero
+      Then the record carries no amount
 
     @integration
     Scenario: A priced question calls its figure an estimate
@@ -192,29 +195,34 @@ Feature: Databricks AI/BI Genie puller
       Given a period the warehouse has refused to price for longer than the hold allows
       When the puller reads the cost
       Then the watermark moves on without it
-      And those questions keep the zero they already carry
+      And those questions stay unpriced, carrying no amount
       # Refusing a partial answer is only half the job. A first sweep reads
       # thirty days, and later runs re-read only the settling window, so a
-      # watermark that moved past those thirty days would make their zeros the
-      # permanent answer — the same undercount the refusal was meant to prevent,
-      # just spread evenly. The cost is a re-read of a period already recorded,
-      # and re-emitting a question replaces its ledger row rather than adding
-      # one, so the real figure lands as soon as the bill does.
+      # watermark that moved past those thirty days would leave them unpriced
+      # for good — the same undercount the refusal was meant to prevent, just
+      # spread evenly. The cost is a re-read of a period already recorded, and
+      # re-emitting a question replaces its ledger row rather than adding one,
+      # so the real figure lands as soon as the bill does.
       #
       # The window is read a week at a time so that holding it is recoverable
       # rather than a stall: a week busy enough to be refused does not stop the
       # ones priced before it from keeping their cost, and the refused week is
       # re-asked in days rather than surrendered whole.
       #
-      # Held when the answer was CUT SHORT, and when it RAN OUT OF TIME. Billing
-      # refusing the question outright is not held: a narrower question would be
-      # refused the same way, and holding would stall a workspace that never
-      # granted the billing tables, with no way out but turning the feature off.
+      # Held when the answer was CUT SHORT, when it RAN OUT OF TIME, and when
+      # billing REFUSED the question outright — a deleted warehouse, a revoked
+      # grant. The refusal skips the smaller pieces, since a narrower question
+      # is refused the same way, but it holds like the others: the questions
+      # carry no amount, and moving past them would make that permanent. This
+      # hold's expiry is what keeps a workspace that never granted the billing
+      # tables from pinning itself forever. See "A warehouse that cannot be
+      # read holds the day open instead of closing it at zero" in
+      # specs/governance/pulled-usage-cost-reporting.feature.
       #
       # Running out of time is not refusing. The two arrive as the same shape —
       # an answer that is not a success — and reading them as one was worth a
       # month of silent zeroes on a workspace whose billing tables are merely
-      # slow. The scenarios below hold the two apart.
+      # slow. They are still told apart: only a refusal is reported as one.
 
     @integration
     Scenario: A cost answer cancelled for taking too long is asked about again
@@ -234,22 +242,15 @@ Feature: Databricks AI/BI Genie puller
       # questions carry becomes the final answer to a question billing was
       # merely slow to answer.
 
-    @integration
-    Scenario: Billing refusing the question outright is still not held
-      Given a workspace that will not let this credential read its billing
-      When the puller reads the cost
-      Then the watermark moves on without it
-      And the questions are still recorded
-      # The counterpart to the scenario above, and the reason that one is phrased
-      # about time rather than about failure. A credential without the billing
-      # grant is refused identically forever; holding for it would stall the
-      # source with no way out but turning the feature off.
-      #
-      # Deliberately silent on how the refusal arrives. A missing grant comes
-      # back as a successful request carrying a failed statement, while a revoked
-      # token comes back as the request itself being rejected — two different
-      # paths that must reach the same answer, and a scenario naming either one
-      # would leave the other free to hold forever.
+    # Billing refusing the question outright used to move the watermark on,
+    # so a workspace that never granted the billing tables would not stall.
+    # It now holds like every other unanswered bill, bounded by the same
+    # expiry, because the questions it moved past carried no amount and moving
+    # past them made that permanent. The scenario lives in
+    # specs/governance/pulled-usage-cost-reporting.feature: "A warehouse that
+    # cannot be read holds the day open instead of closing it at zero". Both
+    # doors — a successful request carrying a failed statement, and the
+    # request itself rejected — are bound there.
 
     @integration
     Scenario: A period the answer cannot carry whole is re-asked in smaller pieces
@@ -368,6 +369,21 @@ Feature: Databricks AI/BI Genie puller
       # spend the moment it lands, because a re-read that already answered
       # cannot answer again.
 
+    @integration
+    Scenario: A question held for its missing bill is priced when the bill lands
+      Given a question whose hour has no billing row yet
+      When the puller runs
+      Then the watermark stays behind that hour rather than moving to the clock
+      And the question is recorded without a cost for now
+      When the bill lands and the puller runs again from where it stopped
+      Then that same question carries its real share
+      # The scenario above is the allocator's half: the question is owed. This
+      # is what the owing has to be FOR. Without the watermark holding behind
+      # the unbilled hour, the sweep moves past a question it has seen, the
+      # fixed settling re-read never reaches back that far, and the zero it was
+      # recorded at becomes permanent. Holding is only worth its cost if the
+      # resumed run actually prices what it went back for.
+
     @unit
     Scenario: A statement that priced on any line is not held for an unbilled one
       Given a statement with one billed line and one line not yet billed
@@ -427,6 +443,19 @@ Feature: Databricks AI/BI Genie puller
       Then the question is sent to the workspace address on the source
       # Same secret, same reasoning as every other call this adapter makes: the
       # address on the source decides where the token goes.
+
+    @integration
+    Scenario: A question is priced by the warehouse that answered it, not the one the connector signs in to
+      Given a Genie source that names a warehouse
+      When the puller asks for billing
+      Then every question it sends runs on the named warehouse
+      But the answer is not narrowed to work that warehouse did
+      # The named warehouse says where the billing query EXECUTES. It does not
+      # say which warehouse answered the question being priced: a Genie space
+      # answers on whichever warehouse it was built against, routinely not the
+      # one the connector holds CAN USE on. Filtering the answer by the
+      # executor would return nothing and record that as a cost of zero, which
+      # reads on the page as a tool nobody is paying for.
 
     @unit
     Scenario: A question is still priced after the provider renames its client label

@@ -1,9 +1,19 @@
+<<<<<<< HEAD:modules/project/web/src/ui/sections/home/components/langy-home-hero.tsx
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette, useCommandBar } from "@langwatch/navigation-web/surfaces/command-bar";
 import { selectLangySuggestions } from "@langwatch/langy-web/surfaces/langy-store";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useHomeDevState } from "./dev/home-dev-state.ts";
+=======
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
+import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";
+import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { AskChip } from "./AskChip";
+import { useHomeDevState } from "./dev/homeDevState";
+import { HeroAskField } from "./HeroAskField";
+>>>>>>> origin/main:platform/app/src/components/home/LangyHomeHero.tsx
 import "./homeHeroScroll.css";
 import { OnboardAgentPill } from "./onboard-agent-pill.tsx";
 import { useProjectReach } from "./use-project-reach.ts";
@@ -12,8 +22,27 @@ import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 /**
  * The Langy home's opening: a greeting, one field, and the asks worth
+<<<<<<< HEAD:modules/project/web/src/ui/sections/home/components/langy-home-hero.tsx
  * borrowing. A CENTRED COLUMN, not a card. THE FIELD IS THE COMMAND
  * PALETTE, mounted inline. NOTHING CHANGES HEIGHT as it's used.
+=======
+ * borrowing.
+ *
+ * It is a CENTRED COLUMN, not a card. The page's question is "what do you want
+ * to do", and the honest shape for that is the shape a search field has always
+ * had: one field on the centre line with room around it. The block this
+ * replaced put a text input inside a bordered panel with an announcement bar
+ * across its top and a control shoved to the far right, which made the field
+ * read as one widget on a dashboard rather than the thing the page is for.
+ *
+ * THE FIELD IS THE COMMAND PALETTE (`HeroAskField`): the same component the
+ * Cmd+K bar renders, mounted inline at hero size, so it navigates, searches,
+ * and hands what you typed to Langy. Its results are an overlay, so nothing
+ * here changes height as the field is used, and the row of asks beneath keeps
+ * its footprint in every state.
+ *
+ * Spec: specs/home/langy-home.feature
+>>>>>>> origin/main:platform/app/src/components/home/LangyHomeHero.tsx
  */
 
 /** The field's reading measure. Wider and it stops reading as one question. */
@@ -28,7 +57,6 @@ const ASK_ROW_MIN_HEIGHT = "26px";
 
 export function LangyHomeHero() {
   const devState = useHomeDevState();
-  const { registerInlinePalette } = useCommandBar();
 
   const realCanAsk = useProjectHomeHost().canAskLangy();
   const canAsk = devState === "read-only" ? false : realCanAsk;
@@ -61,6 +89,7 @@ export function LangyHomeHero() {
 
   const askLangy = useLangyStore((s) => s.askLangy);
 
+<<<<<<< HEAD:modules/project/web/src/ui/sections/home/components/langy-home-hero.tsx
   // The home's own query, deliberately NOT the Cmd+K bar's. The two are the
   // same palette but not the same session: what someone half-typed here should
   // not be sitting in the raised bar on the next page.
@@ -91,6 +120,8 @@ export function LangyHomeHero() {
     inputRef.current?.blur();
   }, []);
 
+=======
+>>>>>>> origin/main:platform/app/src/components/home/LangyHomeHero.tsx
   return (
     <VStack align="center" gap={{ base: 5, md: 6 }} width="full">
       {/* The page's one big line, and it belongs here rather than in the
@@ -105,49 +136,15 @@ export function LangyHomeHero() {
       </Box>
 
       <VStack align="center" gap={3} width="full" maxWidth={ASK_MEASURE}>
-        <Box
-          ref={fieldRef}
-          width="full"
-          position="relative"
-          background="bg.panel/60"
-          borderWidth="1px"
-          /* One step darker on light: over the white bloom, border.muted was
-             faint enough that the field lost its own edge. Dark keeps the
-             quieter hairline; the darker ground already draws the box. */
-          borderColor={
-            focused
-              ? { base: "border.emphasized", _dark: "border" }
-              : { base: "border", _dark: "border.muted" }
+        <HeroAskField
+          placeholder={
+            canAsk
+              ? isNewProject
+                ? "Ask Langy how to get started, or search"
+                : "Ask Langy, search, or jump to anything"
+              : "Search, or jump to anything"
           }
-          borderRadius="16px"
-          boxShadow={
-            focused
-              ? "0 2px 8px rgba(20, 20, 23, 0.08), 0 24px 70px -20px rgba(20, 20, 23, 0.35)"
-              : "0 1px 2px rgba(20, 20, 23, 0.04), 0 12px 30px -22px rgba(20, 20, 23, 0.5)"
-          }
-          transition="border-color 130ms ease, box-shadow 130ms ease"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") standDown();
-          }}
-        >
-          <CommandPalette
-            surface="inline"
-            active={focused}
-            query={query}
-            setQuery={setQuery}
-            onDone={standDown}
-            inputRef={inputRef}
-            onFocus={() => setFocused(true)}
-            onBlur={onBlur}
-            placeholder={
-              canAsk
-                ? isNewProject
-                  ? "Ask Langy how to get started, or search"
-                  : "Ask Langy, search, or jump to anything"
-                : "Search, or jump to anything"
-            }
-          />
-        </Box>
+        />
 
         {/* TWO TIERS, not one wrapping row.
             The chips are prompts: click one and it goes to Langy. The
@@ -203,6 +200,7 @@ export function LangyHomeHero() {
     </VStack>
   );
 }
+<<<<<<< HEAD:modules/project/web/src/ui/sections/home/components/langy-home-hero.tsx
 
 /**
  * One borrowable ask. Deliberately near-opaque, since these sit over a
@@ -249,3 +247,5 @@ function AskChip({
     </chakra.button>
   );
 }
+=======
+>>>>>>> origin/main:platform/app/src/components/home/LangyHomeHero.tsx

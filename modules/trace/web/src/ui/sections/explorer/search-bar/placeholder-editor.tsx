@@ -147,8 +147,9 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
   const segments = useMemo(() => buildSegments(queryText), [queryText]);
   // Chips store the raw id (unique) but display the resolved facet label
   // (readable) — same source the sidebar uses. The label is painted by the
-  // shared CSS overlay (see editorStyles), field prefix intact, and the raw
-  // id slides back into view on hover — identical to the live editor.
+  // shared CSS overlay (see editorStyles), field prefix intact; the raw id
+  // stays in the tooltip so the chip never resizes under the pointer —
+  // identical to the live editor.
   const resolveLabel = useFacetValueLabelResolver();
 
   return (

@@ -9,7 +9,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   setupLocalCli,
-  toolCallFix,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
@@ -73,7 +72,6 @@ Then run CLI commands:
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
@@ -139,7 +137,6 @@ Prompt management commands:
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))

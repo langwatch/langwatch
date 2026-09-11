@@ -29,6 +29,12 @@ Feature: MCP Schema Discovery Tool
     And the options include "model", "topics", and "users"
 
   
+  Scenario: Agent discovers the suite fields and the evaluator attachments
+    When the agent calls discover_schema with category "scenarios"
+    Then the response documents the field identifier rules and the three field types
+    And the response documents the evaluator attachment shape
+    And the response lists every mapping path of the conversation, the scenario and the trace
+
   Scenario: Agent discovers all schema information at once
     When the agent calls discover_schema with category "all"
     Then the response includes filters, metrics, aggregations, and groups sections

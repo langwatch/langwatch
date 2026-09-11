@@ -37,6 +37,11 @@ const fmtRelative = (date: TimeInput | null): string => {
  * deep-link. Detail-data depth (per-day spend, per-user breakdown,
  * model mix) defers to a follow-up; this page exists today to honor
  * the bird's-eye click-through invariant.
+ *
+ * Every control on the page is a link that navigates; the copy names only
+ * what the page shows today and marks the rest as not available yet.
+ *
+ * Spec: specs/ai-governance/dashboard/team-detail-page.feature
  */
 function GovernanceTeamDetailPage() {
   const router = useGovernanceRouter();
@@ -47,9 +52,10 @@ function GovernanceTeamDetailPage() {
   // Resolve the team's first project slug for the bird's-eye drill-in
   // link. Teams typically have a primary project (or a small set);
   // navigating to /[projectSlug]/traces lands the admin on the team's
-  // workspace via the existing project-shell + auto-switches to
-  // PersonalSidebar via the v2 chrome retention discriminator (admin's
-  // not a TeamUser → AdminViewingAsBanner fires from DashboardLayout).
+  // workspace via the existing project-shell. No "viewing as admin" banner
+  // comes with it: that banner keys off a PERSONAL workspace owned by
+  // somebody else (see DashboardPageBody), and an org team is not one, so a
+  // team drill-through is silent and unlogged.
   const teamProjectSlug =
     organizations?.flatMap((org) => org.teams ?? []).find((t) => t.id === teamId)?.projects?.[0]
       ?.slug ?? null;

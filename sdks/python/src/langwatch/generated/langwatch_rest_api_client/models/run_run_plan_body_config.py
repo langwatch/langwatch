@@ -9,6 +9,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.run_run_plan_body_config_evaluators_item import RunRunPlanBodyConfigEvaluatorsItem
     from ..models.run_run_plan_body_config_scope_type_0 import RunRunPlanBodyConfigScopeType0
     from ..models.run_run_plan_body_config_scope_type_1 import RunRunPlanBodyConfigScopeType1
     from ..models.run_run_plan_body_config_scope_type_2 import RunRunPlanBodyConfigScopeType2
@@ -39,6 +40,9 @@ class RunRunPlanBodyConfig:
             choice. Leave it out for the scenario or project default.
         scenario_ids (list[str] | Unset): The scenarios a test_suites or scenarios scope covers. Read by a scenarios
             scope alone; a scope that states a rule resolves its own list at run time.
+        evaluators (list[RunRunPlanBodyConfigEvaluatorsItem] | Unset): The plan's own evaluators, run beside the ones
+            attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace,
+            never a scenario field. Leave it out to keep what the plan already holds.
     """
 
     scope: (
@@ -52,6 +56,7 @@ class RunRunPlanBodyConfig:
     simulator_model: None | str | Unset = UNSET
     judge_model: None | str | Unset = UNSET
     scenario_ids: list[str] | Unset = UNSET
+    evaluators: list[RunRunPlanBodyConfigEvaluatorsItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -92,6 +97,13 @@ class RunRunPlanBodyConfig:
         if not isinstance(self.scenario_ids, Unset):
             scenario_ids = self.scenario_ids
 
+        evaluators: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.evaluators, Unset):
+            evaluators = []
+            for evaluators_item_data in self.evaluators:
+                evaluators_item = evaluators_item_data.to_dict()
+                evaluators.append(evaluators_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -108,11 +120,14 @@ class RunRunPlanBodyConfig:
             field_dict["judgeModel"] = judge_model
         if scenario_ids is not UNSET:
             field_dict["scenarioIds"] = scenario_ids
+        if evaluators is not UNSET:
+            field_dict["evaluators"] = evaluators
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.run_run_plan_body_config_evaluators_item import RunRunPlanBodyConfigEvaluatorsItem
         from ..models.run_run_plan_body_config_scope_type_0 import RunRunPlanBodyConfigScopeType0
         from ..models.run_run_plan_body_config_scope_type_1 import RunRunPlanBodyConfigScopeType1
         from ..models.run_run_plan_body_config_scope_type_2 import RunRunPlanBodyConfigScopeType2
@@ -190,6 +205,15 @@ class RunRunPlanBodyConfig:
 
         scenario_ids = cast(list[str], d.pop("scenarioIds", UNSET))
 
+        _evaluators = d.pop("evaluators", UNSET)
+        evaluators: list[RunRunPlanBodyConfigEvaluatorsItem] | Unset = UNSET
+        if _evaluators is not UNSET:
+            evaluators = []
+            for evaluators_item_data in _evaluators:
+                evaluators_item = RunRunPlanBodyConfigEvaluatorsItem.from_dict(evaluators_item_data)
+
+                evaluators.append(evaluators_item)
+
         run_run_plan_body_config = cls(
             scope=scope,
             targets=targets,
@@ -197,6 +221,7 @@ class RunRunPlanBodyConfig:
             simulator_model=simulator_model,
             judge_model=judge_model,
             scenario_ids=scenario_ids,
+            evaluators=evaluators,
         )
 
         run_run_plan_body_config.additional_properties = d

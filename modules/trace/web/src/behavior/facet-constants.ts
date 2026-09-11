@@ -83,10 +83,27 @@ export const NORMAL_CASE_FIELDS = new Set([
 ]);
 
 /**
- * Status keeps a fixed traffic-light mapping.
+ * Evaluator Verdict is the traffic light the evaluator drilldown paints: green
+ * Passed, red Failed, yellow Errored. Without an entry here the field falls
+ * through to `hashColor` and the two surfaces show the same words in different
+ * colours. `skipped` and `unknown` are non-verdicts and stay neutral grey.
+ */
+const EVALUATOR_VERDICT_COLORS: Record<string, Tokens["colors"]> = {
+  pass: "green.solid",
+  fail: "red.solid",
+  error: "yellow.solid",
+  skipped: "gray.solid",
+  unknown: "gray.solid",
+};
+
+/**
+ * Status keeps a fixed traffic-light mapping. Origin takes its dot colours from
+ * the shared `ORIGIN_DISPLAY` table, the one the Origin column badge reads, so
+ * the two agree. Span Type still hashes: the value set is open-ended.
  */
 export const FACET_COLORS: Record<string, Record<string, Tokens["colors"]>> = {
   status: STATUS_COLORS,
+  evaluatorVerdict: EVALUATOR_VERDICT_COLORS,
   origin: Object.fromEntries(
     Object.entries(ORIGIN_DISPLAY).map(([value, { colorPalette }]) => [
       value,
@@ -129,8 +146,21 @@ export const FACET_DEFAULTS: Record<string, string[]> = {
 };
 
 /**
- * Range keys that should appear in the sidebar immediately — even before discover
- * responds — as synthetic placeholder sections.
+ * Display order for facets whose values have an inherent sequence, applied on
+ * top of the default count-sort. Deliberately not `FACET_DEFAULTS`: that map
+ * seeds values and would conjure zero-count rows for verdicts a project never
+ * emitted. Ordering ranks what is present. Values outside a list keep their
+ * count-sorted position behind it.
+ */
+export const FACET_VALUE_ORDER: Record<string, readonly string[]> = {
+  evaluatorVerdict: ["pass", "fail", "error"],
+};
+
+/**
+ * Range keys that should appear in the sidebar immediately — even before
+ * discover responds — as synthetic placeholder sections. Rendered disabled
+ * (min === max === 0, flagged synthetic) so the affordance is visible without
+ * being interactive on a zero-span range.
  */
 export const RANGE_DEFAULTS: readonly string[] = ["duration", "cost", "tokens"];
 
@@ -138,7 +168,15 @@ export const RANGE_DEFAULTS: readonly string[] = ["duration", "cost", "tokens"];
  * Fields whose colour palette is curated. Other categoricals get hashed
  * colours rendered at reduced opacity to keep the sidebar visually calm.
  */
-export const VIBRANT_FIELDS = new Set(["status", "origin", "spanType"]);
+export const VIBRANT_FIELDS = new Set([
+  "status",
+  "origin",
+  "spanType",
+  // Curated traffic light — dimming it would leave pass and fail as two
+  // washed-out dots a reader has to squint at to tell apart, while the
+  // drilldown right above paints the same verdicts at full strength.
+  "evaluatorVerdict",
+]);
 
 export const FACET_ICONS: Record<string, LucideIcon> = {
   origin: Compass,

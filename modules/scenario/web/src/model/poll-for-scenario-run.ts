@@ -46,6 +46,7 @@ const TERMINAL_STATUS_OUTCOME: Record<ScenarioRunStatus, "run_failed" | "run_err
   [ScenarioRunStatus.PENDING]: null,
   [ScenarioRunStatus.QUEUED]: null,
   [ScenarioRunStatus.RUNNING]: null,
+  [ScenarioRunStatus.PENDING_EVALUATION]: null,
 };
 
 function classifyTerminalStatus(status: ScenarioRunStatus): "run_failed" | "run_error" | null {

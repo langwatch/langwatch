@@ -1,0 +1,191 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import { nanoid } from "nanoid";
+/**
+ * Hidden Governance Project — internal routing/tenancy artifact.
+ *
+ * Per master_orchestrator + rchaves directive 2026-04-27 (unified-trace
+ * branch correction):
+ *   - IngestionSource ingest data lives in the existing trace pipeline
+ *     (recorded_spans + log_records), tagged with origin metadata.
+ *   - Project tenancy is reused for RBAC; the receiver
+ *     resolves a hidden per-org Project (kind = "internal_governance")
+ *     to anchor those writes.
+ *   - The hidden Governance Project is INTERNAL ONLY — never appears in
+ *     ProjectSelector / project list / /api/v1/projects / billing
+ *     exports / RBAC pickers. The Layer-1 filter at
+ *     PrismaOrganizationRepository.getAllForUser (commit 94426716e)
+ *     enforces the bulk of this; per-consumer assertions land in Layer 2.
+ *
+ * Lifecycle: lazily ensured on first need — typically the first
+ * IngestionSource mint per org. Any later callsite (anomaly subscriber,
+ * receiver, UI sub-route) calls the SAME helper. There is no other
+ * lazy-create path. Feature-flag activation alone does NOT create a
+ * Governance Project; the user must mint a real governance entity
+ * first.
+ *
+ * Spec contracts:
+ *   - specs/ai-gateway/governance/architecture-invariants.feature
+ *   - specs/ai-gateway/governance/ui-contract.feature
+ *   - specs/ai-gateway/governance/receiver-shapes.feature
+ */
+import {
+  Prisma,
+  type PrismaClient,
+  type Project,
+} from "~/generated/prisma/client";
+
+import { generateApiKey } from "~/server/utils/apiKeyGenerator";
+import { recordGovernanceTenantUse } from "./governanceTenantHistory.service";
+
+/** Canonical Project.kind values. Free-form string in the DB column for
+ *  extensibility; this constant is the source of truth in TS. */
+export const PROJECT_KIND = {
+  APPLICATION: "application",
+  INTERNAL_GOVERNANCE: "internal_governance",
+} as const;
+export type ProjectKind = (typeof PROJECT_KIND)[keyof typeof PROJECT_KIND];
+
+/**
+ * Read-only lookup of the org's hidden Governance Project. Unlike
+ * `ensureHiddenGovernanceProject`, this NEVER creates — read paths (e.g.
+ * the personal-usage rollups powering /me) must not provision a
+ * Governance Project as a side effect of a GET. Returns null when the org
+ * has never minted an ingestion source, in which case there is no
+ * ingestion-ledger traffic to union in.
+ */
+export async function findHiddenGovernanceProject({
+  prisma,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+}): Promise<Project | null> {
+  return prisma.project.findFirst({
+    where: {
+      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+      team: { organizationId },
+      archivedAt: null,
+    },
+  });
+}
+
+/**
+ * Resolve the org's hidden Governance Project, creating one on first
+ * call.
+ *
+ * Idempotent, but by the slug and not by a constraint on (teamId, kind):
+ * that pair carries an @@index, not an @@unique, so the database will
+ * happily hold two governance rows for one team. What collapses a race is
+ * the globally unique `slug` — `governance-<orgId>`, derived from the org
+ * rather than generated — so two concurrent ensures produce the same slug,
+ * one create wins, and the loser's P2002 is caught below and re-reads the
+ * winner. Anything that mints a governance project by another route, or
+ * changes the slug, loses that guarantee.
+ *
+ * The project is attached to the org's oldest team (any team works for
+ * routing — RBAC is enforced via project membership, which the Layer-1
+ * filter already guarantees won't include the Governance Project for
+ * any user-visible flow).
+ */
+export async function ensureHiddenGovernanceProject(
+  prisma: PrismaClient,
+  organizationId: string,
+): Promise<Project> {
+  const project = await resolveHiddenGovernanceProject(prisma, organizationId);
+  // Every route to a governance TenantId passes through here, so this is the
+  // one place that can promise the history is complete (ADR-128 §11). Recording
+  // it at the point of USE rather than only at creation is what covers the row
+  // this function can hand back from the archived-by-slug branch below — a
+  // tenant the read-side resolver has already gone blind to.
+  await recordGovernanceTenantUse({
+    prisma,
+    organizationId,
+    tenantId: project.id,
+  });
+  return project;
+}
+
+async function resolveHiddenGovernanceProject(
+  prisma: PrismaClient,
+  organizationId: string,
+): Promise<Project> {
+  const existing = await findHiddenGovernanceProject({
+    prisma,
+    organizationId,
+  });
+  if (existing) return existing;
+
+  const team = await prisma.team.findFirst({
+    where: { organizationId },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!team) {
+    throw new Error(
+      `Cannot ensure Governance Project for org ${organizationId}: ` +
+        "org has no team. The fresh-admin onboarding flow must create at " +
+        "least one team before any IngestionSource can be minted.",
+    );
+  }
+
+  // Slug must be globally unique. Org id keeps it stable + scoped.
+  const slug = `governance-${organizationId}`;
+  // Re-check by slug in case a concurrent request just won the race.
+  const bySlug = await prisma.project.findUnique({ where: { slug } });
+  if (bySlug && bySlug.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
+    return bySlug;
+  }
+
+  return await createGovernanceProject({ prisma, slug, teamId: team.id });
+}
+
+/** Creates the row, or returns the one that beat us to the slug.
+ *
+ *  Two concurrent ensures can both pass the caller's slug re-check and reach
+ *  create — that re-check closes the common case but not the window between
+ *  the findUnique and the create. P2002 (unique constraint) is the losing
+ *  side of that race, and the winner's row is the correct answer.
+ */
+async function createGovernanceProject({
+  prisma,
+  slug,
+  teamId,
+}: {
+  prisma: PrismaClient;
+  slug: string;
+  teamId: string;
+}): Promise<Project> {
+  try {
+    return await prisma.project.create({
+      data: {
+        id: nanoid(),
+        name: "Governance (internal)",
+        slug,
+        apiKey: generateApiKey(),
+        teamId,
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        // Internal-only — these aren't real "I'm building an app"
+        // language/framework signals, but the Project model requires
+        // them. Stable values keep the row recognisable in operator
+        // queries.
+        language: "internal",
+        framework: "governance",
+        // Trace sharing disabled — governance data must not be sharable
+        // out of the org's RBAC perimeter via public-share links.
+        traceSharingEnabled: false,
+      },
+    });
+  } catch (err) {
+    if (
+      !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+      err.code !== "P2002"
+    ) {
+      throw err;
+    }
+    const winner = await prisma.project.findUnique({ where: { slug } });
+    if (winner?.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
+      return winner;
+    }
+    throw err;
+  }
+}

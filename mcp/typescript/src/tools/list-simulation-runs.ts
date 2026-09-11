@@ -1,4 +1,5 @@
-import { listSimulationRuns as apiListSimulationRuns } from "../langwatch-api-simulation-runs.js";
+import { listSimulationRuns as apiListSimulationRuns } from "../langwatch-api-simulation-runs.ts";
+import { formatRunStatus } from "./format-suite-details.ts";
 
 /**
  * Handles the platform_list_simulation_runs MCP tool invocation.
@@ -31,8 +32,7 @@ export async function handleListSimulationRuns(params: {
   );
 
   for (const run of runs) {
-    const statusIcon =
-      run.status === "SUCCESS" ? "pass" : run.status === "FAILED" ? "FAIL" : run.status;
+    const statusIcon = formatRunStatus(run.status);
     const duration = run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
     const verdict = run.results?.verdict ?? "";
 

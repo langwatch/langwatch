@@ -107,6 +107,7 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       Then it uses the operator's number
       And it does not warn that the budget is exceeded
 
+<<<<<<< HEAD
   # The client is where tenant scoping can be made unavoidable. In this schema
   # no identifier other than the tenant is unique across customers, so a read
   # that forgets its WHERE clause does not return too much - it returns somebody
@@ -138,6 +139,23 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       When the repository issues it
       Then the client lets it through
       And the reason does not travel to the server as part of the request
+=======
+    @unit
+    Scenario: An override above a known server cap is reported even when the fleet size is unknown
+      Given a deployment that states the server's cap but not the fleet size
+      And an operator sets a bound larger than one process's share of that cap
+      When the platform sizes each process's bound
+      Then it uses the operator's number
+      And it reports that the bound may exceed the server's budget
+
+    @unit
+    Scenario: A known server cap bounds the fallback even when the fleet size is unknown
+      Given a deployment that says what the server allows but not how many siblings a process has
+      When the platform sizes each process's bound
+      Then one process alone never claims more than the server's safe budget
+      And it reports that the fleet may still exceed the budget, so the operator learns to supply the fleet size
+      But a deployment that says nothing keeps the historical fallback unchanged
+>>>>>>> origin/main
 
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object

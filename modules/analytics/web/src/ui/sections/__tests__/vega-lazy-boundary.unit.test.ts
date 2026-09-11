@@ -2,23 +2,23 @@
  * Where Vega is allowed to be reached from.
  *
  * Vega, Vega-Lite, vega-embed and the generated schema validator are several
- * megabytes that only Chart mode needs, and one ordinary-looking static import
- * from the workbench is all it takes to put every byte of it in the entry
- * chunk — with nothing visibly wrong. The import graph is what the bundler
- * splits on, so it is the import graph that is pinned here.
+ * megabytes that only a chart-rendering surface needs, and one
+ * ordinary-looking static import is all it takes to put every byte of it in
+ * the entry chunk — with nothing visibly wrong. The import graph is what the
+ * bundler splits on, so it is the import graph that is pinned here.
  *
  * The claim is containment: within this feature, every module that reaches a
  * Vega package is reachable only *behind a lazy boundary* — a module some
  * `Lazy…` wrapper loads with a dynamic `import()` and nothing imports directly.
  *
- * There are two such boundaries, and they are two because the surfaces mount
- * different components, not because the chunk differs: the workbench mounts
- * `LangWatchQLChartMode`, the dashboard widget mounts
- * `LangWatchQLWidgetChart`. Both reach `LangWatchQLVegaLiteChart` and so both
- * reach Vega; what matters is that neither is reachable statically. Pinning
- * only the workbench's boundary would have let the dashboard's chart be
- * imported directly from the grid — several megabytes back in the entry chunk,
- * with nothing visibly wrong.
+ * One such boundary: the dashboard widget mounts `LangWatchQLWidgetChart`,
+ * which reaches `LangWatchQLVegaLiteChart` and so reaches Vega; what matters
+ * is that it is not reachable statically. Pinning this boundary keeps the
+ * dashboard's chart from being imported directly from the grid — several
+ * megabytes back in the entry chunk, with nothing visibly wrong. (The
+ * workbench page and its own `LangWatchQLChartMode` boundary were removed
+ * along with the Custom query page; this is the one surface left that draws
+ * a Vega-Lite chart.)
  *
  * Node environment on purpose — this reads source, and evaluates none of it.
  */
@@ -28,50 +28,30 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-/** `…/ui/sections/__tests__` → `…/ui/sections` */
-const SECTIONS_DIR = fileURLToPath(new URL("../", import.meta.url));
+/** `…/analytics-query/__tests__` → `…/analytics-query` */
+const FEATURE_DIR = fileURLToPath(new URL("../", import.meta.url));
 
-/** `…/ui/sections` → `…/src` */
-const PACKAGE_SRC_DIR = resolve(SECTIONS_DIR, "../..");
-
-/** Left for the relative-specifier resolver, which walks from a file's own directory. */
-const SRC_DIR = PACKAGE_SRC_DIR;
+/** `…/analytics-query` → `…/src`, which the `~/` alias resolves from. */
+const SRC_DIR = resolve(FEATURE_DIR, "../..");
 
 /**
- * The two boundaries, and what each of them defers.
- *
- * TWO, not one, and they are two because the surfaces mount different
- * components rather than because the chunk differs: the workbench mounts chart
- * mode, the dashboard widget mounts the widget chart. Both reach the Vega-Lite
- * chart and so both reach Vega; what matters is that neither is reachable
- * without a dynamic import.
- *
- * DEFINED HERE FOR THE FIRST TIME. `platform/app`'s copy of this file USED
- * `LAZY_BOUNDARIES` and never declared it, so the whole suite threw
- * `ReferenceError` on load and reported "no tests" — green-looking and pinning
- * nothing at all. Inherited red, fixed rather than carried, because a bundle
- * guarantee that does not run is worse than one that does not exist.
+ * Every lazy boundary in this feature, as the wrapper that defers and the
+ * module it defers to. Adding a third surface that draws a chart means adding
+ * its pair here — a boundary omitted is a boundary this suite does not check.
  */
 const LAZY_BOUNDARIES = [
   {
-    wrapper: join(SECTIONS_DIR, "lazy-langwatch-ql-chart-mode.tsx"),
-    deferred: join(SECTIONS_DIR, "themed-langwatch-ql-chart-mode.tsx"),
-    specifier: 'import("./themed-langwatch-ql-chart-mode")',
-  },
-  {
-    wrapper: join(SECTIONS_DIR, "lazy-langwatch-ql-widget-chart.tsx"),
-    deferred: join(SECTIONS_DIR, "langwatch-ql-widget-chart.tsx"),
-    specifier: 'import("./langwatch-ql-widget-chart")',
+    wrapper: join(FEATURE_DIR, "components/LazyLangWatchQLWidgetChart.tsx"),
+    deferred: join(FEATURE_DIR, "components/LangWatchQLWidgetChart.tsx"),
+    specifier: 'import("./LangWatchQLWidgetChart")',
   },
 ] as const;
-
-const CHART_ENTRY = join(SECTIONS_DIR, "chart.ts");
 
 /** Packages whose presence in a chunk means the Vega runtime is in it. */
 const VEGA_PACKAGE = /^(vega|vega-lite|vega-embed|react-vega)(\/|$)/;
 
 /** The generated schema validator, which is megabytes of its own. */
-const GENERATED_VALIDATOR = "vega-lite-schema-validator.generated";
+const GENERATED_VALIDATOR = "vegaLiteSchemaValidator.generated";
 
 const EXTENSIONS = [".ts", ".tsx", ".js"];
 
@@ -113,8 +93,11 @@ function resolveLocal({
   specifier: string;
   fromFile: string;
 }): string | null {
-  const relativeBase = specifier.startsWith(".") ? resolve(dirname(fromFile), specifier) : null;
-  const base = specifier.startsWith("~/") ? join(SRC_DIR, specifier.slice(2)) : relativeBase;
+  const base = specifier.startsWith("~/")
+    ? join(SRC_DIR, specifier.slice(2))
+    : specifier.startsWith(".")
+      ? resolve(dirname(fromFile), specifier)
+      : null;
   if (base === null) return null;
 
   const candidates = [
@@ -125,7 +108,9 @@ function resolveLocal({
     base.replace(/\.js$/, ".ts"),
   ];
   return (
-    candidates.find((candidate) => existsSync(candidate) && statSync(candidate).isFile()) ?? null
+    candidates.find(
+      (candidate) => existsSync(candidate) && statSync(candidate).isFile(),
+    ) ?? null
   );
 }
 
@@ -170,16 +155,15 @@ const featureSourceFiles = (directory: string): string[] =>
     }
     // A declaration file is erased too, so it is never in a chunk.
     if (entry.name.endsWith(".d.ts")) return [];
-    if (path === join(PACKAGE_SRC_DIR, "model", "visualization", "validation.ts")) return [];
-    const isSourceFile = EXTENSIONS.some((extension) => entry.name.endsWith(extension));
-
-    return isSourceFile ? [path] : [];
+    return EXTENSIONS.some((extension) => entry.name.endsWith(extension))
+      ? [path]
+      : [];
   });
 
 describe("where the Vega runtime can be reached from", () => {
-  describe("given the workbench's own modules", () => {
+  describe("given this feature's own modules", () => {
     describe("when their static import graphs are walked", () => {
-      /** @scenario "Vega dependencies and browser runtime stay behind the lazy boundary" */
+      /** @scenario "Vega loads lazily from the dashboard widget only" */
       it("reaches Vega from each deferred module, and from nothing that is not behind one", () => {
         const behindABoundary = new Set<string>();
         for (const { deferred } of LAZY_BOUNDARIES) {
@@ -190,27 +174,28 @@ describe("where the Vega runtime can be reached from", () => {
           for (const file of walk.files) behindABoundary.add(file);
         }
 
-        const chartEntry = walkStaticGraph(CHART_ENTRY);
-        const behindTheBoundary = new Set([...behindABoundary, ...chartEntry.files]);
-        const leaks = featureSourceFiles(PACKAGE_SRC_DIR)
-          .filter((file) => !behindTheBoundary.has(file))
+        const leaks = featureSourceFiles(FEATURE_DIR)
+          .filter((file) => !behindABoundary.has(file))
           .filter((file) => reachesVega(walkStaticGraph(file)));
 
-        expect(leaks.map((file) => file.replace(PACKAGE_SRC_DIR, ""))).toEqual([]);
+        expect(leaks.map((file) => file.replace(FEATURE_DIR, ""))).toEqual([]);
       });
 
-      /** @scenario "Vega dependencies and browser runtime stay behind the lazy boundary" */
-      it.each(LAZY_BOUNDARIES.map((boundary) => [boundary.wrapper, boundary]))(
-        "keeps %s free of everything it defers",
-        (_name, { wrapper, deferred, specifier }) => {
-          const walk = walkStaticGraph(wrapper);
+      /** @scenario "The lazy Vega wrapper defers its own module, on the dashboard widget" */
+      it.each(
+        LAZY_BOUNDARIES.map((boundary) => [boundary.wrapper, boundary]),
+      )("keeps %s free of everything it defers", (_name, {
+        wrapper,
+        deferred,
+        specifier,
+      }) => {
+        const walk = walkStaticGraph(wrapper);
 
-          expect(reachesVega(walk)).toBe(false);
-          expect(walk.files).not.toContain(deferred);
-          // It is a lazy import, and nothing else would defer anything.
-          expect(readFileSync(wrapper, "utf8")).toContain(specifier);
-        },
-      );
+        expect(reachesVega(walk)).toBe(false);
+        expect(walk.files).not.toContain(deferred);
+        // It is a lazy import, and nothing else would defer anything.
+        expect(readFileSync(wrapper, "utf8")).toContain(specifier);
+      });
     });
   });
 
@@ -223,13 +208,17 @@ describe("where the Vega runtime can be reached from", () => {
     describe("when its specifiers are collected", () => {
       it("records the runtime import that the type-only line precedes", () => {
         expect(
-          specifiersOf('export type Foo = string;\nimport vegaEmbed from "vega-embed";\n'),
+          specifiersOf(
+            'export type Foo = string;\nimport vegaEmbed from "vega-embed";\n',
+          ),
         ).toEqual(["vega-embed"]);
       });
 
       it("records it even where no semicolon closes the type-only line", () => {
         expect(
-          specifiersOf('export type Foo = string\nimport vegaEmbed from "vega-embed"\n'),
+          specifiersOf(
+            'export type Foo = string\nimport vegaEmbed from "vega-embed"\n',
+          ),
         ).toEqual(["vega-embed"]);
       });
 
@@ -238,7 +227,9 @@ describe("where the Vega runtime can be reached from", () => {
       });
 
       it("still reads a specifier across a multi-line brace list", () => {
-        expect(specifiersOf('import {\n  a,\n  b,\n} from "vega-lite";\n')).toEqual(["vega-lite"]);
+        expect(
+          specifiersOf('import {\n  a,\n  b,\n} from "vega-lite";\n'),
+        ).toEqual(["vega-lite"]);
       });
     });
   });

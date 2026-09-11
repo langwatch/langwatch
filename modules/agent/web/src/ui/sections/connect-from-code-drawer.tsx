@@ -7,7 +7,15 @@ import { Box, Button, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
+<<<<<<< HEAD:modules/agent/web/src/ui/sections/connect-from-code-drawer.tsx
 import { Drawer } from "@langwatch/design-system/studio-drawer";
+=======
+import { RenderCode } from "~/components/code/RenderCode";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
+import { useColorMode } from "~/components/ui/color-mode";
+import { Drawer } from "~/components/ui/drawer";
+import { useDrawer } from "~/hooks/useDrawer";
+>>>>>>> origin/main:platform/app/src/components/agents/connected/ConnectFromCodeDrawer.tsx
 import {
   connectSnippets,
   SNIPPET_LANGUAGE_LABELS,
@@ -87,6 +95,10 @@ function SnippetTabs({
   snippets: Record<(typeof SNIPPET_LANGUAGES)[number], string>;
   renderCopyButton: ConnectFromCodeDrawerProps["renderCopyButton"];
 }) {
+  // The theme is unresolved for the first render, before the theme provider
+  // mounts, and that render paints light rather than a dark block that flips.
+  const { colorMode } = useColorMode();
+  const codeColorMode = colorMode === "dark" ? "dark" : "light";
   return (
     // Without a colorPalette the line variant paints the selected trigger
     // with the default palette's fg, which reads fainter than the unselected
@@ -104,6 +116,7 @@ function SnippetTabs({
           <VStack align="stretch" gap={2}>
             <CodeBlock
               code={INSTALL_COMMANDS[language]}
+<<<<<<< HEAD:modules/agent/web/src/ui/sections/connect-from-code-drawer.tsx
               label="Install command"
               renderCopyButton={renderCopyButton}
             />
@@ -111,6 +124,15 @@ function SnippetTabs({
               code={snippets[language]}
               label="Snippet"
               renderCopyButton={renderCopyButton}
+=======
+              language="bash"
+              colorMode={codeColorMode}
+            />
+            <CodeBlock
+              code={snippets[language]}
+              language={language}
+              colorMode={codeColorMode}
+>>>>>>> origin/main:platform/app/src/components/agents/connected/ConnectFromCodeDrawer.tsx
             />
           </VStack>
         </Tabs.Content>
@@ -119,6 +141,7 @@ function SnippetTabs({
   );
 }
 
+<<<<<<< HEAD:modules/agent/web/src/ui/sections/connect-from-code-drawer.tsx
 function CodeBlock({
   code,
   label,
@@ -135,6 +158,41 @@ function CodeBlock({
       </Box>
       {renderCopyButton({ value: code, label })}
     </HStack>
+=======
+/**
+ * A highlighted block that follows the app color mode. Long lines keep their
+ * width and scroll sideways, so the code the reader copies is the code shown.
+ */
+function CodeBlock({
+  code,
+  language,
+  colorMode,
+}: {
+  code: string;
+  language: string;
+  colorMode: "light" | "dark";
+}) {
+  return (
+    <Box
+      borderRadius="md"
+      borderWidth="1px"
+      borderColor="border"
+      overflow="hidden"
+      width="full"
+      // The GitHub themes Shiki paints with, so the padding around the
+      // <pre> is the same color as the code itself.
+      background={colorMode === "dark" ? "#24292e" : "#ffffff"}
+      data-testid={`connect-code-${language}`}
+    >
+      <RenderCode
+        code={code}
+        language={language}
+        colorMode={colorMode}
+        wrap={false}
+        style={{ width: "100%", fontSize: "12px", padding: "12px" }}
+      />
+    </Box>
+>>>>>>> origin/main:platform/app/src/components/agents/connected/ConnectFromCodeDrawer.tsx
   );
 }
 

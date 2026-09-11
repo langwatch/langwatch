@@ -1,16 +1,16 @@
+import { bashCommands } from "@langwatch/scenario";
 import dotenv from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  bashCommands,
   copyFixtureToWorkDir,
   createSkillTestWorkDir,
   installSkillToWorkDir,
   removeSkillTestWorkDir,
-} from "./claude-code-adapter";
-import { createSkillJudgeModel } from "./judge-model";
+} from "./claude-code-adapter.ts";
+import { createSkillJudgeModel } from "./judge-model.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

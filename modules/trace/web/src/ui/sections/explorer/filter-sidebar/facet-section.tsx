@@ -56,9 +56,11 @@ interface FacetSectionProps {
    */
   renderActiveRowExtras?: (item: FacetItem) => React.ReactNode;
   /**
-   * Optional extras renderer for INACTIVE rows. Invoked for each inactive item in the
-   * visible window. Receives the item, whether this row is currently expanded, and a
-   * callback to toggle the expansion. Returns `null` to skip extras for that item.
+   * Optional extras renderer for INACTIVE rows, invoked for each inactive item
+   * in the visible window. `trailing` renders inline at the row's right edge
+   * (the expand chevron), `below` underneath the row (the drilldown panel).
+   * Returns `null` to skip extras for that item. FacetSection decides
+   * `isExpanded` itself, so there is nothing to persist outside it.
    */
   renderInactiveRowExtras?: (
     item: FacetItem,
@@ -94,18 +96,34 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   modeToggleProps,
   serverValueSearch,
 }) => {
-  const [expandedInactiveRows, setExpandedInactiveRows] = useState<Set<string>>(() => new Set());
-  const toggleInactiveExpand = useCallback((value: string) => {
-    setExpandedInactiveRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(value)) {
-        next.delete(value);
-      } else {
-        next.add(value);
-      }
-      return next;
-    });
-  }, []);
+  // A row's drilldown is open whenever that row contributes a filter, included
+  // or excluded alike. Derived rather than latched, so a filter dropped
+  // anywhere closes it. The trailing chevron records an override AGAINST the
+  // state it was pressed on, which expires the moment that state changes.
+  const [expandOverrides, setExpandOverrides] = useState<
+    Map<string, { open: boolean; against: FacetValueState }>
+  >(() => new Map());
+  const isRowExpanded = useCallback(
+    (value: string) => {
+      const state = getValueState(value);
+      const override = expandOverrides.get(value);
+      if (override && override.against === state) return override.open;
+      return state !== "neutral";
+    },
+    [expandOverrides, getValueState],
+  );
+  const toggleInactiveExpand = useCallback(
+    (value: string) => {
+      const state = getValueState(value);
+      const open = isRowExpanded(value);
+      setExpandOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(value, { open: !open, against: state });
+        return next;
+      });
+    },
+    [getValueState, isRowExpanded],
+  );
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
   const [showMore, setShowMore] = useState(false);
@@ -124,6 +142,10 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     if (!searchOpen) setSearchQuery("");
   }, [searchOpen]);
 
+  // Clicking a row that carries a drilldown also opens it, through
+  // `isRowExpanded`. Without that the sub-options are reachable only through
+  // the trailing chevron, which reads as decoration. The layout freeze keeps
+  // the clicked row where it was clicked, so the drilldown opens in place.
   const handleToggle = useCallback((value: string) => onToggle(field, value), [onToggle, field]);
   const handleExclude = useCallback((value: string) => onExclude(field, value), [onExclude, field]);
 
@@ -317,10 +339,8 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
             </Text>
           )}
           {layout.facetWindow.visible.map((item) => {
-            const inactiveExtras = renderInactiveRowExtras?.(
-              item,
-              expandedInactiveRows.has(item.value),
-              () => toggleInactiveExpand(item.value),
+            const inactiveExtras = renderInactiveRowExtras?.(item, isRowExpanded(item.value), () =>
+              toggleInactiveExpand(item.value),
             );
             const row = (
               <FacetRow

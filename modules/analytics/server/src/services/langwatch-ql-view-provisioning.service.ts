@@ -83,6 +83,22 @@ export class LangWatchQLViewProvisioningService {
   }): string[] {
     return [
       ...views.map((view) => viewStatements.viewStatement({ names, sourceDatabase, view, dedup })),
+      // Row policies BEFORE the grants they constrain, and this order is load-bearing rather
+      // than cosmetic. In ClickHouse a table carrying a `SELECT` grant and no row policy
+      // returns every row, so grants-first leaves a window in which the restricted identity
+      // reads across every tenant — and provisioning is not atomic. A caller that dies midway
+      // (a dropped connection, a refused statement) can leave that window standing
+      // indefinitely, and the caller that drives this deliberately swallows the error and
+      // continues booting, so nothing downstream would close it.
+      //
+      // Emitting policies first inverts the failure: a partial run leaves the identity
+      // policed but not yet granted, which refuses reads rather than widening them. Safe to
+      // hoist because every table named here already exists by this point — fact tables come
+      // from migrations, and the PostgreSQL-engine tables are created earlier in the same
+      // batch.
+      ...this.sourceTables({ names, sourceDatabase, views }).map((lwqlTable) =>
+        accessModel.rowPolicyStatement({ names, lwqlTable }),
+      ),
       // A fact table carries far more than the catalog exposes, so its grant is column-scoped.
       // A PostgreSQL-engine table was *created from* the catalog and its whole column list is
       // the exposed surface, so it takes the whole-object grant the key map and the views take
@@ -94,9 +110,6 @@ export class LangWatchQLViewProvisioningService {
           : viewStatements.sourceColumnGrantStatement({ names, sourceDatabase, view }),
       ),
       ...views.map((view) => accessModel.grantStatement({ names, table: view.name })),
-      ...this.sourceTables({ names, sourceDatabase, views }).map((lwqlTable) =>
-        accessModel.rowPolicyStatement({ names, lwqlTable }),
-      ),
     ];
   }
 }

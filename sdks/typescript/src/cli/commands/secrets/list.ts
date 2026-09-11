@@ -1,14 +1,15 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { formatTable } from "../../utils/formatting.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the listing rather than printing it: the output port renders it in
@@ -27,7 +28,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
   const spinner = createSpinner("Fetching secrets...").start();
 
   try {
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/v1/secret?projectId=${encodeURIComponent(credentials.projectId)}`,
       {
         method: "GET",

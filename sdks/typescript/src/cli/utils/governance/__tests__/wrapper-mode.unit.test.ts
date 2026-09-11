@@ -14,6 +14,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as cliApi from "../cli-api";
 import * as configMod from "../config";
 import type { GovernanceConfig } from "../config";
+import { runningCodeRestartNotice } from "../running-code";
+import { buildOtelEnvBlock } from "../otel-env-block";
+import { buildScopedToolFunction, persistBlockToRc, toolMarkers } from "../shell-rc";
+
+vi.mock("../running-code", () => ({ runningCodeRestartNotice: vi.fn() }));
 
 vi.mock("../cli-api", async () => {
   const actual = await vi.importActual<typeof cliApi>("../cli-api");
@@ -41,6 +46,7 @@ let originalUserprofile: string | undefined;
 let originalCodexHome: string | undefined;
 
 beforeEach(() => {
+  vi.mocked(runningCodeRestartNotice).mockReset();
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-wrapper-mode-"));
   originalHome = process.env.HOME;
   originalUserprofile = process.env.USERPROFILE;
@@ -53,7 +59,9 @@ beforeEach(() => {
   // write into the repo checkout.
   tmpCwd = path.join(tmpHome, "project");
   fs.mkdirSync(tmpCwd, { recursive: true });
-  cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpCwd) as ReturnType<typeof vi.spyOn>;
+  cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpCwd) as ReturnType<
+    typeof vi.spyOn
+  >;
 });
 
 afterEach(() => {
@@ -89,6 +97,45 @@ function baseCfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
 }
 
 describe("resolveWrapperMode", () => {
+  describe("when a project switch changes code telemetry while another launcher is running", () => {
+    const restartNotice =
+      "Restart `langwatch code` to apply the updated telemetry settings.";
+    const endpoint = "http://app.example.com/api/otel";
+    const replacementKey = "ik-lw-projectb_secret";
+    const persistCode = (token: string) =>
+      persistBlockToRc(
+        "zsh",
+        buildScopedToolFunction("code", buildOtelEnvBlock("code", endpoint, token), "zsh"),
+        toolMarkers("code"),
+      );
+    const pinnedConfig = () =>
+      baseCfg({
+        tool_project_keys: {
+          code: { secret: replacementKey, project_slug: "project-b" },
+        },
+      });
+
+    beforeEach(() => {
+      vi.mocked(runningCodeRestartNotice).mockReturnValue(restartNotice);
+    });
+
+    /** @scenario "Switching projects through the wrapper reports restart advice" */
+    it("returns restart advice alongside the refreshed wiring", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      persistCode("ik-lw-projecta_secret");
+      const result = await resolveWrapperMode(pinnedConfig(), "code", {});
+      expect(result.refreshedWiring).toContain("code shell function (~/.zshrc)");
+      expect(result.notice).toContain(restartNotice);
+    });
+
+    it("does not inspect processes when the wiring already matches", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      persistCode(replacementKey);
+      const result = await resolveWrapperMode(pinnedConfig(), "code", {});
+      expect(result.notice ?? "").not.toContain(restartNotice);
+      expect(runningCodeRestartNotice).not.toHaveBeenCalled();
+    });
+  });
   describe("when a personal VK is configured", () => {
     it("returns gateway mode with the gateway env vars unchanged", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
@@ -128,9 +175,16 @@ describe("resolveWrapperMode", () => {
 
       expect(out.mode).toBe("ingestion");
       expect(out.newKeyMinted).toBe(true);
-      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(expect.any(Object), "codex");
-      expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
-      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toBe("Authorization=Bearer sk-lw-test-token");
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(
+        expect.any(Object),
+        "codex",
+      );
+      expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
+      );
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toBe(
+        "Authorization=Bearer sk-lw-test-token",
+      );
       expect(out.vars.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=codex");
     });
 
@@ -153,7 +207,9 @@ describe("resolveWrapperMode", () => {
       expect(contents).toContain("[otel.trace_exporter.otlp-http]");
       // The Authorization header persists inline (0600 file), so a
       // plain `codex` run captures without the wrapper's env.
-      expect(contents).toContain(`headers = { "Authorization" = "Bearer sk-lw-test-token" }`);
+      expect(contents).toContain(
+        `headers = { "Authorization" = "Bearer sk-lw-test-token" }`,
+      );
     });
 
     /** @scenario "Every seam that persists the codex exporters wires the turn harvest" */
@@ -197,7 +253,9 @@ describe("resolveWrapperMode", () => {
       expect(out.mode).toBe("ingestion");
       expect(out.newKeyMinted).toBe(false);
       expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain("sk-lw-cached");
-      expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
+      expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
+      );
       expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
     });
   });
@@ -272,7 +330,9 @@ describe("resolveWrapperMode", () => {
     it("falls back to gateway mode without erroring", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
       // No VK stored: the gateway path now issues one lazily.
-      (cliApi.issuePersonalVirtualKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (
+        cliApi.issuePersonalVirtualKey as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
         id: "vk1",
         secret: "vk-lw-issued",
         prefix: "vk-lw-iss",
@@ -332,7 +392,10 @@ describe("resolveWrapperMode", () => {
       const out = await resolveWrapperMode(cfg, "claude", {});
 
       expect(out.mode).toBe("ingestion");
-      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(expect.any(Object), "claude_code");
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(
+        expect.any(Object),
+        "claude_code",
+      );
       expect(out.vars.CLAUDE_CODE_ENABLE_TELEMETRY).toBe("1");
       // Enhanced-telemetry beta: unlocks the real claude_code.tracing spans
       // (agent_id + parent_agent_id) that make sub-agent attribution
@@ -425,7 +488,9 @@ describe("resolveWrapperMode", () => {
       expect(out.mode).toBe("ingestion");
       expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(cfg, "copilot_cli");
       expect(out.vars.COPILOT_OTEL_ENABLED).toBe("true");
-      expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
+      expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
+      );
       expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
         "Authorization=Bearer sk-lw-copilot-test-token",
       );
@@ -466,7 +531,9 @@ describe("resolveWrapperMode", () => {
       const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
       const out = await resolveWrapperMode(cfg, "copilot", {});
 
-      expect(out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBe("true");
+      expect(out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBe(
+        "true",
+      );
     });
 
     /** @scenario An explicit user opt-out of content capture is never overwritten */
@@ -478,7 +545,9 @@ describe("resolveWrapperMode", () => {
         const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
         const out = await resolveWrapperMode(cfg, "copilot", {});
 
-        expect(out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBeUndefined();
+        expect(
+          out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+        ).toBeUndefined();
         expect(out.notice).toContain("tokens only");
       } finally {
         delete process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
@@ -496,7 +565,9 @@ describe("resolveWrapperMode", () => {
           const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
           const out = await resolveWrapperMode(cfg, "copilot", {});
 
-          expect(out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBeUndefined();
+          expect(
+            out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+          ).toBeUndefined();
           expect(out.notice).toContain("tokens only");
         } finally {
           delete process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
@@ -507,7 +578,9 @@ describe("resolveWrapperMode", () => {
     /** @scenario A cached copilot_cli ingest key is reused instead of re-minting */
     it("reuses a live cached copilot_cli key instead of minting again", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      (cliApi.listIngestionKeys as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      (
+        cliApi.listIngestionKeys as ReturnType<typeof vi.fn>
+      ).mockResolvedValueOnce([
         { sourceType: "copilot_cli", lookupId: "cachedlookupid123" },
       ]);
 
@@ -524,7 +597,9 @@ describe("resolveWrapperMode", () => {
       const out = await resolveWrapperMode(cfg, "copilot", {});
 
       expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
-      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain("ik-lw-cachedlookupid123_secretpart");
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
+        "ik-lw-cachedlookupid123_secretpart",
+      );
     });
   });
 
@@ -560,7 +635,10 @@ describe("resolveWrapperMode", () => {
 
       await resolveWrapperMode(baseCfg(), "code", {});
 
-      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(expect.any(Object), "copilot_vscode");
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(
+        expect.any(Object),
+        "copilot_vscode",
+      );
     });
 
     /** @scenario The code env enables the extension's OTel and points it at LangWatch */
@@ -571,7 +649,9 @@ describe("resolveWrapperMode", () => {
       const out = await resolveWrapperMode(baseCfg(), "code", {});
 
       expect(out.vars.COPILOT_OTEL_ENABLED).toBe("true");
-      expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
+      expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
+      );
       expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toBe(
         "Authorization=Bearer sk-lw-vscode-test-token",
       );
@@ -594,7 +674,9 @@ describe("resolveWrapperMode", () => {
 
       const out = await resolveWrapperMode(baseCfg(), "code", {});
 
-      expect(out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBe("true");
+      expect(
+        out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+      ).toBe("true");
     });
 
     /** @scenario An explicit opt-out yields a loud tokens-only notice, never silent */
@@ -607,7 +689,9 @@ describe("resolveWrapperMode", () => {
 
         const out = await resolveWrapperMode(baseCfg(), "code", {});
 
-        expect(out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBeUndefined();
+        expect(
+          out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+        ).toBeUndefined();
         expect(out.notice ?? "").toContain("tokens only");
         // the notice names the actual tool, not a hardcoded "copilot"
         expect(out.notice ?? "").toContain("code traces");
@@ -629,7 +713,9 @@ describe("resolveWrapperMode", () => {
     /** @scenario "The personal virtual key is issued on first gateway use, not at login" */
     it("routes through the gateway, issuing the VK lazily, and does NOT mint an ingestion key", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      (cliApi.issuePersonalVirtualKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (
+        cliApi.issuePersonalVirtualKey as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
         id: "vk1",
         secret: "vk-lw-issued",
         prefix: "vk-lw-iss",
@@ -666,7 +752,10 @@ describe("resolveWrapperMode", () => {
 
       expect(out.mode).toBe("ingestion");
       expect(out.newKeyMinted).toBe(true);
-      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(expect.any(Object), "codex");
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(
+        expect.any(Object),
+        "codex",
+      );
     });
   });
 
@@ -736,7 +825,8 @@ describe("resolveWrapperMode", () => {
       const cfg = baseCfg();
       await resolveWrapperMode(cfg, "copilot", {}, [], "ingestion");
 
-      const saved = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock.calls;
+      const saved = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock
+        .calls;
       for (const call of saved) {
         const persisted = call[0] as GovernanceConfig;
         expect(persisted.tool_mode?.copilot).toBeUndefined();
@@ -750,16 +840,19 @@ describe("resolveWrapperMode", () => {
       "does not pin tool_mode for %s either when a forcedMode was passed (cross-tool regression)",
       async (tool) => {
         const { resolveWrapperMode } = await import("../wrapper-mode.js");
-        (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
-          token: "sk-lw-tok",
-          prefix: "sk-lw-tok",
-          endpoint: "http://app.example.com/api/otel",
-        });
+        (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue(
+          {
+            token: "sk-lw-tok",
+            prefix: "sk-lw-tok",
+            endpoint: "http://app.example.com/api/otel",
+          },
+        );
 
         const cfg = baseCfg();
         await resolveWrapperMode(cfg, tool, {}, [], "ingestion");
 
-        const saved = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock.calls;
+        const saved = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock
+          .calls;
         for (const call of saved) {
           const persisted = call[0] as GovernanceConfig;
           expect(persisted.tool_mode?.[tool]).toBeUndefined();
@@ -778,7 +871,8 @@ describe("resolveWrapperMode", () => {
       const cfg = baseCfg();
       await resolveWrapperMode(cfg, "copilot", {}, [], "ingestion");
 
-      const persisted = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock.calls[
+      const persisted = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock
+        .calls[
         (configMod.saveConfig as ReturnType<typeof vi.fn>).mock.calls.length - 1
       ]?.[0] as GovernanceConfig;
       expect(persisted.default_personal_ingest_keys?.copilot_cli?.secret).toBe(
@@ -826,12 +920,18 @@ describe("resolveWrapperMode", () => {
      */
     it("refreshes the settings.json block to this run's endpoint and key", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      const { appSettingsTargetFor, installAppEnv } = await import("../app-settings.js");
+      const { appSettingsTargetFor, installAppEnv } = await import(
+        "../app-settings.js"
+      );
       const { buildOtelEnvBlock } = await import("../otel-env-block.js");
 
       installAppEnv(
         appSettingsTargetFor("claude")!,
-        buildOtelEnvBlock("claude", "https://app.langwatch.ai/api/otel", "sk-lw-stale-token"),
+        buildOtelEnvBlock(
+          "claude",
+          "https://app.langwatch.ai/api/otel",
+          "sk-lw-stale-token",
+        ),
       );
 
       (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -846,12 +946,18 @@ describe("resolveWrapperMode", () => {
         {},
       );
 
-      expect(out.refreshedWiring).toEqual(["claude telemetry env (~/.claude/settings.json)"]);
+      expect(out.refreshedWiring).toEqual([
+        "claude telemetry env (~/.claude/settings.json)",
+      ]);
       const written = JSON.parse(
         fs.readFileSync(path.join(tmpHome, ".claude", "settings.json"), "utf8"),
       );
-      expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
-      expect(written.env.OTEL_EXPORTER_OTLP_HEADERS).toBe("Authorization=Bearer sk-lw-fresh-token");
+      expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
+      );
+      expect(written.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
+        "Authorization=Bearer sk-lw-fresh-token",
+      );
     });
   });
 
@@ -872,22 +978,35 @@ describe("resolveWrapperMode", () => {
 
       expect(out.claudeProjectPin?.action).toBe("created");
       const pin = JSON.parse(
-        fs.readFileSync(path.join(tmpCwd, ".claude", "settings.local.json"), "utf8"),
+        fs.readFileSync(
+          path.join(tmpCwd, ".claude", "settings.local.json"),
+          "utf8",
+        ),
       );
-      expect(pin.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
-      expect(pin.env.OTEL_EXPORTER_OTLP_HEADERS).toBe("Authorization=Bearer sk-lw-pin-token");
+      expect(pin.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
+      );
+      expect(pin.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
+        "Authorization=Bearer sk-lw-pin-token",
+      );
     });
   });
 
   describe("when claude resolves to gateway mode with a pin left behind", () => {
     it("removes the langwatch env from the project pin (no double-trace)", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
-      const { claudeProjectSettingsTarget, installAppEnv } = await import("../app-settings.js");
+      const { claudeProjectSettingsTarget, installAppEnv } = await import(
+        "../app-settings.js"
+      );
       const { buildOtelEnvBlock } = await import("../otel-env-block.js");
 
       installAppEnv(
         claudeProjectSettingsTarget(tmpCwd),
-        buildOtelEnvBlock("claude", "https://app.langwatch.ai/api/otel", "sk-lw-stale-token"),
+        buildOtelEnvBlock(
+          "claude",
+          "https://app.langwatch.ai/api/otel",
+          "sk-lw-stale-token",
+        ),
       );
 
       const cfg = baseCfg({
@@ -900,7 +1019,9 @@ describe("resolveWrapperMode", () => {
 
       expect(out.mode).toBe("gateway");
       expect(out.claudeProjectPin?.action).toBe("removed");
-      expect(fs.existsSync(path.join(tmpCwd, ".claude", "settings.local.json"))).toBe(false);
+      expect(
+        fs.existsSync(path.join(tmpCwd, ".claude", "settings.local.json")),
+      ).toBe(false);
     });
   });
 });

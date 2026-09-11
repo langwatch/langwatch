@@ -1,12 +1,13 @@
 import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the deletion result rather than printing it: the output port renders
@@ -24,7 +25,7 @@ export const deleteSecretCommand = async (id: string): Promise<CommandResult | v
   const spinner = createSpinner(`Deleting secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/v1/secret/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/secret/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",

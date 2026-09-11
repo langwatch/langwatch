@@ -1,13 +1,14 @@
 import chalk from "chalk";
 import { z } from "zod";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
-import { printResult, type RawOutputFlags } from "../../utils/output";
-import { createCommandEvents } from "../../telemetry/events";
-import { cliAuthHeaders } from "../../utils/authHeaders";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { clockTime, dayHeading, localDay } from "../../utils/event-clock.ts";
+import { printResult, type RawOutputFlags } from "../../utils/output.ts";
+import { createCommandEvents } from "../../telemetry/events.ts";
+import { cliAuthHeaders } from "../../utils/authHeaders.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Bound each page request so a quiet socket cannot hold the CLI open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -108,7 +109,7 @@ const fetchAllSessionEvents = async ({
     if (toMs !== undefined) params.set("to", String(toMs));
     if (cursor) params.set("cursor", cursor);
 
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/v1/coding-agent/sessions/${encodeURIComponent(sessionId)}/events?${params}`,
       {
         headers: cliAuthHeaders({ apiKey }),

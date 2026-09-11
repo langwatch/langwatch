@@ -240,13 +240,22 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
  * header. Do not replace this with `Object.keys(AUTHZ_RESOURCES).filter(...)`;
  * doing so is precisely the fail-open the old allowlist was built to prevent.
  *
- * SIX OF THESE ARE INERT AT PROJECT SCOPE and their presence here is a
+ * SEVEN OF THESE ARE INERT AT PROJECT SCOPE and their presence here is a
  * classification, not an access grant: `governance`, `anomalyRules`,
+<<<<<<< HEAD:modules/langy/contract/src/langy-permission-policy.ts
  * `aiTools`, `activityMonitor`, `gatewaySpend`, and `ingestionSources` are
  * declared organization-only in the registry, so `langyCandidatePermissions`
  * drops every grain of them and the minted key holds nothing. The scope fence
  * was built for ADR-021 scope escalation, not for Langy — several of these
  * families were previously excluded here with their own reasons
+=======
+ * `aiTools`, `activityMonitor`, `gatewaySpend`, `governanceCost`, and
+ * `ingestionSources` are in
+ * `ORG_EXCLUSIVE_RESOURCES` (rbac.ts), so `langyCandidatePermissions` drops
+ * every grain of them and the minted key holds nothing. The org-exclusive
+ * filter was built for ADR-021 scope escalation, not for Langy — several of
+ * these families were previously excluded here with their own reasons
+>>>>>>> origin/main:platform/app/src/server/app-layer/langy/langyPermissionPolicy.ts
  * (`activityMonitor` was "cross-principal activity surveillance"). If the
  * session key ever gains an ORGANIZATION-scoped binding, these six widen
  * instantly from a change in a different file: RE-DECIDE each of them
@@ -270,6 +279,7 @@ const FULL_ACCESS_FAMILIES = new Set([
   "gatewaySpend",
   "gatewayUsage",
   "governance",
+  "governanceCost",
   "ingestionSources",
   "playground",
   "prompts",

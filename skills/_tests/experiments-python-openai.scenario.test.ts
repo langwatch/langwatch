@@ -1,12 +1,7 @@
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
 
-import {
-  assertSkillWasRead,
-  createClaudeCodeAgent,
-  SKILL_TESTS_SET_ID,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createClaudeCodeAgent, SKILL_TESTS_SET_ID } from "./helpers/claude-code-adapter.ts";
 import {
   executedCommandTranscript,
   executedCommands,
@@ -18,7 +13,7 @@ import {
   snapshotExperimentRuns,
   snapshotGeneratedFiles,
   withExperimentWorkDir,
-} from "./helpers/experiments-scenario";
+} from "./helpers/experiments-scenario.ts";
 
 describe("Experiments Skill for a Python OpenAI bot", () => {
   /**
@@ -77,7 +72,6 @@ describe("Experiments Skill for a Python OpenAI bot", () => {
                   ),
                   "Expected a single `langwatch experiment list --format json` command",
                 ).toBe(true);
-                toolCallFix(state);
                 assertSkillWasRead(state, "experiments");
 
                 const createdFiles = findFilesCreatedSince({

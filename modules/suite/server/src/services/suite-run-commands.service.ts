@@ -1,6 +1,7 @@
 import { defineCommand } from "@langwatch/eventing";
 import {
   suiteRunItemCompletedEventDataSchema,
+  suiteRunItemRegradedEventDataSchema,
   suiteRunItemStartedEventDataSchema,
   suiteRunStartedEventDataSchema,
 } from "@langwatch/suite-contract";
@@ -56,7 +57,32 @@ export const CompleteSuiteRunItemCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemCompleted`,
 });
 
-/** The three suite-run-processing commands, named so a pipeline can hold them. */
+/**
+ * Moves a completed item from what it counted as to what it counts as now.
+ * Keyed by the caller's idempotency key (the evaluated event that changed the
+ * verdict), so one verdict change moves the counters once and a later change
+ * moves them again.
+ */
+export const RegradeSuiteRunItemCommand = defineCommand({
+  commandType: "lw.suite_run.regrade_item",
+  eventType: "lw.suite_run.item_regraded",
+  eventVersion: "2026-09-03",
+  aggregateType: "suite_run",
+  schema: suiteRunItemRegradedEventDataSchema,
+  aggregateId: (d) => d.batchRunId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemRegraded:${d.idempotencyKey ?? d.occurredAt}`,
+  spanAttributes: (d) => ({
+    "payload.batchRun.id": d.batchRunId,
+    "payload.scenarioRun.id": d.scenarioRunId,
+    "payload.status": d.status,
+    "payload.previousStatus": d.previousStatus,
+  }),
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.batchRunId}:${d.scenarioRunId}:itemRegraded:${d.idempotencyKey ?? d.occurredAt}`,
+});
+
+/** The four suite-run-processing commands, named so a pipeline can hold them. */
 export class SuiteRunCommandsAdapter {
   static create(): SuiteRunCommandsAdapter {
     return new SuiteRunCommandsAdapter();
@@ -65,6 +91,7 @@ export class SuiteRunCommandsAdapter {
   readonly startSuiteRun = StartSuiteRunCommand;
   readonly recordSuiteRunItemStarted = RecordSuiteRunItemStartedCommand;
   readonly completeSuiteRunItem = CompleteSuiteRunItemCommand;
+  readonly regradeSuiteRunItem = RegradeSuiteRunItemCommand;
 
   private constructor() {}
 }

@@ -24,7 +24,11 @@ import { appSettingsTargetFor, installAppEnv } from "./app-settings";
 import { readClaudePluginState } from "./claude-plugin";
 import type { GovernanceConfig } from "./config";
 import { buildOtelEnvBlock } from "./otel-env-block";
-import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
+import { runningCodeRestartNotice } from "./running-code";
+import {
+  installSessionContextHooks,
+  removeSessionContextHooks,
+} from "./session-context-hooks";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
   assertCodexTurnHarvest,
@@ -34,6 +38,7 @@ import {
   removeBlockFromRc,
   tildify,
   rcPath,
+  rcHasLangwatchBlock,
   toolMarkers,
 } from "./shell-rc";
 
@@ -126,11 +131,24 @@ export function installTelemetryWiring({
     );
     return { labels, warnings, requiredFailures };
   }
+  const codeWiringChanged =
+    tool === "code" &&
+    !rcHasLangwatchBlock({
+      shell,
+      markers: toolMarkers(tool),
+      requiredKeys: [buildScopedToolFunction(tool, vars, shell)],
+    });
   try {
-    persistBlockToRc(shell, buildScopedToolFunction(tool, vars, shell), toolMarkers(tool));
+    persistBlockToRc(
+      shell,
+      buildScopedToolFunction(tool, vars, shell),
+      toolMarkers(tool),
+    );
     labels.push(tildify(rcPath(shell)));
   } catch (err) {
-    warnings.push(`could not write ${tildify(rcPath(shell))}: ${(err as Error).message}`);
+    warnings.push(
+      `could not write ${tildify(rcPath(shell))}: ${(err as Error).message}`,
+    );
   }
   if (tool === "opencode") {
     // opencode only emits spans when `experimental.openTelemetry` is on
@@ -177,6 +195,10 @@ export function installTelemetryWiring({
         );
       }
     }
+  }
+  if (codeWiringChanged && labels.length > 0 && requiredFailures.length === 0) {
+    const notice = runningCodeRestartNotice();
+    if (notice) warnings.push(notice);
   }
   return { labels, warnings, requiredFailures };
 }

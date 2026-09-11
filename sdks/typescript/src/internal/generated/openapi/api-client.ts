@@ -151,6 +151,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List dashboard widgets
+         * @description Lists every dashboard widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
+        put?: never;
+        /**
+         * Create a dashboard widget
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a dashboard widget
+         * @description Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a dashboard widget
+         * @description Deletes one dashboard widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.
+         */
+        delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a dashboard widget
+         * @description Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.
+         */
+        patch: operations["patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a dashboard widget to a dashboard
+         * @description Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that dashboard; its size (colSpan/rowSpan) is preserved.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/query": {
         parameters: {
             query?: never;
@@ -7163,6 +7235,2026 @@ export interface paths {
         patch: operations["patchApiGatewayV1CacheRulesById"];
         trace?: never;
     };
+<<<<<<< HEAD
+=======
+    "/api/governance/ingestion-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List ingestion templates
+         * @description Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL.
+         */
+        get: operations["getApiGovernanceIngestionTemplates"];
+        put?: never;
+        /**
+         * Create org-authored ingestion template
+         * @description Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead.
+         */
+        post: operations["postApiGovernanceIngestionTemplates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List ingestion templates (admin shape, includes OTTL)
+         * @description Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer.
+         */
+        get: operations["getApiGovernanceIngestionTemplatesAdmin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get ingestion template
+         * @description Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404 (no enumeration vector).
+         */
+        get: operations["getApiGovernanceIngestionTemplatesById"];
+        put?: never;
+        post?: never;
+        /**
+         * Soft-archive an org-authored template
+         * @description Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403.
+         */
+        delete: operations["deleteApiGovernanceIngestionTemplatesById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/{id}/ottl-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Replace ottl_rules on an org-authored template
+         * @description Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it.
+         */
+        patch: operations["patchApiGovernanceIngestionTemplatesByIdOttlRules"];
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/clone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clone a platform-published template into the caller's org
+         * @description Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.
+         */
+        post: operations["postApiGovernanceIngestionTemplatesClone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/graphs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all custom graphs, optionally filtered by dashboard */
+        get: operations["getApiGraphs"];
+        put?: never;
+        /** @description Create a custom graph on a dashboard */
+        post: operations["postApiGraphs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/graphs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a custom graph by its ID */
+        get: operations["getApiGraphsById"];
+        put?: never;
+        post?: never;
+        /** @description Delete a custom graph */
+        delete: operations["deleteApiGraphsById"];
+        options?: never;
+        head?: never;
+        /** @description Update a custom graph's name, definition, or filters */
+        patch: operations["patchApiGraphsById"];
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Share a folder over HTTP, for a network that blocks WebSockets. The body is the register frame of the control protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame. */
+        post: operations["registerLangyControlSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Wait for the next frames of a shared folder, then answer with what is waiting or with an empty list. Each poll is also the folder's heartbeat, so a command line that polls reads connected. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        get: operations["pollLangyControlSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Post the frames the command line has for the platform: the acknowledgement of a call, its result, a permission the developer has to answer first, and the deregister that ends the share. */
+        post: operations["postLangyControlFrames"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made. */
+        get: operations["listLangyControlRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Approve one request and share the current folder with the conversation that asked. Answers with a Langy session key scoped to that conversation, which is never shown again. A request is single use: a second approval is refused. */
+        post: operations["approveLangyControlRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Refuse one request from the terminal. The card in the chat reads that sharing was cancelled, and Langy's next turn offers the choice again. */
+        post: operations["cancelLangyControlRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key. */
+        get: operations["getApiMeUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access. */
+        get: operations["getApiMeProject"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prompts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get all prompts for a project */
+        get: operations["getApiPrompts"];
+        put?: never;
+        /** @description Create a new prompt with default initial version */
+        post: operations["postApiPrompts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prompts/{id}/tags/{tag}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Assign a tag (e.g. "production", "staging") to a specific prompt version */
+        put: operations["putApiPromptsByIdTagsByTag"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prompts/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all prompt tag definitions for the organization */
+        get: operations["getApiPromptsTags"];
+        put?: never;
+        /** @description Create a custom prompt tag definition for the organization */
+        post: operations["postApiPromptsTags"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prompts/tags/{tag}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Rename a prompt tag definition */
+        put: operations["putApiPromptsTagsByTag"];
+        post?: never;
+        /** @description Delete a prompt tag definition and cascade to assignments */
+        delete: operations["deleteApiPromptsTagsByTag"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prompts/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get all versions for a prompt. Does not include base prompt data, only versioned data. */
+        get: operations["getApiPromptsByIdVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prompts/{id}/versions/{versionId}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Restore a prompt to a previous version. Creates a new version with the same config data as the specified version. */
+        post: operations["postApiPromptsByIdVersionsByVersionIdRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prompts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare slug like "pizza-prompt" to get the latest version, "pizza-prompt:production" to resolve a tagged version, or "pizza-prompt:2" to fetch version 2. Alternatively, use the tag or version query parameters with a bare slug. */
+        get: operations["getApiPromptsById"];
+        /** @description Update a prompt */
+        put: operations["putApiPromptsById"];
+        post?: never;
+        /** @description Delete a prompt */
+        delete: operations["deleteApiPromptsById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prompts/{id}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Sync/upsert a prompt with local content */
+        post: operations["postApiPromptsByIdSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read. */
+        get: operations["getApiModelDefaults"];
+        put?: never;
+        /** @description Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope. */
+        post: operations["postApiModelDefaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-defaults/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config. */
+        put: operations["putApiModelDefaultsById"];
+        post?: never;
+        /** @description Delete a default-model config. Scope attachments cascade. */
+        delete: operations["deleteApiModelDefaultsById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all model providers for a project with masked API keys */
+        get: operations["getApiModelProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-providers/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Create or update a model provider */
+        put: operations["putApiModelProvidersByProvider"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/monitors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all online evaluation monitors for the project */
+        get: operations["getApiMonitors"];
+        put?: never;
+        /** @description Create a new online evaluation monitor */
+        post: operations["postApiMonitors"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/monitors/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a monitor by its ID */
+        get: operations["getApiMonitorsById"];
+        put?: never;
+        post?: never;
+        /** @description Delete a monitor */
+        delete: operations["deleteApiMonitorsById"];
+        options?: never;
+        head?: never;
+        /** @description Update a monitor (name, enabled state, settings, etc.) */
+        patch: operations["patchApiMonitorsById"];
+        trace?: never;
+    };
+    "/api/monitors/{id}/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Enable or disable a monitor */
+        post: operations["postApiMonitorsByIdToggle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read the organization profile: name, slug, support contact, presence and trace sharing settings, and the S3 storage shape. The single sign-on fields and the S3 secret are never returned. */
+        get: operations["getOrganization"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns. */
+        patch: operations["updateOrganization"];
+        trace?: never;
+    };
+    "/api/organization/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's members with their organization role and disabled status. Disabled members are included only when includeDisabled=true. */
+        get: operations["listOrganizationMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one member, including the teams they reach through team-scoped role bindings. Personal workspaces are not listed: they are not access an administrator manages. */
+        get: operations["getOrganizationMember"];
+        put?: never;
+        post?: never;
+        /** @description Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves. */
+        delete: operations["removeOrganizationMember"];
+        options?: never;
+        head?: never;
+        /** @description Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan. */
+        patch: operations["updateOrganizationMember"];
+        trace?: never;
+    };
+    "/api/organization/members/{userId}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The member's full access breakdown: organization role, group memberships with their bindings, and direct bindings, each with the permissions it grants and the scope it grants them on. */
+        get: operations["getOrganizationMemberAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List pending invites. Each carries its invite code and acceptance link, because a provisioning run with no email provider still has to hand the person something to open. */
+        get: operations["listOrganizationInvites"];
+        put?: never;
+        /** @description Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered. */
+        post: operations["createOrganizationInvites"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/invites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404. */
+        delete: operations["revokeOrganizationInvite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List organizations
+         * @description Self-hosted only. Lists every organization on this instance, newest first.
+         */
+        get: operations["listOrganizations"];
+        put?: never;
+        /**
+         * Create an organization
+         * @description Self-hosted only. Creates an organization with a default team and returns an organization-scoped admin API key, so provisioning can continue through the management APIs without a browser step: the instance key creates the organization, the returned key does everything else. The slug is the natural key; a taken slug answers 409 organization_slug_taken.
+         */
+        post: operations["provisionOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get an organization
+         * @description Self-hosted only. Reads one organization's summary by id.
+         */
+        get: operations["getOrganizationById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/role-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set. */
+        get: operations["listRoleBindings"];
+        put?: never;
+        /** @description Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. */
+        post: operations["createRoleBinding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/role-bindings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found. */
+        delete: operations["deleteRoleBinding"];
+        options?: never;
+        head?: never;
+        /** @description Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead. */
+        patch: operations["updateRoleBinding"];
+        trace?: never;
+    };
+    "/api/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's custom roles with their permission sets. */
+        get: operations["listRoles"];
+        put?: never;
+        /** @description Create a custom role from resource:action permission keys. The name is unique within the organization; a taken name answers 409 custom_role_name_taken. */
+        post: operations["createRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roles/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The permission catalog custom roles are built from: every resource with its actions, annotated with whether the resource only takes effect at organization scope (such a permission cannot be granted by a team- or project-scoped binding). */
+        get: operations["listRolePermissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one custom role. An id from another organization answers 404 custom_role_not_found. */
+        get: operations["getRole"];
+        put?: never;
+        post?: never;
+        /** @description Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta. */
+        delete: operations["deleteRole"];
+        options?: never;
+        head?: never;
+        /** @description Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright. */
+        patch: operations["updateRole"];
+        trace?: never;
+    };
+    "/api/scim-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's SCIM bearer tokens: id, description, the connection each one manages, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
+        get: operations["listScimTokens"];
+        put?: never;
+        /** @description Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against /api/scim/v2. The token only manages the people that connection provisioned. The token value is returned once, here, and never again; store it in the identity provider immediately. */
+        post: operations["createScimToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim-tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found. */
+        delete: operations["revokeScimToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/ServiceProviderConfig": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the SCIM service provider configuration
+         * @description What this SCIM implementation supports (RFC 7643 section 5), which is how an identity provider decides what it may call: PATCH and filtering are supported, bulk operations, sorting, ETags and password change are not. Unauthenticated, because a provider reads it while being configured, before a token exists.
+         */
+        get: operations["scimGetServiceProviderConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/ResourceTypes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the SCIM resource types
+         * @description The resources this service provisions, User and Group, each naming the endpoint and the schema URN that serves it (RFC 7643 section 6). Unauthenticated, like the rest of SCIM discovery.
+         */
+        get: operations["scimListResourceTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Schemas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the SCIM resource schemas
+         * @description The attribute definitions for the User and Group resources (RFC 7643 section 7), which an identity provider reads to build its attribute mapping. A LangWatch group is an access group: its membership drives role bindings, and it is not a team. Unauthenticated, like the rest of SCIM discovery.
+         */
+        get: operations["scimListSchemas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List provisioned users
+         * @description The members of the organization the token belongs to, as SCIM users. One filter expression is understood, `userName eq "someone@example.com"`, matched against the member's email without regard to case.
+         */
+        get: operations["scimListUsers"];
+        put?: never;
+        /**
+         * Provision a user
+         * @description Adds a member to the organization, creating the LangWatch account when the email is new. Someone who already has an account is added and reactivated rather than refused, which is what lets a directory sync be re-run without special-casing the people it already knows. New members join with the MEMBER role at organization scope. `costCenter` on the enterprise user extension assigns their department, creating that department on first use.
+         */
+        post: operations["scimCreateUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a provisioned user
+         * @description Reads one member of the organization the token belongs to. An id that is not a member answers 404, whether or not it names a LangWatch account elsewhere.
+         */
+        get: operations["scimGetUser"];
+        /**
+         * Replace a provisioned user
+         * @description Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the identity provider leaves out is reset rather than kept: omitting `active` reactivates the member. Send PATCH instead to change one attribute.
+         */
+        put: operations["scimReplaceUser"];
+        post?: never;
+        /**
+         * Deprovision a user
+         * @description Removes the member from the organization, drops the role bindings they held there, and deactivates their account. The LangWatch user record itself is kept, so past traces, evaluations and audit entries stay attributable.
+         */
+        delete: operations["scimDeleteUser"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a provisioned user
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Replace` that Entra ID writes is accepted; any other name, or a missing or non-string one, is rejected with a 400. An understood operation aimed at anything not listed above is accepted and changes nothing.
+         */
+        patch: operations["scimPatchUser"];
+        trace?: never;
+    };
+    "/api/scim/v2/Groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List provisioned groups
+         * @description The organization's SCIM-provisioned access groups. Groups created in LangWatch itself are not listed: the directory sees what it provisioned, and nothing else. One filter expression is understood, `displayName eq "Engineering"`, matched without regard to case.
+         */
+        get: operations["scimListGroups"];
+        put?: never;
+        /**
+         * Provision a group
+         * @description Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints return; an id that is not a member of the organization is skipped rather than failing the call, so a group can be provisioned before everyone in it is. Granting the group access is a separate step: a group carries no permissions until a role binding is created for it.
+         */
+        post: operations["scimCreateGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a provisioned group
+         * @description Reads one provisioned group and its members. A group that exists but was created in LangWatch rather than provisioned is not readable here.
+         */
+        get: operations["scimGetGroup"];
+        /**
+         * Replace a provisioned group
+         * @description Replaces the group's display name and its membership with the body. Membership is a whole-resource write: a member absent from `members` is removed from the group, and omitting `members` empties it. Role bindings granted to the group are untouched.
+         */
+        put: operations["scimReplaceGroup"];
+        post?: never;
+        /**
+         * Deprovision a group
+         * @description Deletes the group along with its memberships and every role binding granted through it, so the access it carried is revoked with it. The members themselves keep their organization membership and any access they hold directly.
+         */
+        delete: operations["scimDeleteGroup"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a provisioned group
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Add` / `Remove` that Entra ID writes are accepted; any other name, or a missing or non-string one, is rejected with a 400. An `add` or a `remove` aimed at anything other than members is accepted and changes nothing. A `replace` that is not a `displayName` rename is treated as a replacement of the whole member list, so one that carries no members empties the group.
+         */
+        patch: operations["scimPatchGroup"];
+        trace?: never;
+    };
+    "/api/scenario-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Create a new scenario event */
+        post: operations["postApiScenarioEvents"];
+        /** @description Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run). */
+        delete: operations["deleteApiScenarioEvents"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scenario-events/browser-tab": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it. */
+        post: operations["postApiScenarioEventsBrowserTab"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get all scenarios for a project */
+        get: operations["getApiScenarios"];
+        put?: never;
+        /** @description Create a new scenario */
+        post: operations["postApiScenarios"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scenarios/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a specific scenario by ID */
+        get: operations["getApiScenariosById"];
+        /** @description Update an existing scenario */
+        put: operations["putApiScenariosById"];
+        post?: never;
+        /** @description Archive (soft-delete) a scenario */
+        delete: operations["deleteApiScenariosById"];
+        options?: never;
+        head?: never;
+        /** @description Update an existing scenario */
+        patch: operations["patchApiScenariosById"];
+        trace?: never;
+    };
+    "/api/scenarios/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry. */
+        get: operations["getApiScenariosByIdVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scenarios/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them. */
+        get: operations["getApiScenariosByIdVersionsByVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List projects
+         * @description List all non-archived projects for the organization (paginated). Requires an admin API key with project:view permission.
+         */
+        get: operations["listProjects"];
+        put?: never;
+        /**
+         * Create a project
+         * @description Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.
+         */
+        post: operations["createProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a project
+         * @description Get a project by ID, including its API key. Requires project:view permission.
+         */
+        get: operations["getProject"];
+        put?: never;
+        post?: never;
+        /**
+         * Archive a project
+         * @description Soft-delete (archive) a project. Archived projects are excluded from list responses. Requires project:delete permission.
+         */
+        delete: operations["archiveProject"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a project
+         * @description Update project fields. Only provided fields are changed. Requires project:update permission.
+         */
+        patch: operations["updateProject"];
+        trace?: never;
+    };
+    "/api/projects/{id}/api-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the project API key
+         * @description Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with. Requires an admin API key holding project:update on this project.
+         */
+        get: operations["getProjectApiKey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/regenerate-api-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerate the project API key
+         * @description Issue a new API key for the project and invalidate the previous one immediately. Anything still sending the old key starts failing authentication as soon as this returns, so roll it out before calling this. Requires an admin API key holding project:manage.
+         */
+        post: operations["regenerateProjectApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all secrets for the project (values are never returned) */
+        get: operations["getApiSecrets"];
+        put?: never;
+        /** @description Create a new project secret. The value is encrypted at rest and never returned. */
+        post: operations["postApiSecrets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a secret by its ID (value is never returned) */
+        get: operations["getApiSecretsById"];
+        /** @description Update a secret's value */
+        put: operations["putApiSecretsById"];
+        post?: never;
+        /** @description Delete a secret */
+        delete: operations["deleteApiSecretsById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulation-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations. */
+        get: operations["getApiSimulationRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulation-runs/{scenarioRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a single simulation run by its ID */
+        get: operations["getApiSimulationRunsByScenarioRunId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulation-runs/batches/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List batch summaries for a scenario set (pass/fail counts per batch) */
+        get: operations["getApiSimulationRunsBatchesList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulation-runs/batches/{batchRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get the summary of a single batch run, including its completion flag */
+        get: operations["getApiSimulationRunsBatchesByBatchRunId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the project. By default only run plans are returned; pass kind=folder for test suites.
+         */
+        get: operations["getApiSuites"];
+        put?: never;
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+         */
+        post: operations["postApiSuites"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Get a suite (run plan) by its ID.
+         */
+        get: operations["getApiSuitesById"];
+        put?: never;
+        post?: never;
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Archive (soft-delete) a suite. Archiving a folder also archives every scenario filed in it, in one transaction.
+         */
+        delete: operations["deleteApiSuitesById"];
+        options?: never;
+        head?: never;
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Update a suite (run plan).
+         */
+        patch: operations["patchApiSuitesById"];
+        trace?: never;
+    };
+    "/api/suites/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Duplicate a suite (run plan).
+         */
+        post: operations["postApiSuitesByIdDuplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suites/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.
+         */
+        post: operations["postApiSuitesByIdRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites are not run plans and are listed by the test suites family. */
+        get: operations["listRunPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Run a configuration under a name. The name identifies the run plan: send a name already in use and that plan's configuration is replaced with this one, send a new name and the plan is created, send no name and one is derived from what the run covers and what it runs against. */
+        post: operations["runRunPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one run plan. An id the project does not hold, and a test suite id, both answer 404 suite_not_found. */
+        get: operations["getRunPlan"];
+        put?: never;
+        post?: never;
+        /** @description Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are. */
+        delete: operations["archiveRunPlan"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a plan again
+         * @description Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.
+         */
+        post: operations["rerunRunPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/test-suites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family. */
+        get: operations["listTestSuites"];
+        put?: never;
+        /** @description Create a test suite. It starts with no scenario: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start. */
+        post: operations["createTestSuite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/test-suites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one test suite
+         * @description Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.
+         */
+        get: operations["getTestSuite"];
+        put?: never;
+        post?: never;
+        /** @description Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live. */
+        delete: operations["archiveTestSuite"];
+        options?: never;
+        head?: never;
+        /** @description Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are. */
+        patch: operations["updateTestSuite"];
+        trace?: never;
+    };
+    "/api/v1/test-suites/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a test suite
+         * @description Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.
+         */
+        post: operations["runTestSuite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all non-archived teams for the organization (paginated) */
+        get: operations["getApiTeams"];
+        put?: never;
+        /** @description Create a new team that can group projects and members */
+        post: operations["postApiTeams"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a team by its id */
+        get: operations["getApiTeamsById"];
+        put?: never;
+        post?: never;
+        /** @description Archive a team (soft-delete) */
+        delete: operations["deleteApiTeamsById"];
+        options?: never;
+        head?: never;
+        /** @description Update a team by its id */
+        patch: operations["patchApiTeamsById"];
+        trace?: never;
+    };
+    "/api/teams/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a team */
+        get: operations["getApiTeamsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a team */
+        post: operations["postApiTeamsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a team */
+        delete: operations["deleteApiTeamsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List projects in a team */
+        get: operations["getApiTeamsByIdProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all groups for the organization */
+        get: operations["getApiGroups"];
+        put?: never;
+        /** @description Create a new group */
+        post: operations["postApiGroups"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a group with members and bindings */
+        get: operations["getApiGroupsById"];
+        put?: never;
+        post?: never;
+        /** @description Delete a group */
+        delete: operations["deleteApiGroupsById"];
+        options?: never;
+        head?: never;
+        /** @description Rename a group */
+        patch: operations["patchApiGroupsById"];
+        trace?: never;
+    };
+    "/api/groups/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a group */
+        get: operations["getApiGroupsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a group */
+        post: operations["postApiGroupsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a group */
+        delete: operations["deleteApiGroupsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List role bindings for a group */
+        get: operations["getApiGroupsByIdBindings"];
+        put?: never;
+        /** @description Add a role binding to a group */
+        post: operations["postApiGroupsByIdBindings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings/{bindingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a role binding from a group */
+        delete: operations["deleteApiGroupsByIdBindingsByBindingId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/traces/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Search traces for a project */
+        post: operations["postApiTracesSearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/traces/{traceId}/transcript": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content. */
+        get: operations["getApiTracesByTraceIdTranscript"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/traces/{traceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a single trace by ID. */
+        get: operations["getApiTracesByTraceId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/traces/{traceId}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update trace metadata
+         * @description Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
+         */
+        patch: operations["patchApiTracesByTraceIdMetadata"];
+        trace?: never;
+    };
+    "/api/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all active triggers (automations) for the project */
+        get: operations["getApiTriggers"];
+        put?: never;
+        /** @description Create a new trigger (automation) */
+        post: operations["postApiTriggers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a trigger by its ID */
+        get: operations["getApiTriggersById"];
+        put?: never;
+        post?: never;
+        /** @description Delete (soft-delete) a trigger */
+        delete: operations["deleteApiTriggersById"];
+        options?: never;
+        head?: never;
+        /** @description Update a trigger (name, active state, message, filters) */
+        patch: operations["patchApiTriggersById"];
+        trace?: never;
+    };
+    "/api/webhooks/v1/endpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List webhook endpoints
+         * @description List the organization's webhook endpoints
+         */
+        get: operations["getApiWebhooksV1Endpoints"];
+        put?: never;
+        /**
+         * Create a webhook endpoint
+         * @description Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         */
+        post: operations["postApiWebhooksV1Endpoints"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/v1/endpoints/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a webhook endpoint
+         * @description Get one webhook endpoint
+         */
+        get: operations["getApiWebhooksV1EndpointsById"];
+        put?: never;
+        post?: never;
+        /**
+         * Archive a webhook endpoint
+         * @description Archive a webhook endpoint
+         */
+        delete: operations["deleteApiWebhooksV1EndpointsById"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a webhook endpoint
+         * @description Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.
+         */
+        patch: operations["patchApiWebhooksV1EndpointsById"];
+        trace?: never;
+    };
+    "/api/webhooks/v1/endpoints/{id}/roll-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Roll an endpoint's signing secret
+         * @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.
+         */
+        post: operations["postApiWebhooksV1EndpointsByIdRollSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/v1/endpoints/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test event to an endpoint
+         * @description Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.
+         */
+        post: operations["postApiWebhooksV1EndpointsByIdTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/v1/endpoints/{id}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an endpoint's delivery attempts
+         * @description The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
+         */
+        get: operations["getApiWebhooksV1EndpointsByIdDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/v1/endpoints/{id}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read an endpoint's delivery health
+         * @description Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.
+         */
+        get: operations["getApiWebhooksV1EndpointsByIdHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/v1/event-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List subscribable event types
+         * @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet
+         */
+        get: operations["getApiWebhooksV1EventTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List emitted events
+         * @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.
+         */
+        get: operations["getApiWebhooksV1Events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/v1/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one emitted event
+         * @description One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.
+         */
+        get: operations["getApiWebhooksV1EventsById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+>>>>>>> origin/main
     "/api/gateway/v1/spend-summaries": {
         parameters: {
             query?: never;
@@ -8876,6 +10968,867 @@ export interface operations {
                             /** @enum {string} */
                             fault?: "customer" | "platform" | "provider";
                             reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The project's dashboard widgets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            definition: {
+                                version: number;
+                                code: string;
+                                queries: {
+                                    name: string;
+                                    sql: string;
+                                    parameters?: {
+                                        name: string;
+                                        /** @enum {string} */
+                                        type: "string" | "number" | "boolean";
+                                        default?: string | number | boolean;
+                                    }[];
+                                }[];
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                            platformUrl: string;
+                            dashboardId: string | null;
+                            gridColumn: number;
+                            gridRow: number;
+                            colSpan: number;
+                            rowSpan: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    code: string;
+                    queries: {
+                        name: string;
+                        sql: string;
+                        parameters?: {
+                            name: string;
+                            /** @enum {string} */
+                            type: "string" | "number" | "boolean";
+                            default?: string | number | boolean;
+                        }[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The widget was saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dashboard widget */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The widget was deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    code?: string;
+                    queries?: {
+                        name: string;
+                        sql: string;
+                        parameters?: {
+                            name: string;
+                            /** @enum {string} */
+                            type: "string" | "number" | "boolean";
+                            default?: string | number | boolean;
+                        }[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The updated widget */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    dashboardId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The widget was added to the dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
                         };
                     };
                 };
@@ -38919,6 +41872,24 @@ export interface operations {
                         metCriteria: string[];
                         unmetCriteria: string[];
                         error?: string;
+                        evaluations?: {
+                            evaluatorId: string;
+                            name: string;
+                            /** @enum {string} */
+                            status: "passed" | "failed" | "scored" | "skipped" | "error";
+                            required: boolean;
+                            passed?: boolean;
+                            score?: number;
+                            label?: string;
+                            details?: string;
+                            cost?: {
+                                currency: string;
+                                amount: number;
+                            };
+                            inputs?: {
+                                [key: string]: string;
+                            };
+                        }[];
                     } | null;
                 } | {
                     /** @constant */
@@ -42648,6 +45619,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -42740,6 +45715,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -42776,6 +45755,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -42874,6 +45857,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -42978,6 +45965,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -43014,6 +46005,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -43203,6 +46198,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -43239,6 +46238,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -43464,6 +46467,10 @@ export interface operations {
                             judgeModel: string | null;
                             maxTurns: number | null;
                             minTurns: number | null;
+                            /** @description The field values as this version saved them. Absent on servers that predate suite fields. */
+                            fields?: {
+                                [key: string]: string | number | boolean;
+                            };
                         };
                     };
                 };
@@ -45103,6 +48110,25 @@ export interface operations {
                                 metCriteria?: string[];
                                 unmetCriteria?: string[];
                                 error?: string | null;
+                                /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                                evaluations?: {
+                                    evaluatorId: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                    required: boolean;
+                                    passed?: boolean;
+                                    score?: number;
+                                    label?: string;
+                                    details?: string;
+                                    cost?: {
+                                        currency: string;
+                                        amount: number;
+                                    };
+                                    inputs?: {
+                                        [key: string]: string;
+                                    };
+                                }[];
                             } | null;
                             messages: {
                                 role: string;
@@ -45204,6 +48230,25 @@ export interface operations {
                             metCriteria?: string[];
                             unmetCriteria?: string[];
                             error?: string | null;
+                            /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                            evaluations?: {
+                                evaluatorId: string;
+                                name: string;
+                                /** @enum {string} */
+                                status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                required: boolean;
+                                passed?: boolean;
+                                score?: number;
+                                label?: string;
+                                details?: string;
+                                cost?: {
+                                    currency: string;
+                                    amount: number;
+                                };
+                                inputs?: {
+                                    [key: string]: string;
+                                };
+                            }[];
                         } | null;
                         messages: {
                             role: string;
@@ -48528,6 +51573,29 @@ export interface operations {
                         judgeModel: string | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
+                        /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the plan was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the plan was created. */
@@ -48652,6 +51720,29 @@ export interface operations {
                         judgeModel?: string | null;
                         /** @description The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time. */
                         scenarioIds?: string[];
+                        /** @description The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                     };
                     /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
                     idempotencyKey?: string;
@@ -48855,6 +51946,29 @@ export interface operations {
                         judgeModel: string | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
+                        /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the plan was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the plan was created. */
@@ -49205,6 +52319,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -49281,6 +52428,39 @@ export interface operations {
                 "application/json": {
                     /** @description The test suite name, as it reads in the platform. */
                     name: string;
+                    /** @description The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean. */
+                    fields?: {
+                        /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                        identifier: string;
+                        /**
+                         * @description The value type every scenario carries for this field.
+                         * @enum {string}
+                         */
+                        type: "text" | "number" | "boolean";
+                    }[];
+                    /** @description The evaluators that run after every scenario run. Up to 20. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates. */
+                    evaluators?: {
+                        /** @description The attachment id. Stable across edits of the attachment. */
+                        id: string;
+                        /** @description The id of the saved evaluator this attachment runs. */
+                        evaluatorId: string;
+                        /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                        required: boolean;
+                        /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                        mappings: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                /** @enum {string} */
+                                sourceId: "conversation" | "scenario" | "trace";
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                    }[];
                 };
             };
         };
@@ -49302,6 +52482,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -49395,6 +52608,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -49569,7 +52815,7 @@ export interface operations {
             };
         };
     };
-    renameTestSuite: {
+    updateTestSuite: {
         parameters: {
             query?: never;
             header?: never;
@@ -49582,8 +52828,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The test suite name, as it reads in the platform. */
-                    name: string;
+                    /** @description The new name. The slug is kept. */
+                    name?: string;
+                    /** @description The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use. */
+                    fields?: {
+                        /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                        identifier: string;
+                        /**
+                         * @description The value type every scenario carries for this field.
+                         * @enum {string}
+                         */
+                        type: "text" | "number" | "boolean";
+                    }[];
+                    /** @description The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid. */
+                    evaluators?: {
+                        /** @description The attachment id. Stable across edits of the attachment. */
+                        id: string;
+                        /** @description The id of the saved evaluator this attachment runs. */
+                        evaluatorId: string;
+                        /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                        required: boolean;
+                        /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                        mappings: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                /** @enum {string} */
+                                sourceId: "conversation" | "scenario" | "trace";
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                    }[];
                 };
             };
         };
@@ -49605,6 +52884,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */

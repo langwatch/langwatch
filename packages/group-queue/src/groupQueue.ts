@@ -72,7 +72,6 @@ import {
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
-  gqJobsDroppedTotal,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
@@ -81,9 +80,20 @@ import {
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
   gqRetryEncodeFailuresTotal,
+<<<<<<< HEAD:packages/group-queue/src/groupQueue.ts
 } from "./metrics.ts";
 import { GroupQueueMetricsCollector } from "./metricsCollector.ts";
 import { fallbackReadyScore, isPlausibleReadyScore, resolveReadyScore } from "./readyScore.ts";
+=======
+  recordDroppedJob,
+} from "./metrics";
+import { GroupQueueMetricsCollector } from "./metricsCollector";
+import {
+  fallbackReadyScore,
+  isPlausibleReadyScore,
+  resolveReadyScore,
+} from "./readyScore";
+>>>>>>> origin/main:platform/app/src/server/event-sourcing/queues/groupQueue/groupQueue.ts
 import {
   DEFAULT_BISECTION_SPLITS_PER_DISPATCH,
   DEFAULT_CONFIRMED_DEATH_THRESHOLD,
@@ -2341,7 +2351,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     const { pipelineName, jobType, jobName } = readJobRoutingMeta(jobDataJson);
     const descriptor = readEnvelopeDescriptor(jobDataJson);
 
-    gqJobsDroppedTotal.inc({
+    recordDroppedJob({
       queue_name: this.queueName,
       pipeline_name: pipelineName ?? "unknown",
       job_type: jobType ?? "unknown",

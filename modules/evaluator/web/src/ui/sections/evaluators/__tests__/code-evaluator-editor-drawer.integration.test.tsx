@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -47,7 +48,11 @@ vi.mock("@langwatch/ui-host/errors", () => ({
 vi.mock("@langwatch/workflow-web/surfaces/code-editor-transport", () => ({
   CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
-vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
+// Only the section is stubbed: the drawer reaches the module's other exports
+// (the type labels the outputs list reads at module scope) through the gate
+// section, and a bare stub would leave them undefined.
+vi.mock("@langwatch/prompt-web/surfaces/variables", async (importOriginal) => ({
+  ...((await importOriginal()) as Record<string, unknown>),
   VariablesSection: () => <div data-testid="variables-section" />,
 }));
 
@@ -181,6 +186,52 @@ describe("CodeEvaluatorEditorDrawer", () => {
         expect(screen.getByTestId("code-editor")).toHaveTextContent(
           "def __call__(self, output: str = None):",
         );
+      });
+    });
+  });
+
+  describe("given the drawer edits a scenario attachment", () => {
+    describe("when the attachment carries a gate and a remove action", () => {
+      /** @scenario A code evaluator attachment gates and removes itself */
+      it("reads and writes the Required to pass switch, and offers Remove evaluator", async () => {
+        const user = userEvent.setup();
+        const onRequiredChange = vi.fn();
+        const onRemove = vi.fn();
+        render(
+          <CodeEvaluatorEditorDrawer
+            open
+            gate={{ required: false, canRequire: true }}
+            onRequiredChange={onRequiredChange}
+            onRemove={onRemove}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        await waitFor(() => {
+          expect(screen.getByText("New Code Evaluator")).toBeInTheDocument();
+        });
+
+        const requiredSwitch = screen.getByTestId("evaluator-required-switch");
+        expect(requiredSwitch).not.toBeChecked();
+        await user.click(requiredSwitch);
+        expect(onRequiredChange).toHaveBeenCalledWith(true);
+
+        fireEvent.click(screen.getByTestId("evaluator-remove-button"));
+        expect(onRemove).toHaveBeenCalled();
+      });
+    });
+
+    describe("when the attachment carries no gate", () => {
+      /** @scenario "An evaluator editor without a gate offers no Required to pass switch" */
+      it("shows no Required to pass section and no remove action", async () => {
+        render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
+
+        await waitFor(() => {
+          expect(screen.getByText("New Code Evaluator")).toBeInTheDocument();
+        });
+
+        expect(screen.queryByTestId("evaluator-gate-section")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("evaluator-remove-button")).not.toBeInTheDocument();
       });
     });
   });

@@ -6,8 +6,12 @@
 
 import { useMemo } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import {
+  parseEvaluatorAttachments,
+  parseSuiteFieldDefinitions,
+} from "@langwatch/scenario-contract";
 import { api, type RouterOutputs } from "../../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { CaseLastResult } from "./cases-table.tsx";
 import {
   type ExternalSetEntry,
@@ -135,6 +139,8 @@ function useSuiteEntries({
         name: testSuite.name,
         slug: testSuite.slug,
         caseCount: countByTestSuite.get(testSuite.id) ?? 0,
+        fields: parseSuiteFieldDefinitions(testSuite.fields),
+        evaluators: parseEvaluatorAttachments(testSuite.evaluators),
       })),
     );
   }, [testSuites, cases]);

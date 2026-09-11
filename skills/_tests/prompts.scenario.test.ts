@@ -1,4 +1,4 @@
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
@@ -9,8 +9,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
-  toolCallFix,
-  assertSkillWasRead,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
@@ -77,7 +75,6 @@ describe("Prompts Skill", () => {
           scenario.user("version my agent prompts with langwatch"),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "prompts");
 
             // Verify the agent modified main.py to use langwatch prompts
@@ -135,7 +132,6 @@ describe("Prompts Skill", () => {
           scenario.user("version my agent prompts with langwatch"),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "prompts");
             const indexTs = fs.readFileSync(`${tempFolder}/index.ts`, "utf8");
             expect(indexTs).toContain("langwatch");
@@ -185,7 +181,6 @@ describe("Prompts Skill", () => {
           scenario.user("version my agent prompts with langwatch"),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "prompts");
 
             const mainPy = fs.readFileSync(path.join(tempFolder, "main.py"), "utf8");
@@ -235,7 +230,6 @@ describe("Prompts Skill", () => {
           scenario.user("version my agent prompts with langwatch"),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "prompts");
 
             const indexTs = fs.readFileSync(`${tempFolder}/index.ts`, "utf8");
@@ -290,7 +284,6 @@ describe("Prompts Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "prompts");
             const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             // Either the code was updated to use langwatch prompts, or prompt files were created
@@ -348,7 +341,6 @@ describe("Prompts Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "prompts");
 
             const mainPy = fs.readFileSync(path.join(tempFolder, "main.py"), "utf8");

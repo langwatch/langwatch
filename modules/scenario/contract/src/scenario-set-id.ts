@@ -53,3 +53,17 @@ export function expandSetIdFilter(scenarioSetId: string): string[] {
   }
   return [scenarioSetId];
 }
+
+/**
+ * The set every voice call run is recorded under.
+ *
+ * Reads that list a project's own scenario sets exclude it, the way they
+ * exclude the agent test set: a voice call is a run of the voice agent, not a
+ * set somebody authored.
+ *
+ * Defined here rather than beside the voice agent's own configuration because
+ * this is the only module that reads it today. The voice agent configuration
+ * imports it from the scenario contract when it lands; it must not declare a
+ * second copy.
+ */
+export const VOICE_CALL_SCENARIO_SET_ID = "voice-calls";

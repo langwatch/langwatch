@@ -86,6 +86,12 @@ function fmtTrendPct(pct: number): string {
   return `${Math.round(abs)}%`;
 }
 
+/**
+ * The full ranking of people by spend. Its address redirects to the People
+ * tab of /governance/people (see `legacyRedirects.tsx`); this page keeps
+ * the same table for the detail page's neighbourhood and renders nothing
+ * of its own.
+ */
 function GovernanceUsersListPage() {
   const router = useGovernanceRouter();
   const { organization, hasAnyPermission } = useGovernanceScope();
@@ -100,7 +106,7 @@ function GovernanceUsersListPage() {
   };
 
   return (
-    <GovernanceLayout pageTitle="Users · AI Governance · LangWatch">
+    <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
@@ -123,7 +129,7 @@ function GovernanceUsersListPage() {
         ) : (
           <PermissionRequiredNotice
             permission="activityMonitor:view"
-            detail="Member spend and activity stay hidden until then."
+            detail="Spend and activity per person stay hidden until then."
           />
         )}
       </VStack>

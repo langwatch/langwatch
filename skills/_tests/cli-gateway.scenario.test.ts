@@ -9,7 +9,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   setupLocalCli,
-  toolCallFix,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
@@ -78,7 +77,6 @@ Workflow to exercise (in order):
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
@@ -145,7 +143,6 @@ Workflow:
           scenario.user("Read CLAUDE.md and follow the workflow via Bash. No MCP tools."),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
@@ -211,7 +208,6 @@ Your goal: report back which top-level command groups are available and what the
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))

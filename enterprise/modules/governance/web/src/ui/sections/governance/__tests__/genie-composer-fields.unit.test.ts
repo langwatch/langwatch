@@ -64,9 +64,22 @@ describe("given the Genie composer field definitions", () => {
     });
 
     /** @scenario "Genie setup asks for the service principal first" */
-    it("marks the token, space IDs, and warehouse ID as Advanced", () => {
+    it("marks the token, space IDs, warehouse ID and paid bill switch as Advanced", () => {
       const advancedKeys = genieFields.filter((f) => f.advanced).map((f) => f.key);
-      expect(advancedKeys).toEqual(["credentialsToken", "spaceIds", "warehouseId"]);
+      expect(advancedKeys).toEqual([
+        "credentialsToken",
+        "spaceIds",
+        "warehouseId",
+        "readPaidGenieBill",
+      ]);
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/__tests__/genieComposerFields.unit.test.ts
+    });
+
+    /** @scenario "The paid Genie bill read is off unless switched on" */
+    it("offers the paid bill read as a switch that starts off", () => {
+      const field = genieFields.find((f) => f.key === "readPaidGenieBill");
+      expect(field?.control).toBe("switch");
+      expect(field?.defaultOn).toBe(false);
     });
 
     /** @scenario "Genie setup asks for the service principal first" */
@@ -116,6 +129,41 @@ describe("given the create input for a pull-mode source", () => {
       const input = createInputFor(genieComposer({}));
       expect(input).not.toBeNull();
       expect((input?.pullConfig as { spaceIds?: string[] }).spaceIds).toEqual([]);
+    });
+  });
+
+  describe("when the paid bill switch was never touched", () => {
+    /** @scenario "The paid Genie bill read is off unless switched on" */
+    it("sends the adapter a real false, never a missing setting", () => {
+      const input = buildCreateInput({
+        composer: genieComposer({}),
+        organizationId: "org-1",
+      });
+      expect(
+        (input?.pullConfig as { readPaidGenieBill?: unknown })
+          .readPaidGenieBill,
+      ).toBe(false);
+    });
+  });
+
+  describe("when the admin switched the paid bill read on", () => {
+    /** @scenario "The paid Genie bill read is off unless switched on" */
+    it("sends the adapter a real true", () => {
+      const input = buildCreateInput({
+        composer: genieComposer({
+          parserConfig: {
+            workspaceUrl: "https://adb-123.7.azuredatabricks.net",
+            credentialsClientId: "client-id",
+            credentialsClientSecret: "client-secret",
+            readPaidGenieBill: "true",
+          },
+        }),
+        organizationId: "org-1",
+      });
+      expect(
+        (input?.pullConfig as { readPaidGenieBill?: unknown })
+          .readPaidGenieBill,
+      ).toBe(true);
     });
   });
 

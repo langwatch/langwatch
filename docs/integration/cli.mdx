@@ -218,6 +218,12 @@ const langwatch = new LangWatch();
 const prompt = await langwatch.prompts.get("my-agent");
 ```
 
+```go Go
+import "github.com/langwatch/langwatch/sdks/go/client"
+
+lw, _ := client.New()
+prompt, _ := lw.Prompts.Get(ctx, "my-agent", nil)
+```
 </CodeGroup>
 
 ### Tag versions for deployment
@@ -239,6 +245,11 @@ prompt = langwatch.prompts.get("my-agent", tag="production")
 const prompt = await langwatch.prompts.get("my-agent", { tag: "production" });
 ```
 
+```go Go
+prompt, _ := lw.Prompts.Get(ctx, "my-agent", &client.GetPromptOptions{Tag: "production"})
+// Shorthand: a suffix in the handle works too.
+prompt, _ = lw.Prompts.Get(ctx, "my-agent:production", nil)
+```
 </CodeGroup>
 
 For canary or blue/green deployments, create custom tags with `langwatch prompt tag create`.

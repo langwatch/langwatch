@@ -83,6 +83,9 @@ const UNDOCUMENTED_LANGY_LOCAL_CONTROL =
 const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
   "Not yet documented in the API reference: the saved workbench chart routes require the analytics:view permission and have no reference pages yet.";
 
+const UNDOCUMENTED_DASHBOARD_WIDGETS =
+  "Live surface gated behind the release_custom_chart_playground feature flag, deliberately undocumented until release.";
+
 /**
  * The dated (`2026-08-07`) and literal-`latest`-segment address of an
  * operation this generator already skips, or already documents, at its
@@ -161,6 +164,12 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}": UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets":
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}":
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -322,7 +331,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     // workflow run, and reads as part of the same family.
     pathPrefixes: ["/api/workflows", "/api/optimization"],
     overviewDescription:
-      "Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.",
+      "List, run and archive the workflows you build in the LangWatch workflow editor, and update their name, icon and description.",
   },
   {
     name: "Dashboards",

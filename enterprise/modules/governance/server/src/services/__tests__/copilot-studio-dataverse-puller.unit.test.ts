@@ -65,7 +65,7 @@ interface TranscriptTable {
 
 const ENVIRONMENT_URL = "https://org12345.crm.dynamics.com";
 const CREDENTIALS = {
-  tenantId: "3807ec24-0000-4000-8000-000000000001",
+  tenantId: "aaaaaaaa-0000-4000-8000-000000000001",
   clientId: "app-client-id",
   clientSecret: "app-client-secret",
 };
@@ -74,9 +74,19 @@ const CONFIG = {
   adapter: "copilot_studio_dataverse" as const,
   environmentUrl: ENVIRONMENT_URL,
   botIds: [],
+  // Named rather than left to the schema's default, which is on: this file is
+  // about the conversation read, and a licence read would add two calls to
+  // every queued-response count here without testing anything the seats suite
+  // does not already. `copilotStudioDataverseSeats.unit.test.ts` owns that read.
+  readSeats: false,
+  // Off for the same reason, and named for the same reason. The schema's
+  // default is on, and a directory read adds a Graph call to every
+  // queued-response count in this file.
+  // `copilotStudioDataverseDirectory.unit.test.ts` owns that read.
+  readDirectory: false,
 };
 
-const BOT_ID = "cc7bc3b3-dfd8-4bd9-b637-eac033f399e2";
+const BOT_ID = "bbbbbbbb-0000-4000-8000-000000000002";
 
 /**
  * Evaluate one OData `$filter` against one row.
@@ -173,6 +183,22 @@ function stringOrder(left: string, right: string): number {
   return left > right ? 1 : 0;
 }
 
+/**
+ * Where the transcript walk got to, out of the stored position.
+ *
+ * The position also carries how far the Azure bill has been priced, which is a
+ * separate watermark on a separate window. Reading only the transcript half
+ * here keeps these assertions about the thing they are testing — and stops
+ * them failing the day a second reader is added to the same source.
+ */
+function transcriptPositionOf(
+  cursor: string | null,
+): { createdon?: string; conversationtranscriptid?: string } | null {
+  if (!cursor) return null;
+  const { createdon, conversationtranscriptid } = JSON.parse(cursor);
+  return { createdon, conversationtranscriptid };
+}
+
 /** The order the adapter's `$orderby` asks for, applied by the fake server. */
 function byCursorOrder(a: Record<string, unknown>, b: Record<string, unknown>): number {
   const byTime = Date.parse(String(a.createdon)) - Date.parse(String(b.createdon));
@@ -203,13 +229,13 @@ function serveTranscriptPage(url: string, table: TranscriptTable): Record<string
 function transcriptRow(overrides: Record<string, unknown> = {}) {
   return {
     conversationtranscriptid: "11111111-1111-4111-8111-111111111111",
-    name: "b957a08c-0000-4000-8000-000000000001_dacfd251-bot",
+    name: "cccccccc-0000-4000-8000-000000000003_agent-one",
     conversationstarttime: "2026-08-25T19:14:34Z",
     createdon: "2026-08-25T19:44:43Z",
     // `metadata.BotId` is deliberately not `BOT_ID`. On a real row those two
     // differ, and only the lookup column joins to the agent — a fixture that
     // made them equal would let a mix-up pass.
-    metadata: JSON.stringify({ BotId: "dacfd251-bot", BatchId: 0 }),
+    metadata: JSON.stringify({ BotId: "agent-one", BatchId: 0 }),
     content: JSON.stringify({ activities: [] }),
     _bot_conversationtranscriptid_value: BOT_ID,
     ...overrides,
@@ -421,8 +447,8 @@ describe("given a response steering the next page somewhere else", () => {
 });
 
 describe("given a run against an environment holding one conversation", () => {
-  /** @scenario "The puller never reaches beyond the customer's environment" */
-  it("reaches only the sign-in and the environment, never the directory", async () => {
+  /** @scenario "The conversation read never reaches beyond the environment" */
+  it("reaches only the sign-in and the environment when the directory read is off", async () => {
     const adapter = await newAdapter();
     queueSignInAndBots();
     responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
@@ -508,7 +534,10 @@ describe("given a run against an environment holding one conversation", () => {
     // and one carrying the id the row's `metadata` claims. Joining on the
     // wrong field would find the second and put a confident, wrong name on
     // the conversation instead of leaving it unnamed.
-    queueSignInAndBots([botRow(), botRow({ botid: "dacfd251-bot", name: "wrong-agent" })]);
+    queueSignInAndBots([
+      botRow(),
+      botRow({ botid: "agent-one", name: "wrong-agent" }),
+    ]);
     responseQueue.push({
       status: 200,
       body: {
@@ -532,7 +561,7 @@ describe("given a run against an environment holding one conversation", () => {
     expect(result.events[0]!.extra).toMatchObject({
       botName: "engineering-agent",
     });
-    // Its metadata still says `dacfd251-bot`, and an agent by that id is
+    // Its metadata still says `agent-one`, and an agent by that id is
     // sitting in the list — so a name here at all would be the bug.
     expect(result.events[1]!.extra?.botName).toBeUndefined();
     expect(result.events[1]!.target).toBe("");
@@ -748,7 +777,7 @@ describe("given a cursor from a previous run", () => {
       adapter.validateConfig(CONFIG),
     );
 
-    expect(JSON.parse(result.cursor!)).toEqual({
+    expect(transcriptPositionOf(result.cursor)).toEqual({
       createdon: "2026-08-25T19:45:12Z",
       conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
     });
@@ -846,7 +875,7 @@ describe("given several conversations written in the same instant", () => {
     for (let run = 0; run < 3; run += 1) {
       const result = await runStoppingAfterOnePage(adapter, cursor);
       cursor = result.cursor;
-      cursors.push(JSON.parse(cursor!));
+      cursors.push(transcriptPositionOf(cursor));
     }
 
     expect(cursors).toEqual([
@@ -886,7 +915,7 @@ describe("given several conversations written in the same instant", () => {
       "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     ]);
-    expect(JSON.parse(result.cursor!)).toEqual({
+    expect(transcriptPositionOf(result.cursor)).toEqual({
       createdon: LATER,
       conversationtranscriptid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     });
@@ -1018,7 +1047,7 @@ describe("given the pull goes wrong", () => {
 
     expect(result.errorCount).toBe(1);
     expect(result.events).toHaveLength(1);
-    expect(JSON.parse(result.cursor ?? "null")).toEqual({
+    expect(transcriptPositionOf(result.cursor)).toEqual({
       createdon: "2026-08-25T19:45:00Z",
       conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
     });
@@ -1063,7 +1092,7 @@ describe("given the pull goes wrong", () => {
 
     expect(result.events).toHaveLength(0);
     expect(result.errorCount).toBe(3);
-    expect(JSON.parse(result.cursor ?? "null")).toEqual({
+    expect(transcriptPositionOf(result.cursor)).toEqual({
       createdon: "2026-08-25T19:46:00Z",
       conversationtranscriptid: "33333333-3333-4333-8333-333333333333",
     });
@@ -1097,7 +1126,7 @@ describe("given the pull goes wrong", () => {
     );
 
     expect(result.errorCount).toBe(1);
-    expect(JSON.parse(result.cursor ?? "null")).toEqual({
+    expect(transcriptPositionOf(result.cursor)).toEqual({
       createdon: "2026-08-25T19:44:43Z",
       conversationtranscriptid: "11111111-1111-4111-8111-111111111111",
     });
@@ -1156,5 +1185,369 @@ describe("given the pull goes wrong", () => {
     // so there is nothing to continue from.
     expect(query).toContain("createdon ge");
     expect(query).not.toContain("createdon gt");
+  });
+});
+
+/**
+ * The Azure bill arriving in more than one piece.
+ *
+ * The mapper's own tests already prove it reports the next-page link. Nothing
+ * proved the loop that follows the link, and "reads several pages whole" is a
+ * promise about the loop, not about the link: a caller that reported the link
+ * and stopped would pass every mapper test and still hand back a bill missing
+ * most of its days.
+ *
+ * The page walk is reached directly. Driving it through a whole run would need
+ * a subscription, a cursor and a write path, none of which this is about, and
+ * all of which would hide the property being asserted behind their own
+ * failures.
+ */
+describe("given an Azure bill that does not fit in one reply", () => {
+  interface PageWalk {
+    fetchAzureCostPages(params: {
+      subscriptionId: string;
+      token: string;
+      window: { fromDay: string; toDay: string };
+      options: { signal?: AbortSignal; deadlineMs?: number };
+    }): Promise<Array<{ day: string; costMinor: string }> | null>;
+  }
+
+  async function readTheBill(
+    options: { signal?: AbortSignal; deadlineMs?: number } = {},
+  ) {
+    const adapter = await newAdapter();
+    return await (adapter as unknown as PageWalk).fetchAzureCostPages({
+      subscriptionId: "sub-1",
+      token: "token-xyz",
+      window: { fromDay: "2026-08-01", toDay: "2026-08-02" },
+      options,
+    });
+  }
+
+  function costPage({
+    day,
+    cost,
+    nextLink = null,
+  }: {
+    day: number;
+    cost: number;
+    nextLink?: string | null;
+  }) {
+    return {
+      properties: {
+        columns: [
+          { name: "UsageDate" },
+          { name: "Cost" },
+          { name: "MeterCategory" },
+          { name: "Currency" },
+        ],
+        rows: [[day, cost, "Power Platform", "EUR"]],
+        nextLink,
+      },
+    };
+  }
+
+  function costCalls() {
+    // Lowercased before matching: a host is case-insensitive, and a link that
+    // shouts its host is still a call to Azure that these counts must see.
+    return capturedCalls.filter((call) =>
+      call.url.toLowerCase().includes("management.azure.com"),
+    );
+  }
+
+  describe("when the next page is Azure Resource Manager's own", () => {
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it("follows it and returns the days from both pages", async () => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({
+          day: 20260801,
+          cost: 1.5,
+          nextLink: "https://management.azure.com/next-page",
+        }),
+      });
+      responseQueue.push({
+        status: 200,
+        body: costPage({ day: 20260802, cost: 2.5 }),
+      });
+
+      const days = await readTheBill();
+
+      expect(days?.map((day) => day.day)).toEqual(["2026-08-01", "2026-08-02"]);
+      expect(costCalls()[1]?.url).toBe(
+        "https://management.azure.com/next-page",
+      );
+    });
+
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it("still follows it when it differs from ARM's own only in letter case", async () => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({
+          day: 20260801,
+          cost: 1.5,
+          nextLink: "https://MANAGEMENT.AZURE.COM/next-page",
+        }),
+      });
+      responseQueue.push({
+        status: 200,
+        body: costPage({ day: 20260801, cost: 2.5 }),
+      });
+
+      expect(await readTheBill()).not.toBeNull();
+      expect(costCalls()).toHaveLength(2);
+    });
+  });
+
+  describe("when the next page field is present but empty", () => {
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it.each([
+      "",
+      "   ",
+    ])("ends the walk on %j and keeps the days it already read", async (nextLink) => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({ day: 20260801, cost: 1.5, nextLink }),
+      });
+
+      const days = await readTheBill();
+
+      // Null here would hold the window and later give it up with the day
+      // below unpriced again, which is what an empty marker used to cost.
+      expect(days?.map((day) => day.day)).toEqual(["2026-08-01"]);
+      expect(costCalls()).toHaveLength(1);
+      expect(errors.join(" ")).not.toContain(
+        "refusing an Azure cost next-page link",
+      );
+    });
+  });
+
+  describe("when the next page points somewhere that is not Azure", () => {
+    /** @scenario "A next page cannot move the Azure token to another host" */
+    it("holds the window rather than report half a bill", async () => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({
+          day: 20260801,
+          cost: 1.5,
+          nextLink: "https://not-azure.example.com/next",
+        }),
+      });
+
+      expect(await readTheBill()).toBeNull();
+      // The refused link carries the token if followed.
+      expect(costCalls()).toHaveLength(1);
+      expect(errors.join(" ")).toContain("not-azure.example.com");
+    });
+  });
+
+  describe("when the next page is dressed up to look like Azure", () => {
+    /** @scenario "A next page cannot move the Azure token to another host" */
+    it.each([
+      // The host carries on past the name ARM answers to.
+      "https://management.azure.com.evil.example/next",
+      // The name sits in the user field; the real host is after the @.
+      "https://management.azure.com@evil.example/next",
+      // The same, hidden behind something that reads like a port.
+      "https://management.azure.com:443@evil.example/next",
+      // The dot before evil is percent-encoded rather than written.
+      "https://management.azure.com%2eevil.example/next",
+      // ARM's name, reached without TLS, where the token would go in clear.
+      "http://management.azure.com/next",
+      // ARM's own name, but a port ARM does not answer on. The host resolves;
+      // whatever is listening there is not the service that issued the token.
+      "https://management.azure.com:8443/next",
+      // Credentials smuggled in front of a host that does match, which a
+      // request would then send along with the bearer.
+      "https://someone@management.azure.com/next",
+      // A password with no user beside it, which clears the user field and
+      // would slip past a check that only looked there.
+      "https://:a-password@management.azure.com/next",
+      // Not a link at all.
+      "management.azure.com/next",
+    ])("holds the window rather than send the token to %s", async (link) => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({ day: 20260801, cost: 1.5, nextLink: link }),
+      });
+
+      expect(await readTheBill()).toBeNull();
+      // One call: the first page. The dressed-up link was never followed.
+      expect(costCalls()).toHaveLength(1);
+      // And the refusal is said out loud. A window that stalls silently is
+      // indistinguishable to an operator from one they have no permission on.
+      expect(errors.join(" ")).toContain(
+        "refusing an Azure cost next-page link",
+      );
+    });
+  });
+
+  describe("when there are more pages than one run will read", () => {
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it("holds the window instead of recording the pages it did read", async () => {
+      for (let page = 0; page < 60; page++) {
+        responseQueue.push({
+          status: 200,
+          body: costPage({
+            day: 20260801,
+            cost: 1,
+            nextLink: `https://management.azure.com/page-${page}`,
+          }),
+        });
+      }
+
+      expect(await readTheBill()).toBeNull();
+      expect(costCalls()).toHaveLength(50);
+    });
+  });
+
+  describe("when the run is over before the first page is asked for", () => {
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it("asks for nothing and holds the window", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      expect(await readTheBill({ signal: controller.signal })).toBeNull();
+      expect(costCalls()).toHaveLength(0);
+    });
+  });
+
+  describe("when Azure asks the read to slow down mid-bill", () => {
+    /** @scenario "Being asked to slow down leaves the window unpriced rather than priced at nothing" */
+    it("holds the whole window, including the page it already read", async () => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({
+          day: 20260801,
+          cost: 1.5,
+          nextLink: "https://management.azure.com/next-page",
+        }),
+      });
+      responseQueue.push({ status: 429, body: {} });
+
+      expect(await readTheBill()).toBeNull();
+      expect(warnings.join(" ")).toContain("HTTP 429");
+    });
+  });
+});
+
+describe("given a source reading a period of conversations", () => {
+  describe("when it asks the environment for a page", () => {
+    /**
+     * Naming a row count without stating it as a preference leaves this
+     * provider free to answer with its own far larger page, so the limit on
+     * how many pages one run may take bounds a much bigger read than intended.
+     *
+     * The header is Dataverse's own way of asking: `Prefer:
+     * odata.maxpagesize=<n>`, and it has to agree with the row count already
+     * in the query, which is why both are read off the same call here.
+     */
+    /** @scenario "The conversation read asks the provider for the page size it intends to read" */
+    it("states the page size it wants as a preference the provider will honour", async () => {
+      const adapter = await newAdapter();
+      queueSignInAndBots();
+      responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
+
+      await adapter.runOnce(
+        { cursor: null, credentials: CREDENTIALS },
+        adapter.validateConfig(CONFIG),
+      );
+
+      const call = transcriptCall();
+      const requested = new URL(call.url).searchParams.get("$top");
+      expect(requested).not.toBeNull();
+      const headers = (call.init?.headers ?? {}) as Record<string, string>;
+      const preference = Object.entries(headers).find(
+        ([name]) => name.toLowerCase() === "prefer",
+      )?.[1];
+
+      expect(preference).toBe(`odata.maxpagesize=${requested}`);
+    });
+  });
+});
+
+/**
+ * Which lines of the bill become recorded AI cost.
+ *
+ * Asserted HERE, at the step that decides, rather than against the parser or
+ * the event builder one layer down. `readAzureCostRows` records faithfully
+ * what Azure said and `azureCostEvents` promises exactly one event per day the
+ * reply named; a category filter inside either would falsify a stated
+ * contract, and inside the parser it would turn a reader into a policy engine.
+ *
+ * The recording step is reached directly, the same way the page walk above is.
+ * Driving a whole run would need a cursor and a write path, neither of which
+ * this is about, and both of which would hide the property behind their own
+ * failures.
+ */
+describe("given a subscription billing both AI services and unrelated infrastructure", () => {
+  interface CostRead {
+    readAzureCost(params: {
+      config: unknown;
+      options: unknown;
+      previous: {
+        pricedThroughDay: string | null;
+        heldSinceMs: number | null;
+        readAtMs: number | null;
+        deepReadDay: string | null;
+      };
+    }): Promise<{ events: Array<{ target: string }> }>;
+  }
+
+  /** A bill naming one AI line and one that is plainly not. */
+  function mixedBill() {
+    return {
+      properties: {
+        columns: [
+          { name: "UsageDate" },
+          { name: "Cost" },
+          { name: "CostUSD" },
+          { name: "Currency" },
+          { name: "MeterCategory" },
+        ],
+        rows: [
+          [20260115, 4.5, 4.5, "USD", "Foundry Models"],
+          [20260115, 99.0, 99.0, "USD", "Load Balancer"],
+        ],
+        nextLink: null,
+      },
+    };
+  }
+
+  describe("when the bill is read", () => {
+    /** @scenario "The cloud bill is asked only for the lines that carry AI spend" */
+    it("does not record an unrelated infrastructure line as AI cost", async () => {
+      const adapter = await newAdapter();
+      // The billing sign-in, then the bill itself.
+      responseQueue.push({ status: 200, body: { access_token: "token-xyz" } });
+      responseQueue.push({ status: 200, body: mixedBill() });
+
+      const read = await (adapter as unknown as CostRead).readAzureCost({
+        config: { ...CONFIG, azureSubscriptionId: "sub-1" },
+        options: {
+          cursor: null,
+          credentials: {
+            ...CREDENTIALS,
+            billingClientId: "billing-client-id",
+            billingClientSecret: "billing-client-secret",
+          },
+        },
+        // Never read before, so this run is due to ask — and no deep read has
+        // finished either, which is a state production reaches and the omitted
+        // fourth one (a caller that does no deep reads at all) is not.
+        previous: {
+          pricedThroughDay: null,
+          heldSinceMs: null,
+          readAtMs: null,
+          deepReadDay: null,
+        },
+      });
+
+      // Belt and braces on top of the request filter: Azure answered with a
+      // category outside the list, and it becomes no recorded cost at all.
+      expect(read.events.map((event) => event.target)).toEqual([
+        "Foundry Models",
+      ]);
+    });
   });
 });

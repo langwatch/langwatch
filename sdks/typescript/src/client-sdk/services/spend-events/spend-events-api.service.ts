@@ -7,6 +7,7 @@ import { mutationInit, type MutationOptions } from "@/client-sdk/services/_share
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface SpendEvent {
   id: string;
@@ -323,7 +324,7 @@ export class SpendEventsApiService {
   }
 
   private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.endpoint}${path}`, {
+    const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...init,
       // A hung control plane must fail the command, not freeze it.
       signal: init?.signal ?? AbortSignal.timeout(30_000),

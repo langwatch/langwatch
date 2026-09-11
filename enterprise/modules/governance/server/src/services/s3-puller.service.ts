@@ -63,6 +63,17 @@ const s3PollingConfigSchema = z.object({
   parser: z.enum(["ndjson", "json-array", "csv"]),
   schedule: z.string().min(1),
   eventMapping: eventMappingSchema,
+  /**
+   * Whether each event keeps a verbatim copy of the line it was mapped from.
+   *
+   * On by default: the contract reserves `raw_payload` for a replay against a
+   * future mapping, and the audit row exports it for a SIEM to drill back to.
+   * A source turns it off when the line carries what the mapping was written
+   * to leave out. The OpenAI compliance export puts the person's email beside
+   * the id on every line; the mapping names the person by the id, and a kept
+   * copy would carry the address into the audit row by the back door.
+   */
+  retainRawPayload: z.boolean().default(true),
 });
 
 export type S3PollingConfig = z.infer<typeof s3PollingConfigSchema>;
@@ -89,14 +100,22 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
   async runOnce(options: PullRunOptions, config: S3PollingConfig): Promise<PullResult> {
     const cursor = options.cursor;
 
+<<<<<<< HEAD:enterprise/modules/governance/server/src/services/s3-puller.service.ts
     const listed = await this.listKeys({
+=======
+    const { keys: listed, isTruncated } = await this.listKeys({
+      client,
+>>>>>>> origin/main:platform/app/ee/governance/services/pullers/s3PollingPullerAdapter.ts
       config,
       options,
       startAfter: cursor ?? undefined,
       signal: options.signal,
     });
+    let completeness: "complete" | "truncated" = isTruncated
+      ? "truncated"
+      : "complete";
     if (listed.length === 0) {
-      return { events: [], cursor, errorCount: 0 };
+      return { events: [], cursor, errorCount: 0, completeness };
     }
 
     const events: NormalizedPullEvent[] = [];
@@ -104,6 +123,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     let lastSuccessfulKey: string | null = cursor;
 
     for (const key of listed) {
+<<<<<<< HEAD:enterprise/modules/governance/server/src/services/s3-puller.service.ts
       if (options.deadlineMs !== undefined && nowInstant().epochMilliseconds > options.deadlineMs) {
         this.diagnostics.info("deadline reached mid-pull, returning partial results", {
           adapter: this.id,
@@ -111,6 +131,16 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
           processed: events.length,
         });
         return { events, cursor: lastSuccessfulKey, errorCount };
+=======
+      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
+        logger.info(
+          { adapter: this.id, key, processed: events.length },
+          "deadline reached mid-pull, returning partial results",
+        );
+        // A deadline leaves the store half-read whatever the listing said.
+        completeness = "truncated";
+        break;
+>>>>>>> origin/main:platform/app/ee/governance/services/pullers/s3PollingPullerAdapter.ts
       }
       try {
         const body = await this.readObject({
@@ -122,6 +152,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
         const { records, unreadable } = this.parseBody({ body, config });
         errorCount += unreadable;
         await this.reportUnreadableLines({ key, unreadable });
+<<<<<<< HEAD:enterprise/modules/governance/server/src/services/s3-puller.service.ts
         for (const raw of records) {
           try {
             events.push(this.mapEvent(raw, config));
@@ -138,6 +169,14 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
             });
           }
         }
+=======
+        errorCount += await this.collectEvents({
+          records,
+          config,
+          key,
+          events,
+        });
+>>>>>>> origin/main:platform/app/ee/governance/services/pullers/s3PollingPullerAdapter.ts
         lastSuccessfulKey = key;
       } catch (error) {
         // Reading the file itself failed — this is more serious than a
@@ -161,7 +200,49 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       }
     }
 
-    return { events, cursor: lastSuccessfulKey, errorCount };
+    return { events, cursor: lastSuccessfulKey, errorCount, completeness };
+  }
+
+  /**
+   * Maps one file's records onto `events`, returning how many it could not.
+   *
+   * A record that will not map is skipped rather than thrown: one malformed
+   * line must not cost the whole file, let alone the run. The count it returns
+   * is what tells the caller the run was a partial success.
+   */
+  private async collectEvents({
+    records,
+    config,
+    key,
+    events,
+  }: {
+    records: unknown[];
+    config: S3PollingConfig;
+    key: string;
+    events: NormalizedPullEvent[];
+  }): Promise<number> {
+    let unmapped = 0;
+    for (const raw of records) {
+      try {
+        events.push(this.mapEvent(raw, config));
+      } catch (error) {
+        unmapped += 1;
+        logger.warn(
+          {
+            adapter: this.id,
+            key,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "skipping malformed event",
+        );
+        await withScope(async (scope) => {
+          scope.setTag?.("adapter", this.id);
+          scope.setExtra?.("key", key);
+          captureException(toError(error));
+        });
+      }
+    }
+    return unmapped;
   }
 
   private credentials(options: PullRunOptions) {
@@ -183,6 +264,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     options: PullRunOptions;
     startAfter?: string;
     signal?: AbortSignal;
+<<<<<<< HEAD:enterprise/modules/governance/server/src/services/s3-puller.service.ts
   }): Promise<string[]> {
     return this.objects.list({
       bucket: config.bucket,
@@ -194,6 +276,54 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       signal,
       limit: MAX_FILES_PER_RUN,
     });
+=======
+    /**
+     * The keys to read, and whether the store held more than this run may take.
+     *
+     * `isTruncated` is returned rather than inferred by the caller from
+     * `keys.length`: a listing that happens to hold exactly the cap is
+     * indistinguishable from one cut short by it, and the caller would have
+     * to re-derive a rule that already lives here.
+     *
+     * It becomes the run's `completeness`. A listing cut short by the file cap
+     * and one that drained the bucket used to leave through the same exit, so
+     * a source permanently stuck on a fraction of its objects looked exactly
+     * like a healthy quiet one. Neither is a failure — the events and money
+     * already gathered are kept and the cursor still advances — so the answer
+     * rides beside `errorCount` rather than raising it.
+     */
+  }): Promise<{ keys: string[]; isTruncated: boolean }> {
+    const keys: string[] = [];
+    let continuationToken: string | undefined;
+    let pages = 0;
+    do {
+      pages += 1;
+      const response = await client.send(
+        new ListObjectsV2Command({
+          Bucket: config.bucket,
+          Prefix: config.prefix,
+          ContinuationToken: continuationToken,
+          StartAfter: continuationToken ? undefined : startAfter,
+          MaxKeys: 1000,
+        }),
+        { abortSignal: signal },
+      );
+      const contents: _Object[] = response.Contents ?? [];
+      for (const obj of contents) {
+        if (obj.Key) keys.push(obj.Key);
+      }
+      continuationToken = response.IsTruncated
+        ? response.NextContinuationToken
+        : undefined;
+      if (keys.length >= MAX_FILES_PER_RUN) {
+        // Safety cap — the cursor will pick up the rest on the next run
+        return { keys: keys.slice(0, MAX_FILES_PER_RUN), isTruncated: true };
+      }
+    } while (continuationToken && pages < 50);
+    // A token still in hand means the page cap above stopped the walk, which
+    // leaves the store just as half-read as the file cap does.
+    return { keys, isTruncated: continuationToken !== undefined };
+>>>>>>> origin/main:platform/app/ee/governance/services/pullers/s3PollingPullerAdapter.ts
   }
 
   private async readObject({
@@ -388,7 +518,9 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       cost_usd: asDecimalString(get(config.eventMapping.cost_usd)),
       tokens_input: asInt(get(config.eventMapping.tokens_input)),
       tokens_output: asInt(get(config.eventMapping.tokens_output)),
-      raw_payload: JSON.stringify(rawEvent),
+      // Empty, not absent, when the copy is not kept: the contract types the
+      // field as a string, and an empty string carries nothing of the line.
+      raw_payload: config.retainRawPayload ? JSON.stringify(rawEvent) : "",
       ...(Object.keys(extras).length > 0 ? { extra: extras } : {}),
     };
   }

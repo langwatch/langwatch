@@ -368,7 +368,116 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return orgUser?.role ?? null;
   }
 
+<<<<<<< HEAD:modules/organization/server/src/repositories/prisma/prisma.organization-membership.repository.ts
   async tryFindPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null> {
+=======
+  async getProjectIds(organizationId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    return projects.map((p) => p.id);
+  }
+
+  async findWithAdmins(
+    organizationId: string,
+  ): Promise<OrganizationWithAdmins | null> {
+    return this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: {
+        members: {
+          where: { role: "ADMIN" },
+          include: {
+            user: true,
+          },
+        },
+      },
+    }) as Promise<OrganizationWithAdmins | null>;
+  }
+
+  async updateSentPlanLimitAlert(
+    organizationId: string,
+    timestamp: Date,
+  ): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { sentPlanLimitAlert: timestamp },
+    });
+  }
+
+  async findProjectsWithName(
+    organizationId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
+    return this.prisma.project.findMany({
+      // Named projects reach a customer — the plan-limit alert email lists
+      // them per project. The governance project's usage stays in the
+      // org-level total rather than becoming a line that reveals it.
+      where: { team: { organizationId }, kind: { not: "internal_governance" } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async clearTrialLicense(organizationId: string): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        license: null,
+        licenseExpiresAt: null,
+        licenseLastValidatedAt: null,
+      },
+    });
+  }
+
+  async updateCurrency(input: {
+    organizationId: string;
+    currency: string;
+  }): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: input.organizationId },
+      data: { currency: input.currency as Currency },
+    });
+  }
+
+  async getPricingModel(organizationId: string): Promise<string | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { pricingModel: true },
+    });
+    return org?.pricingModel ?? null;
+  }
+
+  async getStripeCustomerId(organizationId: string): Promise<string | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { stripeCustomerId: true },
+    });
+    return org?.stripeCustomerId ?? null;
+  }
+
+  async findByStripeCustomerId(
+    stripeCustomerId: string,
+  ): Promise<{ id: string } | null> {
+    return this.prisma.organization.findFirst({
+      where: { stripeCustomerId },
+      select: { id: true },
+    });
+  }
+
+  async findNameById(
+    organizationId: string,
+  ): Promise<{ id: string; name: string } | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true },
+    });
+    return org ?? null;
+  }
+
+  async findPrimaryIntentById(
+    organizationId: string,
+  ): Promise<OrganizationIntent | null> {
+>>>>>>> origin/main:platform/app/src/server/app-layer/organizations/repositories/organization.prisma.repository.ts
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { primaryIntent: true },

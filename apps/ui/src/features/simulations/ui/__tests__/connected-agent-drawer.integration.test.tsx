@@ -8,6 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
+<<<<<<< HEAD:apps/ui/src/features/simulations/ui/__tests__/connected-agent-drawer.integration.test.tsx
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 beforeAll(() => {
@@ -21,6 +22,10 @@ beforeAll(() => {
   );
 });
 afterAll(() => vi.unstubAllGlobals());
+=======
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { OFFLINE_AGENT_TEST_COPY } from "~/components/agents/offlineAgentCopy";
+>>>>>>> origin/main:platform/app/src/components/agents/connected/__tests__/ConnectedAgentDrawer.integration.test.tsx
 
 const agentRow = {
   id: "agent_1",
@@ -196,7 +201,13 @@ describe("<ConnectedAgentDrawer />", () => {
       expect(test).toBeDisabled();
       await user.hover(test);
 
+<<<<<<< HEAD:apps/ui/src/features/simulations/ui/__tests__/connected-agent-drawer.integration.test.tsx
       expect(await screen.findByRole("tooltip")).toHaveTextContent("This agent is offline");
+=======
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        OFFLINE_AGENT_TEST_COPY,
+      );
+>>>>>>> origin/main:platform/app/src/components/agents/connected/__tests__/ConnectedAgentDrawer.integration.test.tsx
     });
   });
 
@@ -240,6 +251,30 @@ describe("<ConnectedAgentDrawer />", () => {
       const result = await screen.findByTestId("agent-test-result");
       expect(result).toHaveTextContent("Hello back");
       expect(result).toHaveTextContent("build-box (eu-pod)");
+    });
+
+    describe("given the agent declares a parameter", () => {
+      /** @scenario "The connected agent drawer test turn takes parameter overrides" */
+      it("suggests the declared parameter, sends a typed value and sends nothing when the line is empty", async () => {
+        const user = userEvent.setup();
+        await renderDrawer();
+
+        const line = await screen.findByTestId("agent-test-parameters");
+        expect(line).toHaveAttribute("placeholder", "model=gpt-5-mini");
+
+        await user.type(line, "model=gpt-5");
+        await user.click(screen.getByTestId("agent-test-run"));
+        expect(testMutate).toHaveBeenLastCalledWith({
+          id: "agent_1",
+          projectId: "project_1",
+          message: "ping",
+          params: { model: "gpt-5" },
+        });
+
+        await user.clear(line);
+        await user.click(screen.getByTestId("agent-test-run"));
+        expect(testMutate.mock.lastCall?.[0]).not.toHaveProperty("params");
+      });
     });
   });
 });

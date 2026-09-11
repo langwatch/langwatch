@@ -2,8 +2,10 @@ package app
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -85,6 +87,11 @@ type Config struct {
 	// won't come up. The zero value is false (portless enabled), matching every
 	// stack provisioned before this knob existed — see domain.Stack.PortlessDisabled.
 	PortlessDisabled bool
+	// PublicURL is the external origin a tunnel (tailscale serve, cloudflared)
+	// presents to browsers, from LANGWATCH_HAVEN_PUBLIC_URL. When set, it is
+	// copied onto Stack.PublicURL so OverlayEnv carries it in BASE_HOST and
+	// NEXTAUTH_URL instead of the local app URL — see PublicURLFromEnv.
+	PublicURL string
 }
 
 // PlanOptions decide which services `up` runs and how.
@@ -132,4 +139,22 @@ func RedisDBOverrideFromEnv(v string) *int {
 		return nil
 	}
 	return &db
+}
+
+// PublicURLFromEnv parses LANGWATCH_HAVEN_PUBLIC_URL into the origin a tunnel
+// presents to browsers, or "" when unset or malformed. Only an http(s) URL
+// with a non-empty host is accepted — a scheme-less or garbled value would
+// otherwise land verbatim in BASE_HOST/NEXTAUTH_URL and break every sign-in,
+// local and tunneled alike.
+func PublicURLFromEnv() string {
+	v := strings.TrimSuffix(strings.TrimSpace(os.Getenv("LANGWATCH_HAVEN_PUBLIC_URL")), "/")
+	if v == "" {
+		return ""
+	}
+	u, err := url.Parse(v)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		fmt.Fprintf(os.Stderr, "haven: ignoring LANGWATCH_HAVEN_PUBLIC_URL=%q (want http(s)://host[:port])\n", v)
+		return ""
+	}
+	return v
 }

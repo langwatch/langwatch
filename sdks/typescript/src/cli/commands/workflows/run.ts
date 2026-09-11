@@ -1,15 +1,16 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { parseRunParameterFlags } from "../../utils/keyValueFlags";
+import { parseRunParameterFlags } from "../../utils/keyValueFlags.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export const runWorkflowCommand = async ({
   id,
@@ -47,14 +48,17 @@ export const runWorkflowCommand = async ({
     const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
-    const response = await fetch(`${endpoint}/api/v1/workflows/${encodeURIComponent(id)}/run`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+    const response = await langwatchFetch(
+      `${endpoint}/api/v1/workflows/${encodeURIComponent(id)}/run`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey }),
+        },
+        body: JSON.stringify(input),
       },
-      body: JSON.stringify(input),
-    });
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);

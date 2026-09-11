@@ -8,9 +8,7 @@ keywords: LangWatch, Python, SDK, integration, guide, setup, tracing, spans, tra
 import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a
-  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up
-  for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
@@ -204,8 +202,12 @@ langwatch.setup(
 </ParamField>
 
 <ParamField path="endpoint_url" type="str | None">
-  The LangWatch endpoint URL. Defaults to the `LANGWATCH_ENDPOINT` environment variable or
-  `https://app.langwatch.ai`.
+  The LangWatch endpoint URL. Defaults to the `LANGWATCH_ENDPOINT` environment
+  variable or `https://app.langwatch.ai`. GET and HEAD requests follow redirects, up to
+  five hops. Every other request only follows an `http://` endpoint's redirect
+  to the same `https://` URL, once, with one warning per process. A refused
+  redirect raises `langwatch.http_client.RedirectRefusedError`: set the
+  endpoint to the final URL.
 </ParamField>
 
 <ParamField path="base_attributes" type="dict[str, Any] | None">

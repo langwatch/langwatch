@@ -10,9 +10,8 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   setupLocalCli,
-  toolCallFix,
   SKILL_TESTS_SET_ID,
-} from "./helpers/claude-code-adapter";
+} from "./helpers/claude-code-adapter.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -161,8 +160,6 @@ describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
                 ),
                 scenario.agent(),
                 (state) => {
-                  toolCallFix(state);
-
                   const allText = state.messages
                     .map((m) =>
                       typeof m.content === "string" ? m.content : JSON.stringify(m.content),
@@ -242,8 +239,6 @@ describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
               ),
               scenario.agent(),
               (state) => {
-                toolCallFix(state);
-
                 const allText = state.messages
                   .map((m) =>
                     typeof m.content === "string" ? m.content : JSON.stringify(m.content),

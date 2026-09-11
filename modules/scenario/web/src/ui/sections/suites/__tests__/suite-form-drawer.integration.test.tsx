@@ -187,6 +187,8 @@ function makeSuiteConfig(overrides: Partial<SimulationSuite> = {}): SimulationSu
     name: "My Suite",
     slug: "my-suite",
     kind: "run_plan",
+    fields: null,
+    evaluators: null,
     scope: null,
     description: "A test suite",
     scenarioIds: ["scen_1", "scen_2"],

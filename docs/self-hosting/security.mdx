@@ -98,7 +98,7 @@ The Helm chart's `secretKeyRef` pattern works with any Kubernetes Secret, regard
 ### Private control-plane paths are blocked at the ingress
 
 Everything under `/api/internal/*` is the app's private control plane: the Langy
-agent's callbacks and the AI gateway's usage callbacks. Those routes authenticate
+agent's callbacks and the AI Gateway's usage callbacks. Those routes authenticate
 with a shared secret, but they are never meant to be reachable from the internet.
 
 The chart blocks them at the ingress by default, via `ingress.blockedPaths`
@@ -244,7 +244,7 @@ One more toggle in the overlay isn't an admission failure but an unmet dependenc
 
 - **Gateway HPA** (`gateway.autoscaling.enabled`) scales on a custom metric via `prometheus-adapter`. Set it to `false` if you don't run one; the overlay pins `gateway.replicaCount: 2` instead.
 
-With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so nothing exposes or scrapes a `/metrics` endpoint; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
+With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so no component exposes or scrapes a `/metrics` endpoint; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
 
 In-cluster datastores satisfy read-only-root policies, but managed databases (the `postgres-external`, `redis-external`, and `clickhouse-external` overlays) are still the better production choice: you get backups, HA, and patching, and there are no datastore pods to admit.
 

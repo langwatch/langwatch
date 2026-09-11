@@ -94,6 +94,19 @@ afterEach(() => {
 });
 
 describe("instrumentCommand", () => {
+
+  describe("given changed wiring and a running langwatch code launcher", () => {
+    it("prints the restart advice returned by the installer", async () => {
+      const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
+      asMock(installTelemetryWiring).mockReturnValue({
+        labels: ["~/.zshrc"], warnings: [notice], requiredFailures: [],
+      });
+
+      await instrumentCommand("code", {});
+
+      expect(writtenTo(stderrSpy)).toContain(notice);
+    });
+  });
   describe("given a companion write the wiring depends on failed", () => {
     it("fails instead of reporting a wired tool", async () => {
       asMock(installTelemetryWiring).mockReturnValue({
@@ -106,6 +119,26 @@ describe("instrumentCommand", () => {
 
       expect(writtenTo(stderrSpy)).toContain("could not enable opencode's OpenTelemetry flag");
       expect(writtenTo(stdoutSpy)).not.toContain("runs now send telemetry to");
+    });
+  });
+
+  describe("given a platform that refuses the device session", () => {
+    /** @scenario "A signed-out device is told its wiring was not confirmed" */
+    it("wires the cached key and says the machine is signed out", async () => {
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        sessionExpired: true,
+      });
+
+      await instrumentCommand("claude", {});
+
+      // The wiring is worth writing: the cached key may still work. What is
+      // not acceptable is the success line alone, which reads as a confirmed
+      // setup on a machine that cannot confirm anything.
+      expect(installTelemetryWiring).toHaveBeenCalledTimes(1);
+      const err = writtenTo(stderrSpy);
+      expect(err).toContain("signed out");
+      expect(err).toContain("langwatch login --device");
     });
   });
 

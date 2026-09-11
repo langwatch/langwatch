@@ -401,6 +401,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           accessModel.rowPolicyStatement({
             names: harness.names,
             lwqlTable: sourceTable,
+            sourceDatabase: facts,
           }),
         ]);
       }

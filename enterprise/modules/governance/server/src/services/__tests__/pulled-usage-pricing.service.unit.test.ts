@@ -58,7 +58,7 @@ describe("given the provider reported its own cost", () => {
       expect(priced.rateVersion).toBeNull();
       // Scaled from the decimal string, not the float: 12.345678901 USD is
       // exactly 12_345_678_901 nano-USD and must survive as an integer.
-      expect(priced.costNanoUsd).toBe(12_345_678_901);
+      expect(priced.costNanoMinor).toBe(12_345_678_901);
     });
 
     /**
@@ -75,7 +75,7 @@ describe("given the provider reported its own cost", () => {
 
       expect(priced.costBasis).toBe("provider_reported");
       expect(priced.costStatus).toBe("estimate");
-      expect(priced.costNanoUsd).toBe(3_500_000_000);
+      expect(priced.costNanoMinor).toBe(3_500_000_000);
     });
 
     it("refuses a figure too large to represent rather than rounding it", () => {
@@ -102,7 +102,7 @@ describe("given the provider gave only quantities", () => {
 
       expect(priced.costBasis).toBe("computed");
       expect(priced.costStatus).toBe("estimate");
-      expect(priced.costNanoUsd).toBeGreaterThan(0);
+      expect(priced.costNanoMinor).toBeGreaterThan(0);
       // A computed figure came from a price table, and the record names which.
       expect(priced.rateVersion).toBeTruthy();
     });
@@ -144,9 +144,9 @@ describe("given the provider gave only quantities", () => {
       const first = price(input);
       const second = price(input);
 
-      expect(second.costNanoUsd).toBe(first.costNanoUsd);
+      expect(second.costNanoMinor).toBe(first.costNanoMinor);
       expect(second.rateVersion).toBe(first.rateVersion);
-      expect(Number.isInteger(first.costNanoUsd)).toBe(true);
+      expect(Number.isInteger(first.costNanoMinor)).toBe(true);
     });
   });
 });

@@ -125,7 +125,7 @@ function offencesIn(files: readonly string[]): string[] {
   });
 }
 
-describe("the workbench feature's source", () => {
+describe("the feature's source", () => {
   describe("given it is inspected for schedules, background refreshes and persistence", () => {
     /** @scenario "The workbench has no unsolicited work or hidden client persistence" */
     it("contains none of them", () => {

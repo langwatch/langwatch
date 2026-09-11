@@ -6,6 +6,7 @@ import type {
 } from "./serialized-handled-error.ts";
 
 import type { AppErrorCode } from "./app-codes.ts";
+
 import {
   type HandledErrorShape,
   handledShapeFromSerialized,
@@ -355,7 +356,7 @@ const presentations = {
   lwql_reserved_parameter_type: {
     title: "The time window has to be a date and time",
     describe: () =>
-      "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+      "Declare dashboard_context_period_start and dashboard_context_period_end as DateTime, for example {dashboard_context_period_start:DateTime}, and run the query again.",
   },
   // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
   // either `"declared-type"` or `"step-value"`, but the three doors that can
@@ -368,7 +369,7 @@ const presentations = {
   lwql_granularity_parameter_type: {
     title: "The granularity has to be declared as UInt32",
     describe: () =>
-      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}, and run the query again.",
+      "Declare dashboard_context_granularity_seconds as UInt32, for example {dashboard_context_granularity_seconds:UInt32}, and run the query again.",
   },
   lwql_granularity_too_fine: {
     title: "That granularity would return too many datapoints",
@@ -378,7 +379,7 @@ const presentations = {
   lwql_granularity_requires_window: {
     title: "Granularity needs the period parameters",
     describe: () =>
-      "A query declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
+      "A query declaring dashboard_context_granularity_seconds must also declare {dashboard_context_period_start:DateTime} and {dashboard_context_period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
   },
   lwql_not_enabled: {
     title: "Custom SQL isn't switched on here",
@@ -440,6 +441,16 @@ const presentations = {
     describe: () =>
       "The new order wasn't saved. Reload to see the current list, then arrange it again.",
   },
+  dashboard_widget_not_found: {
+    title: "That dashboard widget isn't here",
+    describe: () =>
+      "It may have been deleted, or it belongs to another project. Check the list of dashboard widgets.",
+  },
+  dashboard_widget_definition_invalid: {
+    title: "This dashboard widget can't be opened",
+    describe: () =>
+      "We can't read what was stored for it. Rebuild the widget and save it again.",
+  },
   lwql_unavailable: {
     // Names the workspace administrator first: on a self-hosted deployment
     // the reader's own operator controls whether this is provisioned, and
@@ -447,6 +458,15 @@ const presentations = {
     title: "Analytics SQL isn't available here",
     describe: () =>
       "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
+  },
+  lwql_provisioning_incomplete: {
+    // Deliberately does NOT name the workspace administrator: unlike
+    // lwql_unavailable, this fires on a deployment where the feature IS
+    // provisioned and working — one dataset behind it is not fully readable
+    // yet, which is entirely on us, not something a customer's admin can fix.
+    title: "This query couldn't read one of its datasets",
+    describe: () =>
+      "This is a temporary gap on our side, not a setting in your workspace. Try again shortly, or contact support if it persists.",
   },
   cli_key_selection_invalid: {
     title: "Check the access selection",
@@ -1322,6 +1342,16 @@ const presentations = {
     title: "That private key couldn't sign the license",
     describe: () => "Check it is the license signing key and was copied in full.",
   },
+  custom_chart_playground_not_enabled: {
+    title: "Custom chart playground isn't switched on here",
+    describe: () =>
+      "This project doesn't have the custom chart playground enabled yet. Ask your administrator to switch it on.",
+  },
+  custom_graph_writes_disabled_for_playground: {
+    title: "Dashboard graph editing is off while the playground is on",
+    describe: () =>
+      "This project has the custom chart playground enabled, which turns off creating or editing dashboard graphs. Use the playground to build a chart instead.",
+  },
   custom_role_not_found: {
     title: "Custom role not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -2072,8 +2102,9 @@ const presentations = {
     describe: () => "Choose a different name and try again.",
   },
   scenario_not_found: {
-    title: "That test case isn't available",
-    describe: () => "It may have been archived or removed. Reload and try again.",
+    title: "That scenario isn't available",
+    describe: () =>
+      "It may have been archived or removed. Reload, then pick a scenario again.",
   },
   scenario_parameter_missing: {
     title: "This run is missing a parameter value",
@@ -2177,11 +2208,46 @@ const presentations = {
       return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
     },
   },
+  scenario_field_unknown: {
+    // The names are our own identifiers, not free text: the editor shows the
+    // refused name beside the ones the suite declares so the typo is visible.
+    title:
+      "This scenario carries a value for a field its test suite does not declare",
+    describe: (error) => {
+      const unknown = strList(error, "identifiers");
+      const declared = strList(error, "declared");
+      const subject =
+        unknown.length > 0
+          ? `${listLabels(unknown)} ${unknown.length > 1 ? "are" : "is"} not declared by the test suite.`
+          : "The value names a field the test suite does not declare.";
+      const hint =
+        declared.length > 0
+          ? ` It declares ${listLabels(declared)}.`
+          : " It declares no fields.";
+      return `${subject}${hint} Add the field to the test suite, or remove the value.`;
+    },
+  },
+  scenario_field_type_invalid: {
+    title: "A field value does not match the type its test suite declares",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      const type = str(error, "type", "");
+      const subject = identifier
+        ? `The value of ${identifier} cannot be read as ${type || "its declared type"}.`
+        : "One value cannot be read as the type the test suite declares.";
+      return `${subject} Enter a value of that type, or leave the field empty.`;
+    },
+  },
   scenario_stale_version: {
     // Nothing was written: the save is refused before the update, so the copy
     // can promise the customer's own edit is still theirs to redo.
     title: "This test case changed since you loaded it",
     describe: () => "Reload to pick up the latest version, then make your change again.",
+  },
+  scenario_user_code_error: {
+    title: "The agent's own code raised an error",
+    describe: () =>
+      "The scenario ran, and the code behind the agent stopped with an error of its own. Open the run to read what it reported.",
   },
   scenario_version_not_found: {
     title: "That version is not available",
@@ -2313,6 +2379,23 @@ const presentations = {
     title: "That sign-in method can't be verified right now",
     describe: () =>
       "It is already verified, or it was removed. Refresh the page to see its current state.",
+  },
+  // ADR-128 §12. Both are races rather than mistakes: a review queue is read
+  // by people, and the world moves between reading it and clicking.
+  identity_match_suggestion_not_found: {
+    title: "That match suggestion is no longer there",
+    describe: () =>
+      "Somebody may have confirmed it already, or it stopped being suggested. Reload to see the current list.",
+  },
+  identity_already_linked: {
+    title: "This person is already linked to an account",
+    describe: () =>
+      "Someone linked them while this list was open. Reload to see who they are linked to.",
+  },
+  identity_erased: {
+    title: "This person has been erased",
+    describe: () =>
+      "Their details were removed at their request, so they can no longer be linked to an account. Reload to see the current list.",
   },
   identity_primary_must_demote_first: {
     title: "Your primary sign-in method can't be removed",
@@ -2630,6 +2713,22 @@ const presentations = {
     describe: () =>
       "Wait for it to finish, or stop it from the list of running updates, then start this one again.",
   },
+  agent_listing_unavailable: {
+    // fault: platform, and the copy is written to match. Nothing reached a
+    // provider here — the ask could not be recorded at all — so there is no
+    // outcome landing later, no half-finished sync, and nothing already on
+    // the page is affected.
+    //
+    // It deliberately does not say "try again". Both causes are settings of
+    // the install rather than moments: this deployment does not run the
+    // pipeline that carries listings, or the organization has no governance
+    // project for the request to be tenanted to. Pressing the button a second
+    // time changes neither, and copy that implied otherwise would send an
+    // admin round a loop that cannot end.
+    title: "Agent sync isn't switched on for this organization",
+    describe: () =>
+      "Your providers weren't asked, so no agent list is on the way. Ask your administrator to switch it on, or contact support — trying again won't help until they do.",
+  },
 
   // ---- datasets ----
   dataset_name_taken: {
@@ -2692,6 +2791,15 @@ const presentations = {
               : "What you picked is";
       return `${subject} no longer in this organization, so it cannot be put in a department. Reload and try again.`;
     },
+  },
+  dataset_too_large_to_search: {
+    // A limit, not a breakage: the search would have had to read more of the
+    // dataset than one search reads. Saying so beats returning the matches
+    // found before giving up, which reads as a complete answer and is not one.
+    // Paging still works, so the copy points at the way through.
+    title: "This dataset is too large to search",
+    describe: () =>
+      "Page through the rows, or split the dataset into smaller ones.",
   },
   storage_not_writable: {
     // fault: platform. Storage for this deployment was never provisioned, so
@@ -2788,6 +2896,56 @@ const presentations = {
     title: "Choose an agent to run against",
     describe: () =>
       "This suite has no agent or prompt to test yet. Pick one in the run dialog, then run again.",
+  },
+  suite_field_identifier_invalid: {
+    title: "That field name cannot be used",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      const lead = identifier ? `${identifier} is not a usable name.` : "";
+      return `${lead} Field names start with a lowercase letter and use only lowercase letters, digits and underscores, and cannot be situation, criteria, name, input or output.`.trim();
+    },
+  },
+  suite_field_identifier_duplicate: {
+    title: "Two fields share a name",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      return identifier
+        ? `${identifier} is declared more than once. Give each field its own name.`
+        : "Give each field its own name.";
+    },
+  },
+  suite_field_in_use: {
+    title: "An evaluator still reads this field",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "this field");
+      return `Change the evaluator mappings that read ${identifier} first, then remove the field.`;
+    },
+  },
+  suite_evaluator_not_found: {
+    title: "That evaluator is not in this project",
+    describe: () =>
+      "It may have been deleted. Pick an evaluator from the list, then save again.",
+  },
+  suite_evaluator_mapping_invalid: {
+    title: "An evaluator mapping points at something the run cannot read",
+    describe: (error) => {
+      const input = str(error, "input", "");
+      const lead = input ? `The mapping of ${input} ` : "One mapping ";
+      return `${lead}names a source the run does not provide, or a field the test suite does not declare. Open the evaluator and pick another source.`;
+    },
+  },
+  suite_evaluator_mappings_missing: {
+    // The run is refused before anything is queued, so the copy can send the
+    // customer to the evaluator instead of warning about a half-started run.
+    title: "An evaluator is missing required mappings",
+    describe: (error) => {
+      const inputs = strList(error, "inputs");
+      const subject =
+        inputs.length > 0
+          ? `${listLabels(inputs)} ${inputs.length > 1 ? "have" : "has"} no source yet.`
+          : "A required input has no source yet.";
+      return `${subject} Configure the missing mappings on the evaluator, then run again.`;
+    },
   },
 
   // ---- annotations & review queues ----
@@ -3015,6 +3173,15 @@ const presentations = {
   langy_dispatch_rejected: {
     title: "That request couldn't be understood",
     describe: () => "Rephrase and try again.",
+  },
+  langy_skill_not_available: {
+    title: "That capability isn't turned on yet",
+    describe: (error) => {
+      const skillId = str(error, "skillId", "");
+      return skillId
+        ? `The "${skillId}" capability isn't enabled for this project. Try describing what you want a different way.`
+        : "That capability isn't enabled for this project.";
+    },
   },
   langy_rate_limited: {
     // Raised when someone sends faster than their own Langy allowance. The
@@ -3655,6 +3822,49 @@ const presentations = {
     title: "That evaluator cannot run as a guardrail",
     describe: () =>
       "A guardrail needs an evaluator that is enabled in this project and set to run as a guardrail. Turn it on for this project and set it to run as a guardrail, or choose one that already does.",
+  },
+  voice_agents_disabled: {
+    // voiceAgents.message has zero imports of its own, so pulling it in here
+    // never drags server-only Prisma code into this client-bundled registry.
+    // Inlined rather than imported: this registry is client-bundled and
+    // `@langwatch/handled-error` takes no module dependencies. The canonical
+    // declaration is VOICE_AGENTS_DISABLED_MESSAGE in
+    // modules/feature-flag/contract/src/voiceAgents.message.ts - keep them equal.
+    title: "Voice agents are not enabled for this project",
+    describe: () => "Ask an admin to turn the feature on for this project.",
+  },
+  voice_key_missing: {
+    title: "No key configured for this voice provider",
+    describe: () => "Add a provider key for this project, then try again.",
+  },
+  voice_mint_failed: {
+    title: "Could not start the call",
+    describe: () => "The voice provider refused the request. Try again.",
+  },
+  voice_name_required: {
+    title: "A name is required to save the agent",
+    describe: () => "",
+  },
+  voice_phone_transport_unavailable: {
+    title: "Phone targets have no browser call",
+    describe: () =>
+      "A phone target has no browser call. Run a scenario against the phone number instead.",
+  },
+  voice_recording_unavailable: {
+    title: "The call recording is not available",
+    describe: () => "",
+  },
+  voice_recording_key_missing: {
+    title: "The call recording is not available",
+    describe: () => "",
+  },
+  voice_conversation_mismatch: {
+    title: "This conversation does not belong to the minted session",
+    describe: () => "",
+  },
+  voice_session_invalid: {
+    title: "The session is invalid or has expired",
+    describe: () => "Start the call again.",
   },
   gateway_budget_cycle_anchor_invalid: {
     // Names the window back, because the fix is to change one of the two:

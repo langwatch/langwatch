@@ -1,5 +1,37 @@
 /**
- * The top line of an open run plan: which run is on screen on the left, and everything a person can do with the plan on the right, all on one row.
+ * The top line of an open run plan: which run is on screen on the left, and
+ * everything a person can do with the plan on the right, all on one row.
+ *
+ * The name of the plan is not here: it reads as the page title while the plan
+ * is open, so this line can stay on the run itself.
+ *
+ * A set that runs from code is not a plan anyone wrote, so it carries neither
+ * "Edit run plan" nor Run. Export lives in the overflow menu, so the line ends
+ * on the two actions the prototype draws.
+ *
+ * "Show run settings" turns on the block under this line that says what the
+ * run was configured with. It is off until it is asked for, so nothing pushes
+ * the results down on a page a person opened to read them.
+ *
+ * The line holds one row whatever the note says. The run summary takes the
+ * space the actions leave and cuts the note with an ellipsis, so the actions
+ * keep the same place on a run with a note and on a run without one. On a
+ * window too narrow even for the actions alone the line breaks, and the
+ * actions stay at its right end.
+ *
+ * The evaluators of the run read after the pass block, one pill each, at the
+ * size of the pass block: the run's verdict and how each check scored are
+ * peers. A pass or fail evaluator reads its pass rate over the run; a score
+ * reads its mean with no colour.
+ *
+ * How long ago the run started is not on this line. The runs rail beside it
+ * already says that for every run, and the settings block says it again with
+ * the date, so a third copy on the line the results start from says nothing
+ * new.
+ *
+ * The back control is not here: it lives in the runs rail, beside the list it
+ * goes back to.
+ *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */
@@ -10,8 +42,13 @@ import { RunMetricsSummary } from "@langwatch/suite-web/run-cards";
 import { type RunGroupSummary } from "@langwatch/suite-web/run-formatters";
 import { Menu } from "@langwatch/design-system/menu";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import {
+  EvaluatorPill,
+  readingOfSummary,
+} from "../../../elements/agent-testing/shared/EvaluatorPill.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import type { AgentTestingViewMode } from "../use-agent-testing-store.ts";
+import type { EvaluatorSummary } from "./evaluation-summaries.ts";
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { ViewModeToggle } from "./view-mode-toggle.tsx";
 import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
@@ -26,6 +63,8 @@ export type RunPlanDetailRun = {
   title: string;
   note: string | null;
   summary: RunGroupSummary | null;
+  /** One entry per evaluator that ran on the run; empty when none did. */
+  evaluators: EvaluatorSummary[];
 };
 
 export type RunPlanDetailHeaderProps = {
@@ -60,6 +99,19 @@ function RunSummary({ run }: { run: RunPlanDetailRun }) {
         <Box flexShrink={0}>
           <RunMetricsSummary summary={run.summary} size="md" />
         </Box>
+      ) : null}
+      {run.summary && run.evaluators.length > 0 ? (
+        <HStack gap={1.5} flexShrink={0} data-testid="run-summary-evaluators">
+          {run.evaluators.map((evaluator) => (
+            <EvaluatorPill
+              key={evaluator.evaluatorId}
+              evaluatorId={evaluator.evaluatorId}
+              name={evaluator.name}
+              reading={readingOfSummary(evaluator)}
+              size="md"
+            />
+          ))}
+        </HStack>
       ) : null}
       {run.note ? (
         <Text

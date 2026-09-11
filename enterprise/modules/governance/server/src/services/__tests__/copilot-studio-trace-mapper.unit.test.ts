@@ -35,7 +35,7 @@ const ORIGIN = {
 };
 
 const CONVERSATION_START = "2026-08-25T19:14:34Z";
-const NAME = "b957a08c-0000-4000-8000-000000000001_dacfd251-bot";
+const NAME = "cccccccc-0000-4000-8000-000000000003_agent-one";
 
 /** A per-conversation channel id. GUID-shaped, and never a person. */
 const CHANNEL_ID = "3237db76-f6f8-03f7-72fc-c309292eefdc";
@@ -120,7 +120,7 @@ function transcriptRow({
     conversationstarttime: start,
     conversationtranscriptid: transcriptId,
     metadata: JSON.stringify({
-      BotId: "dacfd251-bot",
+      BotId: "agent-one",
       BotName: "engineering-agent",
       ...(batchId === null ? {} : { BatchId: batchId }),
     }),
@@ -910,17 +910,23 @@ describe("given a tool call the agent ran", () => {
 
 describe("given what the agent was running", () => {
   /** @scenario "The trace names the product, never the model the agent was running" */
-  it("names the product and reports no configured model", () => {
+  it("labels the turn with the product and reports no model of its own", () => {
     const events = [
       copilotEvent(transcriptRow({ activities: CHAT }), {
         botModifiedOn: "2026-08-20T10:00:00Z",
       }),
     ];
     const attrs = attrsOf(spansOf(events)[0]!);
-    // The `bot` table has no model column — see BotFacts. Asserting the
-    // absence rather than deleting the case: the previous version of this
-    // test injected a `botModel` no query produces and passed on data
-    // production cannot emit.
+    // Nothing the adapter reads names a model — the `bot` read asks for
+    // `botid,name,modifiedon` and the transcript row carries the conversation,
+    // not the agent's settings; see BotFacts. That is an absent field in what
+    // is read, not proof the agent has no configured model: the model does
+    // sit on the same `bot` row, in the `configuration` column this query does
+    // not request, and it is left unread because a per-agent series name is
+    // neither an exact model nor tied to the turn being priced.
+    // Asserting the absence rather than deleting the case: the previous
+    // version of this test injected a `botModel` no query here produces and
+    // passed on data production cannot emit.
     expect(attrs["copilot_studio.agent_model"]).toBeUndefined();
     expect(attrs["copilot_studio.agent_changed_since"]).toBeUndefined();
 

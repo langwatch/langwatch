@@ -13,6 +13,7 @@
 
 import type { RunParameterValues } from "./scenario.parameters.ts";
 import type { ScenarioRunStatus } from "./scenario-run.ts";
+import type { ScenarioEvaluationStatus } from "./scenario-evaluation-result.ts";
 
 /** The target key a run carries when it names no platform target. */
 export const UNKNOWN_TARGET_KEY = "unknown";
@@ -36,8 +37,30 @@ export const UNKNOWN_TARGET_KEY = "unknown";
  */
 export type AtomCostSource = "run" | "traces" | "none" | "unknown";
 
-/** How an atom's status reads once categorised. */
+/**
+ * How an atom's status reads once categorised.
+ *
+ * Read off the run's status, which already holds the evaluator gate: a
+ * required evaluator that failed turned the run's status to failed when its
+ * results were recorded, so an atom never reads as passed past a failed
+ * required check.
+ */
 export type AtomOutcome = "passed" | "failed" | "pending";
+
+/**
+ * One evaluator result on an atom, as much of it as a results table needs:
+ * what ran, whether it counted, and what it said. The details and the
+ * resolved inputs stay on the run itself.
+ */
+export interface AtomEvaluation {
+  evaluatorId: string;
+  name: string;
+  status: ScenarioEvaluationStatus;
+  required: boolean;
+  passed: boolean | null;
+  score: number | null;
+  label: string | null;
+}
 
 /**
  * One scenario, run once against one target, inside one run.
@@ -111,6 +134,8 @@ export interface ResultAtom {
   targetName: string | null;
   status: ScenarioRunStatus;
   outcome: AtomOutcome;
+  /** One entry per evaluator that ran on the scenario; empty when none did. */
+  evaluations: AtomEvaluation[];
   durationMs: number | null;
   /** Null only when {@link costSource} is `unknown`. */
   costUsd: number | null;

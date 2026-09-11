@@ -32,6 +32,7 @@ const metricNames = [
   "gq_retry_encode_failures_total",
   // #5538
   "gq_jobs_dropped_total",
+  "gq_jobs_last_dropped_timestamp_seconds",
   "gq_group_attempt_read_failures_total",
   // 2026-07-22 blob-retention fix
   "gq_blob_release_grace_total",
@@ -378,6 +379,29 @@ export const gqJobsDroppedTotal = new Counter({
   help: "Staged jobs discarded because they could not be decoded",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name", "reason"] as const,
 });
+
+export const gqJobsLastDroppedTimestampSeconds = new Gauge({
+  name: "gq_jobs_last_dropped_timestamp_seconds",
+  help: "Unix timestamp of the latest discarded job in this process. Detects the first discard without a previous counter sample; not durable across an unscraped process exit.",
+  labelNames: [
+    "queue_name",
+    "pipeline_name",
+    "job_type",
+    "job_name",
+    "reason",
+  ] as const,
+});
+
+export function recordDroppedJob(labels: {
+  queue_name: string;
+  pipeline_name: string;
+  job_type: string;
+  job_name: string;
+  reason: string;
+}): void {
+  gqJobsDroppedTotal.inc(labels);
+  gqJobsLastDroppedTimestampSeconds.set(labels, Date.now() / 1000);
+}
 
 /**
  * A dispatched job whose routing metadata names a pipeline this worker does

@@ -1,18 +1,29 @@
 /**
- * The line above the scenarios table: the suite that is open, how many scenarios it
- * holds, the label filter and the entry points that write.
+ * The lines above the scenarios table: the suite that is open, what it
+ * holds, the label filter and the entry points that write; and under them
+ * the fields and the evaluators the suite declares, when it declares any.
+ *
+ * The way into a recent run sits here too, between "Edit suite" and "Run
+ * suite", so writing a scenario, editing the suite, reading what the suite
+ * already did and running it again are one row of controls.
+ *
+ * A set that runs from code is read-only, so it offers the recent runs and
+ * nothing else. Its results stay one click away: a row of the table opens
+ * them as well.
+ *
  * @see specs/features/agent-testing/cases-table.feature
+ * @see specs/features/agent-testing/suite-editor.feature
  */
 
-import { HStack, Icon, Spacer, Text } from "@chakra-ui/react";
-import { Folder, FolderCode, Play, Plus } from "lucide-react";
-import { ScenarioLabelFilter as LabelFilterDropdown } from "../../../elements/scenario-library-controls.tsx";
+import { HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Folder, FolderCode, Pencil, Play, Plus } from "lucide-react";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
-import type { CasesPanelProps } from "./cases-panel.tsx";
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
+import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import { ScenarioLabelFilter as LabelFilterDropdown } from "../../../elements/scenario-library-controls.tsx";
+import { declarationsCountLine, SuiteDeclarationsRow } from "../suite/suite-declarations-row.tsx";
+import type { CasesPanelProps } from "./cases-panel.tsx";
 import { RecentRunsMenu } from "./recent-runs-menu.tsx";
-import { SuiteNameHeading } from "./suite-name-heading.tsx";
 
 export type CasesPanelHeaderProps = Pick<
   CasesPanelProps,
@@ -25,7 +36,7 @@ export type CasesPanelHeaderProps = Pick<
   | "isRunningSet"
   | "onRunSet"
   | "onNewTestCase"
-  | "onRenameSuite"
+  | "onEditSuite"
   | "period"
   | "suiteScenarioIds"
   | "externalCases"
@@ -61,12 +72,15 @@ function CasesPanelIdentity(props: CasesPanelHeaderProps) {
   return (
     <>
       <Icon as={props.isExternal ? FolderCode : Folder} boxSize="15px" color={FG_MUTED} />
-      <SuiteNameHeading
-        name={props.title}
-        onRename={!props.isExternal && props.canManage ? props.onRenameSuite : undefined}
-      />
-      <Text fontSize="11.5px" color={FG_MUTED}>
-        {props.caseCount} {props.caseCount === 1 ? "scenario" : "scenarios"}
+      <Text fontSize="14px" fontWeight="semibold" color="fg" truncate>
+        {props.title}
+      </Text>
+      <Text fontSize="11.5px" color={FG_MUTED} data-testid="cases-panel-count-line">
+        {declarationsCountLine({
+          caseCount: props.caseCount,
+          fieldCount: props.suite?.fields.length ?? 0,
+          evaluatorCount: props.suite?.evaluators.length ?? 0,
+        })}
       </Text>
       {props.isExternal && <FromCodeBadge />}
     </>
@@ -81,35 +95,48 @@ export function CasesPanelHeader(props: CasesPanelHeaderProps) {
   const canWrite = props.canManage && !props.isExternal;
 
   return (
-    <HStack gap={2} minHeight="32px" flexWrap="wrap">
-      <CasesPanelIdentity {...props} />
-      <Spacer />
-      {canWrite && (
-        <>
-          {props.allLabels.length > 0 && (
-            <LabelFilterDropdown
-              allLabels={props.allLabels}
-              activeLabels={props.activeLabels}
-              onToggle={props.onToggleLabel}
-            />
-          )}
-          <SmallButton onClick={props.onNewTestCase}>
-            <Plus size={13} />
-            New scenario
+    <VStack align="stretch" gap={1.5}>
+      <HStack gap={2} minHeight="32px" flexWrap="wrap">
+        <CasesPanelIdentity {...props} />
+        <Spacer />
+        {canWrite && (
+          <>
+            {props.allLabels.length > 0 && (
+              <LabelFilterDropdown
+                allLabels={props.allLabels}
+                activeLabels={props.activeLabels}
+                onToggle={props.onToggleLabel}
+              />
+            )}
+            <SmallButton onClick={props.onNewTestCase}>
+              <Plus size={13} />
+              New scenario
+            </SmallButton>
+            <SmallButton onClick={() => props.onEditSuite()} data-testid="edit-suite-button">
+              <Pencil size={13} />
+              Edit suite
+            </SmallButton>
+          </>
+        )}
+        <RecentRunsMenu
+          period={props.period}
+          scenarioIds={recentRunScenarioIds(props)}
+          hasRun={hasRunInPeriod(props)}
+        />
+        {canWrite && (
+          <SmallButton loading={props.isRunningSet} onClick={props.onRunSet}>
+            <Play size={13} />
+            Run suite
           </SmallButton>
-        </>
+        )}
+      </HStack>
+      {props.suite && !props.isExternal && (
+        <SuiteDeclarationsRow
+          fields={props.suite.fields}
+          evaluators={props.suite.evaluators}
+          onEdit={canWrite ? props.onEditSuite : undefined}
+        />
       )}
-      <RecentRunsMenu
-        period={props.period}
-        scenarioIds={recentRunScenarioIds(props)}
-        hasRun={hasRunInPeriod(props)}
-      />
-      {canWrite && (
-        <SmallButton loading={props.isRunningSet} onClick={props.onRunSet}>
-          <Play size={13} />
-          Run suite
-        </SmallButton>
-      )}
-    </HStack>
+    </VStack>
   );
 }

@@ -29,6 +29,8 @@ const metricNames = [
   "pm_outbox_overdue_pending",
   "pm_outbox_lapsed_leases",
   "pm_outbox_dead",
+  "pm_fleet_collection_success",
+  "pm_fleet_last_success_timestamp_seconds",
 ] as const;
 
 export interface ProcessFleetMetricsRow {
@@ -46,16 +48,27 @@ type FleetReader = () => Promise<ProcessFleetMetricsRow[]>;
 let readFleet: FleetReader | null = null;
 
 /**
+<<<<<<< HEAD:packages/eventing/src/process-manager/metrics.ts
  * Collection-time cache: six gauges are observed within milliseconds of each
  * other on every export, and each must see the same read rather than issuing
  * six aggregate queries. In-flight reads are shared; a settled read serves ten
  * seconds, comfortably inside one export interval.
+=======
+ * All fleet gauges share one database read per ten seconds, including failed
+ * attempts. Freshness advances only after a successful database read.
+>>>>>>> origin/main:platform/app/src/server/event-sourcing/process-manager/metrics.ts
  */
-let cached: { at: number; rows: ProcessFleetMetricsRow[] } | null = null;
+let cached: {
+  at: number;
+  rows: ProcessFleetMetricsRow[];
+  success: boolean;
+} | null = null;
+let lastSuccessAt = 0;
 let inFlight: Promise<ProcessFleetMetricsRow[]> | null = null;
 const CACHE_TTL_MS = 10_000;
 
 async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
+<<<<<<< HEAD:packages/eventing/src/process-manager/metrics.ts
   if (!readFleet) return [];
   if (cached && nowInstant().epochMilliseconds - cached.at < CACHE_TTL_MS) return cached.rows;
   if (inFlight !== null) return inFlight;
@@ -68,6 +81,30 @@ async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
       // A failed read reports nothing rather than stale numbers presented
       // as fresh; the export itself still succeeds.
       return cached?.rows ?? [];
+=======
+  const read = readFleet;
+  if (!read) {
+    return [];
+  }
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    return cached.rows;
+  }
+  if (inFlight !== null) {
+    return inFlight;
+  }
+  inFlight = Promise.resolve()
+    .then(read)
+    .then((rows) => {
+      lastSuccessAt = Date.now();
+      cached = { at: lastSuccessAt, rows, success: true };
+      return rows;
+    })
+    .catch(() => {
+      // Retain unresolved work, but never advance its freshness on failure.
+      const rows = cached?.rows ?? [];
+      cached = { at: Date.now(), rows, success: false };
+      return rows;
+>>>>>>> origin/main:platform/app/src/server/event-sourcing/process-manager/metrics.ts
     })
     .finally(() => {
       inFlight = null;
@@ -83,6 +120,7 @@ async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
 export function bindProcessFleetMetricsSource(read: FleetReader): void {
   readFleet = read;
   cached = null;
+  lastSuccessAt = 0;
 }
 
 function fleetGauge(
@@ -129,3 +167,31 @@ fleetGauge(
   "Dead outbox messages per process name — intents that will not happen until redriven.",
   (r) => r.deadMessages,
 );
+
+export const pmFleetCollectionSuccess = new Gauge({
+  name: "pm_fleet_collection_success",
+  help: "Whether the latest process fleet database collection succeeded. Absent when this process has no source bound.",
+  async collect() {
+    await readCounts();
+    this.reset();
+    if (readFleet) {
+      this.set(cached?.success ? 1 : 0);
+    } else {
+      this.remove();
+    }
+  },
+});
+
+export const pmFleetLastSuccessTimestampSeconds = new Gauge({
+  name: "pm_fleet_last_success_timestamp_seconds",
+  help: "Unix timestamp of the last successful process fleet database collection, or zero before the first success.",
+  async collect() {
+    await readCounts();
+    this.reset();
+    if (readFleet) {
+      this.set(lastSuccessAt / 1000);
+    } else {
+      this.remove();
+    }
+  },
+});

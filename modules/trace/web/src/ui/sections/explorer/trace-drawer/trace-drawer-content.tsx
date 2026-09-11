@@ -138,7 +138,19 @@ export function TraceDrawerContent({
               bg={{ base: "bg.surface", _dark: "bg.panel" }}
             >
               <ScenarioRoleProvider
+<<<<<<< HEAD:modules/trace/web/src/ui/sections/explorer/trace-drawer/trace-drawer-content.tsx
                 isScenario={!!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])}
+=======
+                isScenario={
+                  !!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
+                }
+                // A voice call's caller is a real person: their side reads as
+                // "You", not the "User Simulator" the scenario swap would
+                // otherwise apply (#8020). Stamped by the voice trace writer.
+                isHumanCaller={
+                  trace.attributes["voice.call.caller"] === "human"
+                }
+>>>>>>> origin/main:platform/app/src/features/traces-v2/components/TraceDrawer/TraceDrawerContent.tsx
               >
                 {/* Conversation view is suppressed for read-only share
                     viewers: it is backed by `tracesV2.list` (disabled without

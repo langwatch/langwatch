@@ -1,3 +1,4 @@
+import { Badge, Box, Heading, HStack, Spacer, VStack } from "@chakra-ui/react";
 import {
   Badge,
   Box,
@@ -31,22 +32,45 @@ import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 /**
- * Governance overview - spend, users, anomalies, IngestionSource health.
- * Wires the api.activityMonitor.* procedures for live reads off
- * gateway_activity_events.
+ * The governance overview: a greeting, the command palette mounted inline,
+ * the ways in, and the two lists that will fill once there is something in
+ * them.
  *
- * When no traffic has been ingested yet, the page shows a setup
- * checklist instead of empty zeroes - a "configure your first source"
- * onboarding rather than an empty wasteland.
+ * Everything sits in ONE centred column of `HOME_MEASURE` rather than running
+ * out to the window: a full-bleed row under a centred field reads as two
+ * pages stacked. The ask field itself is narrower than that column, centred
+ * inside it, because it is the same field the project home opens with and is
+ * set to the same width there (see `ASK_MEASURE` in `GovernanceHero`). The
+ * column stays wider than the field for the two lists' sake, whose rows carry
+ * a badge, a headline and a date across two grid columns.
  *
- * Every panel here reads a different router, and those routers do not all
- * ask for the same grant. The page opens for anyone holding
- * `governance:view` (the grant the Governance product itself is offered on)
- * and each panel then answers for its own access: readable panels render,
- * and the rest name the grant they need. A viewer delegated part of the
- * surface gets the part they hold instead of one refusal for the lot.
+ * The hero stands on the same lit ground as the project home's ask field
+ * (`GovernanceHeroGround`), because the two screens ask for the same thing in
+ * the same words and only one of them was lit.
  *
- * Spec: specs/ai-gateway/governance/admin-oversight.feature,
+ * It reads nothing of its own. The page used to carry every activity-monitor
+ * panel — spend, users, anomalies, ingestion-source health, the CLI session
+ * policy — each on its own router and its own grant, so a reader whose plan
+ * or role did not include one of them met an error alert before they met the
+ * page. Those panels live on the pages that own them (Costs, Inventory,
+ * Agents, People), and the overview is now the way in rather than a second
+ * copy of all four.
+ *
+ * Reading nothing is also why sample mode here is hard-coded `absent` rather
+ * than settled from queries: there is no read on this page that could ever
+ * come back holding a row, so the honest answer is that nothing is measured.
+ * The toggle in the header is the section's one shared toggle — pressing it
+ * here is the same press as pressing it on People — so it must be on this
+ * page too, or the overview would be the one screen a reader could not turn
+ * the samples off from.
+ *
+ * The one thing still drawn beside the hero is the quarantine-fill warning,
+ * which is silent unless ingest is actually misconfigured
+ * (specs/ai-gateway/governance/ingestion-attribution.feature).
+ *
+ * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature,
+ * specs/ai-governance/dashboard/governance-ui-controls.feature,
+ * specs/ai-gateway/governance/governance-home-routing.feature,
  * specs/ai-governance/rbac/delegated-governance-viewer.feature
  */
 
@@ -83,63 +107,11 @@ function GovernanceOverviewPage() {
   const { organization, hasAnyPermission } = useGovernanceScope();
   const orgId = organization?.id ?? "";
 
-  // What this viewer may read, panel by panel. Each flag names the grant the
-  // panel's own router asks for, so a query is never fired against a refusal
-  // we can already predict.
-  const canReadActivity = hasAnyPermission("activityMonitor:view");
-  const canReadSources = hasAnyPermission("ingestionSources:view");
+  // The one grant the overview asks about: the vendor pill opens an add flow
+  // the inventory refuses without it.
   const canManageSources = hasAnyPermission("ingestionSources:manage");
-  const canReadPolicies = hasAnyPermission("routingPolicies:view");
-  const canReadAnomalyRules = hasAnyPermission("anomalyRules:view");
-  const canReadCatalog = hasAnyPermission("aiTools:manage");
-  const canReadSessionPolicy = hasAnyPermission("organization:view");
-  const canManageSessionPolicy = hasAnyPermission("organization:manage");
 
-  const sourcesQuery = api.ingestionSources.list.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadSources, refetchOnWindowFocus: false },
-  );
-  const policiesQuery = api.routingPolicy.list.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadPolicies, refetchOnWindowFocus: false },
-  );
-  const anomalyRulesQuery = api.anomalyRules.list.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadAnomalyRules, refetchOnWindowFocus: false },
-  );
-  const catalogQuery = api.aiTools.adminList.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadCatalog, refetchOnWindowFocus: false },
-  );
-  const summaryQuery = api.activityMonitor.summary.useQuery(
-    { organizationId: orgId, windowDays: 30 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const usersQuery = api.activityMonitor.spendByUser.useQuery(
-    { organizationId: orgId, windowDays: 30, limit: 50 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
-    { organizationId: orgId, windowDays: 30, limit: 50 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const departmentsQuery = api.activityMonitor.spendByDepartment.useQuery(
-    { organizationId: orgId, windowDays: 30 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const healthQuery = api.activityMonitor.ingestionSourcesHealth.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const anomaliesQuery = api.activityMonitor.recentAnomalies.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const [chartGroupBy, setChartGroupBy] = useState<GroupBy>("team");
-  const spendOverTimeQuery = api.activityMonitor.spendOverTime.useQuery(
-    { organizationId: orgId, windowDays: 30, groupBy: chartGroupBy },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
+  const sample = useSampleMode();
 
   // The activity-monitor panels share one gate and one enterprise plan check,
   // so they share one alert. Without it a refusal reads as "no spend, no
@@ -195,7 +167,9 @@ function GovernanceOverviewPage() {
           <Spacer />
         </HStack>
 
-        {orgId && <QuarantineFillAlert organizationId={orgId} />}
+          {orgId && !sample.active && (
+            <QuarantineFillAlert organizationId={orgId} />
+          )}
 
         <HandledErrorAlert error={setupError} fallbackTitle="Couldn't load the setup state" />
 
@@ -268,8 +242,8 @@ function GovernanceOverviewPage() {
                 subline="Members install the CLI on their devices to start using AI tools through LangWatch. Run `langwatch login` after install to authenticate."
               />
             </Box>
-          </Box>
-        )}
+          </GovernanceHeroGround>
+        </VStack>
 
         {!canReadActivity && (
           <SectionCard

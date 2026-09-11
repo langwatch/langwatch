@@ -18,10 +18,17 @@
     "unified": "^11.0.5"
   },
   "devDependencies": {
+<<<<<<< HEAD
     "@ai-sdk/anthropic": "catalog:",
     "@ai-sdk/google": "^3.0.120",
     "@ai-sdk/openai": "catalog:",
     "@langwatch/scenario": "^0.4.12",
+=======
+    "@ai-sdk/anthropic": "^3.0.44",
+    "@ai-sdk/google": "^2.0.78",
+    "@ai-sdk/openai": "^3.0.41",
+    "@langwatch/scenario": "^1.6.0",
+>>>>>>> origin/main
     "@types/mdast": "^4.0.4",
     "@types/node": "catalog:",
     "chalk": "catalog:",

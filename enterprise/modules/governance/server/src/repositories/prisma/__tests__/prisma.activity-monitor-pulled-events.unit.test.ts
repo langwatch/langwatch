@@ -213,6 +213,61 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
     );
   });
 
+  describe("given a provider that names the actor by an opaque id", () => {
+    describe("when the stored row therefore has no actor email", () => {
+      it("attributes the event to the opaque id rather than to nobody", async () => {
+        // The OpenAI cost report sends `user-…` and no address, so the audit
+        // row carries it in ActorUserId and leaves ActorEmail blank. Reading
+        // the email alone would blank the actor column for every OpenAI row.
+        query.mockImplementation(async ({ query: sql }: { query: string }) => ({
+          json: async () =>
+            sql.includes("governance_ocsf_events")
+              ? [
+                  {
+                    eventId: "openai-cost-line",
+                    eventType: "openai_admin",
+                    actorUserId: "user-A1b2C3d4E5",
+                    actorEmail: "",
+                    actorEnduserId: "",
+                    action: "cost_report",
+                    target: "gpt-5-mini",
+                    occurredMs: "1786619820000",
+                    createdMs: "1786619821000",
+                    rawPayload: JSON.stringify({
+                      metadata: { extension: { cost_usd: 1.25 } },
+                    }),
+                  },
+                ]
+              : [],
+        }));
+
+        const prisma = {
+          project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
+        };
+        const service = ActivityMonitorService.create({
+          prisma: prisma as never,
+          repository: new ActivityMonitorClickHouseRepository(
+            async () => ({ query }) as never,
+          ),
+        });
+
+        const rows = await service.eventsForSource({
+          organizationId: "org",
+          sourceId: "source",
+          limit: 50,
+        });
+
+        expect(rows[0]).toEqual(
+          expect.objectContaining({
+            eventId: "openai-cost-line",
+            actor: "user-A1b2C3d4E5",
+            action: "cost_report",
+          }),
+        );
+      });
+    });
+  });
+
   it("includes pulled OCSF events in source health counts and last event", async () => {
     const prisma = {
       project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },

@@ -187,10 +187,22 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		Layout:      detectLayout(p.WorktreeDir),
 		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
+<<<<<<< HEAD
 		LangyTier:        opts.LangyTier,
 		LangyImage:       opts.langyImageTag,
 		DisableGoogleDLP: o.cfg.ShouldDisableGoogleDLP,
 		PortlessDisabled: o.cfg.PortlessDisabled,
+=======
+		PublicURL: o.cfg.PublicURL,
+		// Mirror planChildren: a separate `workers` lane exists only when workers
+		// are requested AND not hosted in-process. Persist it so restart targets
+		// the workers' own group rather than the API's when they share a process.
+		HasStandaloneWorkers: opts.Selection.Workers,
+		LangyTier:            opts.LangyTier,
+		LangyImage:           opts.langyImageTag,
+		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
+		PortlessDisabled:     o.cfg.PortlessDisabled,
+>>>>>>> origin/main
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{

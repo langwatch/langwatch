@@ -37,6 +37,20 @@ export interface GeneratedSkill {
   category: "skill" | "recipe";
   /** The suggested opener some skills declare, if any. */
   userPrompt?: string;
+  /**
+   * The feature flag gating this skill's offer, if it declares one in its
+   * front-matter (`feature-flag: <key>`). Absent = always offered, the
+   * default for every skill today except `dashboard-widgets`.
+   */
+  featureFlag?: string;
+  /**
+   * The feature flag that, when ON, excludes this skill instead — the
+   * inverse of `featureFlag` (`exclude-when-flag: <key>` in front-matter).
+   * `lwql-charts` declares this for `release_custom_chart_playground`, so
+   * the two chart skills are mutually exclusive: exactly one is ever in
+   * Langy's set, never both, never a choice for the agent to get wrong.
+   */
+  excludedByFlag?: string;
 }
 
 /**
@@ -95,6 +109,8 @@ function readSkill(dir: string): GeneratedSkill | null {
   // rather than by teaching the shared parser about nesting it does not need.
   const isRecipe = /^\s+category:\s*recipe\s*$/m.test(raw.split("---")[1] ?? "");
   const userPrompt = frontmatter["user-prompt"]?.replace(/^["']|["']$/g, "");
+  const featureFlag = frontmatter["feature-flag"];
+  const excludedByFlag = frontmatter["exclude-when-flag"];
 
   return {
     id,
@@ -102,6 +118,8 @@ function readSkill(dir: string): GeneratedSkill | null {
     description,
     category: isRecipe ? "recipe" : "skill",
     ...(userPrompt ? { userPrompt } : {}),
+    ...(featureFlag ? { featureFlag } : {}),
+    ...(excludedByFlag ? { excludedByFlag } : {}),
   };
 }
 

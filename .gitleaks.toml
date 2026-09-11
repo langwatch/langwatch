@@ -264,3 +264,125 @@ regexes = ['''^ik-lw-fresh1234567890_secret$''']
 description = "Documented `your-api-key` placeholder in the docs curl examples, not a credential"
 targetRules = ["curl-auth-header"]
 regexes = ['''^your-api-key$''']
+
+# The two synthetic credentials the code-agent adapter's "engine echoed a
+# credential back" tests hand it (lw#3439). Each test's whole point is that a
+# credential the NLP engine's error text quotes back at us is scrubbed before
+# it reaches the customer — a defence-in-depth check pattern-based redaction
+# alone cannot make, since it requires knowing the actual configured value, not
+# just its shape. Proving that requires a fixture shaped exactly like the thing
+# a real leak would be, so gitleaks flags it, correctly, on shape alone.
+#
+# Naming the values, as this file requires:
+#   sk-live-abcdef0123456789   stands in for the project's own API key, fed
+#                              back inside a mocked 401 "rejected api key ..."
+#                              error body.
+#   shh-9f3a2b7c4e             stands in for a user-configured secret (a
+#                              `config.secrets` entry), fed back inside a
+#                              mocked engine ValueError message/traceback.
+# No provider issued either value, neither has ever authenticated anything, and
+# there is nothing to revoke.
+#
+# Scoped by VALUE and ANCHORED, for the reason given above the block before it:
+# a substring allowlist would also permit a real token that merely starts with
+# one of these.
+[[allowlists]]
+description = "Synthetic credentials the code-agent adapter's echoed-secret redaction tests plant (lw#3439)"
+targetRules = ["generic-api-key"]
+regexes = [
+  '''^sk-live-abcdef0123456789$''',
+  '''^shh-9f3a2b7c4e$''',
+]
+
+# `vk-lw-YOUR_VIRTUAL_KEY`, the placeholder an earlier commit on the AI Gateway
+# docs branch put in the `Authorization: Bearer` header of the DNS and TLS
+# verification example. The tip spells it `$LANGWATCH_VIRTUAL_KEY`, an env var
+# reference no rule fires on, but gitleaks scans the whole commit range on a
+# pull request, so the earlier commit still needs naming here. The same
+# placeholder reaches `docs/llms-full.txt`, which is generated from the pages.
+#
+# It is issued by nobody, authenticates against nothing, and there is nothing to
+# revoke. Scoped by VALUE and ANCHORED, for the reason given above the block
+# before it: a substring allowlist would also permit a real virtual key that
+# merely starts with this prefix.
+[[allowlists]]
+description = "Documented `vk-lw-YOUR_VIRTUAL_KEY` placeholder in the AI Gateway docs, not a credential"
+targetRules = ["curl-auth-header"]
+regexes = ['''^vk-lw-YOUR_VIRTUAL_KEY$''']
+
+# `TOOL_CARD_ROWS` in the governance tool card names the rows a card prints —
+# seats, licence per month, tokens over thirty days, and so on. Every entry is a
+# plain string identifier the UI keys its labels off. Nobody issued any of them,
+# they authenticate against nothing, and there is nothing to revoke.
+#
+# gitleaks reads consecutive array entries as a key/value pair: the finding is
+# reported on the `"tokens30Days",` line and names the NEXT entry as the secret,
+# because `generic-api-key` fires on a `...token...": "<high-entropy value>"`
+# shape and two adjacent camel-case identifiers are exactly that shape.
+#
+# So the trigger is POSITION, not the value — whichever row happens to follow
+# `tokens30Days` is the one accused. It is also entropy-dependent, which makes
+# it worse rather than better: of seven plausible row names tested in that slot,
+# `completions30Days` and `conversationsPerSeat30Days` trip the rule while
+# `escalations30Days`, `promptsLast7Days`, `integrationsLast30Days`,
+# `deflectionRateLast30Days` and `averageHandleTime30Days` do not. A value-scoped
+# allowlist therefore fixes exactly one arrangement of this list and breaks the
+# build again, unpredictably, the next time someone adds or reorders a row.
+#
+# Scoped by path rather than by value for the same reason the Stripe catalog
+# block above is: a new row must not need a config change to be added.
+#
+# `targetRules` holds this to `generic-api-key` alone, so every other rule still
+# applies to this file by construction. Checked rather than assumed: a synthetic
+# GitHub PAT, Stripe live key and Slack bot token appended to this file are each
+# still reported, identically to the same string in a file this block does not
+# cover.
+#
+# Anchored at BOTH ends, because an unanchored pattern here is a substring match
+# and exempts more than it names. Without `$` it also swallows `toolCards.tsx`,
+# `toolCards.ts.bak` and `toolCards.ts.orig`; without `^` it also swallows any
+# prefixed path, so a vendored or submoduled copy at
+# `vendor/platform/app/.../toolCards.ts` is silently exempt too. Both were
+# confirmed by scanning a repo containing those files, not by reading the docs.
+#
+# gitleaks reports a path relative to the scan root it was given. CI passes `.`
+# from the repository root (`gitleaks git ... .`, see
+# .github/scripts/secrets-scan.sh), so the path this pattern is matched against
+# is repository-relative and `^` anchors it correctly. Passing an ABSOLUTE
+# directory instead — `gitleaks dir /abs/path`, which no CI job does — makes the
+# reported path absolute and the `^` stop matching. That direction is safe: the
+# block simply does not apply, the file is scanned, and the result is a false
+# positive rather than a hidden secret. The missing-`^` failure runs the other
+# way, which is why it is anchored.
+[[allowlists]]
+description = "Governance tool-card row identifiers are UI keys, not credentials"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^platform/app/ee/governance/dashboard/components/toolCatalog/toolCards\.ts$''',
+]
+
+# `dGhlIHNhbXBsZSBub25jZQ==`, the `Sec-WebSocket-Key` in the raw upgrade
+# requests the voice listener tests write onto a socket. A `Sec-WebSocket-Key`
+# is not a credential by construction: RFC 6455 defines it as a nonce the
+# CLIENT invents per handshake, sent in the clear, whose only purpose is to
+# prove the response came from a server that understood the upgrade. The server
+# echoes a hash of it back and then forgets it. It authorizes nothing and
+# survives nothing.
+#
+# This particular value is the example printed in RFC 6455 section 1.3 itself:
+# base64 for the ASCII words `the sample nonce`. It is issued by nobody and
+# there is nothing to revoke.
+#
+# gitleaks' `generic-api-key` rule fires on the `...Key: <value>` shape and
+# cannot tell a handshake nonce from a credential.
+#
+# Scoped by VALUE and ANCHORED, the stronger of the two axes: any OTHER
+# high-entropy string in these tests is still reported, and every
+# provider-specific rule still applies to them. Anchoring matters for the usual
+# reason — a gitleaks allowlist regex is a substring match, so an unanchored
+# pattern would also permit a real credential that merely starts with these
+# characters.
+[[allowlists]]
+description = "RFC 6455 sample Sec-WebSocket-Key in the voice listener handshake tests, a client-invented nonce"
+targetRules = ["generic-api-key"]
+regexes = ['''^dGhlIHNhbXBsZSBub25jZQ==$''']

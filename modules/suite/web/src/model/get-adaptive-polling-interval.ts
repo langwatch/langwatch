@@ -11,6 +11,8 @@ const ACTIVE_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set<ScenarioRunStatu
   ScenarioRunStatus.PENDING,
   ScenarioRunStatus.QUEUED,
   ScenarioRunStatus.RUNNING,
+  // The verdict can still change when the evaluator results land.
+  ScenarioRunStatus.PENDING_EVALUATION,
 ]);
 
 /**

@@ -297,8 +297,9 @@ describe("the product sidebar", () => {
 
       expect(screen.getByText("Overview")).toBeInTheDocument();
       expect(screen.getByText("Inventory")).toBeInTheDocument();
-      expect(screen.getByText("Anomaly Rules")).toBeInTheDocument();
+      expect(screen.getByText("Agents")).toBeInTheDocument();
       expect(screen.getByText("People")).toBeInTheDocument();
+<<<<<<< HEAD:modules/navigation/web/src/ui/sections/__tests__/product-sidebar.integration.test.tsx
       // The stub flags report the billed-cost placeholders on.
       expect(screen.getByText("Costs")).toBeInTheDocument();
       expect(screen.getByText("Billed")).toBeInTheDocument();
@@ -325,6 +326,42 @@ describe("the product sidebar", () => {
           ["Overview", "Costs", "Billed", "Inventory"].includes(label ?? ""),
         );
       expect(labels).toEqual(["Overview", "Costs", "Billed", "Inventory"]);
+=======
+      // The flag mock reports every flag enabled, so Costs is visible here;
+      // enabling it must not expose the unfinished Billed destination.
+      expect(screen.getByText("Costs")).toBeInTheDocument();
+      expect(screen.queryByText("Billed")).not.toBeInTheDocument();
+      // Tool Tiles folded into Inventory's Catalog tab, Anomaly Rules into
+      // its own Inventory tab.
+      expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
+      expect(screen.queryByText("Anomaly Rules")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The Platform group lists its three entries under one label" */
+    it("groups the Platform entries under one label, after the ungrouped ones", () => {
+      mockPathname = "/governance";
+      renderSidebar("governance");
+
+      expect(
+        screen.getByRole("button", { name: "Collapse Platform" }),
+      ).toBeInTheDocument();
+      // DOM order, not presence: the group sits after every flat entry
+      // and keeps its own order inside.
+      const labels = screen
+        .getAllByRole("link")
+        .map((link) => link.textContent?.trim())
+        .filter((label) =>
+          ["People", "Insights", "Analytics", "Signals & Alerts"].includes(
+            label ?? "",
+          ),
+        );
+      expect(labels).toEqual([
+        "People",
+        "Insights",
+        "Analytics",
+        "Signals & Alerts",
+      ]);
+>>>>>>> origin/main:platform/app/src/features/navigation/__tests__/ProductSidebar.integration.test.tsx
     });
   });
 

@@ -385,10 +385,21 @@ overrides:
   # module init. The published SDK still calls it; the workspace one already
   # moved to `createNoopLogger`, so scenario reads from the same copy the app
   # does instead of a second, older one resolved from npm.
-  # Pinned to the vendored 1.3.0 specifically: mcp/typescript and skills are on
-  # @langwatch/scenario 0.4.x, which pins langwatch to 0.16.1 exactly, and they
-  # are not built through the inlining bundle that breaks.
-  "@langwatch/scenario@1.3.0>langwatch": "workspace:*"
+  # The version in this key MUST be bumped together with the vendored tarball
+  # version below, in the same change, or the crash returns. It was previously
+  # pinned to @langwatch/scenario@1.3.0, and when scenario was bumped 1.3.0 ->
+  # 1.6.0 the pinned key silently stopped matching, so the override no longer
+  # applied and the child bundle fell back to the published npm langwatch (whose
+  # NoopLoggerProvider crashed the run at module init).
+  # The version pin is deliberate, not a convenience. An unversioned selector
+  # ("@langwatch/scenario>langwatch") also matches the OLDER scenario versions
+  # that mcp/typescript (0.4.x) and skills (1.6.x) depend on, and forces THEM
+  # onto the workspace SDK too. Those two are built against npm langwatch 0.16.1,
+  # not through the inlining bundle that breaks, and the workspace SDK is a newer
+  # major with a different zod peer, so pointing them at it introduces peer
+  # mismatches for no benefit. Pinning to the exact vendored version keeps the
+  # override scoped to the one package that needs it, the child-bundle tarball.
+  "@langwatch/scenario@1.7.0-dev.29dea33>langwatch": "workspace:*"
 
   # --- Security ---
   # shell-quote quote() newline escaping (CRITICAL), then a further escaping

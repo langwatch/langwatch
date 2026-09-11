@@ -32,8 +32,27 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
   },
 }));
 
+<<<<<<< HEAD:modules/langy/web/src/features/langy/ui/sections/__tests__/composer.typing-renders.integration.test.tsx
 import { Composer } from "../composer.tsx";
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+=======
+// The skills palette now reads the project context and a feature flag to gate
+// flag-scoped skills; this test only cares that `/` opens the palette, so both
+// resolve to a stable off state instead of dragging in the tRPC surface.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: undefined,
+    organization: undefined,
+  }),
+}));
+
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false }),
+}));
+
+import { Composer } from "../components/Composer";
+import { useLangyStore } from "../stores/langyStore";
+>>>>>>> origin/main:platform/app/src/features/langy/__tests__/ComposerTypingRenders.integration.test.tsx
 
 function renderComposer(onSend: (input: string) => void = () => {}) {
   return render(

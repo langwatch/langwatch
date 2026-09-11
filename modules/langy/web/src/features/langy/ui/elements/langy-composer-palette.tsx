@@ -9,7 +9,18 @@ import {
 } from "@chakra-ui/react";
 import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
+<<<<<<< HEAD:modules/langy/web/src/features/langy/ui/elements/langy-composer-palette.tsx
 import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
+=======
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
+import {
+  isSkillAvailable,
+  LANGY_SKILLS,
+  type LangySkill,
+} from "~/shared/langy/langySkills";
+>>>>>>> origin/main:platform/app/src/features/langy/components/LangyComposerPalette.tsx
 import {
   absorbContextTarget,
   type LangyContextTarget as LangyContextTargetDescriptor,
@@ -94,13 +105,25 @@ function buildItems({
   mode,
   chips,
   pageTargets,
+  enabledFlags,
 }: {
   mode: PaletteMode;
   chips: LangyContextChip[];
+<<<<<<< HEAD:modules/langy/web/src/features/langy/ui/elements/langy-composer-palette.tsx
   pageTargets: LangyContextTargetDescriptor[];
+=======
+  pageTargets: LangyContextTarget[];
+  /** Flags currently on, for the handful of skills that declare one. */
+  enabledFlags: ReadonlySet<string>;
+>>>>>>> origin/main:platform/app/src/features/langy/components/LangyComposerPalette.tsx
 }): PaletteItem[] {
   if (mode === "skills") {
-    return LANGY_SKILLS.map((skill) => ({
+    return LANGY_SKILLS.filter((skill) =>
+      isSkillAvailable({
+        skill,
+        isFlagEnabled: (flag) => enabledFlags.has(flag),
+      }),
+    ).map((skill) => ({
       value: `skill:${skill.id}`,
       label: skill.label,
       detail: skill.summary,
@@ -153,6 +176,29 @@ export function LangyComposerPalette({
   const setSpotlight = useLangyContextTargetStore((s) => s.setSpotlight);
   const chrome = MODE_CHROME[mode];
 
+  // The one flag any skill currently declares (as a featureFlag OR an
+  // excludedByFlag — lwql-charts and playground-widgets are mutually
+  // exclusive on this same flag, so one resolution covers both). A second
+  // independent gate needs a line here too — LANGY_SKILLS' flag values are
+  // static per build, so this stays a fixed, non-generic list rather than a
+  // loop calling a hook a variable number of times.
+  const { project, organization } = useOrganizationTeamProject();
+  const { enabled: customChartPlaygroundEnabled } = useFeatureFlag(
+    "release_custom_chart_playground",
+    {
+      projectId: project?.id ?? NOT_TARGETED,
+      organizationId: organization?.id ?? NOT_TARGETED,
+      enabled: mode === "skills",
+    },
+  );
+  const enabledFlags = useMemo(
+    () =>
+      new Set(
+        customChartPlaygroundEnabled ? ["release_custom_chart_playground"] : [],
+      ),
+    [customChartPlaygroundEnabled],
+  );
+
   // A row that names something on the page lights that thing up while the
   // pointer is on it — the palette says which card it means instead of asking
   // the user to match a label against nine of them. Cleared on the way out, so
@@ -169,8 +215,8 @@ export function LangyComposerPalette({
     const pageTargets = Object.values(registeredTargets).filter(
       (target) => !activeChipIds.has(target.id),
     );
-    return buildItems({ mode, chips, pageTargets });
-  }, [mode, chips, registeredTargets, activeChipIds]);
+    return buildItems({ mode, chips, pageTargets, enabledFlags });
+  }, [mode, chips, registeredTargets, activeChipIds, enabledFlags]);
 
   const collection = useMemo(() => {
     const q = query.trim().toLowerCase();

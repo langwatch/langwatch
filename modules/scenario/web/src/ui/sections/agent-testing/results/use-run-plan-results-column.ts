@@ -25,6 +25,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { RunActor, ScenarioRunData } from "@langwatch/scenario-contract";
 import { api } from "../../../../behavior/scenario-api.ts";
 import { useSession } from "../../../../behavior/auth-session.ts";
+import { summarizeEvaluations } from "../../../../model/agent-testing/results/evaluation-summaries.ts";
 import { type RunSettings, readRunSettings, runActorName } from "./run-settings.ts";
 import { type BatchTarget, isComparison, useBatchTargets } from "./use-batch-targets.ts";
 
@@ -111,6 +112,10 @@ export function useRunPlanResultsColumn({
   const selectedRuns = selection.selectedBatch?.scenarioRuns ?? NO_RUNS;
   const runSettings = useMemo(() => readRunSettings(selectedRuns), [selectedRuns]);
   const targets = useBatchTargets(selectedRuns);
+  const evaluatorSummaries = useMemo(
+    () => summarizeEvaluations({ runs: selectedRuns }),
+    [selectedRuns],
+  );
 
   // The date as well as the age: the runs rail already says "2h ago", and a
   // person reading the settings of an old run wants the day it ran.
@@ -150,6 +155,7 @@ export function useRunPlanResultsColumn({
           // two targets says nothing about either, and each column carries
           // its own.
           summary: isComparison(targets) ? null : selection.summary,
+          evaluators: evaluatorSummaries,
         }
       : null,
     runSettings,

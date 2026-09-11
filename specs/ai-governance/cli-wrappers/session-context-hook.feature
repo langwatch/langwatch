@@ -424,6 +424,18 @@ Rule: A revoked ingest key heals itself
     When the hook runs
     Then a new key is minted
 
+  # A device whose own session the platform refuses can neither check its key
+  # nor mint a replacement. Saying nothing leaves the session exporting into
+  # a 401 with no sign of why, so the one repair a person can make is named.
+
+  @unit
+  Scenario: A signed-out device is told to sign in again
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a platform that refuses the device's session
+    When the hook runs
+    Then no new key is minted
+    And the user is told to sign this machine in again
+
   @unit
   Scenario: A withheld heal spends the throttle
     Given a hook that was told a person revoked its key minutes ago

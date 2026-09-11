@@ -166,6 +166,13 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   "gatewaySpend:view",
   "gatewaySpend:manage",
   "featureFlags:manageExperiments",
+  // The organization's cost screen. Attached to ADMIN by default for the
+  // same reason the rest of the governance family is: an admin has to be
+  // able to open the screen before they can delegate it to anyone else.
+  // The rbac.ts mirror carries the identical entry — roles-parity pins them
+  // as a pair, and holding it in only one bag grants the permission to
+  // nobody at all.
+  "governanceCost:view",
 ];
 
 const ORG_MEMBER: readonly AuthzPermission[] = ["organization:view", "aiTools:view"];

@@ -69,11 +69,13 @@ Paths are relative to the timeline file, except `cursors/*` and
   "quality": { "crf": 38, "cpuUsed": 2 },
 
   // Optional. Applies the cut list in the same pass, so there is one encode.
+  // A third number on a segment is its own speed, overriding `speed` there.
   "cut": {
     "speed": 2,
     "segments": [
       [17.2, 29.6],
       [31.6, 39.2],
+      [96.0, 128.0, 3],
     ],
   },
 
@@ -197,6 +199,17 @@ pacing: 32.83s -> 34.46s  [5.96+0.08 6.26+0.90 6.61+1.00 8.63-1.25 ...]
 Beat times in the timeline are always source seconds, so a pause or a skip
 never means retiming the beats that follow.
 
+### Per-segment speed
+
+`cut.speed` is the speed of the whole take. A third number on a segment
+overrides it for that stretch only, which is what a long live run needs: the
+opening stays at 2x so the clicks read, and the minutes of conversation that
+follow run at 3x. `tRaw` still maps through the cut, so nothing else changes.
+
+```jsonc
+"cut": { "speed": 2, "segments": [[8.0, 16.4], [96.0, 128.0, 3]] }
+```
+
 ### Beats
 
 One beat per click, in seconds of the cut source. Pacing moves them onto the
@@ -305,3 +318,21 @@ the cursor is sharp at any size. Point `cursor.arrow` and `cursor.pointer` at
 other files to change them, and set `cursor.hotspot` when the new artwork puts
 its tip somewhere else. The hotspot is a fraction of the artwork's own box:
 `{ "x": 0.293, "y": 0.175 }` is the arrow's tip.
+
+## Joined clips
+
+The introduction hero is four beats with a full-frame title card in front of
+each. Every beat has its own timeline (`timelines/introduction-beat*.json`),
+polished on its own into `.claude/tmp/video/hero/`. `hero/make-cards.sh` draws
+the cards over `backgrounds/default.webp` with rsvg-convert, and
+`hero/join-hero.sh` joins cards and beats with an xfade (1.2 s on the card,
+0.4 s fade). The cards are joined after the polish step on purpose: spliced
+into a take, the polish step would draw them as a window on a background.
+
+```bash
+for t in docs/scripts/video/timelines/introduction-beat*.json; do
+  node docs/scripts/video/polish-recording.mjs "$t"
+done
+bash docs/scripts/video/hero/make-cards.sh
+bash docs/scripts/video/hero/join-hero.sh
+```

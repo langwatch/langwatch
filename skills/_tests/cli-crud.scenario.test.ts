@@ -9,7 +9,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   setupLocalCli,
-  toolCallFix,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
@@ -75,7 +74,6 @@ Then run CLI commands directly:
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
@@ -142,7 +140,6 @@ Then: \`langwatch dataset records list qa-test-set\`
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
@@ -203,7 +200,6 @@ Then: \`langwatch trace search --limit 5\`
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
 
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))

@@ -148,8 +148,31 @@ Feature: OpenAI Admin cost puller
     Scenario: Spend is attributed to the person the provider named
       Given a day whose spend the provider attributes to a person
       When the puller records it
-      Then the record names that person by the email the provider gave
+      Then the record names that person by the identifier the provider gave
       And the record carries the provider's own id for that person
+      # The identifier is the provider's opaque one, not an email address. The
+      # report does send an address beside it, and reading that instead is the
+      # thing being refused: the id is stable and an address on a money row is
+      # heavier to erase. Turning the id into a name is the identity engine's
+      # job, and it needs the record to name somebody at all to have anything
+      # to work from.
+
+    @unit
+    Scenario: Spend the provider attributes to nobody names nobody
+      Given a day whose spend the provider attributes to no person
+      When the puller records it
+      Then the record names nobody
+      # An invented placeholder would put a person on the People screen who
+      # does not exist, and give the tenant's procurement somebody to blame.
+
+    @unit
+    Scenario: Naming the person does not re-key the day
+      Given a day whose spend the provider attributes to a person
+      When the puller records it
+      Then the day is identified by its coordinates alone
+      # The person is already one of those coordinates. Adding them a second
+      # time as a separate term would give every day already recorded a new
+      # identity, and the same spend would be counted twice.
 
     @integration
     Scenario: The credential the spend was billed to is recorded
@@ -198,7 +221,9 @@ Feature: OpenAI Admin cost puller
       And the source starts the new question from the beginning
       # The provider binds a page token to the exact question that produced it
       # and refuses it under any other, so a replayed token fails the run rather
-      # than returning the wrong page.
+      # than returning the wrong page. That binding is verified against the live
+      # API but the provider publishes no promise about it, so it can change
+      # without notice and without this scenario going red.
 
     @integration
     Scenario: Widening the backfill start makes the source read the older days

@@ -1,12 +1,13 @@
 import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 /**
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -20,7 +21,7 @@ export const deleteGraphCommand = async (id: string): Promise<CommandResult | vo
   const spinner = createSpinner(`Deleting graph "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/v1/graphs/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/graphs/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: buildAuthHeaders({ apiKey }),
     });

@@ -161,6 +161,9 @@ export const AddAnnotationQueueDrawer = ({
           // queue page itself, the participants picker, the sidebar entries and
           // its badges. A queue nobody can see yet is a queue nobody can use.
           void queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
+          // Membership decides whose work an item is, so a walk already open
+          // is reading the wrong set the moment it changes.
+          void queryClient.annotation.getQueueWalkStep.invalidate();
           void queryClient.annotation.getQueueBySlugOrId.invalidate();
           void queryClient.annotation.getQueues.invalidate();
           void queryClient.annotation.getQueueItemsCounts.invalidate();

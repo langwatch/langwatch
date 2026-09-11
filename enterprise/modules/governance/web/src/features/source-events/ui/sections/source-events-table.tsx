@@ -299,10 +299,22 @@ export function SourceEventsTable({
   pager,
   emptyState,
   presentation,
+  headerAside,
 }: {
   pager: SourceEventsPager<SourceEventRowData>;
   emptyState: ReactNode;
   presentation?: SourceEventsTablePresentation;
+  /**
+   * Something to hang beside the heading — in practice the (i) that carries
+   * this source's setup instructions. It sits here rather than inside the
+   * empty state because those instructions are worth reading whether or not
+   * events have arrived, and an admin debugging a source that IS delivering
+   * would otherwise have no way to reach them.
+   *
+   * The table takes it as a node because the instructions are per-source and
+   * this component deliberately knows nothing about sources.
+   */
+  headerAside?: ReactNode;
 }) {
   const renderError = (error: unknown, title: string) =>
     presentation?.renderError?.({ error, title }) ?? <ErrorAlert title={title} />;
@@ -312,13 +324,19 @@ export function SourceEventsTable({
       <EventsTableBody pager={pager} />
     </Table.Body>
   );
+  // "Click a row for the raw and normalised records" describes rows that are
+  // not there in the empty state, and the empty pane says its own piece.
+  const isEmpty = pager.status === "ready" && pager.loadedCount === 0;
   return (
     <VStack align="stretch" gap={3}>
       <VStack align="start" gap={1}>
-        <Heading as="h3" size="sm">
-          Events
-        </Heading>
-        {pager.status !== "error" && (
+        <HStack gap={1}>
+          <Heading as="h3" size="sm">
+            Events
+          </Heading>
+          {headerAside}
+        </HStack>
+        {pager.status !== "error" && !isEmpty && (
           <Text fontSize="sm" color="fg.muted">
             Every OCSF-normalised event from this source, newest first. Click a row for the raw and
             normalised records.
@@ -328,7 +346,7 @@ export function SourceEventsTable({
 
       {pager.status === "error" ? (
         renderError(pager.error, "Couldn't load this source's events")
-      ) : pager.status === "ready" && pager.loadedCount === 0 ? (
+      ) : isEmpty ? (
         emptyState
       ) : (
         <Box>

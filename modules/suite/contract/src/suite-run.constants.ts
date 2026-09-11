@@ -10,12 +10,14 @@ export const SUITE_RUN_EVENT_TYPES = {
   STARTED: "lw.suite_run.started",
   ITEM_STARTED: "lw.suite_run.item_started",
   ITEM_COMPLETED: "lw.suite_run.item_completed",
+  ITEM_REGRADED: "lw.suite_run.item_regraded",
 } as const;
 
 export const SUITE_RUN_PROCESSING_EVENT_TYPES = [
   SUITE_RUN_EVENT_TYPES.STARTED,
   SUITE_RUN_EVENT_TYPES.ITEM_STARTED,
   SUITE_RUN_EVENT_TYPES.ITEM_COMPLETED,
+  SUITE_RUN_EVENT_TYPES.ITEM_REGRADED,
 ] as const;
 
 export type SuiteRunProcessingEventType = (typeof SUITE_RUN_PROCESSING_EVENT_TYPES)[number];
@@ -28,12 +30,14 @@ export const SUITE_RUN_COMMAND_TYPES = {
   START: "lw.suite_run.start",
   RECORD_ITEM_STARTED: "lw.suite_run.record_item_started",
   COMPLETE_ITEM: "lw.suite_run.complete_item",
+  REGRADE_ITEM: "lw.suite_run.regrade_item",
 } as const;
 
 export const SUITE_RUN_PROCESSING_COMMAND_TYPES = [
   SUITE_RUN_COMMAND_TYPES.START,
   SUITE_RUN_COMMAND_TYPES.RECORD_ITEM_STARTED,
   SUITE_RUN_COMMAND_TYPES.COMPLETE_ITEM,
+  SUITE_RUN_COMMAND_TYPES.REGRADE_ITEM,
 ] as const;
 
 export type SuiteRunProcessingCommandType = (typeof SUITE_RUN_PROCESSING_COMMAND_TYPES)[number];
@@ -45,6 +49,7 @@ export const SUITE_RUN_EVENT_VERSIONS = {
   STARTED: "2026-03-01",
   ITEM_STARTED: "2026-03-01",
   ITEM_COMPLETED: "2026-03-01",
+  ITEM_REGRADED: "2026-09-03",
 } as const;
 
 /**

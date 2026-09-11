@@ -165,6 +165,46 @@ preflight:
 # Advanced: override any computed value (applied last)
 env: {}
 
+# LangWatchQL (LWQL) access model (issue langwatch-saas#1168, Design C).
+#
+# When enabled, the pod renders the langwatch_lwql restricted user, the
+# lwql_restricted profile, its grants, the tenant row filters and the
+# lwql_postgres named collection directly as ClickHouse config, from secrets
+# mounted below. Whoever owns the ClickHouse server owns the access model: a
+# chart-managed server renders it here, so the application does NOT self-provision
+# it (the parent langwatch chart flips LWQL_SELF_PROVISION off for chart-managed
+# ClickHouse). Leave disabled for installs that do not use LangWatchQL.
+#
+# The passwords are mounted from a Secret with optional: true — a Secret missing
+# a key leaves that half unprovisioned (fail-closed) instead of bricking the pod.
+lwqlAccessModel:
+  enabled: false
+  # Database holding the LWQL objects; must match the app's LWQL_DATABASE.
+  database: langwatch
+  # Secret carrying the LWQL passwords. Empty = the ClickHouse auth Secret.
+  existingSecret: ""
+  # Key holding the langwatch_lwql user password (SHA256-hashed at boot).
+  passwordSecretKey: lwql_password
+  # PostgreSQL bridge for the lwql_postgres named collection. An EMPTY host means
+  # the bridge is NOT rendered — this subchart never guesses a host (see
+  # clickhouse-serverless.lwqlPgHost). When installed as the parent langwatch
+  # chart's dependency, that chart's OWN values.yaml supplies the release-derived
+  # host (<release>-postgresql) as its default for this field, so the collection
+  # still renders on the default chart-managed path; that default lives in the
+  # PARENT, not here. Set host to point at an external PostgreSQL. It dials as a
+  # dedicated read-only role (lwql_ro),
+  # never the superuser; the application converges that role from the reader
+  # password. The password key must be present in the Secret (the reader
+  # password cannot be hashed — ClickHouse dials PostgreSQL with it). The parent
+  # langwatch chart overrides database/user to match its own PostgreSQL; these
+  # defaults are for standalone subchart installs.
+  postgres:
+    host: ""
+    port: 5432
+    database: langwatch
+    user: lwql_ro
+    passwordSecretKey: lwql_pg_password
+
 # Keeper resources (only used when replicas > 1)
 keeper:
   resources:

@@ -148,6 +148,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts --filter "langwatch..." --fi
 # ../../feature-map.json) relative to it.
 WORKDIR /src/sdks/typescript
 
+<<<<<<< HEAD
 # The CLI imports types GENERATED from first-party source: copy-types.sh copies
 # the Zod-first contract modules out of packages/ + services/langevals/ and
 # derives default-prompt-model.generated.ts from the model catalogue, and the
@@ -161,6 +162,25 @@ WORKDIR /src/sdks/typescript
 COPY modules/trace/contract/src/trace-format.schemas.ts /src/modules/trace/contract/src/trace-format.schemas.ts
 COPY modules/evaluator/contract/src/evaluators.native.ts /src/modules/evaluator/contract/src/evaluators.native.ts
 COPY modules/model-provider/contract/src/catalog/model-catalog.json /src/modules/model-provider/contract/src/catalog/model-catalog.json
+=======
+# The CLI imports types GENERATED from the platform source: copy-types.sh copies
+# the Zod-first modules out of platform/app/ + services/langevals/ and derives
+# default-prompt-model.generated.ts from llmModels.json, and the OpenAPI client is
+# generated from the app's OpenAPI json. Those sources live OUTSIDE sdks/typescript/
+# and the install ran with --ignore-scripts, so the generated tree is absent and
+# the Bun compile fails to resolve `internal/generated/*`. Bring in exactly the
+# files the generators read (at the ../../platform/app, ../../services/langevals paths copy-types.sh
+# expects relative to /src/sdks/typescript), then run the generators. These are
+# written INTO the image, so .dockerignore's `*.generated.*` filter (a host→context
+# rule) does not strip them.
+COPY platform/app/src/server/tracer/types.ts             /src/platform/app/src/server/tracer/types.ts
+COPY platform/app/src/server/filters/types.ts            /src/platform/app/src/server/filters/types.ts
+COPY platform/app/src/server/evaluations/types.ts        /src/platform/app/src/server/evaluations/types.ts
+COPY platform/app/src/server/evaluations/evaluators.native.ts /src/platform/app/src/server/evaluations/evaluators.native.ts
+COPY platform/app/src/server/scenarios/suite-fields.ts    /src/platform/app/src/server/scenarios/suite-fields.ts
+COPY platform/app/src/server/scenarios/evaluator-attachments.ts /src/platform/app/src/server/scenarios/evaluator-attachments.ts
+COPY platform/app/src/server/modelProviders/llmModels.json /src/platform/app/src/server/modelProviders/llmModels.json
+>>>>>>> origin/main
 COPY packages/redaction/src                           /src/packages/redaction/src
 COPY apps/api/src/features/discovery/openapi-document.json /src/apps/api/src/features/discovery/openapi-document.json
 COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts
