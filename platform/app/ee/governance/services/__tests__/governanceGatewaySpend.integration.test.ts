@@ -369,6 +369,43 @@ describe("the governance gateway spend read", () => {
       expect(day?.requestsWithoutAmount).toBe(2);
       // requestCount is the priced-or-charged confirmed+failed rows.
       expect(day?.requestCount).toBe(2);
+      // Of those, only the $10 one is priced.
+      expect(day?.pricedRequestCount).toBe(1);
+    });
+  });
+
+  describe("given a day of only zero-cost requests that consumed tokens", () => {
+    /** @scenario "A window of only requests with no dollar amount still shows the metered lane" */
+    it("reports the requests as charged but none of them as priced", async () => {
+      await insert([
+        spendRow({
+          tenantId: projectA,
+          status: "confirmed",
+          costNanoUsd: 0,
+          tokensInput: 100,
+          tokensOutput: 20,
+        }),
+        spendRow({
+          tenantId: projectA,
+          status: "confirmed",
+          costNanoUsd: 0,
+          tokensInput: 300,
+          tokensOutput: 40,
+        }),
+      ]);
+
+      const [day] = await repo.sumDaysForOrganizationProjects({
+        tenantIds: [projectA],
+        ...WINDOW,
+      });
+
+      // Charged, tokens consumed, priced at nothing: the ledger does not know
+      // what these cost. The priced count is what lets the service say so
+      // instead of rendering the zero sum as a figure.
+      expect(day?.amountNanoUsd).toBe(0);
+      expect(day?.requestCount).toBe(2);
+      expect(day?.pricedRequestCount).toBe(0);
+      expect(day?.requestsWithoutAmount).toBe(2);
     });
   });
 

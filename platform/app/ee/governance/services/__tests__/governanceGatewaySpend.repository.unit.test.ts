@@ -119,6 +119,20 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
       expect(query).toContain("AS RequestsWithoutAmount");
     });
 
+    it("counts the priced requests apart from the charged ones", async () => {
+      const { client, repo } = repositoryOver([]);
+      await read(repo, WINDOW);
+
+      // A charged request priced at zero with tokens consumed is charged but
+      // not priced. The service needs the priced count on its own to tell a
+      // day that spent nothing from a day whose cost is unknown; the charged
+      // count alone cannot, and subtracting the unpriced count would fold the
+      // settled requests into it.
+      expect(queryOf(client)).toContain(
+        "countIf(RequestStatus IN ('confirmed', 'failed') AND RequestCostNanoUSD > 0) AS PricedRequestCount",
+      );
+    });
+
     it("never selects a person column", async () => {
       const { client, repo } = repositoryOver([]);
       await read(repo, WINDOW);
@@ -200,6 +214,7 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
           Day: "2026-08-01",
           AmountNanoUsd: "3500000",
           RequestCount: "3",
+          PricedRequestCount: "1",
           RequestsWithoutAmount: "2",
         },
       ]);
@@ -211,6 +226,7 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
           day: "2026-08-01",
           amountNanoUsd: 3_500_000,
           requestCount: 3,
+          pricedRequestCount: 1,
           requestsWithoutAmount: 2,
         },
       ]);
@@ -242,6 +258,7 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
           Model: "gpt-5-mini",
           AmountNanoUsd: "10",
           RequestCount: "1",
+          PricedRequestCount: "1",
           RequestsWithoutAmount: "0",
         },
       ]);
@@ -250,6 +267,7 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
           VirtualKeyId: "vk_1",
           AmountNanoUsd: "10",
           RequestCount: "1",
+          PricedRequestCount: "1",
           RequestsWithoutAmount: "0",
         },
       ]);
@@ -259,6 +277,7 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
           model: "gpt-5-mini",
           amountNanoUsd: 10,
           requestCount: 1,
+          pricedRequestCount: 1,
           requestsWithoutAmount: 0,
         },
       ]);
@@ -269,6 +288,7 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
           virtualKeyId: "vk_1",
           amountNanoUsd: 10,
           requestCount: 1,
+          pricedRequestCount: 1,
           requestsWithoutAmount: 0,
         },
       ]);

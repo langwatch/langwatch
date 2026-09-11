@@ -1503,16 +1503,42 @@ function dayCurrencyLinesFrom(
 }
 
 /**
- * A day's metered figure, or null when the day charged nothing.
+ * Whether a set of metered requests supports a dollar figure at all.
  *
- * Null when no confirmed or failed request landed on the day — a day of only
- * settled requests has an unknown cost, and $0.00 would claim it was free.
- * When a request DID charge, the sum stands even at zero (a refund day), and
- * the requests carrying no dollar amount are the marker beside it, never a
- * reason to withhold it.
+ * THE RULE, applied to a day and to the window alike: the figure stands when
+ * at least one charged request was priced, or when requests were charged and
+ * none of them lacks an amount — every charged request priced at zero with
+ * nothing consumed, so nothing was spent and nothing is unknown, and $0.00 is
+ * honest. Otherwise null: no charged request at all (a day of only settled
+ * requests), or charged requests that are ALL in the unpriced count (priced
+ * at zero with tokens consumed — free or unpriced, the ledger cannot tell
+ * which). In that last case the zero sum is not a measurement, and a "$0.00"
+ * beside "N requests with no dollar amount" would claim free where the ledger
+ * says unknown.
+ *
+ * `pricedRequestCount` is the ledger's own count, never charged minus
+ * unpriced: the unpriced count also holds settled requests, which are not
+ * charged.
+ */
+function gatewayFigureStands(counts: {
+  requestCount: number;
+  pricedRequestCount: number;
+  requestsWithoutAmount: number;
+}): boolean {
+  if (counts.pricedRequestCount > 0) return true;
+  return counts.requestCount > 0 && counts.requestsWithoutAmount === 0;
+}
+
+/**
+ * A day's metered figure, or null when the day cannot state one.
+ *
+ * Null by the rule in `gatewayFigureStands`: no charged request, or charged
+ * requests the ledger could not price. When the figure stands, the sum is
+ * shown even at zero, and the requests carrying no dollar amount are the
+ * marker beside it, never a reason to withhold it.
  */
 function gatewayDayUsd(day: GovernanceGatewaySpendDayRow): number | null {
-  if (day.requestCount === 0) return null;
+  if (!gatewayFigureStands(day)) return null;
   return Number(nanoUsdToDecimalString(BigInt(day.amountNanoUsd)));
 }
 
@@ -1526,13 +1552,19 @@ function gatewayDayUsd(day: GovernanceGatewaySpendDayRow): number | null {
  * bill and so withholds. So `cellsWithoutAmount` is always 0 here (the gateway
  * withholds nothing) and `requestsWithoutAmount` carries the count instead.
  *
- * `amountUsd` is null only when no charged request landed at all — a window of
- * only settled requests has an unknown cost, not a zero one.
+ * `amountUsd` is null by the rule in `gatewayFigureStands`, applied to the
+ * window's summed counts: no charged request at all, or charged requests the
+ * ledger could not price — a window of only such requests has an unknown
+ * cost, not a zero one.
  */
 function gatewayLaneFrom(
   days: readonly GovernanceGatewaySpendDayRow[],
 ): GovernanceCostLaneDto {
   const requestCount = days.reduce((n, day) => n + day.requestCount, 0);
+  const pricedRequestCount = days.reduce(
+    (n, day) => n + day.pricedRequestCount,
+    0,
+  );
   const requestsWithoutAmount = days.reduce(
     (n, day) => n + day.requestsWithoutAmount,
     0,
@@ -1544,8 +1576,13 @@ function gatewayLaneFrom(
     (sum, day) => sum + BigInt(day.amountNanoUsd),
     0n,
   );
-  const amountUsd =
-    requestCount > 0 ? Number(nanoUsdToDecimalString(totalNanoUsd)) : null;
+  const amountUsd = gatewayFigureStands({
+    requestCount,
+    pricedRequestCount,
+    requestsWithoutAmount,
+  })
+    ? Number(nanoUsdToDecimalString(totalNanoUsd))
+    : null;
   return {
     amountUsd,
     cellsWithoutAmount: 0,

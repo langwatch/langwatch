@@ -28,12 +28,17 @@ type GatewayDayRow = Awaited<
   >
 >[number];
 
-/** One metered day, priced and complete unless said otherwise. */
+/**
+ * One metered day, empty unless said otherwise. A test that wants the day to
+ * hold a figure says how many of its requests were priced: the service reads
+ * `pricedRequestCount`, not the money, to decide whether a figure stands.
+ */
 function gatewayDay(overrides: Partial<GatewayDayRow> = {}): GatewayDayRow {
   return {
     day: "2026-08-01",
     amountNanoUsd: 0,
     requestCount: 0,
+    pricedRequestCount: 0,
     requestsWithoutAmount: 0,
     ...overrides,
   };
@@ -847,11 +852,13 @@ describe("GovernanceCostService.summary", () => {
           day: "2026-08-01",
           amountNanoUsd: 3 * NANO,
           requestCount: 1,
+          pricedRequestCount: 1,
         }),
         gatewayDay({
           day: "2026-08-02",
           amountNanoUsd: 4 * NANO,
           requestCount: 1,
+          pricedRequestCount: 1,
         }),
       ]);
       const projects = projectsReturning(["proj-a", "proj-b"]);
@@ -897,6 +904,7 @@ describe("GovernanceCostService.summary", () => {
             day: "2026-08-01",
             amountNanoUsd: 10 * NANO,
             requestCount: 3,
+            pricedRequestCount: 1,
             requestsWithoutAmount: 2,
           }),
         ]),
@@ -914,13 +922,17 @@ describe("GovernanceCostService.summary", () => {
       // withhold rule.
       expect(result.gateway.amountUsd).toBe(10);
       expect(result.gateway.requestsWithoutAmount).toBe(2);
+      expect(result.series).toEqual([
+        expect.objectContaining({ day: "2026-08-01", gatewayUsd: 10 }),
+      ]);
       // The gateway never withholds a currency total, so it names no unpriced
       // cells and no foreign currency.
       expect(result.gateway.cellsWithoutAmount).toBe(0);
       expect(result.gateway.currenciesWithoutUsdAmount).toEqual([]);
     });
 
-    it("holds no total for a metered lane whose every request carries no dollar amount", async () => {
+    /** @scenario "A window of only requests with no dollar amount still shows the metered lane" */
+    it("holds no figure for a day of only charged requests the ledger could not price", async () => {
       const service = createService({
         prisma: prismaWithGovProject("gov-1"),
         costRollup: rollupReturning({ rows: [] }),
@@ -928,7 +940,10 @@ describe("GovernanceCostService.summary", () => {
           gatewayDay({
             day: "2026-08-01",
             amountNanoUsd: 0,
-            requestCount: 0,
+            // Three requests, all charged, all priced at zero with tokens
+            // consumed: the ledger cannot tell free from unpriced.
+            requestCount: 3,
+            pricedRequestCount: 0,
             requestsWithoutAmount: 3,
           }),
         ]),
@@ -940,10 +955,45 @@ describe("GovernanceCostService.summary", () => {
         now: new Date("2026-08-01T12:00:00.000Z"),
       });
 
-      // No charged request, so no figure — null, never $0.00, which would be a
-      // claim that nothing was spent when the truth is we do not know.
+      // Charged requests alone do not make a figure. Every one of these is
+      // in the unpriced count, so the zero sum is not a measurement — null,
+      // never $0.00, which would say "free" where the ledger says "unknown".
       expect(result.gateway.amountUsd).toBeNull();
       expect(result.gateway.requestsWithoutAmount).toBe(3);
+      expect(result.series).toEqual([
+        expect.objectContaining({ day: "2026-08-01", gatewayUsd: null }),
+      ]);
+    });
+
+    it("states $0.00 for a day of only requests that consumed nothing and cost nothing", async () => {
+      const service = createService({
+        prisma: prismaWithGovProject("gov-1"),
+        costRollup: rollupReturning({ rows: [] }),
+        gatewaySpend: gatewayReturning([
+          gatewayDay({
+            day: "2026-08-01",
+            amountNanoUsd: 0,
+            // Two failures before any token was consumed: charged, priced at
+            // zero, and nothing about them is unknown.
+            requestCount: 2,
+            pricedRequestCount: 0,
+            requestsWithoutAmount: 0,
+          }),
+        ]),
+      });
+
+      const result = await service.summary({
+        organizationId: "org-1",
+        windowDays: 30,
+        now: new Date("2026-08-01T12:00:00.000Z"),
+      });
+
+      // Nothing spent and nothing unknown: zero is the honest figure.
+      expect(result.gateway.amountUsd).toBe(0);
+      expect(result.gateway.requestsWithoutAmount).toBe(0);
+      expect(result.series).toEqual([
+        expect.objectContaining({ day: "2026-08-01", gatewayUsd: 0 }),
+      ]);
     });
 
     /** @scenario "A failed gateway ledger read never renders the metered lane as zero" */

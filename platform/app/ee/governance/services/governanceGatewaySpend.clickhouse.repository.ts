@@ -122,15 +122,21 @@ const LATEST_REQUEST_SUBQUERY = `
  * grouping.
  *
  * `AmountNanoUsd` sums only the charged requests. `RequestCount` is the charged
- * requests. `RequestsWithoutAmount` is counted BESIDE the total, never inside
- * it: a charged request that consumed tokens yet priced at zero (free or
- * unpriced — the ledger cannot tell which), plus a settled request whose
- * confirmation never arrived so its cost is unknown. Settled rows add nothing
- * to the money sum.
+ * requests. `PricedRequestCount` is the charged requests that carry a positive
+ * cost — counted on its own, NOT derived as charged minus unpriced, because
+ * the unpriced count also holds settled requests, which are not charged at
+ * all. The service reads it to tell a day that spent nothing from a day whose
+ * cost is unknown: a charged request priced at zero with tokens consumed is in
+ * `RequestCount` but not here. `RequestsWithoutAmount` is counted BESIDE the
+ * total, never inside it: a charged request that consumed tokens yet priced
+ * at zero (free or unpriced — the ledger cannot tell which), plus a settled
+ * request whose confirmation never arrived so its cost is unknown. Settled
+ * rows add nothing to the money sum.
  */
 const METERED_FIGURE_COLUMNS = `
           toString(sumIf(RequestCostNanoUSD, RequestStatus IN ${CHARGED_STATUSES})) AS AmountNanoUsd,
           countIf(RequestStatus IN ${CHARGED_STATUSES}) AS RequestCount,
+          countIf(RequestStatus IN ${CHARGED_STATUSES} AND RequestCostNanoUSD > 0) AS PricedRequestCount,
           countIf(
             RequestStatus IN ${CHARGED_STATUSES}
             AND RequestCostNanoUSD = 0
@@ -170,6 +176,9 @@ export interface GovernanceGatewaySpendDayRow {
   amountNanoUsd: number;
   /** Charged (confirmed + failed) requests on the day. */
   requestCount: number;
+  /** Charged requests with a positive cost. Zero with `requestCount` above
+   *  zero means every charged request priced at zero. */
+  pricedRequestCount: number;
   /** Requests carrying no dollar amount: zero-cost-with-tokens plus settled. */
   requestsWithoutAmount: number;
 }
@@ -179,6 +188,7 @@ export interface GovernanceGatewaySpendModelRow {
   model: string;
   amountNanoUsd: number;
   requestCount: number;
+  pricedRequestCount: number;
   requestsWithoutAmount: number;
 }
 
@@ -186,6 +196,7 @@ export interface GovernanceGatewaySpendVirtualKeyRow {
   virtualKeyId: string;
   amountNanoUsd: number;
   requestCount: number;
+  pricedRequestCount: number;
   requestsWithoutAmount: number;
 }
 
@@ -221,6 +232,7 @@ export class GovernanceGatewaySpendClickHouseRepository {
       day: String(row.Day ?? ""),
       amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
       requestCount: int(row.RequestCount),
+      pricedRequestCount: int(row.PricedRequestCount),
       requestsWithoutAmount: int(row.RequestsWithoutAmount),
     }));
   }
@@ -245,6 +257,7 @@ export class GovernanceGatewaySpendClickHouseRepository {
       model: String(row.Model ?? ""),
       amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
       requestCount: int(row.RequestCount),
+      pricedRequestCount: int(row.PricedRequestCount),
       requestsWithoutAmount: int(row.RequestsWithoutAmount),
     }));
   }
@@ -263,6 +276,7 @@ export class GovernanceGatewaySpendClickHouseRepository {
       virtualKeyId: String(row.VirtualKeyId ?? ""),
       amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
       requestCount: int(row.RequestCount),
+      pricedRequestCount: int(row.PricedRequestCount),
       requestsWithoutAmount: int(row.RequestsWithoutAmount),
     }));
   }
