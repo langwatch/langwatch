@@ -11,7 +11,10 @@ import {
   ESSENTIAL_PII_ENTITIES,
   redactEssentialPiiInText,
 } from "./essentialPii";
-import { isReservedIdentifierAttributeKey } from "./identifierHoldout";
+import {
+  isReservedIdentifierAttributeKey,
+  reservesTraceAddress,
+} from "./identifierHoldout";
 
 const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(
   ESSENTIAL_PII_ENTITIES,
@@ -169,12 +172,15 @@ export function isIdentifierAttributeName(key: string): boolean {
  * the shape-only value rules. Every other rule runs as it does on any other
  * attribute.
  *
- * A name {@link isReservedIdentifierAttributeKey} accepts additionally skips the
+ * An attribute {@link reservesTraceAddress} accepts additionally skips the
  * personal-data pass. That is the stronger claim, which is why the list behind
  * it is short and holds only trace and span addresses: the value is minted by a
  * tracer, never typed by a person, and a decimal trace id carries no letter so
- * no shape rule would hold it back. The vendor, armour and credential-keyword
- * secret rules still run, so a key pasted under such a name is still scrubbed.
+ * no shape rule would hold it back. It takes the VALUE as well as the name,
+ * because the OTLP endpoint forwards caller-written attribute names verbatim —
+ * a reserved name over an email address does not get the personal-data pass
+ * turned off. The vendor, armour and credential-keyword secret rules still run,
+ * so a key pasted under such a name is still scrubbed.
  */
 export function redactAttributeNative({
   key,
@@ -189,8 +195,9 @@ export function redactAttributeNative({
   compiledSecretPatterns?: readonly RegExp[];
   compiledPiiExceptions?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
-  const reservesAnAddress = isReservedIdentifierAttributeKey(key);
-  const namesAnIdentifier = reservesAnAddress || isIdentifierAttributeName(key);
+  const namesAnAddress = isReservedIdentifierAttributeKey(key);
+  const reservesAnAddress = reservesTraceAddress({ key, value });
+  const namesAnIdentifier = namesAnAddress || isIdentifierAttributeName(key);
   if (
     policy.secrets.enabled &&
     value.length > 0 &&

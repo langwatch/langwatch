@@ -278,6 +278,36 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       expect(attr(span, "metadata.otelTraceId")).toBe(decimalTraceId);
       expect(batchSpy).not.toHaveBeenCalled();
     });
+
+    // The reserved names are not a namespace anyone owns: attributes arrive on
+    // the ingestion endpoint spelled exactly as the sender wrote them. A rule
+    // that went on the name alone would let a sender turn the personal-data
+    // pass off for any value at all, and the value is stored before anyone
+    // could notice. The name has to be carrying something that could actually
+    // be the address it promises.
+    /** @scenario "A reserved trace identifier name holding an email address is redacted at the strict level" */
+    it("redacts an email address written under a reserved name, and never submits it in the clear", async () => {
+      const { service, submitted } = makeService();
+      const span = spanWith({ "metadata.trace_id": "jane@example.com" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(attr(span, "metadata.trace_id")).toBe("[EMAIL_ADDRESS]");
+      expect(submitted()).not.toContain("jane@example.com");
+    });
+
+    /** @scenario "A reserved trace identifier name holding an email address is still redacted" */
+    it("redacts an email address written under a reserved name natively", async () => {
+      const { service } = makeService({
+        ...STRICT_POLICY,
+        pii: { level: "essential", entities: [], exceptPatterns: [] },
+      });
+      const span = spanWith({ "metadata.trace_id": "jane@example.com" });
+
+      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+
+      expect(attr(span, "metadata.trace_id")).toBe("[EMAIL_ADDRESS]");
+    });
   });
 
   describe("given an attribute that carries prose", () => {
@@ -300,6 +330,27 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       await service.redactSpan(span, null, "STRICT", TENANT);
 
       expect(submitted()).toContain("Jane Doe");
+    });
+
+    // Carrying an identifier is not the same as being one. A support message,
+    // a log line or an error string routinely quotes the trace id it is about,
+    // and a rule that held a value back as soon as it CONTAINED an opaque run
+    // would stop scanning all of them — storing the names in the clear, which
+    // is the failure this module exists to prevent arrived at from the other
+    // side. Both separators are covered because "_" and "-" split a run while
+    // a space does not, so the two spellings reach the rule differently.
+    /** @scenario "Prose that quotes an opaque identifier is still sent for analysis" */
+    it.each([
+      ["a prefixed identifier", "trace_db237ee0db82f81cc87fa28b188bd8ef"],
+      ["a bare hex identifier", "db237ee0db82f81cc87fa28b188bd8ef"],
+    ])("submits a sentence naming a person next to %s", async (_case, id) => {
+      const { service, submitted } = makeService();
+      const sentence = `Jane Doe in Berlin reported this on ${id}`;
+      const span = spanWith({ "app.support_note": sentence });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submitted()).toContain(sentence);
     });
 
     // The hold-out reads a whole attribute value, so a name written as ONE

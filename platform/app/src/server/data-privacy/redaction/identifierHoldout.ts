@@ -13,12 +13,17 @@
  *
  * Two questions are asked, in this order.
  *
- *   1. Does the attribute NAME reserve it? A short list of trace and span
- *      identifier names whose values are minted by a tracer and never written by
- *      a person. Nothing under them is ever analysed, whatever it holds.
+ *   1. Does the attribute NAME reserve it, AND does the value look like the
+ *      address that name promises? A short list of trace and span identifier
+ *      names whose values a tracer mints and a person never writes. The names
+ *      are not a protected namespace — the OTLP endpoint takes attributes as the
+ *      caller wrote them — so the value still has to be hex or decimal before
+ *      the name is allowed to turn the personal-data pass off.
  *   2. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
  *      digest, a ULID, a `prefix_<random>` record id. Nothing in such a value
  *      is personal data, so there is nothing for either engine to find.
+ *      Exclusively: a value that merely CONTAINS one is prose, and prose is
+ *      analysed.
  *
  * WHY THERE ARE TWO VALUE RULES. The engines pay different prices for a wrong
  * answer, so they get different rules and the difference is the whole point.
@@ -93,6 +98,24 @@ const ALPHANUMERIC_RUN = /[A-Za-z0-9]+/g;
 const HEX_RUN = /^[0-9a-f]+$/i;
 
 /**
+ * The characters ONE identifier token is written with: letters, digits, the
+ * separators ids use, and what remains of base64's alphabet with its padding.
+ *
+ * This is a whole-value gate, and it is what makes the rule below mean what its
+ * name says. Without it a value qualifies as soon as it CONTAINS an opaque run,
+ * so "Jane Doe handled trace_<hex>" is withheld from the only pass that finds
+ * people, and the name is stored in the clear — the very failure this module
+ * exists to prevent, reached from the other side. A space, a quote, a brace, a
+ * comma or a slash means the text is prose or structure that HOLDS an
+ * identifier, and the words around that identifier are precisely what the
+ * analysis pass is for.
+ *
+ * `/` is left out deliberately, for the reason it is left out of
+ * {@link IDENTIFIER_VALUE}: a URL path carries identifiers AND names.
+ */
+const OPAQUE_TOKEN_VALUE = /^[A-Za-z0-9._:+=-]+$/;
+
+/**
  * How long a run has to be before a person is unlikely to have typed it, and
  * how many digits it has to carry. A ULID is twenty-six characters, a short hex
  * span id is sixteen; the longest single-word surnames run to about eighteen,
@@ -114,6 +137,11 @@ const MIN_DIGITS_IN_OPAQUE_RUN = 2;
  *     all hexadecimal, or mixes letters with at least two digits. That covers a
  *     hex digest, a ULID, a `prefix_<random>` record id and a base64 token,
  *     including when a readable prefix sits in front of the random part.
+ *
+ * Either way the WHOLE value has to be one token first
+ * ({@link OPAQUE_TOKEN_VALUE}). Carrying an identifier is not the same as being
+ * one: prose that quotes a trace id is still prose, and the sentence around the
+ * id is where the names are.
  *
  * Runs are measured BETWEEN separators and never across them. That is what
  * keeps "maria.schmidt.1972" out: joined up it would clear the bar, but nobody
@@ -145,6 +173,7 @@ const MIN_DIGITS_IN_OPAQUE_RUN = 2;
  */
 export function isOpaqueIdentifierValue(value: string): boolean {
   if (value.length > MAX_IDENTIFIER_LENGTH) return false;
+  if (!OPAQUE_TOKEN_VALUE.test(value)) return false;
   if (UUID_VALUE.test(value)) return true;
 
   for (const [run] of value.matchAll(ALPHANUMERIC_RUN)) {
@@ -173,7 +202,8 @@ function isOpaqueRun(run: string): boolean {
  *
  * Compared lower-cased, so a dialect that writes `metadata.TraceId` is covered.
  * Keep this list short and keep it to addresses: a name here turns the whole
- * personal-data pass off for that attribute.
+ * personal-data pass off for that attribute — and then only for a value that is
+ * shaped like an address, see {@link reservesTraceAddress}.
  */
 const RESERVED_IDENTIFIER_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
   "metadata.oteltraceid",
@@ -194,6 +224,39 @@ export function isReservedIdentifierAttributeKey(key: string): boolean {
 }
 
 /**
+ * What a trace or span address is actually written as: hexadecimal (W3C, B3 and
+ * the OTel SDKs) or a decimal integer (the Datadog and B3 bridges, which is the
+ * case the reserved list exists for at all).
+ *
+ * The names above are NOT a protected namespace. Span attributes arrive on the
+ * OTLP endpoint exactly as the caller wrote them, so anyone can send
+ * `metadata.trace_id` holding an email address — and a name-only hold-out would
+ * then turn the personal-data pass off for it and store that email in the
+ * clear. Requiring the value to be address-shaped closes that without costing
+ * anything real: a value this rejects is still put to the ordinary
+ * {@link isOpaqueIdentifierValue} question, which is what catches a uuid-shaped
+ * or prefixed trace id. Only a value that is neither an address nor an opaque
+ * token loses the exemption, and that value was never an address.
+ */
+const TRACE_ADDRESS_VALUE = /^(?:[0-9a-f]{8,64}|\d{1,32})$/i;
+
+/**
+ * Whether this attribute is a reserved trace/span name carrying something that
+ * could be the address the name promises.
+ */
+export function reservesTraceAddress({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}): boolean {
+  return (
+    isReservedIdentifierAttributeKey(key) && TRACE_ADDRESS_VALUE.test(value)
+  );
+}
+
+/**
  * Whether one attribute is held back from PII analysis altogether: reserved by
  * name, or a value that is exclusively one opaque identifier token.
  *
@@ -207,7 +270,5 @@ export function isHeldOutIdentifierAttribute({
   key: string;
   value: string;
 }): boolean {
-  return (
-    isReservedIdentifierAttributeKey(key) || isOpaqueIdentifierValue(value)
-  );
+  return reservesTraceAddress({ key, value }) || isOpaqueIdentifierValue(value);
 }

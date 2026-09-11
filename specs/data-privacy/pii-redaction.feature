@@ -218,6 +218,17 @@ Feature: Redacting personal data from traces
     When a trace is ingested with an attribute whose whole value is a valid taproot address
     Then the stored attribute has the address redacted
 
+  # A checksum is only as narrow as the grammar behind it. The character after
+  # the "bc1" prefix is the witness version, read from a thirty-two character
+  # alphabet, and bitcoin defines only the first seventeen of those. A token
+  # carrying one of the other fifteen decodes to no address at all, so treating
+  # it as one would put a marker over a value that was never a payment address.
+  @unit
+  Scenario: A token using a witness version bitcoin does not define is not an address
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute holding a checksum valid token whose witness version is seventeen
+    Then the stored attribute still reads as it was sent
+
   @unit
   Scenario: A millisecond timestamp is not read as a card number
     Given the resolved PII level for "web-app" is essential
@@ -284,6 +295,25 @@ Feature: Redacting personal data from traces
     When a trace is ingested with a reserved trace identifier attribute
     Then the analysis service never received that value
 
+  # The reserved names are not a namespace anyone owns. Attributes arrive on the
+  # ingestion endpoint spelled exactly as the sender wrote them, so a sender can
+  # put an email address under a trace identifier name - by mistake or on
+  # purpose - and a rule that went on the name alone would then store that email
+  # in the clear forever. The name earns the exemption only for a value that
+  # could be the address it promises, which is to say hexadecimal or decimal.
+  @unit
+  Scenario: A reserved trace identifier name holding an email address is redacted at the strict level
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a reserved trace identifier attribute whose value is an email address
+    Then the stored attribute has the email address redacted
+    And the analysis service never received the email address in the clear
+
+  @unit
+  Scenario: A reserved trace identifier name holding an email address is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with a reserved trace identifier attribute whose value is an email address
+    Then the stored attribute has the email address redacted
+
   @unit
   Scenario: A corpus of opaque identifiers is never sent for analysis
     Given the resolved PII level for "web-app" is strict
@@ -306,6 +336,17 @@ Feature: Redacting personal data from traces
   Scenario: Prose that holds a name is still sent for analysis
     Given the resolved PII level for "web-app" is strict
     When a trace is ingested with an attribute whose value is a sentence naming a person
+    Then the analysis service received that sentence
+
+  # Holding a value back is decided on the WHOLE value, never on a part of it.
+  # Carrying an identifier is not the same as being one: a sentence that quotes
+  # a trace id is still a sentence, and the words around the id are exactly what
+  # the analysis pass exists to read. Deciding on a part would mean any message
+  # with a request id in it stopped being scanned for names.
+  @unit
+  Scenario: Prose that quotes an opaque identifier is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with an attribute whose value is a sentence naming a person next to a trace identifier
     Then the analysis service received that sentence
 
   @unit
