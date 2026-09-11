@@ -46,12 +46,12 @@ the report should say which it found.
    `ComposedApiFeatures` in `app-trpc.composed.ts`. There is no `createTrpcHandlerBinding` /
    `createTrpcApiService` / `createTrpcService` chain to hand-assemble any more; that
    builder set is deleted; a mount file that still names it is conversion debt
-   (`legacy-transport-runtime`). Details: `references/extend.md` section 7.
+   (`legacy-transport-runtime`). Details: `references/transport.md` section 2.
 3. **REST**: `apps/api/src/features/<f>/<f>-rest.mount.ts` builds `createRestRuntime({ identity: { authenticate } })`
    and calls `runtime.mount(<f>Rest.router(), { app, credential, onError })`; the root
    registers it in its REST list. `security.createServiceVersionedApp(...)` and
    `mountProjectTransport(...)` are deleted; do not recommend or extend either. Details:
-   `references/extend.md` section 6.
+   `references/transport.md` section 1.
 4. **The root**: `apps/api/src/app/api-production.composition.ts` calls `installApi<F>`
    with the peers it holds (`this.composedProject.app`, `this.composedAuthz.app`, …) and
    wires the returned routers and REST services.

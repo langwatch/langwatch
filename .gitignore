@@ -171,3 +171,18 @@ server.log
 packages/prisma-client/src/generated/
 .claims.tsv
 .claims.tsv.lock/
+
+# Multi-agent workflow runtime state. The protocol itself lives in
+# .claude/coordinator/ and IS tracked; what it produces is not. A manifest is
+# one task's contract and a handoff is a snapshot between two agents - both are
+# stale the moment the drive moves on, and a stale handoff in git history is
+# something a future agent reads and believes. Anything worth keeping graduates
+# to dev/docs/adr/, dev/docs/plans/ or .claude/skills/core/.
+#
+# The contents are ignored rather than the directories, because git cannot
+# re-include a file whose parent directory is excluded - the README negations
+# below only work this way round.
+.claude/handoffs/*
+!.claude/handoffs/README.md
+.claude/manifests/*
+!.claude/manifests/README.md

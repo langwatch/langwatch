@@ -22,7 +22,8 @@ the reference every task below copies.
 | You are... | Read |
 | --- | --- |
 | Creating a module that has no package yet | `references/new.md` |
-| Adding a capability to a module that already exists: a new operation, field, error, screen section, drawer, REST endpoint or tRPC procedure | `references/extend.md` |
+| Adding a capability to a module that already exists: a new operation, field, error, screen section or drawer | `references/extend.md` |
+| Adding a REST endpoint or a tRPC procedure to a module that already exists | `references/transport.md` |
 | Bringing a module that still carries legacy pieces (`feature-shape` entries) into the annotation shape | `references/convert.md` |
 | Booting an already-built module's installer into a process, mounting a namespace/family, registering it in `apps/ui`/`apps/worker`/`apps/tasks` | `references/wire.md` |
 | Relocating code (a service, a screen, a test, a whole family) into its owning module | `references/move.md` |
@@ -79,16 +80,22 @@ Full detail for each layer: `.claude/skills/architecture-guide/references/{contr
 
 ## What a lane may and may not do
 
+The operating rules - scoped checks, no git writes, no secret reads, owned paths,
+cost discipline - are canonical in `.claude/skills/core/repository-rules.md` and
+`.claude/skills/core/testing-rules.md`, and are not restated here. What follows
+is what is specific to changing a module.
+
 - **Lift and shift, not redesign.** Every operation, error code, query and screen a
   module has today it still has after; a redesign is a separate change once the shape is
   right.
 - **Never re-export for backwards compatibility.** Update every importer instead.
 - **Read before you delete.** `git diff` and read every file in a directory before `rm`.
-- **`mv`, not `git mv`.** Lanes never stage, commit, stash, reset or clean; a moved file
-  goes with plain `mv`, the root session owns the index.
-- **No re-exports, no `as unknown as`, no `as PrismaClient`, no `try*`/`require*` methods,
-  no optional collaborator a process always supplies, no `process.env` below the
-  entrypoint.**
+- **`mv`, not `git mv`.** A moved file goes with plain `mv` - the root session owns the
+  index, and a lane makes no git write at all.
+- **No re-exports, no `as unknown as`, no `as never`, no `as PrismaClient`, no non-null
+  `!`, no `ctx: unknown`, no `try*`/`require*` methods, no optional collaborator a process
+  always supplies, no `process.env` below the entrypoint, folders at most twelve files,
+  no file under twenty lines.**
 - **Named absences, not stubs.** If a dependency genuinely is not there yet, the
   composition root names it; nothing returns fake data. Do not invent a `refusing<F>Feature()`
   twin, an `Unavailable*` error or a `Logged*Absence` for new work (ADR-133 retires the
@@ -98,9 +105,9 @@ Full detail for each layer: `.claude/skills/architecture-guide/references/{contr
 - **Sabotage once per moved or new behaviour.** Break it, watch the right test fail for
   the right reason, restore. An unchanged test result after sabotage is not evidence;
   say so.
-- **Never run the root `pnpm typecheck`, `pnpm lint --fix` or `pnpm format`.** Scope every
-  check to the packages you touched (`references/new.md`'s gates section, or
-  `.claude/skills/architecture-guide/references/gates.md` directly).
+- **Which gates a module must pass** is `references/new.md`'s gates section, or
+  `.claude/skills/architecture-guide/references/gates.md` directly. How narrowly to run
+  them is `core/testing-rules.md`.
 - **Never boot `pnpm dev` to verify a change.** The installation and composition
   integration tests are the proof.
 
