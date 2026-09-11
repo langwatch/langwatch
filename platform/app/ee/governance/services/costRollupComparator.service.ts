@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
+import type { SchedulerHandler } from "~/server/app-layer/scheduler/scheduler.types";
 import {
   incrementGovernanceCostRollupMismatch,
   setGovernanceCostRollupLagSeconds,
@@ -19,7 +20,10 @@ import {
   governanceCostRollupKey,
   governanceCostRollupTotals,
 } from "../projections/governanceCostRollup.foldProjection";
-import type { ComparedCostSource } from "./costRollupComparatorSchedule";
+import {
+  type ComparedCostSource,
+  costSourceFromTargetId,
+} from "./costRollupComparatorSchedule";
 import type {
   GovernanceCostRollupClickHouseRepository,
   GovernanceCostRollupRow,
@@ -228,4 +232,62 @@ function governanceCostRollupKeyOfRow(row: GovernanceCostRollupRow): string {
     currencyCode: row.CurrencyCode,
     rawActorId: row.RawActorId,
   });
+}
+
+/** The slice of the comparator the scheduled fire needs. */
+export interface CostRollupComparatorDayComparer {
+  compareDay(params: {
+    tenantId: string;
+    day: string;
+    costSource: ComparedCostSource;
+  }): Promise<unknown>;
+}
+
+interface CostRollupComparatorFireLogger {
+  warn(context: Record<string, unknown>, message: string): void;
+}
+
+/**
+ * The handler the scheduler runs when a comparator calendar entry comes due.
+ *
+ * The fire is a tiny trigger — the lane is read back out of `targetId`, the
+ * day derived from the slot — so everything is re-derived at fire time rather
+ * than acted on from a payload minted when the schedule was written. It
+ * samples YESTERDAY, not today: a day still being written to is expected to
+ * disagree with its own summary, and a watchdog that fires on that is a
+ * watchdog nobody reads.
+ *
+ * A fire naming a lane we no longer compare (a leftover metered entry from
+ * before that lane read the ledger directly) is logged and settled as
+ * delivered — the handler resolves, so the scheduler advances the slot rather
+ * than retrying a comparison that has nothing to compare against.
+ */
+export function costRollupComparatorFireHandler({
+  comparator,
+  logger,
+}: {
+  comparator: CostRollupComparatorDayComparer;
+  logger: CostRollupComparatorFireLogger;
+}): SchedulerHandler {
+  return async (fire) => {
+    const costSource = costSourceFromTargetId(fire.targetId);
+    if (!costSource) {
+      // A row naming a lane we do not have. Comparing the wrong lane would
+      // report drift between two things never meant to match, so say so
+      // and do nothing.
+      logger.warn(
+        { targetId: fire.targetId, tenantId: fire.projectId },
+        "Cost rollup comparator fired for an unknown cost source; skipping",
+      );
+      return;
+    }
+    const sampled = new Date(fire.slot.getTime() - 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    await comparator.compareDay({
+      tenantId: fire.projectId,
+      day: sampled,
+      costSource,
+    });
+  };
 }

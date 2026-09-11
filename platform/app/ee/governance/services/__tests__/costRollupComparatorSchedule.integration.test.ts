@@ -17,15 +17,21 @@
  * Decision: ADR-128.
  */
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { Organization, Project } from "~/generated/prisma/client";
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
 import { PrismaScheduledJobRepository } from "~/server/app-layer/scheduler/scheduled-job.repository";
 import { prisma } from "~/server/db";
 
-import { GOVERNANCE_COST_SOURCE } from "../../projections/governanceCostRollup.constants";
-import { COST_ROLLUP_COMPARATOR_TARGET_TYPE } from "../costRollupComparator.service";
+import {
+  GOVERNANCE_COST_SOURCE,
+  type GovernanceCostSource,
+} from "../../projections/governanceCostRollup.constants";
+import {
+  COST_ROLLUP_COMPARATOR_TARGET_TYPE,
+  costRollupComparatorFireHandler,
+} from "../costRollupComparator.service";
 import {
   COST_ROLLUP_COMPARATOR_CRON,
   COST_ROLLUP_COMPARATOR_TIMEZONE,
@@ -319,14 +325,91 @@ describe("costSourceFromTargetId", () => {
     expect(costSourceFromTargetId("proj_abc:seats")).toBeNull();
   });
 
-  /** @scenario "A leftover metered check that fires anyway settles quietly" */
-  it("names no lane for a metered check, which is what lets the handler settle it without comparing", () => {
-    // A leftover row can fire in the window between the loop's due-scan and
-    // the boot step that retires it. The handler answers a null lane by
-    // logging and returning — delivered, not thrown — so the slot is not
-    // retried. That null is the whole mechanism, and this pins it.
+  it("names no lane for a metered check", () => {
     expect(
       costSourceFromTargetId(`proj_abc:${GOVERNANCE_COST_SOURCE.GATEWAY}`),
     ).toBeNull();
+  });
+});
+
+/**
+ * The handler the scheduler runs, driven directly with a fire shaped the way
+ * `SchedulerService` hands it over. The scheduler's own contract is: a handler
+ * that RESOLVES has its slot settled as delivered (the calendar advances, the
+ * retry counter resets); a handler that THROWS is retried up to the cap. So
+ * "settles quietly" is asserted here as "resolves without comparing", and the
+ * scheduler's bookkeeping of a resolved handler is covered by its own tests.
+ */
+describe("costRollupComparatorFireHandler", () => {
+  const fireFor = ({
+    tenantId,
+    costSource,
+    slot,
+  }: {
+    tenantId: string;
+    costSource: GovernanceCostSource;
+    slot: Date;
+  }) => ({
+    projectId: tenantId,
+    targetType: COST_ROLLUP_COMPARATOR_TARGET_TYPE,
+    targetId: costRollupComparatorTargetId({ tenantId, costSource }),
+    slot,
+  });
+
+  const harness = () => {
+    const compareDay = vi.fn(async () => ({}));
+    const warn = vi.fn();
+    const handler = costRollupComparatorFireHandler({
+      comparator: { compareDay },
+      logger: { warn },
+    });
+    return { compareDay, warn, handler };
+  };
+
+  /** @scenario "A leftover metered check that fires anyway settles quietly" */
+  it("settles a metered fire without comparing, warning once with the target named", async () => {
+    // A leftover row can fire in the window between the loop's due-scan and
+    // the boot step that retires it. Comparing the wrong lane would report
+    // drift between two things never meant to match, and throwing would have
+    // the scheduler retry a check that has nothing to check.
+    const tenantId = `proj_${nanoid(8)}`;
+    const { compareDay, warn, handler } = harness();
+    const fire = fireFor({
+      tenantId,
+      costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+      slot: new Date("2026-03-02T03:00:00.000Z"),
+    });
+
+    await expect(handler(fire)).resolves.toBeUndefined();
+
+    expect(compareDay).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ targetId: fire.targetId, tenantId }),
+      expect.any(String),
+    );
+  });
+
+  it("compares yesterday's UTC day for a billed fire", async () => {
+    const tenantId = `proj_${nanoid(8)}`;
+    const { compareDay, warn, handler } = harness();
+
+    await handler(
+      fireFor({
+        tenantId,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+        // Just past midnight UTC on the 2nd: "yesterday" is the 1st, and the
+        // day must come from the slot, not from the wall clock.
+        slot: new Date("2026-03-02T00:05:00.000Z"),
+      }),
+    );
+
+    expect(compareDay).toHaveBeenCalledTimes(1);
+    expect(compareDay).toHaveBeenCalledWith({
+      tenantId,
+      day: "2026-03-01",
+      costSource: GOVERNANCE_COST_SOURCE.PULLED,
+    });
+    expect(warn).not.toHaveBeenCalled();
   });
 });

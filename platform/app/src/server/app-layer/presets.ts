@@ -14,11 +14,9 @@ import { resolveSourceNonBillable } from "@ee/governance/services/costAttributio
 import {
   COST_ROLLUP_COMPARATOR_TARGET_TYPE,
   CostRollupComparatorService,
+  costRollupComparatorFireHandler,
 } from "@ee/governance/services/costRollupComparator.service";
-import {
-  costSourceFromTargetId,
-  reconcileCostRollupComparatorSchedules,
-} from "@ee/governance/services/costRollupComparatorSchedule";
+import { reconcileCostRollupComparatorSchedules } from "@ee/governance/services/costRollupComparatorSchedule";
 import { installGovernanceSuppressionSnapshot } from "@ee/governance/services/erasureSuppression.service";
 import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
 import { GovernanceGatewaySpendClickHouseRepository } from "@ee/governance/services/governanceGatewaySpend.clickhouse.repository";
@@ -1259,27 +1257,10 @@ export function initializeDefaultApp(options?: {
     );
     schedulerRegistry.register({
       targetType: COST_ROLLUP_COMPARATOR_TARGET_TYPE,
-      handler: async (fire) => {
-        const costSource = costSourceFromTargetId(fire.targetId);
-        if (!costSource) {
-          // A row naming a lane we do not have. Comparing the wrong lane would
-          // report drift between two things never meant to match, so say so
-          // and do nothing.
-          comparatorLogger.warn(
-            { targetId: fire.targetId, tenantId: fire.projectId },
-            "Cost rollup comparator fired for an unknown cost source; skipping",
-          );
-          return;
-        }
-        const sampled = new Date(fire.slot.getTime() - 86_400_000)
-          .toISOString()
-          .slice(0, 10);
-        await comparator.compareDay({
-          tenantId: fire.projectId,
-          day: sampled,
-          costSource,
-        });
-      },
+      handler: costRollupComparatorFireHandler({
+        comparator,
+        logger: comparatorLogger,
+      }),
     });
 
     // Registering the handler is only half of it: without calendar entries
