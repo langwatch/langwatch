@@ -72,7 +72,9 @@ describe("registering a connection", () => {
 
   describe("when the issuer resolves publicly", () => {
     it("registers the connection", async () => {
-      const { service, registerConnection } = serviceResolving(["93.184.216.34"]);
+      const { service, registerConnection } = serviceResolving([
+        "93.184.216.34",
+      ]);
 
       await service.registerConnection({
         ...registration,
