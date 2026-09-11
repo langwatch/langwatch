@@ -32,6 +32,7 @@ type fakeStore struct {
 	heavyRunSnapshots  []HeavyRunSnapshot
 	runHistory         []domain.RunRecord
 	appendHistoryErr   error
+	prereqSkips        map[string]bool
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -83,6 +84,11 @@ func (f *fakeStore) WriteSelection(worktreeDir string, sel domain.Selection) err
 		f.selection = map[string]domain.Selection{}
 	}
 	f.selection[worktreeDir] = sel
+	return nil
+}
+func (f *fakeStore) ReadPrereqSkips() map[string]bool { return f.prereqSkips }
+func (f *fakeStore) WritePrereqSkips(skips map[string]bool) error {
+	f.prereqSkips = skips
 	return nil
 }
 func (f *fakeStore) ClaimDaemon(DaemonInfo) (bool, error) { return true, nil }

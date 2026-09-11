@@ -124,7 +124,7 @@ Hostname routing is **opt-in** — `pnpm dev` uses the plain `PORT`+offset schem
 
 ```bash
 make haven up          # == make haven up (bootstraps portless itself on first run)
-make haven install      # optional: go install so plain `haven ...` works everywhere
+make haven install      # optional: go install so plain `haven ...` works everywhere, then check the machine's prerequisites
 make haven status       # every stack, service health, shared servers — one shot
 haven up +langy         # add a service to this worktree's stack, sticky
 haven logs nlp -t       # tail one service's logs from any terminal

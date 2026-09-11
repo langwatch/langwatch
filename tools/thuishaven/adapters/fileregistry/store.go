@@ -201,6 +201,58 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return atomicfile.Write(path, data, perm)
 }
 
+// prereqSkipsPath is the machine-wide record of which prerequisites `haven
+// install` was told never to ask about again. It lives beside the registry
+// rather than in a worktree: what is installed on the machine is the same
+// answer from every checkout, and so is the developer's decision about it.
+func (s *Store) prereqSkipsPath() string { return filepath.Join(s.home, "install-skips.json") }
+
+// prereqSkipsFile is the on-disk shape. A list rather than a map, so the file
+// reads as the sentence it is ("never ask me about these") and a hand edit is
+// obvious.
+type prereqSkipsFile struct {
+	Skipped []string `json:"skipped"`
+}
+
+// ReadPrereqSkips loads the set. Absent, unreadable or corrupt all read as the
+// empty set: a preference nobody has expressed yet is not a failure, and a
+// truncated file must not be able to block the install command entirely.
+func (s *Store) ReadPrereqSkips() map[string]bool {
+	skips := map[string]bool{}
+	b, err := os.ReadFile(s.prereqSkipsPath())
+	if err != nil {
+		return skips
+	}
+	var f prereqSkipsFile
+	if json.Unmarshal(b, &f) != nil {
+		return skips
+	}
+	for _, key := range f.Skipped {
+		skips[key] = true
+	}
+	return skips
+}
+
+// WritePrereqSkips replaces the set. Sorted, so the file does not churn
+// between runs that record the same thing in a different order.
+func (s *Store) WritePrereqSkips(skips map[string]bool) error {
+	if err := os.MkdirAll(s.home, 0o755); err != nil {
+		return err
+	}
+	f := prereqSkipsFile{Skipped: []string{}}
+	for key, on := range skips {
+		if on {
+			f.Skipped = append(f.Skipped, key)
+		}
+	}
+	sort.Strings(f.Skipped)
+	b, err := json.MarshalIndent(f, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(s.prereqSkipsPath(), append(b, '\n'), 0o644)
+}
+
 // hmrGatePath is the marker the Vite HMR-gate plugin reads. The plugin resolves
 // it against its own working directory, which is the Vite lane's — apps/ui —
 // so the marker is written there, not at the workspace root.
