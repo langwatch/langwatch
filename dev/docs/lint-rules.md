@@ -182,7 +182,7 @@ Messages:
 
 - `commentColumns`
   - what: Comment line is {{width}} columns; wrap at {{max}}.
-  - fix: Wrap the line.
+  - fix: Rewrap the block at {{max}} columns, or cut it to the sentence that earns its place.
 
 ## `langwatch/comment-block-size-warning`
 
@@ -196,8 +196,8 @@ Options: none.
 Messages:
 
 - `commentBlockSize`
-  - what: Comment block has {{lines}} lines; the maximum is {{max}}. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.
-  - fix: 
+  - what: Comment block has {{lines}} lines; the maximum is {{max}}.
+  - fix: Keep one or two lines of why beside the code and move the narrative into an ADR or a dev/docs page this comment links; delete it outright when the code already says it. More than one block in a file is a sweep, not an edit: list them with `pnpm exec oxlint --config .oxlintrc.architecture.json <file>` and hand that list to a haiku subagent to rewrite in one pass.
 
 ## `langwatch/condition-shape`
 
@@ -248,11 +248,11 @@ Messages:
 
 - `danglingImport`
   - what: `{{specifier}}` is imported here but no file of that name exists.
-  - fix: Point the import at the file's new path, or delete the line if the file is gone.
+  - fix: Point the import at the file's new path, or delete the line if the file is gone. These arrive in batches from one in-flight move: resolve the whole file in one pass rather than a line at a time.
   - why: A stale `dist/*.d.ts` keeps diagnostics green, so only a test run finds it.
 - `danglingReexport`
   - what: `{{specifier}}` is re-exported here but no file of that name exists.
-  - fix: Point the re-export at the file's new path, or delete the line if the file is gone.
+  - fix: Point the re-export at the file's new path, or delete the line if the file is gone. These arrive in batches from one in-flight move: resolve the whole barrel in one pass rather than a line at a time.
   - why: A stale `dist/*.d.ts` keeps diagnostics green, so only a test run finds it.
 
 ## `langwatch/empty-catch`
@@ -363,8 +363,8 @@ Options: none.
 Messages:
 
 - `filename`
-  - what: Rename `{{name}}` to `<subject>.<artifact>.ts` in lower kebab case, e.g. `trace-search.service.ts`.
-  - fix: Allowed artifacts: {{artifacts}}.
+  - what: `{{name}}` is not `<subject>.<artifact>.ts` in lower kebab case.
+  - fix: Rename it after the subject and the artifact, e.g. `trace-search.service.ts`; the artifacts are {{artifacts}}.
 
 ## `langwatch/feature-source-layout`
 
@@ -789,7 +789,7 @@ Messages:
 
 - `handWrittenRefusal`
   - what: A refusal is written as a status and a body ({{shape}}).
-  - fix: Throw a `HandledError` with a stable code and let the boundary render it
+  - fix: Throw a `HandledError` with a stable code and let the boundary render it, and give that code an entry in `packages/handled-error/src/presentation.ts` so the customer reads words instead of the slug.
   - why: Nothing hand-rendered reaches the error boundary, so the answer carries no code: the client presentation registry has nothing to key the customer's words on, and a test can only assert prose that will change.
 
 ## `langwatch/repository-takes-only-its-store`

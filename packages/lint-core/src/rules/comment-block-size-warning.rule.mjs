@@ -1,5 +1,6 @@
 import {
-  COMMENT_BLOCK_SIZE_MESSAGE,
+  COMMENT_BLOCK_SIZE_FIX,
+  COMMENT_BLOCK_SIZE_WHAT,
   MAX_COMMENT_BLOCK_LINES,
 } from "../../grammar/comment-block-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
@@ -20,8 +21,8 @@ export const commentBlockSizeWarningRule = defineRule({
   kind: "style",
   messages: {
     commentBlockSize: {
-      what: COMMENT_BLOCK_SIZE_MESSAGE,
-      fix: "",
+      what: COMMENT_BLOCK_SIZE_WHAT,
+      fix: COMMENT_BLOCK_SIZE_FIX,
     },
   },
   create(context, file) {
