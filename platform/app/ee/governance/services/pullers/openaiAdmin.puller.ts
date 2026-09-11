@@ -595,8 +595,9 @@ function mustBankRefusal({
 }
 
 /**
- * One page, read or refused. `banked` says whether the refusal arrived with
- * earlier pages of the same run already read — see `mustBankRefusal`.
+ * One page, read or refused. `hasBankedProgress` says whether the refusal
+ * arrived with earlier pages of the same run already read — see
+ * `mustBankRefusal`.
  */
 type PageRead =
   | {
@@ -606,7 +607,7 @@ type PageRead =
       watermark: string | null;
       hasKeyGrouping: boolean;
     }
-  | { ok: false; banked: boolean };
+  | { ok: false; hasBankedProgress: boolean };
 
 /**
  * What a run returns when a page could not be read.
@@ -624,17 +625,17 @@ type PageRead =
  * page three again, for as long as the window needed more than one page.
  */
 function pageUnread({
-  banked,
+  hasBankedProgress,
   events,
   stoppedShort,
   incomingCursor,
 }: {
-  banked: boolean;
+  hasBankedProgress: boolean;
   events: NormalizedPullEvent[];
   stoppedShort: () => PullResult;
   incomingCursor: string | null;
 }): PullResult {
-  if (banked)
+  if (hasBankedProgress)
     return { ...stoppedShort(), errorCount: 1, unreadPage: true as const };
   return { events, cursor: incomingCursor, errorCount: 1 };
 }
@@ -646,12 +647,12 @@ function pageUnread({
 function logPageUnread({
   adapter,
   pageCount,
-  banked,
+  hasBankedProgress,
   error,
 }: {
   adapter: string;
   pageCount: number;
-  banked: boolean;
+  hasBankedProgress: boolean;
   error: unknown;
 }): void {
   logger.error(
@@ -660,7 +661,7 @@ function logPageUnread({
       pageCount,
       error: error instanceof Error ? error.message : String(error),
     },
-    banked
+    hasBankedProgress
       ? "openai admin page refused mid-window; keeping the pages already read and resuming at the refused one"
       : "openai admin fetch failed; leaving the cursor where it was",
   );
@@ -748,7 +749,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         // window for a retry when it read none. Never returns a partial window
         // as if it were complete.
         return pageUnread({
-          banked: read.banked,
+          hasBankedProgress: read.hasBankedProgress,
           events,
           stoppedShort,
           incomingCursor: options.cursor,
@@ -790,9 +791,9 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
    *
    * A transport failure is a returned `ok: false` rather than a throw, because
    * the caller has to answer it by deciding what the window is worth — which is
-   * why the failure carries `banked`. A malformed response still throws: a
-   * shape we do not recognise is not a window to retry, it is a contract that
-   * moved.
+   * why the failure carries `hasBankedProgress`. A malformed response still
+   * throws: a shape we do not recognise is not a window to retry, it is a
+   * contract that moved.
    */
   private async readPage({
     startingAt,
@@ -817,14 +818,15 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         options,
       });
     } catch (error) {
-      const banked = mustBankRefusal({ error, pageCount });
+      const hasBankedProgress = mustBankRefusal({ error, pageCount });
       // Let the durable outbox retain Retry-After instead of losing it in
       // errorCount — unless the pages already read are worth more than the wait.
-      if (!banked && error instanceof DispatchError) throw error;
-      logPageUnread({ adapter: this.id, pageCount, banked, error });
-      return { ok: false, banked };
+      if (!hasBankedProgress && error instanceof DispatchError) throw error;
+      logPageUnread({ adapter: this.id, pageCount, hasBankedProgress, error });
+      return { ok: false, hasBankedProgress };
     }
-    if (fetched === null) return { ok: false, banked: pageCount > 0 };
+    if (fetched === null)
+      return { ok: false, hasBankedProgress: pageCount > 0 };
     const usedKeyGrouping = fetched.hasKeyGrouping;
 
     const parsed = pageSchema.parse(fetched.body);
