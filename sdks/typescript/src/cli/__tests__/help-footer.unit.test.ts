@@ -30,11 +30,11 @@ function helpOutput(program: Command): string {
   return out;
 }
 
-/** First word of each line in the footer section, until the blank line. */
-function footerEntries(help: string): string[] {
+/** First word of each line in a named footer section, until the blank line. */
+function footerEntries(help: string, section = "Coding assistants:"): string[] {
   const lines = help.split("\n");
-  const start = lines.findIndex((l) => l.trim() === "Coding assistants:");
-  expect(start, "the Coding assistants footer section is missing").toBeGreaterThan(-1);
+  const start = lines.findIndex((l) => l.trim() === section);
+  expect(start, `the ${section} footer section is missing`).toBeGreaterThan(-1);
   const entries: string[] = [];
   for (const line of lines.slice(start + 1)) {
     if (line.trim() === "") break;
@@ -60,11 +60,20 @@ describe("the coding-assistants help footer", () => {
     ]);
   });
 
+  it("lists the local-model launcher in its own section", () => {
+    const help = helpOutput(buildProgram());
+
+    // `ollama` runs a local model server, not a coding assistant, and the
+    // one thing a reader of --help must not conclude is that wrapping it
+    // routes anything through the gateway.
+    expect(footerEntries(help, "Local models:")).toEqual(["ollama"]);
+  });
+
   it("names only registered commands, every one of them hidden", () => {
     const program = buildProgram();
     const help = helpOutput(program);
 
-    for (const name of footerEntries(help)) {
+    for (const name of [...footerEntries(help), ...footerEntries(help, "Local models:")]) {
       const cmd = program.commands.find((c) => c.name() === name);
       expect(cmd, `the footer names '${name}' but no such command is registered`).toBeDefined();
       // Hidden keeps the command out of commander's own Commands section,

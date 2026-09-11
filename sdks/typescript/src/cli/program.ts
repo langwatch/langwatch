@@ -484,6 +484,25 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     });
 
   program
+    .command("ollama", { hidden: true })
+    .description(
+      "Run an `ollama` command with every model call it makes captured by LangWatch. Ollama has no telemetry settings, so the capture runs as a loopback proxy in front of the server for this command only; nothing is written to disk.",
+    )
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { ollamaCommand } = await import("./commands/ollama.js");
+        await ollamaCommand(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  program
     .command("opencode", { hidden: true })
     .description(
       "Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).",
@@ -518,6 +537,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",
       "  copilot-app     Set up capture for the standalone GitHub Copilot app",
       "  instrument      Write persistent telemetry wiring for a tool without launching it",
+      "",
+      "Local models:",
+      "  ollama          Run an `ollama` command with its model calls captured",
       "",
       "`lw` and `langwatch` are the same binary: use whichever you prefer.",
       "",

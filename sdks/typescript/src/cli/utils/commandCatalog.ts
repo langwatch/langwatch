@@ -89,6 +89,9 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "gemini",
   "opencode",
   "copilot",
+  // Local-model wrapper: `ollama` execs the ollama CLI behind a capture
+  // proxy rather than returning a LangWatch result.
+  "ollama",
   // VS Code launcher: `code` execs VS Code with Copilot Chat telemetry env,
   // returning no LangWatch result. ADR-039 §Extension #2.
   "code",
