@@ -27,10 +27,15 @@ const silentLogger = {
  * `exit` or `error` so a dead child hangs the wait until the Vitest timeout
  * instead of failing loud. Removes every listener it attached once settled.
  */
-function waitForChildMessage<T>(
-  child: ChildProcess,
-  matches: (message: T) => boolean,
-): Promise<T> {
+interface WaitForChildMessageOptions<T> {
+  child: ChildProcess;
+  matches: (message: T) => boolean;
+}
+
+function waitForChildMessage<T>({
+  child,
+  matches,
+}: WaitForChildMessageOptions<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const onMessage = (message: T): void => {
       if (matches(message)) {
@@ -92,10 +97,10 @@ describe("voice media socket handoff to a real child process", () => {
     });
     const theChild = child;
 
-    await waitForChildMessage<{ ready?: boolean }>(
-      theChild,
-      (msg) => !!msg.ready,
-    );
+    await waitForChildMessage<{ ready?: boolean }>({
+      child: theChild,
+      matches: (msg) => !!msg.ready,
+    });
 
     const registry = new VoiceNonceRegistry();
     listener = await bootVoiceWsListener({
@@ -111,7 +116,7 @@ describe("voice media socket handoff to a real child process", () => {
       received?: boolean;
       nonce: string;
       head: string;
-    }>(theChild, (msg) => !!msg.received);
+    }>({ child: theChild, matches: (msg) => !!msg.received });
 
     // Write the upgrade request plus extra bytes after the header block, so
     // the head buffer the child must receive is non-empty.
