@@ -9,13 +9,11 @@
  */
 
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
-import { runWithIdentityBirth } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import {
-  bornFinalizedOptIn,
   passwordResetSessionBridge,
   sessionCallbackEvidence,
   sessionRevocation,
@@ -182,21 +180,6 @@ const betterAuthCatchAll = async (c: Context) => {
     return c.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, 403);
   }
 
-  // ADR-116 §3: the born-finalized entrance's request-scoped marker, decided
-  // HERE and only here, and only once the backend allowlist check has
-  // passed.
-  //
-  // INERT AS BUILT, and deliberately left so — see ADR-116 §3 "Amendment,
-  // 2026-09-11". This arms only for POST `/sign-up/email`, and the first
-  // statement of better-auth's before hook (`refuseDirectEmailSignUp`) 404s
-  // that exact path. The marker is set, the handler is entered, the route
-  // refuses, and no birth branch runs. Do not read the branch below as a live
-  // path; the amendment records the two ways out and which is recommended. Nothing below re-decides it, and outside a marked request the
-  // entrance is never reached — which is what makes deploying it a no-op
-  // until an operator targets an organization.
-  const isBorn = await bornFinalizedOptIn().isBornFinalizedSignUp({
-    request: c.req.raw,
-  });
   // BetterAuth's auth.handler is fetch-compatible (Request => Response). The
   // marker only changes which BRANCH the writes inside it take; the answer
   // that comes back is the same shape either way, and is translated the same
@@ -219,9 +202,7 @@ const betterAuthCatchAll = async (c: Context) => {
   // reset path: it is a per-request slot that costs nothing empty, and the
   // path check belongs to the hook that reads it, not to the route.
   const response = await sessionCallbackEvidence().runWithScope(() =>
-    passwordResetSessionBridge().runWithScope(() =>
-      isBorn ? runWithIdentityBirth(handle) : handle(),
-    ),
+    passwordResetSessionBridge().runWithScope(handle),
   );
   // better-auth's refusals speak its own vocabulary, which is neither a
   // registered code nor copy anybody wrote for a customer. This is where the

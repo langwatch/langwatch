@@ -62,8 +62,10 @@ export interface PasswordResetSessionBridgeDeps {
  * out a single instance, so the `run` that opens it and the `read` that
  * empties it are the same storage.
  *
- * The scope is opened by the route (`routes/auth.ts`), the same way the
- * born-finalized entrance's marker is — one place, around the whole handler.
+ * The scope is opened by the route (`routes/auth.ts`) in one place, around
+ * the whole handler, rather than on the reset path alone: it is a per-request
+ * slot that costs nothing empty, and the path check belongs to the hook that
+ * reads it.
  */
 export class PasswordResetSessionBridge {
   private readonly scope = new AsyncLocalStorage<PasswordResetScope>();

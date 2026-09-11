@@ -40,7 +40,6 @@ import {
 } from "@langwatch/identity-server";
 import type { IdentityAccountCeremonies } from "@langwatch/identity-server/better-auth";
 import {
-  birthAwareGate,
   bridgeAccountCeremonies,
   createIdentityStorageAdapter,
   IdentityAccountWriter,
@@ -57,10 +56,6 @@ import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { changeAuth0Password } from "../../auth0/passwordService";
-import {
-  BORN_FINALIZED_SIGNUP_FLAG,
-  BornFinalizedOptIn,
-} from "../../better-auth/bornFinalizedOptIn";
 import type { SecondaryStorageDeps } from "../../better-auth/config/secondary-storage";
 import { LastWayInGuard } from "../../better-auth/last-way-in";
 import { PasskeySignUpRegistration } from "../../better-auth/passkey-signup";
@@ -78,8 +73,8 @@ import { grantsLedgerWriter } from "../authz/ledger";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { AccountIdentifiersService } from "./account-identifiers.service";
 import { buildAddressConfirmationUrl } from "./address-confirmation-link";
+import { IdentityAddressLockReaperService } from "./address-lock-reaper";
 import { BetterAuthInstanceHandle } from "./better-auth-instance.adapter";
-import { IdentityBirthService } from "./birth";
 import { LocalDoorBreakGlassBinding } from "./break-glass-binding";
 import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
 import { IdentitySsoConnectionGrandfatherMigration } from "./connection-grandfather.migration";
@@ -102,7 +97,6 @@ import { JoinRequestsService } from "./join-requests.service";
 import { LastWayInService } from "./last-way-in.service";
 import { IdentityLedgerWriter } from "./ledger";
 import { MfaLedgerWriter } from "./mfa-ledger";
-import { IdentityNewbornReconciliationService } from "./newborn-reconciliation";
 import { OrganizationMfaService } from "./organization-mfa.service";
 import {
   EmailOrganizationMfaNotifier,
@@ -119,7 +113,6 @@ import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfi
 import { EventLogIdentityRepository } from "./repositories/identity-event-log.repository";
 import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.prisma.repository";
 import { PrismaIdentityLookupRepository } from "./repositories/identity-lookup.prisma.repository";
-import { PrismaIdentityNewbornRepository } from "./repositories/identity-newborn.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
 import { PrismaIdentityReservationRepository } from "./repositories/identity-reservations.prisma.repository";
 import { PrismaIdentityResolutionRepository } from "./repositories/identity-resolution.prisma.repository";
@@ -177,11 +170,7 @@ import { SsoConnectionLedgerWriter } from "./sso-connection-ledger";
 import { PrismaTwoStepAccount } from "./two-step-account.adapter";
 import { TwoStepVerificationService } from "./two-step-verification.service";
 import { BetterAuthTwoStepProtocol } from "./two-step-verification-adapters";
-import {
-  forgetIdentityWriteGate,
-  isAnyoneOnIdentityWrites,
-  isUserOnIdentityWrites,
-} from "./write-gate";
+import { isAnyoneOnIdentityWrites, isUserOnIdentityWrites } from "./write-gate";
 
 /**
  * The method-set policy, re-stated on the runtime because the runtime is the
@@ -199,9 +188,7 @@ const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
 const identityAccounts = new PrismaIdentityAccountsRepository(prisma);
 const identityResolution = new PrismaIdentityResolutionRepository(prisma);
-const identityNewborns = new PrismaIdentityNewbornRepository(prisma);
-/** The address lock (ADR-116 §6): one constraint, contended by the guards and
- *  the born-finalized entrance alike. */
+/** The address lock (ADR-116 §6): the one constraint the guards contend on. */
 const identityReservations = new PrismaIdentityReservationRepository(prisma);
 const migrationState = new PrismaSystemMigrationStateRepository(prisma);
 
@@ -220,11 +207,11 @@ export function isAnyoneLatched(): Promise<boolean> {
 }
 
 /**
- * The write fork the storage adapter uses, birth-aware — and therefore the
- * one question the `databaseHooks` bridge has to ask before it states an
- * attach the adapter is about to state as well (ADR-116 §5).
+ * The write fork the storage adapter uses — and therefore the one question
+ * the `databaseHooks` bridge has to ask before it states an attach the
+ * adapter is about to state as well (ADR-116 §5).
  */
-export const routesToIdentityBranch = birthAwareGate(isLatched);
+export const routesToIdentityBranch = isLatched;
 
 /**
  * The read fork for `User.email`. A module-level singleton rather than a
@@ -371,12 +358,9 @@ export function identityCeremonies(): IdentityCeremonies {
     identityHeads,
     identityUsers,
     identityService(),
-    // The ceremonies fork on the SAME question the storage adapter does, so
-    // they take the same birth-aware gate (ADR-116 §3). A newborn whose
-    // adapter routed to the identity branch while their ceremony declined
-    // would end up with a legacy `Account` row anyway, which is exactly what
-    // the entrance exists to prevent.
-    birthAwareGate(isLatched),
+    // The ceremonies fork on the SAME question the storage adapter does,
+    // so they take the same gate (ADR-116 §5).
+    isLatched,
     { now: Date.now, newCommandId: newIdentityCommandId },
   );
 }
@@ -394,25 +378,6 @@ export function identityBridgeCeremonies(): Pick<
   return bridgeAccountCeremonies({
     ceremonies: identityCeremonies(),
     routesToIdentity: routesToIdentityBranch,
-  });
-}
-
-/**
- * ADR-116 §3's born-finalized entrance. Composed per call like every other
- * identity write surface, because the ledger writer it sequences resolves
- * the pipeline handle lazily — better-auth builds its adapter at module
- * load, before any App exists.
- */
-export function identityBirth(): IdentityBirthService {
-  return new IdentityBirthService({
-    guards: identityGuards(),
-    ledger: new IdentityLedgerWriter({
-      projectionStore: identityProjectionStore(),
-      heads: identityHeads,
-    }),
-    rows: identityNewborns,
-    reservations: identityReservations,
-    forgetGate: forgetIdentityWriteGate,
   });
 }
 
@@ -895,13 +860,11 @@ export function signUpVerification(): SignUpVerificationService {
 }
 
 /**
- * The sweep that removes abandoned newborn streams — a required companion to
- * the entrance, not optional hygiene (ADR-116 §3).
+ * The reap that releases address locks no live identifier backs — a required
+ * companion to the lock, not optional hygiene (ADR-116 §6).
  */
-export function identityNewbornReconciliation(): IdentityNewbornReconciliationService {
-  return new IdentityNewbornReconciliationService({
-    newborns: identityNewborns,
-    identity: identityService(),
+export function identityAddressLockReaper(): IdentityAddressLockReaperService {
+  return new IdentityAddressLockReaperService({
     reservations: identityReservations,
   });
 }
@@ -930,7 +893,6 @@ const identityStorage = createIdentityStorageAdapter({
   ceremonies: identityCeremonies(),
   isUserOnIdentityWrites: isLatched,
   isAnyoneOnIdentityWrites: isAnyoneLatched,
-  birth: identityBirth(),
 });
 
 export function identityStorageAdapter(): AdapterFactory<BetterAuthOptions> {
@@ -1017,24 +979,6 @@ export function passkeySignUp(): PasskeySignUpRegistration {
         signUpVerification().validateAddressProof({ token, email }),
       claimAddressProof: ({ token, email }) =>
         signUpVerification().claimAddressProof({ token, email }),
-    },
-  });
-}
-
-/** ADR-116 §3's born-finalized entrance, and the allowlist in front of it. */
-export function bornFinalizedOptIn(): BornFinalizedOptIn {
-  return new BornFinalizedOptIn({
-    organizations: new PrismaLegacySsoOrganizationRepository(prisma),
-    flag: {
-      isEnabled: ({ distinctId, organizationId }) =>
-        featureFlagService.isEnabled(BORN_FINALIZED_SIGNUP_FLAG, {
-          distinctId,
-          defaultValue: false,
-          // Sign-up time: the person has no project yet, and an organization
-          // only when their email domain matches one.
-          projectId: NOT_TARGETED,
-          organizationId: organizationId ?? NOT_TARGETED,
-        }),
     },
   });
 }

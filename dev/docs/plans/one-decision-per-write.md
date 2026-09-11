@@ -141,13 +141,15 @@ log never gets the event — the address lock then holds forever.
 
 Two corrections to what this stage claimed:
 
-- **The born-finalized entrance never used provisional heads.** It calls the
-  guard, stages, commits the newborn rows and awaits the fold directly, bypassing
-  `commit` by design — `writeProvisionalHeads` lives only inside
-  `IdentityLedgerWriter.commit`. Its ordering guarantee (stage before rows, so an
-  unavailable engine fails the sign-up before any row exists) does not depend on
-  them. A1 makes this entrance *simpler*: the await-the-fold leg is deleted
-  outright, and the "nothing after leg two may fail" rule becomes vacuous.
+- **The born-finalized entrance is gone (2026-09-11), which removes this
+  question rather than answering it.** It was the one caller that bypassed
+  `commit` — calling the guard, staging, committing rows and awaiting the fold
+  directly — so it was also the one dispatch shape an outcome channel would
+  have had to serve on top of the ordinary one. It never used provisional heads
+  (`writeProvisionalHeads` lives only inside `IdentityLedgerWriter.commit`), and
+  it never executed at all: it armed only for a route that 404s. Retired in
+  ADR-116 §3; `stage`/`awaitFold` are private again and every ceremony goes
+  through `commit`. Design the channel against that single path.
 - **`/auth/join` is the surface that breaks first.** `verifiedEmailsOf` answers
   `[]` rather than `null` for a finalized user with empty heads, so the legacy
   `User.email` fallback is skipped and the join lookup says `{outcome: "none"}`

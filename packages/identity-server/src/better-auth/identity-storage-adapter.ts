@@ -23,13 +23,6 @@ import {
   providerIdFromIssuer,
 } from "./account-queries";
 import type { IdentityAccountCeremonies } from "./ceremony-types";
-import {
-  anyBornInThisRequest,
-  birthAwareGate,
-  currentIdentityBirth,
-  type IdentityBirthPort,
-  recordIdentityBirth,
-} from "./identity-birth";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
@@ -147,12 +140,6 @@ export interface IdentityStorageAdapterDeps {
    * does.
    */
   isAnyoneOnIdentityWrites: () => Promise<boolean>;
-  /**
-   * ADR-116 §3's entrance, reached only inside a request the auth route
-   * boundary marked. Outside one this is never called, which is what keeps a
-   * deploy of the entrance from changing anything on its own.
-   */
-  birth: IdentityBirthPort;
 }
 
 export type PasskeyRemovalOutcome =
@@ -250,32 +237,21 @@ function identityCustomAdapter({
   ceremonies,
   isUserOnIdentityWrites,
   isAnyoneOnIdentityWrites,
-  birth,
 }: Omit<IdentityStorageAdapterDeps, "legacyEngine"> & {
   legacy: DBAdapter;
 }): AdapterFactoryCustomizeAdapterCreator {
   return ({ getDefaultModelName, getDefaultFieldName, getFieldName }) => {
     const modelOf = (model: string): string => getDefaultModelName(model);
 
-    /**
-     * The write fork, as every routed write asks it (ADR-116 §2, §3).
-     *
-     * The gate, plus the answer it cannot give for a user this request just
-     * bore: their state row says `finalized`, but the gate reads it on
-     * another connection behind a TTL cache that answered before they
-     * existed. Wrapped HERE as well as at the composition root, so an
-     * application that composes the adapter without wrapping still cannot
-     * route a newborn's account write to the legacy table.
-     */
-    const routesToIdentity = birthAwareGate(isUserOnIdentityWrites);
+    /** The write fork, as every routed write asks it (ADR-116 §2). */
+    const routesToIdentity = isUserOnIdentityWrites;
     const accountWriter = IdentityAccountWriter.create({
       accounts,
       ceremonies,
     });
 
     /** The same fork asked of the fleet, for a query that names nobody. */
-    const anyoneRoutesToIdentity = async (): Promise<boolean> =>
-      anyBornInThisRequest() || (await isAnyoneOnIdentityWrites());
+    const anyoneRoutesToIdentity = isAnyoneOnIdentityWrites;
 
     const toCanonicalKeys = (model: string, data: Row): Row =>
       Object.fromEntries(
@@ -679,41 +655,6 @@ function identityCustomAdapter({
     };
 
     /**
-     * A `user` create inside a marked request: the born-finalized entrance
-     * (ADR-116 §3), or nothing at all.
-     *
-     * Only a create that carries an email is a birth. better-auth's own
-     * sign-up always does; anything else — a plugin minting a placeholder
-     * user, an anonymous session — has no address to derive an identifier
-     * from and takes the legacy branch, marker or not.
-     */
-    const bearOnIdentityBranch = async (
-      canonical: Row,
-    ): Promise<Row | null> => {
-      if (currentIdentityBirth() === undefined) return null;
-      const { email, createdAt } = canonical;
-      if (typeof email !== "string" || email.length === 0) {
-        logger.warn(
-          { model: "user" },
-          "a flagged request created a user with no email; the born-finalized entrance has no identifier to state, so the create takes the legacy branch",
-        );
-        return null;
-      }
-      const born = await birth.bear({
-        row: canonical,
-        email,
-        createdAtMs:
-          createdAt instanceof Date ? createdAt.getTime() : Date.now(),
-      });
-      // From here the request's remaining routed writes are this user's, and
-      // the gate — which cannot see a state row written moments ago on
-      // another connection — is answered by the marker instead.
-      const bornId = born.id;
-      if (typeof bornId === "string") recordIdentityBirth({ userId: bornId });
-      return born;
-    };
-
-    /**
      * A `user` update on the identity branch, with `email` taken out of it
      * (ADR-116 §6) — or the update exactly as it arrived.
      *
@@ -912,10 +853,6 @@ function identityCustomAdapter({
     const adapter: CustomAdapter = {
       create: async ({ model, data, select }) => {
         const canonical = toCanonicalKeys(model, data);
-        if (modelOf(model) === "user") {
-          const born = await bearOnIdentityBranch(canonical);
-          if (born) return toStorageKeys(model, { ...born }) as never;
-        }
         if (modelOf(model) === "account") {
           const userId = canonical.userId;
           if (

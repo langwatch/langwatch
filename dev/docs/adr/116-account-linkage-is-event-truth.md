@@ -111,8 +111,8 @@ delegate to the stock logic, because they act only on unrouted models.
 application already runs: the stock adapter is configured with `transaction`
 unset, which is an as-is passthrough with no real transaction. The identity
 adapter preserves that passthrough exactly and invents no cross-branch
-transactional promise. The Postgres transaction in §3 is the adapter's own,
-inside its create path — not better-auth's.
+transactional promise. (§3's entrance opened a Postgres transaction of its
+own inside the create path — never better-auth's — and retired with it.)
 
 The legacy branch reuses better-auth's own published Prisma logic rather
 than a re-implementation, so an unlatched user's behaviour is byte-for-byte
@@ -170,161 +170,75 @@ values and does nothing else; `Identifier` values are D01-normalized
 plus-addressed sign-in that works today keeps working the moment its user
 latches. Without it, a working sign-in goes dark at latch.
 
-### 3. Born finalized: how a new user starts on the identity branch
+### 3. Born finalized: RETIRED, 2026-09-11
 
-A flagged sign-up (the opt-in sign-in page → backend feature-flag check, per
-organization/allowlist) sets a request-scoped marker at the auth route
-boundary (AsyncLocalStorage).
+**This section described a mechanism that no longer exists.** It is kept as a
+heading rather than deleted because §4's phase table and several other
+sections refer to it, and because the reason it was retired is worth more
+than the design it replaced.
 
-The reach of that boundary is narrower than it looks today, and saying so is
-part of the decision: the product's own sign-up posts to the tRPC
-`user.register` procedure, which writes the `User` row through Prisma and
-never calls `auth.api.signUpEmail`, so it does not pass the entrance at all.
-The entrance is reachable only by a client calling better-auth's sign-up route
-directly. Routing `user.register` through `auth.api.signUpEmail` is future
-work, and it is a precondition of the general rollout this entrance is
-hardened for.
+**What it was.** A flagged sign-up set a request-scoped marker at the auth
+route boundary; the storage adapter read that marker and ran a birth sequence
+— stage the facts, write the `User` row and a `finalized` migration-state row
+in one Postgres transaction, then wait for the fold — so a brand-new user's
+FIRST write landed on the identity branch instead of on the legacy branch they
+would then have to be migrated off.
 
-**The marker governs every routed write in that request**, not only the
-`user` create. better-auth creates the user and then, in the same request,
-the credential account; that second write is routed by the gate, and the
-gate cannot see the newborn's state row — it reads on a separate connection
-under READ COMMITTED, and `write-gate.ts`'s anyone-finalized short-circuit
-caches `false` fleet-wide for its TTL before the first finalized user
-exists. So while the marker is set, the adapter routes the newborn's `user`
-and `account` writes to the identity branch and treats the gate as open for
-that user, seeding the per-user cache when the rows commit.
+**Why it was retired rather than re-pointed.** It could not execute on any
+tier. It armed in exactly one place, for a `POST` whose path ends
+`/sign-up/email`, and the first statement of better-auth's `before` hook is
+`refuseDirectEmailSignUp`, which 404s that exact path with no exemption.
+`ssoRouteTableCanary` asserts that 404, including in email mode — the one tier
+where a local sign-up is the real door. Both halves were deliberate, both were
+tested, and nothing tested the composition, which is how they came to
+contradict each other quietly.
 
-The ClickHouse append and the Postgres writes share no transaction, and
-ADR-101's queue-only rule bars folding in-request. The entrance is therefore
-an **idempotent sequence with retries**, not an atomic ceremony.
+Re-pointing it at `CredentialAccountService.openCredentialAccount` — the real
+local door — was considered and rejected on two grounds:
 
-Ids are minted once per sign-up and reused by every retry: the `commandId`
-is the event store's idempotency key (D01 — a retried command dedupes rather
-than appending twice), the identifier id is deterministic (D01), and the
-newborn's user id is pinned to the flow.
+1. **The async path is load-bearing on every door anyway.** A social or SSO
+   newborn arrives inside an OAuth callback with no address in the body to
+   evaluate a flag against, so the entrance could never reach them; they are
+   adopted by the backfill. And `sign-up-identifier.ts` makes the credential
+   door's own identifier attach deliberately best-effort — a staging failure is
+   logged and the backfill adopts the user on its next pass. Adoption can never
+   be retired, so the entrance was a synchronous optimisation on a path that
+   has to be correct regardless.
+2. **It would have put two contradictory availability postures on one door.**
+   The birth sequence failed a sign-up loudly when the engine was down; the
+   sibling fact-statement beside it logs the same failure and carries on.
 
-Before any leg runs, the entrance **claims** the newborn's tenant: its
-migration-state row is written at `migrated`, carrying a born report. Only
-`finalized` opens the write gate, so the claim grants nothing; what it
-leaves behind is a handle, and the residual below is what needs one. The
-legs, in order:
+**What the entrance was still worth** was only the `finalized` migration-state
+row, so the user never needed adopting. `openCredentialAccount` already states
+the credential identifier fact at birth, so the aggregate learns about every
+new user either way.
 
-1. the **idempotent attach command, staged** onto the per-user queue. The
-   queued run is the sole appender (ADR-110's shape: appending on the calling
-   path as well and staging afterwards writes every fact twice, because the
-   staged run re-executes the guard against heads the fold has not advanced
-   yet). Staging is what fails loudly when the engine is unavailable, and it
-   happens before any row exists on either branch;
-2. **one Postgres transaction** over the row writes the entrance itself
-   performs — the user row and the `finalized` migration-state row. These
-   *can* share a transaction: they are one store;
-3. the **bounded wait** on the fold. The fold skips harmlessly and retries
-   while the user row is not yet visible.
+**What went.** `BornFinalizedOptIn`, `IdentityBirthService`, the `birth` dep on
+the storage adapter, `runWithIdentityBirth` and the rest of the request-scoped
+marker, `birthAwareGate`, `deriveNewbornUserId`, the newborn claim repository,
+`forgetIdentityWriteGate`, the `release_identity_born_finalized_signup` flag,
+and the `identity_engine_unavailable` error code — which had no other raiser.
+The identity ledger's two legs were public so the entrance could interleave row
+writes between them; they are private again and every ceremony goes through
+`commit`.
 
-Nothing after leg two may fail the sign-up. Once the transaction commits, the
-user exists and is `finalized`; a throw from the observation that follows
-would leave a user nothing owns, since the runner skips terminal tenants and
-the sweep hunts claims with no user row behind them.
+**What was deliberately KEPT, and nearly went with it.** The address lock
+(§6) and its reap. The retirement brief listed the reconciliation sweep for
+deletion, but the sweep had two halves and only one belonged to the entrance:
+`IdentityGuards` claims the lock on the live verify and primary paths, and
+`reapOrphans` releases any lock no live identifier backs — not only a
+newborn's. Deleting it would have left every abandoned verification ceremony
+holding an address nobody could ever register again. The sweep was narrowed to
+`IdentityAddressLockReaperService` and still runs on the migration pass's
+cadence.
 
-The pinned user id is a convergence key for a RETRY of one birth, never a
-claim on a user who already exists. Normalization strips plus-tags, so
-`sam+x@acme.com` derives the id `sam@acme.com` was born under; adopting
-whatever row stands at that id would hand the second signer a session as the
-first. An occupied pinned id is refused with `identity_email_in_use` before
-any fact is stated.
-
-The `AccountCredential` row sits outside that transaction, and better-auth
-is what puts it there. `signUpEmail` runs `createUser` and then
-`linkAccount`, with `databaseHooks.user.create.after` firing between them —
-and this application's after-create hook writes rows that FK the user. The
-user row therefore cannot be deferred past its own create to join a later
-transaction, so the credential row is written by the account create that
-follows, on the identity branch, routed there by the marker. Both rows
-exist when sign-up returns, which is what the spec pins.
-
-If any leg fails, the sign-up fails and the retry re-executes **every** leg.
-Already-done legs are no-ops — the append dedupes on the command id, the row
-writes are keyed by ids already pinned — so a leg written more than once is
-absorbed by idempotency and the sequence converges instead of duplicating.
-
-The residual, named plainly: a sign-up abandoned between the append and the
-row commit leaves facts under a tenant that never gained a user row. Nothing
-serves them — the fold declines to project a user that does not exist, and
-resolution reads resolve nothing — and a **reconciliation sweep removes
-orphaned newborn streams**. That sweep is a required companion to this
-entrance, not optional hygiene, and the claim is what it hunts by: the event
-store exposes no aggregate enumeration, and an entrance that dies before the
-row commit staged no fold either — so without the claim the orphan would
-leave nothing anything could find it by.
-
-This deliberately re-couples flagged sign-up to engine availability — the
-coupling the authz programme removed ("born-on-engine"). It is accepted
-here because it is scoped: only flag-listed organizations can hit it, and a
-flagged sign-up **fails loudly** (`identity_engine_unavailable`, a
-`HandledError` with `fault: "platform"`) and is retried when the engine is
-down, rather than silently falling back to the legacy branch — a test user
-quietly born on the old path would poison the very rollout the flag exists
-to test. Before general rollout, this entrance is the thing to harden.
-
-#### Amendment, 2026-09-11: the entrance is attached to a sealed door
-
-**As built, this entrance cannot execute on any tier.** It is armed in exactly
-one place — `routes/auth.ts`, for a `POST` whose path ends `/sign-up/email` —
-and the first statement of the better-auth `before` hook is
-`refuseDirectEmailSignUp`, which throws `NOT_FOUND` for that exact path with no
-exemption. `ssoRouteTableCanary` asserts that 404. So the marker is set, the
-handler is entered, and the route 404s before any birth branch runs.
-
-Both halves are deliberate and both are tested, which is why neither test
-fails: one asserts the flag arms, the other asserts the route is sealed, and
-nothing asserts that arming it reaches anything. The seal is right — local
-account creation belongs to `user.register`, which writes the pending
-confirmation latch and sends its continuation email, and better-auth's raw
-route would create an account with no supported way to request that proof.
-
-`signupConfirmationPending` in `config/database-hooks.ts` is unreachable for
-the same reason: its branch is keyed on the same 404'd path.
-
-**What this means in practice.** No user is born on the identity branch. Every
-user arrives by backfill adoption, which is the path that works and is tested.
-The `release_identity_born_finalized_signup` flag changes nothing when flipped:
-an operator targeting an organization gets no behaviour change and no error.
-`IdentityNewbornReconciliationService` runs every migration pass hunting claims
-that the entrance is the only producer of, and therefore finds nothing.
-
-**What the entrance is actually still for.** Less than the machinery suggests.
-`CredentialAccountService.openCredentialAccount` — the single writer both local
-sign-up doors share — already states the credential identifier fact, so the
-identity aggregate already learns about every new user at birth. What born
-finalized adds on top is only the finalized migration-state row, so the user
-never needs adopting.
-
-**Why it cannot simply be re-pointed at the real door.** Finalizing a user
-makes the identity branch their truth. Do that before the fold lands and the
-projection is still empty, so the branch answers "no identifiers" for an
-account that has them — the "not yet versus nothing" hazard
-[ADR-135](135-a-write-states-its-facts-once.md) names, and the reason `birth.ts`
-sequences stage, then rows, then observe rather than writing rows first. Moving
-the entrance means restructuring the live sign-up path, not moving a call.
-
-**The choice this now needs**, which is deliberately left open here rather than
-decided in a pull request that is already large:
-
-1. **Re-point it** at `openCredentialAccount`, running the birth sequence there
-   so a flagged sign-up is finalized at birth with the ordering guarantee
-   intact. Real work on the highest-risk path in the product.
-2. **Retire it.** Delete `BornFinalizedOptIn`, `IdentityBirthService`, the
-   `birth` dep on the storage adapter, `runWithIdentityBirth`, the birth half of
-   `birthAwareGate` and the newborn sweep. Nothing that works today is lost —
-   adoption by backfill is what every user already does — and roughly a
-   thousand lines of unreachable code that reads as active stop inviting the
-   assumption that new users start on the identity branch.
-
-ADR-135 already withdraws this entrance's provisional identifier heads, so the
-design is in flux either way. Option 2 is the recommendation on the evidence:
-the entrance's distinctive value was making a newborn's FIRST write land on the
-identity branch, and the ordinary attach path now states that fact anyway.
+**Nothing is left behind in the schema.** The newborn claim was never a table
+of its own: it was a `SystemMigrationTenantState` row under the identifier
+backfill's migration name, carrying a `"born"` report kind, which is what made
+an abandoned entrance findable when the event store enumerates no aggregates.
+It went with the repository that wrote it, and since the entrance never
+executed on any tier, no such row was ever written. No model, no migration, and
+nothing to drop.
 
 ### 4. Phases, and what retires when
 
@@ -569,11 +483,10 @@ ClickHouse mutation, the `userHashKey` shred, the value wipes.
   are served from the table that models them.
 - **One adapter, forever, that we maintain.** The upgrade coupling in §7 is
   the price, paid deliberately, with loud-failure and end-to-end nets.
-- **Flagged sign-ups are an idempotent sequence, not an atomic one.** Scoped
-  to the allowlist; a failed leg fails the sign-up and the retry converges
-  on the pinned ids; engine-down fails loudly
-  (`identity_engine_unavailable`) rather than falling back; hardened before
-  general rollout (§3).
+- **New users are adopted, not born, on the identity branch.** §3's
+  entrance was retired on 2026-09-11 without ever having executed; every user
+  reaches the branch through the backfill, which is the path that works and is
+  tested.
 - **Replay restores linkage, not secrets.** Replay rebuilds `Identifier`
   whole; `AccountCredential` is row-truth like `Session` and was never in
   replay's contract.

@@ -30,18 +30,6 @@ export {
   parseAccountQuery,
 } from "./better-auth/account-queries";
 export {
-  anyBornInThisRequest,
-  birthAwareGate,
-  currentIdentityBirth,
-  IdentityEngineUnavailableError,
-  type IdentityBirthPort,
-  type IdentityBirthScope,
-  type IdentityNewborn,
-  recordIdentityBirth,
-  runWithIdentityBirth,
-  wasBornInThisRequest,
-} from "./better-auth/identity-birth";
-export {
   bridgeAccountCeremonies,
   IdentityCeremonies,
 } from "./better-auth/identity-ceremonies";

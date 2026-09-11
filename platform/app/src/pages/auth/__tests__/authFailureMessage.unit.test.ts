@@ -51,12 +51,14 @@ describe("authFailureMessage", () => {
 
     it("renders the registry's copy for a 503 rather than the generic server-side line", () => {
       const message = authFailureMessage({
-        code: "identity_engine_unavailable",
-        message: "identity_engine_unavailable",
+        code: "identity_verification_not_settled",
+        message: "identity_verification_not_settled",
         status: 503,
       });
 
-      expect(message).toContain(registryCopy("identity_engine_unavailable"));
+      expect(message).toContain(
+        registryCopy("identity_verification_not_settled"),
+      );
       expect(message).not.toBe(
         "Something went wrong on our side. Try again in a moment.",
       );

@@ -335,11 +335,10 @@ export abstract class StagedLedgerWriter<
  * are willing to wait. All six are below.
  *
  * What is NOT here, deliberately: the identity ledger keeps its own subclass.
- * Its commit writes a newborn's provisional heads before staging and exposes
- * its two legs separately so ADR-116 §3's born-finalized entrance can put row
- * writes between them. That is a different sequence, not a different
- * configuration, and flattening it into this one would be the kind of sharing
- * that has to be undone later.
+ * Its commit writes a newborn's provisional heads before staging, so the
+ * front door can route an address while the fold is still queued. That is a
+ * different sequence, not a different configuration, and flattening it into
+ * this one would be the kind of sharing that has to be undone later.
  */
 export interface ConvergentLedgerSpec<
   TCommand extends StagedLedgerCommand & { data: { tenantId: string } },

@@ -141,6 +141,7 @@ async function seedUser({
 
 afterAll(async () => {
   await cleanupTestRows(prisma, [
+    ["accountCredential", { userId: { startsWith: namespace } }],
     ["account", { userId: { startsWith: namespace } }],
     ["user", { id: { startsWith: namespace } }],
   ]);
@@ -246,6 +247,35 @@ describe("PrismaCredentialAccountRepository.deleteLinkedAccount", () => {
           await prisma.account.count({ where: { userId: other.userId } }),
         ).toBe(2);
       });
+    });
+  });
+});
+
+describe("deleting a User", () => {
+  describe("when the user was never latched onto the identity branch", () => {
+    /** @scenario "Deleting a user reaps the credentials of an unlatched one too" */
+    it("takes their credential rows with them", async () => {
+      const userId = `${namespace}-deleted-${nanoid(5)}`;
+      await prisma.user.create({
+        data: { id: userId, email: `${userId}@example.com` },
+      });
+      await prisma.accountCredential.create({
+        data: {
+          id: `${userId}-acc`,
+          userId,
+          provider: "credential",
+          password: "hashed",
+        },
+      });
+
+      await prisma.user.delete({ where: { id: userId } });
+
+      // A password hash and provider tokens must never outlive the user, and
+      // the identity branch's own delete is not the only path that removes
+      // one.
+      expect(
+        await prisma.accountCredential.findMany({ where: { userId } }),
+      ).toEqual([]);
     });
   });
 });

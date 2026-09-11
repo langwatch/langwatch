@@ -1,14 +1,16 @@
 /**
  * @vitest-environment node
  *
- * The abandoned-newborn sweep runs on the migration pass's cadence (ADR-116
- * §3), which is what makes it a companion to the born-finalized entrance
- * rather than a class someone remembered to write.
+ * The address-lock reap runs on the migration pass's cadence (ADR-116 §6),
+ * which is what makes it a companion to the lock rather than a class someone
+ * remembered to write. `IdentityGuards` claims a lock before the fact is
+ * stated, so a ceremony that claims and then fails leaves an address nobody
+ * could ever take again.
  *
  * It is a LEG of the pass rather than a registered migration, and the reason
- * is the thing this suite pins: what the sweep hunts has no tenant a runner
- * could visit. The user tenant source enumerates `User` rows, and an abandoned
- * entrance is precisely a claim with no user row behind it — so a per-tenant
+ * is the thing this suite pins: what the reap hunts has no tenant a runner
+ * could visit. The user tenant source enumerates `User` rows, and an orphaned
+ * lock is precisely a claim no live identifier backs — so a per-tenant
  * migration would never reach one.
  *
  * Corresponds to specs/identity/identity-storage-adapter.feature.
@@ -16,12 +18,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const stubs = vi.hoisted(() => {
-  const runPass = vi.fn(async () => ({
-    examined: 0,
-    erased: 0,
-    failed: 0,
-    locksReaped: 0,
-  }));
+  const runPass = vi.fn(async () => ({ locksReaped: 0 }));
   return {
     runPass,
     prisma: {
@@ -86,7 +83,7 @@ vi.mock("../../identity/runtime", () => ({
     enrolledAutomatically: false,
     migrateTenant: vi.fn(),
   }),
-  identityNewbornReconciliation: () => ({ runPass: stubs.runPass }),
+  identityAddressLockReaper: () => ({ runPass: stubs.runPass }),
 }));
 
 import { runSystemMigrationPass } from "../runtime";
@@ -94,27 +91,22 @@ import { runSystemMigrationPass } from "../runtime";
 describe("the system migration pass", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    stubs.runPass.mockResolvedValue({
-      examined: 0,
-      erased: 0,
-      failed: 0,
-      locksReaped: 0,
-    });
+    stubs.runPass.mockResolvedValue({ locksReaped: 0 });
   });
 
   describe("when a pass runs", () => {
-    /** @scenario "The reconciliation sweep runs on every migration pass" */
-    it("sweeps abandoned newborn streams alongside the user-rooted migrations", async () => {
+    /** @scenario "The address-lock reap runs on every migration pass" */
+    it("reaps orphaned address locks alongside the user-rooted migrations", async () => {
       await runSystemMigrationPass({ redis: null });
 
       expect(stubs.runPass).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe("when the sweep itself fails", () => {
-    /** @scenario "The reconciliation sweep runs on every migration pass" */
-    it("still reports the pass, because the sweep cleans rows the pass did not write", async () => {
-      stubs.runPass.mockRejectedValueOnce(new Error("clickhouse unavailable"));
+  describe("when the reap itself fails", () => {
+    /** @scenario "The address-lock reap runs on every migration pass" */
+    it("still reports the pass, because the reap cleans rows the pass did not write", async () => {
+      stubs.runPass.mockRejectedValueOnce(new Error("database unavailable"));
 
       const summary = await runSystemMigrationPass({ redis: null });
 

@@ -130,12 +130,15 @@ function enforceGate({
 /**
  * Seals better-auth's own sign-up route.
  *
- * This is also what makes the born-finalized entrance inert: that entrance
- * arms for this exact path and nothing else, so sealing the route seals the
- * entrance. Both are deliberate, both are tested, and nothing tests the
- * composition — which is how they came to contradict each other quietly. If
- * this seal is ever lifted, re-read ADR-116 §3 "Amendment, 2026-09-11" before
- * assuming the entrance behind it still works.
+ * Local account creation belongs to `user.register`, which writes the
+ * pending-confirmation latch and sends its continuation email; better-auth's
+ * raw route would create an account with no supported way to request that
+ * proof.
+ *
+ * ADR-116 §3's born-finalized entrance armed for this exact path and nothing
+ * else, so this seal is what made it unreachable on every tier. The entrance
+ * was retired rather than re-pointed — see the amendment — and the seal is
+ * the half that was right.
  */
 function refuseDirectEmailSignUp(pathname: string): void {
   if (!pathname.endsWith("/sign-up/email")) return;
