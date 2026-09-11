@@ -55,6 +55,11 @@ import {
   type FailureEventParams,
   ScenarioFailureHandler,
 } from "./scenario-failure-handler";
+import {
+  handleVoiceNonceRegisterMessage,
+  isVoiceNonceRegisterMessage,
+} from "./voice/voice-nonce-handoff";
+import { getVoiceNonceRegistry } from "./voice/voice-nonce-registry";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -582,10 +587,18 @@ async function spawnScenarioChildProcess(
       packageRoot,
       nodeEnv: process.env.NODE_ENV,
     });
+    // A voice target's child mints its own Twilio stream nonce and must tell
+    // this parent about it before dialling (voice-nonce-handoff.ts) — that
+    // round trip needs a Node IPC channel, absent from every other target's
+    // plain pipe stdio. Scoped to voice so no other child gains a channel it
+    // has no use for.
+    const isVoiceChild = childProcessData.adapterData?.type === "voice";
     log("info", "Spawning scenario child process", { command, args });
     const child: ChildProcess = spawn(command, args, {
       env: childEnv,
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: isVoiceChild
+        ? ["pipe", "pipe", "pipe", "ipc"]
+        : ["pipe", "pipe", "pipe"],
       cwd: packageRoot,
     });
     log("info", "Child process spawned", {
@@ -595,6 +608,23 @@ async function spawnScenarioChildProcess(
 
     // Register in the pool so cancel broadcasts can find this child
     pool.registerChild(jobData.scenarioRunId, child);
+
+    // Voice-only: answer the child's nonce-registration request by writing it
+    // into THIS process's registry and acking — this process is exactly the
+    // one the voice-ws-listener reads (both boot together under
+    // VOICE_WORKER_ONLY, see worker-boot-plan.ts), so the registration and
+    // the eventual `consume()` lookup share memory by construction.
+    if (isVoiceChild) {
+      child.on("message", (message: unknown) => {
+        if (!isVoiceNonceRegisterMessage(message)) return;
+        const ack = handleVoiceNonceRegisterMessage({
+          message,
+          child,
+          registry: getVoiceNonceRegistry(),
+        });
+        child.send?.(ack);
+      });
+    }
 
     let stderr = "";
     let stdout = "";
