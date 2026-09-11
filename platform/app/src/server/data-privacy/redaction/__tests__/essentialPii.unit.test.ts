@@ -349,8 +349,8 @@ describe("redactEssentialPiiInText with exception patterns", () => {
   describe("given an exception matching only part of the detected value", () => {
     /** @scenario An exception must cover the whole detected value */
     it("redacts anyway, since exceptions must cover the whole match", () => {
-      const { text } = withExceptions("reservation 00528000043000 here", [
-        "00\\d{6}",
+      const { text } = withExceptions("reservation 4111111111111111 here", [
+        "4111\\d{4}",
       ]);
       expect(text).toBe("reservation [CREDIT_CARD] here");
     });

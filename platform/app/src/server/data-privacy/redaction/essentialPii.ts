@@ -1,5 +1,10 @@
 import { formatPiiMarker } from "@langwatch/redaction";
 import { findPhoneNumbersInText } from "libphonenumber-js";
+import { isBitcoinAddress } from "./bitcoinAddress";
+import {
+  isIdentifierShapedValue,
+  MAX_IDENTIFIER_LENGTH,
+} from "./identifierHoldout";
 
 /**
  * Native, lightweight redaction for the "essential" PII level: the pattern- and
@@ -77,6 +82,14 @@ interface Recognizer {
    * identifier holds by accident. Only these recognizers keep running on a
    * value that is exclusively one identifier-shaped token
    * (see {@link isIdentifierShapedValue}).
+   *
+   * The claim has to be TRUE, and a shape is not a proof. Both entries that
+   * claimed it on a shape alone were destroying machine identifiers at every
+   * privacy level: the bitcoin pattern matched one in sixty random hex trace
+   * ids, and the card pattern accepted any Luhn-passing digit run, which a
+   * millisecond timestamp is about one time in ten. Both now validate. Before
+   * setting this flag, ask what a random hex string has to clear to match, and
+   * if the answer is "nothing", write a validator or leave the flag off.
    */
   isSelfProving?: boolean;
 }
@@ -96,6 +109,42 @@ function luhnValid(raw: string): boolean {
     double = !double;
   }
   return sum % 10 === 0;
+}
+
+/**
+ * The issuer ranges payment cards are actually minted under: first digit 3
+ * (Amex, Diners, JCB), 4 (Visa), 5 (Mastercard, Maestro) or 6 (Discover,
+ * UnionPay, Maestro), plus Mastercard's 2221-2720 series.
+ *
+ * Deliberately generous — a range missing here means a real card number stored
+ * in the clear, so this errs towards accepting. It still excludes the whole 0,
+ * 1, 7, 8 and 9 space, which is where machine numbers live: a millisecond Unix
+ * timestamp is thirteen digits starting `17`, a nanosecond one nineteen digits
+ * starting `17`, and both passed the Luhn check often enough to be replaced
+ * with a card marker in real traffic.
+ */
+function issuedCardRange(digits: string): boolean {
+  const first = digits.charCodeAt(0) - 48;
+  if (first >= 3 && first <= 6) return true;
+  if (first !== 2) return false;
+  const series = Number(digits.slice(0, 4));
+  return series >= 2221 && series <= 2720;
+}
+
+/**
+ * Whether a digit run is a plausible payment card: a valid length, an issuer
+ * range, and the Luhn check digit.
+ *
+ * Luhn ALONE is not proof. It is a single check digit, so one random digit run
+ * in ten passes it, and the recognizer's pattern accepts a bare run of 13 to 19
+ * digits with no separator and no nearby word to confirm it. Requiring the
+ * issuer range as well is what makes the CREDIT_CARD recognizer self-proving in
+ * the sense the flag claims.
+ */
+function creditCardValid(raw: string): boolean {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 13 || digits.length > 19) return false;
+  return issuedCardRange(digits) && luhnValid(raw);
 }
 
 function ibanValid(raw: string): boolean {
@@ -164,7 +213,7 @@ const RECOGNIZERS: Recognizer[] = [
   {
     entity: "CREDIT_CARD",
     regex: /\b\d(?:[ -]?\d){12,18}\b/g,
-    validate: luhnValid,
+    validate: creditCardValid,
     isSelfProving: true,
   },
   {
@@ -173,15 +222,24 @@ const RECOGNIZERS: Recognizer[] = [
     validate: ibanValid,
     isSelfProving: true,
   },
+  // An Ethereum address is the literal `0x` followed by exactly forty hex
+  // characters. The prefix is the proof here: a trace id, a span id and a digest
+  // are bare hex, so none of them carries it, and the `requiresSubstring` gate
+  // means the pattern is not even scanned for on text without it.
   {
     entity: "CRYPTO",
     regex: /\b0x[a-fA-F0-9]{40}\b/g,
     requiresSubstring: "0x",
     isSelfProving: true,
   },
+  // Bitcoin, legacy (`1…`/`3…`) and segwit (`bc1…`). The pattern alone is a
+  // SHAPE that roughly one in sixty random 32-character hex strings fits, which
+  // is to say one in sixty OTel trace ids; `isBitcoinAddress` verifies the
+  // base58check or bech32 checksum so a match is proof rather than a guess.
   {
     entity: "CRYPTO",
     regex: /\b(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g,
+    validate: isBitcoinAddress,
     isSelfProving: true,
   },
   // Hyphenated US SSN is distinctive enough to fire without context.
@@ -280,60 +338,14 @@ interface Span {
 
 const HAS_WHITESPACE = /\s/;
 const HAS_LETTER = /[A-Za-z]/;
-const HAS_DIGIT = /\d/;
-const HAS_LOWERCASE = /[a-z]/;
-const HAS_UPPERCASE = /[A-Z]/;
-const UUID_VALUE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const HEX_RUN_VALUE = /^[0-9a-f]{16,}$/i;
-const BASE64ISH_VALUE = /^[A-Za-z0-9+/_=-]{16,}$/;
-
-/**
- * The characters an identifier is written with: letters, digits, and the
- * separators ids use. A quote, a brace, a comma or a slash means the text is
- * structure that HOLDS values rather than one identifier, so minified JSON and
- * URLs stay fully scanned.
- */
-const IDENTIFIER_VALUE = /^[A-Za-z0-9._:-]+$/;
 
 /**
  * The characters that carry on an identifier around a detected span. Narrower
- * than {@link IDENTIFIER_VALUE}: a dot or a colon ends the token here, so
- * sentence punctuation and `"phone":"+1..."` in minified JSON cannot pull a
- * detected number into an identifier that surrounds it.
+ * than the whole-value rule in {@link isIdentifierShapedValue}: a dot or a colon
+ * ends the token here, so sentence punctuation and `"phone":"+1..."` in minified
+ * JSON cannot pull a detected number into an identifier that surrounds it.
  */
 const IDENTIFIER_TOKEN_CHAR = /[A-Za-z0-9_-]/;
-
-/**
- * How far the identifier rules read. Identifiers people send as references are
- * far shorter, and the cap keeps both checks flat in the ingestion path however
- * long the text is.
- */
-const MAX_IDENTIFIER_LENGTH = 256;
-
-/**
- * Whether a whole attribute value is exclusively one identifier-shaped token:
- * letters together with digits and identifier separators
- * (`hosted-eu-20260812-09`), or the shape of a uuid, a hex digest, or a
- * base64-style token.
- *
- * The letter requirement is what keeps personal data in scope. A value built
- * only from digits and separators (`+31 6 12345678`, `20260812-09`, a bare card
- * number) is never identifier-shaped here, however much a customer means it as
- * a reference.
- */
-function isIdentifierShapedValue(value: string): boolean {
-  if (value.length > MAX_IDENTIFIER_LENGTH || !HAS_LETTER.test(value)) {
-    return false;
-  }
-  if (HAS_DIGIT.test(value) && IDENTIFIER_VALUE.test(value)) return true;
-  if (UUID_VALUE.test(value) || HEX_RUN_VALUE.test(value)) return true;
-  return (
-    BASE64ISH_VALUE.test(value) &&
-    HAS_LOWERCASE.test(value) &&
-    HAS_UPPERCASE.test(value)
-  );
-}
 
 /**
  * Whether a match sits inside a longer identifier: the identifier characters

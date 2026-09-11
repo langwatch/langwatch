@@ -11,6 +11,7 @@ import {
   ESSENTIAL_PII_ENTITIES,
   redactEssentialPiiInText,
 } from "./essentialPii";
+import { isReservedIdentifierAttributeKey } from "./identifierHoldout";
 
 const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(
   ESSENTIAL_PII_ENTITIES,
@@ -59,6 +60,12 @@ export function nativePiiEntitiesForPolicy(
  * string while the policy stays on, for the attribute names
  * {@link isIdentifierAttributeName} accepts. Custom patterns and the PII pass
  * are out of its reach.
+ *
+ * `skipPiiPass` turns the personal-data pass off for this one string while the
+ * policy stays on. Only the reserved trace and span identifier names use it
+ * (see {@link isReservedIdentifierAttributeKey}); their values are addresses a
+ * tracer minted, so there is no personal data in them to find and a marker
+ * written over one is permanent.
  */
 export function redactStringNative({
   text,
@@ -67,6 +74,7 @@ export function redactStringNative({
   compiledPiiExceptions,
   isAttributeValue = false,
   skipSecretRuleIds,
+  skipPiiPass = false,
 }: {
   text: string;
   policy: ResolvedDataPrivacy;
@@ -74,6 +82,7 @@ export function redactStringNative({
   compiledPiiExceptions?: readonly RegExp[];
   isAttributeValue?: boolean;
   skipSecretRuleIds?: readonly string[];
+  skipPiiPass?: boolean;
 }): { text: string; redactedCount: number } {
   let result = text;
   let redactedCount = 0;
@@ -88,7 +97,7 @@ export function redactStringNative({
     redactedCount += secrets.redactedCount;
   }
 
-  const piiEntities = nativePiiEntitiesForPolicy(policy);
+  const piiEntities = skipPiiPass ? null : nativePiiEntitiesForPolicy(policy);
   if (
     piiEntities !== null &&
     (piiEntities === "all" || piiEntities.length > 0)
@@ -159,6 +168,13 @@ export function isIdentifierAttributeName(key: string): boolean {
  * A name {@link isIdentifierAttributeName} accepts skips both the deny-list and
  * the shape-only value rules. Every other rule runs as it does on any other
  * attribute.
+ *
+ * A name {@link isReservedIdentifierAttributeKey} accepts additionally skips the
+ * personal-data pass. That is the stronger claim, which is why the list behind
+ * it is short and holds only trace and span addresses: the value is minted by a
+ * tracer, never typed by a person, and a decimal trace id carries no letter so
+ * no shape rule would hold it back. The vendor, armour and credential-keyword
+ * secret rules still run, so a key pasted under such a name is still scrubbed.
  */
 export function redactAttributeNative({
   key,
@@ -173,7 +189,8 @@ export function redactAttributeNative({
   compiledSecretPatterns?: readonly RegExp[];
   compiledPiiExceptions?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
-  const namesAnIdentifier = isIdentifierAttributeName(key);
+  const reservesAnAddress = isReservedIdentifierAttributeKey(key);
+  const namesAnIdentifier = reservesAnAddress || isIdentifierAttributeName(key);
   if (
     policy.secrets.enabled &&
     value.length > 0 &&
@@ -188,6 +205,7 @@ export function redactAttributeNative({
     skipSecretRuleIds: namesAnIdentifier
       ? SHAPE_ONLY_SECRET_RULE_IDS
       : undefined,
+    skipPiiPass: reservesAnAddress,
     compiledSecretPatterns,
     compiledPiiExceptions,
     isAttributeValue: true,

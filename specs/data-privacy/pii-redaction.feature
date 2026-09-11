@@ -174,6 +174,110 @@ Feature: Redacting personal data from traces
     When a trace is ingested with an attribute whose whole value is an email address with digits in it
     Then the stored attribute has the email address redacted
 
+  # The hold-out above only bites when nothing claims to have PROVEN its finding.
+  # A recognizer marked self-proving keeps running on an identifier-shaped value,
+  # on the promise that it carries a checksum or a marker no machine identifier
+  # holds by accident. Two of them did not keep that promise, and a trace id is
+  # not recoverable once a marker is written over it, because redaction runs
+  # before the event store.
+  #
+  # The bitcoin address pattern matched on shape alone - any 26 to 35 character
+  # token that starts with "1" or "3" and avoids the four look-alike characters -
+  # so roughly one in sixty random 32-character hex trace ids was stored as a
+  # crypto marker, at every level including the default. It now verifies the
+  # address checksum, so real addresses are still redacted and hex ids are not.
+  # The card pattern accepted any digit run that passes the Luhn check, which a
+  # thirteen-digit millisecond timestamp does about one time in ten; it now also
+  # requires a digit range a payment card is actually issued under.
+
+  @unit
+  Scenario: An opaque trace identifier survives redaction at the default level
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is a hex trace identifier starting with a one
+    Then the stored attribute still reads as it was sent
+
+  @unit
+  Scenario: A corpus of random hex identifiers survives the native engine intact
+    Given the resolved PII level for "web-app" is essential
+    When two thousand random hex trace identifiers are ingested as whole attribute values
+    Then every stored attribute still reads as it was sent
+
+  @unit
+  Scenario: A real bitcoin address is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is a valid bitcoin address
+    Then the stored attribute has the address redacted
+
+  @unit
+  Scenario: A millisecond timestamp is not read as a card number
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds a thirteen digit millisecond timestamp that passes the Luhn check
+    Then the stored input still contains the timestamp
+
+  @unit
+  Scenario: A card number written without separators is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds a card number written as one digit run
+    Then the stored input has the card number redacted
+
+  # The strict level adds names and locations, which need the external analysis
+  # service. That service guesses from wording, and an opaque identifier gives it
+  # nothing to go on, so it labels hex ids as people and places. Values are
+  # therefore filtered before they leave the process: an attribute whose whole
+  # value is one opaque identifier is never sent, and neither is an attribute
+  # under one of the reserved trace and span identifier names, whatever it holds.
+  #
+  # Correlation attributes a customer fills in themselves - the user, customer,
+  # thread and conversation identifiers - are deliberately NOT on the reserved
+  # list. Customers routinely put an email address in them, and never analysing
+  # them would store that email in the clear. They are covered by the same rule
+  # as every other attribute: held back when the whole value is one opaque
+  # identifier, analysed when it is personal data.
+
+  @unit
+  Scenario: An opaque identifier attribute value is never sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with an attribute whose whole value is a hex span identifier
+    Then the analysis service never received that value
+    And the stored attribute still reads as it was sent
+
+  @unit
+  Scenario: A reserved trace identifier attribute is never sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a reserved trace identifier attribute
+    Then the analysis service never received that value
+
+  @unit
+  Scenario: A corpus of opaque identifiers is never sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with attributes holding hex identifiers, dashed uuids and prefixed ULIDs
+    Then the analysis service received none of them
+
+  @unit
+  Scenario: Prose that holds a name is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with an attribute whose value is a sentence naming a person
+    Then the analysis service received that sentence
+
+  @unit
+  Scenario: A customer identifier that holds a person name is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a user identifier attribute whose value is a person name
+    Then the analysis service received that value
+
+  @unit
+  Scenario: A reserved identifier attribute survives even when its value is all digits
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with a reserved trace identifier attribute written in decimal
+    Then the stored attribute still reads as it was sent
+
+  @unit
+  Scenario: Log attributes hold opaque identifiers back from analysis
+    Given the resolved PII level for "web-app" is strict
+    When a log record is ingested with an attribute whose whole value is a hex identifier
+    Then the analysis service never received that value
+    And the analysis service received the log body
+
   # Detection heuristics over-trigger on business identifiers that merely look
   # like PII: a 14-digit reservation number reads as a credit card, an
   # "orders@acme.internal" queue address reads as a personal email. Exception

@@ -13,6 +13,7 @@ import {
   redactStringNative,
 } from "~/server/data-privacy/redaction/applyContentRedaction";
 import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
+import { isHeldOutIdentifierAttribute } from "~/server/data-privacy/redaction/identifierHoldout";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   batchPresidioClearPII as defaultBatchPresidioClearPII,
@@ -691,6 +692,7 @@ export class OtlpSpanPiiRedactionService {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     lambda?: {
@@ -706,10 +708,13 @@ export class OtlpSpanPiiRedactionService {
     if (!options) return;
 
     const batch = this.createRedactionBatch();
+    // The body is free text, not an attribute value, so no hold-out applies:
+    // an identifier written in a sentence sits next to content that may well
+    // hold personal data.
     if (log.body) {
       batch.tryPush(log as unknown as Record<string, string>, "body", log.body);
     }
-    this.collectRecordEntries(batch, log.attributes);
+    this.collectRecordEntries(batch, log.attributes, log.attributeNames);
     this.collectRecordEntries(batch, log.resourceAttributes);
 
     await this.applyRedactionBatch(batch, options);
@@ -761,6 +766,7 @@ export class OtlpSpanPiiRedactionService {
     metric: {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     lambda?: {
@@ -776,7 +782,7 @@ export class OtlpSpanPiiRedactionService {
     if (!options) return;
 
     const batch = this.createRedactionBatch();
-    this.collectRecordEntries(batch, metric.attributes);
+    this.collectRecordEntries(batch, metric.attributes, metric.attributeNames);
     this.collectRecordEntries(batch, metric.resourceAttributes);
 
     await this.applyRedactionBatch(batch, options);
@@ -857,14 +863,31 @@ export class OtlpSpanPiiRedactionService {
     };
   }
 
+  /**
+   * The log and metric counterpart of {@link collectStringEntries}: the same
+   * identifier hold-out, over a flattened record rather than an OTLP list.
+   *
+   * `attributeNames` restores the real attribute name where the record is keyed
+   * by an addressing path instead, because the reserved-name half of the
+   * hold-out reads the name and a path would never match one.
+   */
   private collectRecordEntries(
     batch: RedactionBatch,
     record: Record<string, string>,
+    attributeNames?: Record<string, string>,
   ): void {
     for (const key of Object.keys(record)) {
-      if (record[key]) {
-        batch.tryPush(record, key, record[key]!);
+      const value = record[key];
+      if (!value) continue;
+      if (
+        isHeldOutIdentifierAttribute({
+          key: attributeNames?.[key] ?? key,
+          value,
+        })
+      ) {
+        continue;
       }
+      batch.tryPush(record, key, value);
     }
   }
 
@@ -902,6 +925,12 @@ export class OtlpSpanPiiRedactionService {
    * Collects string attribute values into the entries array.
    * Enforces a cumulative character budget — once adding a value would
    * exceed piiRedactionMaxAttributeLength the value is skipped.
+   *
+   * Machine identifiers never leave the process (see
+   * {@link isHeldOutIdentifierAttribute}). Holding one back is NOT a skip: a
+   * skip means "this value may still hold personal data we did not scan for",
+   * which is what marks the span as partially redacted, and an opaque address
+   * holds none. So a held-out attribute sets neither flag.
    */
   private collectStringEntries(
     attributes: OtlpKeyValue[],
@@ -918,6 +947,14 @@ export class OtlpSpanPiiRedactionService {
         attr.value.stringValue !== null &&
         attr.value.stringValue.length > 0
       ) {
+        if (
+          isHeldOutIdentifierAttribute({
+            key: attr.key,
+            value: attr.value.stringValue,
+          })
+        ) {
+          continue;
+        }
         if (
           totalLength + attr.value.stringValue.length >
           this.deps.piiRedactionMaxAttributeLength
