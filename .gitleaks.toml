@@ -393,3 +393,36 @@ paths = [
 description = "RFC 6455 sample Sec-WebSocket-Key in the voice listener handshake tests, a client-invented nonce"
 targetRules = ["generic-api-key"]
 regexes = ['''^dGhlIHNhbXBsZSBub25jZQ==$''']
+
+# Two bech32m test vectors in the bitcoin-address suite, which prove the
+# recognizer rejects a witness version bitcoin does not define. They are one
+# payload written at version one and at version seventeen, so the version one
+# member validating is what shows the version seventeen member is rejected for
+# its version rather than for a checksum that never lined up.
+#
+# Naming them, as this file requires. Neither is a credential and neither can
+# become one: a bech32 string is a PUBLIC address, the thing you hand out to be
+# paid, and these two were generated for this test rather than observed. The
+# version seventeen member is not a bitcoin address at all — no wallet will
+# parse it — and the version one member encodes a payload of counted-up bytes,
+# so it is a well-formed address to a key nobody holds. There is nothing to
+# revoke, and nothing to send anywhere.
+#
+# They cannot be assembled at run time the way the base64 fixture in the
+# identifier hold-out suite is. The checksum IS the thing under test, so a test
+# that computed it would be asserting one implementation against a copy of
+# itself; the literal is what makes the vector a vector.
+#
+# gitleaks' `generic-api-key` rule fires on the `const token = "<entropy>"`
+# shape and cannot tell an address from a key.
+#
+# Scoped by VALUE and ANCHORED, for the reason given above the block before it:
+# a substring allowlist would also permit a real secret that merely starts with
+# these characters.
+[[allowlists]]
+description = "Generated bech32m vectors in the bitcoin-address tests; public addresses to keys nobody holds"
+targetRules = ["generic-api-key"]
+regexes = [
+  '''^bc1pr23clxd5mzfsh79vn6pg0kaytjeq8w4u8x8jd8$''',
+  '''^bc13r23clxd5mzfsh79vn6pg0kaytjeq8w4un2kxzn$''',
+]

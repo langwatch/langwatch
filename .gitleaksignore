@@ -13,3 +13,13 @@
 # the gate walks every commit in the pull request's range, and this one is now
 # history.
 4c7f177f4f5b4a4290d9281031dc4cdeff2d23a6:services/aigateway/adapters/providers/bifrost_error_test.go:generic-api-key:217
+
+# A fixture in the identifier hold-out suite spelled out a base64 token, to
+# prove that a token of that shape is held back from the analysis service. It
+# decodes to the ASCII words `hello world 1234567890`: issued by nobody,
+# authenticating nothing, with nothing to revoke — but its entropy is a
+# credential's, which is the rule working as intended and not something gitleaks
+# should be asked to tell apart. The fixture now assembles the value at run time
+# so the tree carries no literal; the finding survives only because the gate
+# walks every commit in the pull request's range, and this one is now history.
+6c763c36b3193a085698ff5c61a3cbac22623f69:platform/app/src/server/data-privacy/redaction/__tests__/identifierHoldout.unit.test.ts:generic-api-key:34
