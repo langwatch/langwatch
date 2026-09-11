@@ -37,6 +37,7 @@ interface CreateNextContextOptions {
 }
 
 import { auditLog } from "@ee/audit-log/auditLog";
+import { rateLimit } from "../rateLimit";
 import type {
   AuthzPermission,
   DeclarationError,
@@ -475,6 +476,53 @@ const enforcePermissionCheck = t.middleware(({ ctx, next }) => {
   return next();
 });
 
+/**
+ * How many refused calls one caller may write to the audit trail in a window.
+ *
+ * The middleware below records a row for any refusal a signed-in caller
+ * provokes, which is the right instinct — a refused act is worth keeping —
+ * and also a write anybody with a session can repeat. A validation error is
+ * free to cause on purpose, so without a bound one account can grow the table
+ * at the speed it can issue requests.
+ *
+ * An hour, because a person clicking around a broken screen produces refusals
+ * in tens and a script produces them in thousands, and the trail only needs
+ * enough of them to show that it happened. Spending the budget never changes
+ * what the caller is told: the refusal they get is the one the procedure
+ * already decided.
+ */
+const REFUSAL_AUDIT_WINDOW_SECONDS = 60 * 60;
+const REFUSAL_AUDIT_BUDGET = 200;
+
+/**
+ * Whether this refusal still fits in the caller's budget.
+ *
+ * Fails OPEN, like the limiter underneath it: if the budget cannot be read we
+ * would rather write an extra audit row than lose one. A refusal is never
+ * failed over the bookkeeping that records it.
+ */
+async function refusalAuditBudget(userId: string): Promise<boolean> {
+  try {
+    const { allowed, remaining } = await rateLimit({
+      key: `trpc-refusal-audit:${userId}`,
+      windowSeconds: REFUSAL_AUDIT_WINDOW_SECONDS,
+      max: REFUSAL_AUDIT_BUDGET,
+    });
+    if (!allowed && remaining === 0) {
+      // Said once as the budget runs out rather than per dropped row: the
+      // flood stays visible in the logs, which is where an unbounded stream
+      // belongs, without the trail carrying it.
+      logger.warn(
+        { userId },
+        "refusal audit budget spent; further refused calls by this caller are logged but not recorded in the audit trail",
+      );
+    }
+    return allowed;
+  } catch {
+    return true;
+  }
+}
+
 const auditLogTRPCErrors = t.middleware(
   async ({ ctx, next, path, type, input }) => {
     const result = await next();
@@ -483,7 +531,8 @@ const auditLogTRPCErrors = t.middleware(
       !result.ok &&
       result.error instanceof TRPCError &&
       result.error.code !== "INTERNAL_SERVER_ERROR" &&
-      ctx.session?.user.id
+      ctx.session?.user.id &&
+      (await refusalAuditBudget(ctx.session.user.id))
     ) {
       await auditLog({
         userId: ctx.session.user.id,
