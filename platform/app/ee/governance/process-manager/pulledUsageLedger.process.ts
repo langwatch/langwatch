@@ -435,7 +435,10 @@ export function pulledUsageLedgerPM(
         // `filedCell` hold `{}`, and the runtime hands stored state back
         // verbatim rather than merging it over the initial state. Such a row
         // has never filed a cell we can name, so it is treated exactly like a
-        // first observation.
+        // first observation. The price is the lost-process-store degradation
+        // described in the file header: a reissue seen on that first
+        // post-fix observation is not withdrawn, and that day carries the
+        // charge twice until the next correction.
         const filed = state.filedCell ?? null;
         const reissued = filed !== null && isReissuedElsewhere(filed, record);
         const intents = reissued
