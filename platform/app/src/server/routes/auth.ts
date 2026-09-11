@@ -21,6 +21,8 @@ import {
   sessionRevocation,
 } from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
+import { requestStatingCaller } from "~/server/auth/caller-header";
+import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limit-client-ip";
 import { auth } from "~/server/better-auth";
 import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
@@ -152,6 +154,7 @@ secured.access(authPolicy()).get("/auth/logout", logoutHandler);
 secured.access(authPolicy()).post("/auth/logout", logoutHandler);
 
 // ---------- /api/auth/* catch-all (BetterAuth) ----------
+
 const betterAuthCatchAll = async (c: Context) => {
   // Origin gate for state-changing requests
   if (
@@ -195,7 +198,16 @@ const betterAuthCatchAll = async (c: Context) => {
   // the allowlist had opted IN was the one sign-up whose refusals skipped the
   // handled-error contract and reached the browser in better-auth's own
   // vocabulary.
-  const handle = () => auth.handler(c.req.raw);
+  // Better Auth decides its own rate-limit buckets from the request it is
+  // handed, so it is handed the caller this application already resolved from
+  // the connection. See `auth/caller-header.ts`.
+  const handle = () =>
+    auth.handler(
+      requestStatingCaller({
+        request: c.req.raw,
+        caller: getAuthRateLimitClientIpFromHonoContext(c),
+      }),
+    );
   // The reset scope is opened around EVERY request rather than only the
   // reset path: it is a per-request slot that costs nothing empty, and the
   // path check belongs to the hook that reads it, not to the route.

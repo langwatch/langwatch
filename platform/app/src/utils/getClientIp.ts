@@ -90,23 +90,92 @@ export function getDirectPeerIp(
 /**
  * Resolves a rate-limit address without trusting caller-controlled headers.
  *
- * The socket peer is authoritative unless the operator explicitly names it
- * as a trusted proxy. Only then is the canonical `x-forwarded-for` chain
- * considered, walking from right to left until the first hop that is not
- * itself trusted. A generic proxy is not evidence that a Cloudflare, Fastly,
- * or other vendor-specific header was sanitized, so those headers never
- * participate in this security-sensitive answer.
+ * The socket peer is authoritative unless it is one of the deployment's own
+ * hops. Only then is the canonical `x-forwarded-for` chain considered, walking
+ * from right to left until the first hop that is not a hop itself. A generic
+ * proxy is not evidence that a Cloudflare, Fastly, or other vendor-specific
+ * header was sanitized, so those headers never participate in this
+ * security-sensitive answer.
  */
 export function getTrustedProxyClientIp(
   req: DirectPeerRequest | undefined,
   trustedProxies: readonly string[],
 ): string | undefined {
   const socketAddress = getDirectPeerIp(req);
-  if (!socketAddress || !isTrustedProxy(socketAddress, trustedProxies)) {
+  if (!socketAddress || !isInfrastructureHop(socketAddress, trustedProxies)) {
     return socketAddress;
   }
 
   return forwardedAddress(req?.headers ?? {}, trustedProxies) ?? socketAddress;
+}
+
+/**
+ * Whether an address is one of the deployment's own hops rather than a caller.
+ *
+ * With `TRUSTED_PROXY_ADDRESSES` set the operator has answered this exactly,
+ * and nothing outside the list is a hop.
+ *
+ * With nothing set the answer has to come from the address itself, and the one
+ * thing an address proves is which side of the network boundary it sits on. A
+ * private, loopback or link-local peer reached this process without crossing
+ * the public internet, so it is something the operator runs - an ingress, a
+ * service mesh, a sidecar. A public peer is a caller, whatever its headers say
+ * about itself.
+ *
+ * That default is what keeps both failure modes off an unconfigured
+ * deployment. Believing a public caller's own header would let it choose its
+ * own rate-limit bucket; refusing to read a private ingress's header would
+ * collapse every visitor behind that ingress into one bucket, which is a cap on
+ * the installation rather than on an attacker. Naming the addresses is still
+ * strictly better, and is the only way to narrow trust WITHIN a private
+ * network, which is why the setting stays and the log line below asks for it.
+ */
+function isInfrastructureHop(
+  address: string,
+  trustedProxies: readonly string[],
+): boolean {
+  return trustedProxies.length > 0
+    ? isTrustedProxy(address, trustedProxies)
+    : isPrivateAddress(address);
+}
+
+/**
+ * Ranges that cannot be reached from the public internet, so an address in one
+ * of them belongs to the operator's own network.
+ *
+ * Carrier-grade NAT (100.64.0.0/10) is deliberately absent: it is unreachable
+ * publicly, but it is where a mobile CARRIER puts its subscribers, so a peer in
+ * it is a caller rather than a hop.
+ */
+const PRIVATE_IPV4_RANGES = [
+  "10.0.0.0/8",
+  "172.16.0.0/12",
+  "192.168.0.0/16",
+  "127.0.0.0/8",
+  "169.254.0.0/16",
+] as const;
+
+export function isPrivateAddress(address: string): boolean {
+  if (isIP(address) === 4) {
+    return PRIVATE_IPV4_RANGES.some((range) => withinIpv4Range(address, range));
+  }
+  return isPrivateIpv6(address);
+}
+
+/** Loopback (`::1`), unique-local (`fc00::/7`) and link-local (`fe80::/10`). */
+function isPrivateIpv6(address: string): boolean {
+  if (isIP(address) !== 6) return false;
+
+  const normalized = address.toLowerCase();
+  if (normalized === "::1") return true;
+
+  const firstGroup = normalized.split(":")[0];
+  if (!firstGroup) return false;
+
+  const group = Number.parseInt(firstGroup, 16);
+  if (Number.isNaN(group)) return false;
+
+  return (group & 0xfe_00) === 0xfc_00 || (group & 0xff_c0) === 0xfe_80;
 }
 
 export function parseTrustedProxyAddresses(
@@ -147,7 +216,7 @@ function forwardedAddress(
   for (let index = hops.length - 1; index >= 0; index--) {
     const address = parseAddress(hops[index] ?? "");
     if (!address) continue;
-    if (!isTrustedProxy(address, trustedProxies)) return address;
+    if (!isInfrastructureHop(address, trustedProxies)) return address;
   }
 
   return undefined;
@@ -225,4 +294,31 @@ export function getClientIpFromHonoContext(c: Context): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The same answer as `getTrustedProxyClientIp`, asked of a Hono request.
+ *
+ * `getConnInfo` is the only place the socket peer survives the fetch-`Request`
+ * boundary: a `Request` carries headers and nothing at all about the connection
+ * that delivered it. Wrapped defensively for the reason
+ * `getClientIpFromHonoContext` gives - `app.request()` and other adapters leave
+ * `c.env` empty - and a peer we cannot read is treated as no peer, which leaves
+ * the forwarding headers unread rather than believed.
+ */
+export function getTrustedProxyClientIpFromHonoContext(
+  c: Context,
+  trustedProxies: readonly string[],
+): string | undefined {
+  let remoteAddress: string | undefined;
+  try {
+    remoteAddress = getConnInfo(c).remote.address;
+  } catch {
+    remoteAddress = undefined;
+  }
+
+  return getTrustedProxyClientIp(
+    { headers: c.req.header(), socket: { remoteAddress } },
+    trustedProxies,
+  );
 }
