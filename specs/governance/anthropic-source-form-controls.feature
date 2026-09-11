@@ -143,8 +143,11 @@ Feature: Choose Anthropic adapter settings instead of typing them
       And the hint says this is the first day we read data for
       And that later runs continue forward from where the last one stopped
       And that clearing it reads only the last few days
+      And that on the usage report the date is fixed once the source has pulled
       # "Backfill start" is our word for it, and "optional" described the form
       # rather than the setting. The admin's question is how far back to read.
+      # The lock is said here, on the form where the date is still a choice,
+      # because by the time the edit drawer explains it the choice is made.
 
     @unit
     Scenario: A new Anthropic source proposes six months of history

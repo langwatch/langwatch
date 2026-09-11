@@ -3178,7 +3178,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       // Everything the two-entry picker conveyed by listing both reports has
       // to live here instead, or an admin turning this off is not told what
       // they are turning it on to.
-      hint: "On: Anthropic's own daily spend figure, which is what almost everyone wants (Priority Tier usage is excluded, so it is close to but not the invoice). Off: raw token counts that we price ourselves. A source records one report only, never both — pointing two sources at the same organization would count the same spend twice.",
+      hint: "On: Anthropic's own daily spend figure, which is what almost everyone wants (Priority Tier usage is excluded, so it is close to but not the invoice). Off: raw token counts that we price ourselves. A source records one report only, never both: pointing two sources at the same organization would count the same spend twice.",
       // Two states, and one of them right for almost every organization: the
       // provider's own figure for what was spent. The usage report is the
       // specialist choice, made by someone who wants our pricing applied to
@@ -3224,7 +3224,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "startingAt",
       label: "Read history from",
       placeholder: "",
-      hint: "The first day we read data for. Later runs continue forward from where the last one stopped. Clear it to read only the last few days.",
+      hint: "The first day we read data for. Later runs continue forward from where the last one stopped. Clear it to read only the last few days. On the usage report this date is fixed once the source has pulled.",
       control: "date",
       defaultValue: () => defaultBackfillStart("anthropic_admin") ?? "",
     },

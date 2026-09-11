@@ -360,6 +360,10 @@ describe("Anthropic composer controls", () => {
       expect(hint).toMatch(/first day/i);
       expect(hint).toMatch(/forward|where the last/i);
       expect(hint).toMatch(/clear/i);
+      // Said here, where the date is still a choice. The edit drawer explains
+      // the lock too, but by then the admin has already made the choice it
+      // constrains.
+      expect(hint).toMatch(/fixed once the source has pulled/i);
     });
 
     // @scenario "A new Anthropic source proposes six months of history"
