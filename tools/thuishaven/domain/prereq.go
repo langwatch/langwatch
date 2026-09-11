@@ -62,6 +62,13 @@ type Candidate struct {
 	// whichever version is already there rather than forcing its own (see
 	// adapters/postgresbrew).
 	Formula string
+	// FormulaIsAuthority marks a candidate haven drives THROUGH Homebrew: the
+	// shared Postgres and Redis are started with `brew services`, so a copy
+	// brew does not know about is one haven cannot start, however good it is.
+	// Without this the binary on PATH wins and haven reports a source-built
+	// redis-server as installed — and then `haven up` fails with "redis is
+	// not installed", which is the contradiction this check exists to prevent.
+	FormulaIsAuthority bool
 	// Install is the shell command that installs this candidate. Empty means
 	// haven will not install it: see Manual.
 	Install string
@@ -70,6 +77,25 @@ type Candidate struct {
 	// directory ownership, which is not a decision a dev tool makes on someone
 	// else's behalf from inside a picker.
 	Manual string
+}
+
+// InstallOn resolves how this candidate is installed on a platform: the
+// command to run, or the words to print when there is none.
+//
+// Every install command haven knows is either npm (portless, which works
+// anywhere node does) or Homebrew. Homebrew is the macOS story — haven
+// reports brew itself as not-applicable elsewhere — so on another platform a
+// `brew install` line is not advice, it is a command that exits 127. There it
+// becomes a manual entry naming what to install, and the developer's own
+// package manager installs it.
+func (c Candidate) InstallOn(goos string) (command, manual string) {
+	if c.Install == "" {
+		return "", c.Manual
+	}
+	if goos != "darwin" && strings.HasPrefix(c.Install, "brew ") {
+		return "", "install " + c.Label + " with your platform's package manager (haven's own command, `" + c.Install + "`, is macOS's)"
+	}
+	return c.Install, c.Manual
 }
 
 // Prereq is one entry of the catalogue.
@@ -192,11 +218,14 @@ var Prereqs = []Prereq{{
 		"    whichever postgresql@NN is already installed rather than forcing its own,\n" +
 		"    so this is only offered when there is none at all.",
 	Candidates: []Candidate{{
-		Key:      "postgres",
-		Label:    DefaultPostgresFormula,
-		Binaries: []string{"psql"},
-		Formula:  "postgresql@",
-		Install:  "brew install " + DefaultPostgresFormula,
+		Key: "postgres",
+		// No Binaries: psql arriving from Postgres.app or a source build says
+		// nothing about whether `brew services start postgresql@NN` — which is
+		// how haven starts this server — has anything to start.
+		Label:              DefaultPostgresFormula,
+		Formula:            "postgresql@",
+		FormulaIsAuthority: true,
+		Install:            "brew install " + DefaultPostgresFormula,
 	}},
 }, {
 	Key:         "redis",
@@ -209,11 +238,11 @@ var Prereqs = []Prereq{{
 		"    because each gets its own database index. Without it the worker has no\n" +
 		"    queues, which reads as a stack that serves pages and runs no jobs.",
 	Candidates: []Candidate{{
-		Key:      "redis",
-		Label:    DefaultRedisFormula,
-		Binaries: []string{"redis-server"},
-		Formula:  DefaultRedisFormula,
-		Install:  "brew install " + DefaultRedisFormula,
+		Key:                "redis",
+		Label:              DefaultRedisFormula,
+		Formula:            DefaultRedisFormula,
+		FormulaIsAuthority: true,
+		Install:            "brew install " + DefaultRedisFormula,
 	}},
 }, {
 	Key:         "runtime",
@@ -439,12 +468,25 @@ func DefaultChoice(p Prereq) string {
 	return p.Candidates[0].Key
 }
 
-// MissingRequired names the required entries a report says are not there, so
-// a caller can give the verdict in one line.
+// MissingRequired names the required entries that are not installed at all.
+// Deliberately not "every required entry haven would act on": an outdated one
+// is installed and working, and calling it missing is how a verdict ends up
+// contradicting the line above it in its own report.
 func MissingRequired(report []PrereqStatus) []string {
+	return requiredInState(report, PrereqMissing)
+}
+
+// OutdatedRequired names the required entries that are present but not the
+// version haven pins. `haven up` upgrades those in place on its own, so they
+// are a note on a ready machine rather than a reason it is not ready.
+func OutdatedRequired(report []PrereqStatus) []string {
+	return requiredInState(report, PrereqOutdated)
+}
+
+func requiredInState(report []PrereqStatus, state PrereqState) []string {
 	var out []string
 	for _, s := range report {
-		if s.Requirement == PrereqRequired && s.State.Actionable() {
+		if s.Requirement == PrereqRequired && s.State == state {
 			out = append(out, s.Name)
 		}
 	}
@@ -453,8 +495,16 @@ func MissingRequired(report []PrereqStatus) []string {
 
 // ReadyLine is the one-line verdict the report ends with.
 func ReadyLine(report []PrereqStatus) string {
-	if missing := MissingRequired(report); len(missing) > 0 {
+	missing, outdated := MissingRequired(report), OutdatedRequired(report)
+	switch {
+	case len(missing) > 0 && len(outdated) > 0:
+		return fmt.Sprintf("not ready — missing %s (and %s is not the version haven pins)",
+			strings.Join(missing, ", "), strings.Join(outdated, ", "))
+	case len(missing) > 0:
 		return fmt.Sprintf("not ready — missing %s", strings.Join(missing, ", "))
+	case len(outdated) > 0:
+		return fmt.Sprintf("ready — though %s is not the version haven pins, which `haven up` upgrades in place",
+			strings.Join(outdated, ", "))
 	}
 	return "ready — every required prerequisite is installed"
 }

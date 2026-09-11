@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/installtui"
@@ -38,6 +39,18 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 		}
 	}
 
+	// --list is resolved BEFORE the positional form, and refuses to be
+	// combined with it. It promises to change nothing, and `haven install
+	// --list redis` reaching the installer below would break that promise in
+	// the one place a reader has been told it is safe to look.
+	if inv.has("--list") {
+		if len(inv.args) > 0 {
+			return fmt.Errorf("haven install --list reports on every prerequisite and installs none of them — drop %s, or drop --list to install it", strings.Join(inv.args, " "))
+		}
+		printPrereqReport(os.Stdout, d.orch.CheckPrereqs(ctx))
+		return nil
+	}
+
 	// Naming prerequisites is the one form that does not consult the report:
 	// it is how a developer takes back an earlier "never ask again", and
 	// re-deriving that from a probe would just refuse them on the way in.
@@ -50,7 +63,12 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 	}
 
 	report := d.orch.CheckPrereqs(ctx)
-	if inv.has("--list") {
+	// Nothing to do is an answer, and it is the same answer however the
+	// command was invoked. Handled here rather than in each branch because
+	// the interactive one used to end at "nothing selected; nothing
+	// installed" — which, as the last line of `make haven install` on a
+	// healthy machine, reads as the target having failed to do anything.
+	if !anyActionable(report) {
 		printPrereqReport(os.Stdout, report)
 		return nil
 	}
@@ -120,6 +138,16 @@ func installInteractive(ctx context.Context, d deps, report []domain.PrereqStatu
 	return d.orch.InstallPrereqs(ctx, result.Install)
 }
 
+// anyActionable reports whether the machine gives the command anything to do.
+func anyActionable(report []domain.PrereqStatus) bool {
+	for _, st := range report {
+		if st.State.Actionable() {
+			return true
+		}
+	}
+	return false
+}
+
 func resetPrereqSkips(d deps) error {
 	cleared, err := d.orch.ResetPrereqSkips()
 	if err != nil {
@@ -173,15 +201,18 @@ func prereqCommand(st domain.PrereqStatus) string {
 	if !ok {
 		return st.Summary
 	}
-	if c.Install == "" {
-		return c.Manual
+	// Resolved for THIS platform: a `brew install` line printed on Linux is
+	// not advice, it is a command that exits 127.
+	command, manual := c.InstallOn(runtime.GOOS)
+	if command == "" {
+		return manual
 	}
 	if len(st.Candidates) > 1 {
 		// A choice reported as one command would hide the alternative, and
 		// this is the only place a pipe reader ever sees it.
-		return c.Install + "   (or: haven install " + st.Key + "=" + otherCandidate(st.Prereq, candidate) + ")"
+		return command + "   (or: haven install " + st.Key + "=" + otherCandidate(st.Prereq, candidate) + ")"
 	}
-	return c.Install
+	return command
 }
 
 func otherCandidate(p domain.Prereq, chosen string) string {

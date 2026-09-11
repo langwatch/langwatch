@@ -12,6 +12,7 @@ package installtui
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -384,11 +385,11 @@ func (m model) commandLine(r row) string {
 	if !r.actionable() || len(r.st.Candidates) == 0 {
 		return ""
 	}
-	c := r.st.Candidates[r.candidate]
-	if c.Install == "" {
-		return "haven will not run this one for you:\n" + c.Manual
+	command, manual := r.st.Candidates[r.candidate].InstallOn(runtime.GOOS)
+	if command == "" {
+		return "haven will not run this one for you:\n" + manual
 	}
-	return "will run: " + c.Install
+	return "will run: " + command
 }
 
 func (m model) renderFooter() string {

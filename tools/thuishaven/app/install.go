@@ -66,6 +66,14 @@ func (o *Orchestrator) probeCandidate(ctx context.Context, c domain.Candidate) d
 	if c.Key == "portless" {
 		return o.probePortless()
 	}
+	if c.FormulaIsAuthority {
+		// haven starts this one with `brew services`, so brew's answer is the
+		// only one that predicts whether it can. A binary on PATH from
+		// somewhere else would report installed and leave `haven up` to fail
+		// with "not installed" — the report contradicting the thing it is
+		// supposed to be checking.
+		return o.probeFormula(ctx, c)
+	}
 	var detail []string
 	for _, bin := range c.Binaries {
 		path := o.prereqTools().BinaryPath(bin)
@@ -120,8 +128,10 @@ func (o *Orchestrator) probePortless() domain.Found {
 // continuing past a failure produces a second, more confusing error about a
 // cause that is already known.
 //
-// A manual entry is not an error and not an install — it prints the command
-// and moves on, which is the whole contract for Homebrew.
+// A manual entry prints its command rather than running it. If it is also
+// REQUIRED and anything is ordered after it, the run ends there: the rest are
+// installed through it, so attempting them would fail on a cause already on
+// screen and blame the wrong tool for it.
 func (o *Orchestrator) InstallPrereqs(ctx context.Context, chosen []domain.Chosen) error {
 	return o.installPrereqsTo(ctx, os.Stdout, chosen)
 }
@@ -132,7 +142,7 @@ func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen
 		fmt.Fprintln(w, "nothing selected; nothing installed.")
 		return nil
 	}
-	for _, pick := range ordered {
+	for i, pick := range ordered {
 		p, ok := domain.LookupPrereq(pick.Key)
 		if !ok {
 			return fmt.Errorf("unknown prerequisite %q — known: %s", pick.Key, strings.Join(domain.PrereqKeys(), ", "))
@@ -141,13 +151,23 @@ func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen
 		if !ok {
 			return fmt.Errorf("%s has no option %q", p.Key, pick.Candidate)
 		}
-		if candidate.Install == "" {
-			fmt.Fprintf(w, "\n· %s — haven does not install this one for you. Run:\n    %s\n", p.Name, candidate.Manual)
+		command, manual := candidate.InstallOn(runtime.GOOS)
+		if command == "" {
+			fmt.Fprintf(w, "\n· %s — haven does not install this one for you. Run:\n    %s\n", p.Name, manual)
+			// Carrying on past a REQUIRED one haven cannot install is how the
+			// fresh-Mac case produced its worst message: print the Homebrew
+			// line, then run `brew install node`, then report "could not
+			// install Node.js (exit status 127) — run `brew install node` by
+			// hand", which blames the wrong tool. Everything ordered after it
+			// is installed THROUGH it, so this is where the run ends.
+			if p.Requirement == domain.PrereqRequired && i < len(ordered)-1 {
+				return fmt.Errorf("%s has to be installed first — the rest are installed through it. Run the command above, then re-run `haven install`", p.Name)
+			}
 			continue
 		}
-		fmt.Fprintf(w, "\n→ %s: %s\n", p.Name, candidate.Install)
-		if err := o.runPrereqInstall(ctx, p, candidate); err != nil {
-			return fmt.Errorf("could not install %s (%w) — run `%s` by hand and try again", p.Name, err, candidate.Install)
+		fmt.Fprintf(w, "\n→ %s: %s\n", p.Name, command)
+		if err := o.runPrereqInstall(ctx, p, command); err != nil {
+			return fmt.Errorf("could not install %s (%w) — run `%s` by hand and try again", p.Name, err, command)
 		}
 		fmt.Fprintf(w, "✓ %s installed\n", p.Name)
 		// Installing something answers the question the skip was suppressing,
@@ -163,14 +183,14 @@ func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen
 // runPrereqInstall routes portless through the proxy adapter, which owns the
 // pinned package name and the "install it by hand like this" error, and
 // everything else through the shell command the catalogue declares.
-func (o *Orchestrator) runPrereqInstall(ctx context.Context, p domain.Prereq, c domain.Candidate) error {
+func (o *Orchestrator) runPrereqInstall(ctx context.Context, p domain.Prereq, command string) error {
 	if p.Key == "portless" {
 		if o.proxy == nil {
 			return fmt.Errorf("no portless adapter is wired in")
 		}
 		return o.proxy.Install()
 	}
-	return o.prereqTools().Install(ctx, c.Install)
+	return o.prereqTools().Install(ctx, command)
 }
 
 // PrereqSkips is the machine-wide "never ask me about this again" set. It is

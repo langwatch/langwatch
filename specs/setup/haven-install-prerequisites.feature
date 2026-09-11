@@ -73,7 +73,7 @@ Feature: haven install checks the machine's prerequisites
 
     Scenario: A skipped prerequisite is still installed when named
       Given the ClickHouse client is recorded as skipped
-      When the developer runs "haven install clickhouse"
+      When the developer runs "haven install clickhouse-client"
       Then it is installed
       And it is no longer recorded as skipped
 
@@ -82,6 +82,49 @@ Feature: haven install checks the machine's prerequisites
       When the developer runs "haven install --reset-skips"
       Then nothing is recorded as skipped any more
       And the next run offers both again
+
+  Rule: Reporting never installs, and installing always reports
+
+    Scenario: The report-only flag refuses to be given something to install
+      Given the ClickHouse client is missing
+      When the developer runs "haven install --list clickhouse-client"
+      Then it fails saying the two cannot be combined
+      And nothing is installed
+
+    Scenario: A machine with nothing to do still says so
+      Given every prerequisite is present
+      And the developer is at a terminal
+      When the developer runs "haven install"
+      Then the full report is printed with the ready verdict
+      And no picker is shown
+
+    Scenario: A prerequisite present at the wrong version is not called missing
+      Given portless is installed at a version haven does not pin
+      When the prerequisites are planned
+      Then the verdict says the machine is ready
+      And it notes that portless is not the pinned version
+
+  Rule: A prerequisite is probed the way haven will use it
+
+    Scenario: A brew-managed server is judged by the formula, not the binary
+      Given redis-server is on PATH but no redis formula is installed
+      When the prerequisites are planned
+      Then Redis is reported missing
+      # haven starts it with `brew services`, which has nothing to start
+
+    Scenario: A keg-only formula counts even with no binary on PATH
+      Given postgresql@15 is installed but psql is not on PATH
+      When the prerequisites are planned
+      Then PostgreSQL is reported installed
+
+  Rule: Only commands that can run on this platform are offered
+
+    Scenario: A brew command is not offered where there is no brew
+      Given the machine is not macOS
+      And node is missing
+      When the prerequisites are planned
+      Then node is reported with words, not a `brew install` command
+      And a silent run does not attempt it
 
   Rule: An agent and a pipe are never asked a question
 
@@ -104,6 +147,7 @@ Feature: haven install checks the machine's prerequisites
       When the developer runs "haven install --yes"
       Then brew is reported as install-it-yourself with its official command
       And no installer is run for it
+      And the run stops there rather than failing on the formulae below it
 
   Rule: The picker chooses; the installing happens after it closes
 

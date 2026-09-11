@@ -44,6 +44,47 @@ func TestInstallAndSetupSaySoWhichScopeTheyTouch(t *testing.T) {
 	}
 }
 
+// --list promises to change nothing, and it is resolved before the positional
+// form so that promise holds. `haven install --list redis` used to fall
+// straight through to the installer: the one command a reader has been told
+// is safe to run would have run `brew install redis`.
+// @scenario "The report-only flag refuses to be given something to install"
+func TestListRefusesToBeCombinedWithNamesToInstall(t *testing.T) {
+	spec := specByName(t, "install")
+	if !strings.Contains(spec.flags[0].summary, "change nothing") {
+		t.Fatalf("--list's summary %q no longer makes the promise this test guards", spec.flags[0].summary)
+	}
+	err := runInstall(t.Context(), deps{}, invocation{
+		flags: map[string]string{"--list": ""},
+		args:  []string{"redis"},
+	})
+	if err == nil {
+		t.Fatal("--list with names must be refused, not resolved in favour of one of them")
+	}
+	if !strings.Contains(err.Error(), "redis") {
+		t.Errorf("error %q should name what it will not install", err)
+	}
+}
+
+// Nothing to do is an answer, and the same answer however the command was
+// invoked. The interactive path used to end at "nothing selected; nothing
+// installed" — which, as the last line of `make haven install` on a healthy
+// machine, reads as the target having done nothing at all. The branch is
+// here; what it prints is pinned by the report tests above.
+// @scenario "A machine with nothing to do still says so"
+func TestAHealthyMachineHasNothingActionable(t *testing.T) {
+	found := map[string]domain.Found{}
+	for _, p := range domain.Prereqs {
+		found[p.Candidates[0].Key] = domain.Found{Present: true}
+	}
+	if anyActionable(domain.PlanPrereqs(found, nil, "darwin")) {
+		t.Error("a machine with everything installed gives the command nothing to do")
+	}
+	if !anyActionable(domain.PlanPrereqs(map[string]domain.Found{}, nil, "darwin")) {
+		t.Error("a fresh machine plainly does")
+	}
+}
+
 // @scenario "A required prerequisite that is missing fails the check"
 func TestReportNamesTheCommandThatWouldFixAMissingEntry(t *testing.T) {
 	var out bytes.Buffer
