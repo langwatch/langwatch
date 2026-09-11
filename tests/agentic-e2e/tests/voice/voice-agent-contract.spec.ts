@@ -26,9 +26,14 @@
  *
  * Also required in the target project (environment prerequisites, not gated
  * here): the `release_voice_agents_enabled` feature flag on, and an LLM model
- * provider so the simulated user and the judge can run. Pin a fresh project
- * with E2E_PROJECT_SLUG so the voice agent can be created through the Agents
- * page (see givenAVoiceAgentExists in steps.ts).
+ * provider so the simulated user and the judge can run. The media-in-traces
+ * assertion also needs `release_trace_media_extraction` force-enabled and a
+ * production-shaped (`project_…`) project — a legacy id like `local-dev-project`
+ * makes the `/api/files/<projectId>/...` URL fail secret redaction (see
+ * getProjectSlug in ../helpers.ts). Leave E2E_PROJECT_SLUG unset (the harness
+ * selects a fresh production-shaped project) or point it at another
+ * `project_…` project; the voice agent is created through the Agents page (see
+ * givenAVoiceAgentExists in steps.ts).
  */
 import { randomUUID } from "node:crypto";
 

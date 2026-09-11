@@ -183,8 +183,22 @@ credentials are absent (`test.skip(cond, reason)`). Set these to run them.
 
 Both also need, in the target project (not gated — prerequisites): the
 `release_voice_agents_enabled` feature flag on, and an LLM model provider so the
-simulated user and judge can run. Pin a fresh project with `E2E_PROJECT_SLUG` so
-the voice agent can be created through the drawer's "Setup agent" box.
+simulated user and judge can run.
+
+Two more prerequisites are specific to the media-in-traces assertions:
+
+- **`release_trace_media_extraction` must be force-enabled** (e.g. via
+  `FEATURE_FLAG_FORCE_ENABLE=release_trace_media_extraction`), or the trace
+  drawer never extracts the call audio and `thenTheTracesCarryTheAudio` fails.
+- **The project id must be production-shaped (`project_…`).** The suite runs in
+  whatever project `getProjectSlug` selects, and it now prefers a
+  production-shaped project for exactly this reason. Redaction only allowlists
+  the `project` id prefix, so a legacy/seeded project such as
+  `local-dev-project` makes the media player's `/api/files/<projectId>/so_…`
+  URL get rewritten to `[SECRET]`, 404, and never render. Do **not** pin
+  `E2E_PROJECT_SLUG` at a legacy-id project; leave it unset (the harness
+  creates and selects a fresh production-shaped project) or point it at another
+  `project_…` project.
 
 ## Running Tests
 
