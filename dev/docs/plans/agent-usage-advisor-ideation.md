@@ -5,7 +5,16 @@
 **Origin:** PR #7536 cost $28,654 in coding-agent spend. The diagnosis happened
 once, by hand, after the money was gone.
 
-## The three parts
+> ### ⚠ Read Part 6 first
+>
+> [**Part 6 — what four independent reviews found wrong**](agent-usage-06-review-findings.md)
+> is a corrections register against everything below. Four conclusions in this set
+> **invert** under review, including the one in §11.10 that the instruction floor is
+> "not the dominant lever" — it is roughly **25%** of all cache reads, not 2.8%,
+> because the prefix is re-read per model call and not per turn. Do not spec
+> anything here without reading that register.
+
+## The parts
 
 This document is the evidence and the argument. The work splits into three
 pieces, in dependency order:
@@ -18,7 +27,7 @@ pieces, in dependency order:
 | 4 | [Metrics and context analysis](agent-usage-04-metrics-and-context-analysis.md) | A `coding_agent.*` family in the existing analytics registry, so dashboards come free — plus a breakdown of what is actually in the context window. |
 | 5 | [Practice adoption](agent-usage-05-practice-adoption.md) | What a team has not adopted yet, and what adopting it is worth, priced on their own traffic. |
 
-Sections 1–11 below are the shared evidence base all five draw on.
+Sections 1–11 below are the shared evidence base, as originally written. Part 6 says which of it survived.
 
 **One mechanic runs through all of them.** Context is re-read, so the cost of
 anything put into it is its size multiplied by how long it survives. Measured
