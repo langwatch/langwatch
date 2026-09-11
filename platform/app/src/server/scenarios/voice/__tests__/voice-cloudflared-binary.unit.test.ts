@@ -6,7 +6,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   type CloudflaredModule,
+  type CloudflaredScope,
   ensureCloudflaredOnPath,
+  resolveCloudflaredFromScopes,
   VoiceTunnelBinaryError,
 } from "../voice-cloudflared-binary";
 
@@ -18,6 +20,28 @@ function fakeModule(
   install: CloudflaredModule["install"] = vi.fn(async () => BIN),
 ): CloudflaredModule {
   return { bin: BIN, install };
+}
+
+/**
+ * A fake `require` for one scope: `resolves` says whether it can resolve
+ * `cloudflared/package.json`, and loading `cloudflared` returns `mod`.
+ */
+function fakeScopeRequire(opts: {
+  resolves: boolean;
+  mod?: Partial<CloudflaredModule>;
+}): NodeRequire {
+  const req = ((specifier: string): unknown => {
+    if (specifier === "cloudflared") return opts.mod;
+    throw new Error(`unexpected require(${specifier})`);
+  }) as unknown as NodeRequire;
+  req.resolve = ((specifier: string): string => {
+    if (specifier === "cloudflared/package.json") {
+      if (opts.resolves) return "/pkg/cloudflared/package.json";
+      throw new Error("Cannot find module 'cloudflared/package.json'");
+    }
+    throw new Error(`unexpected resolve(${specifier})`);
+  }) as NodeRequire["resolve"];
+  return req;
 }
 
 describe("ensureCloudflaredOnPath", () => {
@@ -126,6 +150,73 @@ describe("ensureCloudflaredOnPath", () => {
   });
 
   describe("given the cloudflared package cannot be resolved", () => {
+    describe("when the langwatch SDK scope resolves it", () => {
+      /** @scenario "cloudflared resolves through the langwatch SDK scope first" */
+      it("returns the module from the langwatch scope without trying later scopes", () => {
+        const langwatchMod = fakeModule();
+        const scopes: CloudflaredScope[] = [
+          {
+            name: "langwatch",
+            require: fakeScopeRequire({ resolves: true, mod: langwatchMod }),
+          },
+          {
+            name: "@langwatch/scenario",
+            require: fakeScopeRequire({ resolves: true, mod: fakeModule() }),
+          },
+          {
+            name: "app scope",
+            require: fakeScopeRequire({ resolves: true, mod: fakeModule() }),
+          },
+        ];
+
+        const scenarioResolve = vi.spyOn(scopes[1]!.require!, "resolve");
+
+        const mod = resolveCloudflaredFromScopes(scopes);
+
+        expect(mod.bin).toBe(BIN);
+        expect(mod.install).toBe(langwatchMod.install);
+        expect(scenarioResolve).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the langwatch scope fails but the scenario scope resolves it", () => {
+      /** @scenario "cloudflared falls back to the scenario scope when the langwatch scope fails" */
+      it("returns the module from the scenario scope", () => {
+        const scenarioMod = fakeModule();
+        const scopes: CloudflaredScope[] = [
+          // Anchor unresolved: this scope is skipped entirely.
+          { name: "langwatch", require: null },
+          {
+            name: "@langwatch/scenario",
+            require: fakeScopeRequire({ resolves: true, mod: scenarioMod }),
+          },
+          { name: "app scope", require: fakeScopeRequire({ resolves: false }) },
+        ];
+
+        const mod = resolveCloudflaredFromScopes(scopes);
+
+        expect(mod.install).toBe(scenarioMod.install);
+      });
+    });
+
+    describe("when no scope can resolve it", () => {
+      /** @scenario "cloudflared unresolvable from every scope names all tried scopes" */
+      it("throws naming all three tried scopes", () => {
+        const scopes: CloudflaredScope[] = [
+          { name: "langwatch", require: null },
+          {
+            name: "@langwatch/scenario",
+            require: fakeScopeRequire({ resolves: false }),
+          },
+          { name: "app scope", require: fakeScopeRequire({ resolves: false }) },
+        ];
+
+        expect(() => resolveCloudflaredFromScopes(scopes)).toThrow(
+          /could not resolve the cloudflared package from any of: langwatch, @langwatch\/scenario, app scope/,
+        );
+      });
+    });
+
     describe("when the binary is ensured", () => {
       /** @scenario "An unresolvable cloudflared package surfaces as a tunnel binary error" */
       it("throws a tunnel binary error naming the resolution failure", async () => {

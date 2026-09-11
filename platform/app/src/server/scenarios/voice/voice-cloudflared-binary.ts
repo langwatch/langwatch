@@ -21,6 +21,16 @@
  * is cheap — the binary is already on disk from the build-time postinstall, so
  * this only reads a path and prepends it; the `install()` call is a fallback for
  * an image that shipped without the binary.
+ *
+ * WHERE the `cloudflared` npm package lives. It is a prod dependency of the
+ * workspace `langwatch` SDK package (`sdks/typescript/package.json`), NOT of
+ * `@langwatch/scenario`. `@langwatch/web` depends on `langwatch: workspace:*`,
+ * so that edge survives the prod-filtered install (`--prod --filter
+ * "@langwatch/web..."`), and under pnpm's strict `node_modules` layout the
+ * binary is only resolvable by scoping the require to where `langwatch`
+ * resolved. So the resolution below searches scopes in order — the `langwatch`
+ * SDK scope first (the real dependency edge), then `@langwatch/scenario` as a
+ * secondary fallback in case packaging changes, then the app's own scope.
  */
 
 import { spawnSync } from "node:child_process";
@@ -57,7 +67,9 @@ export interface EnsureCloudflaredOnPathDeps {
    *  `spawnSync("cloudflared", ["--version"])`. */
   isOnPath?: () => boolean;
   /** Resolves the npm `cloudflared` package's binary path and installer.
-   *  Defaults to a require scoped to where `@langwatch/scenario` resolved. */
+   *  Defaults to a require scoped to where the `langwatch` SDK resolved (the
+   *  real dependency edge), falling back to `@langwatch/scenario` then the app
+   *  scope. */
   resolveModule?: () => CloudflaredModule;
   /** Whether the binary already exists on disk. Defaults to `fs.existsSync`. */
   binaryExists?: (binPath: string) => boolean;
@@ -110,31 +122,70 @@ function defaultIsOnPath(): boolean {
 }
 
 /**
- * Resolves the npm `cloudflared` package's `bin`/`install`, scoped to where the
- * vendored `@langwatch/scenario` SDK resolved.
- *
- * The SDK is what actually spawns cloudflared, and under pnpm's strict
- * `node_modules` layout `cloudflared` is the SDK's own (transitive) dependency
- * and may not be resolvable from the app's scope. So resolve from the SDK's
- * scope first, falling back to the app's own scope if that throws.
+ * One named candidate scope to search for the npm `cloudflared` package. The
+ * `require` is `null` when the scope's own anchor did not resolve (e.g. the
+ * `langwatch` specifier itself threw), so it is simply skipped.
+ */
+export interface CloudflaredScope {
+  /** Human-readable scope name, surfaced in the all-scopes-failed error. */
+  name: string;
+  /** The require to resolve/load `cloudflared` from, or `null` if the scope's
+   *  anchor did not resolve. */
+  require: NodeRequire | null;
+}
+
+/**
+ * Loads the npm `cloudflared` package's `bin`/`install` from the first
+ * {@link CloudflaredScope} that can resolve `cloudflared/package.json`. Resolving
+ * the `package.json` is the robust presence check; the package root
+ * (`lib/lib.js`) then re-exports `bin` + `install`. Throws naming every tried
+ * scope when none can resolve it.
+ */
+export function resolveCloudflaredFromScopes(
+  scopes: CloudflaredScope[],
+): CloudflaredModule {
+  for (const scope of scopes) {
+    if (scope.require === null) continue;
+    try {
+      scope.require.resolve("cloudflared/package.json");
+    } catch {
+      continue;
+    }
+    const mod = scope.require("cloudflared") as Partial<CloudflaredModule>;
+    if (typeof mod.bin !== "string" || typeof mod.install !== "function") {
+      throw new Error("the cloudflared package did not export bin/install");
+    }
+    return { bin: mod.bin, install: mod.install };
+  }
+  throw new Error(
+    `could not resolve the cloudflared package from any of: ${scopes
+      .map((scope) => scope.name)
+      .join(", ")}`,
+  );
+}
+
+/**
+ * Resolves the npm `cloudflared` package's `bin`/`install`, searching scopes in
+ * dependency-truth order: the `langwatch` SDK scope (which actually depends on
+ * `cloudflared`), then `@langwatch/scenario` as a secondary fallback, then the
+ * app's own scope. Under pnpm's strict `node_modules` layout `cloudflared` is
+ * only reachable from the `langwatch` scope, so that scope must be tried first.
  */
 function defaultResolveModule(): CloudflaredModule {
   const appRequire = createRequire(import.meta.url);
-  let scopedRequire = appRequire;
-  try {
-    scopedRequire = createRequire(appRequire.resolve("@langwatch/scenario"));
-  } catch {
-    // @langwatch/scenario not resolvable from here; keep the app-scoped require.
-    scopedRequire = appRequire;
-  }
-  // Resolve the package.json first as the robust presence check, then load the
-  // package root (its `main`, `lib/lib.js`), which re-exports `bin` + `install`.
-  scopedRequire.resolve("cloudflared/package.json");
-  const mod = scopedRequire("cloudflared") as Partial<CloudflaredModule>;
-  if (typeof mod.bin !== "string" || typeof mod.install !== "function") {
-    throw new Error("the cloudflared package did not export bin/install");
-  }
-  return { bin: mod.bin, install: mod.install };
+  const scopeFrom = (specifier: string): NodeRequire | null => {
+    try {
+      return createRequire(appRequire.resolve(specifier));
+    } catch {
+      // Anchor specifier not resolvable from here; skip this scope.
+      return null;
+    }
+  };
+  return resolveCloudflaredFromScopes([
+    { name: "langwatch", require: scopeFrom("langwatch") },
+    { name: "@langwatch/scenario", require: scopeFrom("@langwatch/scenario") },
+    { name: "app scope", require: appRequire },
+  ]);
 }
 
 /** Reject once `ms` elapses, so a hung download cannot park worker boot. */
