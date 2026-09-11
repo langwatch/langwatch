@@ -17,8 +17,14 @@ The worker migration has **barely started**:
 apps/worker  64 composition files   13,725 lines
              worker-production.composition.ts alone   2,530 lines
                                                         120 local bindings
-                                                        153 constructions
+                                                        200 constructions
 ```
+
+The construction figure was **153 in the first draft and it was wrong** - it
+missed the 51 bare `createWorkerXxx(...)` / `tryCreateWorkerXxx(...)` delegate
+calls. On the narrow reading (`new` and `.create()` only) it is 148, which is
+what the original grep measured. Both are quoted below where they matter, since
+the classification differs between them.
 
 The worker has adopted half the mechanism and not the other half:
 
@@ -57,6 +63,49 @@ an implementation live in `services/` (`TraceSpanNormalization`,
 
 That is a module whose own services are built by its caller. It is precisely the
 inversion ADR-144 decision 2 refuses, and the bag is what carries it.
+
+## The falsification test, and its result
+
+The first draft rested on an unproven claim: that the worker root's
+constructions are *mostly* building things its modules should own. That was
+tested by classifying all 200 against a fixed rubric - (a) bag construction,
+(b) a module-owned collaborator, (c) genuine process wiring, (d) unclassifiable.
+
+```
+                         constructions        lines
+(a) bag construction          127              728
+(b) module-owned                4              115
+(c) process wiring             37              364
+(d) unclassifiable             32              449
+    non-construction            -              874
+                              ---             ----
+                              200            2,530
+```
+
+**(a)+(b) beats (c) by 78% to 22% on count and 70% to 30% on lines.** The
+headline stands, and two things make the margin conservative rather than
+generous: ten of (c)'s 37 are `new Error(...)` guard throws, which are not
+wiring at all - excluding them puts it at 83% to 17%; and reclassifying every
+one of the 51 delegate calls from (a) to (c), the single choice that could have
+flipped the count, still leaves (a)+(b) ahead on lines.
+
+Two findings the first draft did not have:
+
+- **476 lines of the file (2055-2530) are class *implementations*, not
+  constructions.** `PrismaGovernanceOldestTeamAdapter`,
+  `PrismaAutomationOrganizationPricingAdapter` and thirteen
+  `LoggedWorker<Module>Absence` classes are *defined* in the composition root,
+  not merely built there. That is stronger evidence than any construction count:
+  a root that instantiates a module's collaborator knows too much about it, and
+  a root that **implements** one has absorbed it.
+- **(d) is 32 constructions and 449 lines**, all of one shape - a per-module
+  absence reporter, duplicated thirteen times. Genuinely ambiguous between
+  module-owned and process-level observability, and left unresolved on purpose.
+  It is 18% of the file and it wants its own decision, not a bucket.
+
+The ratchet's baseline should count the (d) shape as its own row rather than
+folding it into a module's bag, or the first lane to reach it will make that
+decision by accident.
 
 ## Why this is now urgent rather than tidy
 
@@ -155,9 +204,9 @@ they cannot silently stall.
   telemetry-shaped fields (`traceEdgeMediaTelemetry`,
   `traceWindowedReadMetrics`); check them first, since they are the most likely
   counter-example and there are only a few.
-- **If the worker's 13,725 lines are not mostly bag construction**, the headline
-  is wrong. Sample `worker-production.composition.ts`'s 153 constructions before
-  committing to step 4.
+- ~~**If the worker's 13,725 lines are not mostly bag construction**, the
+  headline is wrong.~~ **Tested 2026-09-11; the headline survived.** See
+  "The falsification test, and its result" above.
 - **If `members.<name>` turns out to be load-bearing** for something other than
   the bags, A is not purely transitional and C needs rethinking.
 
