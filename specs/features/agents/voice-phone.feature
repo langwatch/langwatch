@@ -357,6 +357,24 @@ Feature: Voice agents: reach an agent by phone
     Then it fails with a tunnel binary error naming the resolution failure
 
   @unit
+  Scenario: cloudflared resolves through the langwatch SDK scope first
+    Given the langwatch SDK scope can resolve the cloudflared package
+    When the worker resolves cloudflared across its scopes
+    Then it uses the langwatch scope's package and tries no later scope
+
+  @unit
+  Scenario: cloudflared falls back to the scenario scope when the langwatch scope fails
+    Given the langwatch scope cannot resolve cloudflared but the scenario scope can
+    When the worker resolves cloudflared across its scopes
+    Then it uses the scenario scope's package
+
+  @unit
+  Scenario: cloudflared unresolvable from every scope names all tried scopes
+    Given no scope can resolve the cloudflared package
+    When the worker resolves cloudflared across its scopes
+    Then it fails with an error naming every scope it tried
+
+  @unit
   Scenario: A voice worker puts cloudflared on PATH before opening its quick tunnel
     Given a voice worker about to open its quick tunnel
     When it opens the tunnel
