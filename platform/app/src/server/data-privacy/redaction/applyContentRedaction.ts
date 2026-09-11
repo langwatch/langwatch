@@ -64,11 +64,14 @@ export function nativePiiEntitiesForPolicy(
  * {@link isIdentifierAttributeName} accepts. Custom patterns and the PII pass
  * are out of its reach.
  *
- * `skipPiiPass` turns the personal-data pass off for this one string while the
- * policy stays on. Only the reserved trace and span identifier names use it
- * (see {@link isReservedIdentifierAttributeKey}); their values are addresses a
- * tracer minted, so there is no personal data in them to find and a marker
- * written over one is permanent.
+ * `treatAsIdentifier` says this attribute value is an identifier even though its
+ * shape does not say so, which is the case the reserved trace and span names
+ * exist for: a decimal trace id carries no letter, so no shape rule holds it
+ * back. It buys the SAME exemption a hex id gets — the shape-only recognizers
+ * stand down, the self-proving ones still run — rather than turning the
+ * personal-data pass off. A reserved name is a claim about where the value came
+ * from, and the sender writes that name, so it must not be able to keep a card
+ * number out of a check that can prove what it is looking at.
  */
 export function redactStringNative({
   text,
@@ -77,7 +80,7 @@ export function redactStringNative({
   compiledPiiExceptions,
   isAttributeValue = false,
   skipSecretRuleIds,
-  skipPiiPass = false,
+  treatAsIdentifier = false,
 }: {
   text: string;
   policy: ResolvedDataPrivacy;
@@ -85,7 +88,7 @@ export function redactStringNative({
   compiledPiiExceptions?: readonly RegExp[];
   isAttributeValue?: boolean;
   skipSecretRuleIds?: readonly string[];
-  skipPiiPass?: boolean;
+  treatAsIdentifier?: boolean;
 }): { text: string; redactedCount: number } {
   let result = text;
   let redactedCount = 0;
@@ -100,7 +103,7 @@ export function redactStringNative({
     redactedCount += secrets.redactedCount;
   }
 
-  const piiEntities = skipPiiPass ? null : nativePiiEntitiesForPolicy(policy);
+  const piiEntities = nativePiiEntitiesForPolicy(policy);
   if (
     piiEntities !== null &&
     (piiEntities === "all" || piiEntities.length > 0)
@@ -110,6 +113,7 @@ export function redactStringNative({
       entities: piiEntities === "all" ? undefined : piiEntities,
       exceptPatterns: compiledPiiExceptions,
       isAttributeValue,
+      treatAsIdentifier,
     });
     result = pii.text;
     redactedCount += pii.redactedCount;
@@ -172,15 +176,18 @@ export function isIdentifierAttributeName(key: string): boolean {
  * the shape-only value rules. Every other rule runs as it does on any other
  * attribute.
  *
- * An attribute {@link reservesTraceAddress} accepts additionally skips the
- * personal-data pass. That is the stronger claim, which is why the list behind
- * it is short and holds only trace and span addresses: the value is minted by a
- * tracer, never typed by a person, and a decimal trace id carries no letter so
- * no shape rule would hold it back. It takes the VALUE as well as the name,
- * because the OTLP endpoint forwards caller-written attribute names verbatim —
- * a reserved name over an email address does not get the personal-data pass
- * turned off. The vendor, armour and credential-keyword secret rules still run,
- * so a key pasted under such a name is still scrubbed.
+ * An attribute {@link reservesTraceAddress} accepts is treated as identifier-
+ * shaped even when its shape does not say so, which is what the list behind it
+ * exists for: a decimal trace id carries no letter, so no shape rule would hold
+ * it back. It takes the VALUE as well as the name, because the ingestion
+ * endpoint forwards caller-written attribute names verbatim, and a reserved
+ * name over an email address is not an address.
+ *
+ * That is the same exemption an identifier-shaped value gets, deliberately, and
+ * not a stronger one: the self-proving recognizers still run, so a card number
+ * written under a reserved name is still redacted. The vendor, armour and
+ * credential-keyword secret rules still run too, so a key pasted under such a
+ * name is still scrubbed.
  */
 export function redactAttributeNative({
   key,
@@ -212,7 +219,7 @@ export function redactAttributeNative({
     skipSecretRuleIds: namesAnIdentifier
       ? SHAPE_ONLY_SECRET_RULE_IDS
       : undefined,
-    skipPiiPass: reservesAnAddress,
+    treatAsIdentifier: reservesAnAddress,
     compiledSecretPatterns,
     compiledPiiExceptions,
     isAttributeValue: true,

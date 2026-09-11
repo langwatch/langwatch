@@ -325,6 +325,18 @@ Feature: Redacting personal data from traces
     When a trace is ingested with a reserved trace identifier attribute whose value is an email address
     Then the stored attribute has the email address redacted
 
+  # A decimal trace identifier and a card number are the same shape, so no rule
+  # reading the value alone can separate them. What separates them is proof: the
+  # reserved name stands the shape-only detectors down, the way it does for any
+  # identifier, and leaves running the ones that can prove what they are looking
+  # at. A number carrying a card checksum inside a range a scheme actually
+  # issues is redacted whatever attribute it arrives under.
+  @unit
+  Scenario: A card number written under a reserved trace identifier name is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with a reserved trace identifier attribute whose value is a valid card number
+    Then the stored attribute has the card number redacted
+
   @unit
   Scenario: A corpus of opaque identifiers is never sent for analysis
     Given the resolved PII level for "web-app" is strict

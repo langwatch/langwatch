@@ -754,17 +754,25 @@ function maskSpans({
  * the self-proving recognizers, because customers send identifiers on purpose
  * and a shape alone does not make one personal data. Free text never takes the
  * exemption: a document with no spaces in it is still a document.
+ *
+ * `treatAsIdentifier` takes that exemption on the caller's word, for the one
+ * case the shape rule cannot see: a decimal trace id carries no letter, so it
+ * reads as a digit run. It is the SAME exemption, not a stronger one — the
+ * self-proving recognizers still run, so a value under such a name that carries
+ * a card's checksum and a real issuer range is still redacted.
  */
 export function redactEssentialPiiInText({
   text,
   entities,
   exceptPatterns,
   isAttributeValue = false,
+  treatAsIdentifier = false,
 }: {
   text: string;
   entities?: readonly string[];
   exceptPatterns?: readonly RegExp[];
   isAttributeValue?: boolean;
+  treatAsIdentifier?: boolean;
 }): PiiRedactionResult {
   if (
     typeof text !== "string" ||
@@ -780,7 +788,8 @@ export function redactEssentialPiiInText({
     allowed: entities ? new Set(entities) : null,
     exceptPatterns,
     protectedRanges,
-    isIdentifierShaped: isAttributeValue && isIdentifierShapedValue(text),
+    isIdentifierShaped:
+      isAttributeValue && (treatAsIdentifier || isIdentifierShapedValue(text)),
   });
   if (spans.length === 0) return { text, redactedCount: 0 };
 

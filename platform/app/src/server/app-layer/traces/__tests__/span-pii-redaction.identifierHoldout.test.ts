@@ -308,6 +308,25 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
 
       expect(attr(span, "metadata.trace_id")).toBe("[EMAIL_ADDRESS]");
     });
+
+    // A decimal trace id and a card number are the same shape, so the reserved
+    // name cannot be a blanket exemption: it stands the shape-only detectors
+    // down, which is what it is for, and leaves the ones that can prove what
+    // they are looking at running. The control above it is the decimal trace id
+    // that must survive, which is what makes this a rule about proof rather
+    // than a rule about length.
+    /** @scenario "A card number written under a reserved trace identifier name is still redacted" */
+    it("redacts a valid card number written under a reserved name", async () => {
+      const { service } = makeService({
+        ...STRICT_POLICY,
+        pii: { level: "essential", entities: [], exceptPatterns: [] },
+      });
+      const span = spanWith({ "metadata.trace_id": "4111111111111111" });
+
+      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+
+      expect(attr(span, "metadata.trace_id")).toBe("[CREDIT_CARD]");
+    });
   });
 
   describe("given an attribute that carries prose", () => {
