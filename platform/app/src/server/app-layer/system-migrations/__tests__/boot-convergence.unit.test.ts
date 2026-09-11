@@ -85,7 +85,7 @@ describe("runSystemMigrationsToQuiescence", () => {
     expect(stubs.runPass).toHaveBeenCalledTimes(1);
   });
 
-  /** @scenario A finite held or parked migration prevents startup */
+  /** @scenario A finite held migration prevents startup */
   it("rejects finite held work that cannot converge", async () => {
     stubs.runPass.mockResolvedValue({
       ...summaryOf({ advanced: 0 }),
@@ -151,12 +151,36 @@ describe("runSystemMigrationsToQuiescence", () => {
     expect(stubs.runPass).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects a parked tenant at the startup boundary", async () => {
+  /** @scenario One tenant's parked migration does not stop the fleet starting */
+  it("lets the fleet start when one tenant's migration parks", async () => {
+    // A park is one tenant's migration throwing. Its gate stays shut, so it
+    // is served exactly as it was before the identity branch existed —
+    // refusing every pod in the fleet for it bought nothing, and cost the
+    // scale-up needed to clear whatever caused the park.
     stubs.runPass.mockResolvedValue({
       ...summaryOf({ advanced: 0 }),
       parked: 1,
     });
-    await expect(runSystemMigrationsToQuiescence()).rejects.toThrow("parked 1");
+
+    await expect(runSystemMigrationsToQuiescence()).resolves.toMatchObject({
+      parked: 1,
+    });
+  });
+
+  /** @scenario One tenant's parked migration does not stop the fleet starting */
+  it("still refuses when a finite migration stalls beside the park", async () => {
+    // The park is tolerated; the stalled finite hold beside it is not, so
+    // dropping the park refusal must not have dropped that one with it.
+    stubs.runPass.mockResolvedValue({
+      ...summaryOf({ advanced: 0 }),
+      parked: 1,
+      held: 1,
+      finiteHeld: 1,
+    });
+
+    await expect(runSystemMigrationsToQuiescence()).rejects.toThrow(
+      "finite migrations held",
+    );
   });
 
   it("waits for queue effects and propagates barrier failures", async () => {

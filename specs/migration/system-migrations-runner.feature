@@ -86,11 +86,19 @@ Feature: Running system migrations across organizations
     And being re-proved into the same state does not count as progress
 
   @unit
-  Scenario: A finite held or parked migration prevents startup
-    Given a finite migration remains held or parked after its pass
+  Scenario: A finite held migration prevents startup
+    Given a finite migration remains held after its pass, with nothing advancing
     When the app starts
     Then the preflight fails
     And runtime processes do not start
+
+  @unit
+  Scenario: One tenant's parked migration does not stop the fleet starting
+    Given one tenant's migration parks on an error
+    When the app starts
+    Then the preflight still completes and runtime processes start
+    And that tenant stays on its legacy path, served as it was before
+    And the park is reported as an error against its tenant and migration
 
   @unit
   Scenario: Cancelling startup stops the loop between passes
