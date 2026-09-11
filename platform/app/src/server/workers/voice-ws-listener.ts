@@ -17,8 +17,8 @@
  */
 
 import type { ChildProcess } from "node:child_process";
-import http from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import http from "node:http";
 import type { AddressInfo, Socket } from "node:net";
 import type { Duplex } from "node:stream";
 import { createLogger, type Logger } from "@langwatch/observability";
