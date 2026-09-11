@@ -4,7 +4,7 @@ Read `.claude/skills/architecture-guide/SKILL.md` first, then the references for
 contract, server, web and install as you reach each step. Everything below is the order
 that keeps the linter green from the first commit. **Copy `modules/annotation`**;
 it is the reference and the only module with no entry in
-`packages/architecture-lint/src/feature-shape-baseline.json`. Do not copy a module that
+`packages/architecture-enforcer/src/feature-shape-baseline.json`. Do not copy a module that
 still has one.
 
 ## 0. Decide the subject and check ownership
@@ -76,7 +76,7 @@ for anything already listed there, rather than typing a range. Only add an
 explicit range for a dependency the catalog doesn't carry yet — and if two or
 more packages will end up sharing that exact range, that's a sign it belongs
 in the catalog instead (`dev/docs/best_practices/typescript.md`, "pnpm
-catalogs"; `packages/architecture-lint/tests/catalog-enforcement.test.ts`
+catalogs"; `packages/architecture-enforcer/tests/catalog-enforcement.test.ts`
 enforces it).
 
 Operations use RPC verbs (`get`, `getMany`, `list`, `create`, `update`, `delete`,
@@ -184,7 +184,7 @@ pnpm install    # new workspace packages
 
 then `.claude/skills/architecture-guide/references/gates.md` for the three new packages,
 `@langwatch/runtime-composition` (typecheck fails if `feature-names.generated.ts` lags),
-`@langwatch/platform-api`, `@langwatch/ui`, architecture-lint and parity. Your new
+`@langwatch/platform-api`, `@langwatch/ui`, architecture-enforcer and parity. Your new
 `.feature` file must report all bound, and `feature-shape` must report nothing for the new
 module: a new module never gets a baseline entry.
 

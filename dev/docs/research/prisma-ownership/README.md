@@ -10,7 +10,7 @@ All **125 models** are assigned once below: **40 existing feature owners and 3 p
 
 ## What was inspected
 
-The source scan covers **8,604 production TypeScript/JavaScript files** under `packages` and `apps`, excluding generated clients, dist, declaration files, tests, fixtures, storybooks, seeds and migrations. A TypeScript 6 parser already installed for architecture-lint supplied syntax traversal; no typechecker, LSP server or test run was needed. The application uses **Prisma 7.9.1**. Parser version is not the application's TypeScript version.
+The source scan covers **8,604 production TypeScript/JavaScript files** under `packages` and `apps`, excluding generated clients, dist, declaration files, tests, fixtures, storybooks, seeds and migrations. A TypeScript 6 parser already installed for architecture-enforcer supplied syntax traversal; no typechecker, LSP server or test run was needed. The application uses **Prisma 7.9.1**. Parser version is not the application's TypeScript version.
 
 It found **239 files / 1,706 direct delegate-call expressions**, **462 repository-shaped files across all stores/ports**, including **189 with Prisma evidence**, and **24 files containing raw-query expressions**. **56 direct-query files are outside repository-shaped files**; these include legitimate platform adapters as well as feature adapters, services and process composition.
 
@@ -35,7 +35,7 @@ Feature counts exclude app/platform roots. They are direct-query counts; relatio
 | `User`         |                 39 |                12 | `user`         |
 | `AuditLog`     |                 16 |                10 | `audit-log`    |
 
-The current containment rule mostly checks where generated Prisma can be imported. A foreign feature's `repositories/prisma` directory is still allowed, so it does not establish table ownership. See [prisma-containment.rule.mjs](../../../../packages/lint-core/src/rules/prisma-containment.rule.mjs).
+The current containment rule mostly checks where generated Prisma can be imported. A foreign feature's `repositories/prisma` directory is still allowed, so it does not establish table ownership. See [prisma-containment.rule.mjs](../../../../packages/oxlint/src/rules/prisma-containment.rule.mjs).
 
 ## Day-one table groups
 

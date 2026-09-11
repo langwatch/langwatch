@@ -20,8 +20,8 @@ UU mcp/typescript/src/langwatch-api-agents.ts
 UU mcp/typescript/src/langwatch-api.ts
 UU mcp/typescript/src/tools/get-prompt.ts
 UU packages/api/src/rest/validation.ts
-UU packages/architecture-lint/src/check-feature-parity.ts
-UU packages/architecture-lint/tests/resolve-nlp-service.test.ts
+UU packages/architecture-enforcer/src/check-feature-parity.ts
+UU packages/architecture-enforcer/tests/resolve-nlp-service.test.ts
 UU packages/design-system/src/system/config.ts
 UU enterprise/modules/billing/server/src/adapters/__tests__/reportUsageForMonth.command.unit.test.ts
 UU enterprise/modules/billing/server/src/adapters/eventing.report-usage-for-month.adapter.ts

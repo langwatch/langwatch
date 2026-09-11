@@ -7,10 +7,10 @@
 **Behavioural contract:**
 [Package boundaries](../../../specs/tooling/lint-package-boundaries.feature),
 [browser imports of server values](../../../specs/tooling/lint-web-imports-server-shaped-value.feature),
-[feature package boundaries](../../../packages/architecture-lint/specs/feature-package-boundaries.feature),
-[frontend feature boundaries](../../../packages/architecture-lint/specs/frontend-feature-boundaries.feature),
-[API transport through the framework](../../../packages/architecture-lint/specs/api-transport-through-framework.feature),
-[the API package surface](../../../packages/architecture-lint/specs/api-package-surface.feature)
+[feature package boundaries](../../../packages/architecture-enforcer/specs/feature-package-boundaries.feature),
+[frontend feature boundaries](../../../packages/architecture-enforcer/specs/frontend-feature-boundaries.feature),
+[API transport through the framework](../../../packages/architecture-enforcer/specs/api-transport-through-framework.feature),
+[the API package surface](../../../packages/architecture-enforcer/specs/api-package-surface.feature)
 
 **Related:** [ADR-070: modular package architecture](./070-modular-package-architecture.md),
 [ADR-101: feature package surfaces](./101-feature-package-surfaces.md),
@@ -44,7 +44,7 @@ export factories no application ever constructs.
 
 Import direction is checked per import, in the plugin, because it needs the
 importing file's role and the target's manifest. Everything that needs the
-package graph, the catalogue or more than one manifest is architecture-lint.
+package graph, the catalogue or more than one manifest is architecture-enforcer.
 A type-only import is always allowed: types are erased, and the browser program
 never loads the graph behind them.
 
@@ -53,24 +53,24 @@ never loads the graph behind them.
 | `langwatch/package-boundaries` | plugin | Thirteen message ids, one per shape: `webImportsServer`, `serverImportsBrowser`, `coreImportsEnterprise`, `contractRuntime`, `schemaBoundary`, `crossFeature`, `compositionRoot`, `featureLayer`, `sealedExports`, `packageEscape`, `prismaContainment`, `deadAlias`, `retiredPackageRuntime`. |
 | `langwatch/web-imports-server-shaped-value` | plugin | A browser module may not value-import a package whose declarations are the server's. |
 | `langwatch/service-does-not-open-a-channel` | plugin | A file under `services/` may not open the event bus, Redis pub/sub, an HTTP client, an AWS client, a mail sender or Slack; the conduit is a channel and the service takes its interface (ADR-144 decision 9). |
-| `boundary-signature-mirrors` | architecture-lint | A boundary signature mirroring another type through `Parameters`/`ReturnType`, or hiding a nested `any` cast. |
-| `enterprise-source-license` | architecture-lint | Every `enterprise/` source file carries its SPDX licence header. |
-| `application-boundaries` | architecture-lint | One application may not import another's source, nor the wrong Enterprise composition. |
-| `frontend-ui-boundaries` | architecture-lint | Every `apps/ui` production file has an owner in the catalogue, and no forbidden web cross-import. |
-| `cycles` | architecture-lint | No circular manifest dependency among workspace packages. |
-| `port-modules` | architecture-lint | A strict port module is exactly one exported abstract class named `*Port`. |
-| `manifests` | architecture-lint | Every manifest declares an explicit `exports` map, no private or accidental entry point, no retired Zod, no cross-application dependency. |
-| `global-app-access` | architecture-lint | No new use of the legacy `getApp` service locator, against a shrink-only baseline. |
-| `declarations` | architecture-lint | A package's public `.d.ts` does not leak Prisma, application source or private repository types. |
-| `composed-exports` | architecture-lint | A server package does not export a factory no application entrypoint constructs. |
-| `declaration-project-references` | architecture-lint | Declaration-project references do not cycle, dangle, or drift from the manifest. |
-| `contract-build-config` | architecture-lint | A contract package's declaration build is configured, and src-only. |
-| `api-transport-boundaries` | architecture-lint | A transport handler does not reach raw request or response context. |
-| `api-transport-framework` | architecture-lint | A REST or tRPC file goes through `@langwatch/api` rather than hand-rolling the framework or skipping output validation. |
-| `service-projection-boundaries` | architecture-lint | A domain service does not depend on a collaborator exposing projection-store writes. |
-| `eventing-roles` | architecture-lint | A projection, subscriber or process manager stays inside its role: no I/O, no awaiting, no fabricated durable events. |
-| `architecture-records` | architecture-lint | Every non-application ownership root owns a boundary ADR with the required sections and at least one spec. |
-| `feature-configuration` | architecture-lint | Two applications do not each bind the same environment variable through their own config schema. |
+| `boundary-signature-mirrors` | architecture-enforcer | A boundary signature mirroring another type through `Parameters`/`ReturnType`, or hiding a nested `any` cast. |
+| `enterprise-source-license` | architecture-enforcer | Every `enterprise/` source file carries its SPDX licence header. |
+| `application-boundaries` | architecture-enforcer | One application may not import another's source, nor the wrong Enterprise composition. |
+| `frontend-ui-boundaries` | architecture-enforcer | Every `apps/ui` production file has an owner in the catalogue, and no forbidden web cross-import. |
+| `cycles` | architecture-enforcer | No circular manifest dependency among workspace packages. |
+| `port-modules` | architecture-enforcer | A strict port module is exactly one exported abstract class named `*Port`. |
+| `manifests` | architecture-enforcer | Every manifest declares an explicit `exports` map, no private or accidental entry point, no retired Zod, no cross-application dependency. |
+| `global-app-access` | architecture-enforcer | No new use of the legacy `getApp` service locator, against a shrink-only baseline. |
+| `declarations` | architecture-enforcer | A package's public `.d.ts` does not leak Prisma, application source or private repository types. |
+| `composed-exports` | architecture-enforcer | A server package does not export a factory no application entrypoint constructs. |
+| `declaration-project-references` | architecture-enforcer | Declaration-project references do not cycle, dangle, or drift from the manifest. |
+| `contract-build-config` | architecture-enforcer | A contract package's declaration build is configured, and src-only. |
+| `api-transport-boundaries` | architecture-enforcer | A transport handler does not reach raw request or response context. |
+| `api-transport-framework` | architecture-enforcer | A REST or tRPC file goes through `@langwatch/api` rather than hand-rolling the framework or skipping output validation. |
+| `service-projection-boundaries` | architecture-enforcer | A domain service does not depend on a collaborator exposing projection-store writes. |
+| `eventing-roles` | architecture-enforcer | A projection, subscriber or process manager stays inside its role: no I/O, no awaiting, no fabricated durable events. |
+| `architecture-records` | architecture-enforcer | Every non-application ownership root owns a boundary ADR with the required sections and at least one spec. |
+| `feature-configuration` | architecture-enforcer | Two applications do not each bind the same environment variable through their own config schema. |
 
 `sealedExports` is why `package-boundaries` cannot become
 `no-restricted-imports`: it reads the *target* package's `exports` map to

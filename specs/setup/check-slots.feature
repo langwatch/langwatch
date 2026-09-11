@@ -492,7 +492,7 @@ Feature: Machine-wide slots for whole-repo checks
   #
   # The mechanism (dev/scripts/install-check-shims.mjs, TOOLS) is shared,
   # tool-agnostic code already proven for tsc/tsgo/oxlint/oxfmt by
-  # packages/architecture-lint/tests/check-shims.test.ts, which is outside
+  # packages/architecture-enforcer/tests/check-shims.test.ts, which is outside
   # this lane's touched paths for this change. Tagged @unimplemented here
   # rather than left silently unbound: the code change (vitest added to
   # TOOLS) shipped in this change, the dedicated test naming vitest did not.

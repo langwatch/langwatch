@@ -91,9 +91,9 @@ change with its own callers to fix first, not a rename — see the note on
 
 The rule is: no file may name the retired singleton, and no file outside this
 package may construct an ioredis client. Two source guards enforce this in
-`packages/architecture-lint/tests/redis-ownership.unit.test.ts`, one test per
+`packages/architecture-enforcer/tests/redis-ownership.unit.test.ts`, one test per
 pattern so a gap in either would fail silently rather than together — the
 rebuild of the guard that went with `platform/app`
 (`src/server/app-layer/__tests__/redis-ownership.unit.test.ts`, deleted in
 commit `faaa9ec333`). Run it with
-`pnpm --filter @langwatch/architecture-lint test:unit tests/redis-ownership.unit.test.ts`.
+`pnpm --filter @langwatch/architecture-enforcer test:unit tests/redis-ownership.unit.test.ts`.

@@ -6,7 +6,7 @@
 
 **Behavioural contract:**
 [The ast-grep test shapes](../../../specs/tooling/lint-test-shapes.feature),
-[architecture test quality](../../../packages/architecture-lint/specs/feature-package-boundaries.feature)
+[architecture test quality](../../../packages/architecture-enforcer/specs/feature-package-boundaries.feature)
 
 **Related:** [ADR-135: the toolchain](./135-lint-and-format-toolchain.md),
 [the testing philosophy](../TESTING_PHILOSOPHY.md)
@@ -41,7 +41,7 @@ before the user has done anything wrong.
 | `require-bdd-describe-context` | ast-grep | A nested `describe` states a condition: `given <precondition>` or `when <action>`. |
 | `no-form-watch-in-child` | ast-grep | A child component holding `form` as a prop uses `useWatch`, never `form.watch()`. |
 | `no-form-disable-on-isvalid` | ast-grep | Disable a submit button while the request is in flight, not on form validity. |
-| `test-quality` | architecture-lint | Tests with no real assertion, duplicated bodies, a mocked subject, or an empty snapshot, across the workspace. |
+| `test-quality` | architecture-enforcer | Tests with no real assertion, duplicated bodies, a mocked subject, or an empty snapshot, across the workspace. |
 
 `no-test-without-assertion` and `no-empty-test` were ast-grep rules that
 duplicated `vitest/expect-expect`, a built-in already enabled at oxlint's own

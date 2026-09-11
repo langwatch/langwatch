@@ -241,7 +241,7 @@ isolation, not in the boot path.
 
 `classification` and `tier` currently name the same split on every catalogue
 entry and have not been folded into one field; `classification` is what
-architecture-lint's existing policies read, `tier` is what the generator
+architecture-enforcer's existing policies read, `tier` is what the generator
 reads.
 
 ### Step 6 - the address inventory

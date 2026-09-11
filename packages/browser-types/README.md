@@ -9,6 +9,6 @@ It is a bare directory rather than a workspace package on purpose — nothing
 imports it by name, and the only consumers are `paths` entries in
 `apps/ui/tsconfig.json` and `modules/auth/web/tsconfig.json`.
 
-`packages/lint-core/src/rules/web-imports-server-shaped-value.rule.mjs` is the
+`packages/oxlint/src/rules/web-imports-server-shaped-value.rule.mjs` is the
 rule that makes the two better-auth client entrypoints an allowed exception,
 and `specs/tooling/browser-better-auth-contract.feature` is the spec.

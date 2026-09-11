@@ -9,7 +9,7 @@ Feature: Every lint rule is recorded, and every record names a live rule
   So that a rule cannot be added without a reason or deleted without a trace
 
   Background:
-    Given the rules in the langwatch plugin, the ast-grep directory and the architecture-lint policy registry
+    Given the rules in the langwatch plugin, the ast-grep directory and the architecture-enforcer policy registry
 
   Rule: The committed tree agrees with itself
 

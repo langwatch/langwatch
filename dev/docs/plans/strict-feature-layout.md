@@ -9,7 +9,7 @@ reads) are listed in section 8; every one of them is subordinate to this file.
 
 Consolidated 2026-09-06 from the plan sweep; rewritten 2026-09-08 23:30 to fold
 in the API rebuild, the feature conversion drive, the process wiring waves and
-the architecture-lint rebuild. HEAD `74d8aeae66`, 492 commits since
+the architecture-enforcer rebuild. HEAD `74d8aeae66`, 492 commits since
 `771069e998`, 68 of them on 2026-09-08.
 
 Status words used below: **DONE** (committed, hash given), **RUNNING** (an
@@ -76,7 +76,7 @@ Four processes compose the feature packages:
 
 - 0 unbound scenarios on the parity summary line.
 - oxlint errors 0, with no debt registers used as a baseline.
-- architecture-lint hard findings 0, with no baseline file present.
+- architecture-enforcer hard findings 0, with no baseline file present.
 - One install surface per application.
 - The three journeys green: browser, SDK and CLI.
 
@@ -114,13 +114,13 @@ Where an ADR states one, the ADR is the authority and this list is the index.
 
 | Counter | Command | Value 2026-09-06 | Value 2026-09-08 23:30 | Target |
 | --- | --- | --- | --- | --- |
-| Feature-shape rows | `node -e` over `packages/architecture-lint/src/feature-shape-baseline.json` (key `<feature>\|<kind>` after lint L2) | 392 rows, 47 features | **246 rows, 39 features, 27 on the legacy transport** (09-09 01:4x, after lint L2: evaluation, stored-object and monitor rows removed; agent's six and api-key's one read stale against uncommitted work that is not mine) | 0 |
+| Feature-shape rows | `node -e` over `packages/architecture-enforcer/src/feature-shape-baseline.json` (key `<feature>\|<kind>` after lint L2) | 392 rows, 47 features | **246 rows, 39 features, 27 on the legacy transport** (09-09 01:4x, after lint L2: evaluation, stored-object and monitor rows removed; agent's six and api-key's one read stale against uncommitted work that is not mine) | 0 |
 | Fully converted features | rows = 0 | 1 (annotation) | **14**: annotation, api-key (Kimi), dashboard, data-privacy, data-retention, entitlement, feature-flag, notification, platform-health, secret, share, sso, suite, topic | every feature |
 | Source-folder-shape rows | same file family | 431 (09-08 17:50) | **356** | 0 |
-| Unbound scenarios | `pnpm --filter @langwatch/architecture-lint check:feature-parity`, read `THIS RUN FAILS: N unbound` | 1 | **140** (rose with the restored legacy specs and the lanes' new scenarios; every converted feature's own specs are `✓ all bound`) | 0 |
+| Unbound scenarios | `pnpm --filter @langwatch/architecture-enforcer check:feature-parity`, read `THIS RUN FAILS: N unbound` | 1 | **140** (rose with the restored legacy specs and the lanes' new scenarios; every converted feature's own specs are `✓ all bound`) | 0 |
 | `apps/api` typecheck | `tsc --noEmit -p apps/api/tsconfig.test.json`, colour stripped | not clean | **1,432 errors, red by design** until every family converts | prints nothing |
 | `apps/worker` typecheck | same for the worker | not clean | **742** | prints nothing |
-| architecture-lint findings | `pnpm --filter @langwatch/architecture-lint lint` (summary first since `111eb16bf2`) | red, five baselines | **2,990 findings, 36 policies**, 9 stale rows; 14 baseline files in 8 shapes (L2 running) | 0, no baseline files |
+| architecture-enforcer findings | `pnpm --filter @langwatch/architecture-enforcer lint` (summary first since `111eb16bf2`) | red, five baselines | **2,990 findings, 36 policies**, 9 stale rows; 14 baseline files in 8 shapes (L2 running) | 0, no baseline files |
 | Handled-error codes added tonight | `packages/handled-error/src/app-codes.ts` | — | **15** (data-privacy 5, data-retention 8, platform-health 2) | every knowable failure |
 | Uncommitted paths in the worktree | `git status --porcelain \| wc -l` | — | **~1,400**, almost all the 09-07 pile (section 6) | 0 |
 | Disk free | `df -h /` | — | 22 GiB (was 40 at 16:00; lane transcripts and declaration caches) | keep above 15 |
@@ -165,7 +165,7 @@ per-package form; the whole-repository form runs once before a push.
 - **09-08. "Just delete legacy."** The legacy transport builders are deleted, not retired gradually; 44 features and `apps/api` go red and convert or do not build. DONE `1dfbc5dcf1`.
 - **09-08. "Add lint so it can't happen again, not targeted but intent, with errors that are prompts."** `source-folder-shape`. DONE `64322961e3`.
 - **09-08. The audit log sits behind one port**, OSS null recorder, enterprise recorder. DONE `008a5cd882`.
-- **09-08. Full review of the architecture-lint package**, then rebuild it (section 7).
+- **09-08. Full review of the architecture-enforcer package**, then rebuild it (section 7).
 - **09-08. Every finding from a review becomes a fix, a lint rule or a skill line.** Tonight's sample review produced `memory-twin-untested`, the mount and installer fragment exemptions, two false-positive fixes, four skill rules and a fix lane.
 
 ## 4. The conversion board
@@ -380,9 +380,9 @@ by the stopped 09-07 lane: `apps/worker/src/app/{worker-tenancy,worker-productio
 `apps/api/src/features/trace/__tests__/api-key-cost-protections.unit.test.ts`.
 The worker cannot land cleanly until the pile has an owner: **DECISION D-b.**
 
-## 7. The architecture-lint rebuild
+## 7. The architecture-enforcer rebuild
 
-Review: `architecture-lint-review-2026-09-08.md` (`55c5ac8bd0`). Verdict: the
+Review: `architecture-enforcer-review-2026-09-08.md` (`55c5ac8bd0`). Verdict: the
 policies are mostly right (91/91 spec scenarios bound); the package around them
 is not (55 files flat in `src`, six over 700 lines, 14 baselines in 8 shapes,
 six empty ratchets still carrying loaders and flags, one run printed 30,645
@@ -428,7 +428,7 @@ guarding things outside the package, 29 failing, 17 policies untested).
 Live briefs kept as work orders: `wave4-process-wiring.md` (landed `9697edd1f5`; its Wave 5 section is the open work order),
 `api-rest-runtime-gaps-3.md` (parts D and E landed, remaining parts QUEUED), `api-package-rebuild.md` (phase 3
 deletion list, QUEUED for after the last family converts), `modules-rename.md` (LANDED, both phases),
-`agent-server-cleanup.md` (QUEUED with the agent conversion), `architecture-lint-review-2026-09-08.md` (L3 to
+`agent-server-cleanup.md` (QUEUED with the agent conversion), `architecture-enforcer-review-2026-09-08.md` (L3 to
 L8). Every landed brief is retired in section 14.
 
 Rules every lane runs under: Opus for shape choices, Sonnet for cross-file renames and repoints, Haiku for
@@ -596,7 +596,7 @@ order. Report the counters only after them.
 7. **Seams are read once by Fable**, one fresh session per seam. The seams are
    `packages/api/src/rest` and `src/trpc`; the two production compositions;
    `apps/api/src/api-rest.security.ts` with `modules/authz/server`;
-   and the architecture-lint rules with `.oxlintrc.architecture.json`.
+   and the architecture-enforcer rules with `.oxlintrc.architecture.json`.
 8. **Code Owners review is required on `main`.** `.github/CODEOWNERS` names an
    owner for every seam, so a function cannot join a complexity register
    without a person seeing the line appear.
@@ -631,7 +631,7 @@ everything in between.
   bulk (~300k lines)        seams (~15k lines)        judgement
   ┌──────────────────┐      ┌─────────────────┐      ┌──────────────┐
   │ oxlint           │      │ packages/api    │      │ Fable, one   │
-  │ architecture-lint│      │ compositions    │ ───► │ session per  │
+  │ architecture-enforcer│      │ compositions    │ ───► │ session per  │
   │ parity gate      │      │ security + authz│      │ seam         │
   │ per-package tests│      │ lint rules      │      └──────────────┘
   │ visual diff, CI  │      └─────────────────┘
@@ -657,7 +657,7 @@ Five questions answer faster than a review, and each is a grep:
 
 ### Burn-down ground rules
 
-These govern every architecture-lint slice.
+These govern every architecture-enforcer slice.
 
 1. **A finding is one of three things.** The code is wrong, so fix it in a
    slice an agent can run without judgement. The rule is wrong or redundant, so
@@ -747,8 +747,8 @@ what the document was for, what it decided or found, and where its remainder wen
 | `composition-simplification-options.md` | Options A to J for simplifying composition | Superseded | The composition design ADR draft, section 13 |
 | `feature-application-and-typed-transports.md` | A typed feature-application transport shape | Superseded | The composition design ADR draft, section 13 |
 | `typed-rest-context-design.md` | A typed REST context | Superseded | The composition design ADR draft, section 13 |
-| `architecture-lint-burn-down-plan.md` | The burn-down of 2,946 architecture-lint violations | The seven ground rules, R1 to R9 landed, and the open code slices | Section 12 (the ground rules). Section 10 item 12 (the open slices) |
-| `architecture-lint-review-2026-09-03.md` | Companion review of the lint rules | Folded into the lint review lane | The lint review report, section 13 |
+| `architecture-enforcer-burn-down-plan.md` | The burn-down of 2,946 architecture-enforcer violations | The seven ground rules, R1 to R9 landed, and the open code slices | Section 12 (the ground rules). Section 10 item 12 (the open slices) |
+| `architecture-enforcer-review-2026-09-03.md` | Companion review of the lint rules | Folded into the lint review lane | The lint review report, section 13 |
 | `experiment-orchestrator-split-plan.md` | The split of an 88 KB orchestrator service | Done: 3,956 lines became 385 lines plus 27 sibling services | Section 3 (decision 16) |
 | `ui-family-move-manifests.md` | Eighteen manifests for the UI family moves | The drawer registry mechanism moves, not the drawers. `@langwatch/ui-drawer` owns the address vocabulary, the navigation stack, the stores, the lazy registry and `CurrentDrawer` | `best_practices/drawers.md`, section "The drawer registry" |
 | `ui-subscription-transport.md` | The tRPC subscription wire for the browser | All nine live procedures resolve on the api root and stream over `/api/sse/*`. The wire is ours, not tRPC's | ADR-128 (public REST and internal tRPC) amendment |

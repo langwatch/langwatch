@@ -24,10 +24,10 @@ const repoRoot = path.resolve(__dirname, "../..");
 
 /**
  * This file lives beside the product skill dogfoods rather than in
- * packages/architecture-lint because the subject is the same: a real Claude Code
+ * packages/architecture-enforcer because the subject is the same: a real Claude Code
  * sub-session, judged. This directory owns the only harness that can spawn one.
  * The structural half of the protocol - the half that needs no LLM - is
- * packages/architecture-lint/tests/agent-workflow-protocol.unit.test.ts.
+ * packages/architecture-enforcer/tests/agent-workflow-protocol.unit.test.ts.
  *
  * One run binds four scenarios. Each run spawns a real sub-process and hits live
  * models, so the scenarios that share a fixture share a run rather than paying

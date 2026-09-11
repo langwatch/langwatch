@@ -35,7 +35,7 @@ import {
  *            ├─ ExecuteEvaluationCommand.makeJobId the dedup identity
  *            └─ the process's evaluation queue     the transport
  *
- * WHY THE DISPATCH IS A PORT AND NOT AN IMPORT. `architecture-lint`'s
+ * WHY THE DISPATCH IS A PORT AND NOT AN IMPORT. `architecture-enforcer`'s
  * `cross-feature` policy forbids a feature server from depending on another
  * feature's server package, and `ExecuteEvaluationCommand` lives in
  * `@langwatch/evaluation-server`. That is not a technicality here: the trace

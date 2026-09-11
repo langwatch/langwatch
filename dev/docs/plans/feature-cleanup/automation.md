@@ -152,7 +152,7 @@ functions in `subscribers/`, re-passing the same four dependencies each time.
 
 ### P4 — Four ports are declared twice to satisfy the lint rule (breaks R4, R8)
 
-`packages/architecture-lint/src/port-modules.ts:214-217` requires every
+`packages/architecture-enforcer/src/port-modules.ts:214-217` requires every
 `ports/*.port.ts` to export an abstract class **whose name ends in `Port`**. Four
 files satisfy it with an empty subclass and keep the real name for every consumer:
 

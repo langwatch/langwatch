@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  // The entry point, and deliberately almost empty. What it points at owns
+  // the content: the architecture rules live beside the plugin that
+  // implements them, and the debt baseline lives with the repository's other
+  // lint configuration. Later entries win, so anything restated below
+  // overrides them on purpose.
+  "extends": [
+    "./packages/architecture-enforcer/oxlint.architecture.jsonc",
+    "./dev/lint/oxlint.baseline.jsonc"
+  ],
+
+  // Oxlint's default plugin set plus vitest and jest, which is what lets the
+  // test-quality rules in the baseline (noFocusedTests and friends, carried
+  // from the deleted biome.jsonc) be named at all. Setting this key
+  // REPLACES the default set, so the four defaults are restated here.
+  "plugins": ["react", "unicorn", "typescript", "oxc", "vitest", "jest"],
+  "rules": {
+    "complexity": ["error", { "max": 25 }],
+    "no-nested-ternary": "error"
+  }
+}

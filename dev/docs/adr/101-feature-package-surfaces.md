@@ -17,7 +17,7 @@ domain ownership defined by [ADR-112](./112-singular-feature-ownership.md).
 [Stored Objects](../../../modules/stored-object/adrs/001-package-boundary.md),
 [the design system](../../../packages/design-system/adrs/001-design-system-boundary.md),
 [shared JavaScript configuration](../../../packages/config/adrs/001-shared-runtime-configuration.md),
-and [package-boundary enforcement](../../../packages/architecture-lint/adrs/001-feature-package-boundaries.md).
+and [package-boundary enforcement](../../../packages/architecture-enforcer/adrs/001-feature-package-boundaries.md).
 
 ## Context
 

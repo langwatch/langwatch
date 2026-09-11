@@ -142,10 +142,10 @@ architecture linter.
   live-blog history and generic architecture prose; link shared ADRs instead.
 - After a coherent slice, run package typechecks/tests, focused app tests,
   Oxfmt, Oxc, architecture lint, and `git diff --check`. Also run:
-  `pnpm --filter @langwatch/architecture-lint review:test-quality` for changed
+  `pnpm --filter @langwatch/architecture-enforcer review:test-quality` for changed
   tests and `review:comment-blocks` when reviewing long comments.
   Run Oxc from the repository root with
-  `pnpm exec oxlint --quiet --config .oxlintrc.architecture.json <paths>`.
+  `pnpm exec oxlint --quiet --config .oxlintrc.jsonc <paths>`.
   Whole-feature compliance requires the whole feature directory, including tests;
   a plain Oxc run or selected-file pass does not establish architecture compliance.
 - If the full workspace is red from unrelated work, prove the changed slice and

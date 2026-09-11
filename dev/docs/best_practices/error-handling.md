@@ -148,7 +148,7 @@ in order of how often they are violated:
    `logic/__tests__/noRawErrorToasts.unit.test.ts` scans the tree for it. It is
    now the only guard: an author-time GritQL plugin used to run alongside it and
    went with the linter that hosted it (see
-   `packages/architecture-lint/adrs/003-unified-oxc-toolchain.md`). The scanner
+   `packages/architecture-enforcer/adrs/003-unified-oxc-toolchain.md`). The scanner
    was always the authority on what may ship, and it catches everything the
    plugin did except one shape — a copy object built outside the toast call's
    own argument list, `toaster.create(buildToast({ description: error.message

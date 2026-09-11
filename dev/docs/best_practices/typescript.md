@@ -107,7 +107,7 @@ don't force it on their consumers, for example — gets a small named catalog
 dependency whose manifests still disagree for no documented reason is left
 with its own explicit range everywhere, on purpose: `dev/scripts/print-resolved-versions.mjs`
 is what proved the migration didn't silently change any manifest's resolved
-version, and `packages/architecture-lint/tests/catalog-enforcement.test.ts`
+version, and `packages/architecture-enforcer/tests/catalog-enforcement.test.ts`
 is what stops a manifest drifting back to an explicit range for a dependency
 the default catalog already carries. New manifests declare `"dep": "catalog:"`
 for anything already in the catalog; `catalogMode: strict` makes `pnpm add`

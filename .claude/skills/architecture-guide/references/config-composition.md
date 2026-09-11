@@ -204,7 +204,7 @@ on the API sends a command; it never appends.
 
 No value import chain from server code may reach a browser package (React, Chakra,
 react-router, a `*-web` package, `apps/ui`).
-`packages/architecture-lint/tests/frontend-boundary.unit.test.ts` walks the real import
+`packages/architecture-enforcer/tests/frontend-boundary.unit.test.ts` walks the real import
 graph from both backend entrypoints, every `*.composition.ts`, and every server package.
 `import type` is always fine for a framework-free module, but not for a type whose
 module drags a value graph behind it, which is the whole of ADR-130.

@@ -73,7 +73,7 @@ The spend path is shallower but ends the same way:
 behaviour.**
 
 Detectors agree. `no-same-name-delegation-ts` fires 8 times inside the feature,
-`no-identity-function-ts` twice, and `packages/architecture-lint` reports 10
+`no-identity-function-ts` twice, and `packages/architecture-enforcer` reports 10
 policy hits — every one of which is reproduced below with its own evidence.
 
 ## 2. Problems
@@ -189,7 +189,7 @@ methods over a repository declaring the same 7 names
 (`repositories/gateway-cache-rule.repository.ts:10-20`). Five are literal
 delegations (`:22`, `:26`, `:34`, `:38`, `:60`); `update` and `archive` add a
 not-found check. `layer-class` already flagged it and it was waived, not fixed:
-`packages/architecture-lint/src/overengineering-baseline.json:13`.
+`packages/architecture-enforcer/src/overengineering-baseline.json:13`.
 
 **`GatewayGuardrailCatalogue`** (`services/gateway-guardrail.service.ts`) — same
 shape, 3 of 6 delegating (`:47`, `:51`, `:55`).

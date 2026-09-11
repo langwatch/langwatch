@@ -106,7 +106,7 @@ One dependency and one map. That is the whole contract.
 The other entries — `.`, `./rest`, `./trpc`, `./contract`, `./access` and
 `./composition` — are the server's half of the same package, and
 `ui-screen-closure` refuses every one of them from a browser closure. The
-allow-list in `packages/architecture-lint/src/frontend-ui-boundaries.ts` names
+allow-list in `packages/architecture-enforcer/src/frontend-ui-boundaries.ts` names
 `@langwatch/api/web` and nothing else, so reaching for a deeper import fails the
 lint rather than quietly pulling server code into the bundle.
 
@@ -119,7 +119,7 @@ Provider.
 Two hard walls, both worth knowing before someone tries to route around them.
 
 1. **A web package may not import `@trpc/server`, even as a type.**
-   `packages/architecture-lint/oxlint-plugin.mjs:340-348` rejects it for the
+   `packages/architecture-enforcer/oxlint-plugin.mjs:340-348` rejects it for the
    `web` role and `:340-345` for `contract` as well. The rule fires from
    `ImportDeclaration` and never inspects `importKind`, so `import type` is
    rejected exactly like a value import. Since `AnyRouter`,

@@ -95,7 +95,7 @@ describe("the retired library cannot come back", () => {
   describe("given the architecture lint configuration", () => {
     /** @scenario "The linter refuses a new import of the retired library" */
     it("names date-fns in a no-restricted-imports pattern with @langwatch/time as the remedy", () => {
-      const config = readFileSync(join(repoRoot, ".oxlintrc.architecture.json"), "utf8");
+      const config = readFileSync(join(repoRoot, "dev/lint/oxlint.baseline.jsonc"), "utf8");
       const groupMatch = config.match(
         /"group":\s*\[\s*"date-fns"\s*,\s*"date-fns\/\*"\s*\][^}]*"message":\s*"([^"]*)"/s,
       );

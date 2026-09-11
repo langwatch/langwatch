@@ -19,8 +19,8 @@ mcp/typescript/src/langwatch-api-agents.ts
 mcp/typescript/src/langwatch-api.ts
 mcp/typescript/src/tools/get-prompt.ts
 packages/api/src/rest/validation.ts
-packages/architecture-lint/src/check-feature-parity.ts
-packages/architecture-lint/tests/resolve-nlp-service.test.ts
+packages/architecture-enforcer/src/check-feature-parity.ts
+packages/architecture-enforcer/tests/resolve-nlp-service.test.ts
 packages/design-system/src/system/config.ts
 enterprise/modules/billing/server/src/adapters/__tests__/reportUsageForMonth.command.unit.test.ts
 enterprise/modules/billing/server/src/adapters/eventing.report-usage-for-month.adapter.ts

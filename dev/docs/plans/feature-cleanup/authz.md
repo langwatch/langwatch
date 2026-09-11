@@ -90,9 +90,9 @@ Two of these fire `no-same-name-delegation-ts` (`:723`, `:739`); the other
 eleven escape only because the delegate's name differs.
 
 The file is on the `service-quality` baseline at
-`packages/architecture-lint/src/service-quality-baseline.json:37` for
+`packages/architecture-enforcer/src/service-quality-baseline.json:37` for
 `moduleLines: 775` against a ceiling of 500
-(`packages/architecture-lint/src/service-quality.ts:9`). Sixty of the excess
+(`packages/architecture-enforcer/src/service-quality.ts:9`). Sixty of the excess
 lines are the delegation block.
 
 The listing half and the deciding half share nothing: `listUserBindings` never
@@ -214,7 +214,7 @@ out checks nothing. `InternalPostgresAuthzDatabase`
 what the repositories need; the public one is ceremony over it.
 
 Three of five port files are on the `strict-port-module` baseline
-(`packages/architecture-lint/src/port-module-baseline.json:17-19`):
+(`packages/architecture-enforcer/src/port-module-baseline.json:17-19`):
 `authz-grants-command-dispatcher.port.ts` (class lacks the `Port` suffix and the
 file also exports a re-export and a const),
 `authz-revocation-telemetry.port.ts` (same), and

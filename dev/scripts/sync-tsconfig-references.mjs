@@ -10,7 +10,7 @@ import {
   deriveWorkspaceReferences,
   readWorkspaceMembers,
   renderReferences,
-} from "../../packages/architecture-lint/src/workspace/tsconfig-references.ts";
+} from "../../packages/architecture-enforcer/src/workspace/tsconfig-references.ts";
 
 const options = process.argv.slice(2);
 const rootIndex = options.indexOf("--root");

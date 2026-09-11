@@ -1,7 +1,7 @@
 # See ../../dev/docs/adr/112-singular-feature-ownership.md
 # Package surface and source-layout mechanics remain owned by
-# ../../packages/architecture-lint/specs/feature-package-boundaries.feature and
-# ../../packages/architecture-lint/specs/strict-feature-layout.feature.
+# ../../packages/architecture-enforcer/specs/feature-package-boundaries.feature and
+# ../../packages/architecture-enforcer/specs/strict-feature-layout.feature.
 # Physical executable extraction remains owned by
 # application-workspace-boundaries.feature.
 # Enterprise catalogue membership remains owned by

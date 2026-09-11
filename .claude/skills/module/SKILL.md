@@ -14,7 +14,7 @@ the identifiers a module author types: `defineModule`, `withModule`, `moduleApi`
 
 Read `.claude/skills/architecture-guide/SKILL.md` first, always. It is the map of the
 whole shape; this skill is the set of procedures for changing it. `modules/annotation`
-is the one module with no entry in `packages/architecture-lint/src/feature-shape-baseline.json`,
+is the one module with no entry in `packages/architecture-enforcer/src/feature-shape-baseline.json`,
 the reference every task below copies.
 
 ## What are you doing → read which reference
@@ -113,12 +113,12 @@ is what is specific to changing a module.
 
 ## The exit bar
 
-- `packages/architecture-lint/src/feature-shape-baseline.json` gains no new entry for the
+- `packages/architecture-enforcer/src/feature-shape-baseline.json` gains no new entry for the
   module you touched (a brand-new module gets zero entries, ever).
-- `pnpm --filter @langwatch/architecture-lint lint` shows no new violation in the files
+- `pnpm --filter @langwatch/architecture-enforcer lint` shows no new violation in the files
   you touched (baselined, pre-existing ones are not yours to fix unless you touched that
   file).
-- `pnpm --filter @langwatch/architecture-lint check:feature-parity` reports every scenario
+- `pnpm --filter @langwatch/architecture-enforcer check:feature-parity` reports every scenario
   you added or touched as bound; read the `✗ THIS RUN FAILS: …` banner, not a per-file `✓`.
 - Every package you touched passes its own `typecheck` and `test`.
 - No re-export, no `refusing*` twin, no widened `.strict()` schema, no message-prose

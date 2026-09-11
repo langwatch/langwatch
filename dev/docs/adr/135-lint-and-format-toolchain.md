@@ -33,7 +33,7 @@ arbitrary. oxlint runs in Rust over one file at a time. Its JavaScript plugin
 runs in a Node bridge, still one file at a time, but with the workspace path,
 the module's role and the shared baseline in hand. ast-grep is a separate
 pinned CLI that matches syntax patterns and is what CodeRabbit reads during
-review. architecture-lint loads a `WorkspaceSnapshot` - every manifest, the
+review. architecture-enforcer loads a `WorkspaceSnapshot` - every manifest, the
 module catalogue, the Prisma schema, the package graph and the spec tree - and
 answers questions no single-file linter can be asked, such as whether the
 package graph has a cycle or whether two modules claim the same table.
@@ -47,8 +47,8 @@ a path.
 
 ### oxlint and oxfmt are the whole toolchain
 
-`pnpm lint` is oxlint with `.oxlintrc.architecture.json` over a named list of
-application, module and package roots, followed by architecture-lint over the
+`pnpm lint` is oxlint with `.oxlintrc.jsonc` over a named list of
+application, module and package roots, followed by architecture-enforcer over the
 whole workspace snapshot; `pnpm format` is oxfmt. There is no ESLint, no Prettier and no Biome, and adding one back is an
 ADR of its own. ADR-143 covers the formatter.
 
@@ -60,7 +60,7 @@ In order:
 2. **oxlint configuration** - `no-restricted-imports`, `no-restricted-globals`,
    `no-restricted-properties`, `no-restricted-types` and an `overrides` block -
    if the rule is "this file kind may not name that thing".
-3. **The `langwatch` JavaScript plugin** (`packages/lint-core`), if the rule
+3. **The `langwatch` JavaScript plugin** (`packages/oxlint`), if the rule
    needs the AST, the file's classified role, or the shared baseline. This is
    also the only route for anything oxlint's config cannot say at all: oxlint
    has no `no-restricted-syntax`, so there is no generic AST-selector escape
@@ -68,7 +68,7 @@ In order:
 4. **ast-grep**, for a syntactic shape the plugin does not see and for the
    rules we want CodeRabbit to quote back during review. It is a pinned CLI
    with committed fixtures, gated in CI.
-5. **architecture-lint**, for anything that reads more than the file in front
+5. **architecture-enforcer**, for anything that reads more than the file in front
    of it.
 
 Layer 3 buys message quality as well as reach: a `defineRule` message is a
@@ -79,14 +79,14 @@ declaration itself. `no-restricted-imports` gives one flat string.
 
 | Registry | Where | Count | Enforced by |
 | --- | --- | --- | --- |
-| oxlint built-ins | `.oxlintrc.architecture.json` `rules` and `overrides` | 1 workspace-wide, the rest scoped | `pnpm lint` |
-| `langwatch` plugin | `packages/lint-core/src/rules/*.rule.mjs` | 34 defined, 30 enabled | `pnpm lint` |
+| oxlint built-ins | `.oxlintrc.jsonc` `rules` and `overrides` | 1 workspace-wide, the rest scoped | `pnpm lint` |
+| `langwatch` plugin | `packages/oxlint/src/rules/*.rule.mjs` | 34 defined, 30 enabled | `pnpm lint` |
 | ast-grep | `dev/lint/ast-grep/rules/*.yml` | 13 rules in 21 files | the `ast-grep` CI job and CodeRabbit |
-| architecture-lint | `packages/architecture-lint/src/policies/index.ts` | 31 policies | `pnpm lint:architecture` |
+| architecture-enforcer | `packages/architecture-enforcer/src/policies/index.ts` | 31 policies | `pnpm lint:architecture` |
 
 ### The baseline is a ratchet, not an amnesty
 
-`packages/architecture-lint/src/oxlint-baseline.json` holds 2,586 entries
+`packages/architecture-enforcer/src/oxlint-baseline.json` holds 2,586 entries
 across 10 rules, keyed `rule|file` with a `measured` date. A plugin rule
 consults it directly and reports nothing for a listed file; the two native
 rules that cannot read it get a generated `overrides` block. The `oxlint`
@@ -99,9 +99,9 @@ why the mechanism survives even if every class A and B rule below moves.
 
 | Rule | Layer | Meaning |
 | --- | --- | --- |
-| `oxlint` | architecture-lint | The oxlint baseline is shrink-only and every entry carries a measured date. |
-| `comment-block-root` | architecture-lint | The allowed roots for long comment blocks are a ratcheted list, not a free-for-all. |
-| `comment-block-review` | architecture-lint | The 4 to 5 line review tier is registered so it can be listed and queried; it never fails a run. |
+| `oxlint` | architecture-enforcer | The oxlint baseline is shrink-only and every entry carries a measured date. |
+| `comment-block-root` | architecture-enforcer | The allowed roots for long comment blocks are a ratcheted list, not a free-for-all. |
+| `comment-block-review` | architecture-enforcer | The 4 to 5 line review tier is registered so it can be listed and queried; it never fails a run. |
 
 `langwatch/runtime-undefined` used to hold a fourth row here: a plugin rule,
 defined and tested, wired into no config. ADR-135's class-A migration deleted
@@ -126,19 +126,19 @@ A rule's spec record is resolved in this order: a `Rule:` line under
 `specs/tooling/` naming the rule id in backticks; failing that, the
 conventional `specs/tooling/lint-<name>.feature` for a plugin rule, which is
 the same path `dev/docs/lint-rules.md` renders; failing that, the `spec` a
-policy registers in `packages/architecture-lint/src/policies/index.ts`.
+policy registers in `packages/architecture-enforcer/src/policies/index.ts`.
 
 ## Consequences
 
 Every rule now has one address: a row in one of these nine ADRs, a `Rule:`
 block in `specs/tooling/`, and a bound scenario. A drift guard
-(`packages/architecture-lint/tests/lint-rule-records.unit.test.mjs`) enumerates
+(`packages/architecture-enforcer/tests/lint-rule-records.unit.test.mjs`) enumerates
 the three registries and fails when a rule has no ADR row, when an ADR row
 names a rule that no longer exists, or when a rule has no spec. Adding a rule
 is therefore three files, and deleting one is three files.
 
 A second guard
-(`packages/architecture-lint/tests/ast-grep-rule-fixtures.unit.test.mjs`) pairs
+(`packages/architecture-enforcer/tests/ast-grep-rule-fixtures.unit.test.mjs`) pairs
 every ast-grep rule with its fixture. The `ast-grep test` CI step proves a rule
 still matches the fixture it has; it cannot notice a rule that has none, which
 is how `no-form-watch-in-child` once matched nothing unnoticed.

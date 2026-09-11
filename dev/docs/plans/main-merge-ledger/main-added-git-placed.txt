@@ -10,8 +10,8 @@ packages/api/src/rest/suite-wire.ts
 packages/api/src/rest/v1/__tests__/project-service.unit.test.ts
 packages/api/src/rest/v1/project-service.ts
 packages/api/src/rest/v1/version.ts
-packages/architecture-lint/tests/langyMountScope.unit.test.ts
-packages/architecture-lint/tests/plan-langy-lane.unit.test.ts
+packages/architecture-enforcer/tests/langyMountScope.unit.test.ts
+packages/architecture-enforcer/tests/plan-langy-lane.unit.test.ts
 packages/design-system/src/components/avatar.tsx
 packages/design-system/tests/avatar.integration.test.tsx
 packages/design-system/tests/avatarInitials.unit.test.ts

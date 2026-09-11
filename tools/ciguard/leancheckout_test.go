@@ -23,7 +23,6 @@ const leanJob = `jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
       - name: Next
         run: echo hi
@@ -142,11 +141,10 @@ func TestLeanCheckoutStillRequiresExclusionsOnAWholeTreeCheckout(t *testing.T) {
 	problems, err := ciguard.LeanCheckout(root)
 
 	require.NoError(t, err)
-	require.Len(t, problems, 3)
+	require.Len(t, problems, 2)
 	joined := strings.Join(problems, "\n")
 	assert.Contains(t, joined, "does not exclude /docs/media/")
 	assert.Contains(t, joined, "does not exclude /docs/images/")
-	assert.Contains(t, joined, "does not exclude /assets/")
 }
 
 // @scenario "Prose under docs/ is kept, because CI reads it"
@@ -191,7 +189,7 @@ func TestLeanCheckoutRejectsAnUnparseableConeModeValue(t *testing.T) {
 // @scenario "The exclusions are root-anchored"
 func TestLeanCheckoutRejectsAnUnanchoredExclusion(t *testing.T) {
 	root := writeWorkflows(t, map[string]string{
-		ciguard.LeanCheckoutWorkflows[0]: strings.Replace(leanJob, "!/assets/", "!assets/", 1),
+		ciguard.LeanCheckoutWorkflows[0]: strings.Replace(leanJob, "!/docs/images/", "!docs/images/", 1),
 	})
 
 	problems, err := ciguard.LeanCheckout(root)

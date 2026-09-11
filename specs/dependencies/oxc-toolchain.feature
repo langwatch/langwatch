@@ -1,5 +1,5 @@
-# See ../../packages/architecture-lint/adrs/003-unified-oxc-toolchain.md
-# Complements ../../packages/architecture-lint/specs/feature-package-boundaries.feature,
+# See ../../packages/architecture-enforcer/adrs/003-unified-oxc-toolchain.md
+# Complements ../../packages/architecture-enforcer/specs/feature-package-boundaries.feature,
 # which owns feature-graph and source-architecture diagnostics.
 # The application-workspace migration is specified by
 # application-workspace-boundaries.feature.

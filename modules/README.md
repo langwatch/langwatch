@@ -7,12 +7,12 @@ package boundaries instead of spreading a feature through the application.
 The rules in this document are enforced by architecture lint. The architectural
 decisions remain the source of truth:
 
-- [Feature package boundaries](../architecture-lint/adrs/001-feature-package-boundaries.md)
-- [Strict versioned source layout](../architecture-lint/adrs/002-versioned-strict-feature-layout.md)
+- [Feature package boundaries](../architecture-enforcer/adrs/001-feature-package-boundaries.md)
+- [Strict versioned source layout](../architecture-enforcer/adrs/002-versioned-strict-feature-layout.md)
 - [Singular feature ownership](../../dev/docs/adr/112-singular-feature-ownership.md)
 - [One feature installer, one construction path](../../dev/docs/adr/133-composition-spec.md)
 - `annotation` is the reference feature (its [ADR-001](./annotation/adrs/001-annotation-service-boundary.md)
-  records the shape); `packages/architecture-lint/src/feature-shape-baseline.json`
+  records the shape); `packages/architecture-enforcer/src/feature-shape-baseline.json`
   lists what every other feature still carries from the older shape, and it only
   shrinks. Existing plural roots are migration paths, not naming precedents.
 
@@ -468,14 +468,14 @@ this command only reconciles already tolerated legacy edges:
 pnpm lint:architecture:migration
 ```
 
-For focused architecture-lint development:
+For focused architecture-enforcer development:
 
 ```bash
-pnpm --filter @langwatch/architecture-lint typecheck
-pnpm --filter @langwatch/architecture-lint test
-pnpm --filter @langwatch/architecture-lint lint
-pnpm --filter @langwatch/architecture-lint lint:declarations
-pnpm --filter @langwatch/architecture-lint lint:migration
+pnpm --filter @langwatch/architecture-enforcer typecheck
+pnpm --filter @langwatch/architecture-enforcer test
+pnpm --filter @langwatch/architecture-enforcer lint
+pnpm --filter @langwatch/architecture-enforcer lint:declarations
+pnpm --filter @langwatch/architecture-enforcer lint:migration
 ```
 
 Also typecheck and test each changed physical feature package.
@@ -486,7 +486,7 @@ Do not suppress a layout failure with a local exception or invent a feature-only
 directory. If the shared format no longer fits, change it deliberately:
 
 1. Write an architecture decision explaining the new shape.
-2. Add or update the Gherkin scenarios and architecture-lint fixtures.
+2. Add or update the Gherkin scenarios and architecture-enforcer fixtures.
 3. Implement layout version 1 rather than changing version 0 underneath
    existing features.
 4. Migrate a feature by changing its source, tests, ADR, and `feature.json` in

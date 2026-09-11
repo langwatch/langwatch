@@ -1,0 +1,154 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+
+  // The architecture rules themselves: the langwatch/* plugin this package
+  // implements, every rule it exposes, and the exemptions that are part of a
+  // rule's definition rather than debt against it. The root .oxlintrc.jsonc
+  // extends this file, so the rules live beside the code that enforces them.
+  //
+  // Debt — a path exempted because it has not been paid down yet — does NOT
+  // belong here. That is dev/lint/oxlint.baseline.jsonc.
+  "jsPlugins": [
+    {
+      "name": "langwatch",
+      "specifier": "./oxlint-plugin.mjs"
+    }
+  ],
+  "rules": {
+    "langwatch/cognitive-complexity": ["error", { "max": 15 }],
+    "langwatch/condition-shape": "error",
+    "langwatch/api-context-services": "error",
+    "langwatch/comment-block-size": "error",
+    "langwatch/comment-block-size-warning": "warn",
+    "langwatch/conditional-type-depth": "error",
+    "langwatch/zod-object-composition": "error",
+    "langwatch/fallible-result-naming": "error",
+    "langwatch/feature-source-filename": "error",
+    "langwatch/feature-source-layout": "error",
+    "langwatch/feature-source-subject": "error",
+    "langwatch/handled-error-outside-contract": "error",
+    "langwatch/layer-class": "error",
+    "langwatch/no-raw-hono-mount": "error",
+    "langwatch/overload-by-literal": "error",
+    "langwatch/plan-literals": "error",
+    "langwatch/prisma-containment": "error",
+    "langwatch/schema-outside-contract": "error",
+    "langwatch/service-loads-its-own-config": "error",
+    "langwatch/temporal-only": "error",
+    "langwatch/typed-prisma-seam": "error",
+    "langwatch/web-imports-server-shaped-value": "error",
+    "langwatch/environment-boundaries": "error",
+    "langwatch/secrets-through-source": "error",
+    "langwatch/package-boundaries": "error",
+    "langwatch/feature-module-classes": "error",
+    "langwatch/service-classes": "error",
+    "langwatch/service-dependencies": "error",
+    "langwatch/namespace-class": "error",
+    "langwatch/unbounded-loop": "error",
+    "langwatch/id-generation-origin": "error",
+    "langwatch/no-runtime-reflection": "error",
+    "langwatch/feature-side-holds-no-app": "error",
+    "langwatch/transport-middleware-is-a-gate": "error",
+    "langwatch/type-only-value-import": "error",
+    "langwatch/no-alias-reexport": "error",
+    "langwatch/no-prototype-stub": "error",
+    "langwatch/no-logger-spy": "error",
+    "langwatch/no-raw-error-output": "error",
+    "langwatch/no-boot-hook-outside-guard": "error",
+    "langwatch/banned-legacy-names": "error",
+    // The word "port" is banned outright. The baseline below is every file that
+    // still carries it and it may only shrink; a new one is a hard failure.
+    "langwatch/no-port-vocabulary": "error",
+    // Measured 2026-09-10: 70 files, 80 reports, across 20 modules, seeded
+    // into the shrink-only baseline. The channel conversion (ADR-144 decision
+    // 9) empties services/ of conduits and the rows go with it.
+    "langwatch/refusal-is-a-handled-error": "error",
+    "langwatch/channel-takes-only-its-client": "error",
+    "langwatch/repository-takes-only-its-store": "error",
+    "langwatch/service-does-not-open-a-channel": "error",
+    "langwatch/module-app-only-across-packages": "error",
+    // Measured 2026-09-10 over the `lint:oxlint` paths: 80 reports across 30
+    // files. Every one is a specifier no file answers to, left behind by an
+    // in-flight move; the baseline holds them only until those lanes land.
+    "langwatch/dangling-barrel-export": "error",
+    // Measured 2026-09-10 over the `lint:oxlint` paths: 320 reports across
+    // 216 files.
+    "langwatch/empty-catch": "error",
+    // Measured 2026-09-10 over the `lint:oxlint` paths: 328 reports across
+    // 178 files.
+    "langwatch/stand-in-cast": "error",
+    // Measured 2026-09-10 over the `lint:oxlint` paths: 9 reports across 9
+    // files.
+    "langwatch/transport-imports-a-repository": "error"
+  },
+  "overrides": [
+    {
+      "files": ["packages/architecture-enforcer/src/**/*.ts"],
+      "rules": {
+        "langwatch/boolean-wall": "error",
+        "langwatch/logical-statement-spacing": "error"
+      }
+    },
+    {
+      // The reference shape reads in paragraphs. Enabled where the shape is
+      // already the annotation one; a feature turns it on as it converts
+      // (the rule auto-fixes: run oxlint --fix over the feature).
+      "files": [
+        "packages/api/src/**/*.ts",
+        "modules/annotation/**/*.ts",
+        "modules/annotation/**/*.tsx",
+        "apps/api/src/features/annotation/**/*.ts",
+        "apps/ui/src/features/annotation/**/*.ts",
+        "apps/ui/src/features/annotation/**/*.tsx"
+      ],
+      "rules": { "langwatch/logical-statement-spacing": "error" }
+    },
+
+    // ------------------------------------------------------------------
+    // DEBT REGISTER, langwatch/boolean-wall, packages/architecture-enforcer/src
+    // only. logical-statement-spacing (the sibling rule in the override
+    // above) auto-fixes cleanly and carries no register.
+    //
+    // Measured 2026-09-06: 48 boolean walls over 9 files, mostly TS-AST
+    // predicate helpers (isPropertyName, isBindingName, unwrap, and
+    // similar) that return one long && / || chain directly. Splitting
+    // each into named intermediate predicates is real refactoring, not a
+    // rename, so the 9 files are held here rather than switched off
+    // package-wide. The register can only shrink: name a predicate and
+    // delete the file's line.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "packages/architecture-enforcer/src/policies/api-transport.ts",
+        "packages/architecture-enforcer/src/policies/global-app-access.ts",
+        "packages/architecture-enforcer/src/policies/frontend/frontend-ui-boundaries.ts",
+        "packages/architecture-enforcer/src/policies/quality/service-projection-boundaries.ts",
+        "packages/architecture-enforcer/src/tools/check-feature-parity.ts",
+        "packages/architecture-enforcer/src/tools/test-colocation.ts",
+        "packages/architecture-enforcer/src/policies/test-quality.ts",
+        "packages/architecture-enforcer/src/policies/feature-layout.ts",
+        "packages/architecture-enforcer/src/policies/api-transport.ts"
+      ],
+      "rules": { "langwatch/boolean-wall": "off" }
+    },
+    // ------------------------------------------------------------------
+    // COGNITIVE COMPLEXITY, CONDITION SHAPE, NESTED TERNARIES. Every function
+    // is held to max 15 cognitive complexity; every condition test must stay
+    // readable (see langwatch/condition-shape); no ternary may nest inside
+    // another. All three rules are `langwatch/*` plugin rules, so unlike
+    // max-depth/complexity above they consult
+    // packages/architecture-enforcer/src/oxlint-baseline.json directly and report
+    // nothing for a baselined file -- no override needed here. Existing debt
+    // is recorded in that file (rule|file, with a measured date); add a file
+    // there to exempt it, or fix it and delete its line.
+    // ------------------------------------------------------------------
+    // Test files are held to 40 -- a table-driven suite branches more than a
+    // service method -- and the 23 that sit above it are registered below.
+    {
+      "files": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "langwatch/cognitive-complexity": ["error", { "max": 40 }]
+      }
+    }
+  ]
+}

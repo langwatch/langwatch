@@ -381,7 +381,7 @@ is started.
 - The `backend` lane reuses `dev/scripts/dev-supervisor.mjs --watch`, which
   already coalesces a burst of writes into one restart and already reports how
   many files triggered it. Its roots are the package's own `src` plus
-  `../../packages` (architecture-lint forbids a backend graph from importing a
+  `../../packages` (architecture-enforcer forbids a backend graph from importing a
   browser package, so that is a safe superset), and it ignores tests, build
   output, generated code and watcher noise.
 - The `go` lane is `air`, which rebuilds the one binary and **restarts only on a

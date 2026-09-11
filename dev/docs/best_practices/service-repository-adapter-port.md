@@ -239,6 +239,6 @@ adapter.
   that produces this shape.
 - `dev/docs/best_practices/feature-cleanup-review.md` — the R1–R8 review
   criteria; the layers here answer R1.
-- `packages/architecture-lint/src/typed-prisma-seam.ts` — the rule.
-- `packages/architecture-lint/src/prisma-boundaries.ts` — the containment
+- `packages/architecture-enforcer/src/typed-prisma-seam.ts` — the rule.
+- `packages/architecture-enforcer/src/prisma-boundaries.ts` — the containment
   policy naming both permitted places for `PrismaClient`.

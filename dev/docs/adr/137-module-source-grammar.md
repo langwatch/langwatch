@@ -16,8 +16,8 @@
 [the ast-grep delegation rule](../../../specs/tooling/lint-naming-shapes.feature),
 [schemas in the contract](../../../specs/tooling/lint-schema-outside-contract.feature),
 [HandledError in the contract](../../../specs/tooling/lint-handled-error-outside-contract.feature),
-[strict feature layout](../../../packages/architecture-lint/specs/strict-feature-layout.feature),
-[source folder shape](../../../packages/architecture-lint/specs/source-folder-shape.feature)
+[strict feature layout](../../../packages/architecture-enforcer/specs/strict-feature-layout.feature),
+[source folder shape](../../../packages/architecture-enforcer/specs/source-folder-shape.feature)
 
 **Related:** [ADR-112: singular feature ownership](./112-singular-feature-ownership.md),
 [ADR-133: the composition spec](./133-composition-spec.md),
@@ -62,18 +62,18 @@ one neighbour reads is a hop too.
 | `langwatch/namespace-class` | plugin | A class with only static members is a module wearing a class. |
 | `langwatch/schema-outside-contract` | plugin | A Zod schema authored (not merely composed from an import) as a top-level const in `server/src/transport/**` belongs in the module's contract package. |
 | `langwatch/handled-error-outside-contract` | plugin | A class extending `HandledError` declared anywhere under a module's `server/src` belongs in `contract/src/<m>.errors.ts`. |
-| `feature-layout` | architecture-lint | A server file outside the folder-and-kind grammar, or a root exporting a private repository, store or projection. |
-| `feature-app-contract` | architecture-lint | A module's contract is exactly one `*.api.ts` interface of callable operations named `<Feature>Api`. |
-| `feature-setup-infrastructure` | architecture-lint | An App factory's `FeatureSetup` declares concrete technical records, never a peer API or service capability. |
-| `feature-shape` | architecture-lint | A module carrying a legacy pre-ADR-133 shape fragment, against a shrink-only baseline. |
-| `source-folder-shape` | architecture-lint | Folder and fragment budgets: at most 12 files in a source folder, no sub-20-line fragment only one neighbour reads. |
-| `legacy-feature-fragments` | architecture-lint | The remaining legacy composition, adapter, page-shell and transport fragments may only shrink. |
-| `unused-module-export` | architecture-lint | A name a module's `server` package exports that no file in the repository imports, the package index included. |
-| `infrastructure-member-unused` | architecture-lint | A member of a `<Feature>Infrastructure` interface no app, service or repository in the owning package reaches. |
-| `memory-twin-drift` | architecture-lint | A repository whose Prisma implementation and memory twin declare different method sets, in either direction. |
+| `feature-layout` | architecture-enforcer | A server file outside the folder-and-kind grammar, or a root exporting a private repository, store or projection. |
+| `feature-app-contract` | architecture-enforcer | A module's contract is exactly one `*.api.ts` interface of callable operations named `<Feature>Api`. |
+| `feature-setup-infrastructure` | architecture-enforcer | An App factory's `FeatureSetup` declares concrete technical records, never a peer API or service capability. |
+| `feature-shape` | architecture-enforcer | A module carrying a legacy pre-ADR-133 shape fragment, against a shrink-only baseline. |
+| `source-folder-shape` | architecture-enforcer | Folder and fragment budgets: at most 12 files in a source folder, no sub-20-line fragment only one neighbour reads. |
+| `legacy-feature-fragments` | architecture-enforcer | The remaining legacy composition, adapter, page-shell and transport fragments may only shrink. |
+| `unused-module-export` | architecture-enforcer | A name a module's `server` package exports that no file in the repository imports, the package index included. |
+| `infrastructure-member-unused` | architecture-enforcer | A member of a `<Feature>Infrastructure` interface no app, service or repository in the owning package reaches. |
+| `memory-twin-drift` | architecture-enforcer | A repository whose Prisma implementation and memory twin declare different method sets, in either direction. |
 
 The per-file half is the plugin, because it needs the file's classified role
-and layout version. The per-module half is architecture-lint, because it needs
+and layout version. The per-module half is architecture-enforcer, because it needs
 the catalogue, the manifests and the whole tree of a module at once. Neither
 half can be expressed in oxlint configuration at all.
 

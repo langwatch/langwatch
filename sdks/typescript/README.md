@@ -1,7 +1,7 @@
 # LangWatch TypeScript SDK
 
 <p align="center">
-  <img src="https://github.com/langwatch/langwatch/blob/main/assets/logo-header.webp?raw=true" alt="LangWatch Logo" />
+  <img src="https://github.com/langwatch/langwatch/blob/main/.github/assets/logo-header.webp?raw=true" alt="LangWatch Logo" />
 </p>
 
 <p align="center">

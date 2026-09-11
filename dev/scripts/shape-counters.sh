@@ -6,7 +6,7 @@ legacy=$(git grep -lE "$L" HEAD -- 'apps/api/src/*.ts' 'modules/*.ts' 'enterpris
 # The shape register is empty, so it can no longer answer this: count the
 # modules that still hold a transport file naming a deleted builder.
 mods=$(git ls-tree -r --name-only HEAD modules enterprise/modules | grep -E "/transport/(api-rest|api-trpc)/[^/]+\.api\.ts$" | sed -E "s|^((enterprise/)?modules/[^/]+)/.*|\\1|" | sort -u | wc -l | tr -d " ")
-rows=$(node -e 'console.log(String(require("./packages/architecture-lint/src/feature-shape-baseline.json").entries.length))')
+rows=$(node -e 'console.log(String(require("./packages/architecture-enforcer/src/feature-shape-baseline.json").entries.length))')
 # The doors table is deleted. A family is now a module's own REST declaration,
 # and it is absent until a process mounts it.
 # A family is absent while the process refuses to mount it, and the one reason

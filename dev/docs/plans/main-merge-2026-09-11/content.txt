@@ -354,8 +354,8 @@ modules/trace/web/src/ui/sections/explorer/trace-drawer/trace-drawer-content.tsx
 modules/user/web/src/behavior/use-personal-context.ts
 modules/workflow/web/src/model/run-via-api/__tests__/run-snippets.unit.test.ts
 modules/workflow/web/src/model/run-via-api/run-snippets.ts
-packages/architecture-lint/src/tools/check-feature-parity.ts
-packages/architecture-lint/tests/check-feature-parity.test.ts
+packages/architecture-enforcer/src/tools/check-feature-parity.ts
+packages/architecture-enforcer/tests/check-feature-parity.test.ts
 packages/clickhouse-client/src/pool.ts
 packages/clickhouse-client/src/tasks/__tests__/retention-ttl.unit.test.ts
 packages/clickhouse-client/src/tasks/ttl.reconciler.ts

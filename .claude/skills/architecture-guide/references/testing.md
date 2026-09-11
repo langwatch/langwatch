@@ -97,7 +97,7 @@ See `gates.md`. Never `npx vitest`, never a hand-rolled vitest config, never
 
 | Rule                                                                                       | Source                                                     | Catches                                                     |
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------- |
-| `feature-source-layout`, `-filename`, `-subject`                                           | `oxlint-plugin.mjs` over the lint-core grammar module      | wrong folder, wrong dot/hyphen, another module's subject   |
+| `feature-source-layout`, `-filename`, `-subject`                                           | `oxlint-plugin.mjs` over the oxlint grammar module      | wrong folder, wrong dot/hyphen, another module's subject   |
 | `feature-shape`, `feature-shape-baseline`                                                  | `src/feature-shape.ts`                                     | a legacy piece (contract service, persistence adapter, fixtures/, testing.ts, nested transport, unregistered or memory-less repositories) not in the shrinking inventory |
 | `feature-app-contract`, `feature-app-factory`                                              | `src/feature-app-contract.ts`, `src/feature-setup-infrastructure.ts` | a contract without its `*Api` token, an app whose public surface differs from its API, a capability smuggled through infrastructure |
 | `prisma-containment`, `prisma-table-ownership`                                             | `oxlint-plugin.mjs`, `src/prisma-table-ownership.ts`       | Prisma outside `repositories/prisma`; two modules claiming one table |
@@ -108,11 +108,11 @@ See `gates.md`. Never `npx vitest`, never a hand-rolled vitest config, never
 | `ui-web-public-entry`, `ui-screen-closure`, `ui-dependency-direction`, `ui-root-catch-all` | `src/frontend-ui-boundaries.ts`                            | web layer and entry violations                              |
 | `application-boundary`, `composition-source`, `enterprise-composition`, `package-cycle`    | `src/application-boundaries.ts`, `src/cycles.ts`           | wrong direction, cycles, enterprise leaks                   |
 | `eventing-subscriber-idempotency`                                                          | `src/eventing-roles.ts`                                    | a subscriber that cannot be replayed                        |
-| `secrets-through-source`                                                                   | `packages/lint-core/src/rules`                             | `process.env.<SECRET>` outside the secrets seam             |
+| `secrets-through-source`                                                                   | `packages/oxlint/src/rules`                             | `process.env.<SECRET>` outside the secrets seam             |
 | over-abstraction detectors                                                                 | `src/overengineering-policy.mjs`, `src/overengineering.ts` | identity functions, layer classes, one-implementation ports |
 | frontend-boundary test                                                                     | `tests/frontend-boundary.unit.test.ts`                     | a server value-import reaching a browser package            |
 | `check-feature-parity`                                                                     | `src/check-feature-parity.ts`                              | unbound or inert scenarios, unknown annotations             |
 
-All paths are relative to `packages/architecture-lint/`. Baselines
-(`*-baseline.json` in `packages/architecture-lint/src`) record pre-existing violations and
+All paths are relative to `packages/architecture-enforcer/`. Baselines
+(`*-baseline.json` in `packages/architecture-enforcer/src`) record pre-existing violations and
 may only shrink. A new violation in a file you touched is yours to fix, not to baseline.

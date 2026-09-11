@@ -5,7 +5,7 @@
 **Status:** Accepted
 
 **Related:**
-[Frontend feature boundary ADR](../../../packages/architecture-lint/adrs/004-frontend-feature-boundaries.md),
+[Frontend feature boundary ADR](../../../packages/architecture-enforcer/adrs/004-frontend-feature-boundaries.md),
 [ADR-101: feature package surfaces](../../../dev/docs/adr/101-feature-package-surfaces.md),
 and [ADR-111: physical application workspaces](../../../dev/docs/adr/111-physical-application-workspaces.md).
 
@@ -23,7 +23,7 @@ stores, transport hooks or the whole Prompt Studio importable there.
 
 ## Decision
 
-`apps/ui` adopts the frontend boundary enforced by architecture-lint ADR-004.
+`apps/ui` adopts the frontend boundary enforced by architecture-enforcer ADR-004.
 Its source uses these governed roots:
 
 ```text

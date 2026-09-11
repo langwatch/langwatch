@@ -100,7 +100,7 @@ exact change:
 apps/api/src/app-rest/api-rest.doors.ts
   add:  installApiTraceExport,   (after installApiTrace, line 34)
 
-packages/architecture-lint/src/feature-shape-baseline.json
+packages/architecture-enforcer/src/feature-shape-baseline.json
   drop: "trace|legacy-transport-runtime"
   drop: "trace|nested-transport"
 ```
