@@ -90,11 +90,7 @@ test_enabled_renders_deployment() {
     fail "voice deployment replicas" "expected replicas: 1"
     return
   fi
-  if ! printf '%s' "$block" | grep -A1 "name: VOICE_WORKER_ONLY" | grep -q 'value: "true"'; then
-    fail "voice deployment VOICE_WORKER_ONLY" "expected VOICE_WORKER_ONLY=true"
-    return
-  fi
-  echo "ok   [voice deployment] replicas=1, VOICE_WORKER_ONLY=true"
+  echo "ok   [voice deployment] replicas=1"
 }
 
 # @scenario "The voice worker's shutdown timing is its own, not borrowed from the background workers"

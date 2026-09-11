@@ -25,9 +25,9 @@ Feature: The voice worker needs zero extra configuration to route phone simulati
   #   charts/langwatch/tests/voice-worker.sh: the suite that renders the
   #     chart and asserts what this feature describes.
   #   langwatch/langwatch#8015 and the env contract on #8014
-  #     (voice-env-contract comment): VOICE_WORKER_ONLY, VOICE_WS_PORT and
-  #     VOICE_PUBLIC_BASE_URL. Call-provider credentials are per-project
-  #     data configured inside LangWatch, not chart values or operator env.
+  #     (voice-env-contract comment): VOICE_WS_PORT and VOICE_PUBLIC_BASE_URL.
+  #     Call-provider credentials are per-project data configured inside
+  #     LangWatch, not chart values or operator env.
   #
   # These scenarios are verified by rendering the chart. The gating
   # condition, the resolution priority, the required-value checks, and the

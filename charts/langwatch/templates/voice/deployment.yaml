@@ -102,16 +102,13 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: {{ .Values.voice.otel.serviceName | default "langwatch-voice" | quote }}
 
-            # Same value as the workers Deployment: even with
-            # VOICE_WORKER_ONLY=true consuming only the voice queue, the
-            # process still needs the app's callback base URL for the rest of
-            # the worker runtime it shares with the workers Deployment.
+            # Same value as the workers Deployment: the process needs the app's
+            # callback base URL for the rest of the worker runtime it shares with
+            # the workers Deployment.
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
 
             # Env contract: langwatch/langwatch#8014 (voice-env-contract comment).
-            - name: VOICE_WORKER_ONLY
-              value: "true"
             - name: VOICE_WS_PORT
               value: {{ .Values.voice.wsPort | quote }}
             - name: VOICE_PUBLIC_BASE_URL

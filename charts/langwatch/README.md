@@ -717,12 +717,11 @@ The public origin is resolved in priority order:
 Set `voice.publicBaseUrl` explicitly only when voice needs a **different**
 public host than the app (its own subdomain, its own edge).
 
-Turning it on deploys a **single-replica** worker Deployment (same app image,
-`VOICE_WORKER_ONLY=true`) that terminates inbound Media Streams calls, plus a
-Service and (also on by default) an Ingress for its WebSocket port. Replicas
-are fixed at 1: the WebSocket routes an in-flight call by nonce inside one
-process, so a second replica would split a call's frames across two processes
-with no shared state.
+Turning it on deploys a **single-replica** worker Deployment (same app image)
+that terminates inbound Media Streams calls, plus a Service and (also on by
+default) an Ingress for its WebSocket port. Replicas are fixed at 1: the
+WebSocket routes an in-flight call by nonce inside one process, so a second
+replica would split a call's frames across two processes with no shared state.
 
 **Media Streams connects INBOUND to you.** Without a resolved public
 `https://` origin, there are no phone targets, no matter what else is

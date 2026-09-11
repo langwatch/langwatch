@@ -1084,13 +1084,12 @@ workers:
 # (ingress or a cloud load balancer) and point voice.publicBaseUrl at that
 # public origin.
 #
-# Env contract (langwatch/langwatch#8014): the worker reads VOICE_WORKER_ONLY,
-# VOICE_WS_PORT and VOICE_PUBLIC_BASE_URL below. Replicas are fixed at 1, not
-# a value, the Media Streams WebSocket routes an in-flight call by nonce
-# inside one process, so a second replica would split a call's frames across
-# two processes with no shared state. Call-provider credentials (account SID,
-# auth token, from-number) are per-project data configured inside LangWatch,
-# not chart values.
+# Env contract (langwatch/langwatch#8014): the worker reads VOICE_WS_PORT and
+# VOICE_PUBLIC_BASE_URL below. Replicas are fixed at 1, not a value, the Media
+# Streams WebSocket routes an in-flight call by nonce inside one process, so a
+# second replica would split a call's frames across two processes with no
+# shared state. Call-provider credentials (account SID, auth token, from-number)
+# are per-project data configured inside LangWatch, not chart values.
 ## @section Voice worker (opt-in)
 voice:
   # See workers.otel: named separately so voice worker telemetry is distinguishable.
