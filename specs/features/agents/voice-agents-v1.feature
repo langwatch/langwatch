@@ -14,6 +14,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   # ---------------------------------------------------------------------------
 
   # AC1, AC2, AC3, AC4, AC6, AC10, AC13, AC16, AC19, AC24
+  # Proven: run scenariorun_0002mz2FOX0FmRBTfPCRLLK23czeT after #8037 (no automated e2e binding yet)
   @e2e @unimplemented
   Scenario: First voice agent, from a blank project to a judged run
     Given a project with no ElevenLabs key configured
@@ -33,6 +34,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And when the call ends the run shows a verdict, one chip per criterion and caller "Simulated"
 
   # AC5, AC10, AC13
+  # Proven: PR #8040 (c0996a92a7) (no automated e2e binding yet)
   @e2e @unimplemented
   Scenario: Talk to an existing agent from its drawer
     Given the voice agent "Support line" with a configured ElevenLabs key

@@ -20,6 +20,7 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
+import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
 import {
   VOICE_TRANSPORTS,
@@ -32,20 +33,30 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import { getServerAuthSession } from "~/server/auth";
 import { isVoiceAgentsEnabledForProject } from "~/server/featureFlag/voiceAgents";
 import {
-  VOICE_HTTP_TIMEOUT_MS,
-  voiceCallMaxSeconds,
-} from "~/server/scenarios/voice/voice-limits";
+  findTwilioProviderForProject,
+  getTwilioCredential,
+} from "~/server/gateway/twilioCredential.service";
+import { proxyAudioStream } from "~/server/scenarios/voice/audio-proxy-stream";
+import {
+  resolveTwilioRecordingWavUrl,
+  twilioBasicAuthHeader,
+} from "~/server/scenarios/voice/twilio-recording.service";
+import { voiceCallMaxSeconds } from "~/server/scenarios/voice/voice-limits";
 import { voiceSessionPorts as ports } from "~/server/scenarios/voice/voice-session.ports";
 import {
   authorizeRecordingPlayback,
   finishVoiceSession,
   mintVoiceSession,
   VoiceAgentsGateDisabledError,
+  VoiceRecordingKeyMissingError,
   VoiceRecordingUnavailableError,
   VoiceSessionInvalidError,
   VoiceUnauthenticatedError,
 } from "~/server/scenarios/voice/voice-session.service";
 import { verifyVoiceSessionToken } from "~/server/scenarios/voice/voice-session-token";
+import { wholeCallAudioPorts } from "~/server/scenarios/voice/whole-call-audio.ports";
+import { resolveWholeCallAudio } from "~/server/scenarios/voice/whole-call-audio.service";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 const secured = createServiceApp({ basePath: "/api/voice" });
 
@@ -142,9 +153,10 @@ async function requireProject({
   req: Request;
   projectId: string;
   permissions: readonly VoicePermission[];
-}): Promise<void> {
+}): Promise<VoiceAuthWitness> {
   const witness = await authenticateVoiceRequest({ req, projectId });
   await requirePermissions({ witness, projectId, permissions });
+  return witness;
 }
 
 // POST /api/voice/session — mint a signed-URL session from the form values.
@@ -318,50 +330,116 @@ export const route = secured
         conversationId,
       });
 
-      // A timeout on the connect/headers phase only: once the response
-      // arrives we stop racing the timeout against the body so a long
-      // recording is never cut mid-stream. The caller's own abort (tab
-      // closed, request cancelled) still propagates the whole way through.
-      const timeoutController = new AbortController();
-      const timeout = setTimeout(
-        () => timeoutController.abort(),
-        VOICE_HTTP_TIMEOUT_MS,
-      );
-      const onCallerAbort = () => timeoutController.abort();
-      c.req.raw.signal.addEventListener("abort", onCallerAbort);
+      return proxyAudioStream({
+        signal: c.req.raw.signal,
+        url: `${credential.baseUrl}/v1/convai/conversations/${encodeURIComponent(
+          conversationId,
+        )}/audio`,
+        headers: { "xi-api-key": credential.apiKey },
+        // The provider base URL is customer-configured, so never echo the
+        // upstream content type back on our own origin; always label the
+        // ElevenLabs stream with a safe audio type (AC13/AC15).
+        forceContentType: "audio/mpeg",
+        fallbackContentType: "audio/mpeg",
+      });
+    },
+  );
 
-      let upstream: Response;
-      try {
-        upstream = await fetch(
-          `${credential.baseUrl}/v1/convai/conversations/${encodeURIComponent(
-            conversationId,
+// GET /api/voice/run/:scenarioRunId/audio — stream the WHOLE-call recording of
+// a headless voice run, for both transports. The vendor handle is resolved
+// from the run's own trace spans (#8014), so a run reads back only its own
+// call, and the provider credential is read server-side and never reaches the
+// browser (AC13/AC15). Same session auth as the per-turn session-audio route.
+secured
+  .access(
+    handlerManagedAuth({
+      reason: "browser session validated in-handler via getServerAuthSession",
+      permissions: ["scenarios:view"],
+      credential: "session",
+    }),
+  )
+  .get(
+    "/run/:scenarioRunId/audio",
+    zValidator(
+      "param",
+      z.object({ scenarioRunId: z.string().min(1).max(200) }),
+    ),
+    zValidator("query", z.object({ projectId: z.string().min(1) })),
+    async (c) => {
+      const { scenarioRunId } = c.req.valid("param");
+      const { projectId } = c.req.valid("query");
+      const witness = await requireProject({
+        req: c.req.raw,
+        projectId,
+        permissions: ["scenarios:view"],
+      });
+
+      // The run belongs to this project (its traces are read tenant-scoped
+      // below), so resolving the handle off its own spans is the authorization.
+      const handle = await resolveWholeCallAudio({
+        projectId,
+        scenarioRunId,
+        ports: wholeCallAudioPorts,
+      });
+      if (!handle) throw new VoiceRecordingUnavailableError();
+
+      // A call recording is PII, so record who accessed it once authorization
+      // has fully succeeded (permission + the run-ownership handle) and before
+      // the body streams. Fire-and-forget, the same way `project.apiKey.*` and
+      // the management-API writes audit: the access already succeeded, so an
+      // audit-write failure must not turn a working download into a 500.
+      void auditLog({
+        action: "voice.recording.accessed",
+        userId: witness.session.user.id,
+        projectId,
+        args: { scenarioRunId, transport: handle.kind },
+      }).catch(captureException);
+
+      if (handle.kind === "elevenlabs") {
+        // Reuse the same conversation-audio path as the per-turn route.
+        const credential = await ports.resolveCredential({
+          projectId,
+          transport: "elevenlabs_convai",
+        });
+        if (credential?.kind !== "elevenlabs") {
+          throw new VoiceRecordingKeyMissingError();
+        }
+        return proxyAudioStream({
+          signal: c.req.raw.signal,
+          url: `${credential.baseUrl}/v1/convai/conversations/${encodeURIComponent(
+            handle.conversationId,
           )}/audio`,
-          {
-            headers: { "xi-api-key": credential.apiKey },
-            signal: timeoutController.signal,
-            // A followed redirect would forward the credentialed header to
-            // whatever host answered it.
-            redirect: "error",
-          },
-        );
-      } catch {
-        // A refused redirect, a connect timeout, or a network failure all
-        // mean the same thing to the player: no recording to play. Answer
-        // 404 rather than letting the rejection surface as a 500.
-        throw new VoiceRecordingUnavailableError();
-      } finally {
-        clearTimeout(timeout);
-        c.req.raw.signal.removeEventListener("abort", onCallerAbort);
+          headers: { "xi-api-key": credential.apiKey },
+          // Never echo the customer-configured upstream's content type on our
+          // own origin; always label the ElevenLabs stream safely (AC13/AC15).
+          forceContentType: "audio/mpeg",
+          fallbackContentType: "audio/mpeg",
+        });
       }
-      if (!upstream.ok || !upstream.body) {
-        throw new VoiceRecordingUnavailableError();
-      }
-      return new Response(upstream.body, {
-        status: 200,
-        headers: {
-          "content-type": upstream.headers.get("content-type") ?? "audio/mpeg",
-          "cache-control": "no-store",
-        },
+
+      // Twilio: list the call's recordings with the project's credential, take
+      // the first, and stream its .wav. Twilio publishes the recording shortly
+      // after the call ends, so a 404 here means "not ready yet" and the player
+      // can retry.
+      const provider = await findTwilioProviderForProject({ projectId });
+      const credential = provider
+        ? await getTwilioCredential({ modelProviderId: provider.id })
+        : null;
+      if (!credential) throw new VoiceRecordingKeyMissingError();
+
+      const wavUrl = await resolveTwilioRecordingWavUrl({
+        credential,
+        callSid: handle.callSid,
+        signal: c.req.raw.signal,
+      });
+      if (!wavUrl) throw new VoiceRecordingUnavailableError();
+
+      return proxyAudioStream({
+        signal: c.req.raw.signal,
+        url: wavUrl,
+        headers: { authorization: twilioBasicAuthHeader(credential) },
+        fallbackContentType: "audio/wav",
+        forceContentType: "audio/wav",
       });
     },
   );

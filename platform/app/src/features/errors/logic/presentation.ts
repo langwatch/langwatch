@@ -3239,9 +3239,9 @@ const presentations = {
     describe: () => "",
   },
   voice_phone_transport_unavailable: {
-    title: "Phone targets are not available yet",
+    title: "Phone targets have no browser call",
     describe: () =>
-      "Phone targets are called from the voice worker, which is not available yet. Track langwatch/langwatch#8014.",
+      "A phone target has no browser call. Run a scenario against the phone number instead.",
   },
   voice_recording_unavailable: {
     title: "The call recording is not available",

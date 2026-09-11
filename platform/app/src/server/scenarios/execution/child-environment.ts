@@ -164,5 +164,16 @@ export function buildChildEnvironment({
     // here (not just at the call site) so a caller credential can never reach
     // an unrelated child even if a future caller forgets to gate it (#26).
     ...(jobData.target.type === "voice" ? (callerEnv ?? {}) : {}),
+    // Voice-only. The phone transport reads these from the child's own env
+    // (`resolvePublicBaseUrl`/`resolveHttpPort` in `phone.transport.ts`) once
+    // it is running in the pool child, and this allowlist is the only gate
+    // between the operator's process env and that child.
+    ...(jobData.target.type === "voice"
+      ? {
+          VOICE_PUBLIC_BASE_URL: process.env.VOICE_PUBLIC_BASE_URL,
+          BASE_HOST: env.BASE_HOST,
+          VOICE_WS_PORT: process.env.VOICE_WS_PORT,
+        }
+      : {}),
   });
 }
