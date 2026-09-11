@@ -127,6 +127,16 @@ function enforceGate({
   }
 }
 
+/**
+ * Seals better-auth's own sign-up route.
+ *
+ * This is also what makes the born-finalized entrance inert: that entrance
+ * arms for this exact path and nothing else, so sealing the route seals the
+ * entrance. Both are deliberate, both are tested, and nothing tests the
+ * composition — which is how they came to contradict each other quietly. If
+ * this seal is ever lifted, re-read ADR-116 §3 "Amendment, 2026-09-11" before
+ * assuming the entrance behind it still works.
+ */
 function refuseDirectEmailSignUp(pathname: string): void {
   if (!pathname.endsWith("/sign-up/email")) return;
 
