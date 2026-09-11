@@ -35,6 +35,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ActivityMonitorSpendClickHouseRepository } from "../activityMonitor.spend.clickhouse.repository";
 
+/**
+ * Builds the real repository over a mock ClickHouse client, so the assertions
+ * run against the SQL production would actually send rather than a stub.
+ * Returns the repository and the query spy that captured the call.
+ */
 function makeRepo() {
   const query = vi.fn(async () => ({
     json: async () => [] as unknown[],
@@ -50,6 +55,10 @@ type CapturedCall = {
   clickhouse_settings?: Record<string, unknown>;
 };
 
+/**
+ * Pulls the first call handed to the mock client, which is the SQL, bound
+ * parameters and ClickHouse settings the read issued.
+ */
 function captured(query: { mock: { calls: unknown[][] } }): CapturedCall {
   const first = query.mock.calls[0]?.[0];
   return first as CapturedCall;
@@ -158,10 +167,11 @@ describe("ActivityMonitorSpendClickHouseRepository query bounds", () => {
 
         const call = captured(query);
         expect(call.clickhouse_settings).toBeDefined();
-        expect(typeof call.clickhouse_settings?.max_execution_time).toBe(
-          "number",
-        );
-        expect(typeof call.clickhouse_settings?.max_threads).toBe("number");
+        // Exact values, not just "a number": the point of this test is to lock
+        // the guardrail, so weakening either limit must fail here and be a
+        // deliberate edit to both the constant and this line.
+        expect(call.clickhouse_settings?.max_execution_time).toBe(45);
+        expect(call.clickhouse_settings?.max_threads).toBe(2);
       });
     }
   });
