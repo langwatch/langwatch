@@ -143,11 +143,11 @@ Feature: Voice agents: reach an agent by phone
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: The Phone number option appears only when a Twilio provider is configured
+  Scenario: The Phone number option is always listed, disabled and marked Unavailable without a Twilio provider
     Given the voice agent editor with no Twilio provider in the project
-    Then the "Reached via" list offers no Phone number option, and a hint points at Settings > Model Providers
+    Then the "Reached via" list offers a disabled Phone number (Unavailable) option, and a hint links to Settings > Model Providers that opens in a new tab
     When the project has a Twilio provider
-    Then the "Reached via" list offers the Phone number option
+    Then the "Reached via" list offers the Phone number option enabled
 
   @integration
   Scenario: A phone target's drawer explains why Talk to it is off

@@ -901,21 +901,29 @@ function VoiceAgentTalkView({
 }
 
 /**
- * The transports offered in the "Reached via" select. Phone stays hidden until
- * the project has a Twilio provider in Settings > Model Providers, but an agent
- * already configured as phone still lists it so its own transport renders (the
- * gate is on the OPTION, not on an existing target).
+ * The transports offered in the "Reached via" select. Every transport is
+ * always rendered as an option; phone is disabled and labelled "Unavailable"
+ * until the project has a Twilio provider in Settings > Model Providers, but
+ * an agent already configured as phone keeps its own transport selectable
+ * (the gate is on the OPTION, not on an existing target).
  */
-function visibleTransportsFor({
+function transportOptionsFor({
   hasTwilioKey,
   transport,
 }: {
   hasTwilioKey: boolean;
   transport: VoiceTransport;
-}): readonly VoiceTransport[] {
-  return VOICE_TRANSPORTS.filter(
-    (t) => t !== "phone" || hasTwilioKey || transport === "phone",
-  );
+}): readonly { value: VoiceTransport; label: string; disabled: boolean }[] {
+  return VOICE_TRANSPORTS.map((t) => {
+    const disabled = t === "phone" && !hasTwilioKey && transport !== "phone";
+    return {
+      value: t,
+      label: disabled
+        ? `${VOICE_TRANSPORT_LABELS[t]} (Unavailable)`
+        : VOICE_TRANSPORT_LABELS[t],
+      disabled,
+    };
+  });
 }
 
 function VoiceAgentForm({
@@ -949,11 +957,10 @@ function VoiceAgentForm({
   const phoneNumberInvalid =
     hasAttemptedSubmit && !E164_PHONE_PATTERN.test(phoneNumber.trim());
   const isPhone = transport === "phone";
-  const visibleTransports = visibleTransportsFor({
+  const transportOptions = transportOptionsFor({
     hasTwilioKey,
     transport,
   });
-  const transportOptionsDisabled = visibleTransports.length <= 1;
   return (
     <VStack
       gap={4}
@@ -976,15 +983,15 @@ function VoiceAgentForm({
 
       <Field.Root>
         <Field.Label>Reached via</Field.Label>
-        <NativeSelect.Root disabled={transportOptionsDisabled}>
+        <NativeSelect.Root>
           <NativeSelect.Field
             value={transport}
             onChange={(e) => setTransport(e.target.value as VoiceTransport)}
             data-testid="voice-agent-transport-select"
           >
-            {visibleTransports.map((t) => (
-              <option key={t} value={t}>
-                {VOICE_TRANSPORT_LABELS[t]}
+            {transportOptions.map((o) => (
+              <option key={o.value} value={o.value} disabled={o.disabled}>
+                {o.label}
               </option>
             ))}
           </NativeSelect.Field>
@@ -992,8 +999,16 @@ function VoiceAgentForm({
         </NativeSelect.Root>
         {!hasTwilioKey && !isPhone && (
           <Field.HelperText data-testid="voice-agent-phone-hint">
-            To reach an agent by phone, add Twilio in Settings &gt; Model
-            Providers.
+            To reach an agent by phone, add Twilio in Settings &gt;{" "}
+            <Link
+              href="/settings/model-providers"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="voice-agent-model-providers-link"
+            >
+              Model Providers
+            </Link>
+            .
           </Field.HelperText>
         )}
       </Field.Root>
