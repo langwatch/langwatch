@@ -78,13 +78,11 @@ export async function createWorkerCodingAgentApp(options: {
       }
     : { backend: "memory", infrastructure: {} };
 
-  const runtime = await createApp({ name: "langwatch-worker" })
-    .withPersistence(persistence.backend, persistence.infrastructure)
-    .withInfrastructure({})
+  const runtime = await createApp({ role: "api", config: {} })
     .withProvided(ProjectApi, options.projects)
     .withProvided(GithubApi, github)
     .withModule(codingAgentServer, {
-      infrastructure: {
+      members: {
         billing: options.billing,
         scopeDirectory: new WorkerCodingAgentScopeDirectory(options.database),
         scopePermissions: new WorkerCodingAgentScopePermissions(options.authorization),
@@ -104,7 +102,7 @@ export async function createWorkerCodingAgentApp(options: {
         },
       },
     })
-    .boot({ role: "worker" });
+    .boot();
 
   return { app: runtime.module(codingAgentServer).provided, github };
 }

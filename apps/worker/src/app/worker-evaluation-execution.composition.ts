@@ -122,19 +122,17 @@ export async function createWorkerMonitorApp(options: {
   permissions: AuthzApi;
   resources: ResourceOwnership;
 }): Promise<MonitorApi> {
-  const runtime = await createApp({ name: "langwatch-worker-monitor" })
-    .withPersistence("postgres", { prisma: options.database })
-    .withInfrastructure({})
+  const runtime = await createApp({ role: "api", config: {} })
     .withProvided(AuthzApi, options.permissions)
     .withModule(monitorServer, {
-      infrastructure: {
+      members: {
         evaluators: new UncomposedMonitorEvaluators(),
         performance: new UncomposedMonitorPerformance(),
         replication: new UncomposedMonitorReplication(),
         generateId: () => `monitor_${nanoid()}`,
       },
     })
-    .boot({ role: "worker" });
+    .boot();
 
   options.resources.own("worker monitor application", () => runtime.stop());
 

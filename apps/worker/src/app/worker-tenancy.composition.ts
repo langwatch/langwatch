@@ -84,11 +84,9 @@ export function installWorkerTenancy<Infrastructure>(
   const prompts = PostgresPromptAdapter.create({ database }).build();
 
   return builder
-    .withModule(authzServer, {
-      infrastructure: { database, redis: options.redis, ...options.authz },
-    })
+    .withModules([withMemoryRepositories(authzServer)])
     .withModule(organizationServer, {
-      infrastructure: {
+      members: {
         identities: PersonalWorkspaceIdentityAdapter.create(),
         teamIdentities: TeamIdentityAdapter.create(),
         groupIdentities: GroupIdentityAdapter.create(),
@@ -98,15 +96,11 @@ export function installWorkerTenancy<Infrastructure>(
         seats: WorkerOrganizationSeats.create({ plans: options.plans, database }),
       },
     })
-    .withModule(projectServer, { infrastructure: options.project })
-    .withModule(apiKeyServer, { config: options.apiKeys })
-    .withModule(dataRetentionServer, {
-      infrastructure: { ...options.dataRetention, redis: options.redis },
-    })
-    .withModule(shareServer, {
-      infrastructure: { ...options.share, redis: options.redis },
-    })
-    .withModule(topicServer, { infrastructure: options.topics });
+    .withModules([withMemoryRepositories(projectServer)])
+    .withModules([withMemoryRepositories(apiKeyServer)])
+    .withModules([withMemoryRepositories(dataRetentionServer)])
+    .withModules([withMemoryRepositories(shareServer)])
+    .withModules([withMemoryRepositories(topicServer)]);
 }
 
 class WorkerOrganizationSettingsSecrets implements OrganizationSettingsSecret {

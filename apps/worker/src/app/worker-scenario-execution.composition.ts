@@ -25,7 +25,7 @@ import { PromptApi } from "@langwatch/prompt-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
-import { createApp, instantiateRepositories, type ResourceScope } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories, instantiateRepositories, type ResourceScope } from "@langwatch/runtime-composition";
 import {
   NodeScenarioChildProcessAdapter,
   OtelScenarioProcessorMetricsAdapter,
@@ -263,22 +263,20 @@ export async function createWorkerScenarioExecutionGraph(input: {
   // The suite application, over the feature's own repositories. This process
   // starts no run — the refusal below says so by name — but it reads the plans
   // and the run projection a scenario child reports against.
-  const suiteRuntime = await createApp({ name: "langwatch-worker-suite" })
-    .withPersistence("postgres", { prisma })
-    .withInfrastructure({})
+  const suiteRuntime = await createApp({ role: "api", config: {} })
     .withProvided(ScenarioApi, input.scenarioApi)
     .withProvided(AgentApi, agents)
     .withProvided(PromptApi, promptApp)
     .withProvided(ProjectApi, deps.projects)
     .withModule(suiteServer, {
-      infrastructure: {
+      members: {
         resolveClickHouseClient: deps.resolveClickHouseClient,
         defaultRetentionDays: deps.defaultRetentionDays,
         execution: new WorkerSuiteStartRefusal(deps.config.serviceName),
         generateId: () => `suite_${nanoid()}`,
       },
     })
-    .boot({ role: "worker" });
+    .boot();
   input.resources.own("worker scenario suites", () => suiteRuntime.stop());
   const suites = suiteRuntime.module(suiteServer).provided;
 
@@ -320,11 +318,9 @@ export async function createWorkerScenarioExecutionGraph(input: {
 
   // The SAME cipher the child processes decrypt a run's parameters with, over this
   // pod's own connection: the secret feature owns the reserved-name list itself now.
-  const secretRuntime = await createApp({ name: "langwatch-worker-secret" })
-    .withPersistence("postgres", { prisma })
-    .withInfrastructure({})
-    .withModule(secretServer, { infrastructure: { encryption } })
-    .boot({ role: "worker" });
+  const secretRuntime = await createApp({ role: "api", config: {} })
+    .withModules([withMemoryRepositories(secretServer)])
+    .boot();
   input.resources.own("worker scenario secrets", () => secretRuntime.stop());
   const secrets = secretRuntime.module(secretServer).provided;
 

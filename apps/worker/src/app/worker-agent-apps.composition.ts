@@ -82,12 +82,10 @@ export async function createWorkerAgentApps(options: {
     nlpServiceUrl: prerequisites.nlpServiceUrl,
     legacyDefaultModel: prerequisites.config.infrastructure.execution.defaultModel,
   };
-  const scenarioRuntime = await createApp({ name: "langwatch-worker-scenario" })
-    .withPersistence("postgres", { prisma: database })
-    .withInfrastructure({})
+  const scenarioRuntime = await createApp({ role: "api", config: {} })
     .withProvided(UserApi, foundation.users)
     .withModule(scenarioServer, {
-      infrastructure: {
+      members: {
         ...graph.scenarioPorts,
         simulations,
         scenarioExecution: execution.execution,
@@ -118,7 +116,7 @@ export async function createWorkerAgentApps(options: {
         ),
       },
     })
-    .boot({ role: "worker" });
+    .boot();
   resources.own("worker scenario module", () => scenarioRuntime.stop());
   const scenarios = scenarioRuntime.module(scenarioServer).provided;
   const evaluators = await installWorkerEvaluator({

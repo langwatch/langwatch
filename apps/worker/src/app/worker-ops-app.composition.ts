@@ -92,7 +92,7 @@ export function installWorkerOps<Infrastructure>(
     RedisOpsSnapshotRepository.create(IoredisOpsSnapshotRedisAdapter.create(options.redis)),
   );
   return builder.withModule(opsServer, {
-    infrastructure: {
+    members: {
       createCapability: (peers: OpsAppDependencies) => {
         const operations = OpsOperations.create({
           adminEmails: options.adminEmails,
