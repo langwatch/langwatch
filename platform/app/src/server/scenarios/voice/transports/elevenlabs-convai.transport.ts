@@ -166,7 +166,23 @@ interface ElevenLabsConversationResponse {
   has_audio?: boolean;
 }
 
-function authHeaders(credential: VoiceTransportCredential): HeadersInit {
+/** The ElevenLabs branch of the transport credential union, or a thrown error.
+ *  Every method here reads an API key and host; a credential built for another
+ *  transport reaching this runner is a wiring bug, so it fails loudly rather
+ *  than being read as a shape it is not. */
+function elevenLabsCredentialOf(credential: VoiceTransportCredential): {
+  apiKey: string;
+  baseUrl: string;
+} {
+  if (credential.kind !== "elevenlabs") {
+    throw new Error(
+      `ElevenLabs transport received a ${credential.kind} credential`,
+    );
+  }
+  return { apiKey: credential.apiKey, baseUrl: credential.baseUrl };
+}
+
+function authHeaders(credential: { apiKey: string }): HeadersInit {
   return { [API_KEY_HEADER]: credential.apiKey, accept: "application/json" };
 }
 
@@ -217,13 +233,14 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
   missingKeyMessage: NO_ELEVENLABS_KEY_MESSAGE,
 
   async mintSession({ agentId, credential }) {
-    const url = `${credential.baseUrl}${SIGNED_URL_PATH}?agent_id=${encodeURIComponent(
+    const el = elevenLabsCredentialOf(credential);
+    const url = `${el.baseUrl}${SIGNED_URL_PATH}?agent_id=${encodeURIComponent(
       agentId,
     )}`;
     let response: Response;
     try {
       response = await fetch(url, {
-        headers: authHeaders(credential),
+        headers: authHeaders(el),
         signal: AbortSignal.timeout(VOICE_HTTP_TIMEOUT_MS),
       });
     } catch (error) {
@@ -249,7 +266,7 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     if (
       !isAcceptableSignedUrl({
         signedUrl: body.signed_url,
-        baseUrl: credential.baseUrl,
+        baseUrl: el.baseUrl,
       })
     ) {
       throw new Error(
@@ -260,11 +277,12 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
   },
 
   async fetchCallRecord({ conversationId, credential, audioProxyUrl }) {
-    const url = `${credential.baseUrl}${CONVERSATION_PATH}/${encodeURIComponent(
+    const el = elevenLabsCredentialOf(credential);
+    const url = `${el.baseUrl}${CONVERSATION_PATH}/${encodeURIComponent(
       conversationId,
     )}`;
     const response = await fetch(url, {
-      headers: authHeaders(credential),
+      headers: authHeaders(el),
       signal: AbortSignal.timeout(VOICE_HTTP_TIMEOUT_MS),
     });
     // Not ready yet: the record does not exist for this conversation. The
@@ -325,12 +343,13 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
   },
 
   createAgentAdapter({ agentId, credential, maxCallSeconds }): AgentAdapter {
+    const el = elevenLabsCredentialOf(credential);
     // No prompt/first-message overrides: passing them drops the agent's own
     // tool ids server-side (scenario#838). The key rides only into the SDK
     // adapter here — never onto the job payload's events or logs.
     const adapter = ScenarioRunner.voice.elevenLabsAgent({
       agentId,
-      apiKey: credential.apiKey,
+      apiKey: el.apiKey,
     });
     // A single agent turn should never out-wait the whole-call budget the
     // child enforces; clamp the per-turn wait to it. The whole-call cut is the

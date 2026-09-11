@@ -7,9 +7,10 @@ import {
 } from "../elevenlabs-convai.transport";
 
 const CREDENTIAL = {
+  kind: "elevenlabs",
   apiKey: "sk-secret",
   baseUrl: "https://api.elevenlabs.io",
-};
+} as const;
 
 function mockFetchOnce(response: Partial<Response> & { json?: () => unknown }) {
   vi.stubGlobal(

@@ -248,22 +248,43 @@ export type ConnectedAgentData = z.infer<typeof ConnectedAgentDataSchema>;
 
 /**
  * What a voice run carries to the child: the transport, the agent id on that
- * transport, and the project's ElevenLabs credential resolved from the
- * provider row (never stored on the agent). The credential is `null` when the
- * project has no key, so the child fails the run with a named reason rather
- * than reaching the vendor with an empty credential — the same way the http
- * data carries its secrets to the child.
+ * transport (the ElevenLabs agent id, or the phone number for a phone target),
+ * and the project's provider credential resolved from the model-provider row
+ * (never stored on the agent). A discriminated union on `transport` so each
+ * transport carries only the credential shape it can use: ElevenLabs an API key
+ * and host, phone the Twilio account SID, auth token and from-number. The
+ * credential is `null` when the project has no key for the transport, so the
+ * child fails the run with a named reason rather than reaching the vendor with
+ * an empty credential — the same way the http data carries its secrets to the
+ * child.
  */
-export const VoiceTargetSchema = z.object({
+export const ElevenLabsVoiceTargetSchema = z.object({
   transport: z.literal("elevenlabs_convai"),
   agentId: z.string(),
   credential: z
     .object({
+      kind: z.literal("elevenlabs"),
       apiKey: z.string(),
       baseUrl: z.string(),
     })
     .nullable(),
 });
+export const PhoneVoiceTargetSchema = z.object({
+  transport: z.literal("phone"),
+  agentId: z.string(),
+  credential: z
+    .object({
+      kind: z.literal("twilio"),
+      accountSid: z.string(),
+      authToken: z.string(),
+      fromNumber: z.string(),
+    })
+    .nullable(),
+});
+export const VoiceTargetSchema = z.discriminatedUnion("transport", [
+  ElevenLabsVoiceTargetSchema,
+  PhoneVoiceTargetSchema,
+]);
 export type VoiceTarget = z.infer<typeof VoiceTargetSchema>;
 
 /** Pre-fetched voice agent configuration for serialized execution. */

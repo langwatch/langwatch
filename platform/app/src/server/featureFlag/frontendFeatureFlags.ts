@@ -63,11 +63,6 @@ export const FRONTEND_FEATURE_FLAGS = [
   // run, and run scenarios with a simulated caller. Off by default.
   // See useVoiceAgentsEnabled and specs/features/agents/voice-agents-v1.feature.
   "release_voice_agents_enabled",
-  // The Phone number transport option in the voice agent drawer. Off by default
-  // until the voice worker that dials phone targets ships (#8014); an existing
-  // phone target still renders its fields regardless of this flag. See
-  // AgentVoiceEditorDrawer and specs/features/agents/voice-phone.feature.
-  "release_voice_phone_targets_enabled",
   // Governance: gates the personal-keys / admin oversight /
   // RoutingPolicy / IngestionSource UI surfaces. On by default
   // (ADR-038 Decision 7); SaaS rollout and per-org kill switches are

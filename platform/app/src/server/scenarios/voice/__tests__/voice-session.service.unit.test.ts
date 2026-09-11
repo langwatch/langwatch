@@ -28,6 +28,7 @@ import type {
 } from "../voice-transport.registry";
 
 const CREDENTIAL: VoiceTransportCredential = {
+  kind: "elevenlabs",
   apiKey: "sk-secret-123",
   baseUrl: "https://api.elevenlabs.io",
 };
@@ -236,8 +237,8 @@ describe("mintVoiceSession", () => {
       });
     });
 
-    describe("when the transport cannot run yet (the phone stub)", () => {
-      /** @scenario "Running a phone target before the voice worker exists fails with a clear message" */
+    describe("when a phone target is called from the browser", () => {
+      /** @scenario "A browser mint of a phone target is refused with a clear message" */
       it("rejects with the unavailable error before any credential lookup", async () => {
         const runner = fakeRunner();
         const resolveCredential = vi.fn(async () => CREDENTIAL);
@@ -1184,6 +1185,34 @@ describe("authorizeRecordingPlayback", () => {
             conversationId: "conv_1",
           }),
         ).rejects.toBeInstanceOf(VoiceRecordingKeyMissingError);
+      });
+    });
+
+    describe("given a non ElevenLabs credential", () => {
+      describe("when playback is authorized", () => {
+        it("throws", async () => {
+          const ports = fakePorts({
+            runner: fakeRunner(),
+            over: {
+              resolveCredential: vi.fn(async () => ({
+                kind: "twilio" as const,
+                accountSid: "AC123",
+                authToken: "tok-secret",
+                fromNumber: "+14155550000",
+              })),
+            },
+          });
+
+          await expect(
+            authorizeRecordingPlayback({
+              ports,
+              projectId: "p1",
+              conversationId: "conv_1",
+            }),
+          ).rejects.toThrow(
+            "Recording playback is only available for ElevenLabs conversations",
+          );
+        });
       });
     });
   });
