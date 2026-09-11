@@ -90,6 +90,12 @@ describe("defineServerModule", () => {
 
     await expect(
       createApp({ role: "api", config: { annotation: {} }, members: memberSourceOf({ prefix: "unused" }) })
+        // The config slice is deliberately incomplete, and ModuleConfigGuard is
+        // right to refuse it where it can see it. This test covers the refusal
+        // that still has to hold when it cannot: config reaching boot from JSON,
+        // the environment or a process config file was never type-checked, so
+        // the runtime parse stays the load-bearing one.
+        // @ts-expect-error - the compile-time refusal is asserted by this directive
         .withModules([declaration])
         .boot(),
     ).rejects.toThrow("suffix is required");

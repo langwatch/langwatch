@@ -211,12 +211,28 @@ export interface FeatureInstallArguments<Members> {
 }
 
 /**
- * A declaration as the application root holds it: every type parameter but the
- * members erased, because the root installs features it knows nothing
- * else about.
+ * A declaration as the application root holds it.
+ *
+ * Two things are NOT erased, because a process must be held to both: the
+ * module's own NAME, as the literal it was declared with, and the type of the
+ * config slice its schema parses. Together they are what lets `withModules`
+ * refuse a process that installs a module whose config it never stated
+ * (ADR-144, ruling 19). Everything else is erased, because the root installs
+ * modules it knows nothing else about.
  */
-export interface InstallableServerFeature<Members> {
-  readonly name: string;
+export interface InstallableServerFeature<
+  Members,
+  Name extends string = string,
+  Config = unknown,
+> {
+  readonly name: Name;
+  /**
+   * The schema this module's config slice is parsed through, where it declared
+   * one. It is here rather than closed over alone so a process's own config
+   * type can be derived from the modules it installs; `install` still parses
+   * through the schema it captured, and never reads this.
+   */
+  readonly configSchema?: FeatureConfigSchema<Config>;
   /** Every door this feature declared, for the process root to mount at boot. */
   readonly transports?: readonly FeatureTransportDescriptor[];
   readonly repositories?: FeatureRepositories;
@@ -255,6 +271,79 @@ export interface InstallableServerFeature<Members> {
   readonly install: (args: FeatureInstallArguments<Members>) => InstalledFeatureState;
 }
 
+/** One slice per module name, as a process states the config it hands them. */
+export type ModuleConfigRecord = Readonly<Record<string, unknown>>;
+
+/** A process that stated no module config at all. Its key set is empty. */
+export type NoModuleConfig = Readonly<Record<never, never>>;
+
+/** The module name a config slice is keyed by, or nothing where it declared none. */
+type ConfiguredModuleName<Module> =
+  Module extends InstallableServerFeature<never, infer Name, infer Config>
+    ? [Config] extends [undefined]
+      ? never
+      : Name
+    : never;
+
+/** The slice one module's own schema parses. */
+type ConfiguredModuleConfig<Module> =
+  Module extends InstallableServerFeature<never, string, infer Config> ? Config : never;
+
+/**
+ * The config a process installing exactly these modules must state.
+ *
+ * A module that declared no schema contributes nothing; one that did
+ * contributes its own name as the key and what its schema parses as the value.
+ * A composition annotates its config with this, so the slice it writes is
+ * checked where it is written rather than where it is installed.
+ */
+export type ModuleConfigFor<Modules extends readonly unknown[]> = {
+  readonly [Module in Modules[number] as ConfiguredModuleName<Module>]: ConfiguredModuleConfig<Module>;
+};
+
+/**
+ * Every module on the list whose slice the config already supplied does not cover.
+ *
+ * A module whose name is not a literal is skipped rather than refused. The
+ * guard identifies a module by its name, so a name widened to `string` is one
+ * it cannot identify - and a guard that cannot know must not refuse, or it
+ * rejects correct calls while naming no module a reader can act on. The legacy
+ * `serverFeature` builder is the only thing that produces such a name;
+ * `defineServerModule` carries the literal through `const Name`.
+ */
+type ModulesMissingConfig<Required, Supplied> = {
+  [Name in keyof Required]: string extends Name
+    ? never
+    : number extends Name
+      ? never
+      : Name extends keyof Supplied
+        ? Supplied[Name] extends Required[Name]
+          ? never
+          : Name
+        : Name;
+}[keyof Required];
+
+/**
+ * What `withModules` asks for from a process that did not state a module's config.
+ *
+ * It is a type nothing satisfies, carrying the module names in its one
+ * property, so the refusal names the modules and the key rather than printing
+ * the structural mismatch between two forty-member tuples.
+ */
+export interface ModuleConfigMissing<Modules extends string> {
+  readonly "config this process did not state, by module": Modules;
+}
+
+/**
+ * Nothing where the supplied config covers this list, and a refusal naming the
+ * modules where it does not. Intersected with the list itself at the parameter,
+ * so the list is still what the call infers.
+ */
+export type ModuleConfigGuard<Modules extends readonly unknown[], Supplied> =
+  [ModulesMissingConfig<ModuleConfigFor<Modules>, Supplied>] extends [never]
+    ? unknown
+    : ModuleConfigMissing<ModulesMissingConfig<ModuleConfigFor<Modules>, Supplied> & string>;
+
 /**
  * This module, installed on its memory repositories.
  *
@@ -288,7 +377,8 @@ export interface ServerFeatureDeclaration<
   Rest,
   Trpc,
   Worker,
-> extends InstallableServerFeature<Members> {
+  Name extends string = string,
+> extends InstallableServerFeature<Members, Name, Config> {
   /** Present only so the declaration's types are reachable from a runtime read. */
   readonly types: {
     config: Config;
@@ -307,8 +397,9 @@ interface FeatureShape<
   Config,
   Dependencies extends TokenMap,
   TransportDependencies extends TokenMap,
+  Name extends string = string,
 > {
-  readonly name: string;
+  readonly name: Name;
   readonly configSchema: FeatureConfigSchema<Config> | undefined;
   readonly dependencies: Dependencies;
   readonly transportDependencies: TransportDependencies;
@@ -326,27 +417,28 @@ export class ServerFeatureBuilder<
   Members,
   Dependencies extends TokenMap,
   TransportDependencies extends TokenMap,
+  Name extends string = string
 > {
-  constructor(private readonly shape: FeatureShape<Config, Dependencies, TransportDependencies>) {}
+  constructor(private readonly shape: FeatureShape<Config, Dependencies, TransportDependencies, Name>) {}
 
   /** The typed config slice `boot({ config })` must carry for this feature. */
   withConfig<NextConfig>(
     schema: FeatureConfigSchema<NextConfig>,
-  ): ServerFeatureBuilder<NextConfig, Members, Dependencies, TransportDependencies> {
+  ): ServerFeatureBuilder<NextConfig, Members, Dependencies, TransportDependencies, Name> {
     return new ServerFeatureBuilder({ ...this.shape, configSchema: schema });
   }
 
   /** The contract services this feature needs in EVERY role it is installed in. */
   withDependencies<NextDependencies extends TokenMap>(
     dependencies: NextDependencies,
-  ): ServerFeatureBuilder<Config, Members, NextDependencies, TransportDependencies> {
+  ): ServerFeatureBuilder<Config, Members, NextDependencies, TransportDependencies, Name> {
     return new ServerFeatureBuilder({ ...this.shape, dependencies });
   }
 
   /** The tokens this feature needs only where it serves a transport. They are */
   withTransportDependencies<NextTransportDependencies extends TokenMap>(
     transportDependencies: NextTransportDependencies,
-  ): ServerFeatureBuilder<Config, Members, Dependencies, NextTransportDependencies> {
+  ): ServerFeatureBuilder<Config, Members, Dependencies, NextTransportDependencies, Name> {
     return new ServerFeatureBuilder({ ...this.shape, transportDependencies });
   }
 
@@ -360,7 +452,7 @@ export class ServerFeatureBuilder<
    */
   withMembers(
     ...members: readonly string[]
-  ): ServerFeatureBuilder<Config, Members, Dependencies, TransportDependencies> {
+  ): ServerFeatureBuilder<Config, Members, Dependencies, TransportDependencies, Name> {
     return new ServerFeatureBuilder({ ...this.shape, members });
   }
 
@@ -378,7 +470,8 @@ export class ServerFeatureBuilder<
     undefined,
     undefined,
     undefined,
-    undefined
+    undefined,
+    Name
   > {
     return new ServerFeatureAssembly({
       ...this.shape,
@@ -405,7 +498,8 @@ interface FeatureAssemblyState<
   Rest,
   Trpc,
   Worker,
-> extends FeatureShape<Config, Dependencies, TransportDependencies> {
+  Name extends string = string
+> extends FeatureShape<Config, Dependencies, TransportDependencies, Name> {
   readonly setup: (
     args: FeatureSetupArguments<Config, Members, ResolvedTokens<Dependencies>>,
   ) => Provided;
@@ -501,6 +595,7 @@ export class ServerFeatureAssembly<
   Rest,
   Trpc,
   Worker,
+  Name extends string = string
 > {
   constructor(
     private readonly state: FeatureAssemblyState<
@@ -512,7 +607,8 @@ export class ServerFeatureAssembly<
       Transport,
       Rest,
       Trpc,
-      Worker
+      Worker,
+      Name
     >,
   ) {}
 
@@ -528,7 +624,8 @@ export class ServerFeatureAssembly<
     Transport,
     Rest,
     Trpc,
-    Worker
+    Worker,
+    Name
   > {
     const alreadyProvidesApp = this.state.providers.length !== 0;
     if (alreadyProvidesApp) {
@@ -563,7 +660,8 @@ export class ServerFeatureAssembly<
     NextTransport,
     undefined,
     undefined,
-    Worker
+    Worker,
+    Name
   > {
     return new ServerFeatureAssembly({
       ...this.state,
@@ -595,7 +693,8 @@ export class ServerFeatureAssembly<
     Transport,
     NextRest,
     Trpc,
-    Worker
+    Worker,
+    Name
   > {
     return new ServerFeatureAssembly({ ...this.state, rest: create });
   }
@@ -630,7 +729,8 @@ export class ServerFeatureAssembly<
     Transport,
     Rest,
     Trpc,
-    Worker
+    Worker,
+    Name
   > {
     return new ServerFeatureAssembly({ ...this.state, transportFacts: bind });
   }
@@ -656,7 +756,8 @@ export class ServerFeatureAssembly<
     Transport,
     Rest,
     NextTrpc,
-    Worker
+    Worker,
+    Name
   > {
     return new ServerFeatureAssembly({ ...this.state, trpc: create });
   }
@@ -675,7 +776,8 @@ export class ServerFeatureAssembly<
     Transport,
     Rest,
     Trpc,
-    NextWorker
+    NextWorker,
+    Name
   > {
     return new ServerFeatureAssembly({ ...this.state, worker: create });
   }
@@ -692,7 +794,8 @@ export class ServerFeatureAssembly<
     Transport,
     Rest,
     Trpc,
-    Worker
+    Worker,
+    Name
   > {
     return new ServerFeatureAssembly({ ...this.state, close });
   }
@@ -712,6 +815,7 @@ export class ServerFeatureAssembly<
     const state = this.state;
     const declaration = {
       name: state.name,
+      configSchema: state.configSchema,
       dependencies: state.dependencies,
       transportDependencies: state.transportDependencies,
       providers: state.providers as readonly FeatureProvider<never>[],
@@ -799,7 +903,7 @@ export class ServerFeatureAssembly<
  */
 export function serverFeature<Members>(
   name: string,
-): ServerFeatureBuilder<undefined, Members, Record<never, never>, Record<never, never>> {
+): ServerFeatureBuilder<undefined, Members, Record<never, never>, Record<never, never>, string> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("A feature installer needs a name.");
   return new ServerFeatureBuilder({
@@ -1031,7 +1135,8 @@ class RepositoryAppBuilder<
     undefined,
     undefined,
     undefined,
-    undefined
+    undefined,
+    Name
   > {
     const app = this.app;
     const registry = this.repositories;
@@ -1052,6 +1157,9 @@ class RepositoryAppBuilder<
       .build();
     return {
       ...setup,
+      // The name is the literal the module was declared with, which is the key
+      // its config slice is stated under. The builder chain above widens it.
+      name,
       // The registry is read ONCE per install, here, and the instances are
       // handed to the app and to this module's eventing declaration alike. A
       // second read would give the two halves separate objects over the same
@@ -1175,7 +1283,8 @@ class ConfiguredAppBuilder<
     undefined,
     undefined,
     undefined,
-    undefined
+    undefined,
+    Name
   > {
     const app = this.app;
     const declaration = serverFeature<Members>(this.name)
@@ -1193,6 +1302,7 @@ class ConfiguredAppBuilder<
       .build();
     return {
       ...declaration,
+      name: this.name,
       repositories: snapshotRepositories(app.repositories),
       members: declaredReads(app),
       ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
@@ -1241,7 +1351,8 @@ class UnconfiguredAppBuilder<
     undefined,
     undefined,
     undefined,
-    undefined
+    undefined,
+    Name
   > {
     const app = this.app;
     const declaration = serverFeature<Members>(this.name)
@@ -1259,6 +1370,7 @@ class UnconfiguredAppBuilder<
       .build();
     return {
       ...declaration,
+      name: this.name,
       repositories: snapshotRepositories(app.repositories),
       members: declaredReads(app),
       ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
@@ -1327,7 +1439,8 @@ class ConfiguredAppWithTransportsBuilder<
     undefined,
     undefined,
     undefined,
-    undefined
+    undefined,
+    Name
   > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> } {
     const declaration = new ConfiguredAppBuilder(this.name, this.app).build();
     return {
@@ -1398,7 +1511,8 @@ class UnconfiguredAppWithTransportsBuilder<
     undefined,
     undefined,
     undefined,
-    undefined
+    undefined,
+    Name
   > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> } {
     const declaration = new UnconfiguredAppBuilder(this.name, this.app).build();
     return {
