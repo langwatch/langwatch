@@ -577,6 +577,18 @@ async function providerRefusal(response: {
  * about this source, so the pages already read are worth more than starting the
  * window over.
  *
+ * One thing banks here that is NOT transient. A 4xx this adapter does not
+ * classify — a 400 that is not the key-breakdown cutoff, a 404, a 422 — leaves
+ * `fetchPage` as a plain error on the same line a 5xx does, so pages in hand
+ * bank it too. That keeps pages the old code threw away, so it is not a
+ * regression, but the window still never completes: the next run starts AT the
+ * refused page, reads nothing, and reports the failure with the cursor held,
+ * which HOLDS the consecutive count rather than raising it. A source wedged
+ * that way reads as partly collected rather than failing. Pinning those
+ * statuses as refusals would overturn the cases already fixing a
+ * differently-shaped 400 to a counted failure rather than a throw, so it is a
+ * change of its own.
+ *
  * Banking is never the same as succeeding. The result carries `unreadPage`, so
  * the run status counts the failure while keeping the progress — without it a
  * source refused on every run would read as healthy forever.
