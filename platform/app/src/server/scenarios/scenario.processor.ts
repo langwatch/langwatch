@@ -164,32 +164,57 @@ export async function handleSucceededJobResult({
   deps: ProcessorDependencies;
 }): Promise<void> {
   if (result.agentInstance) {
-    try {
-      await deps.agentInstanceRecorder.recordAgentInstance({
-        projectId: jobData.projectId,
-        scenarioRunId: jobData.scenarioRunId,
-        agentInstance: result.agentInstance,
-      });
-    } catch (err) {
-      logger.warn(
-        { err, scenarioRunId: jobData.scenarioRunId },
-        "Could not record the agent instance that served the run",
-      );
-    }
+    const agentInstance = result.agentInstance;
+    await recordBestEffort({
+      what: "the agent instance that served the run",
+      jobData,
+      record: () =>
+        deps.agentInstanceRecorder.recordAgentInstance({
+          projectId: jobData.projectId,
+          scenarioRunId: jobData.scenarioRunId,
+          agentInstance,
+        }),
+    });
   }
 
   if (result.isCutAtLimit) {
-    try {
-      await deps.cutAtLimitRecorder.recordCutAtLimit({
-        projectId: jobData.projectId,
+    await recordBestEffort({
+      what: "that the run was cut at the call limit",
+      jobData,
+      record: () =>
+        deps.cutAtLimitRecorder.recordCutAtLimit({
+          projectId: jobData.projectId,
+          scenarioRunId: jobData.scenarioRunId,
+        }),
+    });
+  }
+}
+
+/**
+ * Run one best-effort recorder: a throwing recorder is logged with the run
+ * and project ids and swallowed, so a side-channel write can never fail a
+ * job that already ran to the end (#8029).
+ */
+export async function recordBestEffort({
+  what,
+  jobData,
+  record,
+}: {
+  what: string;
+  jobData: Pick<ExecutionJobData, "projectId" | "scenarioRunId">;
+  record: () => Promise<unknown>;
+}): Promise<void> {
+  try {
+    await record();
+  } catch (err) {
+    logger.warn(
+      {
+        err,
         scenarioRunId: jobData.scenarioRunId,
-      });
-    } catch (err) {
-      logger.warn(
-        { err, scenarioRunId: jobData.scenarioRunId },
-        "Could not record that the run was cut at the call limit",
-      );
-    }
+        projectId: jobData.projectId,
+      },
+      `Could not record ${what}`,
+    );
   }
 }
 
