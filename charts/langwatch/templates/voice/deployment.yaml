@@ -1,9 +1,13 @@
 {{- if .Values.voice.enabled }}
-{{- if not .Values.voice.publicBaseUrl }}
-{{- fail "voice.publicBaseUrl is required when voice.enabled is true, Media Streams connects inbound to this URL, and the worker refuses to start without it. Set it to the public https:// origin fronting the voice Service/Ingress." }}
-{{- end }}
-{{- if not (regexMatch "^https://[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$" .Values.voice.publicBaseUrl) }}
-{{- fail (printf "voice.publicBaseUrl (%q) must be an https origin only: scheme, hostname, optional port 1-65535, no path or query, for example https://voice.example.com." .Values.voice.publicBaseUrl) }}
+{{- $voicePublicBaseUrl := include "langwatch.voice.publicBaseUrl" . }}
+{{/* Empty means unresolved: no explicit voice.publicBaseUrl and
+     app.http.publicUrl is not an https:// origin (e.g. the chart default,
+     http://localhost:5560). That is a quiet "render nothing", not a failure
+     — see the helper doc comment. An explicit bad value never resolves to
+     empty, so it always reaches the regex check below and fails loudly. */}}
+{{- if $voicePublicBaseUrl }}
+{{- if not (regexMatch "^https://[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$" $voicePublicBaseUrl) }}
+{{- fail (printf "voice.publicBaseUrl (%q) must be an https origin only: scheme, hostname, optional port 1-65535, no path or query, for example https://voice.example.com." $voicePublicBaseUrl) }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -111,7 +115,7 @@ spec:
             - name: VOICE_WS_PORT
               value: {{ .Values.voice.wsPort | quote }}
             - name: VOICE_PUBLIC_BASE_URL
-              value: {{ .Values.voice.publicBaseUrl | quote }}
+              value: {{ $voicePublicBaseUrl | quote }}
 
             {{- with .Values.voice.extraEnvs }}
             {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "voice.extraEnvs") }}
@@ -126,4 +130,5 @@ spec:
       volumes:
         - name: tmp-dir
           emptyDir: {}
+{{- end }}
 {{- end }}

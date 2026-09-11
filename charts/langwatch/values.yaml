@@ -1099,13 +1099,24 @@ voice:
   otel:
     serviceName: langwatch-voice
 
-  ## @param voice.enabled [default: false] Deploy the voice worker Deployment, Service (and Ingress if voice.ingress.enabled). Off by default.
-  enabled: false
+  ## @param voice.enabled [default: true] Deploy the voice worker Deployment, Service (and Ingress if voice.ingress.enabled) once a public https:// origin can be resolved (see voice.publicBaseUrl below). On by default; set false to opt the whole feature out even when a public URL is available.
+  enabled: true
 
   # Public https:// origin the call provider dials back to; the worker
-  # derives wss://<host>/twilio/<nonce> from it. Required whenever
-  # voice.enabled is true, the chart refuses to render without it.
-  ## @param voice.publicBaseUrl [string] Public https:// origin the call provider connects to (e.g. https://voice.example.com). Required when voice.enabled is true. Must be an https origin only: scheme, hostname, optional port, no path or query; a value that does not match this is rejected, not trimmed.
+  # derives wss://<host>/twilio/<nonce> from it.
+  #
+  # Left empty (the default), the chart resolves it FROM app.http.publicUrl
+  # instead, so a cluster that already has a public https:// URL for the app
+  # gets phone simulations for free, with zero extra values set. If
+  # app.http.publicUrl is not an https:// origin either (e.g. it is still the
+  # chart default, http://localhost:5560), no public address can be resolved
+  # and the voice Deployment/Service/Ingress simply do not render — NOTES.txt
+  # explains why and names both settings that fix it. Set this value
+  # explicitly only when voice needs a DIFFERENT public host than the app
+  # (its own subdomain, its own edge). An explicit value here always wins
+  # over app.http.publicUrl, including a bad one: the chart still refuses to
+  # render rather than silently ignore it.
+  ## @param voice.publicBaseUrl [string] Public https:// origin the call provider connects to (e.g. https://voice.example.com). Empty resolves to app.http.publicUrl when that is an https:// origin. Must be an https origin only: scheme, hostname, optional port, no path or query; a value that does not match this is rejected, not trimmed.
   publicBaseUrl: ""
 
   # TCP port of the Media Streams WebSocket listener inside the pod.
@@ -1185,19 +1196,26 @@ voice:
     type: ClusterIP
     port: 3300
 
-  # Optional Ingress fronting the WebSocket port. TLS termination and any
-  # WebSocket-upgrade timeout annotations your controller needs are left to
-  # you: add them under voice.ingress.annotations.
+  # Ingress fronting the WebSocket port, on by default alongside voice.enabled
+  # (it still only renders once a public https:// origin resolves, same as
+  # the Deployment/Service). TLS termination is left to your edge, same as
+  # the main ingress.
   ## @extra voice.ingress Ingress configuration for the voice worker.
-  ## @param voice.ingress.enabled [default: false] Create an Ingress for the voice worker.
+  ## @param voice.ingress.enabled [default: true] Create an Ingress for the voice worker once a public https:// origin resolves. On by default.
   ## @param voice.ingress.className [string] IngressClassName for the voice Ingress.
-  ## @param voice.ingress.annotations [object] Additional annotations (e.g. controller-specific WebSocket upgrade/timeout settings).
-  ## @param voice.ingress.host [string] Hostname the voice Ingress routes, matching voice.publicBaseUrl. Required when voice.ingress.enabled is true.
+  ## @param voice.ingress.annotations [object] Additional annotations (e.g. controller-specific WebSocket upgrade/timeout settings). Defaults to nginx's proxy-read/send-timeout at 3600s (the stock 60s value would cut off any call longer than a minute) — nginx-specific; a non-nginx controller needs its own equivalents set here instead. Set to {} (or override each key) to replace the defaults entirely.
+  ## @param voice.ingress.host [string] Hostname the voice Ingress routes, matching voice.publicBaseUrl (or its app.http.publicUrl fallback). Empty defaults to that resolved URL's hostname; set explicitly only to override it, and it must then agree with the resolved URL or the render is refused.
   ## @param voice.ingress.tls [array] TLS configuration, same shape as ingress.tls ([{secretName, hosts}]).
   ingress:
-    enabled: false
+    enabled: true
     className: ""
-    annotations: {}
+    # nginx-specific: extends the default 60s proxy timeout so a Media
+    # Streams WebSocket survives calls up to an hour. A different ingress
+    # controller needs its own WebSocket/timeout annotations here instead —
+    # override this whole map to swap them in.
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     host: ""
     tls: []
 

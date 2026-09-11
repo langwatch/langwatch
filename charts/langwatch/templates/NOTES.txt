@@ -410,3 +410,23 @@ else breaks.
 Disabled (lwql.enabled=false). No LangWatchQL objects are provisioned
 and the endpoints refuse every query.
 {{- end }}
+
+{{- if and .Values.voice.enabled (not (include "langwatch.voice.publicBaseUrl" .)) }}
+
+──────────────────────────────────────────────────────────────────────
+9. Voice worker (Twilio phone simulations)
+──────────────────────────────────────────────────────────────────────
+⚠ Voice simulations are OFF: no public https:// URL is configured, so no
+voice worker resources were rendered.
+
+The voice worker (voice.enabled, on by default) needs a public https://
+origin to hand to the call provider. It resolves this two ways:
+  • app.http.publicUrl, if that is already an https:// origin — the common
+    case, zero extra values needed.
+  • voice.publicBaseUrl, set explicitly, if voice needs a different public
+    host than the app.
+
+Neither is set to an https:// origin on this install, so phone simulations
+stay off. Set one of them (and, for a cluster edge, terminate TLS in front
+of it) to turn voice on.
+{{- end }}

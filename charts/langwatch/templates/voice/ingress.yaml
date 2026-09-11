@@ -1,23 +1,31 @@
-{{- if and .Values.voice.enabled .Values.voice.ingress.enabled }}
-{{- if not .Values.voice.ingress.host }}
-{{- fail "voice.ingress.host is required when voice.ingress.enabled is true: it must match the hostname in voice.publicBaseUrl." }}
+{{- $voicePublicBaseUrl := include "langwatch.voice.publicBaseUrl" . }}
+{{/* Gated the same way as templates/voice/deployment.yaml: without a
+     resolved public base URL there is nothing for this Ingress to route to
+     (the Deployment and Service stay silent too), so this degrades quietly
+     rather than failing. An explicit voice.publicBaseUrl that fails
+     validation still aborts the whole render, via deployment.yaml/
+     service.yaml — the check does not need to be repeated here. */}}
+{{- if and .Values.voice.enabled .Values.voice.ingress.enabled $voicePublicBaseUrl }}
+{{/* voice.ingress.host defaults to the hostname of the resolved public base
+     URL, so an operator only sets it to override that default. An explicit
+     value that disagrees with the resolved URL is still refused: Twilio
+     dials voice.publicBaseUrl (or its app.http.publicUrl fallback), and an
+     Ingress routing a different host would never see the WebSocket upgrade
+     at all — the mismatch would only surface as an unreachable call at
+     runtime. Compared here, at render time, instead. */}}
+{{- $resolvedHost := (urlParse $voicePublicBaseUrl).hostname }}
+{{- $explicitHost := .Values.voice.ingress.host | default "" }}
+{{- if and $explicitHost (ne $explicitHost $resolvedHost) }}
+{{- fail (printf "voice.ingress.host (%q) does not match the hostname in voice.publicBaseUrl (%q). Twilio dials voice.publicBaseUrl, so the Ingress must route the same host or the call never reaches it." $explicitHost $resolvedHost) }}
 {{- end }}
-{{/* voice.publicBaseUrl is what Twilio actually dials; an Ingress routing a
-     different host would never see the WebSocket upgrade at all, and the
-     mismatch would only surface as an unreachable call at runtime. Compared
-     here, at render time, instead. Guarded on publicBaseUrl being set: if it
-     is empty, templates/voice/deployment.yaml already refuses the render for
-     that reason. */}}
-{{- if .Values.voice.publicBaseUrl }}
-{{- $publicHost := (urlParse .Values.voice.publicBaseUrl).hostname }}
-{{- if ne $publicHost .Values.voice.ingress.host }}
-{{- fail (printf "voice.ingress.host (%q) does not match the hostname in voice.publicBaseUrl (%q). Twilio dials voice.publicBaseUrl, so the Ingress must route the same host or the call never reaches it." .Values.voice.ingress.host $publicHost) }}
-{{- end }}
-{{- end }}
+{{- $host := $explicitHost | default $resolvedHost }}
 # Fronts the voice worker's WebSocket port. Twilio Media Streams needs a
 # WebSocket-capable path: add any upgrade/timeout annotations your ingress
 # controller requires under voice.ingress.annotations (TLS termination is left
-# to your edge, same as the main ingress).
+# to your edge, same as the main ingress). The default annotations already
+# set nginx's proxy-read/send timeouts to 3600s, since the stock 60s value
+# would cut off any call longer than a minute; other controllers need their
+# own equivalents under this same key.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -46,7 +54,7 @@ spec:
     {{- end }}
   {{- end }}
   rules:
-    - host: {{ .Values.voice.ingress.host | quote }}
+    - host: {{ $host | quote }}
       http:
         paths:
           - path: /twilio
