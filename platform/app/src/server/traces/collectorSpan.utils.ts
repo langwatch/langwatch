@@ -39,8 +39,20 @@ function boolAttr(key: string, value: boolean): OtlpKeyValue {
   return { key, value: { boolValue: value } };
 }
 
-function msToNanoString(ms: number): string {
-  return String(ms * 1_000_000);
+/**
+ * Epoch milliseconds as the OTLP nanosecond string.
+ *
+ * A plain `ms * 1_000_000` exceeds `Number.MAX_SAFE_INTEGER` for real epoch
+ * values (~1.7e12 ms), so the low digits of the product are rounding noise.
+ * Split instead: BigInt keeps the large whole-millisecond part exact, and
+ * only the sub-millisecond remainder — which a double does carry at this
+ * magnitude — is rounded to whole nanoseconds. A 0.25ms span keeps its
+ * duration instead of collapsing to zero (#8038).
+ */
+export function epochMsToOtlpNanos(ms: number): string {
+  const wholeMs = Math.floor(ms);
+  const remainderNanos = Math.round((ms - wholeMs) * 1_000_000);
+  return (BigInt(wholeMs) * 1_000_000n + BigInt(remainderNanos)).toString();
 }
 
 function buildSpanAttributes(span: Span): OtlpKeyValue[] {
@@ -222,14 +234,14 @@ const convertSpanToOtlp = (span: Span): OtlpSpan => ({
   parentSpanId: span.parent_id ?? null,
   name: span.name ?? span.type,
   kind: spanTypeToESpanKind(span.type),
-  startTimeUnixNano: msToNanoString(span.timestamps.started_at),
-  endTimeUnixNano: msToNanoString(span.timestamps.finished_at),
+  startTimeUnixNano: epochMsToOtlpNanos(span.timestamps.started_at),
+  endTimeUnixNano: epochMsToOtlpNanos(span.timestamps.finished_at),
   attributes: buildSpanAttributes(span),
   events: span.timestamps.first_token_at
     ? [
         {
           name: "first_token",
-          timeUnixNano: msToNanoString(span.timestamps.first_token_at),
+          timeUnixNano: epochMsToOtlpNanos(span.timestamps.first_token_at),
           attributes: [],
         },
       ]
@@ -244,4 +256,5 @@ const convertSpanToOtlp = (span: Span): OtlpSpan => ({
 export const CollectorSpanUtils = {
   convertSpanToOtlp,
   buildResource,
+  epochMsToOtlpNanos,
 };

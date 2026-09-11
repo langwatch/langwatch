@@ -78,7 +78,7 @@ export async function updateTraceMetadata({
   });
 
   const now = Date.now();
-  const nowNano = String(now * 1_000_000);
+  const nowNano = CollectorSpanUtils.epochMsToOtlpNanos(now);
   const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 
   await getApp().traces.recordSpan({
