@@ -284,8 +284,8 @@ describe("phoneTransport", () => {
        * ack back BEFORE dialling — proven here by ORDER, not by spying on an
        * internal: the fake registrar itself records when it ran relative to
        * placeCall.
-       * @scenario "A phone call registers its stream nonce with the parent before dialling"
        */
+      /** @scenario "A phone call registers its stream nonce with the parent before dialling" */
       it("registers the nonce and awaits the ack before placeCall runs", async () => {
         const events: string[] = [];
         const adapter = fakeAdapter();
@@ -383,8 +383,8 @@ describe("phoneTransport", () => {
        * "stream never connected" that hides the real cause. `raceUpgradeRefusal`
        * is what a real IPC-listening race would do; this test drives a fake
        * one that "delivers" a refusal after placeCall has started dialling.
-       * @scenario "A phone call fails fast when the listener refuses the socket mid-dial"
        */
+      /** @scenario "A phone call fails fast when the listener refuses the socket mid-dial" */
       it("fails fast with the refusal reason instead of waiting out placeCall", async () => {
         const adapter = fakeAdapter();
         // placeCall itself never settles on its own — only the race's
@@ -443,8 +443,8 @@ describe("phoneTransport", () => {
        * wiring, nonce registration and dialling would succeed but the
        * arriving socket would have nowhere to go and the call would still
        * never connect — this proves the wiring is real, not a no-op.
-       * @scenario "The child feeds a handed-off Twilio socket into its own adapter"
        */
+      /** @scenario "The child feeds a handed-off Twilio socket into its own adapter" */
       it("forwards the received socket into the adapter's own upgrade handler", () => {
         const adapter = fakeAdapter();
         const receiver = fakeSocketReceiver();

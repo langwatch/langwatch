@@ -184,6 +184,44 @@ export function handleVoiceNonceRegisterMessage(params: {
   }
 }
 
+/** Shared settlement guard across the listener, timer, and send callback of
+ *  one in-flight registration wait — ensures exactly one of them acts. */
+interface NonceRegistrationSettlement {
+  settled: boolean;
+}
+
+/**
+ * Build the ack listener for one in-flight nonce-registration request: on a
+ * matching, not-yet-settled ack it marks the wait settled, cancels the timer
+ * and unsubscribes itself via `onSettle`, then resolves or rejects per the
+ * parent's verdict. Extracted so {@link requestNonceRegistration} does not
+ * carry this nesting in its own executor.
+ */
+function createNonceAckListener(params: {
+  requestId: string;
+  settlement: NonceRegistrationSettlement;
+  onSettle: () => void;
+  resolve: () => void;
+  reject: (error: Error) => void;
+}): (message: unknown) => void {
+  return (message: unknown): void => {
+    if (!isVoiceNonceRegisterAckMessage(message)) return;
+    if (message.requestId !== params.requestId) return;
+    if (params.settlement.settled) return;
+    params.settlement.settled = true;
+    params.onSettle();
+    if (message.ok) {
+      params.resolve();
+    } else {
+      params.reject(
+        new VoiceNonceRegistrationFailedError(
+          message.error ?? "unknown reason",
+        ),
+      );
+    }
+  };
+}
+
 /**
  * Child side: ask the parent to register `nonce` against this child, and wait
  * for the ack. Rejects if there is no IPC channel, the parent does not
@@ -207,28 +245,22 @@ export function requestNonceRegistration(params: {
       return;
     }
 
-    let settled = false;
-    const listener = (message: unknown): void => {
-      if (!isVoiceNonceRegisterAckMessage(message)) return;
-      if (message.requestId !== requestId) return;
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      proc.off("message", listener);
-      if (message.ok) {
-        resolve();
-      } else {
-        reject(
-          new VoiceNonceRegistrationFailedError(
-            message.error ?? "unknown reason",
-          ),
-        );
-      }
-    };
+    const settlement: NonceRegistrationSettlement = { settled: false };
+    let timer: NodeJS.Timeout;
+    const listener = createNonceAckListener({
+      requestId,
+      settlement,
+      onSettle: () => {
+        clearTimeout(timer);
+        proc.off("message", listener);
+      },
+      resolve,
+      reject,
+    });
 
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
+    timer = setTimeout(() => {
+      if (settlement.settled) return;
+      settlement.settled = true;
       proc.off("message", listener);
       reject(new VoiceNonceRegistrationTimeoutError(timeoutMs));
     }, timeoutMs);
@@ -241,8 +273,8 @@ export function requestNonceRegistration(params: {
       nonce: params.nonce,
     };
     proc.send(message, (error) => {
-      if (error && !settled) {
-        settled = true;
+      if (error && !settlement.settled) {
+        settlement.settled = true;
         clearTimeout(timer);
         proc.off("message", listener);
         reject(error);

@@ -75,8 +75,8 @@ describe("VoiceNonceRegistry", () => {
      * rang the callee for tens of seconds first) finds an already-expired
      * nonce and is refused 403, which then reads as a misleading
      * "stream never connected" instead of the true cause.
-     * @scenario "A dial-back arriving after ring delay is still accepted"
      */
+    /** @scenario "A dial-back arriving after ring delay is still accepted" */
     it("stays valid through a Twilio ring delay inside the SDK's connect-wait window", () => {
       let now = 0;
       const registry = new VoiceNonceRegistry({ now: () => now });
@@ -105,8 +105,8 @@ describe("VoiceNonceRegistry", () => {
      * The TTL change must not quietly remove expiry protection: a nonce that
      * outlives even the SDK's own connect-wait window (the caller gave up
      * long ago) is still refused.
-     * @scenario "A nonce that outlives the SDK's own wait window is still refused"
      */
+    /** @scenario "A nonce that outlives the SDK's own wait window is still refused" */
     it("still expires a nonce nobody could legitimately still be waiting on", () => {
       let now = 0;
       const registry = new VoiceNonceRegistry({ now: () => now });

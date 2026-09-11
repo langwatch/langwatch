@@ -28,8 +28,8 @@ describe("nonce registration -> listener upgrade, end to end in one process", ()
      * This is the production gap closed by this change: before it, nothing
      * ever called `registry.register`, so this exact sequence 403'd every
      * real call (confirmed live: Twilio error 31920).
-     * @scenario "A registered nonce lets the real Twilio upgrade through"
      */
+    /** @scenario "A registered nonce lets the real Twilio upgrade through" */
     it("routes the matching Twilio upgrade to a handoff, not a 403", () => {
       const registry = new VoiceNonceRegistry();
       const child = {} as ChildProcess;
@@ -67,8 +67,8 @@ describe("nonce registration -> listener upgrade, end to end in one process", ()
      * through a registry nothing ever wrote to — the exact pre-fix state
      * (nothing ever called registry.register in production). Confirms the
      * refusal shape the fix eliminates.
-     * @scenario "An unregistered nonce is refused 403"
      */
+    /** @scenario "An unregistered nonce is refused 403" */
     it("refuses the upgrade as an unknown nonce", () => {
       const registry = new VoiceNonceRegistry();
 

@@ -238,8 +238,8 @@ describe("raceAgainstUpgradeRefusal", () => {
      * The point of this function: a promise that would otherwise stay
      * pending until its own (much longer) timeout instead fails FAST, with
      * the real cause, the moment the parent's refusal notice arrives.
-     * @scenario "A phone call fails fast when the listener refuses the socket mid-dial"
      */
+    /** @scenario "A phone call fails fast when the listener refuses the socket mid-dial" */
     it("rejects with the refusal reason instead of waiting on the promise", async () => {
       const { proc, emitMessage } = fakeIpcProcess();
       const neverSettles = new Promise<string>(() => {});

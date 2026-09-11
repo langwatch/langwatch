@@ -152,6 +152,24 @@ Feature: Voice agents: reach an agent by phone
     Then connect fails immediately with the refusal reason instead of waiting out the call
     And the caller adapter is disconnected
 
+  @unit
+  Scenario: A phone call registers its stream nonce with the parent before dialling
+    Given a phone transport about to dial
+    When it connects
+    Then it registers the call's nonce and awaits the parent's ack before placeCall runs
+
+  @unit
+  Scenario: A registered nonce lets the real Twilio upgrade through
+    Given the child registered its nonce with the parent
+    When Twilio's dial-back arrives on that nonce
+    Then the upgrade routes to a handoff, not a 403
+
+  @unit
+  Scenario: An unregistered nonce is refused 403
+    Given the child never registered its nonce with the parent
+    When Twilio's dial-back arrives on that nonce
+    Then the upgrade is refused as an unknown nonce
+
   # ---------------------------------------------------------------------------
   # No browser call over phone
   # ---------------------------------------------------------------------------
@@ -264,10 +282,22 @@ Feature: Voice agents: reach an agent by phone
     Then the nonce is still consumed successfully
 
   @unit
+  Scenario: A nonce that outlives the SDK's own wait window is still refused
+    Given a nonce registered to a child
+    When it outlives even the SDK's own connect-wait window
+    Then it is still refused as expired
+
+  @unit
   Scenario: The media listener hands a valid call's socket to its scenario child
     Given the voice media listener is running with a nonce registered to a child
     When an upgrade arrives on that nonce's media path
     Then the raw socket is handed to the registered child
+
+  @unit
+  Scenario: The child feeds a handed-off Twilio socket into its own adapter
+    Given the parent has handed off Twilio's media socket to the child over IPC
+    When the child receives it
+    Then it forwards the received socket into the adapter's own upgrade handler
 
   @integration
   Scenario: A handed-off media socket arrives at the scenario child process
