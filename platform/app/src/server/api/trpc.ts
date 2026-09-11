@@ -37,7 +37,6 @@ interface CreateNextContextOptions {
 }
 
 import { auditLog } from "@ee/audit-log/auditLog";
-import { rateLimit } from "../rateLimit";
 import type {
   AuthzPermission,
   DeclarationError,
@@ -74,6 +73,7 @@ import {
   declaredNoPermission,
   declaredServiceAuthorization,
 } from "../app-layer/authz/trpc-middleware";
+import { rateLimit } from "../rateLimit";
 import { isAuditLogExempt } from "./auditLogExemptions";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
