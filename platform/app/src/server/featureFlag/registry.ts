@@ -170,6 +170,21 @@ export const FEATURE_FLAGS = [
     family: "Governance",
   },
 
+  // Deliberately its own key rather than a reuse of the one above, and it
+  // gates strictly less. That one decides whether pulled cost is RECORDED at
+  // all; this one decides whether a version of a charge that a later pull
+  // superseded is WITHDRAWN. Turning the recording off to stop bad
+  // withdrawals would also stop every good record, so the two need separate
+  // switches or the only available remedy is far too blunt.
+  {
+    key: "release_pulled_usage_retraction_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Withdraws the superseded version of a pulled charge when a provider reissues it under a different currency, agent or spender, so a day does not total the same bill twice (ADR-088/ADR-128). Off by default; enable per organization via the operator store or a PostHog rule. With it off the reissue is still detected and logged, but nothing is withdrawn and the day keeps double-counting. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_pulled_usage_retraction_enabled.",
+    family: "Governance",
+  },
+
   // ----- PRODUCT -----
   {
     key: "release_lwql_workbench",
@@ -191,13 +206,6 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Voice agents: register an ElevenLabs agent, talk to it, call it from a run, and run scenarios with a simulated caller. Off by default; enable per project or organization via the operator store.",
-  },
-  {
-    key: "release_voice_phone_targets_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Reveals the Phone number transport option in the voice agent drawer. Off by default until the voice worker that dials phone targets ships (langwatch/langwatch#8014); an existing phone target still renders its fields regardless. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_voice_phone_targets_enabled.",
   },
   // Per-project gate for the transient S3 spool at the ingestion edge
   // (#4215 / ADR-022). ON by default, so a deployment with object storage

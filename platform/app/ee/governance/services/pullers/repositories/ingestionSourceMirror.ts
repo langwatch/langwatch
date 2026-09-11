@@ -21,6 +21,16 @@ export interface IngestionSourceMirror {
   lastSuccessAt: Date | undefined;
   lastEventAt: Date | undefined;
   status: "active" | undefined;
+  /**
+   * How far the last run read, and whether it reached the end.
+   *
+   * `undefined` on both when the fold holds no answer, which leaves the
+   * columns alone: a producer that has not been taught to report must not
+   * erase what an earlier run recorded, and a row that has never been told
+   * has to read as unknown rather than as either answer.
+   */
+  lastReadThroughAt: Date | undefined;
+  lastRunCompleteness: "complete" | "truncated" | undefined;
 }
 
 export function buildIngestionSourceMirror({
@@ -49,5 +59,14 @@ export function buildIngestionSourceMirror({
         ? new Date(state.LastRunAt)
         : undefined,
     status: deliveredEvents ? "active" : undefined,
+    // Mirrored for the same reason `lastSuccessAt` above is: every reader of
+    // the health surface selects from this row, and two of them render a LIST
+    // of sources, so reaching a per-run projection would be one query per row
+    // on a screen built to show many at once.
+    lastReadThroughAt:
+      state.LastReadThroughAt === null
+        ? undefined
+        : new Date(state.LastReadThroughAt),
+    lastRunCompleteness: state.LastRunCompleteness ?? undefined,
   };
 }

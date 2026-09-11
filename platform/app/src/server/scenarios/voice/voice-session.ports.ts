@@ -111,7 +111,10 @@ export function createVoiceSessionPortsFromServices({
       if (VOICE_TRANSPORT_PROVIDER[transport] !== "elevenlabs") return null;
       const provider = await findElevenLabsProviderForProject({ projectId });
       if (!provider) return null;
-      return getElevenLabsApiCredential({ modelProviderId: provider.id });
+      const credential = await getElevenLabsApiCredential({
+        modelProviderId: provider.id,
+      });
+      return credential ? { kind: "elevenlabs", ...credential } : null;
     },
 
     /** Looks up the vendor agent id off a saved voice agent row: when a mint

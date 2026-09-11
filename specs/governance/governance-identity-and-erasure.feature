@@ -245,6 +245,38 @@ Feature: Erasing a person from the governance data, and making it stick
     # from the identifier the same way every time.
 
   @integration
+  Scenario: Erasure reaches the note of where each pulled charge was filed
+    Given an erased person with pulled spend
+    When they are erased
+    Then the note of where that charge was filed carries the stand-in
+    And it still names the day and the source it was first filed under
+    # A second place the raw identifier is written down, beside the totals and
+    # in the same write, so a charge already filed is not filed twice. Erasure
+    # cleared the totals and stopped there. At several providers the
+    # identifier a bill arrives under is the person's email address, and one
+    # note is written for every pulled charge rather than only for corrected
+    # ones, so what stayed behind was every day the person spent on — for as
+    # long as the note is kept, which is now indefinitely: the fixed thirteen
+    # month timer these tables were created with has been replaced by a
+    # per-row retention that defaults to keep-forever, so overwriting the
+    # identifier is the only thing that ever removes it.
+    #
+    # Both halves are asserted together because either alone is satisfied by a
+    # wrong fix. Removing the note clears the identifier and is the obvious
+    # move: the key a note is filed under deliberately says nothing about who
+    # spent the money, which is what lets a corrected charge replace the one
+    # it corrects — and it means a note filed under one person is equally the
+    # pointer for that same charge reissued against anybody else. Delete it
+    # and the next write files the key wherever it happens to land, moving a
+    # pointer that is required never to move. Leaving the note untouched keeps
+    # the pointer and keeps the identifier.
+    #
+    # So the identifier is overwritten where it sits. It can be, because here
+    # it is payload rather than part of what addresses the note — the exact
+    # opposite of the daily totals above, where it is part of the address and
+    # an edit has to be refused.
+
+  @integration
   Scenario: Erasure reaches areas the organization no longer uses
     Given an erased person with spend in an area the organization has retired
     When they are erased

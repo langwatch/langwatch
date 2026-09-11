@@ -19,9 +19,11 @@ import { ParserConfigFields } from "../inventory";
 function Harness({
   sourceType,
   advancedExtras,
+  invalidKeys,
 }: {
   sourceType: SourceType;
   advancedExtras?: ReactNode;
+  invalidKeys?: readonly string[];
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   return (
@@ -30,6 +32,7 @@ function Harness({
         sourceType={sourceType}
         values={values}
         onChange={setValues}
+        invalidKeys={invalidKeys}
         advancedExtras={advancedExtras}
       />
       {/* What the builder would be handed. A control that looks right and
@@ -48,10 +51,18 @@ async function expandAdvanced() {
   return user;
 }
 
-const renderFields = (sourceType: SourceType, advancedExtras?: ReactNode) =>
+const renderFields = (
+  sourceType: SourceType,
+  advancedExtras?: ReactNode,
+  invalidKeys?: readonly string[],
+) =>
   render(
     <ChakraProvider value={defaultSystem}>
-      <Harness sourceType={sourceType} advancedExtras={advancedExtras} />
+      <Harness
+        sourceType={sourceType}
+        advancedExtras={advancedExtras}
+        invalidKeys={invalidKeys}
+      />
     </ChakraProvider>,
   );
 
@@ -73,11 +84,14 @@ describe("given the Genie source-specific fields", () => {
     });
 
     /** @scenario "Genie setup asks for the service principal first" */
-    it("keeps the token, space IDs, and warehouse ID hidden until Advanced expands", async () => {
+    it("keeps the token, space IDs, warehouse ID, and bill-line switch hidden until Advanced expands", async () => {
       renderFields("databricks_genie");
       expect(screen.queryByText("Workspace token")).toBeNull();
       expect(screen.queryByText(/Genie space IDs/)).toBeNull();
       expect(screen.queryByText(/SQL warehouse ID/)).toBeNull();
+      expect(
+        screen.queryByText(/Also record Genie's own bill line/),
+      ).toBeNull();
 
       const user = userEvent.setup();
       await user.click(screen.getByText("Advanced"));
@@ -86,6 +100,9 @@ describe("given the Genie source-specific fields", () => {
       });
       expect(screen.getByText(/Genie space IDs/)).toBeTruthy();
       expect(screen.getByText(/SQL warehouse ID/)).toBeTruthy();
+      expect(
+        screen.getByText(/Also record Genie's own bill line/),
+      ).toBeTruthy();
     });
   });
 
@@ -344,6 +361,121 @@ describe("given the Copilot Studio create form", () => {
       expect(
         screen.getByText(/Billing app registration client secret/),
       ).toBeTruthy();
+    });
+  });
+});
+
+describe("given the Copilot Studio directory switch", () => {
+  describe("when the form first renders", () => {
+    /** @scenario "A new source starts set to record people and departments" */
+    it("shows the switch already on, holding nothing", () => {
+      renderFields("copilot_studio_dataverse");
+
+      const toggle = screen.getByTestId(
+        "parser-switch-readDirectory",
+      ) as HTMLInputElement;
+
+      // On while the form holds nothing at all: the default lives on the field
+      // definition the builder also reads, so an untouched form cannot show a
+      // directory read the saved source does not do.
+      expect(toggle.checked).toBe(true);
+      expect(heldValues().readDirectory).toBeUndefined();
+    });
+
+    /**
+     * The switch it most resembles — the licence one — is in Advanced by its
+     * own documented decision. This one is not, and the difference is the
+     * point: turning it off empties every screen that names a person.
+     */
+    /** @scenario "A new source starts set to record people and departments" */
+    it("stands in the visible fields rather than inside Advanced", () => {
+      renderFields("copilot_studio_dataverse");
+
+      // Advanced unmounts its contents while collapsed, so anything reachable
+      // before it is expanded is on the leading path by construction. The
+      // licence switch is asserted absent in the same breath, because a
+      // rendering that showed both would pass the line above for the wrong
+      // reason.
+      expect(screen.getByTestId("parser-switch-readDirectory")).toBeTruthy();
+      expect(screen.queryByTestId("parser-switch-readSeats")).toBeNull();
+    });
+  });
+
+  describe("when the admin turns it off", () => {
+    /** @scenario "A refusal is saved as a refusal" */
+    it("writes the refusal down rather than clearing the field", async () => {
+      renderFields("copilot_studio_dataverse");
+      const user = userEvent.setup();
+
+      await user.click(screen.getByTestId("parser-switch-readDirectory"));
+
+      // "false", never blank: blank means the declared default, which is on,
+      // so writing it back would undo the refusal on the next read.
+      await waitFor(() => {
+        expect(heldValues().readDirectory).toBe("false");
+      });
+    });
+  });
+});
+
+describe("given a save refused because a required field is empty", () => {
+  describe("when the field is one the form is showing", () => {
+    /** @scenario "An empty required field is named rather than described" */
+    it("marks the control itself and says what to do about it", () => {
+      renderFields("copilot_studio_dataverse", undefined, ["environmentUrl"]);
+
+      expect(
+        screen.getByTestId("parser-field-error-environmentUrl"),
+      ).toBeTruthy();
+      expect(
+        screen
+          .getByLabelText("Power Platform environment URL")
+          .getAttribute("aria-invalid"),
+      ).toBe("true");
+    });
+
+    /** @scenario "An empty required field is named rather than described" */
+    it("leaves every other field alone", () => {
+      renderFields("copilot_studio_dataverse", undefined, ["environmentUrl"]);
+
+      // An absence assertion proves nothing unless the same query finds the
+      // marker when it IS there, which the test above establishes for the
+      // field that was actually named.
+      expect(
+        screen.queryByTestId("parser-field-error-credentialsTenantId"),
+      ).toBeNull();
+      expect(
+        screen
+          .getByLabelText("Microsoft Entra tenant ID")
+          .getAttribute("aria-invalid"),
+      ).not.toBe("true");
+    });
+  });
+
+  describe("when the field is inside the Advanced group", () => {
+    /** @scenario "A complaint about a hidden field is not left hidden" */
+    it("opens the group so the marked field is on screen", async () => {
+      // Genie keeps its workspace token in Advanced, and Advanced unmounts its
+      // contents while collapsed — so finding the field at all is proof the
+      // group opened, without asserting on the trigger's own state.
+      renderFields("databricks_genie", undefined, ["credentialsToken"]);
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("parser-field-error-credentialsToken"),
+        ).toBeTruthy();
+      });
+    });
+  });
+
+  describe("when nothing was refused", () => {
+    /** @scenario "Answering a field clears the complaint about it" */
+    it("marks nothing, so an untouched form does not open red", () => {
+      renderFields("copilot_studio_dataverse");
+
+      expect(
+        screen.queryByTestId("parser-field-error-environmentUrl"),
+      ).toBeNull();
     });
   });
 });

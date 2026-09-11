@@ -320,3 +320,31 @@ describe("given a config that is not a config at all", () => {
     });
   });
 });
+
+/**
+ * The subscription arm of the wider "one connection per account" rule.
+ *
+ * The rule at `specs/ai-gateway/governance/ingestion-sources.feature` states
+ * one refusal across four identities — a cloud subscription, a conversation
+ * environment, and a provider account read for spend or for token usage. The
+ * subscription arm is the one that shipped first, and this binds the rule's own
+ * scenario to it so the rule is not enforced only where it is newest.
+ *
+ * The environment arm is bound in `environmentOwnership.unit.test.ts`, the
+ * provider-account arm in `providerAccountOwnership.unit.test.ts`.
+ *
+ * Spec: specs/ai-gateway/governance/ingestion-sources.feature
+ */
+describe("given a connection already reading a cloud subscription", () => {
+  describe("when the admin saves another connection naming that same subscription", () => {
+    /** @scenario "A second connection to a subscription another connection reads is refused" */
+    it("refuses the save and names the connection that already reads it", () => {
+      expect(() =>
+        assertAzureBillNotAlreadyClaimed({
+          parserConfig: configNaming(SUBSCRIPTION),
+          claimedBy: [existingReader({ name: "Copilot Studio, first" })],
+        }),
+      ).toThrow(/Copilot Studio, first/);
+    });
+  });
+});

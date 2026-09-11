@@ -189,6 +189,11 @@ func (s Stack) OverlayEnv() []string {
 		// haven's container, which has no backups, opts out explicitly. Otherwise
 		// every 15s stats tick would fail on a missing table for nothing.
 		env = append(env, "CLICKHOUSE_BACKUP_METRICS_ENABLED=false")
+		// The app sizes its connection pool from the server's query cap and
+		// assumes a 300-query server when nobody states it. haven rendered this
+		// one, so haven says so; otherwise a 64-connection pool meets a 32-query
+		// server and the first burst is rejected mid-page (#8064).
+		env = append(env, fmt.Sprintf("CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES=%d", ClickHouseMaxConcurrentQueries))
 	}
 	// Same story for Postgres: one shared brew-managed server, a database per
 	// slug, connected straight to loopback.

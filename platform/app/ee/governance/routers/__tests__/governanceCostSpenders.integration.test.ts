@@ -341,7 +341,12 @@ describe("governanceCost.spenders — router integration", () => {
       });
       expect(summary.unavailableReason).toBeNull();
       expect(summary.providers).toEqual([
-        { provider: "openai_admin", amountUsd: 7, cellsWithoutAmount: 0 },
+        {
+          provider: "openai_admin",
+          amountUsd: 7,
+          cellsWithoutAmount: 0,
+          currenciesWithoutUsdAmount: [],
+        },
       ]);
     });
   });

@@ -3,6 +3,8 @@
 import {
   type PulledUsageObservedEvent,
   PulledUsageObservedEventSchema,
+  type PulledUsageRetractedEvent,
+  PulledUsageRetractedEventSchema,
   readPulledUsageMoney,
 } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
 import {
@@ -40,6 +42,7 @@ const governanceCostRollupEvents = [
   gatewaySpendConfirmedEventSchema,
   gatewaySpendFailedEventSchema,
   PulledUsageObservedEventSchema,
+  PulledUsageRetractedEventSchema,
 ] as const;
 
 /**
@@ -234,6 +237,34 @@ export function utcDayOf(occurredAtMs: number): string {
 }
 
 /**
+ * The fields both pulled events carry, which are exactly the fields the cell's
+ * address is derived from.
+ *
+ * Structural rather than one of the two event data types: naming either would
+ * claim the branch below reads fields the other has not got, and the whole
+ * point is that it reads only what they share.
+ */
+type PulledUsageCellDimensions = {
+  occurredAtMs: number;
+  ingestionSourceId: string;
+  source: string;
+  model: string;
+  agentId?: string;
+  rawActorId?: string;
+  costNanoMinor?: number;
+  currencyCode?: string;
+  costNanoUsd?: number | null;
+};
+
+/** Whether an event type belongs to the pulled lane, either of the two. */
+function isPulledUsageEvent(type: string): boolean {
+  return (
+    type === PulledUsageObservedEventSchema.shape.type.value ||
+    type === PulledUsageRetractedEventSchema.shape.type.value
+  );
+}
+
+/**
  * The dimension tuple an event rolls up into, in sort-key order.
  *
  * Every element is also a column of the table's ORDER BY. The two must stay
@@ -255,8 +286,15 @@ function dimensionsOf(event: {
   currencyCode: string;
   rawActorId: string;
 } {
-  if (event.type === PulledUsageObservedEventSchema.shape.type.value) {
-    const d = event.data as unknown as PulledUsageObservedEvent["data"];
+  if (isPulledUsageEvent(event.type)) {
+    // Both pulled events are addressed the same way, deliberately. A
+    // retraction has to reach the cell it retracts, and the cell's address IS
+    // this tuple, so the retraction carries the same dimension fields under
+    // the same names and is read by the same code. A second branch here would
+    // be a second chance for the two to disagree, and a retraction that
+    // addressed a cell one dimension away would empty a stranger's money and
+    // leave the version it meant to withdraw live.
+    const d = event.data as unknown as PulledUsageCellDimensions;
     return {
       tenantId: event.tenantId,
       day: utcDayOf(d.occurredAtMs),
@@ -679,6 +717,108 @@ export class GovernanceCostRollupFoldProjection
     };
 
     return this.withDerivedRevisionMarkers(observed);
+  }
+
+  /**
+   * Withdraws what one restatement key holds in this cell.
+   *
+   * The item is set to ZERO rather than removed, and the difference is
+   * customer-visible. `amountNanoUsdOf` answers null for a cell nothing has
+   * contributed to, and null is read as "we hold no dollar figure for this",
+   * which drags the whole day into the withheld-figure copy. A retraction is
+   * knowledge, not absence: we do hold a figure for the retracted cell and it
+   * is zero. Removing the item would also lose the restatement key, which is
+   * what the index beside the row is built from.
+   *
+   * A retraction is a revision of the item like any other, so it moves the
+   * same three markers a corrected figure does -- the prior amount, the
+   * revision instant and the count -- and the cell reads as "revised, was $X"
+   * rather than as a figure that quietly vanished.
+   */
+  handlePulledUsageRetracted(
+    event: PulledUsageRetractedEvent,
+    state: GovernanceCostRollupState,
+  ): GovernanceCostRollupState {
+    const d = event.data;
+    const previous = state.pulledItems[d.restatementKey];
+
+    // A retraction older than what the item already holds. Ordering is by the
+    // pull instant carried on the event, never by arrival.
+    //
+    // STRICTLY older, so a retraction sharing its observation's pull instant
+    // still lands. An equal instant is the one case where the two orders
+    // disagreed about money: folded observation-first the retraction was
+    // dropped here and the charge stayed live, folded retraction-first the
+    // observation behind it took the stale path -- which needs a STRICTLY
+    // earlier look to be evidence of anything -- and the cell read as empty.
+    // The comparator folds a day with no ordering at all, so that is a day
+    // reported as drifting or not depending on the order a GROUP BY happened
+    // to return, which is the one alert that says the money on screen is
+    // wrong.
+    //
+    // The retraction is the arm that wins because it is the safe one: a
+    // withdrawal we apply twice costs nothing, and a charge the provider took
+    // back left standing is money on the screen nobody spent. Re-delivering
+    // the same retraction is still a no-op in substance -- the item is
+    // already zero, so nothing MOVES the figure, the revision markers carry
+    // forward untouched and the count does not advance.
+    if (previous !== undefined && previous.observedAtMs > d.observedAtMs) {
+      return state;
+    }
+
+    // A retraction whose observation has not been folded yet still lands, as
+    // an item explicitly holding nothing at the retraction's own pull instant.
+    // Dropping it instead would be a silent order dependency, and the one
+    // reader that most needs this fold to commute has no ordering at all: the
+    // daily comparator re-derives a day by folding whatever `findCostEventsForDay`
+    // hands back, which is a GROUP BY with no ORDER BY on it. Fold the
+    // retraction last and the day agrees with itself; fold it first and the
+    // observation behind it puts the money back, and the day is reported as
+    // drifting on every run for as long as it is kept.
+    //
+    // The observation that arrives afterwards is then a STALE look at an item
+    // already withdrawn, which the stale path reads as evidence of what the
+    // item held before -- so both orders reach zero, and both name the same
+    // prior amount.
+    const movedTheFigure = (previous?.amountNanoMinor ?? 0) !== 0;
+    return this.withDerivedRevisionMarkers({
+      ...state,
+      ...dimensionsOf(event as never),
+      pulledItems: {
+        ...state.pulledItems,
+        [d.restatementKey]: {
+          ...previous,
+          // A withdrawal is a definite statement about the item, not a
+          // pre-invoice guess at it, so an item first seen through its own
+          // retraction is exact.
+          exactOrEstimate: previous?.exactOrEstimate ?? "exact",
+          amountNanoMinor: 0,
+          // Zero in dollars too, on the same reasoning as the zero above:
+          // null here would make the cell unstatable in dollars rather than
+          // stated as holding nothing.
+          amountNanoUsd: 0,
+          // The quantities go with the money. The usage itself still happened
+          // -- it is filed under the cell the correction moved it to, and that
+          // cell carries these same counts -- so leaving them here would make
+          // the day's token totals carry the one bucket twice for exactly the
+          // reason the amount would have.
+          tokensInput: 0,
+          tokensOutput: 0,
+          tokensCacheRead: 0,
+          tokensCacheWrite: 0,
+          observedAtMs: d.observedAtMs,
+          ...revisionMarkersAfterPull(previous, movedTheFigure, d.observedAtMs),
+        },
+      },
+      // Carried so the cell is attributed even when the retraction is the
+      // first thing this fold sees of it, which the comparator's unordered
+      // re-derivation makes an ordinary case rather than a corner.
+      organizationId: d.organizationId || state.organizationId,
+      lastObservedAt: Math.max(state.lastObservedAt, d.observedAtMs),
+      revisionCount: movedTheFigure
+        ? state.revisionCount + 1
+        : state.revisionCount,
+    });
   }
 
   /**

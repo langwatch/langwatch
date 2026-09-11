@@ -614,7 +614,37 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       Given the events request fails
       When the admin views the events section
       Then they see an error message
-      And they do NOT see the "no events yet" setup walkthrough
+      And they do NOT see the "no events yet" empty pane
+
+    # The setup instructions used to BE the empty state: four paragraphs, a
+    # code block and two links in the page body whenever the table came back
+    # empty. That serves neither reader. An admin who has already wired the
+    # source up never sees any of it again, though "which endpoint was this?"
+    # is a question a WORKING source raises just as often; and an admin who
+    # has not wired it up gets a wall of setup text where the page should
+    # first say, in one sentence, what state their source is in.
+    @integration
+    Scenario: An idle source explains itself in a pane, not in a wall of setup text
+      Given a source that has ingested nothing
+      When the admin views the events section
+      Then they see the governance section's shared empty state — a glyph, a
+        headline and one sentence saying nothing has arrived yet
+      And that sentence names no control, so renaming one cannot make it lie
+      And the pane offers nothing to press, because only something upstream
+        can make an event appear
+      And the setup instructions are NOT in the page body
+
+    # In both states, because the questions they answer outlive the setup.
+    # It is a popover on a real button rather than a hover tooltip: the
+    # instructions carry documentation links, and a link inside a hover-only
+    # tooltip cannot be reached by keyboard or by touch.
+    @integration
+    Scenario: Setup instructions sit behind the heading, whatever the source is doing
+      When the admin opens the information control beside the Events heading
+      Then they see the endpoint to push to, what the trace store does with
+        the spans, and what rotating this source's secret does
+      And the documentation links inside it can be reached by keyboard
+      And the control is there whether or not the source has ingested anything
 
     @integration
     Scenario: The pager offers no control it cannot honour
@@ -653,3 +683,238 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And on confirm only the source row is deleted
     And historical events stay readable (TenantId-scoped) until manual purge
     And new events from the upstream operator's old config are rejected with 401
+
+  Rule: A refused save says which field it is refusing
+
+    @unit
+    Scenario: An empty required field is named rather than described
+      Given the composer is open on a source type with required fields
+      And one required field is empty
+      When the admin presses the create button
+      Then that field is marked as the one holding up the save
+      And the field says what to do about it
+      And no source is created
+      # The toast said some of the values were not valid and named none of
+      # them, which leaves an admin auditing a form of a dozen fields
+      # against one sentence. Anything the form can point at, it points at.
+
+    @unit
+    Scenario: A complaint about a hidden field is not left hidden
+      Given a required field that only appears once a switch is turned off
+      And that field is empty
+      When the admin presses the create button
+      Then the group holding it opens
+      # Marking a control nobody can see is telling the admin the form is
+      # wrong and then showing them a form on which everything is filled in.
+
+    @unit
+    Scenario: Answering a field clears the complaint about it
+      Given the create button was pressed with a required field empty
+      When the admin types a value into that field
+      Then the field is no longer marked
+      # A field that stays red after it has been answered reads as a
+      # second, different rejection.
+
+  Rule: What a source needs granted is read once, not on every visit
+
+    @unit
+    Scenario: The setup prose sits behind the heading, not above the fields
+      When the admin opens the composer on any source type
+      Then the body of the form starts with the fields
+      And what the source reads and what it needs granted is behind an
+        information control beside the drawer's heading
+      # It is three or four sentences of prerequisites. Printed in the body
+      # it pushed the fields it describes below the fold, and everyone who
+      # had already read it scrolled past it every time after.
+
+  Rule: One provider account is read by one connection
+
+    Two connections reading the same report from the same provider account
+    bill the same money twice: the same days arrive under two source
+    identities and nothing stored says they describe one account. The
+    refusal happens when the connection is saved, because by the time a run
+    could prove it the admin who could fix it is long gone, and the days
+    already recorded under both cannot be told apart afterwards.
+
+    What counts as the same account differs by provider - the subscription
+    for a cloud bill, the environment for a conversation feed, and for the
+    providers that name nothing at setup time, the account the provider
+    itself reports when it is asked with the administrator key. The refusal
+    reads the same either way and always names the connection that got
+    there first, because saying only that something is already connected
+    sends an admin hunting through a list.
+
+    Two connections onto one account stay legal wherever they cannot bill
+    the same money twice: a cloud subscription whose bill one connection
+    carries while another reads only conversations, and an account one
+    connection reads spend from while another reads token usage. What is
+    refused is a second connection reading the same report.
+
+    @unit
+    Scenario: A second connection to a subscription another connection reads is refused
+      Given a connection already reading a cloud subscription
+      When the admin saves another connection naming that same subscription
+      Then the save is refused
+      And the refusal names the connection that already reads it
+
+    @unit
+    Scenario: A second connection to an environment another connection reads is refused
+      Given a connection already reading a conversation environment
+      When the admin saves another connection naming that same environment written differently
+      Then the save is refused
+      And the refusal names the connection that already reads it
+      # Written differently means the same environment with a trailing
+      # slash, in another case, or with a path after it. A comparison that
+      # takes the typed text at face value refuses almost nothing.
+
+    @unit
+    Scenario: A second connection reading the same report from an account already connected is refused
+      Given a connection already reading a provider account through an administrator key
+      When the admin saves another connection carrying that same key for that same report
+      Then the save is refused
+      And the refusal names the connection that already reads that account
+      # The account is asked for by name while the connection is being
+      # saved, so this holds whether or not the second connection carries
+      # the same key as the first.
+
+    @unit
+    Scenario: A second key belonging to an account already connected is refused
+      Given a connection already reading a provider account
+      When the admin saves another connection carrying a different key for that same account
+      Then the save is refused
+      And the refusal names the connection that already reads that account
+      # One organization holds several administrator keys - a rotation
+      # overlap, a second admin, a service key beside a personal one - and
+      # every one of them reads the same whole-organization spend.
+      # Comparing the keys to each other refuses none of these.
+
+    @unit
+    Scenario: A usage connection and a cost connection may read the same account
+      Given a connection reading token usage from a provider account
+      When the admin saves another connection reading spend from that same account
+      Then the save is accepted
+      # Two different reports about one account, so no charge arrives twice.
+      # Refusing this leaves a customer who wants both having to pick one.
+
+    @unit
+    Scenario: A connection whose account the provider will not confirm is not saved
+      Given the provider cannot be asked which account an administrator key belongs to
+      When the admin saves a connection carrying that key
+      Then the save fails and says the account could not be confirmed
+      And no connection is created
+      # Letting it through unchecked is the same as having no guard at all:
+      # the next save has nothing to compare against, and the two
+      # connections then read the same bill for as long as they both live.
+
+    @unit
+    Scenario: A disabled connection still holds the account it read
+      Given a connection reading a provider account that the admin has disabled
+      When the admin saves another connection naming that same account for that same report
+      Then the save is refused
+      And the refusal says the disabled connection has to be archived first
+      # A disabled connection can be turned back on, and the day it is, the
+      # two of them start counting the same money. Archiving is the act
+      # that gives the account up.
+
+    @unit
+    Scenario: An edit that points a connection at an account another connection reads is refused
+      Given two connections reading two different provider accounts
+      When the admin edits one of them to name the account the other reads
+      Then the save is refused
+      And the refusal names the connection that already reads it
+      # Create and edit are two ways to reach the same forbidden state.
+      # Guarding only the first leaves the second as the way round it.
+
+    @unit
+    Scenario: Saving a connection without changing the account it reads is allowed
+      Given a connection reading a provider account
+      When the admin renames it and saves it against the same account
+      Then the save is accepted
+      # A connection is not its own duplicate. Without this the guard
+      # refuses every edit any admin ever makes to a working connection.
+
+    @unit
+    Scenario: The refusal never shows any part of the stored key
+      Given a connection already reading a provider account through an administrator key
+      When the admin saves another connection carrying that same key
+      Then the refusal names the owning connection and nothing else about it
+      And no part of either key appears in what the admin is shown
+      And nothing worked out from either key is kept
+      # What is kept beside the connection is the account name the provider
+      # itself reports. It is not a secret and it cannot be turned back
+      # into a key, which a stored scramble of a live customer credential
+      # could not have promised.
+
+  Rule: A wait the provider asked for outlives the attempt it was told to
+
+    A provider answering that too many requests were made says how long to
+    wait before asking again. That wait was being held against the single
+    attempt that received it. An attempt running long enough is replaced by
+    a fresh one, which starts from the same position immediately and asks
+    again inside the window the provider had just closed - so the source
+    spends its allowance arguing with a provider that has already said no.
+    The wait belongs to the connection, not to the attempt.
+
+    @unit
+    Scenario: A replacement run honours a wait the run it replaced was told about
+      Given a provider asked a run to wait before asking again
+      When that run is replaced before the wait has passed
+      Then the replacement does not ask the provider until the wait has passed
+
+    @unit
+    Scenario: The next scheduled run is pushed past the wait
+      Given a provider asked a connection to wait longer than its cadence
+      When the next run would otherwise fall due before the wait has passed
+      Then it is scheduled for the end of the wait instead
+      And the cadence the admin chose is unchanged
+
+    @unit
+    Scenario: A provider answering that too many requests were made has its wait read
+      Given a provider answering that too many requests were made
+      And the answer names how long to wait
+      When the connection decides when to try again
+      Then it waits at least as long as the provider asked
+      And not the short fixed delay it would otherwise use
+      # Two of the scheduled sources read this answer and two ignore it,
+      # so the same provider behaviour is handled well on one connection
+      # and retried into the ground on another.
+
+    @unit
+    Scenario: A run replaced before it finished records that it was abandoned
+      Given a run that has been going longer than it is allowed to
+      When a fresh run replaces it
+      Then the history records that the earlier run was abandoned
+      And it records which run replaced it
+      # The replaced run used to end without recording anything at all, so
+      # a wait it had been told about died with it, and its replacement
+      # went straight back to the provider that had just said no.
+
+    @unit
+    Scenario: A wait longer than a day is trimmed to a day
+      Given a provider asking for a wait longer than a day
+      When the connection records that wait
+      Then it waits a day at most
+      # The wait is a number read out of a provider answer, not one we
+      # choose. Left unbounded, a single malformed answer stops a money
+      # source for years with nothing on any screen explaining why.
+
+    @unit
+    Scenario: A wait that cannot be read as a length of time is treated as no wait
+      Given a provider answering that too many requests were made
+      And the wait it names cannot be read as a length of time
+      When the connection decides when to try again
+      Then it falls back to its usual cadence
+      And every other connection keeps running
+      # This value used to be handed straight to the part that works out
+      # the next run, which rejects anything it cannot read. One provider
+      # answering strangely stopped every scheduled connection, not one.
+
+    @unit
+    Scenario: A provider that says too many requests were made is asked only once in that run
+      Given a provider answering that too many requests were made
+      When the run receives that answer
+      Then the run ends without asking again
+      And it carries away the wait the provider named
+      # Asking again inside the run turns one request into several at a
+      # provider that has just asked for silence, and spends the wait it
+      # named arguing rather than waiting.

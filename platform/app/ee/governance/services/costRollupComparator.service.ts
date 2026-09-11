@@ -40,7 +40,15 @@ export const COST_SOURCE_EVENT_TYPES: Record<
     "lw.gateway.spend.confirmed",
     "lw.gateway.spend.failed",
   ],
-  [GOVERNANCE_COST_SOURCE.PULLED]: ["lw.obs.pulled_usage.observed"],
+  // The retraction is here for the same reason the observation is: the check
+  // re-derives a day by folding the events that fall inside it, and a fold
+  // that never sees the retraction re-derives the amount the retraction
+  // withdrew. The day would then be reported as disagreeing with its own
+  // history for as long as it is kept, on every run.
+  [GOVERNANCE_COST_SOURCE.PULLED]: [
+    "lw.obs.pulled_usage.observed",
+    "lw.obs.pulled_usage.retracted",
+  ],
 };
 
 export interface CostRollupCellMismatch {

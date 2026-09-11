@@ -142,3 +142,154 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     # Exposed as a gauge per lane; the assertion is the computed value,
     # not a threshold or an alert.
     Then it reports how far the summary is behind
+
+  # --- A correction that moves the day to a different cell ---
+  # A correction usually lands on the same day under the same provider,
+  # model and currency, and replaces the figure in place. When the provider
+  # reissues the same charge under a different currency it lands somewhere
+  # else instead, and the first version is left behind holding its money
+  # with nothing to say it was superseded. Both are then live, and a total
+  # across the day carries the same bill twice.
+  #
+  # This covers only the things a charge is deliberately not identified by:
+  # the currency it was billed in, the agent it was attributed to, and the
+  # spender the provider named. A charge arriving under a different model
+  # or a different provider is a different charge as far as anything here
+  # can tell, so it is not retracted, and that gap is stated rather than
+  # papered over - a day holding several models is the ordinary case, so
+  # retracting on a model change would zero genuine spend.
+
+  @unit
+  Scenario: A correction that arrives under a different currency retracts what it replaces
+    Given a day summarized from a bill issued in one currency
+    When the provider reissues that same bill in another currency
+    Then an event retracts the amount held under the first currency
+    And the day holds the reissued amount under the second currency only
+    # Retracted by an event rather than by editing or deleting the earlier
+    # row: the summary is a consequence of the event history, so a fix that
+    # only reaches storage is undone by the next rebuild.
+
+  @unit
+  Scenario: A correction that arrives against a different spender retracts what it replaces
+    Given a day summarized from a charge the provider attributed to one spender
+    When the provider reissues that same charge against another spender
+    Then an event retracts the amount held against the first spender
+    And the day holds the reissued amount against the second spender only
+    # The same defect, reached by a different door. Fixing only the
+    # currency case leaves this one and the agent one open behind it.
+
+  @integration
+  Scenario: A day whose bill changed currency is never counted under both
+    Given a day summarized from a bill issued in one currency
+    When the provider reissues that same bill in another currency
+    And the day is read across every currency it holds
+    Then the first currency contributes nothing to the day
+    And no total holds both versions of the one bill
+
+  @integration
+  Scenario: A retraction is dated to the day it corrects
+    Given a day summarized from a bill issued in one currency
+    When the provider reissues that same bill in another currency
+    And the daily check re-derives that day from its recorded history
+    Then the check sees the retraction
+    And the day is not reported as disagreeing with its own history
+    # The check re-derives a day from the events that fall inside that day.
+    # A retraction dated when the correction arrived rather than when the
+    # charge happened is never read by it, so the day would be reported as
+    # drifting for as long as it is kept.
+
+  @integration
+  Scenario: A correction still retracts its earlier version after the summary is rebuilt
+    Given a day summarized from a bill issued in one currency
+    And the summary rebuilt from its recorded history
+    When the provider reissues that same bill in another currency
+    Then the amount held under the first currency is retracted
+    And the day holds the reissued amount only
+    # Where a charge landed the first time is written down beside the
+    # summary as it is built, out of the same events, so a rebuild
+    # reproduces it. Held only in memory it would be lost by every
+    # restart, and looked for by searching the day it would mean reading
+    # every row of that day on every correction.
+
+  @integration
+  Scenario: A cell priced in another currency is not a cell we hold no amount for
+    Given a day holding one cell priced in dollars, one priced in euros, and one holding no amount at all
+    When the day's totals are read
+    Then exactly one cell is counted as holding no amount
+    And the cell priced in euros is not counted among them
+    # Two different absences. A euro cell holds a figure; what it does not
+    # hold is a DOLLAR figure, and the euro line is where that figure is
+    # shown. Counting it as unpriced withholds the dollar total of every day
+    # that touches a foreign bill, and tells the reader we hold no figure for
+    # money we hold a perfectly good figure for.
+
+  # --- Recognising the reissue, rather than being told about it ---
+  # Everything above describes what a retraction DOES once one exists. What
+  # produces one is the gap: nothing compares the cell a charge sits in
+  # against the cell the next pull of that same charge is about to land in.
+  # So a reissue is only ever corrected by someone constructing the
+  # correction by hand, and a day that nobody looks at carries the one bill
+  # twice for as long as it is kept.
+  #
+  # Every version of one charge arrives on ONE ordered stream, because the
+  # charge's restatement key is that stream's identity. So the comparison is
+  # against where the charge sits NOW rather than where it first landed. A
+  # record that never moves points at the original cell forever: the first
+  # correction empties that cell, and every later pull withdraws from a cell
+  # already holding nothing.
+  #
+  # The dimensions that may trigger this are exactly the three a charge is
+  # deliberately not identified by - the currency, the agent and the spender.
+  # The model is NOT among them: an adapter that does not list the model
+  # among its dimensions files two models of one period under ONE restatement
+  # key, so a comparison that included the model would read the second model
+  # as a reissue of the first and withdraw money that was really spent.
+
+  @integration
+  Scenario: A bill reissued in another currency is withdrawn by the pull that finds it
+    Given a source that has already pulled a day's bill issued in one currency
+    When the next pull of that same day returns the bill in another currency
+    Then the pull emits a retraction addressed to the first currency's cell
+    And that cell is left stating zero rather than removed
+    And the day totals the reissued amount only
+    # The pull is the ONLY input. Nothing here constructs the correction,
+    # which is what separates this from every scenario above it: those
+    # describe a retraction that already exists, and this one is about
+    # whether anything ever makes one. The emptied cell states zero rather
+    # than going away because removing it would take its restatement key too.
+
+  @integration
+  Scenario: Pulling the corrected day again withdraws nothing
+    Given a source whose reissued bill has already been withdrawn once
+    When that same corrected day is pulled again unchanged
+    Then the pull emits no retraction at all
+    And the day still totals the reissued amount
+    # Asserted on what the pull EMITS, because the totals alone would hold
+    # even if a second retraction fired: it would withdraw from a cell
+    # already at zero and move no money, while the day's revision markers
+    # climbed forever against a correction that happened once.
+
+  @integration
+  Scenario: A charge reissued a second time is compared against where it sits now
+    Given a source whose bill has already been reissued once in another currency
+    When the provider reissues that same bill again against a different spender
+    Then the pull emits a retraction addressed to the second cell, not the first
+    And no earlier version of that bill is left holding money
+    # Two corrections to one charge is the case a record of where the charge
+    # FIRST landed gets wrong: the second correction would be compared
+    # against a cell the first already emptied, leaving the middle version
+    # live and the day carrying it on top of the newest one.
+
+  @unit
+  Scenario: A reissue is recognised from the currency, the agent and the spender only
+    Given a charge already summarized for one model in a period
+    When a charge for a different model arrives under that same restatement key
+    Then nothing withdraws the first model's amount
+    And both models' spend is left standing
+    # A period holding several models is the ordinary case, not a correction,
+    # and an adapter that does not list the model among its dimensions gives
+    # both of them the same restatement key - so this premise is reachable,
+    # not hypothetical. Comparing on the model would withdraw money that was
+    # really spent, which is the one failure here that is worse than the
+    # double-count this whole block exists to prevent.
+
