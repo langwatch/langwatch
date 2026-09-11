@@ -57,7 +57,7 @@ have paid for the discovery once per module.
 | # | Task | Manifest | Model | Depends on |
 | --- | --- | --- | --- | --- |
 | T1 | `application.ts` onto the member record | `.claude/manifests/cv2-application-member-record.md` | opus | - |
-| T2 | The peer seam replacing `withProvided` | `.claude/manifests/cv2-peer-seam.md` | opus, then sonnet | T1 |
+| T2 | The peer seam - **verify the premise first, see below** | `.claude/manifests/cv2-peer-seam.md` | opus, then sonnet | T1 |
 | T3 | The REST credential object on a route | `.claude/manifests/cv2-rest-credential-object.md` | opus | T1 |
 | T4 | Delete the `port` word | `.claude/manifests/cv2-port-word.md` | sonnet | - |
 | T5 | Per-module conversion | one manifest per module, from the recipe | sonnet | T1, T2, T3 |
@@ -74,6 +74,24 @@ Until this lands, no converted module can delete its
 `apps/api/src/features/<m>/` directory, which is the point of converting. This
 is the critical path and it is architecture work: Opus, one lane, nothing else
 running in the same files.
+
+### T2 - its premise is stale, check before designing
+
+`composition-v2.md` finding 2 says `withProvided` "is gone from
+`ApplicationBuilder` and nothing replaces it, so 193 call sites across 62 `.ts`
+files name a method that no longer exists".
+
+**It is not gone.** Measured at `73d4fdb67d`, `withProvided` is defined at
+`packages/runtime-composition/src/application.ts:355`, takes a token and an
+instance, and 112 call sites across 36 files use it - all of which resolve.
+
+So before opening an Opus lane for a peer seam, establish what is actually
+missing. It may be nothing, in which case T2 disappears and T3 stops waiting on
+it. If something is missing, it is narrower than the finding claims and the
+manifest needs rewriting around the real gap rather than around a removed method.
+
+This is the second stale claim found in the 09-10 documents (the first was 551
+ports/adapters files against a real 31). Measure before you design from either.
 
 ### T5 - the per-module recipe
 
