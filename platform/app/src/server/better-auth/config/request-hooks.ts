@@ -80,7 +80,7 @@ function refuseCredentialMutation(pathname: string): void {
   throw APIError.from("BAD_REQUEST", {
     code: "EMAIL_PASSWORD_DISABLED",
     message:
-      "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
+      "Credential management is disabled — your account is managed by your identity provider.",
   });
 }
 
