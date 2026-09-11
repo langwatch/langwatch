@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -224,5 +225,34 @@ describe("the live-lane roster", () => {
     expect(spawnCall).toBeGreaterThan(recordsBeforeSpawning);
 
     expect(coordinator).toContain("no `active` rows");
+  });
+});
+
+describe("the session-start state report", () => {
+  const script = "dev/scripts/coordinator-state.sh";
+
+  const runIn = (directory: string) =>
+    execFileSync("bash", [join(root, script)], { cwd: directory, encoding: "utf8" });
+
+  /** @scenario "A session is told the drive state without being asked for it" */
+  it("says nothing with no drive in progress, and names the next action when there is one", () => {
+    const sandbox = mkdtempSync(join(tmpdir(), "coordinator-state-"));
+
+    try {
+      // Every session in this repository runs this. Silence is the contract.
+      expect(runIn(sandbox)).toBe("");
+
+      mkdirSync(join(sandbox, "dev/docs/plans"), { recursive: true });
+      writeFileSync(
+        join(sandbox, "dev/docs/plans/handover-2026-01-01.md"),
+        "## Exact next action\n\nSpawn the widget lane.\n",
+      );
+
+      const reported = runIn(sandbox);
+      expect(reported).toContain("Spawn the widget lane.");
+      expect(reported).toContain("no lanes active");
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
   });
 });

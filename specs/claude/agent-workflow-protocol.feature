@@ -197,3 +197,10 @@ Feature: The coordinator and lane protocol holds when a real agent runs under it
     When it reads its own spawn instructions
     Then it is told to record the lane before the spawn call and not after
     And the condition for replacing a coordinator is a roster with no active lanes
+
+  @unit
+  Scenario: A session is told the drive state without being asked for it
+    Given a checkout where no drive is in progress
+    When a session starts
+    Then it is told nothing at all
+    And a checkout carrying a handover is told that handover's next action instead
