@@ -15,7 +15,7 @@
 # per-command wrapper to keep in sync. See `haven help` for the set. There is
 # no setup step: the first `haven up` bootstraps the machine itself.
 #
-#   make haven install       # go install the binary, then just run `haven ...`
+#   make haven install       # go install the binary + check the machine's prerequisites
 #   make haven up            # start this worktree's stack
 #   make haven status        # every stack + shared-server health, one shot
 #   make haven               # build .bin/haven/haven (no subcommand)
@@ -46,13 +46,30 @@ ifeq (haven,$(firstword $(MAKECMDGOALS)))
 endif
 
 # `make haven`         -> build .bin/haven/haven
-# `make haven install` -> go install so plain `haven ...` works everywhere after
+# `make haven install` -> go install, fix PATH, then check the machine
 # `make haven <sub>`   -> run the haven CLI with <sub> (up, down, status, logs, …)
+#
+# The install branch is two steps: put the binary somewhere, then check that
+# it can be run and that the machine has what it drives. `haven install` owns
+# the second half entirely — whether the Go bin dir is on PATH (and offering
+# to fix the shell config), then portless, node, pnpm, the brew formulae and a
+# container runtime. It used to be a bash script sandwiched between two Go
+# programs, which is why the output read as three tools taking turns.
+#
+# The check runs through `go run` rather than the binary just installed: a
+# first-ever install is exactly the case where the Go bin dir is NOT on PATH
+# yet, so the freshly installed name does not resolve — and the check would be
+# skipped on the one machine that needed it most.
+#
+# `|| true` because the check is advice. A declined install, or no terminal to
+# ask in, must not fail a target whose own job — installing the binary — is
+# already done.
 haven:
 ifeq ($(strip $(HAVEN_ARGS)),)
 	@mkdir -p .bin/haven && go build -o .bin/haven/haven $(HAVEN_PKG) && echo "built .bin/haven/haven"
 else ifeq ($(strip $(HAVEN_ARGS)),install)
-	@go install $(HAVEN_PKG) && bash dev/scripts/haven-install-path.sh
+	@go install $(HAVEN_PKG)
+	@go run $(HAVEN_PKG) install || true
 else
 	@$(HAVEN) $(HAVEN_ARGS)
 endif

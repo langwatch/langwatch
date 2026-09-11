@@ -296,7 +296,7 @@ and the README sections "Versioned HTTP services", "Compatibility registration m
   `npx vitest`, never `pnpm dev`. Use `pnpm typecheck:one packages/api`,
   `pnpm --filter @langwatch/api test:unit`, `pnpm --filter @langwatch/annotation-server test:unit`,
   `pnpm --filter @langwatch/platform-api test:unit src/features/annotation`,
-  `pnpm exec oxlint --config .oxlintrc.architecture.json <files>`,
+  `pnpm exec oxlint --config .oxlintrc.jsonc <files>`,
   `pnpm exec oxfmt --write --disable-nested-config <files>`.
 - **Consumers keep compiling.** `pnpm typecheck:one apps/api` is red upstream; the substitute
   is `pnpm exec tsc -p apps/api/tsconfig.test.json --pretty false 2>&1 | grep -c "error TS"`

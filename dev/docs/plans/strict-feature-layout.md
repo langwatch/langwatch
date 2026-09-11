@@ -506,7 +506,7 @@ merge blocker. Where 09-08 changed an item, the note is at the end of its text.
 | 7 | langwatch-saas does not build against this branch. Delete the five moved tasks. Keep `backfillInviteUsersToCio` as a `@langwatch/task` plugin. Drop the submodule. Build `FROM` the public image. Repoint `sync-model-registry.yaml`. Other repository | L | yes | U | | saas |
 | 8 | Visual diff of every route, main against the branch, with no unexplained row. `tools/visualdiff` exists (`d3d8a930a6`). Blocked on applying the three 2026-09-04 additive migrations to the shared dev database | M | yes | U | | visual-diff |
 | 9 | `GET /api/traces/{traceId}/transcript` is a documented operation and is still unmounted. It waits on a composed `LogService`. `1c180c7204` only names the absence. 09-08: still unmounted; waits on log's ClickHouse registry (D-i). | M | yes | U | | api |
-| 10 | Wire `oxlint-tsgolint`. It restores `noFloatingPromises`, `noMisusedPromises`, `useOptionalChain` and `useLiteralKeys`, all lost with Biome. Only a comment in `.oxlintrc.architecture.json:3511` names it | M | no | H | | lint |
+| 10 | Wire `oxlint-tsgolint`. It restores `noFloatingPromises`, `noMisusedPromises`, `useOptionalChain` and `useLiteralKeys`, all lost with Biome. Only a comment in `.oxlintrc.jsonc:3511` names it | M | no | H | | lint |
 | 11 | ADR-130 stages 2 to 4: move 38 procedure maps to contracts, declare `AppApiMap`, annotate `ApiApplication.trpc`, add the conformance test. Then the api-map lane: 39 `createFeatureApi<` sites become `trpcReact`, and `feature-api.ts` and `use-invalidate-procedure.ts` are deleted. No `AppApiMap` is in the tree yet; `04ba1ac99d` moved 22 entries | XL | no | Perf/H | | api-map |
 | 12 | Architecture-lint burn-down slices still open. A1 and A2: `apps/api` and `apps/worker` stop importing enterprise feature packages. A3: plan-gate rename, agent-cache move, `custom-evaluators.ts` port. A5a to A5c: adapter doors for about 56 consumed private exports. A6a to A6c: `PrismaClient` outside the seam, with `typed-prisma-seam-baseline.json` still present. A7: Prisma enums in contracts. A9: `try*` renames. L1 to L6: 303 layout moves. W1 and W3. A12 to A19. Every count predates R1 to R6. Re-derive first. 09-08: superseded by the feature-shape ratchet (section 4) and the lint rebuild (section 7). | XL | no | H | | burn-down |
 | 13 | Tasks lane. `topic-clustering-run` is still unregistered and needs its runner's collaborator graph (3 days). Fix 16: lazy handle composition on `TasksHost`, because `prisma-migrate` opens ClickHouse and Redis it never reads. Fix 18: audit the `stored-object/server` index exports | L | no | H | | tasks |
@@ -596,7 +596,7 @@ order. Report the counters only after them.
 7. **Seams are read once by Fable**, one fresh session per seam. The seams are
    `packages/api/src/rest` and `src/trpc`; the two production compositions;
    `apps/api/src/api-rest.security.ts` with `modules/authz/server`;
-   and the architecture-enforcer rules with `.oxlintrc.architecture.json`.
+   and the architecture-enforcer rules with `.oxlintrc.jsonc`.
 8. **Code Owners review is required on `main`.** `.github/CODEOWNERS` names an
    owner for every seam, so a function cannot join a complexity register
    without a person seeing the line appear.

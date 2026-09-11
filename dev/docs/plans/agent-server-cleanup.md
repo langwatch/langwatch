@@ -118,7 +118,7 @@ pnpm --filter @langwatch/agent-contract test:unit
 pnpm --filter @langwatch/platform-api test:unit src/features/agent
 grep -rnE "for \(;;\)|while \(true\)|\btry[A-Z][A-Za-z]*\(|nanoid|randomUUID|_count|ok: true" modules/agent/server/src modules/agent/contract/src
 ls modules/agent/server/src/services
-pnpm exec oxlint --config .oxlintrc.architecture.json modules/agent/server/src modules/agent/contract/src
+pnpm exec oxlint --config .oxlintrc.jsonc modules/agent/server/src modules/agent/contract/src
 ```
 
 The grep prints nothing. The `ls` prints five files. oxlint reports no new findings.

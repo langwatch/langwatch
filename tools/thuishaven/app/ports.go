@@ -57,6 +57,20 @@ type Store interface {
 	// runs here, surviving terminals and reboots. ok=false means never written.
 	ReadSelection(worktreeDir string) (domain.Selection, bool)
 	WriteSelection(worktreeDir string, sel domain.Selection) error
+	// The machine-wide "never ask me about this prerequisite again" set that
+	// `haven install` records. Machine-wide, not worktree-local, because the
+	// prerequisites are properties of the machine: a developer who declined
+	// the ClickHouse client once should not be asked by the next checkout.
+	// An absent or unreadable file is an empty set, never an error — a
+	// preference nobody has expressed yet is not a failure.
+	ReadPrereqSkips() map[string]bool
+	WritePrereqSkips(map[string]bool) error
+	// The machine's container posture, as the developer chose it. Same file
+	// and the same reasoning as the skips: it is a property of the machine,
+	// so every checkout on it gets the same answer. Empty means never chosen,
+	// which is what makes haven fall back to looking.
+	ReadContainerPosture() string
+	WriteContainerPosture(string) error
 	// HMR gate marker (worktree-local): expiry in unix-ms; 0/absent means no gate.
 	WriteHMRGate(lwDir string, expiryUnixMs int64) error
 	ReadHMRGate(lwDir string) (int64, bool)

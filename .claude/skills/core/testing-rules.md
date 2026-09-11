@@ -14,8 +14,11 @@ several GB per run, multiplied by every agent running one.
 The form is:
 
 ```
-VITEST_MAX_WORKERS=2 rtk pnpm --filter <package> test:unit <paths>
+VITEST_MAX_WORKERS=2 pnpm --filter <package> test:unit <paths>
 ```
+
+Prefix that with `rtk` when the machine has it — `rtk` is optional here, so drop
+the prefix rather than let a `command not found` swallow the run.
 
 `test:integration` exists only in packages that declare a datastore. The root
 `test:integration` and `test:component` scripts are stubs that exit 1 and say so.

@@ -44,7 +44,11 @@ type Orchestrator struct {
 	// Nil everywhere else, including in tests that never install a feature.
 	claude AgentHookSettings
 	codex  AgentHookSettings
-	log    *zap.Logger
+	// prereqs looks at (and installs onto) the machine itself, which only
+	// `haven install` does. Nil elsewhere; see prereqTools for what a graph
+	// without one reports.
+	prereqs PrereqTools
+	log     *zap.Logger
 
 	// isGoverning guards the slow half of a pressure tick, which runs off the
 	// tick so publishing stays bounded. governance is what a caller waits on to
@@ -80,6 +84,7 @@ type Deps struct {
 	ProcTel   ProcTelemetry
 	Claude    AgentHookSettings
 	Codex     AgentHookSettings
+	Prereqs   PrereqTools
 	Log       *zap.Logger
 }
 
@@ -95,7 +100,8 @@ func New(d Deps) *Orchestrator {
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
 		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
-		container: d.Container, janitor: d.Janitor, jobs: d.Jobs, procTel: d.ProcTel, claude: d.Claude, codex: d.Codex, log: d.Log,
+		container: d.Container, janitor: d.Janitor, jobs: d.Jobs, procTel: d.ProcTel, claude: d.Claude, codex: d.Codex,
+		prereqs: d.Prereqs, log: d.Log,
 	}
 }
 
