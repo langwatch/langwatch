@@ -385,6 +385,26 @@ export function governanceCostRollupKey(event: {
 }
 
 /**
+ * The dimension fields making up a key, IN SORT-KEY ORDER — the same order,
+ * column for column, as the `ORDER BY` of the rollup table in migration 00092
+ * and as `KEY_COLUMNS` on the read side. The three are one contract in three
+ * places, and a test pins them to each other, so the order lives in a named
+ * constant rather than inline in the encoder where a reorder would look like
+ * a formatting change.
+ */
+export const GOVERNANCE_COST_ROLLUP_KEY_FIELDS = [
+  "tenantId",
+  "day",
+  "costSource",
+  "ingestionSourceId",
+  "provider",
+  "model",
+  "agentId",
+  "currencyCode",
+  "rawActorId",
+] as const satisfies readonly (keyof GovernanceCostRollupCell)[];
+
+/**
  * The key a cell is addressed by. The comparator reaches for this to ask what
  * key a STORED row would have been written under — the alternative, a second
  * copy of the encoding on the read side, is a pair that can disagree, and a
@@ -395,17 +415,9 @@ export function encodeGovernanceCostRollupKey(
   cell: GovernanceCostRollupCell,
 ): string {
   const payload = Buffer.from(
-    JSON.stringify([
-      cell.tenantId,
-      cell.day,
-      cell.costSource,
-      cell.ingestionSourceId,
-      cell.provider,
-      cell.model,
-      cell.agentId,
-      cell.currencyCode,
-      cell.rawActorId,
-    ]),
+    JSON.stringify(
+      GOVERNANCE_COST_ROLLUP_KEY_FIELDS.map((field) => cell[field]),
+    ),
     "utf8",
   ).toString("base64url");
   return `cost1d:${cell.tenantId}:${cell.day}:${cell.costSource}:${payload}`;

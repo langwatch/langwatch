@@ -419,8 +419,9 @@ const costResultSchema = z
      * saved raw responses (2026-08-25, re-confirmed 2026-09-06: 2,720/2,720
      * rows populated) — and this adapter deliberately reads the id, not the
      * address: the id is stable, and a raw email is heavier on a money row
-     * (erasure, exposure). The email still reaches `raw_payload` via
-     * `.passthrough()` below.
+     * (erasure, exposure). `.passthrough()` below carries the address as far
+     * as this function and no further: `costEvent` drops it before the row is
+     * stringified into `raw_payload`, so the address is never stored.
      *
      * Null whenever the row was not grouped by user, so it is read through
      * `dimension()` like every other coordinate.
@@ -881,6 +882,14 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     // shifts a decimal here and porting that reports 100x the real spend.
     const amountUsd = result.amount.value;
 
+    // Everything the provider sent EXCEPT the billed person's email address.
+    // `.passthrough()` keeps unknown fields so a later question about a row can
+    // be answered from what was stored; the address is the one field excluded,
+    // because no screen, query or export reads it and keeping a raw address on
+    // every money row only adds erasure and exposure surface. The opaque
+    // `user_id` stays — it is the actor and the erasure key.
+    const { user_email: _droppedEmail, ...retainedPayload } = result;
+
     return {
       source_event_id: `cost:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
@@ -899,10 +908,11 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
        * exactly this string (`partitionSuppressedEvents` reads `event.actor`,
        * and a discovered person's `rawActorId` is where the digest comes from),
        * so the two agree: erasing this person suppresses this id. The provider
-       * DOES send a `user_email` beside the id (it survives into `raw_payload`
-       * via the schema's `.passthrough()`); it is deliberately not the actor,
-       * so matching an id to an account is the identity engine's job, not this
-       * adapter's.
+       * DOES send a `user_email` beside the id; it is deliberately not the
+       * actor, and it is dropped from the retained payload below rather than
+       * stored, because nothing in the product reads it and an address on a
+       * money row is pure liability (erasure, exposure). Matching an id to an
+       * account is the identity engine's job, not this adapter's.
        */
       actor: dimension(result.user_id),
       action: "cost_report",
@@ -910,7 +920,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       cost_usd: amountUsd,
       tokens_input: 0,
       tokens_output: 0,
-      raw_payload: JSON.stringify(result),
+      raw_payload: JSON.stringify(retainedPayload),
       extra: {
         // Raw provider ids, resolved never (ADR-088 Decision 13). The worker
         // spreads `extra` into the audit row's metadata extension, which is

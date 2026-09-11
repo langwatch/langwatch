@@ -9,6 +9,7 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-088 (Decisions 6 and 7).
  */
+import { inspect } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
@@ -1054,15 +1055,25 @@ describe("the Anthropic Admin puller", () => {
       schedule: "0 * * * *",
     } as const;
 
+    // The body the provider is made to refuse with. Every fragment is a fake,
+    // and each is distinctive enough that finding it anywhere in the thrown
+    // error can only mean the reply was quoted: a key-shaped string, the
+    // workspace it names, and the provider's own error prose.
+    const REFUSAL_KEY = "sk-ant-admin-FAKE000";
+    const REFUSAL_WORKSPACE = "wrkspc_QUOTED_BODY_MARKER";
+    const REFUSAL_PROSE = "authentication_error";
+    const REFUSAL_BODY = JSON.stringify({
+      error: {
+        type: REFUSAL_PROSE,
+        message: `invalid x-api-key ${REFUSAL_KEY} for workspace ${REFUSAL_WORKSPACE}`,
+      },
+    });
+
     /** @scenario "A key the provider refuses is reported as refused and is not retried as an outage" */
     it.each([
       401, 403,
     ])("ends the run as refused and not worth retrying on HTTP %i, without quoting the reply or the key", async (status) => {
-      fetchMock.mockResolvedValue(
-        new Response('{"error":{"message":"invalid x-api-key sk-admin"}}', {
-          status,
-        }),
-      );
+      fetchMock.mockResolvedValue(new Response(REFUSAL_BODY, { status }));
 
       const run = new AnthropicAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
       await expect(run).rejects.toBeInstanceOf(DispatchError);
@@ -1075,9 +1086,18 @@ describe("the Anthropic Admin puller", () => {
       // `run` is typed by its resolved value, so the rejection has to be read
       // off the promise and cast: the assertions above already proved what it is.
       const error = (await run.catch((e: unknown) => e)) as DispatchError;
-      expect(error.message).not.toContain("sk-admin");
-      expect(error.message).not.toContain("invalid x-api-key");
-      expect(error.customerMessage).not.toContain("sk-admin");
+      // Three surfaces, because the reply reaches a person through any of
+      // them: the log line (`message`), the sentence an admin is shown
+      // (`customerMessage`), and whatever a log serialiser writes down. The
+      // last is rendered with `util.inspect`, which walks own properties,
+      // `stack` and a `cause` to any depth — so a body tucked inside an
+      // object-valued `cause` is caught rather than flattened away.
+      const serialised = inspect(error, { depth: null, showHidden: true });
+      for (const fragment of [REFUSAL_KEY, REFUSAL_WORKSPACE, REFUSAL_PROSE]) {
+        expect(error.message).not.toContain(fragment);
+        expect(error.customerMessage).not.toContain(fragment);
+        expect(serialised).not.toContain(fragment);
+      }
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 

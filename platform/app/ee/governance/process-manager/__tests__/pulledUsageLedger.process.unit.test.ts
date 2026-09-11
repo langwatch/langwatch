@@ -67,7 +67,7 @@ let clock: number;
  * test so that every observation in a test lands on the same stream — which is
  * exactly the production shape, since the key is the aggregate id.
  */
-const RESTATEMENT_KEY = `azure:${ns}:sub-1:2026-08-01`;
+const RESTATEMENT_KEY = `example:${ns}:sub-1:2026-08-01`;
 
 function observation(
   overrides: Partial<PulledUsageObservedEventData> = {},
@@ -265,21 +265,32 @@ describe("recognising a reissued charge", () => {
     });
   });
 
+  /**
+   * Two models of one period landing on ONE process instance, which is what a
+   * shared restatement key means. `restatementKeyFor` (pulledUsageRecord)
+   * hashes the adapter's `dimensions`, so this models an adapter that omits
+   * the model from its dimensions. Azure is not one: it pins `meterCategory`
+   * and `model` into `dimensions` (azureCostManagement.ts), so two Azure
+   * meters never share a key. Hence the neutral source label here rather than
+   * the file's Azure one.
+   */
   describe("given a period that holds more than one model", () => {
+    const OMITS_MODEL_SOURCE = "example_cost_source";
+
     /** @scenario A reissue is recognised from the currency, the agent and the spender only */
     it("withdraws nothing when only the model differs", async () => {
-      await observe(observation({ model: "azure/meter-a" }));
+      await observe(
+        observation({ source: OMITS_MODEL_SOURCE, model: "example/meter-a" }),
+      );
       await observe(
         observation({
-          model: "azure/meter-b",
+          source: OMITS_MODEL_SOURCE,
+          model: "example/meter-b",
           observedAtMs: T0 + 3_600_000,
         }),
       );
       await drainOutbox();
 
-      // An adapter that does not list the model among its dimensions gives
-      // both models of one period the SAME restatement key, so this arrives on
-      // this very instance — the premise is reachable, not hypothetical.
       // Withdrawing here would zero money that was really spent, which is
       // strictly worse than the double-count the detector exists to prevent.
       expect(sendRetractPulledUsage).not.toHaveBeenCalled();
@@ -287,10 +298,13 @@ describe("recognising a reissued charge", () => {
     });
 
     it("still addresses the superseded model when the currency moves too", async () => {
-      await observe(observation({ model: "azure/meter-a" }));
+      await observe(
+        observation({ source: OMITS_MODEL_SOURCE, model: "example/meter-a" }),
+      );
       await observe(
         observation({
-          model: "azure/meter-b",
+          source: OMITS_MODEL_SOURCE,
+          model: "example/meter-b",
           currencyCode: "EUR",
           costNanoUsd: null,
           observedAtMs: T0 + 3_600_000,
@@ -303,7 +317,7 @@ describe("recognising a reissued charge", () => {
       // this charge and leave the one that does untouched.
       expect(sendRetractPulledUsage).toHaveBeenCalledTimes(1);
       expect(sendRetractPulledUsage.mock.calls[0]?.[0]).toMatchObject({
-        model: "azure/meter-a",
+        model: "example/meter-a",
         currencyCode: "USD",
       });
     });

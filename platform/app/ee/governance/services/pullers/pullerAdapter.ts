@@ -224,6 +224,12 @@ export interface PullResult {
    * A degradation a reader of the source needs to know about — "the money is
    * here but nobody is attributed to it" — has to survive as data. A log line
    * cannot be shown to someone looking at the source.
+   *
+   * Today nothing carries it that far: `runPuller` (pullerWorker) returns
+   * `nextCursor`, `eventCount`, `errorCount`, `completeness` and
+   * `readThroughAt` and drops `notices` on the floor, so no screen and no
+   * person sees a code set here. The tests assert on them; nothing else reads
+   * them yet.
    */
   notices?: string[];
 }
