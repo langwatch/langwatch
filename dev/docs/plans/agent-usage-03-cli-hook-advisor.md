@@ -101,6 +101,26 @@ and endpoint — the machinery the context hook already has. Keep the two entrie
 separate so a slow brief can never delay the attribution the context hook exists
 to send.
 
+### 3.1b The same hook should measure the instruction surface
+
+`SessionStart` already knows the working directory. While it is there, it can
+`stat` what the session is about to pay for on every turn and report **sizes and
+counts, never contents**:
+
+```
+claudeMdBytes, skillCount, skillIndexBytes,
+mcpServerCount, mcpToolCount, settingsBytes, memoryFileBytes
+```
+
+Seven integers, one per session, no runtime cost, and no prompt text ever leaves
+the machine. It is the only way to decompose the ~70k-token static prefix that
+Part 2 §4b measures, because the product never captures the prompt itself — and
+on this repository it would immediately have reported that `CLAUDE.md` is 112 KB,
+roughly 28,000 tokens, about **40% of everything re-read on every turn**.
+
+This pairs with the brief: the same session that is told its carry ratio can be
+told what its own instruction file costs.
+
 ### 3.2 The nudge — mid-session, and this is where "you could enable this" lives
 
 Requires registering events that are not registered today. Ranked by value

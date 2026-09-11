@@ -232,6 +232,79 @@ anyone asking.
 
 ---
 
+## 4b. Prompt composition: what a session pays for before it starts
+
+### We do not capture the prompt, and we do not need to
+
+An `llm_request` span's `input.value` holds **only the latest message** — there
+is no message array, no system prompt, no tool definitions. So the prompt cannot
+be decomposed by reading what we store. That is the correct privacy posture and
+it should stay.
+
+It can be measured indirectly, and quite precisely. **The first measured context
+of a session is the static prefix** plus one short user message. Across 236
+sessions:
+
+| | first-call context |
+|---|---:|
+| min | 4,864 |
+| p10 | 63,206 |
+| **median** | **70,151** |
+| p90 | 81,463 |
+
+The tightness of that band — 63k to 81k across every session on the account — is
+the signature of a fixed prefix. **Every session starts at roughly 70,000 tokens
+before any work happens**, and that floor is re-read on every turn for the life
+of the session.
+
+Scale it honestly: 16,980 turns × ~70k ≈ **1.19B tokens**, about **2.8%** of the
+month's 42.75B cache reads. Real money, and not the dominant lever — the
+dominant lever is still session length. Say so rather than overselling it.
+
+### What the floor is made of, and why only a local measurement can say
+
+The floor decomposes into classes the product knows the *names* of and not the
+*sizes* of: harness system prompt, tool definitions, project instructions
+(`CLAUDE.md`), the always-loaded skill index, MCP tool schemas, memory files.
+The session aggregate carries `skills`, `mcpServers` and `mcpTools` as capped
+name sets — so we know what is loaded and nothing about what it costs.
+
+Measured locally on this repository:
+
+| class | on disk | estimated tokens | share of the ~70k floor |
+|---|---:|---:|---:|
+| `CLAUDE.md` | 112 KB | ~28,000 | **~40%** |
+| skill index (15 × frontmatter) | 9.2 KB | ~2,300 | ~3% |
+| harness system prompt + tool definitions + MCP | — | remainder | ~57% |
+
+**A single project instructions file is about 40% of what every turn re-reads.**
+That is a finding a person can act on in an afternoon, and nothing in the product
+could have told them.
+
+### The method: measure sizes locally, never contents
+
+The CLI hook already runs at `SessionStart` and already knows the working
+directory. It can `stat` the instruction surface and report **sizes and counts,
+never contents** — `CLAUDE.md` bytes, skill count and index bytes, MCP server and
+tool counts, settings size. That is a handful of integers per session, costs
+nothing at runtime, keeps prompt text out of the product entirely, and turns both
+`context.instruction_overhead` and `skills.context_tax` from estimates into
+measurements. Part 3 carries the hook change.
+
+### Classifying the request is a different question, and that part is already done
+
+There is already a per-request classification on the span: `llm_request.context`
+(observed value `interaction`) alongside `query_source_safe`
+(`repl_main_thread`), `query_source` and `agent_type`. Those say **what kind of
+call this is** — main thread, sub-agent, classifier, compaction — which is
+exactly what Part 1 needs to separate heavy turns from auxiliary calls. It is
+lifted onto spans but does not reach trace metadata, so it is unavailable to any
+trace-level read today.
+
+So the answer to "is the classification limited by the fields we have" is yes,
+and in two different ways: **request class exists and is not plumbed through**;
+**prompt-composition class does not exist and needs the local measurement above.**
+
 ## 5. On the trace and session: what went wrong here
 
 Replace the red dot (Part 1) with an explanation. For one turn or session:

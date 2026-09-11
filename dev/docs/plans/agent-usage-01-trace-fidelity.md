@@ -155,6 +155,18 @@ Four fifths of what the product calls a trace is a sub-agent call, a permission
 classifier or a one-line reply. The month reduces to **2,013 heavy Opus turns
 costing $19,811**, 62% of the total.
 
+**The classifier already exists and is not plumbed through.** The `llm_request`
+span carries `llm_request.context` (observed value `interaction`) alongside
+`query_source_safe` (`repl_main_thread`), `query_source` and `agent_type`. These
+already say what kind of call this is — main thread, sub-agent, classifier,
+compaction. None of them reaches trace metadata: of the 26 metadata keys present
+across 16,980 month traces, not one is a request class. So a trace-level read
+cannot tell a $19 main-agent turn from a 4-second permission classifier, even
+though the span knew.
+
+Lift one of them onto the trace. It is the cheapest item in this document and it
+unblocks every average in Part 2.
+
 Classify this at ingest — main-agent turn versus auxiliary call — using the
 `query_source` / `agent_type` / `parent_agent_id` scalars already lifted. Without
 it every mean is computed over the wrong denominator and every list shows noise
