@@ -53,24 +53,92 @@ it, and the blast radius is the monitoring system we use to find out that
 anything else is broken. **Operational counters stay bounded; anything keyed by a
 customer's own dimensions belongs in ClickHouse.**
 
-## 3. Do not increment counters on the ingest stream
+## 3. Incrementing is the house pattern. The constraint is which keys, not whether to increment.
 
-The natural reading of "fire off metrics as we ingest" is a counter incremented
-per event. That is wrong here, and specifically wrong for this pipeline.
+An earlier draft of this document said not to increment on the ingest stream.
+That was wrong, and the codebase had already decided otherwise.
 
-Coding-agent telemetry is **re-delivered**, and the design depends on that being
-harmless — sessions fold into a `ReplacingMergeTree` and there is a scenario named
-*"re-delivered telemetry does not inflate a session"*. A counter incremented on
-the event stream has no such protection: a redelivery double-counts it, silently
-and permanently.
+`trace_analytics_rollup` (ADR-034, migration 00038) is an **AggregatingMergeTree
+written per-span by an app-side map projection**, not a ClickHouse materialised
+view. Its columns are `SimpleAggregateFunction(sum, ...)` rather than full
+`AggregateFunction(sum, ...)`, so the projection inserts **raw scalars over
+JSONEachRow** — no `sumState`, no state converters, no `-State`/`-Merge`
+ceremony — and reads are ordinary `sum(CostSum)`. Each immutable span contributes
+one inserted row.
 
-So the rule is: **derive series from the deduped, folded tables — never by
-incrementing on arrival.** That keeps every number replayable, which matters
-because a corrected projection should be able to rebuild history rather than
-leave a permanent scar in a counter.
+Re-delivery is handled by accepting it, explicitly: *"The only repeat is a rare
+crash/retry re-delivery, which over-counts a single bucket by one span's
+contribution. ADR-034 accepts that explicitly (negligible, non-systematic)."*
 
-The existing cost-drift counters are fine because they are operational signals
-about the pipeline, not the customer's ledger.
+### Replay is truncate-first, not zero-first
+
+The migration answers this directly: *"replay rebuilds the rollup truncate-first
+rather than incrementing it."*
+
+Writing a zero row would not work, and it is worth being precise about why: an
+aggregating or summing engine **adds** every row it is given, so a `0` adds
+nothing and clears nothing. The prior rows are still there. Resetting means
+removing them — and `BucketStart` is the partition leaf, so a rebuild is a
+partition-scoped drop and replay rather than a whole-table truncate.
+
+### The real constraint, and it is the one that bites coding agents
+
+From the same migration: *"Rollup keys are the dimensions final at span-write
+time only… A key is stamped onto the increment when the span is written and can
+never be re-stamped. Late / trace-level dimensions that flip during the fold
+(topic, **origin**, user, conversation) are NOT keys here."*
+
+Read that list again — **`origin` is named as a late dimension that flips.** And
+`origin` is precisely how a coding-agent trace is identified. Coding-agent
+dimensions are worse still: repository, branch and pull request are stamped onto
+events from a session-context memo that a hook may deliver late; the session's
+start time is a mutable anchor by design.
+
+So the rule for this family is not "do not increment". It is:
+
+- **Increment on immutable events** — a model call, a tool result, a compaction.
+  Each of those arrives once and its dimensions are final when it is written.
+- **Never increment on the session fold.** The session aggregate converges over
+  many contributions *by design*; incrementing per contribution would over-count
+  systematically rather than rarely, which is a different thing from what
+  ADR-034 accepts.
+- **Keep agent-reported cumulative metrics last-write-wins on the total.** The
+  coding-agent metric contribution already carries `value` as a *converged total,
+  LWW*, and `session_metric_series` is a `ReplacingMergeTree(AsOf)`. Agents report
+  cumulative counters, and summing cumulative counters is simply wrong. Derived
+  metrics we compute per immutable event can increment; reported ones cannot.
+- **Do not key a rollup on a late dimension.** If repository or branch must be a
+  key, it has to be resolved before the increment is written, or the rollup has
+  to be rebuilt when the memo lands.
+
+The existing cost-drift OTel counters are unaffected — they are operational
+signals about the pipeline, not the customer's ledger.
+
+## 3b. Shared pipeline, or a coding-agent one?
+
+**Shared machinery, own table.** That is not a preference — it is what the
+repository already does four times over. Each domain has its own rollup written
+by its own app-side map projection:
+
+- `trace_analytics_rollup` — traces, per span
+- `evaluationAnalyticsRollup` — evaluations
+- `metricTimeRollup` — the general metric-processing pipeline
+- `governanceCostRollup` — governance cost
+
+There is a general customer metrics path (`modules/metric`, with a
+`metric-processing` pipeline and a request-collection service), and coding-agent
+data should use the same *pattern* rather than the same *table*, for a concrete
+reason rather than tidiness: **a rollup's value is its key set, and coding agents
+need a different one.** `trace_analytics_rollup` keys on
+`(TenantId, BucketStart, Model, SpanType)`. A coding-agent rollup needs agent,
+harness, repository, branch and session-shape dimensions. Sharing the table would
+force a choice between keying on dimensions that flip — which §3 forbids — and
+not having the dimensions that make the metrics worth reading.
+
+So: a fifth rollup, `coding_agent_analytics_rollup`, built the same way. Same
+engine, same `SimpleAggregateFunction` scalars, same app-side projection, same
+truncate-first replay, same retention column shape. Nothing novel to design, only
+the key set to choose — and §3 says which dimensions are allowed to be keys.
 
 ## 4. The data plane, and a piece of good news
 
@@ -155,8 +223,8 @@ worth shipping as defaults, drawn from what the month actually showed:
 
 - `coding_agent.*` is a declared family in the analytics registry.
 - `analytics query` and the dashboards can filter by origin.
-- Session-grained series exist as a derived, replayable aggregate — not a counter
-  incremented on arrival — bucketed on an anchor that does not move.
+- A `coding_agent_analytics_rollup` exists, incremented per immutable event,
+  keyed only on dimensions final at write time, rebuilt truncate-first.
 - Operational counters keep bounded labels and never gain a tenant dimension.
 - A context-composition view exists for a session, built from derived floor plus
   locally measured sizes, with no prompt content stored anywhere.
