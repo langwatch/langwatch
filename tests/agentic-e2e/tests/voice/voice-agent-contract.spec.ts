@@ -33,7 +33,10 @@
 import { test } from "@playwright/test";
 
 import {
+  CALL_START_TIMEOUT_MS,
   CALL_VERDICT_TIMEOUT_MS,
+  TRACE_INGESTION_TIMEOUT_MS,
+  WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS,
   elevenLabsCredsFromEnv,
   givenAUserWithAProject,
   givenAVoiceAgentExists,
@@ -58,28 +61,57 @@ import {
   whenTheyRunTheSimulation,
 } from "./steps";
 
-test.describe("Voice agent simulation contract", () => {
-  // Each test places a real call that can take up to ~2 minutes, so the whole
-  // test is given the call-length budget rather than the suite default.
-  test.setTimeout(CALL_VERDICT_TIMEOUT_MS + 120_000);
+/**
+ * UI settle time not covered by any single phase constant below: page
+ * navigation, scenario authoring, provider setup, and the run dialog. Named
+ * rather than folded into one of the phase constants, so a future phase
+ * change doesn't have to hunt for where the slack was hiding.
+ */
+const SETUP_MARGIN_MS = 60_000;
 
+/**
+ * Generates a fresh agent name per test run.
+ *
+ * The project is reused across runs, so a fixed agent name accumulates
+ * duplicate cards over time and `whenTheyRunTheSimulation` picks the first
+ * one matching by name — which can be a stale card from an earlier run, not
+ * the one this run just created. A unique name keeps the selection honest.
+ */
+function uniqueAgentName(prefix: string): string {
+  return `${prefix} ${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+}
+
+test.describe("Voice agent simulation contract", () => {
   /** @scenario "Simulate a call against a voice agent reachable by phone number" */
   test("simulates a call against a voice agent reachable by phone number", async ({
     page,
   }) => {
+    // Each phase below waits up to its own named ceiling; this test's budget
+    // is their sum plus the setup margin, so it cannot drift below what its
+    // own steps can legitimately take: place the call, wait for the verdict,
+    // wait for the recording to publish, then wait for the trace to ingest.
+    test.setTimeout(
+      CALL_START_TIMEOUT_MS +
+        CALL_VERDICT_TIMEOUT_MS +
+        WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS +
+        TRACE_INGESTION_TIMEOUT_MS +
+        SETUP_MARGIN_MS,
+    );
+
     const creds = phoneCredsFromEnv();
     test.skip(
       creds === null,
       "Requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER and E2E_VOICE_PHONE_NUMBER",
     );
     const phone = creds!;
+    const agentName = uniqueAgentName("E2E Phone Agent");
 
     // Given a LangWatch user with a project, and a voice agent reachable by a
     // phone number alone.
     await givenAUserWithAProject(page);
     await givenTheProjectHasTwilio(page, phone);
     await givenAVoiceAgentExists(page, {
-      name: "E2E Phone Agent",
+      name: agentName,
       transport: "phone",
       phoneNumber: phone.toNumber,
     });
@@ -97,7 +129,7 @@ test.describe("Voice agent simulation contract", () => {
     });
 
     // And they run the simulation against that voice agent.
-    await whenTheyRunTheSimulation(page, { name: "E2E Phone Agent" });
+    await whenTheyRunTheSimulation(page, { name: agentName });
 
     // Then LangWatch places a call to that phone number.
     await thenTheCallIsPlaced(page);
@@ -128,19 +160,30 @@ test.describe("Voice agent simulation contract", () => {
   test("simulates a call against a voice agent reachable through ElevenLabs", async ({
     page,
   }) => {
+    // This journey has no separate call-placement phase (no queued state to
+    // leave before ElevenLabs joins), so its budget omits CALL_START_TIMEOUT_MS
+    // — see the phone test above for the full derivation rationale.
+    test.setTimeout(
+      CALL_VERDICT_TIMEOUT_MS +
+        WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS +
+        TRACE_INGESTION_TIMEOUT_MS +
+        SETUP_MARGIN_MS,
+    );
+
     const creds = elevenLabsCredsFromEnv();
     test.skip(
       creds === null,
       "Requires ELEVENLABS_API_KEY and E2E_ELEVENLABS_AGENT_ID",
     );
     const eleven = creds!;
+    const agentName = uniqueAgentName("E2E ElevenLabs Agent");
 
     // Given a LangWatch user with a project, and a voice agent reachable
     // through ElevenLabs.
     await givenAUserWithAProject(page);
     await givenTheProjectHasElevenLabs(page, eleven);
     await givenAVoiceAgentExists(page, {
-      name: "E2E ElevenLabs Agent",
+      name: agentName,
       transport: "elevenlabs_convai",
       agentId: eleven.agentId,
     });
@@ -158,7 +201,7 @@ test.describe("Voice agent simulation contract", () => {
     });
 
     // And they run the simulation against that voice agent.
-    await whenTheyRunTheSimulation(page, { name: "E2E ElevenLabs Agent" });
+    await whenTheyRunTheSimulation(page, { name: agentName });
 
     // Then a simulated user talks to their voice agent.
     await thenASimulatedUserTalksToTheAgent(page);
