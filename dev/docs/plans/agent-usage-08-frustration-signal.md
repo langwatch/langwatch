@@ -47,24 +47,44 @@ on 5,452 and 5,467 traces respectively, overlapping on 5,452. Neither is a
 hidden richer source; the probe reads `input.value` and falls back to the
 metadata key.
 
-**Codex and Kimi are not missing because of a filter.** All 17,463 traces in the
-export carry `langwatch.origin = coding_agent`, so the origin filter excludes
-nothing. The breakdown is simply lopsided:
+**Codex and Kimi are not missing because of a filter — they are not being
+ingested.** The first version of this check was circular: it observed that every
+trace in the export carried `langwatch.origin = coding_agent` and concluded the
+filter excluded nothing, having filtered on exactly that. Re-run with **no origin
+filter at all** over the same window:
 
-| harness | traces | cost | has text |
+| origin | traces | cost |
+|---|---|---|
+| `coding_agent` | 17,502 | $33,204.30 |
+| `application` | 1,031 | **$0.00** |
+| *(none)* | 9 | $1.79 |
+| `langy` | 7 | $0.24 |
+
+| service.name | traces | cost | has text |
 |---|---|---|---|
-| `claude-code` | 17,446 | $33,116.72 | 5,452 |
+| `claude-code` | 17,485 | $33,204.25 | 5,472 |
+| *(none)* | 1,032 | $0.00 | 2 |
 | `codex` | 14 | $0.04 | 14 |
+| `claude-code-desktop` | 8 | $1.79 | 4 |
+| `langy` | 7 | $0.24 | 7 |
 | `codex_cli_rs` | 3 | $0.00 | 1 |
 
-and **Kimi does not appear at all**. Those 17 Codex traces are the review runs
-made while writing Part 6. Any real Codex or Kimi usage is in **another
-project**, and the device login is a project-scoped key: `projects list` returns
-*"This endpoint needs an organization API key."* **Cross-harness comparison is
-blocked on an organization key, not on analysis.** Until one exists, every
-figure in this document describes Claude Code and nothing else — which is
-exactly the per-harness caveat [Part 6](agent-usage-06-review-findings.md) §S5
-demands, arrived at the hard way.
+Dropping the filter adds 1,086 traces carrying **$2.03 between them**, none of
+them a hidden harness. **Kimi appears under no origin, service name or source.**
+The 17 Codex traces are the review runs made while writing Part 6.
+
+So the conclusion is an instrumentation finding, not an access one: **agent work
+on harnesses other than Claude Code is not reaching the platform at all.** Every
+figure in this document describes Claude Code and nothing else — the per-harness
+caveat [Part 6](agent-usage-06-review-findings.md) §S5 demands, arrived at the
+hard way.
+
+This has a direct consequence for [Part 7](agent-usage-07-team-probe.md): a
+colleague who does half their work in Codex will produce a card that silently
+describes only their Claude Code half. The probe reports a `harnesses` breakdown
+for exactly this reason, and the prompt asks them to read it out — an unexpectedly
+one-sided breakdown is a finding about *coverage*, not about behaviour, and must
+not be reported as the latter.
 
 ## 1. The data is already there
 

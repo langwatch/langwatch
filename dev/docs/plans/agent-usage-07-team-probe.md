@@ -149,8 +149,15 @@ this in order and do not skip ahead to the comparison.
      so rather than analysing a broken corpus.
    - How many sessions? Under about 20 and the percentile figures are noise —
      report them with that warning attached.
-   - Which harnesses and models show up? If you use more than one agent, the
-     `harnesses` breakdown matters a lot to us.
+   - **Which harnesses show up, and does that match how you actually work?**
+     Read the `harnesses` breakdown out to me explicitly. On the baseline
+     account it is 99.9% `claude-code` — not because that is all the person
+     used, but because Codex work produced 17 traces and $0.04 and Kimi work
+     produced nothing at all. **If you use more than one agent and only one
+     appears, that is a coverage gap, not a fact about your behaviour**, and
+     everything else in your card describes only the instrumented part. Say so
+     plainly rather than letting the card imply otherwise.
+   - Which models show up, and in what proportion?
    - What fraction of traces have no `thread_id`? Those are invisible to every
      session-grained number.
 
