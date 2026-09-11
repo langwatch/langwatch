@@ -35,10 +35,6 @@ if (!file || !fs.existsSync(file)) {
 }
 const label = flag("label", "unlabelled");
 const outPath = flag("out", "agent-usage-card.json");
-// Opt-in. Reads your own prompt text LOCALLY to score frustration markers and
-// emits rates only — no text, no matched words, nothing quotable. Off unless
-// you ask for it, because every other number here is derived from counts alone.
-const wantFrustration = args.includes("--frustration");
 
 // ---------------------------------------------------------------- utilities
 const hash = (s) => crypto.createHash("sha256").update(String(s)).digest("hex").slice(0, 12);
@@ -95,7 +91,15 @@ const trace = (r) => {
     writes: num(m.cache_creation_input_tokens),
     ctx: num(m.context_size_tokens),
     errored: r.error != null && r.error !== false,
-    text: wantFrustration ? (typeof r.input === "object" ? (r.input?.value ?? null) : r.input ?? null) : null,
+    effort: md["gen_ai.request.reasoning_effort"] ?? "(unset)",
+    modelCount: Array.isArray(md.models) ? md.models.length : 1,
+    // The user's own prompt for this turn. Present on turn-initiating traces.
+    // NOTE: `metadata["langwatch.input"]` is the same string; span-level
+    // chat_messages is NOT — it carries only the session's opening message.
+    text:
+      (typeof r.input === "object" ? r.input?.value : r.input) ??
+      md["langwatch.input"] ??
+      null,
   };
 };
 const T = rows.map(trace).filter((t) => t.t > 0);
@@ -287,10 +291,9 @@ const checkpointing = [150e3, 200e3, 300e3, 500e3].map(checkpointAt);
 const heavy = T.filter((t) => t.cost >= 0.01);
 const light = T.filter((t) => t.cost < 0.01);
 
-// --------------------------------------------- 8b. frustration (opt-in)
+// ------------------------------------------------------ 8b. frustration
 // Scores prompt text for two lexicons and emits RATES ONLY. No text, no
-// matched words, no quotable fragment ever reaches the card. Off unless
-// --frustration is passed.
+// matched words, no quotable fragment ever reaches the card.
 //
 // Two findings this is testing, from one account — see Part 8:
 //   - within a session, frustration roughly doubles from first third to last;
@@ -308,14 +311,18 @@ const STRIP_TAGS = [
 ];
 
 const frustration = (() => {
-  if (!wantFrustration) return null;
   const scored = [];
   for (const t of T) {
     if (typeof t.text !== "string" || !t.text.trim()) continue;
     let txt = t.text;
     for (const rx of STRIP_TAGS) txt = txt.replace(rx, " ");
     if (!txt.trim()) continue;
-    scored.push({ ...t, swear: LEX_SWEAR.test(txt), told: LEX_TOLD.test(txt) });
+    scored.push({
+      ...t,
+      words: txt.split(/\s+/).length,
+      swear: LEX_SWEAR.test(txt),
+      told: LEX_TOLD.test(txt),
+    });
   }
   if (scored.length < 50) return { prompts_with_text: scored.length, note: "too few prompts to score" };
 
@@ -360,9 +367,46 @@ const frustration = (() => {
     }
   }
 
+  // Grouped breakdown. Every row carries the two things that decide whether a
+  // difference is real: rate per 1,000 WORDS (a longer prompt has more room to
+  // contain a swear) and how many distinct sessions the events came from. On
+  // the baseline account the by-model difference passed a length control and
+  // then died here — 14 events, 4 sessions, 7 of them from one.
+  const grouped = (keyName) => {
+    const g = new Map();
+    for (const s of scored) {
+      const k = String(s[keyName] ?? "unknown");
+      if (!g.has(k)) g.set(k, []);
+      g.get(k).push(s);
+    }
+    return [...g.entries()]
+      .filter(([, sel]) => sel.length >= 60)
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([k, sel]) => {
+        const ev = sel.filter((x) => x.swear);
+        const sess = new Set(ev.map((x) => x.sid));
+        const counts = [...sess].map((id) => ev.filter((x) => x.sid === id).length);
+        const words = sel.reduce((a, x) => a + x.words, 0);
+        return {
+          name: k,
+          prompts: sel.length,
+          profanity_pct: r(sel, "swear"),
+          aimed_repetition_pct: r(sel, "told"),
+          profanity_per_1k_words: words ? round((1000 * ev.length) / words, 3) : 0,
+          median_words: pctl(sel.map((x) => x.words).sort((a, b) => a - b), 0.5),
+          events: ev.length,
+          distinct_sessions_with_events: sess.size,
+          largest_session_share_of_events_pct: ev.length ? pct(Math.max(0, ...counts), ev.length) : 0,
+        };
+      });
+  };
+
   return {
     prompts_with_text: scored.length,
     baseline_profanity_pct: r(scored, "swear"),
+    by_model: grouped("model"),
+    by_reasoning_effort: grouped("effort"),
+    by_harness: grouped("harness"),
     baseline_aimed_repetition_pct: r(scored, "told"),
     profanity_events: scored.filter((x) => x.swear).length,
     within_session: {
@@ -509,10 +553,21 @@ for (const k of c.checkpoint_counterfactual.by_threshold) {
 }
 if (frustration && frustration.within_session) {
   const f = frustration;
-  console.log(`\n  frustration signal (opt-in; rates only, no text retained)`);
+  console.log(`\n  frustration signal (rates only, no text retained)`);
   console.log(`  ${f.prompts_with_text.toLocaleString()} prompts with text, ${f.profanity_events} profanity events, baseline ${f.baseline_profanity_pct}%`);
   console.log(`  within session   first third ${f.within_session.first_third_profanity_pct}% → last third ${f.within_session.last_third_profanity_pct}%  (n=${f.within_session.n_per_group} each)`);
   console.log(`  around a reset   profanity ${f.around_reset.profanity_before_pct}% before → ${f.around_reset.profanity_after_pct}% after`);
   console.log(`                   repetition ${f.around_reset.aimed_repetition_before_pct}% before → ${f.around_reset.aimed_repetition_after_pct}% after`);
+  if (f.by_model?.length) {
+    console.log(`\n  by model — read the last two columns before believing any row`);
+    console.log(`  ${"model".padEnd(26)}${"prompts".padStart(8)}${"sworn".padStart(8)}${"per 1k w".padStart(10)}${"events".padStart(8)}${"sessions".padStart(9)}${"top sess".padStart(9)}`);
+    for (const m of f.by_model) {
+      console.log(
+        `  ${m.name.slice(0, 25).padEnd(26)}${String(m.prompts).padStart(8)}${(m.profanity_pct + "%").padStart(8)}` +
+          `${String(m.profanity_per_1k_words).padStart(10)}${String(m.events).padStart(8)}` +
+          `${String(m.distinct_sessions_with_events).padStart(9)}${(m.largest_session_share_of_events_pct + "%").padStart(9)}`,
+      );
+    }
+  }
 }
 console.log(`\n  card written to ${outPath}\n`);

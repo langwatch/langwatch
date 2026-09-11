@@ -17,6 +17,55 @@ way once the artefact is removed.
 
 ---
 
+## 0. Where the text actually lives, and where it does not
+
+Three source questions were settled by measurement, because each would have
+changed the analysis:
+
+**Trace level is the right source. Span level is degraded.** The obvious
+assumption is that a trace rolls up a whole conversation and the spans hold the
+per-turn detail, so spans must carry more user text. **The opposite is true
+here.** A trace *is* one turn, and its `input.value` is that turn's user
+message. Checked on a 12-trace span export (1,993 spans, 166 per trace):
+
+- 743 `llm` spans carried only **44** `chat_messages` arrays between them;
+- every one of those 44 held exactly **one** user message;
+- all 44 were the **same string** — the session's opening message;
+- meanwhile each trace's own `input.value` was the correct, distinct, per-turn
+  prompt.
+
+So `llm.input.chat_messages` is not a record of what was sent to the model on
+that call. **This is a trace-fidelity defect and belongs in
+[Part 1](agent-usage-01-trace-fidelity.md)**: a span claiming to carry
+`chat_messages` should carry the messages of that call, and a consumer who
+trusts the field gets the session's first message repeated arbitrarily many
+times. It also costs 0.4 MB per trace — 7.5 GB across this window — to carry
+that repetition.
+
+**`metadata["langwatch.input"]` and `input.value` are the same string.** Present
+on 5,452 and 5,467 traces respectively, overlapping on 5,452. Neither is a
+hidden richer source; the probe reads `input.value` and falls back to the
+metadata key.
+
+**Codex and Kimi are not missing because of a filter.** All 17,463 traces in the
+export carry `langwatch.origin = coding_agent`, so the origin filter excludes
+nothing. The breakdown is simply lopsided:
+
+| harness | traces | cost | has text |
+|---|---|---|---|
+| `claude-code` | 17,446 | $33,116.72 | 5,452 |
+| `codex` | 14 | $0.04 | 14 |
+| `codex_cli_rs` | 3 | $0.00 | 1 |
+
+and **Kimi does not appear at all**. Those 17 Codex traces are the review runs
+made while writing Part 6. Any real Codex or Kimi usage is in **another
+project**, and the device login is a project-scoped key: `projects list` returns
+*"This endpoint needs an organization API key."* **Cross-harness comparison is
+blocked on an organization key, not on analysis.** Until one exists, every
+figure in this document describes Claude Code and nothing else — which is
+exactly the per-harness caveat [Part 6](agent-usage-06-review-findings.md) §S5
+demands, arrived at the hard way.
+
 ## 1. The data is already there
 
 `langwatch trace export --origin coding_agent` carries `input.value` — the user's
@@ -173,6 +222,52 @@ measured frustration.** The person most confident about their own recent
 frustration was wrong about when it happened. A product that asks people how
 their sessions went will get that same wrong answer.
 
+### Does frustration change by model? Not established — and the way it fails is instructive
+
+| model | prompts | profanity | per 1k words | events | sessions | largest session |
+|---|---|---|---|---|---|---|
+| `claude-opus-5[1m]` | 2,681 | 1.45% | 0.062 | 39 | 23 | 21% |
+| `claude-fable-5` | 1,098 | 1.28% | 0.076 | 14 | 10 | 21% |
+| `claude-fable-5-1` | 737 | 0.95% | 0.033 | 7 | 2 | **86%** |
+| `claude-sonnet-5` | 378 | **3.70%** | 0.129 | 14 | 4 | **50%** |
+
+Sonnet at 2.4× baseline looks like a finding, and it **survives two checks**:
+against the pooled baseline p = 0.001, and length-matched — Sonnet prompts have
+a median of 71 words against Opus's 26, but stratifying into word bands and
+pooling gives 3.70% vs 1.33%, z = 3.63, **p = 0.0003**.
+
+**It dies on the third check.** Those 14 events come from **4 sessions, 7 of
+them from one**. And per 1,000 words the difference nearly vanishes: 0.129
+against Opus's 0.062 on 39 events — with the pooled per-word figures from an
+independent implementation at 0.138 vs 0.124, i.e. flat. What the table actually
+shows is one bad afternoon on Sonnet, not a property of Sonnet.
+
+`claude-fable-5-1` fails the same way more obviously: 86% of its events are one
+session.
+
+Two things follow. First, **"model X makes people angrier" is exactly the
+folklore Part 6 §S5 warns about**, and it would have shipped on a p-value of
+0.0003. A significance test on a concentrated sample measures the concentration.
+Second, the fix is cheap and now permanent: the probe reports `events`,
+`distinct_sessions_with_events` and `largest_session_share_of_events_pct` on
+every grouped row, so no row can be read without seeing what it rests on. Any
+row whose largest session holds more than about a third of its events is one
+session wearing a model's name.
+
+**Reasoning effort: nothing.** `high` 1.23%, `medium` 1.89%, `xhigh` 2.03%,
+`max` 2.70% — directionally upward, all p > 0.2, and `max` has 74 prompts.
+Worth re-testing at scale, not worth stating.
+
+**Model switching within a turn: nothing yet.** Turns naming 2+ models run 1.91%
+against 1.41% for single-model turns, untested for significance and confounded
+by turn length.
+
+**Swearing does not trigger a model switch.** The next turn's model distribution
+after a sworn prompt is within noise of the distribution after a clean one
+(Opus 46.8% vs 48.6%, n = 79 transitions). Recorded because the opposite —
+people escalating to a bigger model when annoyed — is a plausible behaviour that
+would confound any cost attribution, and it is not happening here.
+
 ## 5. What this means for the product
 
 **Profanity is a leading indicator of a compaction, and that is the product.**
@@ -226,7 +321,11 @@ one reads what the person wrote.** That is a different category and should be
 treated as one:
 
 - **It needs explicit opt-in**, separately from trace ingestion, and it must be
-  visible in the product that it is on.
+  visible in the product that it is on. Note the asymmetry with the research
+  probe, which now scores frustration unconditionally: there, a person runs a
+  script over their own data on their own machine and reads the result. In the
+  product, *we* would be computing it over *their* text and storing the result.
+  Those are different acts and only the second needs consent.
 - **Store the score, not the text, and not the matched words.** The computation
   can happen at ingest; nothing needs to persist a lexicon hit, and persisting
   one creates a record of who swore at what.

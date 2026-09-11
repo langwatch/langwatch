@@ -213,12 +213,36 @@ and Copilot have agent definitions but the wire vocabulary is Claude-centric.
 Anything Parts 2 and 3 ship is effectively Claude Code only until this is
 levelled, and that limit should be stated rather than discovered.
 
+## 10. `llm` spans claim to carry `chat_messages` and do not
+
+Measured while building [Part 8](agent-usage-08-frustration-signal.md), on a
+12-trace span export (1,993 spans, 166 per trace):
+
+- 743 `llm` spans carried **44** `chat_messages` arrays between them;
+- each of those 44 held exactly **one** user message;
+- all 44 were the **same string** — the session's opening message, not the
+  message that call was answering;
+- the trace's own `input.value` was meanwhile correct and distinct per turn.
+
+A span typed `chat_messages` should hold the messages of that call. As it
+stands, a consumer who trusts the field gets one stale message repeated, and
+would conclude a 65-turn session had a single prompt. The analysis that found
+this had to fall back to trace-level text, which happens to be right here — but
+only because a coding-agent trace is one turn. Any harness where a trace spans
+more than a turn would have no usable prompt record at all.
+
+It is also expensive: **0.4 MB per trace**, about **7.5 GB** across this
+window, largely to carry that repetition. Either populate the field with the
+call's real messages or stop emitting it.
+
 ---
 
 ## Done when
 
 - A coding-agent trace reports rates and a real `aborted` boolean; the red error
   state is reserved for turns that actually died.
+- An `llm` span's `chat_messages` holds that call's messages, or the field is
+  not emitted.
 - `success` and every other lifted scalar is typed once at the seam, and no
   consumer branches on a stringly-typed boolean.
 - Every error carries a code from a closed list; message prose is never parsed.

@@ -131,14 +131,16 @@ this in order and do not skip ahead to the comparison.
      --out my-card.json
    ```
 
-5. **Optional, and entirely your call** — add `--frustration` to that command.
-   It scores your own prompt text against two word lists (profanity, and
-   "I already told you"-style repetition) and puts **rates only** in the card:
-   no text, no matched words, nothing quotable. It is testing a specific claim
-   — that frustration roughly doubles between the first and last third of a
-   session, and that profanity rises *before* a compaction while repetition
-   rises *after* it. Skip it without explanation if you would rather not; the
-   rest of the card is unaffected.
+5. The probe also scores a **frustration signal** from your own prompt text —
+   two word lists, profanity and "I already told you"-style repetition — and
+   puts **rates only** in the card: no text, no matched words, nothing
+   quotable. It runs on your machine over your own export. It is testing three
+   specific claims: that frustration roughly doubles between the first and last
+   third of a session, that profanity rises *before* a compaction while
+   repetition rises *after* it, and that per-model differences are one-session
+   artefacts rather than model properties. If you would rather it did not run,
+   say so and I will send a build with it removed — don't quietly edit the
+   script, because then your card is no longer comparable.
 
 6. Sanity-check the corpus before you trust anything downstream, and tell me
    what you found:
@@ -230,8 +232,8 @@ above tells them when to open it.
 | **no long-context premium** | realised rate **falls** with context: $0.92/M at 50–100k → $0.65/M above 700k; within a single model, $0.81/M → $0.57/M | a rate that *rises* with context on your models |
 | **checkpointing is the largest lever** | capping context at 300k ≈ **42%** of read tokens (~$14.0k); at 200k ≈ **54%** (~$17.7k). Upper bound — quality loss not modelled | a much smaller share, i.e. your sessions already stay short |
 
-If you ran `--frustration`, these too (5,467 prompts, 83 profanity events —
-small, so treat direction as the claim and magnitude as noise):
+Frustration findings too (5,467 prompts, 83 profanity events — small, so treat
+direction as the claim and magnitude as noise):
 
 | finding | baseline | what would falsify it |
 |---|---|---|
@@ -239,6 +241,11 @@ small, so treat direction as the claim and magnitude as noise):
 | profanity **leads** a compaction | **2.38%** in the 5 prompts before a reset → **1.23%** in the 5 after (p=0.003) | higher after than before |
 | repetition **lags** a compaction | **0.56%** before → **1.43%** after (2.5×, p=0.002) | higher before than after |
 | it is *not* about context size | within one session cohort, splitting by context instead of position reverses the effect | a clean context correlation that survives a within-session control |
+| per-model differences are artefacts | Sonnet reads 3.70% vs 1.52% baseline and survives a length control at p=0.0003, then dies: 14 events, 4 sessions, **7 from one** | a model difference where no single session holds more than ~⅓ of the events |
+
+**On that last row especially — check `largest_session_share_of_events_pct` on
+every `by_model` row of your own card before you believe it.** It is the column
+that killed the most convincing-looking finding in this set.
 
 ## 7. How we read the results
 
