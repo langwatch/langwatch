@@ -7,7 +7,7 @@
 import {
   promptApi,
   PromptHostProvider,
-  type PromptHostPort,
+  type PromptHostApi,
 } from "@langwatch/prompt-web/prompt-studio";
 import { useMemo, type ReactNode } from "react";
 import { browserUiLogger, browserUiStorage } from "../../../../behavior/ui-browser-storage";
@@ -67,7 +67,7 @@ export function PromptHost({ children }: { children: ReactNode }) {
   );
 
   const reading = route.reading();
-  const host = useMemo<PromptHostPort>(
+  const host = useMemo<PromptHostApi>(
     () => ({
       scope: () => ({
         organizationId: scope.organizationId ?? void 0,

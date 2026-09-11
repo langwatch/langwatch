@@ -7,7 +7,7 @@
 import {
   dataPrivacyApi,
   DataPrivacyHostProvider,
-  type DataPrivacyHostPort,
+  type DataPrivacyHostApi,
 } from "@langwatch/data-privacy-web/data-privacy";
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
@@ -29,7 +29,7 @@ export function DataPrivacyHost({ children }: { children: ReactNode }) {
   );
 
   const reading = route.reading();
-  const host = useMemo<DataPrivacyHostPort>(
+  const host = useMemo<DataPrivacyHostApi>(
     () => ({
       scope: () => ({
         organizationId: activeScope.organizationId ?? void 0,

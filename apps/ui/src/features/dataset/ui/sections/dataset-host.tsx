@@ -7,7 +7,7 @@
 import {
   datasetApi,
   DatasetHostProvider,
-  type DatasetHostPort,
+  type DatasetHostApi,
 } from "@langwatch/dataset-web/datasets";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useMemo, type ReactNode } from "react";
@@ -54,7 +54,7 @@ export function DatasetHost({ children }: { children: ReactNode }) {
   );
 
   const reading = route.reading();
-  const host = useMemo<DatasetHostPort>(
+  const host = useMemo<DatasetHostApi>(
     () => ({
       project: () => project,
       hasPermission: (permission) => session.hasPermission(permission),

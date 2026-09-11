@@ -7,7 +7,7 @@
 import {
   evaluatorApi,
   EvaluatorHostProvider,
-  type EvaluatorHostPort,
+  type EvaluatorHostApi,
 } from "@langwatch/evaluator-web/evaluators";
 import { useMemo, type ReactNode } from "react";
 
@@ -56,7 +56,7 @@ export function EvaluatorHost({ children }: { children: ReactNode }) {
   );
 
   const reading = route.reading();
-  const host = useMemo<EvaluatorHostPort>(
+  const host = useMemo<EvaluatorHostApi>(
     () => ({
       scope: () => project,
       hasPermission: (permission) => session.hasPermission(permission),

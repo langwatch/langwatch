@@ -1,11 +1,11 @@
 /**
  * The trace host, answered from the annotation host already above this
- * page, since `ConversationView` requires `trace-web`'s `TraceHostPort`.
+ * page, since `ConversationView` requires `trace-web`'s `TraceHostApi`.
  * Fields the walker never reaches answer `undefined` here.
  */
 
 import {
-  TraceHostPort,
+  TraceHostApi,
   TraceHostProvider,
   type TraceFailureNotice,
   type TraceHostOrganization,
@@ -18,10 +18,10 @@ import {
 } from "@langwatch/trace-web/surfaces/trace-host";
 import { useMemo, type ReactNode } from "react";
 
-import { useAnnotationHost, type AnnotationHostPort } from "@langwatch/annotation-web/annotations";
+import { useAnnotationHost, type AnnotationHostApi } from "@langwatch/annotation-web/annotations";
 
-class AnnotationTraceHost extends TraceHostPort {
-  constructor(private readonly host: AnnotationHostPort) {
+class AnnotationTraceHost extends TraceHostApi {
+  constructor(private readonly host: AnnotationHostApi) {
     super();
   }
 

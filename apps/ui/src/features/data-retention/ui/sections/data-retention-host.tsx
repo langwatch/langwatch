@@ -7,7 +7,7 @@
 import {
   dataRetentionApi,
   DataRetentionHostProvider,
-  type DataRetentionHostPort,
+  type DataRetentionHostApi,
   type RetentionAvailableScopes,
 } from "@langwatch/data-retention-web/data-retention";
 import { useMemo, type ReactNode } from "react";
@@ -80,7 +80,7 @@ export function DataRetentionHost({ children }: { children: ReactNode }) {
   }, [organization]);
 
   const reading = route.reading();
-  const host = useMemo<DataRetentionHostPort>(
+  const host = useMemo<DataRetentionHostApi>(
     () => ({
       scope: () => ({
         organizationId: activeScope.organizationId ?? void 0,

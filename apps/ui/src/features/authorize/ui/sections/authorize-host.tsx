@@ -7,7 +7,7 @@
 import {
   apiKeyApi,
   AuthorizeHostProvider,
-  type AuthorizeHostPort,
+  type AuthorizeHostApi,
   type AuthorizeSessionStatus,
 } from "@langwatch/api-key-web/authorize";
 import { useMemo, type ReactNode } from "react";
@@ -80,7 +80,7 @@ export function AuthorizeHost({ children }: { children: ReactNode }) {
 
   const reading = route.reading();
 
-  const host = useMemo<AuthorizeHostPort>(
+  const host = useMemo<AuthorizeHostApi>(
     () => ({
       scope: () => ({
         projectId: activeScope.projectId ?? void 0,

@@ -42,21 +42,21 @@ const { apiNode, screenFor } = vi.hoisted(() => {
 vi.mock("@langwatch/topic-web/screens/topic-clustering", () => ({
   topicApi: apiNode(),
   topicScreens: { topicClustering: screenFor("the topic clustering page") },
-  TopicHostPort: class {},
+  TopicHostApi: class {},
   TopicHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 vi.mock("@langwatch/notification-web/email-suppressions", () => ({
   notificationApi: apiNode(),
   notificationScreens: { emailSuppressions: screenFor("the email suppressions page") },
-  NotificationHostPort: class {},
+  NotificationHostApi: class {},
   NotificationHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 vi.mock("@langwatch/enterprise-licensing-web/licensing", () => ({
   licensingApi: apiNode(),
   licensingScreens: { license: screenFor("the license page") },
-  LicensingHostPort: class {},
+  LicensingHostApi: class {},
   LicensingHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
@@ -74,7 +74,7 @@ vi.mock("@langwatch/enterprise-billing-web/billing", () => ({
 vi.mock("@langwatch/enterprise-scim-web/scim", () => ({
   scimApi: apiNode(),
   scimScreens: { scim: screenFor("the scim page") },
-  ScimHostPort: class {},
+  ScimHostApi: class {},
   ScimHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
@@ -82,7 +82,7 @@ vi.mock("@langwatch/annotation-web/annotation-scores", () => ({
   annotationScoresApi: apiNode(),
   annotationScoresScreens: { annotationScores: screenFor("the annotation scores page") },
   AnnotationScoreDrawer: () => null,
-  AnnotationScoresHostPort: class {},
+  AnnotationScoresHostApi: class {},
   AnnotationScoresHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
@@ -102,7 +102,7 @@ vi.mock("@langwatch/organization-web/organization", () => ({
     teams: screenFor("the teams page"),
     teamDetail: screenFor("the team detail page"),
   },
-  OrganizationHostPort: class {},
+  OrganizationHostApi: class {},
   OrganizationHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 

@@ -6,7 +6,7 @@
 import {
   analyticsApi,
   AnalyticsHostProvider,
-  type AnalyticsHostPort,
+  type AnalyticsHostApi,
 } from "@langwatch/analytics-web/analytics";
 import { useMemo, type ReactNode } from "react";
 
@@ -38,7 +38,7 @@ export function AnalyticsHost({ children }: { children: ReactNode }) {
   );
 
   const reading = route.reading();
-  const host = useMemo<AnalyticsHostPort>(
+  const host = useMemo<AnalyticsHostApi>(
     () => ({
       project: () => project,
       organizationId: () => scope.organizationId ?? void 0,

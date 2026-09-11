@@ -49,7 +49,7 @@ vi.mock("../../../behavior/public-config", async () => {
   };
 });
 
-import { type LangyHostPort, useLangyHost } from "@langwatch/langy-web/langy";
+import { type LangyHostApi, useLangyHost } from "@langwatch/langy-web/langy";
 import {
   UiCapabilityContextProvider,
   UiDocumentTitle,
@@ -111,8 +111,8 @@ class OpenSession extends UiSession {
 }
 
 /** Mounts the real apps/ui composition and hands back the host it published. */
-function mountHost(projectId: string): LangyHostPort {
-  let published: LangyHostPort | undefined;
+function mountHost(projectId: string): LangyHostApi {
+  let published: LangyHostApi | undefined;
   const Reader = () => {
     published = useLangyHost();
     return null;

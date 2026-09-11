@@ -4,7 +4,7 @@
  * base URL is the deployment's own `appBaseUrl`, not the browser's origin.
  */
 
-import { ScimHostProvider, type ScimHostPort } from "@langwatch/enterprise-scim-web/scim";
+import { ScimHostProvider, type ScimHostApi } from "@langwatch/enterprise-scim-web/scim";
 import { useMemo, type ReactNode } from "react";
 
 import { readPublicAppConfig } from "../../../../behavior/public-config";
@@ -25,7 +25,7 @@ export function ScimHost({ children }: { children: ReactNode }) {
   const { session, feedback } = useUiCapabilities();
   const { organizationId } = session.activeScope();
 
-  const host = useMemo<ScimHostPort>(
+  const host = useMemo<ScimHostApi>(
     () => ({
       organizationId: () => organizationId ?? void 0,
       scimBaseUrl: () => readScimBaseUrl(),

@@ -4,7 +4,7 @@
  * `useUiAddress`, not route reading, since `react-router` is sealed off here.
  */
 
-import { AuthHostProvider, type AuthHostPort } from "@langwatch/auth-web/auth";
+import { AuthHostProvider, type AuthHostApi } from "@langwatch/auth-web/auth";
 import { readPublicAppConfig, toPublicEnvironment } from "@langwatch/ui/public-config";
 import { useMemo, type ReactNode } from "react";
 
@@ -17,7 +17,7 @@ export function AuthHost({ children }: { children: ReactNode }) {
   const address = useUiAddress();
   const pathname = address.split("?")[0]?.split("#")[0] ?? "/";
 
-  const host = useMemo<AuthHostPort>(
+  const host = useMemo<AuthHostApi>(
     () => ({
       publicEnvironment: () => toPublicEnvironment(readPublicAppConfig()),
       route: () => ({ pathname, params: reading.params, query: reading.query }),

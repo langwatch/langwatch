@@ -8,7 +8,7 @@ import {
   modelProviderApi,
   ModelProviderHostProvider,
   type ModelProviderAvailableScopes,
-  type ModelProviderHostPort,
+  type ModelProviderHostApi,
 } from "@langwatch/model-provider-web/model-providers";
 import { useMemo, type ReactNode } from "react";
 import { DRAWER_OPEN_PARAM } from "../../../../model/ui-drawer-address";
@@ -78,7 +78,7 @@ export function ModelProviderHost({ children }: { children: ReactNode }) {
   }, [organization]);
 
   const reading = route.reading();
-  const host = useMemo<ModelProviderHostPort>(
+  const host = useMemo<ModelProviderHostApi>(
     () => ({
       scope: () => ({
         organizationId: activeScope.organizationId ?? void 0,

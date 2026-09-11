@@ -8,7 +8,7 @@ import {
   apiKeyApi,
   ApiKeyHostProvider,
   type ApiKeyAvailableScopes,
-  type ApiKeyHostPort,
+  type ApiKeyHostApi,
   type ApiKeyOrganization,
   type ApiKeyOrganizationProject,
   type ApiKeyOrganizationTeam,
@@ -189,7 +189,7 @@ export function ApiKeyHost({ children }: { children: ReactNode }) {
 
   const reading = route.reading();
 
-  const host = useMemo<ApiKeyHostPort>(
+  const host = useMemo<ApiKeyHostApi>(
     () => ({
       scope: () => ({
         organizationId: activeScope.organizationId ?? void 0,

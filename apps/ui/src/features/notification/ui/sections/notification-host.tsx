@@ -6,7 +6,7 @@
 
 import {
   NotificationHostProvider,
-  type NotificationHostPort,
+  type NotificationHostApi,
 } from "@langwatch/notification-web/email-suppressions";
 import { useMemo, type ReactNode } from "react";
 
@@ -16,7 +16,7 @@ export function NotificationHost({ children }: { children: ReactNode }) {
   const { session, feedback } = useUiCapabilities();
   const { projectId } = session.activeScope();
 
-  const host = useMemo<NotificationHostPort>(
+  const host = useMemo<NotificationHostApi>(
     () => ({
       project: () => (projectId ? { id: projectId } : void 0),
       hasPermission: (permission) => session.hasPermission(permission),

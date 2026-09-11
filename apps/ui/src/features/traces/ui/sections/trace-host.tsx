@@ -7,7 +7,7 @@
 import {
   traceApi,
   TraceHostProvider,
-  type TraceHostPort,
+  type TraceHostApi,
 } from "@langwatch/trace-web/traces";
 import { useMemo, type ReactNode } from "react";
 
@@ -49,7 +49,7 @@ export function TraceHost({ children }: { children: ReactNode }) {
   }, [organizations.data, scope.projectId]);
 
   const reading = route.reading();
-  const host = useMemo<TraceHostPort>(
+  const host = useMemo<TraceHostApi>(
     () => ({
       project: () =>
         placement

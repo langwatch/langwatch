@@ -7,7 +7,7 @@
 import {
   AnnotationScoresHostProvider,
   type AnnotationScoreEditorAddress,
-  type AnnotationScoresHostPort,
+  type AnnotationScoresHostApi,
 } from "@langwatch/annotation-web/annotation-scores";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
@@ -33,7 +33,7 @@ export function AnnotationScoresHost({ children }: { children: ReactNode }) {
     [query],
   );
 
-  const host = useMemo<AnnotationScoresHostPort>(
+  const host = useMemo<AnnotationScoresHostApi>(
     () => ({
       project: () => (projectId ? { id: projectId } : void 0),
       isLiteMember: () => isLiteMember,

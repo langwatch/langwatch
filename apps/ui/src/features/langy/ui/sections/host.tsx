@@ -8,7 +8,7 @@ import {
   langyApi,
   LangyHostProvider,
   setLangyTrpcClient,
-  type LangyHostPort,
+  type LangyHostApi,
 } from "@langwatch/langy-web/langy";
 import { useEffect, useMemo, type ReactNode } from "react";
 
@@ -51,7 +51,7 @@ export function LangyHost({ children }: { children: ReactNode }) {
   }, []);
 
   const reading = route.reading();
-  const host = useMemo<LangyHostPort>(
+  const host = useMemo<LangyHostApi>(
     () => ({
       project: () =>
         placement

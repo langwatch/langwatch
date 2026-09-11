@@ -6,7 +6,7 @@
 
 import {
   GithubHostProvider,
-  type GithubHostPort,
+  type GithubHostApi,
 } from "@langwatch/github-web/integrations";
 import { useMemo, type ReactNode } from "react";
 
@@ -18,7 +18,7 @@ export function GithubHost({ children }: { children: ReactNode }) {
   const scope = session.activeScope();
   const reading = route.reading();
 
-  const host = useMemo<GithubHostPort>(
+  const host = useMemo<GithubHostApi>(
     () => ({
       scope: () => ({ organizationId: scope.organizationId ?? void 0 }),
       route: () => reading,

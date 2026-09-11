@@ -7,7 +7,7 @@
 import {
   licensingApi,
   LicensingHostProvider,
-  type LicensingHostPort,
+  type LicensingHostApi,
 } from "@langwatch/enterprise-licensing-web/licensing";
 import { useMemo, type ReactNode } from "react";
 
@@ -33,7 +33,7 @@ export function LicensingHost({ children }: { children: ReactNode }) {
   const { organizationId } = session.activeScope();
   const utils = licensingApi.useUtils();
 
-  const host = useMemo<LicensingHostPort>(() => {
+  const host = useMemo<LicensingHostApi>(() => {
     const deployment = readDeployment();
     return {
       organizationId: () => organizationId ?? void 0,

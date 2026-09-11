@@ -7,7 +7,7 @@
 import {
   SecretHostProvider,
   secretApi,
-  type SecretHostPort,
+  type SecretHostApi,
 } from "@langwatch/secret-web/secrets";
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
@@ -17,7 +17,7 @@ export function SecretHost({ children }: { children: ReactNode }) {
   const { session, feedback } = useUiCapabilities();
   const activeScope = session.activeScope();
 
-  const host = useMemo<SecretHostPort>(
+  const host = useMemo<SecretHostApi>(
     () => ({
       scope: () => ({
         projectId: activeScope.projectId ?? void 0,

@@ -38,7 +38,7 @@ vi.mock("../src/behavior/ui-organization-facts", () => ({
 }));
 
 import {
-  type AnnotationHostPort,
+  type AnnotationHostApi,
   useAnnotationHost,
 } from "@langwatch/annotation-web/annotations";
 import {
@@ -107,10 +107,10 @@ class ScopedSession extends UiSession {
 
 /** Mounts the provider and hands back the host it published. */
 function mountHost(userId: string): {
-  host: AnnotationHostPort;
+  host: AnnotationHostApi;
   feedback: RecordingFeedback;
 } {
-  let published: AnnotationHostPort | undefined;
+  let published: AnnotationHostApi | undefined;
   const Reader = () => {
     published = useAnnotationHost();
     return null;

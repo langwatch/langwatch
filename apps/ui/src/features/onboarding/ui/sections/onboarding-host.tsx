@@ -7,7 +7,7 @@
 import {
   OnboardingHostProvider,
   onboardingApi,
-  type OnboardingHostPort,
+  type OnboardingHostApi,
   type OnboardingOrganization,
   type OnboardingSessionStatus,
 } from "@langwatch/onboarding-web/onboarding";
@@ -119,7 +119,7 @@ export function OnboardingHost({ children }: { children: ReactNode }) {
 
   const reading = route.reading();
 
-  const host = useMemo<OnboardingHostPort>(
+  const host = useMemo<OnboardingHostApi>(
     () => ({
       scope: () => ({
         organization,

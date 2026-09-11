@@ -7,7 +7,7 @@
 import {
   organizationApi,
   OrganizationHostProvider,
-  type OrganizationHostPort,
+  type OrganizationHostApi,
   type OrganizationReading,
 } from "@langwatch/organization-web/organization";
 import { useDrawer } from "@langwatch/ui-drawer";
@@ -84,7 +84,7 @@ export function OrganizationHost({ children }: { children: ReactNode }) {
   const projectSlug = activeProject?.slug;
 
   const reading = route.reading();
-  const host = useMemo<OrganizationHostPort>(
+  const host = useMemo<OrganizationHostApi>(
     () => ({
       scope: () => ({
         organizationId: activeScope.organizationId ?? void 0,

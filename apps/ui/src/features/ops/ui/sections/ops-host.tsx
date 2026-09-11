@@ -4,7 +4,7 @@
  * `ops:view`/`ops:manage` are deliberately decoupled — widening one can't widen the other.
  */
 
-import { opsApi, OpsHostProvider, type OpsHostPort } from "@langwatch/ops-web/ops";
+import { opsApi, OpsHostProvider, type OpsHostApi } from "@langwatch/ops-web/ops";
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiAddress } from "../../../../behavior/ui-address";
@@ -58,7 +58,7 @@ export function OpsHost({ children }: { children: ReactNode }) {
 
   const reading = route.reading();
 
-  const host = useMemo<OpsHostPort>(
+  const host = useMemo<OpsHostApi>(
     () => ({
       // Fails closed: an answer that has not arrived reads as no.
       hasOpsAccess: () => session.hasPermission(OPS_VIEW_PERMISSION),

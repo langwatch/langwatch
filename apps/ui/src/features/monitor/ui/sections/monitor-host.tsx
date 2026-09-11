@@ -7,7 +7,7 @@
 import {
   monitorApi,
   MonitorHostProvider,
-  type MonitorHostPort,
+  type MonitorHostApi,
 } from "@langwatch/monitor-web/online-evaluations";
 import { useMemo, type ReactNode } from "react";
 
@@ -58,7 +58,7 @@ export function MonitorHost({ children }: { children: ReactNode }) {
 
   const reading = route.reading();
 
-  const host = useMemo<MonitorHostPort>(
+  const host = useMemo<MonitorHostApi>(
     () => ({
       scope: () => project,
       hasPermission: (permission) => session.hasPermission(permission),

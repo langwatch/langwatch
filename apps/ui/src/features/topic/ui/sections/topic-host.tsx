@@ -4,7 +4,7 @@
  * the session's active scope — no graph fetched for this page.
  */
 
-import { TopicHostProvider, type TopicHostPort } from "@langwatch/topic-web/topic-clustering";
+import { TopicHostProvider, type TopicHostApi } from "@langwatch/topic-web/topic-clustering";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
@@ -13,7 +13,7 @@ export function TopicHost({ children }: { children: ReactNode }) {
   const { session, feedback } = useUiCapabilities();
   const { projectId } = session.activeScope();
 
-  const host = useMemo<TopicHostPort>(
+  const host = useMemo<TopicHostApi>(
     () => ({
       project: () => (projectId ? { id: projectId } : void 0),
       succeeded: (notice) => feedback.succeeded(notice),

@@ -17,7 +17,7 @@ import { useMemo, type ReactNode } from "react";
 
 import {
   AnalyticsHostProvider,
-  type AnalyticsHostPort,
+  type AnalyticsHostApi,
 } from "@langwatch/analytics-web/surfaces/analytics-host";
 
 import { resolveAnalyticsProject } from "../../../../behavior/analytics-project";
@@ -155,7 +155,7 @@ export function ProjectHomeHostSection({ children }: { children: ReactNode }) {
   // the graph this host already read, rather than by nesting the analytics
   // shell: that would ask the same question a second time.
   const reading = route.reading();
-  const analyticsHost = useMemo<AnalyticsHostPort>(
+  const analyticsHost = useMemo<AnalyticsHostApi>(
     () => ({
       project: () =>
         resolveAnalyticsProject({

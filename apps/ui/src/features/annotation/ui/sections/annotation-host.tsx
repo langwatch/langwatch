@@ -7,7 +7,7 @@
 import {
   annotationApi,
   AnnotationHostProvider,
-  type AnnotationHostPort,
+  type AnnotationHostApi,
   type RouterOutputs,
 } from "@langwatch/annotation-web/annotations";
 import { useMemo, type ReactNode } from "react";
@@ -71,7 +71,7 @@ export function AnnotationHost({ children }: { children: ReactNode }) {
 
   const reading = route.reading();
 
-  const host = useMemo<AnnotationHostPort>(
+  const host = useMemo<AnnotationHostApi>(
     () => ({
       project: () => placement?.project,
       organizationId: () => scope.organizationId ?? void 0,
