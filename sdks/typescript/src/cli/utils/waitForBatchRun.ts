@@ -135,12 +135,13 @@ export async function waitForBatchRun({
   let latestRuns: BatchRun[] = [];
 
   while (!completed) {
-    if (Date.now() - startTime > timeoutMs) {
+    const remainingMs = timeoutMs - (Date.now() - startTime);
+    if (remainingMs <= 0) {
       outcome = "timeout";
       process.exitCode = 1;
       pollSpinner.fail(
         chalk.red(
-          `The ${subject} timed out after ${describeMinutes(timeoutMs)}`,
+          `Stopped waiting for the ${subject} after ${describeMinutes(timeoutMs)}. The batch was not cancelled.`,
         ),
       );
       if (!machine) {
@@ -153,14 +154,32 @@ export async function waitForBatchRun({
       break;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.min(POLL_INTERVAL_MS, remainingMs)),
+    );
+    const readBudgetMs = timeoutMs - (Date.now() - startTime);
+    if (readBudgetMs <= 0) continue;
+
+    // One budget covers all pages and their bodies. Checking only between
+    // polls cannot stop a status request that never finishes.
+    const controller = new AbortController();
+    const readTimeout = setTimeout(
+      () => controller.abort(),
+      // Node turns delays above its signed 32-bit limit into a 1ms timer.
+      Math.min(readBudgetMs, 2 ** 31 - 1),
+    );
 
     try {
-      latestRuns = await fetchBatchRuns({
+      const runs = await fetchBatchRuns({
         endpoint,
         batchRunId,
         headers: buildAuthHeaders({ apiKey }),
+        signal: controller.signal,
       });
+      if (controller.signal.aborted || Date.now() - startTime >= timeoutMs) {
+        continue;
+      }
+      latestRuns = runs;
       const progress = tallyBatchRuns(latestRuns);
 
       // The schedule knows how many jobs it dispatched; the endpoint only knows
@@ -196,6 +215,9 @@ export async function waitForBatchRun({
         }
       }
     } catch {
+      // Re-enter the deadline check instead of counting our own cancellation
+      // as a failed status poll. Keep the last fully read poll's results.
+      if (controller.signal.aborted) continue;
       consecutivePollFailures++;
       if (consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
         outcome = "poll_failure";
@@ -207,6 +229,8 @@ export async function waitForBatchRun({
         break;
       }
       continue;
+    } finally {
+      clearTimeout(readTimeout);
     }
     consecutivePollFailures = 0;
   }
