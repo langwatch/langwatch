@@ -1,5 +1,5 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
 import { auditLogNullServer } from "../audit-log-null.server.ts";
 
@@ -9,10 +9,9 @@ describe("given a process that installed no Enterprise audit log", () => {
     it.each(["api", "worker"] as const)(
       "accepts the write and answers an empty history in the %s role",
       async (role) => {
-        const runtime = await createApp({ name: "audit-log-null-installation-test" })
-          .withInfrastructure({})
-          .withModule(auditLogNullServer)
-          .boot({ role });
+        const runtime = await createApp({ role: "api", config: {} })
+          .withModules([withMemoryRepositories(auditLogNullServer)])
+          .boot();
 
         try {
           const app = runtime.service(AuditLogApi);

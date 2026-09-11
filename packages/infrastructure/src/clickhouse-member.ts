@@ -22,6 +22,7 @@ import {
   TenantGuard,
   type ClickHouseClientCreationInput,
   type ClickHouseConnection,
+  type InsertRequest,
   type QueryDriver,
   type QueryRequest,
   type QueryResult,
@@ -110,12 +111,35 @@ export function buildClickHouse(options: {
  * down why it has none.
  */
 function routingDriver(connection: ClickHouseConnection<ClickHouseClient>): QueryDriver {
+  /** The server this statement's tenant belongs on, shared only when it has none. */
+  const serverFor = async (tenantId: string): Promise<ClickHouseClient> =>
+    tenantId === "" ? connection.shared() : await connection.resolve(tenantId);
+
   return {
+    async insert(request: InsertRequest): Promise<void> {
+      const vendor = await serverFor(request.tenantId);
+      await vendor.insert({
+        table: request.table,
+        values: request.rows as Record<string, unknown>[],
+        format: "JSONEachRow",
+        ...(request.settings === undefined
+          ? {}
+          : { clickhouse_settings: request.settings as Record<string, never> }),
+      });
+    },
+
+    async command(request: QueryRequest): Promise<void> {
+      const vendor = await serverFor(request.tenantId);
+      await vendor.command({
+        query: request.sql,
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+        ...(request.signal === undefined ? {} : { abort_signal: request.signal as AbortSignal }),
+      });
+    },
+
     async execute<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
-      const vendor =
-        request.tenantId === ""
-          ? connection.shared()
-          : await connection.resolve(request.tenantId);
+      const vendor = await serverFor(request.tenantId);
 
       const started = Date.now();
       const resultSet = await vendor.query({

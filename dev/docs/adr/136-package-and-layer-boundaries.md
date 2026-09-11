@@ -52,6 +52,7 @@ never loads the graph behind them.
 | --- | --- | --- |
 | `langwatch/package-boundaries` | plugin | Thirteen message ids, one per shape: `webImportsServer`, `serverImportsBrowser`, `coreImportsEnterprise`, `contractRuntime`, `schemaBoundary`, `crossFeature`, `compositionRoot`, `featureLayer`, `sealedExports`, `packageEscape`, `prismaContainment`, `deadAlias`, `retiredPackageRuntime`. |
 | `langwatch/web-imports-server-shaped-value` | plugin | A browser module may not value-import a package whose declarations are the server's. |
+| `langwatch/service-does-not-open-a-channel` | plugin | A file under `services/` may not open the event bus, Redis pub/sub, an HTTP client, an AWS client, a mail sender or Slack; the conduit is a channel and the service takes its interface (ADR-144 decision 9). |
 | `boundary-signature-mirrors` | architecture-lint | A boundary signature mirroring another type through `Parameters`/`ReturnType`, or hiding a nested `any` cast. |
 | `enterprise-source-license` | architecture-lint | Every `enterprise/` source file carries its SPDX licence header. |
 | `application-boundaries` | architecture-lint | One application may not import another's source, nor the wrong Enterprise composition. |

@@ -68,6 +68,9 @@ one neighbour reads is a hop too.
 | `feature-shape` | architecture-lint | A module carrying a legacy pre-ADR-133 shape fragment, against a shrink-only baseline. |
 | `source-folder-shape` | architecture-lint | Folder and fragment budgets: at most 12 files in a source folder, no sub-20-line fragment only one neighbour reads. |
 | `legacy-feature-fragments` | architecture-lint | The remaining legacy composition, adapter, page-shell and transport fragments may only shrink. |
+| `unused-module-export` | architecture-lint | A name a module's `server` package exports that no file in the repository imports, the package index included. |
+| `infrastructure-member-unused` | architecture-lint | A member of a `<Feature>Infrastructure` interface no app, service or repository in the owning package reaches. |
+| `memory-twin-drift` | architecture-lint | A repository whose Prisma implementation and memory twin declare different method sets, in either direction. |
 
 The per-file half is the plugin, because it needs the file's classified role
 and layout version. The per-module half is architecture-lint, because it needs
@@ -80,8 +83,9 @@ The grammar is what makes the module skills work: `module`, `module-review` and
 `feature-convert` can state where a file goes because a rule refuses every other
 answer, and `dev/docs/lint-rules.md` renders the sentence the rule prints.
 
-Three of these policies are ratchets rather than rules - `feature-shape`,
-`source-folder-shape` and `legacy-feature-fragments` each carry a baseline of
+Six of these policies are ratchets rather than rules - `feature-shape`,
+`source-folder-shape`, `legacy-feature-fragments`, `unused-module-export`,
+`infrastructure-member-unused` and `memory-twin-drift` each carry a baseline of
 existing violations. That is deliberate: the grammar arrived after the code,
 and a rule that fails 431 folders on day one is a rule somebody turns off. The
 ratchet holds the line and the count only goes down.

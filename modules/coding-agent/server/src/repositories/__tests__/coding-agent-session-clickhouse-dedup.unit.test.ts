@@ -6,11 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
 import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import type {
-  CodingAgentClickHouseClient,
-  CodingAgentClickHouseQueryResult,
-} from "../../app/coding-agent.members.ts";
-import { CodingAgentClickHouse } from "../../app/coding-agent.members.ts";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { parseClickHouseDateTimeMs } from "../clickhouse/clickhouse.mapper.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
 
@@ -31,18 +27,9 @@ function chTime(ms: number): string {
 
 const millis = (value: unknown): number => parseClickHouseDateTimeMs(String(value));
 
-function makePort(client: CodingAgentClickHouseClient): CodingAgentClickHouse {
-  class Port implements CodingAgentClickHouse {
-    async resolve(): Promise<CodingAgentClickHouseClient> {
-      return client;
-    }
-  }
-  return new Port();
-}
-
-function makeRepository(client: CodingAgentClickHouseClient) {
+function makeRepository(client: ClickHouseQueryClient) {
   return CodingAgentSessionClickHouseRepository.create({
-    clickHouse: makePort(client),
+    clickhouse: client,
     defaultTraceRetentionDays: 30,
     metrics: NoopCodingAgentReadMetrics.create(),
     clock: new TestClock(),
@@ -102,13 +89,13 @@ function evaluate(row: Record<string, unknown>, expression: string): number | st
  * emitted `ORDER BY … LIMIT 1` to the candidate rows, rather than replaying
  * whichever row the fixture pushed first.
  */
-function orderingClient(rows: Array<Record<string, unknown>>): CodingAgentClickHouseClient {
+function orderingClient(rows: Array<Record<string, unknown>>): ClickHouseQueryClient {
   return {
-    query: async (params: { query: string }): Promise<CodingAgentClickHouseQueryResult> => ({
-      json: async () => applyOrderBy(rows, params.query).slice(0, 1),
+    query: async (request: { sql: string }) => ({
+      rows: applyOrderBy(rows, request.sql).slice(0, 1),
     }),
     insert: async () => undefined,
-  };
+  } as unknown as ClickHouseQueryClient;
 }
 
 /**
@@ -119,7 +106,7 @@ function orderingClient(rows: Array<Record<string, unknown>>): CodingAgentClickH
 function tiedVersions(
   stale: Record<string, unknown>,
   fresh: Record<string, unknown>,
-): CodingAgentClickHouseClient {
+): ClickHouseQueryClient {
   const base = {
     TenantId: "tenant-1",
     SessionId: "sess-1",
@@ -139,7 +126,7 @@ function tiedVersions(
   ]);
 }
 
-const read = (client: CodingAgentClickHouseClient) =>
+const read = (client: ClickHouseQueryClient) =>
   makeRepository(client).findBySessionIdWithApplied({
     tenantId: "tenant-1",
     sessionId: "sess-1",
@@ -280,18 +267,15 @@ function inScope(
  * would not catch windowing the inner dedup subquery (ADR-071 consequence-4).
  */
 function listClient(rows: Array<Record<string, unknown>>): {
-  client: CodingAgentClickHouseClient;
+  client: ClickHouseQueryClient;
   lastQuery: () => string;
 } {
   let sent = "";
-  const client: CodingAgentClickHouseClient = {
-    query: async (args: {
-      query: string;
-      query_params?: Record<string, unknown>;
-    }): Promise<CodingAgentClickHouseQueryResult> => {
-      sent = args.query;
-      const params = args.query_params ?? {};
-      const { inner, outer } = splitScopes(args.query);
+  const client = {
+    query: async (request: { sql: string; params?: Record<string, unknown> }) => {
+      sent = request.sql;
+      const params = request.params ?? {};
+      const { inner, outer } = splitScopes(request.sql);
 
       const latest = new Map<string, number>();
       for (const row of rows) {
@@ -310,10 +294,10 @@ function listClient(rows: Array<Record<string, unknown>>): {
         .sort((left, right) => millis(right.StartedAt) - millis(left.StartedAt))
         .slice(0, Number(params.limit));
 
-      return { json: async () => selected };
+      return { rows: selected };
     },
     insert: async () => undefined,
-  };
+  } as unknown as ClickHouseQueryClient;
 
   return { client, lastQuery: () => sent };
 }
@@ -346,7 +330,7 @@ function version({
   };
 }
 
-const listRecent = (client: CodingAgentClickHouseClient, userId?: string) =>
+const listRecent = (client: ClickHouseQueryClient, userId?: string) =>
   makeRepository(client).findManyRecent({
     tenantId: "tenant-1",
     fromMs: WINDOW_FROM,

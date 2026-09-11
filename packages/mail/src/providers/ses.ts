@@ -41,6 +41,19 @@ export const buildSesClientConfig = ({
   });
 };
 
+/**
+ * SES reached directly, on the deployment's own credential chain and its own
+ * network path. A deployment that must egress through a proxy supplies its own
+ * builder instead, because the agent that carries the proxy is the process's
+ * and not this package's.
+ */
+export const directSesClientConfiguration = (): SesAwsClientConfiguration => ({
+  build: ({ region, endpoint }) => ({
+    ...(region === undefined ? {} : { region }),
+    ...(endpoint === undefined ? {} : { endpoint }),
+  }),
+});
+
 /** One lazy SES client per mailer process. Its borrowed handler is released by AWS shutdown. */
 export class SesEmailProvider implements EmailProvider {
   readonly name = "ses" as const;

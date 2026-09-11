@@ -29,7 +29,7 @@
  */
 
 import type { ConcurrencyLimiter } from "./rateLimit.ts";
-import type { QueryDriver, QueryRequest, QueryResult } from "./query.ts";
+import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
 import type { RetryPolicy } from "./retry.ts";
 import type { QueryTracer } from "./tracing.ts";
 import type { TenantGuard } from "./tenantGuard.ts";
@@ -85,5 +85,51 @@ export class ClickHouseQueryClient {
         : this.limiter.run({ task: withRetries, signal: request.signal });
 
     return this.tracer === undefined ? withSlot() : this.tracer.trace({ request, task: withSlot });
+  }
+
+  /**
+   * Run a statement that answers no rows, under every policy this client was
+   * given. Same order, same reasons as {@link query}.
+   */
+  async command(request: QueryRequest): Promise<void> {
+    this.tenantGuard?.assert(request);
+
+    const runOnce = () => this.driver.command(request);
+    const withRetries = () =>
+      this.retries === undefined
+        ? runOnce()
+        : this.retries.run(runOnce, { signal: request.signal, request });
+
+    if (this.limiter === undefined) return withRetries();
+    await this.limiter.run({ task: withRetries, signal: request.signal });
+  }
+
+  /**
+   * Write one batch under every policy this client was given.
+   *
+   * The same order as {@link query}, for the same reasons: the guard refuses a
+   * batch that is not one tenant's before it costs a slot or a socket, and a
+   * retrying insert keeps its slot rather than rejoining the queue.
+   */
+  async insert(request: InsertRequest): Promise<void> {
+    this.tenantGuard?.assertInsert(request);
+    if (request.rows.length === 0) return;
+
+    const runOnce = () => this.driver.insert(request);
+    const withRetries = () =>
+      this.retries === undefined
+        ? runOnce()
+        : this.retries.run(runOnce, {
+            signal: request.signal,
+            request: {
+              tenantId: request.tenantId,
+              sql: `INSERT INTO ${request.table}`,
+              table: request.table,
+              kind: "write",
+            },
+          });
+
+    if (this.limiter === undefined) return withRetries();
+    await this.limiter.run({ task: withRetries, signal: request.signal });
   }
 }

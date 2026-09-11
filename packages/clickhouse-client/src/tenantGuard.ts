@@ -3,7 +3,7 @@
  */
 
 import { quietly } from "./observability.ts";
-import type { QueryRequest } from "./query.ts";
+import type { InsertRequest, QueryRequest } from "./query.ts";
 
 export type TenantScopeViolation =
   | { kind: "missing-predicate" }
@@ -15,7 +15,9 @@ export type TenantScopeViolation =
       param: string;
       expected: string;
       actual: unknown;
-    };
+    }
+  | { kind: "missing-row-tenant"; row: number }
+  | { kind: "row-tenant-mismatch"; row: number; actual: unknown };
 
 /** `TenantId = {someName:String}`, allowing an optional table alias. */
 const BOUND_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/i;
@@ -225,6 +227,10 @@ export function describeTenantScopeViolation(violation: TenantScopeViolation): s
       return `Statement binds tenant parameter "${violation.param}" but no such parameter was supplied.`;
     case "param-mismatch":
       return `Statement binds tenant parameter "${violation.param}" to a different tenant than the request claims.`;
+    case "missing-row-tenant":
+      return `Row ${violation.row} of the batch carries no TenantId. Every written row names the tenant it belongs to, so a later read scoped to one tenant can never miss it or find someone else's.`;
+    case "row-tenant-mismatch":
+      return `Row ${violation.row} of the batch carries TenantId "${String(violation.actual)}", which is not the tenant the batch is written for. Write one tenant's rows per batch.`;
   }
 }
 
@@ -270,4 +276,35 @@ export class TenantGuard {
       throw new TenantScopeError(violation, request.tenantId);
     }
   }
+
+  /**
+   * Throws {@link TenantScopeError} unless every row of the batch names the
+   * tenant the batch is written for.
+   *
+   * A write has no predicate to read, so the batch itself is the evidence.
+   * Checking each row rather than the first is what stops one mixed batch
+   * writing rows a tenant-scoped read will never find again.
+   */
+  assertInsert(request: InsertRequest): void {
+    const violation = checkInsertTenantScope(request);
+    if (violation !== null) {
+      throw new TenantScopeError(violation, request.tenantId);
+    }
+  }
+}
+
+/** Returns the reason a batch is not one tenant's, or null when it is. */
+export function checkInsertTenantScope(
+  request: Pick<InsertRequest, "tenantId" | "rows">,
+): TenantScopeViolation | null {
+  for (const [index, row] of request.rows.entries()) {
+    const tenantId = row.TenantId;
+    if (tenantId === undefined || tenantId === null || tenantId === "") {
+      return { kind: "missing-row-tenant", row: index };
+    }
+    if (String(tenantId) !== request.tenantId) {
+      return { kind: "row-tenant-mismatch", row: index, actual: tenantId };
+    }
+  }
+  return null;
 }

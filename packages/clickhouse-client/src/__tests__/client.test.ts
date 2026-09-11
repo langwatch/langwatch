@@ -24,12 +24,23 @@ const request = (overrides: Partial<QueryRequest> = {}): QueryRequest => ({
   ...overrides,
 });
 
+/** These cases are about reads; a write reaching the driver is the test failing. */
+const unusedInsert = async (): Promise<void> => {
+  throw new Error("insert is not part of this case");
+};
+const unusedCommand = async (): Promise<void> => {
+  throw new Error("command is not part of this case");
+};
+const unusedExecute = async (): Promise<never> => {
+  throw new Error("a read is not part of this case");
+};
+
 describe("ClickHouseQueryClient", () => {
   describe("given no policies at all", () => {
     describe("when a statement is executed", () => {
       it("passes it straight to the driver", async () => {
         const execute = vi.fn(async () => ({ rows: [1] }));
-        const client = new ClickHouseQueryClient({ driver: { execute } });
+        const client = new ClickHouseQueryClient({ driver: { execute, insert: unusedInsert, command: unusedCommand } });
 
         await expect(client.query(request())).resolves.toEqual({ rows: [1] });
         expect(execute).toHaveBeenCalledTimes(1);
@@ -47,7 +58,7 @@ describe("ClickHouseQueryClient", () => {
       it("refuses before the driver is reached", async () => {
         const execute = vi.fn(async () => ({ rows: [] }));
         const client = new ClickHouseQueryClient({
-          driver: { execute },
+          driver: { execute, insert: unusedInsert, command: unusedCommand },
           tenantGuard: new TenantGuard(),
         });
 
@@ -97,7 +108,7 @@ describe("ClickHouseQueryClient", () => {
         });
 
         const client = new ClickHouseQueryClient({
-          driver: { execute },
+          driver: { execute, insert: unusedInsert, command: unusedCommand },
           limiter,
           retries: new RetryPolicy({
             sleep: async () => {
@@ -144,6 +155,7 @@ describe("ClickHouseQueryClient", () => {
         let release: (() => void) | undefined;
         const client = new ClickHouseQueryClient({
           driver: {
+            insert: unusedInsert, command: unusedCommand,
             execute: async () =>
               new Promise((resolve) => {
                 release = () => resolve({ rows: [] });
@@ -191,6 +203,7 @@ describe("ClickHouseQueryClient", () => {
 
         const client = new ClickHouseQueryClient({
           driver: {
+            insert: unusedInsert, command: unusedCommand,
             execute: async () => {
               events.push("driver");
               return { rows: [] };
@@ -220,4 +233,93 @@ describe("ClickHouseQueryClient", () => {
       });
     });
   });
+
+  describe("given a tenant guard", () => {
+    describe("when a batch names the tenant it is written for", () => {
+      it("writes it", async () => {
+        const insert = vi.fn(async () => {});
+        const client = new ClickHouseQueryClient({
+          driver: { execute: unusedExecute, insert, command: unusedCommand },
+          tenantGuard: new TenantGuard(),
+        });
+
+        await client.insert({
+          tenantId: "project_1",
+          table: "suite_runs",
+          rows: [{ TenantId: "project_1", BatchRunId: "batch_1" }],
+        });
+
+        expect(insert).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when a batch carries a row belonging to another tenant", () => {
+      /**
+       * A write has no predicate to read, so the batch itself is the evidence.
+       * One mixed batch writes rows a tenant-scoped read can never find again,
+       * which is why the check is per row rather than on the first.
+       */
+      it("refuses the whole batch before the driver is reached", async () => {
+        const insert = vi.fn(async () => {});
+        const client = new ClickHouseQueryClient({
+          driver: { execute: unusedExecute, insert, command: unusedCommand },
+          tenantGuard: new TenantGuard(),
+        });
+
+        await expect(
+          client.insert({
+            tenantId: "project_1",
+            table: "suite_runs",
+            rows: [{ TenantId: "project_1" }, { TenantId: "project_2" }],
+          }),
+        ).rejects.toBeInstanceOf(TenantScopeError);
+        expect(insert).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a batch carries a row that names no tenant at all", () => {
+      it("refuses it", async () => {
+        const client = new ClickHouseQueryClient({
+          driver: { execute: unusedExecute, insert: unusedInsert, command: unusedCommand },
+          tenantGuard: new TenantGuard(),
+        });
+
+        await expect(
+          client.insert({ tenantId: "project_1", table: "suite_runs", rows: [{ BatchRunId: "b" }] }),
+        ).rejects.toBeInstanceOf(TenantScopeError);
+      });
+    });
+
+    describe("when a command has no tenant predicate", () => {
+      it("refuses before the driver is reached", async () => {
+        const command = vi.fn(async () => {});
+        const client = new ClickHouseQueryClient({
+          driver: { execute: unusedExecute, insert: unusedInsert, command },
+          tenantGuard: new TenantGuard(),
+        });
+
+        await expect(
+          client.command({ tenantId: "project_1", sql: "ALTER TABLE t UPDATE x = 1" }),
+        ).rejects.toBeInstanceOf(TenantScopeError);
+        expect(command).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given an empty batch", () => {
+    describe("when it is written", () => {
+      /** Nothing to route and nothing to write: a round trip nobody asked for. */
+      it("reaches no driver at all", async () => {
+        const insert = vi.fn(async () => {});
+        const client = new ClickHouseQueryClient({
+          driver: { execute: unusedExecute, insert, command: unusedCommand },
+        });
+
+        await client.insert({ tenantId: "project_1", table: "suite_runs", rows: [] });
+
+        expect(insert).not.toHaveBeenCalled();
+      });
+    });
+  });
 });
+

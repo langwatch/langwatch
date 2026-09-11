@@ -2,30 +2,32 @@
  * How the per-call fact table's cross-tenant read reaches ClickHouse.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
-import { CodingAgentClickHouse } from "../../../app/coding-agent.members.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 
 const FROM_MS = Date.parse("2026-07-01T00:00:00.000Z");
 
 /**
- * A client that records the tenants each query was sent with and answers with
- * the rows it was given. One per endpoint, so a read that fans out is visible
- * as two recorded queries rather than one.
+ * The process's one client, stood in for. It records the tenant each statement
+ * NAMED — what the real client routes by — beside the tenant list the statement
+ * scoped itself to.
  */
-function endpointClient(rows: Array<Record<string, unknown>>): {
-  client: ClickHouseClient;
-  sentTenantIds: () => string[][];
+function recordingClient(rows: Array<Record<string, unknown>>): {
+  client: ClickHouseQueryClient;
+  named: () => string[];
+  scopedTo: () => string[][];
 } {
-  const sent: string[][] = [];
+  const named: string[] = [];
+  const scopedTo: string[][] = [];
   const client = {
-    query: async (args: { query_params: Record<string, unknown> }) => {
-      sent.push(args.query_params.tenantIds as string[]);
-      return { json: async () => rows };
+    query: async (request: { tenantId: string; params?: Record<string, unknown> }) => {
+      named.push(request.tenantId);
+      scopedTo.push((request.params?.tenantIds ?? []) as string[]);
+      return { rows };
     },
-  } as unknown as ClickHouseClient;
-  return { client, sentTenantIds: () => sent };
+  } as unknown as ClickHouseQueryClient;
+  return { client, named: () => named, scopedTo: () => scopedTo };
 }
 
 function modelTotals({
@@ -49,62 +51,45 @@ function modelTotals({
   };
 }
 
-class RoutedClickHouse implements CodingAgentClickHouse {
-  constructor(private readonly resolveClient: (tenantId: string) => ClickHouseClient) {
-  }
-
-  async resolve(tenantId: string): Promise<ClickHouseClient> {
-    return this.resolveClient(tenantId);
-  }
-}
-
-describe("CodingAgentSessionEventsClickHouseRepository per-model totals routing", () => {
-  describe("given tenants that resolve to two different endpoints", () => {
-    describe("when their sessions' per-model totals are read", () => {
-      it("queries each endpoint for its own tenants and adds both answers together", async () => {
-        const first = endpointClient([
-          modelTotals({ tenantId: "tenant-a", sessionId: "session-a", costUsd: 3 }),
-        ]);
-        const second = endpointClient([
-          modelTotals({ tenantId: "tenant-b", sessionId: "session-b", costUsd: 4 }),
-        ]);
-        const repository = CodingAgentSessionEventsClickHouseRepository.create({
-          clickHouse: new RoutedClickHouse((tenantId) =>
-            tenantId === "tenant-a" ? first.client : second.client,
-          ),
-          defaultTraceRetentionDays: 30,
-        });
-
-        const totals = await repository.sumTokensByModelPerSession({
-          tenantIds: ["tenant-a", "tenant-b"],
-          sessionIds: ["session-a", "session-b"],
-          fromMs: FROM_MS,
-        });
-
-        expect(first.sentTenantIds()).toEqual([["tenant-a"]]);
-        expect(second.sentTenantIds()).toEqual([["tenant-b"]]);
-        expect(totals.map((row) => row.sessionId)).toEqual(["session-a", "session-b"]);
-        expect(totals.map((row) => row.costUsd)).toEqual([3, 4]);
-      });
-    });
+const sumTotals = (clickhouse: ClickHouseQueryClient) =>
+  CodingAgentSessionEventsClickHouseRepository.create({
+    clickhouse,
+    defaultTraceRetentionDays: 30,
+  }).sumTokensByModelPerSession({
+    tenantIds: ["tenant-a", "tenant-b"],
+    sessionIds: ["session-a", "session-b"],
+    fromMs: FROM_MS,
   });
 
-  describe("given tenants that all resolve to one endpoint", () => {
+describe("CodingAgentSessionEventsClickHouseRepository per-model totals", () => {
+  describe("given an organization's project tenants", () => {
     describe("when their sessions' per-model totals are read", () => {
-      it("asks for all of them in a single query", async () => {
-        const only = endpointClient([]);
-        const repository = CodingAgentSessionEventsClickHouseRepository.create({
-          clickHouse: new RoutedClickHouse(() => only.client),
-          defaultTraceRetentionDays: 30,
-        });
+      it("asks for all of them in one statement scoped to the whole list", async () => {
+        const endpoint = recordingClient([]);
 
-        await repository.sumTokensByModelPerSession({
-          tenantIds: ["tenant-a", "tenant-b"],
-          sessionIds: ["session-a"],
-          fromMs: FROM_MS,
-        });
+        await sumTotals(endpoint.client);
 
-        expect(only.sentTenantIds()).toEqual([["tenant-a", "tenant-b"]]);
+        expect(endpoint.scopedTo()).toEqual([["tenant-a", "tenant-b"]]);
+      });
+
+      it("names one of those tenants, so the client routes the statement to their server", async () => {
+        const endpoint = recordingClient([]);
+
+        await sumTotals(endpoint.client);
+
+        expect(endpoint.named()).toEqual(["tenant-a"]);
+      });
+
+      it("adds up every tenant's totals from that one answer", async () => {
+        const endpoint = recordingClient([
+          modelTotals({ tenantId: "tenant-a", sessionId: "session-a", costUsd: 3 }),
+          modelTotals({ tenantId: "tenant-b", sessionId: "session-b", costUsd: 4 }),
+        ]);
+
+        const totals = await sumTotals(endpoint.client);
+
+        expect(totals.map((row) => row.sessionId)).toEqual(["session-a", "session-b"]);
+        expect(totals.map((row) => row.costUsd)).toEqual([3, 4]);
       });
     });
   });

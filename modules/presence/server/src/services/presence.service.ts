@@ -12,7 +12,7 @@ import {
   type PresenceUpdateInput,
 } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { PresenceBroadcast, PresenceDiagnostics } from "../ports/presence.port.ts";
+import type { PresenceBroadcast, PresenceDiagnostics } from "../app/presence.app.ts";
 import type { PresenceRepository } from "../repositories/presence.repository.ts";
 import { nowInstant } from "@langwatch/time";
 

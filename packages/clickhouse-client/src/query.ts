@@ -36,7 +36,7 @@ export interface QueryRequest {
   table?: string | undefined;
   kind?: QueryKind | undefined;
   /** Per-query ClickHouse settings, e.g. a `max_memory_usage` cap. */
-  settings?: Record<string, string> | undefined;
+  settings?: Record<string, string | number> | undefined;
   /** Cooperative cancellation. Policies should stop retrying when aborted. */
   signal?: AbortSignalLike | undefined;
   /**
@@ -50,6 +50,35 @@ export interface QueryRequest {
    * and why. A boolean would be set to `true` and forgotten.
    */
   unscoped?: { reason: string } | undefined;
+}
+
+/**
+ * One batch of rows, written to the server the tenant they belong to is on.
+ *
+ * A write names its tenant the way a read does, and every row carries it: a
+ * batch that mixes tenants is refused rather than routed by whichever row
+ * happened to be first, so "every statement is scoped to one tenant" holds on
+ * the write path without a reader having to remember it.
+ */
+export interface InsertRequest {
+  /**
+   * The tenant these rows belong to. Required for the same reason a read's is:
+   * no other identifier in this schema is unique across tenants, so a batch
+   * that cannot name its tenant cannot be routed.
+   */
+  tenantId: string;
+  /** The table the rows are written to. */
+  table: string;
+  /**
+   * Read-only on purpose: nothing here mutates the batch it is handed, and
+   * saying so lets a caller holding a `readonly` row array write without
+   * copying every row.
+   */
+  rows: readonly Readonly<Record<string, unknown>>[];
+  /** Per-insert ClickHouse settings, e.g. `async_insert`. */
+  settings?: Record<string, string | number> | undefined;
+  /** Cooperative cancellation. Policies should stop retrying when aborted. */
+  signal?: AbortSignalLike | undefined;
 }
 
 export interface QueryResult<Row> {
@@ -73,4 +102,17 @@ export interface QueryResult<Row> {
  */
 export interface QueryDriver {
   execute<Row>(request: QueryRequest): Promise<QueryResult<Row>>;
+  /**
+   * Writes one batch. Separate from {@link execute} because an insert carries
+   * rows rather than text, and because the tenant guard checks a batch by
+   * reading its rows rather than by reading a predicate out of SQL.
+   */
+  insert(request: InsertRequest): Promise<void>;
+  /**
+   * Runs a statement that answers no rows - an `ALTER ... UPDATE`, a `KILL
+   * MUTATION`, a `TRUNCATE`. Separate from {@link execute} because a result
+   * format may not be appended to one: asking for `JSONEachRow` back from a
+   * mutation is a syntax error, not an empty answer.
+   */
+  command(request: QueryRequest): Promise<void>;
 }

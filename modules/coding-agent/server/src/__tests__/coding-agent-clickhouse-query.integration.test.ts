@@ -24,7 +24,7 @@ async function runtime() {
   const endpoint = await TestClickHouseEndpoint.create();
   endpoints.push(endpoint);
   const repositories = ClickHouseCodingAgentRepositories.createWith({
-    clickhouse: endpoint,
+    clickhouse: endpoint.clickhouse,
     defaultRetentionDays: 30,
     clock: new TestClock(),
   });

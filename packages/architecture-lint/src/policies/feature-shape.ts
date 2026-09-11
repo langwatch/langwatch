@@ -80,7 +80,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "no-app":
     "One app: src/app/<feature>.app.ts is class <Feature>App implements <Feature>Api with static contract, static dependencies, a private constructor and static create(setup).",
   "installer-not-booted":
-    "A process boots the installer: createApp(...).withPersistence(...).withProvided(PeerApi, peer).withModule(<feature>Server).boot({ role }) in apps/api, apps/worker or apps/tasks. Delete the hand-built composition.",
+    "A process boots the installer: createApp(...).withPersistence(...).withProvided(PeerApi, peer).withModule(<feature>Server).boot() in apps/api, apps/worker or apps/tasks. Delete the hand-built composition.",
   "refusing-composition":
     "A process either installs the feature or does not. Delete the refusing*/absent twin; a missing provider fails boot by name.",
   "nested-web-entry":

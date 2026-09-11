@@ -86,18 +86,19 @@ function compose(
   } = {},
 ) {
   const insert = vi.fn(
-    async (_request: { table: string; values: readonly unknown[] }) => undefined,
+    async (_request: {
+      tenantId: string;
+      table: string;
+      rows: readonly Record<string, unknown>[];
+    }) => undefined,
   );
-  const resolveClient = vi.fn(async () => ({
-    insert,
-    query: async () => ({ json: async () => [] }),
-  }));
+  const clickhouse = { insert, query: async () => ({ rows: [] }) };
   const set = vi.fn(async (..._args: unknown[]) => "OK");
   const redis = { get: vi.fn(async () => null), set };
   const projectActivity = new RecordingProjectActivity();
 
   const pipeline: CodingAgentProcessingPipeline = RedisCodingAgentProcessingRepository.create({
-    resolveClient: resolveClient as never,
+    clickhouse: clickhouse as never,
     defaultRetentionDays: 49,
     redis: redis as never,
     traceCanonicalisation: new TestTraceCanonicalisation(),
@@ -109,7 +110,7 @@ function compose(
       : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
   }).buildProcessing();
 
-  return { pipeline, insert, resolveClient, redis, set, projectActivity };
+  return { pipeline, insert, redis, set, projectActivity };
 }
 
 function sessionFoldStore(
@@ -177,15 +178,15 @@ describe("RedisCodingAgentProcessingRepository", () => {
 
   describe("when a folded session is stored", () => {
     /** @scenario "Session rows are written through the client this graph resolved" */
-    it("resolves the client for the tenant the session names", async () => {
-      const { pipeline, resolveClient, insert } = compose();
+    it("names the tenant the session names, so the client routes the write to their server", async () => {
+      const { pipeline, insert } = compose();
 
       await storeThrough(pipeline);
 
-      // The client this composition resolved, for the tenant the fold names.
-      // A pipeline handed any other client registers the identical routing
-      // keys and writes its rows somewhere nothing reads.
-      expect(resolveClient).toHaveBeenCalledWith("project_alpha");
+      // The tenant the fold names, on the statement itself. A write that named
+      // any other tenant registers the identical routing keys and lands its
+      // rows on a server nothing reads them back from.
+      expect(insert.mock.calls.map(([request]) => request.tenantId)).toEqual(["project_alpha"]);
       expect(insert.mock.calls.map(([request]) => request.table)).toEqual([
         "coding_agent_sessions",
       ]);
@@ -200,7 +201,7 @@ describe("RedisCodingAgentProcessingRepository", () => {
       // 49 is the `defaultRetentionDays` this adapter was composed with, not a
       // number configured a second time. Two graphs stamping different
       // retentions on one table expire each other's rows.
-      expect(insert.mock.calls[0]![0].values[0]).toMatchObject({
+      expect(insert.mock.calls[0]![0].rows[0]).toMatchObject({
         TenantId: "project_alpha",
         SessionId: "session_1",
         _retention_days: 49,

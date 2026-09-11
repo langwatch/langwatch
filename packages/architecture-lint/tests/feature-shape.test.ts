@@ -67,7 +67,7 @@ function referenceFeature(): void {
   write("modules/widget/web/src/widgets.ts");
   write(
     "apps/api/src/features/widget/widget.composition.ts",
-    'createApp().withModule(widgetServer).boot({ role: "api" });\n',
+    'createApp().withModules([withMemoryRepositories(widgetServer)]).boot();\n',
   );
 }
 
@@ -343,7 +343,7 @@ describe("feature shape", () => {
       referenceFeature();
       write(
         "apps/api/src/features/widget/widget.composition.ts",
-        'createApp().withModule(workerWidgetServer).boot({ role: "worker" });\n',
+        'createApp().withModules([withMemoryRepositories(workerWidgetServer)]).boot();\n',
       );
 
       expect(findings()).toEqual([]);

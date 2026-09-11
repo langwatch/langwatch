@@ -1,13 +1,12 @@
 /**
- * Cross-tenant fan-out for the branch-list read, and the list-read cost signal
+ * How the branch-list read names its tenants, and the list-read cost signal
  * ADR-071 step 3's deferred pruning promise leans on.
  * @see specs/coding-agent/session-aggregate.feature
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 import { NoopCodingAgentReadMetrics } from "../../../services/coding-agent-read-metrics-noop.service.ts";
 import { CodingAgentReadMetrics } from "../../../app/coding-agent.members.ts";
-import { CodingAgentClickHouse } from "../../../app/coding-agent.members.ts";
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
@@ -24,18 +23,26 @@ function chTime(ms: number): string {
   );
 }
 
-function endpointClient(rows: Array<Record<string, unknown>>): {
-  client: ClickHouseClient;
-  sentTenantIds: () => string[][];
+/**
+ * The process's one client, stood in for. It records the tenant each statement
+ * NAMED — what the real client routes by — beside the tenant list the statement
+ * scoped itself to.
+ */
+function recordingClient(rows: Array<Record<string, unknown>>): {
+  client: ClickHouseQueryClient;
+  named: () => string[];
+  scopedTo: () => string[][];
 } {
-  const sent: string[][] = [];
+  const named: string[] = [];
+  const scopedTo: string[][] = [];
   const client = {
-    query: async (args: { query_params: Record<string, unknown> }) => {
-      sent.push(args.query_params.tenantIds as string[]);
-      return { json: async () => rows };
+    query: async (request: { tenantId: string; params?: Record<string, unknown> }) => {
+      named.push(request.tenantId);
+      scopedTo.push((request.params?.tenantIds ?? []) as string[]);
+      return { rows };
     },
-  } as unknown as ClickHouseClient;
-  return { client, sentTenantIds: () => sent };
+  } as unknown as ClickHouseQueryClient;
+  return { client, named: () => named, scopedTo: () => scopedTo };
 }
 
 function branchSession({
@@ -62,73 +69,60 @@ function branchSession({
 }
 
 function makeRepository(
-  resolveClient: (tenantId: string) => ClickHouseClient,
+  clickhouse: ClickHouseQueryClient,
   metrics: CodingAgentReadMetrics = NoopCodingAgentReadMetrics.create(),
 ) {
-  class Routed implements CodingAgentClickHouse {
-    async resolve(tenantId: string): Promise<ClickHouseClient> {
-      return resolveClient(tenantId);
-    }
-  }
   return CodingAgentSessionClickHouseRepository.create({
-    clickHouse: new Routed(),
+    clickhouse,
     defaultTraceRetentionDays: 30,
     metrics,
     clock: new TestClock(),
   });
 }
 
-describe("CodingAgentSessionClickHouseRepository branch-list routing", () => {
-  describe("given tenants that resolve to two different endpoints", () => {
+const listBranch = (repository: ReturnType<typeof makeRepository>) =>
+  repository.listByRepositoryBranch({
+    tenantIds: ["tenant-a", "tenant-b"],
+    repositoryHost: "github.com",
+    repositoryOwner: "acme",
+    repositoryName: "widgets",
+    branches: ["feat/git-context"],
+    startedAtFromMs: WINDOW_FROM,
+  });
+
+describe("CodingAgentSessionClickHouseRepository branch-list read", () => {
+  describe("given an organization's project tenants", () => {
     describe("when the repository's branch sessions are listed", () => {
-      it("queries each endpoint for its own tenants and returns both answers", async () => {
-        const first = endpointClient([
+      it("reads them in one statement scoped to the whole list", async () => {
+        const endpoint = recordingClient([]);
+
+        await listBranch(makeRepository(endpoint.client));
+
+        expect(endpoint.scopedTo()).toEqual([["tenant-a", "tenant-b"]]);
+      });
+
+      it("names one of those tenants, so the client routes the statement to their server", async () => {
+        const endpoint = recordingClient([]);
+
+        await listBranch(makeRepository(endpoint.client));
+
+        expect(endpoint.named()).toEqual(["tenant-a"]);
+      });
+
+      it("returns every tenant's sessions from that one answer", async () => {
+        const endpoint = recordingClient([
           branchSession({ tenantId: "tenant-a", sessionId: "session-a", costUsd: 3 }),
-        ]);
-        const second = endpointClient([
           branchSession({ tenantId: "tenant-b", sessionId: "session-b", costUsd: 4 }),
         ]);
-        const repository = makeRepository((tenantId) =>
-          tenantId === "tenant-a" ? first.client : second.client,
-        );
 
-        const listed = await repository.listByRepositoryBranch({
-          tenantIds: ["tenant-a", "tenant-b"],
-          repositoryHost: "github.com",
-          repositoryOwner: "acme",
-          repositoryName: "widgets",
-          branches: ["feat/git-context"],
-          startedAtFromMs: WINDOW_FROM,
-        });
+        const listed = await listBranch(makeRepository(endpoint.client));
 
-        expect(first.sentTenantIds()).toEqual([["tenant-a"]]);
-        expect(second.sentTenantIds()).toEqual([["tenant-b"]]);
         expect(listed.map((row) => row.sessionId)).toEqual(["session-a", "session-b"]);
         expect(listed.map((row) => row.costUsd)).toEqual([3, 4]);
         expect(listed.map((row) => row.lastEventOccurredAtMs)).toEqual([
           WINDOW_FROM + 60_000,
           WINDOW_FROM + 60_000,
         ]);
-      });
-    });
-  });
-
-  describe("given tenants that all resolve to one endpoint", () => {
-    describe("when the repository's branch sessions are listed", () => {
-      it("asks for all of them in a single query", async () => {
-        const only = endpointClient([]);
-        const repository = makeRepository(() => only.client);
-
-        await repository.listByRepositoryBranch({
-          tenantIds: ["tenant-a", "tenant-b"],
-          repositoryHost: "github.com",
-          repositoryOwner: "acme",
-          repositoryName: "widgets",
-          branches: ["feat/git-context"],
-          startedAtFromMs: WINDOW_FROM,
-        });
-
-        expect(only.sentTenantIds()).toEqual([["tenant-a", "tenant-b"]]);
       });
     });
   });
@@ -166,10 +160,10 @@ function version({
   };
 }
 
-function listClient(rows: Array<Record<string, unknown>>): ClickHouseClient {
+function listClient(rows: Array<Record<string, unknown>>): ClickHouseQueryClient {
   return {
-    query: async () => ({ json: async () => rows }),
-  } as unknown as ClickHouseClient;
+    query: async () => ({ rows }),
+  } as unknown as ClickHouseQueryClient;
 }
 
 /**
@@ -183,10 +177,9 @@ describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
       it("times the read under the hit outcome", async () => {
         const metrics = new CountingReadMetrics();
         const repository = makeRepository(
-          () =>
-            listClient([
-              version({ sessionId: "listed", startedAtMs: WINDOW_FROM + 10 * 60_000, costUsd: 2 }),
-            ]),
+          listClient([
+            version({ sessionId: "listed", startedAtMs: WINDOW_FROM + 10 * 60_000, costUsd: 2 }),
+          ]),
           metrics,
         );
 
@@ -207,7 +200,7 @@ describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
     describe("when the window is listed", () => {
       it("times the read under the empty outcome, which is where the unpruned scan shows up alone", async () => {
         const metrics = new CountingReadMetrics();
-        const repository = makeRepository(() => listClient([]), metrics);
+        const repository = makeRepository(listClient([]), metrics);
 
         await repository.findManyRecent({
           tenantId: "tenant-1",
@@ -230,8 +223,8 @@ describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
           query: async () => {
             throw new Error("clickhouse unavailable");
           },
-        } as unknown as ClickHouseClient;
-        const repository = makeRepository(() => failing, metrics);
+        } as unknown as ClickHouseQueryClient;
+        const repository = makeRepository(failing, metrics);
 
         await expect(
           repository.findManyRecent({

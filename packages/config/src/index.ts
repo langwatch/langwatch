@@ -28,7 +28,14 @@ export {
 
 export { postgresConfigDefinition } from "./postgres.config.ts";
 export { redisConfigDefinition } from "./redis.config.ts";
-export { clickhouseConfigDefinition } from "./clickhouse.config.ts";
+export {
+  clickhouseConfigDefinition,
+  clickhousePrivateRoutesValueSchema,
+  parseClickHousePrivateRoutes,
+  type ClickHousePrivateRoute,
+  type ClickHousePrivateRoutes,
+  type SkippedClickHousePrivateRoute,
+} from "./clickhouse.config.ts";
 export { groupQueueConfigDefinition } from "./queue.config.ts";
 export { observabilityConfigDefinition } from "./observability.config.ts";
 export { loggerConfigDefinition } from "./logger.config.ts";

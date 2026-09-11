@@ -3,7 +3,7 @@ import prompts from "prompts";
 import { detectConflicts, killPidGroups, type ConflictReport } from "./detect.ts";
 import { PORT_BASE_DEFAULT } from "../shared/ports.ts";
 
-export type ResolvedPorts = {
+export type ResolvedMembers = {
   base: number;
   report: ConflictReport;
   resolution: "no-conflict" | "shifted" | "killed" | "manual";
@@ -17,7 +17,7 @@ export type ResolveOptions = {
 export async function resolvePortConflicts({
   base = PORT_BASE_DEFAULT,
   yes = false,
-}: ResolveOptions = {}): Promise<ResolvedPorts> {
+}: ResolveOptions = {}): Promise<ResolvedMembers> {
   const report = await detectConflicts(base);
   if (report.conflicts.length === 0) {
     return { base, report, resolution: "no-conflict" };
@@ -78,7 +78,7 @@ export async function resolvePortConflicts({
   process.exit(1);
 }
 
-function reportShift(newBase: number, report: ConflictReport): ResolvedPorts {
+function reportShift(newBase: number, report: ConflictReport): ResolvedMembers {
   console.log(chalk.cyan(`→ shifting to PORT=${newBase}.`));
   return { base: newBase, report, resolution: "shifted" };
 }

@@ -7,7 +7,7 @@ import {
   type PresenceEvent,
 } from "@langwatch/presence-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PresenceEmitter } from "../ports/presence.port.ts";
+import type { PresenceEmitter } from "../app/presence.app.ts";
 import type { PresenceService } from "./presence.service.ts";
 
 const logger = createLogger("langwatch:api:presence");

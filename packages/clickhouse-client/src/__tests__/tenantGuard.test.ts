@@ -234,7 +234,7 @@ describe("checkTenantScope", () => {
  */
 function guardedBy(execute: QueryDriver["execute"], options: TenantGuardOptions = {}) {
   const client = new ClickHouseQueryClient({
-    driver: { execute },
+    driver: { execute, insert: async () => {}, command: async () => {} },
     tenantGuard: new TenantGuard(options),
   });
   return (request: QueryRequest) => client.query(request);

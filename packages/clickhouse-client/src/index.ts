@@ -14,7 +14,14 @@ export {
   vendorLoggerClassFor,
   VENDOR_CAUSE_FIELD,
 } from "./logging.ts";
-export type { AbortSignalLike, QueryDriver, QueryKind, QueryRequest, QueryResult } from "./query.ts";
+export type {
+  AbortSignalLike,
+  InsertRequest,
+  QueryDriver,
+  QueryKind,
+  QueryRequest,
+  QueryResult,
+} from "./query.ts";
 export type { ClickHouseQueryClientOptions } from "./client.ts";
 export { ClickHouseQueryClient } from "./client.ts";
 export {
@@ -119,6 +126,7 @@ export {
   VendorClientResiliencePolicy,
 } from "./vendorClient.ts";
 export {
+  checkInsertTenantScope,
   checkStatementTenantScope,
   checkTenantScope,
   describeTenantScopeViolation,

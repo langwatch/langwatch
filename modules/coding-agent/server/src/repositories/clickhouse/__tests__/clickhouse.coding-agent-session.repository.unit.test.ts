@@ -19,7 +19,7 @@ async function createRepository() {
   return {
     endpoint,
     repository: CodingAgentSessionClickHouseRepository.create({
-      clickHouse: endpoint,
+      clickhouse: endpoint.clickhouse,
       defaultTraceRetentionDays: 30,
       metrics: NoopCodingAgentReadMetrics.create(),
       clock: new TestClock(),

@@ -15,6 +15,11 @@
       "types": "./dist/typecheck/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./gateway": {
+      "types": "./dist/typecheck/gateway.d.ts",
+      "import": "./dist/gateway.js",
+      "default": "./dist/gateway.js"
     }
   },
   "scripts": {

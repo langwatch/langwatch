@@ -22,7 +22,7 @@ async function createPersistence() {
     endpoint,
     persistence: CodingAgentProjectionPersistenceService.create(
       ClickHouseCodingAgentRepositories.createWith({
-        clickhouse: endpoint,
+        clickhouse: endpoint.clickhouse,
         defaultRetentionDays: 30,
         clock: new TestClock(),
       }),

@@ -8,7 +8,7 @@ import type { TenantId } from "@langwatch/eventing";
 import { redactAttributeNative, redactStringNative } from "@langwatch/redaction/pii";
 import { createLogger } from "@langwatch/observability";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
-import type { PIICheckOptions } from "../ports/pii-analysis.port.ts";
+import type { PIICheckOptions } from "../app/data-privacy.members.ts";
 import type {
   OtlpSpanPiiRedactionServiceDependencies,
   PiiRedactionPolicyService,
