@@ -456,7 +456,7 @@ and configuration and contain no domain queries, no mappers and no duplicate
 services.
 
 - Guard today: `feature-source-layout` and `feature-source-subject`
-  (`packages/oxlint/src/rules/`) fix where a feature's own sources live;
+  (`packages/oxlint-rules/src/rules/`) fix where a feature's own sources live;
   `service-dependencies` stops a service importing a foreign repository;
   `composed-exports` (`packages/architecture-enforcer/src/composed-exports.ts`)
   refuses an exported service no root constructs.
@@ -488,7 +488,7 @@ ownership authority; there is no competing catalogue.
 - Guard today: `feature-catalogue` (`packages/architecture-enforcer/src/feature-catalogue.ts`)
   and `manifests` hold the catalogue as the authority; the one-list convention
   is documented in `dev/docs/best_practices/feature-installation.md` and
-  `no-raw-hono-mount` (`packages/oxlint/src/rules/`) refuses a hand-rolled
+  `no-raw-hono-mount` (`packages/oxlint-rules/src/rules/`) refuses a hand-rolled
   route registration.
 - Guard proposed: `app-with-feature-only` — no `*.composition.ts` under `apps/**`
   outside the one app root per application; manifests derived from declarations
@@ -512,7 +512,7 @@ adaptation never turns a restricted key into its owner and never bypasses a
 service-level ownership check.
 
 - Guard today: `api-transport-boundaries` and `api-context-services`
-  (`packages/oxlint/src/rules/api-context-services.rule.mjs`), the tRPC
+  (`packages/oxlint-rules/src/rules/api-context-services.rule.mjs`), the tRPC
   declared-check middleware chain, and the fail-closed backstop described in
   `feature-installation.md`. Enforcement is per transport; nothing asserts the
   two transports reach the same policy for the same operation.

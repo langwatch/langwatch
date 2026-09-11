@@ -551,7 +551,7 @@ packageExtensions:
       protobufjs: "^7.5.4"
 
 patchedDependencies:
-  "@langwatch/ksuid@2.0.2": patches/@langwatch__ksuid@2.0.2.patch
+  "@langwatch/ksuid@2.0.2": dev/patches/@langwatch__ksuid@2.0.2.patch
 
 # Union of the three roots' allowlists. node-pty is skills/ and mcp/typescript's;
 # the rest came from platform/app/.

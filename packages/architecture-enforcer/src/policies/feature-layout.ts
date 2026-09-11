@@ -9,7 +9,7 @@ import {
   RULES_PATTERN,
   SERVICE_MODULE_PATTERN,
   TEST_DIRECTORY,
-} from "@langwatch/oxlint/grammar/feature-layout-policy.mjs";
+} from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
 import {
   resolveRelativeModule,
   sourceFile,

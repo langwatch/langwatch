@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/oxlint.tsbuildinfo",
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/oxlint-rules.tsbuildinfo",
     "lib": ["es2022"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,

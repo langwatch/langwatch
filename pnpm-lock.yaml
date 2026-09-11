@@ -521,7 +521,7 @@ packageExtensionsChecksum: sha256-m/G/WH1yLdya4bNe65I9ulURa/FU76z3o30vd4qvq6M=
 patchedDependencies:
   '@langwatch/ksuid@2.0.2':
     hash: edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980
-    path: patches/@langwatch__ksuid@2.0.2.patch
+    path: dev/patches/@langwatch__ksuid@2.0.2.patch
 
 importers:
 
@@ -11494,9 +11494,9 @@ importers:
 
   packages/architecture-enforcer:
     dependencies:
-      '@langwatch/oxlint':
+      '@langwatch/oxlint-rules':
         specifier: workspace:*
-        version: link:../oxlint
+        version: link:../oxlint-rules
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
@@ -12077,7 +12077,7 @@ importers:
         specifier: 'catalog:'
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
-  packages/oxlint:
+  packages/oxlint-rules:
     dependencies:
       '@langwatch/secrets':
         specifier: workspace:*

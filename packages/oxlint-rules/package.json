@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/oxlint",
+  "name": "@langwatch/oxlint-rules",
   "version": "0.1.0",
   "private": true,
   "description": "The shared core of the LangWatch oxlint plugin: the rule definition helper, the one per-file classification every rule gates on, the keyed AST walk, the pure policy grammars, and the fixture-tree test harness. Plain ESM so oxlint loads it with no build step.",

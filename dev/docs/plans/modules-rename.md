@@ -29,7 +29,7 @@ Package names (`@langwatch/<feature>-server` etc.) do not change. Only directori
 | Files whose text names `packages/features` (excluding lockfile, node_modules, dist) | 737 |
 | Files whose text names `packages/enterprise` | 169 |
 | `tsconfig*.json` with a relative reference into a feature package | 55 |
-| Literals in `packages/architecture-enforcer/src` + `packages/oxlint/src` | 89 |
+| Literals in `packages/architecture-enforcer/src` + `packages/oxlint-rules/src` | 89 |
 | Feature roots in `packages/features/catalogue.json` | 49 core + 8 enterprise |
 | Skills and `.claude/skills` files naming the paths | 22 |
 
@@ -104,7 +104,7 @@ every "feature" that means a feature flag or a `.feature` spec file.
 grep -rn "packages/features\|packages/enterprise" --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude=pnpm-lock.yaml . | grep -v baseline.json | grep -v "dev/docs/plans/modules-rename.md"
 pnpm typecheck:one modules/annotation/server && pnpm typecheck:one modules/annotation/web && pnpm typecheck:one enterprise/modules/audit-log/server && pnpm typecheck:one packages/api
 pnpm --filter @langwatch/architecture-enforcer test
-pnpm --filter @langwatch/oxlint test
+pnpm --filter @langwatch/oxlint-rules test
 node dev/scripts/check-feature-parity.ts 2>&1 | tail -3
 ```
 

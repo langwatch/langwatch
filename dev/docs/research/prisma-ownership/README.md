@@ -35,7 +35,7 @@ Feature counts exclude app/platform roots. They are direct-query counts; relatio
 | `User`         |                 39 |                12 | `user`         |
 | `AuditLog`     |                 16 |                10 | `audit-log`    |
 
-The current containment rule mostly checks where generated Prisma can be imported. A foreign feature's `repositories/prisma` directory is still allowed, so it does not establish table ownership. See [prisma-containment.rule.mjs](../../../../packages/oxlint/src/rules/prisma-containment.rule.mjs).
+The current containment rule mostly checks where generated Prisma can be imported. A foreign feature's `repositories/prisma` directory is still allowed, so it does not establish table ownership. See [prisma-containment.rule.mjs](../../../../packages/oxlint-rules/src/rules/prisma-containment.rule.mjs).
 
 ## Day-one table groups
 

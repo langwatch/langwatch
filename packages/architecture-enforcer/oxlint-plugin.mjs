@@ -1,4 +1,4 @@
-// The registry: every rule now lives in `@langwatch/oxlint`, built with
+// The registry: every rule now lives in `@langwatch/oxlint-rules`, built with
 // `defineRule` so the message shape, the per-file classification, and the
 // fixture-tree test harness are shared instead of hand-rolled per rule. This
 // file only wires the rule objects into the plugin oxlint loads.
@@ -61,7 +61,7 @@ import {
   typeOnlyValueImportRule,
   webImportsServerShapedValueRule,
   zodObjectCompositionRule,
-} from "@langwatch/oxlint";
+} from "@langwatch/oxlint-rules";
 
 export const rules = {
   "api-context-services": apiContextServicesRule,

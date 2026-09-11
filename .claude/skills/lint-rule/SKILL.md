@@ -1,13 +1,13 @@
 ---
 name: lint-rule
-description: "Add or change a langwatch oxlint rule: the defineRule declaration in packages/oxlint, its fixture-first unit test, its specs/tooling scenario, the one-line registration in the plugin registry and the config, the generated reference in dev/docs/lint-rules.md, and the measurement that says whether it ships at error or on the baseline. Use when a lint message is unclear or wrong, a rule fires where it should not, a new house rule is wanted, a baseline entry must be added or paid down, or someone asks why the plugin is slow."
+description: "Add or change a langwatch oxlint rule: the defineRule declaration in packages/oxlint-rules, its fixture-first unit test, its specs/tooling scenario, the one-line registration in the plugin registry and the config, the generated reference in dev/docs/lint-rules.md, and the measurement that says whether it ships at error or on the baseline. Use when a lint message is unclear or wrong, a rule fires where it should not, a new house rule is wanted, a baseline entry must be added or paid down, or someone asks why the plugin is slow."
 user-invocable: true
 argument-hint: "<rule name or the message that fired>"
 ---
 
 # Add or change a langwatch lint rule
 
-Every rule lives in `packages/oxlint/src/rules/<rule>.rule.mjs`, is registered once in
+Every rule lives in `packages/oxlint-rules/src/rules/<rule>.rule.mjs`, is registered once in
 `packages/architecture-enforcer/oxlint-plugin.mjs`, and is enabled once in
 `packages/architecture-enforcer/oxlint.architecture.jsonc`. `dev/docs/lint-rules.md` is generated from those
 declarations — read it before writing a new rule, so you extend the house grammar.
@@ -55,7 +55,7 @@ A message is `what` + `fix`, joined. `why` is documentation and the linter never
 
 ## 4. Write it fixture-first
 
-1. `packages/oxlint/tests/rules/<rule>.unit.test.mjs`, one `describe("when …")` per
+1. `packages/oxlint-rules/tests/rules/<rule>.unit.test.mjs`, one `describe("when …")` per
    message id, valid and invalid:
 
    ```js
@@ -71,8 +71,8 @@ A message is `what` + `fix`, joined. `why` is documentation and the linter never
    `{ version, features: [{ id, subjects }] }`; pass `files` for anything else.
    `afterAll(() => workspace.cleanup())`.
 
-2. Run it: `pnpm --filter @langwatch/oxlint test:unit tests/rules/<rule>.unit.test.mjs`.
-3. Write `packages/oxlint/src/rules/<rule>.rule.mjs` with `defineRule`. Gate on
+2. Run it: `pnpm --filter @langwatch/oxlint-rules test:unit tests/rules/<rule>.unit.test.mjs`.
+3. Write `packages/oxlint-rules/src/rules/<rule>.rule.mjs` with `defineRule`. Gate on
    `classify(context)` through the `applies` predicate — never parse the filename yourself,
    and never re-derive what `classify` already computed.
 4. Register in `packages/architecture-enforcer/oxlint-plugin.mjs` (one line) and in

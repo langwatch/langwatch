@@ -18,7 +18,7 @@ worker jobs            ─┘         │                          └─ servic
 ## The closed grammar (`server/src`)
 
 `SERVER_PATTERNS` and `RULES_PATTERN` in
-`packages/oxlint/grammar/feature-layout-policy.mjs`, enforced by
+`packages/oxlint-rules/grammar/feature-layout-policy.mjs`, enforced by
 `packages/architecture-enforcer/oxlint-plugin.mjs`, with `NAME = [a-z0-9]+(?:-[a-z0-9]+)*`.
 The reference shape:
 

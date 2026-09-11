@@ -1,7 +1,7 @@
 # `dev/lint/ast-grep/codemods/temporal/`
 
 The mechanical half of the `Date` → `Temporal` migration that the `temporal-only`
-oxlint rule asks for (`packages/oxlint/src/rules/temporal-only.rule.mjs`).
+oxlint rule asks for (`packages/oxlint-rules/src/rules/temporal-only.rule.mjs`).
 
 **These are rewrites, not lint rules.** They live outside the `ruleDirs` in
 `../../sgconfig.yml` on purpose, so `pnpm lint`, `make lint-rules` and CodeRabbit

@@ -60,7 +60,7 @@ In order:
 2. **oxlint configuration** - `no-restricted-imports`, `no-restricted-globals`,
    `no-restricted-properties`, `no-restricted-types` and an `overrides` block -
    if the rule is "this file kind may not name that thing".
-3. **The `langwatch` JavaScript plugin** (`packages/oxlint`), if the rule
+3. **The `langwatch` JavaScript plugin** (`packages/oxlint-rules`), if the rule
    needs the AST, the file's classified role, or the shared baseline. This is
    also the only route for anything oxlint's config cannot say at all: oxlint
    has no `no-restricted-syntax`, so there is no generic AST-selector escape
@@ -80,7 +80,7 @@ declaration itself. `no-restricted-imports` gives one flat string.
 | Registry | Where | Count | Enforced by |
 | --- | --- | --- | --- |
 | oxlint built-ins | `.oxlintrc.jsonc` `rules` and `overrides` | 1 workspace-wide, the rest scoped | `pnpm lint` |
-| `langwatch` plugin | `packages/oxlint/src/rules/*.rule.mjs` | 34 defined, 30 enabled | `pnpm lint` |
+| `langwatch` plugin | `packages/oxlint-rules/src/rules/*.rule.mjs` | 34 defined, 30 enabled | `pnpm lint` |
 | ast-grep | `dev/lint/ast-grep/rules/*.yml` | 13 rules in 21 files | the `ast-grep` CI job and CodeRabbit |
 | architecture-enforcer | `packages/architecture-enforcer/src/policies/index.ts` | 31 policies | `pnpm lint:architecture` |
 

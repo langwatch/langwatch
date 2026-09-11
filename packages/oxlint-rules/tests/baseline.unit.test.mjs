@@ -26,7 +26,7 @@ describe("baseline", () => {
 
   describe("when a file has a baseline entry for the rule", () => {
     it("reports isBaselined true", () => {
-      root = mkdtempSync(join(tmpdir(), "oxlint-baseline-"));
+      root = mkdtempSync(join(tmpdir(), "oxlint-rules-baseline-"));
       writeBaselineFile([
         { key: "cognitive-complexity|apps/api/src/foo.ts", measured: "2026-09-06" },
       ]);
@@ -39,7 +39,7 @@ describe("baseline", () => {
 
   describe("when a file has no baseline entry for the rule", () => {
     it("reports isBaselined false", () => {
-      root = mkdtempSync(join(tmpdir(), "oxlint-baseline-"));
+      root = mkdtempSync(join(tmpdir(), "oxlint-rules-baseline-"));
       writeBaselineFile([
         { key: "cognitive-complexity|apps/api/src/foo.ts", measured: "2026-09-06" },
       ]);
@@ -55,7 +55,7 @@ describe("baseline", () => {
 
   describe("when no baseline file exists", () => {
     it("reports isBaselined false for every file", () => {
-      root = mkdtempSync(join(tmpdir(), "oxlint-baseline-"));
+      root = mkdtempSync(join(tmpdir(), "oxlint-rules-baseline-"));
 
       expect(
         isBaselined({ cwd: root, file: "apps/api/src/foo.ts", rule: "cognitive-complexity" }),
@@ -65,7 +65,7 @@ describe("baseline", () => {
 
   describe("when the same cwd is loaded twice", () => {
     it("reads the file once and reuses the memo", () => {
-      root = mkdtempSync(join(tmpdir(), "oxlint-baseline-"));
+      root = mkdtempSync(join(tmpdir(), "oxlint-rules-baseline-"));
       writeBaselineFile([
         { key: "cognitive-complexity|apps/api/src/foo.ts", measured: "2026-09-06" },
       ]);
@@ -81,7 +81,7 @@ describe("baseline", () => {
 
   describe("when an entry has no measured date", () => {
     it("throws rather than treating the file as baselined forever", () => {
-      root = mkdtempSync(join(tmpdir(), "oxlint-baseline-"));
+      root = mkdtempSync(join(tmpdir(), "oxlint-rules-baseline-"));
       writeBaselineFile([{ key: "cognitive-complexity|apps/api/src/foo.ts" }]);
 
       expect(() =>

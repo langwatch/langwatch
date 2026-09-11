@@ -21,7 +21,7 @@ import {
   marksGeneratedHeader,
   marksLicenseHeader,
   mayContainReviewBlock,
-} from "@langwatch/oxlint/grammar/comment-block-policy.mjs";
+} from "@langwatch/oxlint-rules/grammar/comment-block-policy.mjs";
 import { type Instant, nowInstant } from "@langwatch/time";
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"]);

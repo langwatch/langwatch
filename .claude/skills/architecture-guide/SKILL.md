@@ -191,7 +191,7 @@ and `feature-shape` are baseline keys and keep their names.
 - `packages/architecture-enforcer/adrs/002-versioned-strict-feature-layout.md` (the grammar),
   `packages/architecture-enforcer/adrs/001-feature-package-boundaries.md`,
   `packages/architecture-enforcer/adrs/004-frontend-feature-boundaries.md`
-- `packages/oxlint/grammar/feature-layout-policy.mjs` (`SERVER_PATTERNS`,
+- `packages/oxlint-rules/grammar/feature-layout-policy.mjs` (`SERVER_PATTERNS`,
   `CANONICAL_ARTIFACTS`, `SERVER_ARCHITECTURAL_QUALIFIERS`, `RULES_PATTERN`,
   `PURE_VALUE_CONSTRUCTORS`), consumed by `packages/architecture-enforcer/oxlint-plugin.mjs`
   and `packages/architecture-enforcer/src/feature-layout.ts`

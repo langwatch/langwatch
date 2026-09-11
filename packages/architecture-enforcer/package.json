@@ -32,7 +32,7 @@
     "docs": "node src/lint-rules-doc.mjs"
   },
   "dependencies": {
-    "@langwatch/oxlint": "workspace:*",
+    "@langwatch/oxlint-rules": "workspace:*",
     "@langwatch/time": "workspace:*",
     "typescript": "catalog:sdk-toolchain",
     "zod": "catalog:"

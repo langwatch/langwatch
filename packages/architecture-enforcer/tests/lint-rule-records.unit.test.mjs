@@ -40,7 +40,7 @@ function workspaceRuleLines() {
 }
 
 function registryRuleIds() {
-  const pluginRules = readdirSync(join(root, "packages/oxlint/src/rules"))
+  const pluginRules = readdirSync(join(root, "packages/oxlint-rules/src/rules"))
     .filter((name) => name.endsWith(".rule.mjs"))
     .map((name) => `langwatch/${name.slice(0, -".rule.mjs".length)}`);
 

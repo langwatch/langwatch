@@ -43,8 +43,8 @@ a folder of policy files a reader can hold.
 | A17 | `boundary-edge-baseline.ts:155-163`, `comment-blocks.ts:200-204` enforce `expires`; every other baseline has `measured` only | Two ratchets expire, the rest only shrink; no stated rule for which a baseline gets. | Nobody knows whether a row is a debt with a date or a permanent allowance. | Decision (below): one rule for all baselines. |
 | A18 | `src/cli-run.ts:26-58` | Twelve argv flags parsed by `indexOf`, six of them per-baseline reference paths for the merge-base comparison mode. | Flag plumbing is half the file; the mode is a mystery to anyone who did not write it. | `--mode=check\|shrink\|review`, `--baseline-dir`, nothing else. |
 | A19 | `check-feature-parity.ts:64 SPECS_ROOTS`, `feature-shape.ts:72 BOOT_SCAN_ROOTS`, `feature-configuration.ts:15 APPLICATION_CONFIG_DIRECTORIES`, `frontend-ui-boundaries.ts:25 UI_SOURCE_DIRECTORIES`, `comment-blocks.ts:21`, `files.ts:4`, `source-folder-shape.ts SCANNED_ROOTS` | The repository tree is spelled out in seven constants across seven files. | The `features → modules` rename will touch all seven; today the ignore lists already disagree. | One `workspace/layout.ts` naming the roots and the ignore set. |
-| A20 | `src/comment-blocks.ts` + `comment-block-roots.json` (`apps/api` 1,281 blocks, expires 2026-09-17) versus the oxlint `comment-block-size` rules in `@langwatch/oxlint` | Two systems govern comment length: an oxlint rule per block and an architecture ratchet per root. | Same rule, two reports, two baselines. | Keep the oxlint rule; let the roots ratchet expire and delete it. |
-| A21 | `src/oxlint-baseline-check.ts`, `src/generate-native-baseline-overrides.mjs`, `src/lint-rules-doc.mjs` | Validation of another tool's baseline and its docs generator live here. | They are oxlint plumbing, not boundary policy. | Move to `@langwatch/oxlint`. |
+| A20 | `src/comment-blocks.ts` + `comment-block-roots.json` (`apps/api` 1,281 blocks, expires 2026-09-17) versus the oxlint `comment-block-size` rules in `@langwatch/oxlint-rules` | Two systems govern comment length: an oxlint rule per block and an architecture ratchet per root. | Same rule, two reports, two baselines. | Keep the oxlint rule; let the roots ratchet expire and delete it. |
+| A21 | `src/oxlint-baseline-check.ts`, `src/generate-native-baseline-overrides.mjs`, `src/lint-rules-doc.mjs` | Validation of another tool's baseline and its docs generator live here. | They are oxlint plumbing, not boundary policy. | Move to `@langwatch/oxlint-rules`. |
 | A22 | `src/*.cli.ts` (rename-workspace-package, rename-feature-sources, colocate-tests, declaration-budget) and their non-policy modules | One-shot migration tools share the folder with policies. | They inflate the folder and the door; none is a lint. | `tools/` or delete once their migration is done. |
 
 ## Target layout
@@ -121,6 +121,6 @@ them onto it.
   `overengineering-baseline`, `service-ceilings-baseline-growth`, `typed-prisma-seam-baseline`, all
   three sitting on empty baselines).
 - **D6** Where the oxlint baseline check and the native-override generator live: here or in
-  `@langwatch/oxlint`.
+  `@langwatch/oxlint-rules`.
 - **D7** Whether the `screens/*` and `surfaces/*` spellings keep working during the conversion drive
   or are refused now for the packages already converted.

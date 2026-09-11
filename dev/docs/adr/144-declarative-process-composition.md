@@ -516,7 +516,7 @@ A module has four kinds of collaborator, and each has one home:
 | member | a raw technical client the process supplies from `ProcessMembers`; a module's channel wraps one with the module's own message types |
 
 The folder grammar mirrors repositories exactly and is landed in
-`packages/oxlint/grammar/feature-layout-policy.mjs`'s `SERVER_PATTERNS`:
+`packages/oxlint-rules/grammar/feature-layout-policy.mjs`'s `SERVER_PATTERNS`:
 
 ```
 channels/<subject>.channel.ts                     the interface, in the module's own message types
