@@ -1,7 +1,7 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { ShareApi, ShareLinkNotFoundError } from "@langwatch/share-contract";
 import { describe, expect, it } from "vitest";
 import { shareServer } from "../../share.server.ts";
@@ -9,10 +9,15 @@ import {
   createShareTestAuthz,
   createShareTestDataRetention,
   createShareTestProjects,
+  createShareTestRedis,
 } from "./share.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
+  return createApp({
+    role,
+    config: {},
+    members: membersFrom({ redis: createShareTestRedis() }),
+  })
     .withProvided(AuthzApi, createShareTestAuthz())
     .withProvided(DataRetentionApi, createShareTestDataRetention())
     .withProvided(ProjectApi, createShareTestProjects())

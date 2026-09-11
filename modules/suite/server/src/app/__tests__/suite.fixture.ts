@@ -5,6 +5,7 @@
  * undefined.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
@@ -16,6 +17,32 @@ import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.data
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import type { SuiteRepositories } from "../../repositories/suite.repositories.ts";
 import { SuiteApp } from "../suite.app.ts";
+
+/**
+ * The `clickhouse` member, for a test that never reads a run projection: the
+ * installation assertions only create and list plans, so nothing queries the
+ * run-history repository this client would otherwise back.
+ *
+ * It refuses on any access rather than being an empty object, so that claim is
+ * enforced instead of merely asserted. A scenario that starts reading a
+ * projection fails here, naming the property, rather than somewhere downstream
+ * with `undefined is not a function`.
+ */
+export function createSuiteTestClickHouse(): ClickHouseQueryClient {
+  return new Proxy({} as ClickHouseQueryClient, {
+    get(_target, property) {
+      // Symbols are how a runtime inspects a value (promise-unwrapping, printing).
+      // Refusing those would fail the test for looking at it, not for using it.
+      if (typeof property === "symbol") return void 0;
+
+      throw new Error(
+        `The suite installation test reached clickhouse.${property}, which it is not meant to. ` +
+          `Suite is handed this member because it reads one; give the fixture real behaviour ` +
+          `for the path you are adding rather than deleting this refusal.`,
+      );
+    },
+  });
+}
 
 /** A run that is accepted and scheduled nowhere, recording what it was handed. */
 export class RecordingSuiteExecution implements SuiteExecution {

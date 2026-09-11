@@ -5,7 +5,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { ScenarioApi, type ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
 import { AgentApi as AgentApiToken } from "@langwatch/agent-contract";
 import { ProjectApi as ProjectApiToken } from "@langwatch/project-contract";
@@ -15,10 +15,14 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { suiteServer } from "../../suite.server.ts";
-import { RecordingSuiteExecution } from "./suite.fixture.ts";
+import { RecordingSuiteExecution, createSuiteTestClickHouse } from "./suite.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
+  return createApp({
+    role,
+    config: {},
+    members: membersFrom({ clickhouse: createSuiteTestClickHouse() }),
+  })
     .withProvided(
       ScenarioApi,
       createApiFixture<ScenarioApiContract>({ findTestSuite: async () => null }),

@@ -6,9 +6,23 @@ import { topicTestWake, UnscheduledTopicClustering } from "./topic.fixture.ts";
 
 const WAKE = 1_800_000_060_000;
 
-function process(schedule = UnscheduledTopicClustering.create()) {
-  return createApp({ role, config: {} })
-    .withModules([withMemoryRepositories(topicServer)]);
+/**
+ * A topic process over memory repositories.
+ *
+ * The schedule reader a clustering wake comes from is NOT wired, and cannot be
+ * from here: it is one of `TopicInfrastructure`'s own collaborators, not one of
+ * the canonical process members `reads()` can name, so the only seam that can
+ * carry it is a per-module one - `withModule(topicServer, { members })`, which
+ * `ApplicationBuilder` does not implement yet. Until it does, a caller that
+ * passes a schedule is accepted and the schedule is ignored, and the wake
+ * scenario below fails in `topic.service.ts` where the reader would have been.
+ * Wiring it means changing this test together with `topic.app.ts` and
+ * `topic.server.ts`, which is why it is not done here.
+ */
+function process(input: "api" | "worker" | UnscheduledTopicClustering = "api") {
+  const role = typeof input === "string" ? input : "api";
+
+  return createApp({ role, config: {} }).withModules([withMemoryRepositories(topicServer)]);
 }
 
 describe("topic app installation", () => {

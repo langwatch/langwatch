@@ -1,8 +1,35 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi, PinnedTrace } from "@langwatch/data-retention-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
+
+/**
+ * The `redis` member, for a test that never exercises the view-dedupe cache:
+ * every scenario here either rejects before the cache is consulted or lists
+ * with nothing to deduplicate, so nothing calls a method on this connection.
+ *
+ * It refuses on any access rather than being an empty object, so that claim is
+ * enforced instead of merely asserted. A scenario that starts reaching the cache
+ * fails here, naming the property, rather than somewhere downstream with
+ * `undefined is not a function`.
+ */
+export function createShareTestRedis(): RedisConnection {
+  return new Proxy({} as RedisConnection, {
+    get(_target, property) {
+      // Symbols are how a runtime inspects a value (promise-unwrapping, printing).
+      // Refusing those would fail the test for looking at it, not for using it.
+      if (typeof property === "symbol") return void 0;
+
+      throw new Error(
+        `The share installation test reached redis.${property}, which it is not meant to. ` +
+          `Share is handed this member because it reads one; give the fixture real behaviour ` +
+          `for the path you are adding rather than deleting this refusal.`,
+      );
+    },
+  });
+}
 
 /** Every audience check permits, so a scoped link resolves without a directory. */
 export function createShareTestAuthz(permitted = true): AuthzApi {
