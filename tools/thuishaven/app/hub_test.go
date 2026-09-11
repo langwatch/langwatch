@@ -33,6 +33,7 @@ type fakeStore struct {
 	runHistory         []domain.RunRecord
 	appendHistoryErr   error
 	prereqSkips        map[string]bool
+	containerPosture   string
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -87,6 +88,11 @@ func (f *fakeStore) WriteSelection(worktreeDir string, sel domain.Selection) err
 	return nil
 }
 func (f *fakeStore) ReadPrereqSkips() map[string]bool { return f.prereqSkips }
+func (f *fakeStore) ReadContainerPosture() string     { return f.containerPosture }
+func (f *fakeStore) WriteContainerPosture(p string) error {
+	f.containerPosture = p
+	return nil
+}
 func (f *fakeStore) WritePrereqSkips(skips map[string]bool) error {
 	f.prereqSkips = skips
 	return nil

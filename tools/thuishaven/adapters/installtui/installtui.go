@@ -294,7 +294,13 @@ func (m model) outcome(r row) string {
 	if r.st.State == domain.PrereqOutdated {
 		prefix = havenui.Aging.Render("have "+r.st.Observed) + havenui.Muted.Render(" "+havenui.Bullet+" ")
 	}
-	command, _ := r.st.Candidates[r.candidate].InstallOn(runtime.GOOS)
+	candidate := r.st.Candidates[r.candidate]
+	if candidate.Declines {
+		// Not an install and not a refusal to install — a decision, which
+		// enter records.
+		return prefix + havenui.Absent.Render("record this choice")
+	}
+	command, _ := candidate.InstallOn(runtime.GOOS)
 	switch {
 	case command == "":
 		return prefix + havenui.Muted.Render("install it yourself")
@@ -336,7 +342,9 @@ func (m model) renderDetail() string {
 	if para := strings.ReplaceAll(r.st.Prereq.Detail, "\n    ", "\n"); para != "" {
 		b.WriteString(detail.Render(para) + "\n")
 	}
-	if command, manual := r.st.Candidates[r.candidate].InstallOn(runtime.GOOS); command == "" {
+	if c := r.st.Candidates[r.candidate]; c.Declines {
+		b.WriteString("\n" + detail.Render("nothing is installed; haven records the choice and stops asking.") + "\n")
+	} else if command, manual := c.InstallOn(runtime.GOOS); command == "" {
 		b.WriteString("\n" + detail.Render("haven will not run this one for you:\n"+manual) + "\n")
 	}
 	return b.String()

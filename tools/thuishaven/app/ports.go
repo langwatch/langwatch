@@ -65,6 +65,12 @@ type Store interface {
 	// preference nobody has expressed yet is not a failure.
 	ReadPrereqSkips() map[string]bool
 	WritePrereqSkips(map[string]bool) error
+	// The machine's container posture, as the developer chose it. Same file
+	// and the same reasoning as the skips: it is a property of the machine,
+	// so every checkout on it gets the same answer. Empty means never chosen,
+	// which is what makes haven fall back to looking.
+	ReadContainerPosture() string
+	WriteContainerPosture(string) error
 	// HMR gate marker (worktree-local): expiry in unix-ms; 0/absent means no gate.
 	WriteHMRGate(lwDir string, expiryUnixMs int64) error
 	ReadHMRGate(lwDir string) (int64, bool)

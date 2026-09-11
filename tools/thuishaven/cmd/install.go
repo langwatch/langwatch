@@ -50,7 +50,7 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 		if len(inv.args) > 0 {
 			return fmt.Errorf("haven install --list reports on every prerequisite and installs none of them — drop %s, or drop --list to install it", strings.Join(inv.args, " "))
 		}
-		printPrereqReportStyled(os.Stdout, d.orch.CheckPrereqs(ctx), painterFor(d.isAgent))
+		printPrereqReportWithPosture(os.Stdout, d.orch.CheckPrereqs(ctx), resolvedPosture(ctx, d), painterFor(d.isAgent))
 		return nil
 	}
 
@@ -77,7 +77,7 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 	// takes the whole screen and a question asked underneath it would never
 	// be seen.
 	if !anyActionable(report) {
-		printPrereqReportStyled(os.Stdout, report, painterFor(d.isAgent))
+		printPrereqReportWithPosture(os.Stdout, report, resolvedPosture(ctx, d), painterFor(d.isAgent))
 		reportHavenPath(ctx, d, os.Stdout)
 		return nil
 	}
@@ -86,7 +86,7 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 		return installAuto(ctx, d, report)
 	}
 	if !installCanAsk(d.isAgent, stdoutIsTTY(), stdinIsTTY()) {
-		printPrereqReportStyled(os.Stdout, report, painterFor(d.isAgent))
+		printPrereqReportWithPosture(os.Stdout, report, resolvedPosture(ctx, d), painterFor(d.isAgent))
 		reportHavenPath(ctx, d, os.Stdout)
 		printNonInteractiveHint(os.Stdout, report)
 		return nil
@@ -150,6 +150,18 @@ func installInteractive(ctx context.Context, d deps, report []domain.PrereqStatu
 	return d.orch.InstallPrereqs(ctx, result.Install)
 }
 
+// resolvedPosture is the machine's container posture for the report. A
+// posture that cannot be resolved is left unset rather than failing the
+// report: this command is how a developer finds out what is wrong with their
+// machine, so it must not refuse to run because something is.
+func resolvedPosture(ctx context.Context, d deps) app.ContainerPosture {
+	posture, err := d.orch.ResolveContainerPosture(ctx)
+	if err != nil {
+		return app.ContainerPosture{}
+	}
+	return posture
+}
+
 // anyActionable reports whether the machine gives the command anything to do.
 func anyActionable(report []domain.PrereqStatus) bool {
 	for _, st := range report {
@@ -184,6 +196,13 @@ func printPrereqReport(w io.Writer, report []domain.PrereqStatus) {
 // printPrereqReportStyled is the report with a painter, so a terminal gets
 // colour and an agent or a pipe gets the same words with none.
 func printPrereqReportStyled(w io.Writer, report []domain.PrereqStatus, paint painter) {
+	printPrereqReportWithPosture(w, report, app.ContainerPosture{}, paint)
+}
+
+// printPrereqReportWithPosture is the report plus the one line that says what
+// this machine has decided about containers — which is the setting the whole
+// lower half of the report is downstream of.
+func printPrereqReportWithPosture(w io.Writer, report []domain.PrereqStatus, posture app.ContainerPosture, paint painter) {
 	fmt.Fprintln(w, paint(havenui.Title, "haven install"))
 	fmt.Fprintln(w, paint(havenui.Muted, "  what this machine has"))
 	fmt.Fprintln(w)
@@ -205,6 +224,7 @@ func printPrereqReportStyled(w io.Writer, report []domain.PrereqStatus, paint pa
 	}
 	fmt.Fprintln(w, "  "+paint(style, verdict))
 	printSkippedNote(w, report)
+	printPostureNote(w, posture, paint)
 }
 
 // stateGlyph is one mark per meaning, the same marks every haven screen uses.
@@ -314,6 +334,16 @@ func printSkippedNote(w io.Writer, report []domain.PrereqStatus) {
 		return
 	}
 	fmt.Fprintf(w, "not asking about %s (undo: haven install --reset-skips)\n", strings.Join(skipped, ", "))
+}
+
+// printPostureNote names the machine's container posture under the report.
+// Without it, "runtime: skipped" is a fact with no consequence attached, when
+// in truth it is the setting that decides how three other tiers run.
+func printPostureNote(w io.Writer, posture app.ContainerPosture, paint painter) {
+	if posture.Posture == domain.PostureUnset {
+		return
+	}
+	fmt.Fprintln(w, "  "+paint(havenui.Muted, posture.Line()))
 }
 
 // printNonInteractiveHint is what a pipe or an agent gets instead of a picker:

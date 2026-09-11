@@ -129,8 +129,23 @@ func TestMissingRuntimeIsOneEntryCarryingBothCandidates(t *testing.T) {
 	if st.State != PrereqMissing {
 		t.Fatalf("runtime state = %v, want missing", st.State)
 	}
-	if len(st.Candidates) != 2 {
-		t.Fatalf("the runtime must be offered as one entry with both candidates, got %d", len(st.Candidates))
+	// Two runtimes and the honest third answer, as ONE entry: the question
+	// "what is this machine's container situation" has one answer, and
+	// splitting it into separate demands is what made "none" unsayable.
+	if len(st.Candidates) != 3 {
+		t.Fatalf("the runtime must be one entry carrying every answer, got %d", len(st.Candidates))
+	}
+	var declines int
+	for _, c := range st.Candidates {
+		if c.Declines {
+			declines++
+		}
+		if c.Records == "" {
+			t.Errorf("runtime candidate %q records no posture — choosing it would leave haven still guessing", c.Key)
+		}
+	}
+	if declines != 1 {
+		t.Errorf("exactly one candidate is the no-runtime answer, got %d", declines)
 	}
 	if st.Via != "" {
 		t.Errorf("a real choice must leave Via empty so the picker asks, got %q", st.Via)
@@ -237,6 +252,11 @@ func TestCandidateKeysAreUnique(t *testing.T) {
 func TestEveryCandidateIsProbeable(t *testing.T) {
 	for _, p := range Prereqs {
 		for _, c := range p.Candidates {
+			if c.Declines {
+				// A declining candidate is an answer, not a thing to find.
+				// It is settled by being chosen, never by being probed.
+				continue
+			}
 			if len(c.Binaries) == 0 && c.Formula == "" && p.Key != "portless" {
 				t.Errorf("%s/%s has no binary and no formula to probe — it can never report installed", p.Key, c.Key)
 			}

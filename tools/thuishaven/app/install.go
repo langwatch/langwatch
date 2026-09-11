@@ -151,6 +151,15 @@ func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen
 		if !ok {
 			return fmt.Errorf("%s has no option %q", p.Key, pick.Candidate)
 		}
+		// A declining candidate is an answer, not an install: "none, keep this
+		// machine container-free" settles the question rather than putting
+		// something on the machine.
+		if candidate.Declines {
+			if err := o.recordChoice(w, p, candidate); err != nil {
+				return err
+			}
+			continue
+		}
 		command, manual := candidate.InstallOn(runtime.GOOS)
 		if command == "" {
 			fmt.Fprintf(w, "\n· %s — haven does not install this one for you. Run:\n    %s\n", p.Name, manual)
@@ -170,6 +179,14 @@ func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen
 			return fmt.Errorf("could not install %s (%w) — run `%s` by hand and try again", p.Name, err, command)
 		}
 		fmt.Fprintf(w, "✓ %s installed\n", p.Name)
+		if candidate.Records != "" {
+			// Installing a runtime is also choosing it. Without this the
+			// developer would pick colima at the picker and haven would still
+			// be guessing the posture on the next run.
+			if err := o.recordChoice(w, p, candidate); err != nil {
+				return err
+			}
+		}
 		// Installing something answers the question the skip was suppressing,
 		// so the skip has served its purpose and would otherwise hide the
 		// entry from a later report that should show it satisfied.
@@ -177,6 +194,31 @@ func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen
 			return err
 		}
 	}
+	return nil
+}
+
+// recordChoice writes down the machine setting a candidate stands for, and
+// settles the prerequisite it answers so the question stops being asked.
+func (o *Orchestrator) recordChoice(w io.Writer, p domain.Prereq, c domain.Candidate) error {
+	if c.Records == "" {
+		return nil
+	}
+	changed, err := o.RecordContainerPosture(c.Records)
+	if err != nil {
+		return err
+	}
+	if changed {
+		fmt.Fprintf(w, "\n· %s: %s — recorded for this machine\n", p.Name, c.Label)
+	}
+	if !c.Declines {
+		return nil
+	}
+	// Declining is a settled answer, so the entry should not come back as
+	// missing on the next run. The skip is the existing machinery for that.
+	if _, err := o.SkipPrereqs([]string{p.Key}); err != nil {
+		return err
+	}
+	fmt.Fprintf(w, "  %s\n", domain.PostureLine(domain.PostureNone, domain.PostureRecorded))
 	return nil
 }
 

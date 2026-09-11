@@ -69,6 +69,15 @@ type Candidate struct {
 	// redis-server as installed — and then `haven up` fails with "redis is
 	// not installed", which is the contradiction this check exists to prevent.
 	FormulaIsAuthority bool
+	// Declines marks a candidate that is an answer rather than a thing to
+	// install — "none, keep this machine container-free". Choosing it records
+	// a decision and settles the prerequisite, so the question stops being
+	// asked without pretending something was installed.
+	Declines bool
+	// Records is the machine setting choosing this candidate writes, if any.
+	// Today only the container posture (domain.PostureEnvVar's persisted
+	// twin) is set this way.
+	Records string
 	// Install is the shell command that installs this candidate. Empty means
 	// haven will not install it: see Manual.
 	Install string
@@ -251,22 +260,36 @@ var Prereqs = []Prereq{{
 	Requirement: PrereqOptional,
 	After:       []string{"brew"},
 	DarwinOnly:  true,
-	Detail: "Nothing in the day-to-day loop needs one: with LANGWATCH_HAVEN_CH=0 and\n" +
-		"    LANGWATCH_HAVEN_OBS=0 the whole application stack runs with no runtime\n" +
-		"    installed at all. It buys you the Grafana LGTM stack, the managed\n" +
-		"    ClickHouse container, and langy's sandboxed worker tier.\n" +
-		"    haven's own stack is built on colima: the VM's ceiling is explicit and\n" +
+	Detail: "Nothing in the day-to-day loop needs one, and answering \"none\" is a\n" +
+		"    supported answer rather than a refusal: ClickHouse and the telemetry\n" +
+		"    stack then run natively and langy on the host tier, all from one\n" +
+		"    setting instead of three environment variables.\n" +
+		"    A runtime buys you the managed ClickHouse container, langy's sandboxed\n" +
+		"    worker tier, and traces — which the native telemetry tier cannot carry,\n" +
+		"    because Grafana ships no macOS build of Tempo.\n" +
+		"    haven's own stack is built on colima: its ceiling is explicit and\n" +
 		"    per-profile, and it needs no license. Docker Desktop works too.",
 	Candidates: []Candidate{{
 		Key:      "colima",
 		Label:    "colima + docker CLI",
 		Binaries: []string{"colima", "docker"},
 		Install:  "brew install colima docker",
+		Records:  "colima",
 	}, {
 		Key:      "docker-desktop",
 		Label:    "Docker Desktop",
 		Binaries: []string{"docker"},
 		Install:  "brew install --cask docker",
+		Records:  "docker",
+	}, {
+		// The honest third answer. Without it "no container runtime" could
+		// only be expressed by declining the question forever, which is a
+		// different thing: it left haven guessing on every other decision
+		// that hangs off this one.
+		Key:      "none",
+		Label:    "none — keep this machine container-free",
+		Declines: true,
+		Records:  "none",
 	}},
 }, {
 	Key:         "clickhouse-client",
