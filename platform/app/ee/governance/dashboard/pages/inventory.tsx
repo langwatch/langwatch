@@ -2760,21 +2760,21 @@ export function visibleParserFields({
  * The composer values with any select field cleared whose held value is not
  * among the choices its own control offers.
  *
- * The case this exists for: an admin picks a bucket width of `1h`, then
- * switches the report to `cost`. The width is now a value `validBucketWidth`
- * refuses outright — not ignores — so leaving it in place would reject the
- * whole save for a field the form no longer even offers. Clearing it is the
- * only outcome that matches what the admin is being shown.
+ * The shape this exists for: a select whose choices narrow when another field
+ * is answered, leaving a previously valid pick outside the list the admin is
+ * now looking at. A form showing one thing and submitting another is the bug;
+ * clearing the stale pick is the only outcome that matches the screen.
  *
  * Deliberately narrow: text, date and switch fields are never touched,
  * because their domains are not enumerable and "not in the list" means nothing
  * there — for a switch it would mean silently turning a deliberate off back on.
  *
- * Narrow in one more direction since the bucket width was withdrawn: a field
- * the form does not ask about has no control whose list a held value could be
- * stale against. Measured anyway, an hourly source would be cleared to daily
- * on the first render after its drawer opened — a migration performed by
- * looking at a source.
+ * Narrow in one more direction, and the reason no field exercises this today:
+ * only fields the form actually shows are measured. The bucket width was the
+ * one case, and the form no longer asks it — a held width is now decided at
+ * save time by `bucketWidthToStore` instead. Measured here anyway, an hourly
+ * source would be cleared to daily on the first render after its drawer
+ * opened, a migration performed by looking at a source.
  */
 export function reconcileParserValues({
   sourceType,
@@ -2832,8 +2832,9 @@ export type ParserConfigMode = "create" | "edit";
  * Nothing offers a choice between them any more — every screen that reads this
  * data reads it by day, so a finer width multiplies the rows a day costs and
  * changes no figure the pillar shows. The list survives the withdrawal because
- * `validBucketWidth` still measures a stored width against it: the finer
- * widths are withdrawn from new sources, not taken away from the sources
+ * `bucketWidthToStore` still measures a stored width against it, to decide
+ * whether a usage source keeps what it holds or is written down as daily: the
+ * finer widths are withdrawn from new sources, not taken away from the sources
  * already being read at one.
  *
  * The adapter's own `anthropicAdminPullConfigSchema` declares the same domain
