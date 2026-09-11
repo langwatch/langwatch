@@ -19,6 +19,17 @@ export interface StagedLangevalsPayload {
 }
 
 
+/**
+ * The header a staged request carries its payload URL in.
+ *
+ * Declared here because it is part of what Topic sends, not something a
+ * collaborator answers. `modules/workflow` declares the same literal for the
+ * same wire contract; the two are independent today and will drift, so this
+ * wants a shared contract package rather than a second copy - recorded rather
+ * than fixed here, because moving it is a cross-module decision.
+ */
+export const STAGED_PAYLOAD_HEADER = "X-Payload-S3-URL";
+
 export interface LangevalsPayloadStaging {
   stage(input: {
     projectId: string;

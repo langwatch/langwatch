@@ -67,18 +67,15 @@ export {
   LegacyImportTopicClusteringMigration,
   type TopicClusteringBackfillSummary,
 } from "./migrations/legacy-import.topic-clustering.migration.ts";
-export {
+export type {
   TopicClusteringClickHouse,
-  type TopicClusteringClickHouseQuery,
-  type TopicClusteringClickHouseQueryParams,
-  type TopicClusteringClickHouseResolver,
-} from "./ports/topic-clustering-clickhouse.port.ts";
+  TopicClusteringClickHouseQuery,
+  TopicClusteringClickHouseQueryParams,
+  TopicClusteringClickHouseResolver,
+} from "./app/topic.members.ts";
 export type { TopicClusteringCommands } from "./app/topic.members.ts";
-export {
-  LangevalsPayloadStaging,
-  STAGED_PAYLOAD_HEADER,
-  type StagedLangevalsPayload,
-} from "./ports/langevals-payload-staging.port.ts";
+export { STAGED_PAYLOAD_HEADER } from "./app/topic.members.ts";
+export type { LangevalsPayloadStaging, StagedLangevalsPayload } from "./app/topic.members.ts";
 export {
   LangevalsStagedPayloadAdapter,
   PayloadTooLargeError,
@@ -86,11 +83,11 @@ export {
   type LangevalsStagedPayloadConfig,
   type StagedFetchOptions,
 } from "./services/langevals-staged-payload.service.ts";
-export {
+export type {
   TopicClusteringLangevals,
-  type TopicClusteringLangevalsKind,
-  type TopicClusteringLangevalsResponse,
-} from "./ports/topic-clustering-langevals.port.ts";
+  TopicClusteringLangevalsKind,
+  TopicClusteringLangevalsResponse,
+} from "./app/topic.members.ts";
 export { RequestTopicClusteringTask } from "./intents/run-topic-clustering.intent.ts";
 export { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task.ts";
 export type { TopicClusteringScheduleReader } from "./app/topic.app.ts";
