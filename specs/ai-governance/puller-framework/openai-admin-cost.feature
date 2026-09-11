@@ -201,11 +201,55 @@ Feature: OpenAI Admin cost puller
 
     @integration
     Scenario: A failed read leaves the source where it was
-      Given a run whose request to the provider fails
+      Given a run whose first request to the provider fails
       When the run ends
       Then the source's position is unchanged
       And the failure is reported
       And the next run reads that window again
+      # Only when nothing was read. There is no progress to weigh against the
+      # retry, the whole window is still owed, and the wait the provider named
+      # is the most valuable thing the run has. A failure that arrives once
+      # pages HAVE been read is answered the other way round, below.
+
+    @unit
+    Scenario: A page that cannot be read part-way through a window keeps the ones already read
+      Given a run that has already read earlier pages of a window
+      When a later page cannot be read
+      Then the spend from the pages already read is kept
+      And the source resumes at the page that could not be read
+      And the window is reported as not fully collected
+      # Holding the position still instead cost the run every page it had
+      # already read, so the next run asked for the first page again and was
+      # stopped at the same one. A window needing more than one page could
+      # never be got past, on any number of retries.
+
+    @unit
+    Scenario: A refusal part-way through a window still counts against the source
+      Given a run that kept the pages it read before a later one was refused
+      When the run ends
+      Then the run counts as a failure for the source's health
+      And the spend and position it kept are still kept
+
+    @unit
+    Scenario: A source refused part-way through every run reads as failing
+      Given a source refused part-way through each of its last three runs
+      When an admin looks at it
+      Then its pulls are shown as failing
+      # Every one of those runs ends as a completion, because that is how the
+      # pages it did read survive. Reading a completion as proof the source
+      # works lets one collecting a fraction of its spend every hour say
+      # nothing at all about it.
+
+    @unit
+    Scenario: A refused key fails the run rather than banking part of a window
+      Given a run whose key the provider refuses part-way through a window
+      When the run ends
+      Then the run fails
+      And the refusal names what an admin can fix
+      # A refused key answers the same way on every page, so there is no window
+      # to resume and nothing to gain by keeping part of one. Banking here would
+      # record a completion and leave the source looking healthy while it
+      # collected nothing.
 
     @integration
     Scenario: Every page of a window is read

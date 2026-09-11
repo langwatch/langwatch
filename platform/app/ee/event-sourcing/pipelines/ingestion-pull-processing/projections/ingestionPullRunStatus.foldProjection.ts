@@ -210,6 +210,39 @@ function readThroughOf(event: IngestionPullRunCompletedEvent): {
   };
 }
 
+/**
+ * The failure count a completion leaves behind, in its three shapes.
+ *
+ * A clean run clears it: reaching the provider and being answered is the proof
+ * the source works, including when the answer is "no usage".
+ *
+ * A run that delivered something but also stepped over input it could not read
+ * neither clears it nor adds to it, and stamps no success. Counting that as a
+ * success wrote a fresh one over exactly the signals meant to be loud; counting
+ * it as a failure would turn a source working around one bad row red.
+ *
+ * A run that could not read a PAGE adds to it, even though it completed. That
+ * is the difference between working around input and not reading the window at
+ * all. Holding the count still here let a source refused part-way through every
+ * run sit at zero failures forever: it never reached the threshold that shows
+ * pulls as failing, showed the amber partly-collected line instead, and
+ * collected a fraction of its spend every hour while reading as healthy. The
+ * progress it banked is kept either way — the cursor advances above, and it is
+ * only the source's health this answers.
+ */
+function consecutiveErrorsAfterCompletion({
+  previous,
+  partlySucceeded,
+  pageUnread,
+}: {
+  previous: number;
+  partlySucceeded: boolean;
+  pageUnread: boolean;
+}): number {
+  if (pageUnread) return previous + 1;
+  return partlySucceeded ? previous : 0;
+}
+
 export class IngestionPullRunStatusFoldProjection
   extends AbstractFoldProjection<
     IngestionPullRunStatusData,
@@ -353,10 +386,15 @@ export class IngestionPullRunStatusFoldProjection
   ): IngestionPullRunStatusData {
     if (this.isSuperseded({ state, scheduledFor: event.data.scheduledFor }))
       return state;
+    // A page this run could not read AT ALL, as opposed to rows it read and
+    // stepped over. The adapter banks the pages it already had rather than
+    // throwing them away, so this failure arrives on a COMPLETION -- and it is
+    // still the failure it would have been had it arrived on the first page.
+    const pageUnread = event.data.unreadPage === true;
     // Absent on every completion written before runs reported an error count,
     // and reading that as a clean run is correct: those producers failed the
     // whole run rather than returning partial progress.
-    const partlySucceeded = (event.data.errorCount ?? 0) > 0;
+    const partlySucceeded = (event.data.errorCount ?? 0) > 0 || pageUnread;
     return {
       ...state,
       SourceId: event.data.sourceId,
@@ -366,13 +404,11 @@ export class IngestionPullRunStatusFoldProjection
       LastRunEventCount: event.data.eventCount,
       LastRunError: null,
       LastRunErrorCode: null,
-      // A run that delivered something but also stepped over rows it could not
-      // read, or refused a next-page link, is not the clean run that proves the
-      // source works -- so it neither clears the failure count nor adds to it,
-      // and it stamps no success. Counting it as one wrote a fresh success over
-      // exactly the signals that were meant to be loud, and a source could
-      // launder itself healthy forever while never reading a whole page.
-      ConsecutiveErrors: partlySucceeded ? state.ConsecutiveErrors : 0,
+      ConsecutiveErrors: consecutiveErrorsAfterCompletion({
+        previous: state.ConsecutiveErrors,
+        partlySucceeded,
+        pageUnread,
+      }),
       LastRunScheduledFor: event.data.scheduledFor,
       // Stamped on every clean completion, including one that found nothing
       // new: reaching the provider and being told "no usage" is a working

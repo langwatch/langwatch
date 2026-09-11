@@ -510,6 +510,48 @@ function reportUrl({
 }
 
 /**
+ * The error a provider's refusal carries, or null when the status is not one.
+ *
+ * Two refusals, and the difference between them is the whole of what the caller
+ * does next. A rate limit is the provider asking for time: retryable, and it
+ * carries the wait it asked for. A refused key is the provider answering about
+ * this source: the same answer on every page and every retry, so it is NOT
+ * retryable — which is what stops the ladder and keeps a run from banking half
+ * a window it will never be allowed to finish.
+ *
+ * The body is drained best-effort and never read. A rejected `cancel()` must
+ * not escape in place of the error built here, or the refusal degrades to a
+ * generic failure and the wait never reaches the scheduler; and a refusal from
+ * this endpoint can echo a fragment of the key, so nothing it says is quoted.
+ */
+async function providerRefusal(response: {
+  status: number;
+  headers: { get(name: string): string | null };
+  body?: { cancel(): Promise<unknown> } | null;
+}): Promise<DispatchError | null> {
+  if (
+    response.status !== 429 &&
+    response.status !== 401 &&
+    response.status !== 403
+  )
+    return null;
+  await response.body?.cancel().catch(() => void 0);
+  if (response.status === 429) {
+    return new DispatchError({
+      message: "OpenAI rate limit exceeded (HTTP 429).",
+      retryable: true,
+      retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+    });
+  }
+  return new DispatchError({
+    message: `HTTP ${response.status} (openai cost report): key refused`,
+    retryable: false,
+    customerMessage:
+      "OpenAI refused this key. Check the admin key and its permissions.",
+  });
+}
+
+/**
  * Whether a page refused mid-run should be ANSWERED with the progress already
  * made, rather than thrown out of the run.
  *
@@ -524,9 +566,20 @@ function reportUrl({
  * the pipeline already handles; a window that can never be read past is not
  * recoverable at all.
  *
- * Only a RETRYABLE refusal qualifies. A malformed body, a contract that moved
- * and a provider refusing outright are not windows to retry: each still throws,
- * so the run is recorded as the failure it is.
+ * A NON-RETRYABLE refusal never qualifies. A key the provider refuses (HTTP 401
+ * or 403) answers the same way on every page, so there is no window to resume
+ * and nothing to gain by keeping part of one: it still throws, and the run is
+ * recorded as the refusal it is. A malformed body throws from the parse below
+ * for the same reason — a shape we do not recognise is a contract that moved.
+ *
+ * Everything else with pages in hand banks: a rate limit, a dropped socket, a
+ * provider having a bad minute (5xx). Each is transient and carries no answer
+ * about this source, so the pages already read are worth more than starting the
+ * window over.
+ *
+ * Banking is never the same as succeeding. The result carries `unreadPage`, so
+ * the run status counts the failure while keeping the progress — without it a
+ * source refused on every run would read as healthy forever.
  */
 function mustBankRefusal({
   error,
@@ -581,7 +634,8 @@ function pageUnread({
   stoppedShort: () => PullResult;
   incomingCursor: string | null;
 }): PullResult {
-  if (banked) return { ...stoppedShort(), errorCount: 1 };
+  if (banked)
+    return { ...stoppedShort(), errorCount: 1, unreadPage: true as const };
   return { events, cursor: incomingCursor, errorCount: 1 };
 }
 
@@ -885,17 +939,12 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       },
       signal,
     });
-    if (response.status === 429) {
-      // Best-effort drain, for the reason spelled out in the Anthropic
-      // puller's matching branch: a rejected cancel must not replace the
-      // DispatchError, or the Retry-After never reaches the scheduler.
-      await response.body?.cancel().catch(() => void 0);
-      throw new DispatchError({
-        message: "OpenAI rate limit exceeded (HTTP 429).",
-        retryable: true,
-        retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
-      });
-    }
+    // A rate limit or a refused key, classified the way the Anthropic puller
+    // classifies the same two statuses. Both leave as a DispatchError so the
+    // caller can tell a window worth resuming from a key that will never be
+    // allowed to finish one.
+    const refusal = await providerRefusal(response);
+    if (refusal) throw refusal;
     if (!response.ok) {
       const detail = await safeResponseText(response);
       if (response.status === 400 && isKeyGroupingRefusal(detail)) {

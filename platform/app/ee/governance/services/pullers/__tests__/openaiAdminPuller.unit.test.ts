@@ -211,6 +211,7 @@ describe("given an OpenAI Admin cost source", () => {
      * same page again, and a source that met a rate limit mid-backfill could
      * never get past it on any number of retries.
      */
+    /** @scenario "A page that cannot be read part-way through a window keeps the ones already read" */
     it("keeps the pages already read and resumes at the refused page", async () => {
       fetchMock
         .mockResolvedValueOnce(
@@ -232,7 +233,33 @@ describe("given an OpenAI Admin cost source", () => {
       expect(JSON.parse(result.cursor!)).toMatchObject({ page: "page_2" });
     });
 
+    /**
+     * Keeping the progress must not also make the source look well. The run
+     * completes, so nothing in the failure count moves on its own -- a source
+     * refused part-way through every run would sit at zero failures forever,
+     * never reach the threshold that shows pulls as failing, and quietly
+     * collect a fraction of its spend every hour.
+     */
+    /** @scenario "A refusal part-way through a window still counts against the source" */
+    it("reports the unread page so the source can still show the failure", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse(page({ nextPage: "page_2", hasMore: true })),
+        )
+        .mockResolvedValueOnce(
+          new Response("private upstream payload", {
+            status: 429,
+            headers: { "retry-after": "120" },
+          }),
+        );
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      expect(result.unreadPage).toBe(true);
+    });
+
     /** The same for a page lost to the transport rather than to a refusal. */
+    /** @scenario "A page that cannot be read part-way through a window keeps the ones already read" */
     it("keeps the pages already read when a later page fails on the transport", async () => {
       fetchMock
         .mockResolvedValueOnce(
@@ -255,6 +282,7 @@ describe("given an OpenAI Admin cost source", () => {
      * for is the most valuable thing the run has: it must still reach the
      * scheduler rather than be swallowed into an error count.
      */
+    /** @scenario "A failed read leaves the source where it was" */
     it("still surrenders the rate-limit wait when the first page is refused", async () => {
       fetchMock.mockResolvedValue(
         new Response("private upstream payload", {
@@ -266,6 +294,75 @@ describe("given an OpenAI Admin cost source", () => {
       await expect(
         new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG),
       ).rejects.toMatchObject({ retryAfterMs: 120_000 });
+    });
+  });
+
+  describe("when the provider refuses the key part-way through a window", () => {
+    /**
+     * A refused key answers the same way on every page, so there is no window
+     * to resume: banking the pages already read would record the run as a
+     * completion, leave the source looking healthy, and hide the one failure an
+     * admin can actually act on. The sibling adapter for another provider
+     * classifies these two statuses the same way.
+     */
+    /** @scenario "A refused key fails the run rather than banking part of a window" */
+    it("fails the run rather than keeping what it read", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse(page({ nextPage: "page_2", hasMore: true })),
+        )
+        .mockResolvedValueOnce(
+          new Response("private upstream payload", { status: 401 }),
+        );
+
+      await expect(
+        new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG),
+      ).rejects.toMatchObject({
+        retryable: false,
+        customerMessage:
+          "OpenAI refused this key. Check the admin key and its permissions.",
+      });
+    });
+
+    /** @scenario "A refused key fails the run rather than banking part of a window" */
+    it("does not quote the provider's reply back to the customer", async () => {
+      fetchMock.mockResolvedValue(
+        new Response("private upstream payload", { status: 403 }),
+      );
+
+      await expect(
+        new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG),
+      ).rejects.toMatchObject({
+        retryable: false,
+        message: expect.not.stringContaining("private upstream payload"),
+      });
+    });
+  });
+
+  describe("when the provider faults part-way through a window", () => {
+    /**
+     * A 5xx is the provider having a bad minute rather than an answer about
+     * this source, so it is treated like the transport failure it resembles:
+     * the pages already read are banked and the run resumes at the one that
+     * faulted. It carries no wait of the provider's own, so there is nothing a
+     * dispatch error could hold here that a plain one cannot.
+     */
+    /** @scenario "A page that cannot be read part-way through a window keeps the ones already read" */
+    it("keeps the pages already read and resumes at the faulted page", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse(page({ nextPage: "page_2", hasMore: true })),
+        )
+        .mockResolvedValueOnce(
+          new Response("upstream unavailable", { status: 503 }),
+        );
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      expect(result.errorCount).toBe(1);
+      expect(result.completeness).toBe("truncated");
+      expect(result.unreadPage).toBe(true);
+      expect(JSON.parse(result.cursor!)).toMatchObject({ page: "page_2" });
     });
   });
 
@@ -1003,17 +1100,20 @@ describe("given an OpenAI Admin cost source", () => {
         }),
       );
 
-      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
-
-      expect(result.errorCount).toBe(1);
-      // The reason is logged and shown on the source, so it is read by people
-      // who were never given the credential.
-      expect(logged.error).toHaveBeenCalled();
-      for (const call of logged.error.mock.calls) {
-        expect(JSON.stringify(call)).not.toContain(
-          RUN_OPTIONS.credentials.token,
-        );
-      }
+      // A refused key leaves as a refusal rather than an error count: the same
+      // answer arrives on every page, so there is no window to resume and
+      // nothing to gain by keeping part of one.
+      await expect(
+        new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG),
+      ).rejects.toMatchObject({
+        retryable: false,
+        // The reason is logged and shown on the source, so it is read by people
+        // who were never given the credential -- and the provider's own reply
+        // echoes a fragment of the key, so the body is drained and never
+        // quoted. "sk-a" is the opening of both the real key and that echo.
+        message: expect.not.stringContaining("sk-a"),
+        customerMessage: expect.not.stringContaining("sk-a"),
+      });
     });
 
     it("fails a run with no admin key rather than reporting an empty organization", async () => {
