@@ -9,6 +9,42 @@
 # change. A scenario still carrying @unimplemented when the work is called done
 # is work that was not done.
 
+# WHAT BLOCKS THESE, AS OF 2026-09-11. Read this before picking the file up
+# expecting to tag a few scenarios: the work is sequenced, and the sequence has
+# a hole in the middle that is a design question rather than an implementation.
+#
+#   1. THE OUTCOME CHANNEL IS NOT DESIGNED. ADR-135 §Decision 3 says so in its
+#      own words: a `dispatch(command)` that no longer decides has no events to
+#      hand the convergence wait, so "applied", "refused" and "not yet" collapse
+#      into one answer. The ADR marks this as blocking §Decision 4 — the collapse
+#      of the five ledgers — and it is also what makes
+#      "A write refused by the rule records nothing and says so" unimplementable
+#      as written, which the ADR states outright. Nothing below that needs to
+#      tell a caller WHY a write did not land can be bound until this exists.
+#
+#   2. DELETING PROVISIONAL HEADS IS NOT SAFE ON ITS OWN. §Decision 2 removes
+#      the only rows a newborn has before their fold lands. The regression this
+#      file already shouts about in capitals — a brand-new person told there is
+#      nothing for them to join — is caused BY that deletion, and the thing that
+#      prevents it is the "still being set up" surface two scenarios below
+#      describe. So the UI scenarios land first or in the same change; the
+#      deletion cannot go first.
+#
+#   3. THE CALLING-PATH GUARD IS LOAD-BEARING FOR TWO CALLERS.
+#      `identity-backfill.service.ts` wraps two dispatches in `tolerateRefusal`
+#      and depends on the guard throwing SYNCHRONOUSLY, not on its return value.
+#      Removing the first guard changes when those failures arrive, so those two
+#      call sites need handling in the same change rather than afterwards.
+#
+# None of this is an argument against the ADR, which is right about the defect.
+# It is the reason the scenarios are still @unimplemented rather than half-bound:
+# a scenario tagged before its mechanism exists reports a binding that is not
+# there, which is the failure mode this whole file was written to end.
+#
+# Recommended order: the outcome channel (design first), then the "not yet"
+# surfaces, then provisional heads, then the ledger collapse. Not in a pull
+# request that is also doing something else.
+
 Feature: A write states its facts once
   As somebody whose account is changed by something I did
   I want what I am told to match what was actually recorded
