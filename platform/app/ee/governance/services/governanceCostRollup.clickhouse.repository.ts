@@ -70,8 +70,13 @@ export interface GovernanceCostRollupRestatementIndexRow {
   EventTimestamp: number;
 }
 
-/** The columns that make a row's identity, in sort-key order. */
-const KEY_COLUMNS = [
+/**
+ * The columns that make a row's identity, in sort-key order. Exported so a
+ * test can hold it against the table's own `ORDER BY` in migration 00092 and
+ * against the fold's key field order — three copies of one contract that
+ * nothing else forces to agree.
+ */
+export const KEY_COLUMNS = [
   "TenantId",
   "Day",
   "CostSource",

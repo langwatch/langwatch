@@ -22,6 +22,7 @@ import type {
   ProcessEventEnvelope,
   ProcessInput,
 } from "~/server/event-sourcing/process-manager";
+import { ensureJsonSafe } from "~/server/event-sourcing/process-manager/json";
 import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 
 import { INGESTION_PULL_MAX_COOLDOWN_MS } from "../ingestionPull.process";
@@ -198,7 +199,10 @@ describe("given a wait that cannot be read as a length of time", () => {
   it("records no wait at all, so nothing downstream reads a figure it cannot use", () => {
     const result = refusedAt({ at: T0, retryAfterMs: Number.NaN });
 
-    expect(result.state.cooldownUntil ?? null).toBeNull();
+    // Exactly null, never absent-or-undefined: the state is persisted as
+    // JSON, and `undefined` at this key is what used to park the source.
+    expect(result.state.cooldownUntil).toBeNull();
+    expect(() => ensureJsonSafe(result.state)).not.toThrow();
   });
 
   /** @scenario "A wait that cannot be read as a length of time is treated as no wait" */

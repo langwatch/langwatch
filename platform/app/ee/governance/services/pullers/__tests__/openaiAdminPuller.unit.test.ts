@@ -266,9 +266,12 @@ describe("given an OpenAI Admin cost source", () => {
       expect(event.extra?.actorUserId).toBe("user-1");
       // The row the adapter read did carry an address — this is the half that
       // makes the two lines above a choice rather than the only thing on offer.
-      expect(JSON.parse(event.raw_payload as string).user_email).toBe(
-        "person@acme.test",
+      // The address is dropped before the row is stored, so it is absent from
+      // the retained payload and from anywhere else on the event.
+      expect(JSON.parse(event.raw_payload as string)).not.toHaveProperty(
+        "user_email",
       );
+      expect(JSON.stringify(event)).not.toContain("person@acme.test");
       expect(event.actor).not.toContain("@");
       expect(event.extra?.actorUserId).not.toContain("@");
     });

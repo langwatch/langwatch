@@ -104,6 +104,12 @@ Feature: Voice agents: reach an agent by phone
     When the runner resolves the public base URL
     Then it uses the app's own public base host, and a set VOICE_PUBLIC_BASE_URL overrides it
 
+  @unit
+  Scenario: A phone call's scenario child never binds the worker's media port
+    Given the parent worker's own VOICE_WS_PORT is set in the environment
+    When the phone transport builds the SDK adapter
+    Then the adapter is always given an OS-assigned port, never the worker's own port
+
   # ---------------------------------------------------------------------------
   # Phone run failures
   # ---------------------------------------------------------------------------
@@ -121,6 +127,48 @@ Feature: Voice agents: reach an agent by phone
     When Twilio rejects the outbound call
     Then the run fails with a message prefixed by the phone transport's connect-rejected prefix
     And the caller adapter is disconnected
+
+  # ---------------------------------------------------------------------------
+  # Per-call nonce handoff (the phone transport parent/child IPC race)
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A phone call fails loudly when the parent never acknowledges the nonce
+    Given a phone target with a valid Twilio credential
+    When the run registers the call's nonce and the parent process never acknowledges it
+    Then connect waits on the registration and never places the call
+
+  @unit
+  Scenario: A phone call fails loudly when the parent refuses the nonce
+    Given a phone target with a valid Twilio credential
+    When the parent process refuses to register the call's nonce
+    Then the refusal surfaces as the run's error and no call is placed
+    And the caller adapter is disconnected
+
+  @unit
+  Scenario: A phone call fails fast when the listener refuses the socket mid-dial
+    Given a phone call whose nonce was registered and dialling has started
+    When the media listener refuses the upgrade because the nonce has expired
+    Then connect fails immediately with the refusal reason instead of waiting out the call
+    And the caller adapter is disconnected
+
+  @unit
+  Scenario: A phone call registers its stream nonce with the parent before dialling
+    Given a phone transport about to dial
+    When it connects
+    Then it registers the call's nonce and awaits the parent's ack before placeCall runs
+
+  @unit
+  Scenario: A registered nonce lets the real Twilio upgrade through
+    Given the child registered its nonce with the parent
+    When Twilio's dial-back arrives on that nonce
+    Then the upgrade routes to a handoff, not a 403
+
+  @unit
+  Scenario: An unregistered nonce is refused 403
+    Given the child never registered its nonce with the parent
+    When Twilio's dial-back arrives on that nonce
+    Then the upgrade is refused as an unknown nonce
 
   # ---------------------------------------------------------------------------
   # No browser call over phone
@@ -143,11 +191,11 @@ Feature: Voice agents: reach an agent by phone
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: The Phone number option appears only when a Twilio provider is configured
+  Scenario: The Phone number option is always listed, disabled and marked Unavailable without a Twilio provider
     Given the voice agent editor with no Twilio provider in the project
-    Then the "Reached via" list offers no Phone number option, and a hint points at Settings > Model Providers
+    Then the "Reached via" list offers a disabled Phone number (Unavailable) option, and a hint links to Settings > Model Providers that opens in a new tab
     When the project has a Twilio provider
-    Then the "Reached via" list offers the Phone number option
+    Then the "Reached via" list offers the Phone number option enabled
 
   @integration
   Scenario: A phone target's drawer explains why Talk to it is off
@@ -160,31 +208,53 @@ Feature: Voice agents: reach an agent by phone
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: The voice worker reads its three infrastructure environment variables
+  Scenario: The voice worker reads its infrastructure environment variables
     Given the voice worker environment with no variables set
     When the worker environment is read
-    Then voice worker only is off and the websocket port defaults to 3300
-    And only the literal "true" turns voice worker only on
+    Then the websocket port defaults to 3300 and no public base URL is set
 
   @unit
-  Scenario: A voice worker refuses to start without a public base URL
-    Given the voice worker environment with voice worker only on and no public base URL
+  Scenario: A public base URL must be an https origin
+    Given a public base URL is configured
     When the worker environment is read
-    Then it fails because the worker cannot be reached without a public origin
+    Then an https origin is accepted and reported, and a non-https origin is rejected
 
   @unit
-  Scenario: A voice worker boots only the voice subsystems
-    Given voice worker only is on
+  Scenario: A voice worker opens a quick tunnel when no public base URL is configured
+    Given no public base URL is configured and the tunnel fallback is left on
+    When the worker environment is read and its public URL is resolved
+    Then it does not fail, opens a cloudflared quick tunnel on the websocket port
+    And it waits until the tunnel's host resolves before treating it as ready
+
+  @unit
+  Scenario: A voice worker's public URL tunnel fails fast when it never becomes reachable
+    Given a cloudflared quick tunnel has been opened
+    When its host never resolves before the readiness timeout elapses
+    Then the tunnel is closed and the worker fails, naming the tunnel URL and the timeout
+
+  @unit
+  Scenario: A voice worker's quick tunnel is closed on worker shutdown
+    Given a cloudflared quick tunnel is open and ready
+    When the worker closes it on shutdown
+    Then the underlying tunnel's own close is called
+
+  @unit
+  Scenario: An explicit public base URL always wins over the tunnel fallback
+    Given an explicit https public base URL is configured and the tunnel fallback is on
+    When the worker environment is read
+    Then the explicit public base URL is reported and the tunnel is never opened
+
+  @unit
+  Scenario: A worker's own voice boot failure does not take the worker down
+    Given a worker whose voice tunnel or media listener boot step fails
+    When the worker boots
+    Then the failure is logged and the rest of the worker boots normally
+
+  @unit
+  Scenario: A worker's boot plan always includes the voice media listener
+    Given any worker's boot environment
     When the worker boot plan is resolved
-    Then it boots the scenario processor, the media listener and metrics
-    And it skips ingestion, anomaly, governance, poller and telemetry
-
-  @unit
-  Scenario: A voice worker runs only voice jobs
-    Given a scenario execution pool that accepts only voice jobs
-    When a non-voice job is submitted
-    Then the pool refuses it so another pod runs it
-    And a voice job submitted to the same pool starts
+    Then it boots the voice media listener alongside every other subsystem
 
   @unit
   Scenario: The media listener answers its health check and refuses everything else
@@ -206,10 +276,28 @@ Feature: Voice agents: reach an agent by phone
     Then the upgrade is closed with forbidden before any audio
 
   @unit
+  Scenario: A dial-back arriving after ring delay is still accepted
+    Given a nonce registered to a child
+    When Twilio's dial-back arrives after the callee's ring delay, any time up to the SDK's own connect-wait deadline
+    Then the nonce is still consumed successfully
+
+  @unit
+  Scenario: A nonce that outlives the SDK's own wait window is still refused
+    Given a nonce registered to a child
+    When it outlives even the SDK's own connect-wait window
+    Then it is still refused as expired
+
+  @unit
   Scenario: The media listener hands a valid call's socket to its scenario child
     Given the voice media listener is running with a nonce registered to a child
     When an upgrade arrives on that nonce's media path
     Then the raw socket is handed to the registered child
+
+  @unit
+  Scenario: The child feeds a handed-off Twilio socket into its own adapter
+    Given the parent has handed off Twilio's media socket to the child over IPC
+    When the child receives it
+    Then it forwards the received socket into the adapter's own upgrade handler
 
   @integration
   Scenario: A handed-off media socket arrives at the scenario child process

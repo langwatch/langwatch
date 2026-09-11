@@ -6,70 +6,40 @@ import { describe, expect, it } from "vitest";
 import { resolveWorkerBootPlan } from "../worker-boot-plan";
 
 describe("resolveWorkerBootPlan", () => {
-  describe("given a normal worker", () => {
-    it("boots the full stack", () => {
-      const plan = resolveWorkerBootPlan({
-        voiceWorkerOnly: false,
-        shouldStartMetricsServer: true,
-      });
+  /** @scenario "A worker's boot plan always includes the voice media listener" */
+  it("boots the full stack including the voice media listener", () => {
+    const plan = resolveWorkerBootPlan({ shouldStartMetricsServer: true });
 
-      expect(plan).toEqual([
-        "storage-stats",
-        "scenario-processor",
-        "nlp-fetch-teardown",
-        "anomaly",
-        "spend-spike-anomaly",
-        "usage-stats",
-        "realtime-session-poller",
-        "metrics",
-      ]);
-    });
+    expect(plan).toEqual([
+      "storage-stats",
+      "voice-ws-listener",
+      "scenario-processor",
+      "nlp-fetch-teardown",
+      "anomaly",
+      "spend-spike-anomaly",
+      "usage-stats",
+      "realtime-session-poller",
+      "metrics",
+    ]);
   });
 
-  describe("given a voice worker", () => {
-    /** @scenario "A voice worker boots only the voice subsystems" */
-    it("boots only the scenario processor, media listener and metrics", () => {
-      const plan = resolveWorkerBootPlan({
-        voiceWorkerOnly: true,
-        shouldStartMetricsServer: true,
-      });
+  describe("given the scenario processor claims jobs as soon as it boots", () => {
+    it("binds the voice media listener before the scenario processor", () => {
+      // A voice job claimed in the gap between the two stages would build
+      // TwiML naming a media socket nothing is listening on yet, and the
+      // inbound call would fail on connect. The listener has to win the race.
+      const plan = resolveWorkerBootPlan({ shouldStartMetricsServer: true });
 
-      expect(plan).toEqual([
-        "scenario-processor",
-        "nlp-fetch-teardown",
-        "voice-ws-listener",
-        "metrics",
-      ]);
-    });
-
-    /** @scenario "A voice worker boots only the voice subsystems" */
-    it("skips ingestion, anomaly, governance, poller and telemetry", () => {
-      const plan = resolveWorkerBootPlan({
-        voiceWorkerOnly: true,
-        shouldStartMetricsServer: true,
-      });
-
-      expect(plan).not.toContain("storage-stats");
-      expect(plan).not.toContain("anomaly");
-      expect(plan).not.toContain("spend-spike-anomaly");
-      expect(plan).not.toContain("realtime-session-poller");
-      expect(plan).not.toContain("usage-stats");
+      expect(plan.indexOf("voice-ws-listener")).toBeLessThan(
+        plan.indexOf("scenario-processor"),
+      );
     });
   });
 
   describe("given metrics are served elsewhere", () => {
-    it("drops the metrics stage from either plan", () => {
+    it("drops the metrics stage from the plan", () => {
       expect(
-        resolveWorkerBootPlan({
-          voiceWorkerOnly: true,
-          shouldStartMetricsServer: false,
-        }),
-      ).not.toContain("metrics");
-      expect(
-        resolveWorkerBootPlan({
-          voiceWorkerOnly: false,
-          shouldStartMetricsServer: false,
-        }),
+        resolveWorkerBootPlan({ shouldStartMetricsServer: false }),
       ).not.toContain("metrics");
     });
   });

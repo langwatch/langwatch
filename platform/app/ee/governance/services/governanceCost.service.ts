@@ -746,17 +746,22 @@ export class GovernanceCostService {
    * This panel used to read the metered trace store, which in a deployment
    * whose only money arrives on pulled bills holds nothing — so a screen with
    * a fully populated `Model` column sat there reporting "nothing in this
-   * window yet". Same rollup as every other figure on this screen now, which
-   * is also what makes it add up against the billed lane beside it.
+   * window yet". Same rollup as every other figure on this screen now — but
+   * NOT the same withholding rule: this read withholds on a cell with no USD
+   * amount, the billed lane beside it only on a cell with no amount in any
+   * currency, so a window holding one euro cell shows a withheld model list
+   * next to a lane that states a figure. `sumWindowByModel`
+   * (governanceCostRollup.clickhouse.repository) carries why the model read
+   * keeps the stricter rule.
    *
    * Ordered by spend rather than alphabetically, because the panel is a ranked
    * list and the question it answers is which model costs the most. A withheld
    * figure sorts last: it is not a small number, it is an unknown one, and
    * putting it at the top or in the middle would read as a measurement.
    *
-   * Each figure obeys the same withholding rule as every other on this screen:
-   * a model holding any cell we have no USD amount for states no figure,
-   * because the priced part alone reads as the whole one.
+   * Each figure obeys that stricter rule: a model holding any cell we have no
+   * USD amount for states no figure, because the priced part alone reads as
+   * the whole one.
    */
   async spendByModel({
     organizationId,

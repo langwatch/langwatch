@@ -272,7 +272,7 @@ describe("given a Genie source that has not switched the paid bill read on", () 
 
 describe("given a Genie source with the paid bill read switched on", () => {
   describe("when the workspace bills a person's usage under a price line with a list price", () => {
-    /** @scenario "A paid Genie charge lands on the person who ran it, for that day and that price line" */
+    /** @scenario "A paid Genie charge lands on the identity the bill names as run_as, for that day and that price line" */
     it("records one cost row for that person, day and price line at the list price", async () => {
       billPlan = { kind: "rows", rows: [paidRow()] };
 
@@ -298,7 +298,7 @@ describe("given a Genie source with the paid bill read switched on", () => {
       expect(event.extra?.quantity).toBe("12.5");
     });
 
-    /** @scenario "A paid Genie charge lands on the person who ran it, for that day and that price line" */
+    /** @scenario "A paid Genie charge lands on the identity the bill names as run_as, for that day and that price line" */
     it("asks the workspace for the Genie bill line on the configured warehouse", async () => {
       billPlan = { kind: "rows", rows: [] };
 
@@ -319,7 +319,7 @@ describe("given a Genie source with the paid bill read switched on", () => {
       expect(sql).not.toContain("system.query.history");
     });
 
-    /** @scenario "A paid Genie charge lands on the person who ran it, for that day and that price line" */
+    /** @scenario "A paid Genie charge lands on the identity the bill names as run_as, for that day and that price line" */
     it("carries the currency when the only list price is not in dollars", async () => {
       billPlan = {
         kind: "rows",
