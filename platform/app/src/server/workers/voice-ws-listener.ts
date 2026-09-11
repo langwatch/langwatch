@@ -12,8 +12,8 @@
  * Everything that is not a `/twilio/<nonce>` upgrade is refused before any audio
  * flows: `/healthz` answers 200, every other request answers 404, an upgrade on
  * a wrong path is closed 404, and an unknown or expired nonce is closed 403 with
- * a warn. The listener boots only when VOICE_WORKER_ONLY is on, so it is inert
- * in every default deployment.
+ * a warn. The listener boots on every worker process (see
+ * `workers/worker-boot-plan.ts`).
  */
 
 import type { ChildProcess } from "node:child_process";

@@ -184,21 +184,20 @@ Feature: Voice agents: reach an agent by phone
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: The voice worker reads its three infrastructure environment variables
+  Scenario: The voice worker reads its infrastructure environment variables
     Given the voice worker environment with no variables set
     When the worker environment is read
-    Then voice worker only is off and the websocket port defaults to 3300
-    And only the literal "true" turns voice worker only on
+    Then the websocket port defaults to 3300 and no public base URL is set
 
   @unit
-  Scenario: A voice worker refuses to start without a public base URL
-    Given the voice worker environment with voice worker only on and no public base URL
+  Scenario: A public base URL must be an https origin
+    Given a public base URL is configured
     When the worker environment is read
-    Then it fails because the worker cannot be reached without a public origin
+    Then an https origin is accepted and reported, and a non-https origin is rejected
 
   @unit
   Scenario: A voice worker opens a quick tunnel when no public base URL is configured
-    Given voice worker only is on with no public base URL and the tunnel fallback left on
+    Given no public base URL is configured and the tunnel fallback is left on
     When the worker environment is read and its public URL is resolved
     Then it does not fail, opens a cloudflared quick tunnel on the websocket port
     And it waits until the tunnel's host resolves before treating it as ready
@@ -217,30 +216,21 @@ Feature: Voice agents: reach an agent by phone
 
   @unit
   Scenario: An explicit public base URL always wins over the tunnel fallback
-    Given voice worker only is on with an explicit https public base URL and the tunnel fallback on
+    Given an explicit https public base URL is configured and the tunnel fallback is on
     When the worker environment is read
     Then the explicit public base URL is reported and the tunnel is never opened
 
   @unit
-  Scenario: A voice worker boots only the voice subsystems
-    Given voice worker only is on
+  Scenario: A worker's own voice boot failure does not take the worker down
+    Given a worker whose voice tunnel or media listener boot step fails
+    When the worker boots
+    Then the failure is logged and the rest of the worker boots normally
+
+  @unit
+  Scenario: A worker's boot plan always includes the voice media listener
+    Given any worker's boot environment
     When the worker boot plan is resolved
-    Then it boots the scenario processor, the media listener and metrics
-    And it skips ingestion, anomaly, governance, poller and telemetry
-
-  @unit
-  Scenario: A voice worker runs only voice jobs
-    Given a scenario execution pool that accepts only voice jobs
-    When a non-voice job is submitted
-    Then the pool refuses it so another pod runs it
-    And a voice job submitted to the same pool starts
-
-  @unit
-  Scenario: A normal worker never runs a voice job
-    Given a scenario execution pool that refuses voice jobs, as a normal worker's pool does
-    When a voice job is submitted
-    Then the pool refuses it so a voice worker runs it instead
-    And a non-voice job submitted to the same pool starts
+    Then it boots the voice media listener alongside every other subsystem
 
   @unit
   Scenario: The media listener answers its health check and refuses everything else

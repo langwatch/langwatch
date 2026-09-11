@@ -1,15 +1,16 @@
 /**
  * Which subsystems a worker process boots.
  *
- * Pulled out of {@link ./startWorkers} as a pure decision so the
- * VOICE_WORKER_ONLY branch is unit-testable without mocking every lazily
- * imported boot stage. `startWorkers` maps each returned name to its boot call.
+ * Pulled out of {@link ./startWorkers} as a pure decision so the plan is
+ * unit-testable without mocking every lazily imported boot stage.
+ * `startWorkers` maps each returned name to its boot call.
  *
- * A normal worker boots the full stack. A voice worker (VOICE_WORKER_ONLY on)
- * boots only what a voice run needs: the scenario processor (filtered to voice
- * jobs), its NLP fetch-dispatcher teardown, the media listener, and metrics.
- * Every other subsystem is skipped, so the voice deployment carries none of the
- * ingestion, anomaly, governance, poller or telemetry load.
+ * Every worker boots the full stack, voice included. Each process now opens
+ * its OWN cloudflared quick tunnel (or uses an explicit
+ * VOICE_PUBLIC_BASE_URL) and stamps its own hostname into the TwiML for calls
+ * it places itself, so a call returns to the process that placed it by
+ * construction — there is no shared address to contend over, and no reason
+ * left to confine voice to a dedicated single-replica deployment.
  */
 
 /** Every boot stage `startWorkers` knows how to run. */
@@ -17,11 +18,11 @@ export type WorkerStageName =
   | "storage-stats"
   | "scenario-processor"
   | "nlp-fetch-teardown"
+  | "voice-ws-listener"
   | "anomaly"
   | "spend-spike-anomaly"
   | "usage-stats"
   | "realtime-session-poller"
-  | "voice-ws-listener"
   | "metrics";
 
 /**
@@ -30,26 +31,17 @@ export type WorkerStageName =
  * teardown runs newest-first.
  */
 export function resolveWorkerBootPlan(params: {
-  voiceWorkerOnly: boolean;
   shouldStartMetricsServer: boolean;
 }): WorkerStageName[] {
   const metrics: WorkerStageName[] = params.shouldStartMetricsServer
     ? ["metrics"]
     : [];
 
-  if (params.voiceWorkerOnly) {
-    return [
-      "scenario-processor",
-      "nlp-fetch-teardown",
-      "voice-ws-listener",
-      ...metrics,
-    ];
-  }
-
   return [
     "storage-stats",
     "scenario-processor",
     "nlp-fetch-teardown",
+    "voice-ws-listener",
     "anomaly",
     "spend-spike-anomaly",
     "usage-stats",

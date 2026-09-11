@@ -64,16 +64,8 @@ async function bootStorageStatsCollection(
 // pool holder the simulationRunExecution process manager's execute intent
 // reads. Without this the intent throws (outbox retries) and simulations
 // never execute on this pod.
-//
-// Exported ONLY so a test can pin the `acceptJob` wiring below without
-// re-testing `isVoiceJob`/`isNotVoiceJob` themselves (already covered by
-// execution-pool-voice-filter.unit.test.ts): a one-sided regression here
-// (dropping the `isNotVoiceJob` branch) means every ordinary worker accepts
-// voice jobs it can never actually service, since only a voice worker boots
-// the Twilio media listener.
-export async function bootScenarioProcessor(
+async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
-  options?: { voiceWorkerOnly?: boolean },
 ): Promise<void> {
   const { getScenarioExecutionPool } = await import(
     "~/server/app-layer/presets"
@@ -93,20 +85,11 @@ export async function bootScenarioProcessor(
   const { voiceRunsMaxConcurrent } = await import(
     "~/server/scenarios/voice/voice-limits"
   );
-  const { isVoiceJob, isNotVoiceJob } = await import(
-    "~/server/scenarios/execution/voice-worker-only"
-  );
   const scenarioPool = new ScenarioExecutionPool({
     concurrency: SCENARIO_WORKER.CONCURRENCY,
     // A voice run holds an ElevenLabs socket for the length of a call, so cap
     // how many a project runs at once; the rest wait in the queue.
     voiceGate: new VoiceConcurrencyGate({ max: voiceRunsMaxConcurrent() }),
-    // A voice worker (VOICE_WORKER_ONLY) runs only voice jobs; a normal
-    // worker runs every OTHER job and refuses voice ones. The two predicates
-    // are exact complements (see voice-worker-only.ts) so a voice job is
-    // never accepted anywhere but a voice worker — the process that also
-    // boots the media listener its Twilio nonce registration depends on.
-    acceptJob: options?.voiceWorkerOnly ? isVoiceJob : isNotVoiceJob,
   });
   getScenarioExecutionPool()?.set(scenarioPool);
   const scenarioProcessor = await startScenarioProcessor({
@@ -174,7 +157,7 @@ async function bootRealtimeSessionPoller(
   logger.info("realtime voice session poller ready");
 }
 
-// A voice worker with no VOICE_PUBLIC_BASE_URL configured and the tunnel
+// Every worker with no VOICE_PUBLIC_BASE_URL configured and the tunnel
 // fallback left on (VOICE_TUNNEL, default enabled) discovers its own public
 // origin by opening a free cloudflared quick tunnel to the media listener's
 // port. Runs BEFORE the scenario processor boots: it must set
@@ -182,53 +165,82 @@ async function bootRealtimeSessionPoller(
 // child-environment.ts forwards that var verbatim and phone.transport.ts
 // reads it straight from process.env, with no other plumbing needed. A noop
 // when VOICE_PUBLIC_BASE_URL is already set (explicit config always wins) or
-// the worker is not a voice worker at all.
-async function bootVoicePublicUrlTunnel(
+// the tunnel fallback is disabled.
+//
+// Non-fatal on failure: voice now boots on EVERY worker, so a single
+// Cloudflare hiccup opening this process's tunnel must not take the whole
+// worker down — it would down the entire fleet's job processing over one
+// voice-only outage. Log and continue with no public URL; voice runs on this
+// process fail individually instead (see bootVoiceListener's same guard).
+// Exported only so a test can pin the non-fatal guard: a tunnel failure must
+// not throw out of this function, or it takes the whole worker down with it.
+export async function bootVoicePublicUrlTunnel(
   shutdownHandles: ShutdownHandles,
   voiceEnv: {
-    voiceWorkerOnly: boolean;
     voiceWsPort: number;
     voicePublicBaseUrl: string | undefined;
     voiceTunnelEnabled: boolean;
   },
 ): Promise<string | undefined> {
   if (
-    !voiceEnv.voiceWorkerOnly ||
     voiceEnv.voicePublicBaseUrl !== undefined ||
     !voiceEnv.voiceTunnelEnabled
   ) {
     return voiceEnv.voicePublicBaseUrl;
   }
-  const { openVoicePublicUrlTunnel } = await import(
-    "~/server/scenarios/voice/voice-public-url-tunnel"
-  );
-  const tunnel = await openVoicePublicUrlTunnel({ port: voiceEnv.voiceWsPort });
-  process.env.VOICE_PUBLIC_BASE_URL = tunnel.url;
-  shutdownHandles.push(() => tunnel.close());
-  logger.info({ url: tunnel.url }, "voice public URL tunnel ready");
-  return tunnel.url;
+  try {
+    const { openVoicePublicUrlTunnel } = await import(
+      "~/server/scenarios/voice/voice-public-url-tunnel"
+    );
+    const tunnel = await openVoicePublicUrlTunnel({
+      port: voiceEnv.voiceWsPort,
+    });
+    process.env.VOICE_PUBLIC_BASE_URL = tunnel.url;
+    shutdownHandles.push(() => tunnel.close());
+    logger.info({ url: tunnel.url }, "voice public URL tunnel ready");
+    return tunnel.url;
+  } catch (error) {
+    logger.error(
+      { error },
+      "voice public URL tunnel failed to open; voice runs on this worker will fail until it restarts",
+    );
+    return undefined;
+  }
 }
 
 // The Twilio media listener: its own HTTP+WS server on VOICE_WS_PORT, booted
-// only on a voice worker (VOICE_WORKER_ONLY). It authenticates the per-call
-// nonce and hands the raw upgrade socket to the scenario child that owns the
-// call. Inert in every default deployment, since the stage is absent from the
-// non-voice boot plan.
-async function bootVoiceListener(
+// on every worker. It authenticates the per-call nonce and hands the raw
+// upgrade socket to the scenario child that owns the call.
+//
+// Non-fatal on failure (a port bind failure, most likely): every worker boots
+// this now, so one process failing to bind its listener must not crash the
+// whole worker — log and continue with no listener; voice runs on this
+// process fail individually instead (see bootVoicePublicUrlTunnel's same
+// guard).
+// Exported only so a test can pin the non-fatal guard: a bind failure must
+// not throw out of this function, or it takes the whole worker down with it.
+export async function bootVoiceListener(
   shutdownHandles: ShutdownHandles,
   voiceEnv: { voiceWsPort: number; voicePublicBaseUrl: string | undefined },
 ): Promise<void> {
-  const { getVoiceNonceRegistry } = await import(
-    "~/server/scenarios/voice/voice-nonce-registry"
-  );
-  const { bootVoiceWsListener } = await import("./voice-ws-listener");
-  const { close, address } = await bootVoiceWsListener({
-    port: voiceEnv.voiceWsPort,
-    publicBaseUrl: voiceEnv.voicePublicBaseUrl,
-    registry: getVoiceNonceRegistry(),
-  });
-  shutdownHandles.push(() => close());
-  logger.info(`voice media listener ready on port ${address.port}`);
+  try {
+    const { getVoiceNonceRegistry } = await import(
+      "~/server/scenarios/voice/voice-nonce-registry"
+    );
+    const { bootVoiceWsListener } = await import("./voice-ws-listener");
+    const { close, address } = await bootVoiceWsListener({
+      port: voiceEnv.voiceWsPort,
+      publicBaseUrl: voiceEnv.voicePublicBaseUrl,
+      registry: getVoiceNonceRegistry(),
+    });
+    shutdownHandles.push(() => close());
+    logger.info(`voice media listener ready on port ${address.port}`);
+  } catch (error) {
+    logger.error(
+      { error },
+      "voice media listener failed to start; voice runs on this worker will fail until it restarts",
+    );
+  }
 }
 
 // Self-hosted daily usage telemetry (no-op on SaaS or when
@@ -599,9 +611,8 @@ export async function startWorkers(
   await assertRedisReady();
   await verifyDatabaseReady();
 
-  // Read the voice worker env FIRST: VOICE_WORKER_ONLY chooses the boot plan,
-  // and this throws (refuses to start) when it is on without
-  // VOICE_PUBLIC_BASE_URL and without the VOICE_TUNNEL fallback.
+  // Read the voice worker env FIRST: the tunnel/listener boot below need its
+  // port and tunnel settings. Never throws (see voice-worker-env.ts).
   const { readVoiceWorkerEnv } = await import(
     "~/server/scenarios/voice/voice-worker-env"
   );
@@ -620,14 +631,8 @@ export async function startWorkers(
   };
 
   const { resolveWorkerBootPlan } = await import("./worker-boot-plan");
-  const plan = resolveWorkerBootPlan({
-    voiceWorkerOnly: voiceEnv.voiceWorkerOnly,
-    shouldStartMetricsServer,
-  });
-  logger.info(
-    { voiceWorkerOnly: voiceEnv.voiceWorkerOnly, plan },
-    "worker boot plan",
-  );
+  const plan = resolveWorkerBootPlan({ shouldStartMetricsServer });
+  logger.info({ plan }, "worker boot plan");
 
   try {
     // Ingestion pulls self-drive through durable process wakes and the
@@ -650,9 +655,7 @@ export async function startWorkers(
           await bootStorageStatsCollection(shutdownHandles);
           break;
         case "scenario-processor":
-          await bootScenarioProcessor(shutdownHandles, {
-            voiceWorkerOnly: voiceEnv.voiceWorkerOnly,
-          });
+          await bootScenarioProcessor(shutdownHandles);
           break;
         case "nlp-fetch-teardown":
           await bootNlpFetchDispatcherTeardown(shutdownHandles);

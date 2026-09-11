@@ -609,11 +609,11 @@ async function spawnScenarioChildProcess(
     // Register in the pool so cancel broadcasts can find this child
     pool.registerChild(jobData.scenarioRunId, child);
 
-    // Voice-only: answer the child's nonce-registration request by writing it
+    // Voice: answer the child's nonce-registration request by writing it
     // into THIS process's registry and acking — this process is exactly the
-    // one the voice-ws-listener reads (both boot together under
-    // VOICE_WORKER_ONLY, see worker-boot-plan.ts), so the registration and
-    // the eventual `consume()` lookup share memory by construction.
+    // one the voice-ws-listener reads (both boot together on every worker,
+    // see worker-boot-plan.ts), so the registration and the eventual
+    // `consume()` lookup share memory by construction.
     if (isVoiceChild) {
       child.on("message", (message: unknown) => {
         if (!isVoiceNonceRegisterMessage(message)) return;
