@@ -19,7 +19,27 @@ export const CALL_VERDICT_TIMEOUT_MS = 180_000;
 /** How long to wait for the call to start (leave the queued state). */
 export const CALL_START_TIMEOUT_MS = 60_000;
 
-/** How long to keep retrying a `404` while the provider finishes publishing the recording. */
+/**
+ * How long to keep retrying a `404` before giving up on the whole-call
+ * recording.
+ *
+ * This wait covers two asynchronous stages in sequence, not one. The run's
+ * audio endpoint does not hold the vendor's recording handle directly: it
+ * resolves it by reading the run's own trace spans back out of storage. So
+ * the run's spans must finish ingesting before the endpoint can resolve
+ * anything, and only then can the vendor's recording have finished
+ * publishing. A `404` is ambiguous between the two.
+ *
+ * It is therefore set above `TRACE_INGESTION_TIMEOUT_MS`, the allowance the
+ * trace steps get for that same ingestion, leaving real vendor publish time
+ * on top.
+ *
+ * Raising this is not a cure for a `404` that persists. A run whose spans
+ * never carry a recording handle at all will sit at `404` for any ceiling,
+ * because there is nothing for the endpoint to resolve — that is a defect in
+ * the run, and this step is meant to fail loudly on it rather than wait it
+ * out.
+ */
 export const WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS = 120_000;
 
 /**
