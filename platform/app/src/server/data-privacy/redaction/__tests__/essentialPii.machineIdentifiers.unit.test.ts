@@ -102,6 +102,18 @@ describe("the native essential-PII engine on machine identifiers", () => {
       expect(asAttributeValue(REAL_TAPROOT_ADDRESS)).toBe("[CRYPTO]");
     });
 
+    // Checksum valid, and still not an address: the character after the prefix
+    // is a witness version of seventeen, and bitcoin defines sixteen.
+    // Constructed for this test, because no such value exists in the wild to
+    // borrow — which is the point, as a value of this shape in a customer
+    // attribute is something else entirely and has to survive.
+    /** @scenario "A token using a witness version bitcoin does not define is not an address" */
+    it("keeps a checksum valid token whose witness version bitcoin does not define", () => {
+      const token = "bc13r23clxd5mzfsh79vn6pg0kaytjeq8w4un2kxzn";
+
+      expect(asAttributeValue(token)).toBe(token);
+    });
+
     it("redacts an address written inside a sentence", () => {
       expect(
         redactEssentialPiiInText({ text: `send to ${REAL_P2PKH_ADDRESS} now` })

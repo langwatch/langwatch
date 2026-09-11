@@ -88,6 +88,29 @@ describe("given a bech32 address", () => {
     });
   });
 
+  /**
+   * A checksum is only as narrow as the grammar behind it. The witness version
+   * is read from a thirty-two character alphabet, and BIP-141 defines sixteen
+   * of those values; the other fifteen decode to no segwit program at all.
+   *
+   * The pair below is one payload written at two versions, so the checksums are
+   * built the same way and only the version differs. The version one member
+   * validating is what proves the version seventeen member is rejected for its
+   * version and not for a checksum that was never going to line up.
+   */
+  describe("when the witness version is one bitcoin does not define", () => {
+    const PAYLOAD_AT_V1 = "bc1pr23clxd5mzfsh79vn6pg0kaytjeq8w4u8x8jd8";
+    const PAYLOAD_AT_V17 = "bc13r23clxd5mzfsh79vn6pg0kaytjeq8w4un2kxzn";
+
+    it("accepts the same payload written at a version bitcoin does define", () => {
+      expect(isBech32Address(PAYLOAD_AT_V1)).toBe(true);
+    });
+
+    it("rejects a checksum valid token at version seventeen", () => {
+      expect(isBech32Address(PAYLOAD_AT_V17)).toBe(false);
+    });
+  });
+
   describe("when the address has been altered", () => {
     it.each([
       ["a changed data character", mutate(SEGWIT_V0, 10, "p")],

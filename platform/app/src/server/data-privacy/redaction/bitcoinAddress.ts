@@ -104,6 +104,16 @@ function bech32Polymod(values: readonly number[]): number {
   return checksum >>> 0;
 }
 
+/**
+ * The highest witness version BIP-141 defines. The first data character is read
+ * from a 32-character alphabet, so it can carry 17 through 31 as easily as a
+ * real version — and those decode to no segwit program at all. Without this
+ * bound a `bc13…` string that happens to carry a valid bech32m checksum is
+ * classified as an address and replaced with a marker, which is the data loss
+ * this whole recognizer was rewritten to stop.
+ */
+const MAX_WITNESS_VERSION = 16;
+
 /** The "bc" human-readable part, expanded the way BIP-173 specifies. */
 const BC_HRP_EXPANDED = [
   "b".charCodeAt(0) >> 5,
@@ -119,10 +129,11 @@ const BC_HRP_EXPANDED = [
  * recognizer's pattern matches.
  *
  * The first data character is the witness version, and BIP-350 pairs version 0
- * with the bech32 constant and every later version with the bech32m constant.
+ * with the bech32 constant and versions 1 through 16 with the bech32m constant.
  * Accepting either constant for either version would accept BIP-350's own
  * invalid vectors, so the pairing is enforced rather than the two constants
- * simply being tried in turn.
+ * simply being tried in turn, and a version above 16 is rejected outright
+ * ({@link MAX_WITNESS_VERSION}).
  *
  * BIP-173 requires the whole address to be one case; mixed case is invalid and
  * is rejected here rather than folded away, so this answers the same question
@@ -141,6 +152,7 @@ export function isBech32Address(value: string): boolean {
     values.push(index);
   }
   const witnessVersion = values[BC_HRP_EXPANDED.length]!;
+  if (witnessVersion > MAX_WITNESS_VERSION) return false;
   const expected = witnessVersion === 0 ? BECH32_CONSTANT : BECH32M_CONSTANT;
   return bech32Polymod(values) === expected;
 }
