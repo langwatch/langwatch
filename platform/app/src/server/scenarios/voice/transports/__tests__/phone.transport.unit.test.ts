@@ -399,7 +399,12 @@ describe("phoneTransport", () => {
               ),
             ) as Promise<T>,
         );
-        const { transport } = buildTransport({ adapter, raceUpgradeRefusal });
+        const { transport } = buildTransport({
+          adapter,
+          raceUpgradeRefusal: raceUpgradeRefusal as <T>(
+            promise: Promise<T>,
+          ) => Promise<T>,
+        });
         const built = transport.createAgentAdapter({
           agentId: TARGET,
           credential: TWILIO_CREDENTIAL,

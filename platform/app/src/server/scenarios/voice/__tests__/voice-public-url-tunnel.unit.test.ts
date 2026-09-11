@@ -65,7 +65,9 @@ describe("waitUntilTunnelResolvable", () => {
 
   /** @scenario "A voice worker's public URL tunnel fails fast when it never becomes reachable" */
   it("throws VoiceTunnelNotReadyError once the timeout elapses without a resolution", async () => {
-    const resolveHost = vi.fn<(host: string) => Promise<boolean>>().mockResolvedValue(false);
+    const resolveHost = vi
+      .fn<(host: string) => Promise<boolean>>()
+      .mockResolvedValue(false);
 
     await expect(
       waitUntilTunnelResolvable({
@@ -78,7 +80,9 @@ describe("waitUntilTunnelResolvable", () => {
 
   /** @scenario "A voice worker's public URL tunnel fails fast when it never becomes reachable" */
   it("names the tunnel URL and timeout in the failure message", async () => {
-    const resolveHost = vi.fn<(host: string) => Promise<boolean>>().mockResolvedValue(false);
+    const resolveHost = vi
+      .fn<(host: string) => Promise<boolean>>()
+      .mockResolvedValue(false);
 
     await expect(
       waitUntilTunnelResolvable({

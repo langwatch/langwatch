@@ -26,10 +26,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
-import type {
-  VoiceTransportCredential,
-  VoiceTransportRunner,
-} from "../voice-transport.registry";
 import {
   raceAgainstUpgradeRefusal,
   requestNonceRegistration,
@@ -38,6 +34,10 @@ import {
   createVoiceSocketReceiver,
   type VoiceSocketReceiver,
 } from "../voice-socket-handoff";
+import type {
+  VoiceTransportCredential,
+  VoiceTransportRunner,
+} from "../voice-transport.registry";
 
 const logger = createLogger("langwatch:scenarios:voice:phone");
 
@@ -449,7 +449,8 @@ export function createPhoneTransport(
   const mintNonce = deps.mintNonce ?? mintPhoneStreamNonce;
   const raceUpgradeRefusal =
     deps.raceUpgradeRefusal ??
-    (<T>(promise: Promise<T>): Promise<T> => raceAgainstUpgradeRefusal(promise));
+    (<T>(promise: Promise<T>): Promise<T> =>
+      raceAgainstUpgradeRefusal(promise));
   const socketReceiver = deps.socketReceiver ?? createVoiceSocketReceiver();
 
   return {

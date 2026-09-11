@@ -123,6 +123,30 @@ Feature: Voice agents: reach an agent by phone
     And the caller adapter is disconnected
 
   # ---------------------------------------------------------------------------
+  # Per-call nonce handoff (the phone transport parent/child IPC race)
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A phone call fails loudly when the parent never acknowledges the nonce
+    Given a phone target with a valid Twilio credential
+    When the run registers the call's nonce and the parent process never acknowledges it
+    Then connect waits on the registration and never places the call
+
+  @unit
+  Scenario: A phone call fails loudly when the parent refuses the nonce
+    Given a phone target with a valid Twilio credential
+    When the parent process refuses to register the call's nonce
+    Then the refusal surfaces as the run's error and no call is placed
+    And the caller adapter is disconnected
+
+  @unit
+  Scenario: A phone call fails fast when the listener refuses the socket mid-dial
+    Given a phone call whose nonce was registered and dialling has started
+    When the media listener refuses the upgrade because the nonce has expired
+    Then connect fails immediately with the refusal reason instead of waiting out the call
+    And the caller adapter is disconnected
+
+  # ---------------------------------------------------------------------------
   # No browser call over phone
   # ---------------------------------------------------------------------------
 
@@ -173,6 +197,31 @@ Feature: Voice agents: reach an agent by phone
     Then it fails because the worker cannot be reached without a public origin
 
   @unit
+  Scenario: A voice worker opens a quick tunnel when no public base URL is configured
+    Given voice worker only is on with no public base URL and the tunnel fallback left on
+    When the worker environment is read and its public URL is resolved
+    Then it does not fail, opens a cloudflared quick tunnel on the websocket port
+    And it waits until the tunnel's host resolves before treating it as ready
+
+  @unit
+  Scenario: A voice worker's public URL tunnel fails fast when it never becomes reachable
+    Given a cloudflared quick tunnel has been opened
+    When its host never resolves before the readiness timeout elapses
+    Then the tunnel is closed and the worker fails, naming the tunnel URL and the timeout
+
+  @unit
+  Scenario: A voice worker's quick tunnel is closed on worker shutdown
+    Given a cloudflared quick tunnel is open and ready
+    When the worker closes it on shutdown
+    Then the underlying tunnel's own close is called
+
+  @unit
+  Scenario: An explicit public base URL always wins over the tunnel fallback
+    Given voice worker only is on with an explicit https public base URL and the tunnel fallback on
+    When the worker environment is read
+    Then the explicit public base URL is reported and the tunnel is never opened
+
+  @unit
   Scenario: A voice worker boots only the voice subsystems
     Given voice worker only is on
     When the worker boot plan is resolved
@@ -185,6 +234,13 @@ Feature: Voice agents: reach an agent by phone
     When a non-voice job is submitted
     Then the pool refuses it so another pod runs it
     And a voice job submitted to the same pool starts
+
+  @unit
+  Scenario: A normal worker never runs a voice job
+    Given a scenario execution pool that refuses voice jobs, as a normal worker's pool does
+    When a voice job is submitted
+    Then the pool refuses it so a voice worker runs it instead
+    And a non-voice job submitted to the same pool starts
 
   @unit
   Scenario: The media listener answers its health check and refuses everything else
@@ -204,6 +260,12 @@ Feature: Voice agents: reach an agent by phone
     Given the voice media listener is running
     When an upgrade arrives with a nonce that is unknown or has expired
     Then the upgrade is closed with forbidden before any audio
+
+  @unit
+  Scenario: A dial-back arriving after ring delay is still accepted
+    Given a nonce registered to a child
+    When Twilio's dial-back arrives after the callee's ring delay, any time up to the SDK's own connect-wait deadline
+    Then the nonce is still consumed successfully
 
   @unit
   Scenario: The media listener hands a valid call's socket to its scenario child

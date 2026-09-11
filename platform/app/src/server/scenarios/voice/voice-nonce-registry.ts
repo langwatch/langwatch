@@ -52,7 +52,8 @@ export const SDK_STREAM_CONNECT_TIMEOUT_MS = 120_000;
  * of it. Do not lower this constant without raising
  * {@link SDK_STREAM_CONNECT_TIMEOUT_MS} (or the SDK's own default) to match.
  */
-export const VOICE_NONCE_DEFAULT_TTL_MS = SDK_STREAM_CONNECT_TIMEOUT_MS + 30_000;
+export const VOICE_NONCE_DEFAULT_TTL_MS =
+  SDK_STREAM_CONNECT_TIMEOUT_MS + 30_000;
 
 /**
  * The outcome of consuming a nonce: the owning child, or why it was refused.

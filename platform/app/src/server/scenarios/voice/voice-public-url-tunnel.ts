@@ -29,9 +29,7 @@
 
 import { voice as scenarioVoice } from "@langwatch/scenario";
 
-type OpenedTunnel = Awaited<
-  ReturnType<typeof scenarioVoice.openTwilioTunnel>
->;
+type OpenedTunnel = Awaited<ReturnType<typeof scenarioVoice.openTwilioTunnel>>;
 
 /**
  * The SDK helper this module falls back to when no opener is injected. Exported

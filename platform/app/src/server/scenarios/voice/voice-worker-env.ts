@@ -109,5 +109,10 @@ export function readVoiceWorkerEnv(
     );
   }
 
-  return { voiceWorkerOnly, voiceWsPort, voicePublicBaseUrl, voiceTunnelEnabled };
+  return {
+    voiceWorkerOnly,
+    voiceWsPort,
+    voicePublicBaseUrl,
+    voiceTunnelEnabled,
+  };
 }

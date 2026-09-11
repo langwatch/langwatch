@@ -115,9 +115,9 @@ describe("readVoiceWorkerEnv", () => {
   describe("given VOICE_TUNNEL values", () => {
     /** @scenario "A voice worker opens a quick tunnel when no public base URL is configured" */
     it("is enabled for anything that is not the literal false", () => {
-      expect(readVoiceWorkerEnv({ VOICE_TUNNEL: "TRUE" }).voiceTunnelEnabled).toBe(
-        true,
-      );
+      expect(
+        readVoiceWorkerEnv({ VOICE_TUNNEL: "TRUE" }).voiceTunnelEnabled,
+      ).toBe(true);
       expect(readVoiceWorkerEnv({ VOICE_TUNNEL: "" }).voiceTunnelEnabled).toBe(
         true,
       );

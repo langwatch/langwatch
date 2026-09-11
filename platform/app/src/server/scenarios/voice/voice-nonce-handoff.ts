@@ -90,8 +90,7 @@ export function isVoiceMediaUpgradeRefusedMessage(
   return (
     typeof message === "object" &&
     message !== null &&
-    (message as { type?: unknown }).type ===
-      VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE
+    (message as { type?: unknown }).type === VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE
   );
 }
 
@@ -109,10 +108,7 @@ export function isVoiceNonceRegisterAckMessage(
 /** IPC-bearing subset of `process` the child side needs; eases testing (a
  *  fake stands in for the real `process` and its IPC channel). */
 export interface VoiceNonceRegisterProcess {
-  send?(
-    message: unknown,
-    callback?: (error: Error | null) => void,
-  ): boolean;
+  send?(message: unknown, callback?: (error: Error | null) => void): boolean;
   on(event: "message", listener: (message: unknown) => void): unknown;
   off(event: "message", listener: (message: unknown) => void): unknown;
 }
@@ -201,8 +197,7 @@ export function requestNonceRegistration(params: {
   timeoutMs?: number;
   requestId?: string;
 }): Promise<void> {
-  const proc =
-    params.proc ?? (process as unknown as VoiceNonceRegisterProcess);
+  const proc = params.proc ?? (process as unknown as VoiceNonceRegisterProcess);
   const timeoutMs = params.timeoutMs ?? VOICE_NONCE_REGISTER_TIMEOUT_MS;
   const requestId = params.requestId ?? crypto.randomUUID();
 

@@ -8,6 +8,7 @@ import type { AddressInfo } from "node:net";
 import net from "node:net";
 import type { Logger } from "@langwatch/observability";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { VoiceMediaUpgradeRefusedMessage } from "../../scenarios/voice/voice-nonce-handoff";
 import { VoiceNonceRegistry } from "../../scenarios/voice/voice-nonce-registry";
 import {
   bootVoiceWsListener,
@@ -195,7 +196,7 @@ describe("bootVoiceWsListener", () => {
     // very next upgrade against this nonce takes the "expired" branch.
     registry = new VoiceNonceRegistry({ ttlMs: 0, now: () => Date.now() });
     const port = await boot();
-    const send = vi.fn(() => true);
+    const send = vi.fn((_message: VoiceMediaUpgradeRefusedMessage) => true);
     const child = { send } as unknown as ChildProcess;
     registry.register({ nonce: "stale", child });
 
@@ -215,7 +216,10 @@ describe("bootVoiceWsListener", () => {
   /** @scenario "The media listener refuses an unknown or expired nonce" */
   it("does not notify anyone for an unknown nonce — there is no child to tell", async () => {
     const port = await boot();
-    const { statusLine, socket } = await rawUpgrade(port, "/twilio/never-registered");
+    const { statusLine, socket } = await rawUpgrade(
+      port,
+      "/twilio/never-registered",
+    );
     expect(statusLine).toContain("403");
     socket.destroy();
     // No assertion needed beyond "this doesn't throw" — an unknown nonce

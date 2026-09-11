@@ -16,11 +16,11 @@ import {
   VOICE_NONCE_REGISTER_ACK_MESSAGE,
   VOICE_NONCE_REGISTER_MESSAGE,
   VoiceMediaUpgradeRefusedError,
+  type VoiceNonceRegisterAckMessage,
+  type VoiceNonceRegisterMessage,
   VoiceNonceRegistrationFailedError,
   VoiceNonceRegistrationNoChannelError,
   VoiceNonceRegistrationTimeoutError,
-  type VoiceNonceRegisterAckMessage,
-  type VoiceNonceRegisterMessage,
 } from "../voice-nonce-handoff";
 import { VoiceNonceRegistry } from "../voice-nonce-registry";
 
@@ -32,9 +32,7 @@ describe("isVoiceNonceRegisterMessage", () => {
       nonce: "n1",
     };
     expect(isVoiceNonceRegisterMessage(msg)).toBe(true);
-    expect(isVoiceNonceRegisterMessage({ type: "something-else" })).toBe(
-      false,
-    );
+    expect(isVoiceNonceRegisterMessage({ type: "something-else" })).toBe(false);
     expect(isVoiceNonceRegisterMessage(null)).toBe(false);
   });
 });
