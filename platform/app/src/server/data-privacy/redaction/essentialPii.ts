@@ -111,24 +111,42 @@ function luhnValid(raw: string): boolean {
   return sum % 10 === 0;
 }
 
+const UATP_LENGTH = 15;
+const MASTERCARD_SERIES_FIRST = 2221;
+const MASTERCARD_SERIES_LAST = 2720;
+
 /**
- * The issuer ranges payment cards are actually minted under: first digit 3
- * (Amex, Diners, JCB), 4 (Visa), 5 (Mastercard, Maestro) or 6 (Discover,
- * UnionPay, Maestro), plus Mastercard's 2221-2720 series.
+ * Whether a card scheme could have issued this number AT THIS LENGTH.
  *
- * Deliberately generous — a range missing here means a real card number stored
- * in the clear, so this errs towards accepting. It still excludes the whole 0,
- * 1, 7, 8 and 9 space, which is where machine numbers live: a millisecond Unix
- * timestamp is thirteen digits starting `17`, a nanosecond one nineteen digits
- * starting `17`, and both passed the Luhn check often enough to be replaced
- * with a card marker in real traffic.
+ * The collision this exists to break is a Unix timestamp: thirteen digits for
+ * milliseconds, sixteen for microseconds, nineteen for nanoseconds, all of them
+ * currently starting `17`, and one in ten of them passing the Luhn check. The
+ * only scheme numbering from a leading 1 is UATP, which issues fifteen digits
+ * and nothing else — so length, not the leading digit, is what separates the
+ * two, and gating on length keeps UATP cards redacted.
+ *
+ * The 2-series is Mastercard's and stops at 2720, which also happens to close
+ * the door on the timestamps of the 2030s before they arrive.
+ *
+ * Everything else is accepted, on purpose. A range excluded here is a real card
+ * number stored in the clear and that is the worse failure by a wide margin, so
+ * the 0, 7, 8 and 9 spaces stay in scope: they carry UnionPay's 81 and 88
+ * series, Voyager's 8699, fleet cards in the 7 series, and private-label cards
+ * that follow no published range at all. This check narrows Luhn, it does not
+ * replace it — an arbitrary digit run outside the 1 and 2 ranges is no better
+ * protected than it was before, and the identifier hold-out is what covers
+ * those.
  */
 function issuedCardRange(digits: string): boolean {
   const first = digits.charCodeAt(0) - 48;
-  if (first >= 3 && first <= 6) return true;
-  if (first !== 2) return false;
-  const series = Number(digits.slice(0, 4));
-  return series >= 2221 && series <= 2720;
+  if (first === 1) return digits.length === UATP_LENGTH;
+  if (first === 2) {
+    const series = Number(digits.slice(0, 4));
+    return (
+      series >= MASTERCARD_SERIES_FIRST && series <= MASTERCARD_SERIES_LAST
+    );
+  }
+  return true;
 }
 
 /**

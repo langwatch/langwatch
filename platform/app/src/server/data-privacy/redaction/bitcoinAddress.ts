@@ -114,11 +114,22 @@ const BC_HRP_EXPANDED = [
 ];
 
 /**
- * Whether a `bc1…` address carries a valid bech32 or bech32m checksum. Only the
- * mainnet human-readable part is checked, because that is the only prefix the
+ * Whether a `bc1…` address carries a valid checksum. Only the mainnet
+ * human-readable part is checked, because that is the only prefix the
  * recognizer's pattern matches.
+ *
+ * The first data character is the witness version, and BIP-350 pairs version 0
+ * with the bech32 constant and every later version with the bech32m constant.
+ * Accepting either constant for either version would accept BIP-350's own
+ * invalid vectors, so the pairing is enforced rather than the two constants
+ * simply being tried in turn.
+ *
+ * BIP-173 requires the whole address to be one case; mixed case is invalid and
+ * is rejected here rather than folded away, so this answers the same question
+ * a wallet would.
  */
 export function isBech32Address(value: string): boolean {
+  if (/[a-z]/.test(value) && /[A-Z]/.test(value)) return false;
   const lower = value.toLowerCase();
   if (!lower.startsWith("bc1")) return false;
   const data = lower.slice(3);
@@ -129,8 +140,9 @@ export function isBech32Address(value: string): boolean {
     if (index === -1) return false;
     values.push(index);
   }
-  const polymod = bech32Polymod(values);
-  return polymod === BECH32_CONSTANT || polymod === BECH32M_CONSTANT;
+  const witnessVersion = values[BC_HRP_EXPANDED.length]!;
+  const expected = witnessVersion === 0 ? BECH32_CONSTANT : BECH32M_CONSTANT;
+  return bech32Polymod(values) === expected;
 }
 
 /** Whether a CRYPTO match is a bitcoin address in either of its two forms. */

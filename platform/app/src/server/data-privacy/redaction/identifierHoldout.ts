@@ -20,6 +20,15 @@
  *      digest, a ULID, a `prefix_<random>` record id. Nothing in such a value
  *      is personal data, so there is nothing for either engine to find.
  *
+ * WHY THERE ARE TWO VALUE RULES. The engines pay different prices for a wrong
+ * answer, so they get different rules and the difference is the whole point.
+ * `isIdentifierShapedValue` gates shape-only recognizers, which know nothing
+ * about people, so a false positive there costs a bitcoin pattern that would
+ * have misfired anyway. `isOpaqueIdentifierValue` gates the only pass that can
+ * find a person or a place, so a false positive there is a name stored in the
+ * clear, permanently. The second rule is therefore strictly the meaner one, and
+ * the two must not be collapsed back into one however similar they look.
+ *
  * WHAT IS DELIBERATELY NOT RESERVED. The correlation attributes a customer
  * fills in themselves — user, customer, thread and conversation identifiers.
  * Customers routinely put an email address or a full name in them, and a name on
@@ -77,6 +86,67 @@ export function isIdentifierShapedValue(value: string): boolean {
 }
 
 /**
+ * A maximal run of letters and digits — the parts of a value either side of the
+ * separators a person or a tracer writes between them.
+ */
+const ALPHANUMERIC_RUN = /[A-Za-z0-9]+/g;
+const HEX_RUN = /^[0-9a-f]+$/i;
+
+/**
+ * How long a run has to be before a person is unlikely to have typed it, and
+ * how many digits it has to carry. A ULID is twenty-six characters, a short hex
+ * span id is sixteen; the longest single-word surnames run to about eighteen,
+ * and none of them carry two digits.
+ */
+const MIN_OPAQUE_RUN_LENGTH = 16;
+const MIN_DIGITS_IN_OPAQUE_RUN = 2;
+
+/**
+ * Whether a whole attribute value is a machine identifier and nothing else —
+ * the question asked before a value is offered to the external analysis
+ * service, which is the only pass that finds names and places.
+ *
+ * A value qualifies on one of two grounds.
+ *
+ *   - It is a uuid. Uuids are written in five short groups, so no single run in
+ *     them is long enough for the rule below, and they are named here directly.
+ *   - It carries a run of at least sixteen letters and digits that is either
+ *     all hexadecimal, or mixes letters with at least two digits. That covers a
+ *     hex digest, a ULID, a `prefix_<random>` record id and a base64 token,
+ *     including when a readable prefix sits in front of the random part.
+ *
+ * Runs are measured BETWEEN separators and never across them. That is what
+ * keeps "maria.schmidt.1972" out: joined up it would clear the bar, but nobody
+ * types sixteen random characters in a row, and every segment of a written name
+ * is short. The same applies to "Jean-Claude-Van-Damme" and
+ * "Elm-Street-Apartment-4B".
+ *
+ * The digit requirement is what keeps "AnneMarieJohansson" out: it is one
+ * eighteen-character run, long enough on length alone, and only the absence of
+ * digits marks it as something a person wrote. Hex runs are exempt from the
+ * digit count because a sixteen-character identifier drawn entirely from a-f
+ * happens about once in eighty thousand, and no name is spelled in hex.
+ */
+export function isOpaqueIdentifierValue(value: string): boolean {
+  if (value.length > MAX_IDENTIFIER_LENGTH) return false;
+  if (UUID_VALUE.test(value)) return true;
+
+  for (const [run] of value.matchAll(ALPHANUMERIC_RUN)) {
+    if (isOpaqueRun(run)) return true;
+  }
+  return false;
+}
+
+/** Whether one run between separators is longer and denser than a person writes. */
+function isOpaqueRun(run: string): boolean {
+  if (run.length < MIN_OPAQUE_RUN_LENGTH) return false;
+  // A run with no letter is a digit run: a card, a phone, an account number.
+  if (!HAS_LETTER.test(run)) return false;
+  if (HEX_RUN.test(run)) return true;
+  return (run.match(/\d/g)?.length ?? 0) >= MIN_DIGITS_IN_OPAQUE_RUN;
+}
+
+/**
  * Attribute names whose value is a trace or span address minted by a tracer.
  *
  * The shape rule above already covers the usual spellings, because a trace id is
@@ -122,6 +192,6 @@ export function isHeldOutIdentifierAttribute({
   value: string;
 }): boolean {
   return (
-    isReservedIdentifierAttributeKey(key) || isIdentifierShapedValue(value)
+    isReservedIdentifierAttributeKey(key) || isOpaqueIdentifierValue(value)
   );
 }

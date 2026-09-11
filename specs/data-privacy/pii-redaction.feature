@@ -187,8 +187,12 @@ Feature: Redacting personal data from traces
   # crypto marker, at every level including the default. It now verifies the
   # address checksum, so real addresses are still redacted and hex ids are not.
   # The card pattern accepted any digit run that passes the Luhn check, which a
-  # thirteen-digit millisecond timestamp does about one time in ten; it now also
-  # requires a digit range a payment card is actually issued under.
+  # thirteen-digit millisecond timestamp does about one time in ten. It now also
+  # asks whether a card scheme could have issued that number at that length,
+  # which the timestamps cannot be: the only scheme numbering from a leading one
+  # issues fifteen digits, and timestamps are thirteen, sixteen or nineteen. The
+  # rule is deliberately narrow, because a range excluded here is a real card
+  # number stored in the clear, so every other leading digit is still accepted.
 
   @unit
   Scenario: An opaque trace identifier survives redaction at the default level
@@ -209,10 +213,28 @@ Feature: Redacting personal data from traces
     Then the stored attribute has the address redacted
 
   @unit
+  Scenario: A taproot address is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is a valid taproot address
+    Then the stored attribute has the address redacted
+
+  @unit
   Scenario: A millisecond timestamp is not read as a card number
     Given the resolved PII level for "web-app" is essential
     When a trace is ingested whose input holds a thirteen digit millisecond timestamp that passes the Luhn check
     Then the stored input still contains the timestamp
+
+  @unit
+  Scenario: A timestamp is not read as a card number at any of its widths
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds millisecond, microsecond and nanosecond timestamps that pass the Luhn check
+    Then the stored input still contains every timestamp
+
+  @unit
+  Scenario: Every card scheme in circulation is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds one valid card number from each scheme
+    Then the stored input has every card number redacted
 
   @unit
   Scenario: A card number written without separators is still redacted
@@ -226,6 +248,15 @@ Feature: Redacting personal data from traces
   # therefore filtered before they leave the process: an attribute whose whole
   # value is one opaque identifier is never sent, and neither is an attribute
   # under one of the reserved trace and span identifier names, whatever it holds.
+  #
+  # "Opaque" has to be a high bar here, higher than the bar the native engine
+  # uses, because holding a value back from this service is what stops a name or
+  # a place ever being found in it. A value qualifies only when it carries a run
+  # of at least sixteen letters and digits that no person would type: a hex
+  # digest, or a run mixing letters with at least two digits. A hyphenated or
+  # run-together name - "Jean-Claude-Van-Damme", "AnneMarieJohansson",
+  # "Saint-Jean-Baptiste-Hospital" - has no such run, so it still goes for
+  # analysis and is still redacted.
   #
   # Correlation attributes a customer fills in themselves - the user, customer,
   # thread and conversation identifiers - are deliberately NOT on the reserved
@@ -266,6 +297,18 @@ Feature: Redacting personal data from traces
     Then the analysis service received that value
 
   @unit
+  Scenario: A hyphenated or run-together name is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with attributes holding names written with hyphens, with dots and with no separator at all
+    Then the analysis service received every one of them
+
+  @unit
+  Scenario: A place written as one hyphenated token is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with an attribute whose value is a hyphenated place name
+    Then the analysis service received that value
+
+  @unit
   Scenario: A reserved identifier attribute survives even when its value is all digits
     Given the resolved PII level for "web-app" is essential
     When a trace is ingested with a reserved trace identifier attribute written in decimal
@@ -277,6 +320,13 @@ Feature: Redacting personal data from traces
     When a log record is ingested with an attribute whose whole value is a hex identifier
     Then the analysis service never received that value
     And the analysis service received the log body
+
+  @unit
+  Scenario: Metric attributes hold opaque identifiers back from analysis
+    Given the resolved PII level for "web-app" is strict
+    When a metric is ingested with one attribute holding a hex identifier and another holding prose
+    Then the analysis service never received the identifier
+    And the analysis service received the prose
 
   # Detection heuristics over-trigger on business identifiers that merely look
   # like PII: a 14-digit reservation number reads as a credit card, an

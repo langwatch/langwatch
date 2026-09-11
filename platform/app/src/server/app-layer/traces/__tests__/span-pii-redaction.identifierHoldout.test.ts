@@ -220,6 +220,55 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
 
       expect(submitted()).toContain("Jane Doe");
     });
+
+    // The hold-out reads a whole attribute value, so a name written as ONE
+    // token is the case it can swallow. A control that uses "Jane Doe" only
+    // passes because of the space and guards nothing; these are the forms that
+    // have no space to save them.
+    /** @scenario "A hyphenated or run-together name is still sent for analysis" */
+    it("submits names written with hyphens, with dots and with no separator", async () => {
+      const { service, submitted } = makeService();
+      const names = [
+        "Jean-Claude-Van-Damme",
+        "Gonzalez-Rodriguez-Maria",
+        "Wolfgang-Amadeus-Mozart",
+        "AnneMarieJohansson",
+        "maria.schmidt.1972",
+      ];
+      const span = spanWith(
+        Object.fromEntries(
+          names.map((value, index) => [`langwatch.user_id_${index}`, value]),
+        ),
+      );
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      const withheld = names.filter((name) => !submitted().includes(name));
+      expect(withheld).toEqual([]);
+    });
+
+    /** @scenario "A place written as one hyphenated token is still sent for analysis" */
+    it("submits a hyphenated place and a hyphenated street address", async () => {
+      const { service, submitted } = makeService();
+      const span = spanWith({
+        "patient.clinic": "Saint-Jean-Baptiste-Hospital",
+        "shipping.address_line": "Elm-Street-Apartment-4B",
+      });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submitted()).toContain("Saint-Jean-Baptiste-Hospital");
+      expect(submitted()).toContain("Elm-Street-Apartment-4B");
+    });
+
+    it("submits a run-together name carried in the chat content itself", async () => {
+      const { service, submitted } = makeService();
+      const span = spanWith({ "gen_ai.prompt": "AnneMarieJohansson" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submitted()).toContain("AnneMarieJohansson");
+    });
   });
 
   describe("given a log record", () => {
@@ -241,7 +290,7 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
   });
 
   describe("given metric attributes", () => {
-    /** @scenario "Log attributes hold opaque identifiers back from analysis" */
+    /** @scenario "Metric attributes hold opaque identifiers back from analysis" */
     it("never submits an identifier attribute, and still submits prose", async () => {
       const { service, submitted } = makeService();
       const traceId = "a4f19c2b7e83d05611aa0cbe94d7f2e8";
