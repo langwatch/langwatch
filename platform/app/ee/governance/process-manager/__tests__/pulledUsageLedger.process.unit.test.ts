@@ -159,6 +159,42 @@ beforeEach(() => {
   });
 });
 
+describe("resuming an instance persisted before the state carried a filed cell", () => {
+  /**
+   * The ledger process once kept no state at all, so every instance written
+   * by that version holds `{}`. The runtime hands stored state back verbatim,
+   * with no merge over the initial state, which left `filedCell` undefined
+   * rather than null and crashed the reissue check on every re-observation
+   * of a pre-existing charge.
+   */
+  it("treats the missing cell as a first observation and files the charge", async () => {
+    const ref = {
+      processName: PULLED_USAGE_LEDGER_PROCESS_NAME,
+      projectId: GOV_PROJECT,
+      processKey: RESTATEMENT_KEY,
+    };
+    await store.commit({
+      ref,
+      tenantId: GOV_PROJECT,
+      state: {} as unknown as PulledUsageLedgerState,
+      expectedRevision: 0,
+      nextWakeAt: null,
+      sourceEventId: `legacy:${ns}`,
+      messages: [],
+      now: T0 - 1_000,
+    });
+
+    await observe(observation());
+    await drainOutbox();
+
+    expect(sendRetractPulledUsage).not.toHaveBeenCalled();
+    expect(insertPulledUsageRows).toHaveBeenCalledTimes(1);
+    const instance = await store.findByRef<PulledUsageLedgerState>({ ref });
+    expect(instance?.revision).toBe(2);
+    expect(instance?.state.filedCell).toMatchObject({ currencyCode: "USD" });
+  });
+});
+
 describe("recognising a reissued charge", () => {
   describe("given a day's bill already pulled in one currency", () => {
     /** @scenario A bill reissued in another currency is withdrawn by the pull that finds it */
