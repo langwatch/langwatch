@@ -64,13 +64,17 @@ const EVIDENCE_LABEL: Record<string, string> = {
 /**
  * The provider's own name where we have one, its identifier where we do not.
  *
- * The catalog's labels carry a parenthetical qualifier for the sources that
- * come in more than one flavour ("Anthropic Admin API (usage & cost)"). That
- * qualifier tells an administrator which connector to pick on the inventory
- * screen; on a person's row it is three extra words about a source they did
- * not choose, and it is what pushed the badge onto a line of its own and made
- * one row twice the height of its neighbours. Dropping it shortens the label
- * without abbreviating any word in it.
+ * Some of the catalog's labels carry a parenthetical qualifier — "Claude Code
+ * (Anthropic OAuth)", "Anthropic Claude (Cowork)". That qualifier tells an
+ * administrator which connector to pick on the inventory screen; on a person's
+ * row it is extra words about a source they did not choose, and it is what
+ * pushed the badge onto a line of its own and made one row twice the height of
+ * its neighbours. Dropping it shortens the label without abbreviating any word
+ * in it.
+ *
+ * The Anthropic Admin API label used to be the worst of these ("...(usage &
+ * cost)") and no longer is: it names the product now, and which report a
+ * source pulls is asked in the composer. The trim stays for the rest.
  */
 export function providerLabel(provider: string): string {
   const label =

@@ -222,7 +222,11 @@ export const SOURCE_TYPE_OPTIONS = [
   },
   {
     value: "anthropic_admin",
-    label: "Anthropic Admin API (usage & cost)",
+    // Named after the product. Which report a source pulls is a question the
+    // composer asks two fields later, where the admin can actually answer it;
+    // the old "(usage & cost)" put the answer in a menu that offered no
+    // choice between them.
+    label: "Anthropic Admin API",
     mode: "pull",
     blurb:
       "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (Anthropic's reported spend, excludes Priority Tier). Never create both for the same org — the same spend would be counted twice.",
@@ -413,10 +417,14 @@ export function SourceTypeIconGlyph({
   const icon = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.icon;
   if (!icon) return null;
   return (
-    <IconGlyph
-      icon={icon}
-      monochrome={MONOCHROME_SOURCE_ICONS.has(sourceType)}
-      size={size}
-    />
+    // The mark carries no text, so a test asserting a header shows the vendor
+    // has nothing else to find it by.
+    <span data-testid="source-type-icon">
+      <IconGlyph
+        icon={icon}
+        monochrome={MONOCHROME_SOURCE_ICONS.has(sourceType)}
+        size={size}
+      />
+    </span>
   );
 }

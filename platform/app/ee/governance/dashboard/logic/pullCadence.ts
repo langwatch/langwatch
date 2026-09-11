@@ -90,6 +90,58 @@ export const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   http_polling: "*/15 * * * *",
 };
 
+/**
+ * How many months of history a NEWLY added source proposes to read, per source
+ * type.
+ *
+ * A source added with no start date reads only the last few days, so the
+ * Activity Monitor shows a flat line on the day the admin finishes setting it
+ * up — the moment they are most likely to conclude the integration is broken.
+ * The form therefore proposes a start rather than leaving the field empty. It
+ * is a proposal and nothing more: the admin can move it, and clearing it still
+ * means the adapter's own default.
+ *
+ * The figures differ because the providers do, and because reading further
+ * back is not free — every extra month is more pages on the first run. OpenAI
+ * serves four years, so a year is a deliberate choice rather than a limit:
+ * enough to show a year-on-year trend on day one without a first run that
+ * reads four years of days, and it fits in a single run. Six months of
+ * Anthropic is about six pages at the adapter's daily bucket, well inside
+ * `MAX_PAGES_PER_RUN`.
+ *
+ * Beside the cadence defaults and in one table for the same reason they are:
+ * the proposal and any copy describing it have to read one source, or the form
+ * proposes one span while the hint beside it names another.
+ */
+export const SOURCE_BACKFILL_MONTHS: Partial<Record<SourceType, number>> = {
+  openai_admin: 12,
+  anthropic_admin: 6,
+};
+
+/**
+ * The instant a new source of this type proposes to read history from:
+ * midnight UTC, that many months before today.
+ *
+ * Midnight UTC because every one of these reports is bucketed by UTC day, so a
+ * start in the middle of one asks for a partial bucket the provider will not
+ * serve. Undefined for a source type with no proposal, which leaves the field
+ * empty and the adapter's own default in charge.
+ */
+export function defaultBackfillStart(
+  sourceType: SourceType,
+): string | undefined {
+  const months = SOURCE_BACKFILL_MONTHS[sourceType];
+  if (months === undefined) return undefined;
+  const now = new Date();
+  return new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth() - months,
+      now.getUTCDate(),
+    ),
+  ).toISOString();
+}
+
 /** The recommended schedule for a source type, or null when it has no
  *  pull adapter (push and s3 sources carry no cadence). */
 export function recommendedPullSchedule(sourceType: SourceType): string | null {
