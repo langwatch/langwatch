@@ -2262,7 +2262,7 @@ export function SourceEditDrawer({
   // Misses for a type this deploy has no entry for — a row written by a newer
   // one — so the title falls back to the generic word rather than to
   // "Edit undefined".
-  const editLabel = SOURCE_TYPE_LABEL[sourceType] ?? "source";
+  const editLabel = (sourceType && SOURCE_TYPE_LABEL[sourceType]) ?? "source";
   const lockNotes = editSourceNotes({
     hasPulled,
     report: form.parserConfig.report,
