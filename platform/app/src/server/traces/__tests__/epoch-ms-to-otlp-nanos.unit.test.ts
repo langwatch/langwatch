@@ -22,13 +22,28 @@ describe("epochMsToOtlpNanos", () => {
     });
   });
 
-  describe("given a fractional millisecond input", () => {
-    it("rounds to the nearest millisecond before converting", () => {
-      expect(epochMsToOtlpNanos(1_757_400_000_000.6)).toBe(
-        "1757400000001000000",
+  describe("given fractional millisecond inputs", () => {
+    it("preserves the sub-millisecond remainder", () => {
+      // Exactly representable at this magnitude; the collector's timestamp
+      // validators accept non-integer milliseconds.
+      expect(epochMsToOtlpNanos(1_757_400_000_000.125)).toBe(
+        "1757400000000125000",
       );
-      expect(epochMsToOtlpNanos(1_757_400_000_000.4)).toBe(
-        "1757400000000000000",
+      expect(epochMsToOtlpNanos(1_757_400_000_000.375)).toBe(
+        "1757400000000375000",
+      );
+    });
+
+    it("keeps a 0.25ms span from collapsing to zero duration", () => {
+      const start = BigInt(epochMsToOtlpNanos(1_757_400_000_000.125));
+      const end = BigInt(epochMsToOtlpNanos(1_757_400_000_000.375));
+
+      expect(end - start).toBe(250_000n);
+    });
+
+    it("carries a remainder that rounds up into the next millisecond", () => {
+      expect(epochMsToOtlpNanos(1_757_400_000_000.9999999)).toBe(
+        "1757400000001000000",
       );
     });
   });
