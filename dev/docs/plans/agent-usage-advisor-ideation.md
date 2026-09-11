@@ -15,8 +15,18 @@ pieces, in dependency order:
 | 1 | [Trace fidelity](agent-usage-01-trace-fidelity.md) | Stop marking a whole turn failed. Report rates, type the fields, code the errors. Nothing downstream is trustworthy until this lands. |
 | 2 | [Signals and surfacing](agent-usage-02-signals-and-surfacing.md) | What went wrong on this trace, and whether it is improving over history. Includes skills — used well, badly, or not at all. |
 | 3 | [The advisor in the hooks](agent-usage-03-cli-hook-advisor.md) | Tell the agent in-session what to enable, and stop the big spends. |
+| 4 | [Metrics and context analysis](agent-usage-04-metrics-and-context-analysis.md) | A `coding_agent.*` family in the existing analytics registry, so dashboards come free — plus a breakdown of what is actually in the context window. |
+| 5 | [Practice adoption](agent-usage-05-practice-adoption.md) | What a team has not adopted yet, and what adopting it is worth, priced on their own traffic. |
 
-Sections 1–11 below are the shared evidence base all three draw on.
+Sections 1–11 below are the shared evidence base all five draw on.
+
+**One mechanic runs through all of them.** Context is re-read, so the cost of
+anything put into it is its size multiplied by how long it survives. Measured
+across three sessions, tool output injected 2.73M tokens and caused **71.87M**
+carried re-reads — a **26.3× amplification**, and 29.1× in the longest session.
+Every estimate in Parts 2, 4 and 5 is computed on carried tokens; anything
+computed on injected tokens understates the cost by more than an order of
+magnitude.
 
 ---
 

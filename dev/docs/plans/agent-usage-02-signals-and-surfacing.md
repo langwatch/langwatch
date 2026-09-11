@@ -80,11 +80,18 @@ This is where the month and the span data added most.
 | `behaviour.failure_concentration` | one tool failing far more than the rest | Bash 5.3%, every other tool ~0% |
 | `tool.wide_output` | a tool result large enough to matter once carried | see the caution below |
 
-**A correction on `tool.wide_output`.** It is real but much smaller than the
-first pass implied. Across 6,927 tool results: median 385 bytes, p90 4.1KB, p99
-14.9KB, max 51.6KB — **10.9MB total, roughly 2.7M tokens**. Results above 20KB
-are 0.3% of calls carrying 5.7% of bytes. Tool output is not what fills these
-contexts. Keep the signal, drop it down the ranking, and describe it honestly.
+**A correction on `tool.wide_output`, and then a correction to the correction.**
+Measured by direct injection it looks small: across 6,927 tool results the median
+is 385 bytes, p90 4.1KB, max 51.6KB — 10.9MB total, roughly 2.7M tokens.
+
+But injected size is the wrong measure, because context is re-read. Measured by
+what it *causes*, that 2.73M becomes **71.87M carried re-reads — a 26.3×
+amplification**, 29.1× in a 103-turn session, and Bash accounts for 75% of it.
+[Part 5 §2](agent-usage-05-practice-adoption.md) carries the model and the
+numbers.
+
+So: keep the signal, rank it on carried tokens rather than bytes, and never
+price anything in this library on injection alone.
 
 ### E. `loop.*` and `orchestration.*`
 
