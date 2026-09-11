@@ -5,6 +5,19 @@
 **Origin:** PR #7536 cost $28,654 in coding-agent spend. The diagnosis happened
 once, by hand, after the money was gone.
 
+## The three parts
+
+This document is the evidence and the argument. The work splits into three
+pieces, in dependency order:
+
+| | part | one line |
+|---|---|---|
+| 1 | [Trace fidelity](agent-usage-01-trace-fidelity.md) | Stop marking a whole turn failed. Report rates, type the fields, code the errors. Nothing downstream is trustworthy until this lands. |
+| 2 | [Signals and surfacing](agent-usage-02-signals-and-surfacing.md) | What went wrong on this trace, and whether it is improving over history. Includes skills — used well, badly, or not at all. |
+| 3 | [The advisor in the hooks](agent-usage-03-cli-hook-advisor.md) | Tell the agent in-session what to enable, and stop the big spends. |
+
+Sections 1–11 below are the shared evidence base all three draw on.
+
 ---
 
 ## 1. What actually happened, and why it is a product
