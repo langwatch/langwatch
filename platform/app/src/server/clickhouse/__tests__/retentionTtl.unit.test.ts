@@ -13,7 +13,6 @@ import {
   RETENTION_MANAGED_TABLES,
   RETENTION_TABLE_CATEGORY_MAP,
   RETENTION_TTL_MANAGED_TABLES,
-  SECURITY_RETENTION_EXEMPT_TABLES,
 } from "../../data-retention/retentionPolicy.schema";
 import { AGGREGATE_TYPE_IDENTIFIERS } from "../../event-sourcing/schemas/typeIdentifiers";
 import {
@@ -223,32 +222,39 @@ describe("RETENTION_MANAGED_TABLES", () => {
   });
 
   /**
-   * The reconciler and the policy map are two lists of table names that have
-   * to be the same list, and neither one can see the other. A managed table
+   * The reconciler and the policy schema are two lists of table names that
+   * have to be the same list, and neither one can see the other. A gated table
    * missing a `retentionTTLColumn` here silently keeps its rows forever, so a
    * customer's shortened policy — or their deletion request — quietly does
-   * not reach it. A table carrying one WITHOUT being retention-managed is the
-   * mirror failure: the reconciler writes a `_retention_days` clause onto a
-   * table nothing ever populates that column for.
+   * not reach it. A table carrying one WITHOUT being in the gate is the mirror
+   * failure: the reconciler writes a `_retention_days` clause onto a table
+   * nothing ever populates that column for.
+   *
+   * The gate is `RETENTION_TTL_MANAGED_TABLES`, not the customer-facing
+   * `RETENTION_MANAGED_TABLES`. It is deliberately the wider of the two: the
+   * governance cost tables carry `_retention_days` and default it to zero, so
+   * the reconciler installs the clause and nothing expires until a day count
+   * is stamped on a row. Asking the customer set here would read that
+   * defaulted-to-forever table as an unmanaged one carrying a stray column.
    */
-  it("gives a retention TTL to the managed tables and to nothing else", () => {
+  it("gives a retention TTL to the gated tables and to nothing else", () => {
     const withRetentionTTL = TABLE_TTL_CONFIG.filter(
       (config) => config.retentionTTLColumn !== undefined,
     ).map((config) => config.table);
 
     expect([...withRetentionTTL].sort()).toEqual(
-      [...RETENTION_MANAGED_TABLES].sort(),
+      [...RETENTION_TTL_MANAGED_TABLES].sort(),
     );
 
-    // The remainder is cold-storage-only on purpose: an entry that is not
-    // retention-managed must carry no retention column at all, which is what
-    // keeps billing and durable security tables out of a tenant policy even
-    // if one of them is added to this config for cold storage.
+    // The remainder is cold-storage-only on purpose: an entry outside the gate
+    // must carry no retention column at all, which is what keeps billing and
+    // durable security tables out of a tenant policy even if one of them is
+    // added to this config for cold storage.
     for (const config of TABLE_TTL_CONFIG) {
-      if (RETENTION_MANAGED_TABLES.includes(config.table as never)) continue;
+      if (RETENTION_TTL_MANAGED_TABLES.includes(config.table)) continue;
       expect(
         config.retentionTTLColumn,
-        `${config.table} is not retention-managed but carries a retention column`,
+        `${config.table} is outside the reconciler gate but carries a retention column`,
       ).toBeUndefined();
     }
   });
