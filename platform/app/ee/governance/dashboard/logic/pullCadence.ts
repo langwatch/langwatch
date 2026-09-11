@@ -128,6 +128,13 @@ export const SOURCE_BACKFILL_MONTHS: Partial<Record<SourceType, number>> = {
  * start in the middle of one asks for a partial bucket the provider will not
  * serve. Undefined for a source type with no proposal, which leaves the field
  * empty and the adapter's own default in charge.
+ *
+ * The day is clamped to the target month's last, because `Date.UTC` rolls an
+ * impossible day forward instead of refusing it: six months before the 31st of
+ * August is the 31st of February, which arrives as the 3rd of March. The
+ * proposal would then be five months back on a form whose hint says six.
+ * Clamping lands on the 28th, which is what "six months before" means for a
+ * month that has no 31st.
  */
 export function defaultBackfillStart(
   sourceType: SourceType,
@@ -135,13 +142,13 @@ export function defaultBackfillStart(
   const months = SOURCE_BACKFILL_MONTHS[sourceType];
   if (months === undefined) return undefined;
   const now = new Date();
-  return new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth() - months,
-      now.getUTCDate(),
-    ),
-  ).toISOString();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth() - months;
+  // Day 0 of the following month is the last day of this one, and Date.UTC
+  // normalizes a month outside 0-11 into the right year on the way.
+  const lastDayOfTarget = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const day = Math.min(now.getUTCDate(), lastDayOfTarget);
+  return new Date(Date.UTC(year, month, day)).toISOString();
 }
 
 /** The recommended schedule for a source type, or null when it has no

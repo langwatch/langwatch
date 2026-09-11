@@ -24,7 +24,10 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SOURCE_BACKFILL_MONTHS } from "../../logic/pullCadence";
+import {
+  defaultBackfillStart,
+  SOURCE_BACKFILL_MONTHS,
+} from "../../logic/pullCadence";
 import {
   buildOpenAiAdminPullConfig,
   type ComposerState,
@@ -99,6 +102,44 @@ describe("given the date a scheduled source reads history from", () => {
       // figure is how the proposal and the sentence describing it drift apart.
       expect(SOURCE_BACKFILL_MONTHS.openai_admin).toBe(12);
       expect(SOURCE_BACKFILL_MONTHS.anthropic_admin).toBe(6);
+    });
+  });
+
+  describe("when today is a day the target month does not have", () => {
+    /** @scenario "A proposal from a day the target month does not have lands in that month" */
+    it("clamps the end of August back to the end of February", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-08-31T10:30:00.000Z"));
+
+      // Six months before the 31st of August is the 31st of February, which
+      // Date rolls forward into March. The proposal would then be five months
+      // back and three days, on a form whose hint says six.
+      expect(defaultBackfillStart("anthropic_admin")).toBe(
+        "2026-02-28T00:00:00.000Z",
+      );
+    });
+
+    /** @scenario "A proposal from a day the target month does not have lands in that month" */
+    it("clamps the end of March back to the end of September", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-03-31T10:30:00.000Z"));
+
+      expect(defaultBackfillStart("anthropic_admin")).toBe(
+        "2025-09-30T00:00:00.000Z",
+      );
+    });
+
+    /** @scenario "A proposal from a day the target month does not have lands in that month" */
+    it("clamps a leap day back to the last day of a common February", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2024-02-29T10:30:00.000Z"));
+
+      // A year back from the 29th only exists every fourth year, so this is
+      // the same rollover with the target month a year away rather than six
+      // months.
+      expect(defaultBackfillStart("openai_admin")).toBe(
+        "2023-02-28T00:00:00.000Z",
+      );
     });
   });
 

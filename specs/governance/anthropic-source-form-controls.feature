@@ -159,6 +159,16 @@ Feature: Choose Anthropic adapter settings instead of typing them
       # describes it cannot drift apart.
 
     @unit
+    Scenario: A proposal from a day the target month does not have lands in that month
+      Given today is the 31st of August
+      When the admin opens the form for a new Anthropic source
+      Then the proposed date is the last day of February, six months back
+      # Counting back by month from the 31st asks for a day February does not
+      # have, and a date built from one rolls forward into March instead of
+      # refusing. The proposal would then be five months back on a form whose
+      # hint promises six.
+
+    @unit
     Scenario: Editing shows the stored date rather than proposing a new one
       Given the source was saved with a backfill start of "2026-08-01T00:00:00.000Z"
       When the admin opens the edit form
