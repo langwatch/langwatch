@@ -3841,7 +3841,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--batch-run-id <id>", "Filter by batch run ID (requires --scenario-set-id)")
       .option("--status <status>", "Filter by status (e.g. SUCCESS, FAILED, ERROR, IN_PROGRESS)")
       .option("--name <substring>", "Filter by run name substring (case-insensitive)")
-      .option("--limit <n>", "Max results (default: 20)")
+      .option("--limit <n>", "Max results, up to 100 (default: 20)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (options: { scenarioSetId?: string; batchRunId?: string; status?: string; name?: string; limit?: string }) => {
       const { listSimulationRunsCommand: impl } = await import("./commands/simulation-runs/list.js");
