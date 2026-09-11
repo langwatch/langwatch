@@ -198,35 +198,46 @@ describe("AgentVoiceEditorDrawer", () => {
   });
 
   describe("given a Twilio provider gates the Phone number option", () => {
-    /** @scenario "The Phone number option appears only when a Twilio provider is configured" */
-    it("hides the option with a hint when no Twilio provider, and offers it once one exists", async () => {
+    /** @scenario "The Phone number option is always listed, disabled and marked Unavailable without a Twilio provider" */
+    it("lists the option disabled with a hint when no Twilio provider, and enables it once one exists", async () => {
       mockProviders = [];
       const { unmount } = renderVoiceDrawer();
       await screen.findByTestId("voice-agent-transport-select");
-      expect(
-        screen.queryByRole("option", { name: "Phone number" }),
-      ).not.toBeInTheDocument();
+      const disabledOption = screen.getByRole("option", {
+        name: /Phone number/,
+      }) as HTMLOptionElement;
+      expect(disabledOption).toBeDisabled();
+      expect(disabledOption.textContent).toContain("(Unavailable)");
       expect(screen.getByTestId("voice-agent-phone-hint")).toBeInTheDocument();
+      const link = screen.getByTestId("voice-agent-model-providers-link");
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute("href", "/settings/model-providers");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link.getAttribute("rel")).toContain("noopener");
       unmount();
 
       mockProviders = [TWILIO_KEYED_PROVIDER];
       renderVoiceDrawer();
       await screen.findByTestId("voice-agent-transport-select");
-      expect(
-        screen.getByRole("option", { name: "Phone number" }),
-      ).toBeInTheDocument();
+      const enabledOption = screen.getByRole("option", {
+        name: "Phone number",
+      }) as HTMLOptionElement;
+      expect(enabledOption).not.toBeDisabled();
+      expect(enabledOption.textContent).not.toContain("(Unavailable)");
       expect(
         screen.queryByTestId("voice-agent-phone-hint"),
       ).not.toBeInTheDocument();
     });
 
-    it("keeps the option hidden when the only Twilio row is an env-fed system row missing the other two keys", async () => {
+    it("keeps the option disabled when the only Twilio row is an env-fed system row missing the other two keys", async () => {
       mockProviders = [TWILIO_SYSTEM_ROW_MISSING_KEYS];
       renderVoiceDrawer();
       await screen.findByTestId("voice-agent-transport-select");
-      expect(
-        screen.queryByRole("option", { name: "Phone number" }),
-      ).not.toBeInTheDocument();
+      const option = screen.getByRole("option", {
+        name: /Phone number/,
+      }) as HTMLOptionElement;
+      expect(option).toBeDisabled();
+      expect(option.textContent).toContain("(Unavailable)");
       expect(screen.getByTestId("voice-agent-phone-hint")).toBeInTheDocument();
     });
 
@@ -242,9 +253,11 @@ describe("AgentVoiceEditorDrawer", () => {
         "voice-agent-phone-input",
       )) as HTMLInputElement;
       expect(input.value).toBe("+14155550123");
-      expect(
-        screen.getByRole("option", { name: "Phone number" }),
-      ).toBeInTheDocument();
+      const option = screen.getByRole("option", {
+        name: "Phone number",
+      }) as HTMLOptionElement;
+      expect(option).toBeInTheDocument();
+      expect(option).not.toBeDisabled();
     });
 
     it("never persists the typed phone number in the sessionStorage draft", async () => {
