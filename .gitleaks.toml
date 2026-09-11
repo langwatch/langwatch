@@ -394,19 +394,20 @@ description = "RFC 6455 sample Sec-WebSocket-Key in the voice listener handshake
 targetRules = ["generic-api-key"]
 regexes = ['''^dGhlIHNhbXBsZSBub25jZQ==$''']
 
-# Two bech32m test vectors in the bitcoin-address suite, which prove the
-# recognizer rejects a witness version bitcoin does not define. They are one
-# payload written at version one and at version seventeen, so the version one
-# member validating is what shows the version seventeen member is rejected for
-# its version rather than for a checksum that never lined up.
+# The bech32 test vectors in the bitcoin-address suite, which prove the
+# recognizer rejects a witness version or a witness program bitcoin does not
+# allow. They come in pairs: the same construction at a value bitcoin permits
+# and at one it does not, so the permitted member validating is what shows the
+# other is rejected for its version or its program rather than for a checksum
+# that never lined up.
 #
-# Naming them, as this file requires. Neither is a credential and neither can
-# become one: a bech32 string is a PUBLIC address, the thing you hand out to be
-# paid, and these two were generated for this test rather than observed. The
-# version seventeen member is not a bitcoin address at all — no wallet will
-# parse it — and the version one member encodes a payload of counted-up bytes,
-# so it is a well-formed address to a key nobody holds. There is nothing to
-# revoke, and nothing to send anywhere.
+# Naming them, as this file requires. None is a credential and none can become
+# one: a bech32 string is a PUBLIC address, the thing you hand out to be paid,
+# and these were generated for this test rather than observed. The rejected
+# members are not bitcoin addresses at all — no wallet will parse them — and the
+# accepted members encode payloads of counted-up bytes, so they are well-formed
+# addresses to keys nobody holds. There is nothing to revoke, and nothing to
+# send anywhere.
 #
 # They cannot be assembled at run time the way the base64 fixture in the
 # identifier hold-out suite is. The checksum IS the thing under test, so a test
@@ -420,9 +421,15 @@ regexes = ['''^dGhlIHNhbXBsZSBub25jZQ==$''']
 # a substring allowlist would also permit a real secret that merely starts with
 # these characters.
 [[allowlists]]
-description = "Generated bech32m vectors in the bitcoin-address tests; public addresses to keys nobody holds"
+description = "Generated bech32 vectors in the bitcoin-address tests; public addresses to keys nobody holds"
 targetRules = ["generic-api-key"]
 regexes = [
   '''^bc1pr23clxd5mzfsh79vn6pg0kaytjeq8w4u8x8jd8$''',
   '''^bc13r23clxd5mzfsh79vn6pg0kaytjeq8w4un2kxzn$''',
+  '''^bc1pqvwl8xs0$''',
+  '''^bc1pqdnfnnda$''',
+  '''^bc1pqv9pzxqlyckngw6zf9g9whn9d3eh4qvg37tfmf9tk2uup37w6hww86h3lrlsvrg5rvlw2s2x$''',
+  '''^bc1pqv9pzxqlyckngw6zf9g9whn9d3eh4qvge0qxlk$''',
+  '''^bc1qqv9pzxqlyckngw6zf9g9whn9dsaqaxas$''',
+  '''^bc1qqv9pzxqlyckngw6zf9g9whn9d3eh4qvg8d8phl$''',
 ]
