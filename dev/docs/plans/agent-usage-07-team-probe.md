@@ -122,8 +122,8 @@ this in order and do not skip ahead to the comparison.
 4. Fetch the probe and run it:
 
    ```bash
-   gh api repos/langwatch/langwatch/contents/dev/scripts/agent-usage-probe.mjs \
-     --jq .content -H "Accept: application/vnd.github.raw" \
+   gh api "repos/langwatch/langwatch/contents/dev/scripts/agent-usage-probe.mjs?ref=feat/agent-usage-advisor-ideation" \
+     -H "Accept: application/vnd.github.raw" \
      > agent-usage-probe.mjs
 
    node agent-usage-probe.mjs my-agent-traces.jsonl \
