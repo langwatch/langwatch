@@ -30,6 +30,8 @@
  * with E2E_PROJECT_SLUG so the voice agent can be created through the Agents
  * page (see givenAVoiceAgentExists in steps.ts).
  */
+import { randomUUID } from "node:crypto";
+
 import { test } from "@playwright/test";
 
 import {
@@ -78,9 +80,15 @@ const SETUP_MARGIN_MS = 60_000;
  * duplicate cards over time and `whenTheyRunTheSimulation` picks the first
  * one matching by name — which can be a stale card from an earlier run, not
  * the one this run just created. A unique name keeps the selection honest.
+ *
+ * Uses `randomUUID` rather than `Math.random`: the name is only a test
+ * label, but it flows into a created agent record, and CodeQL's
+ * js/insecure-randomness rule treats that as a security context and
+ * fails the build. A real random source costs nothing here and keeps
+ * the check green without an inline suppression.
  */
 function uniqueAgentName(prefix: string): string {
-  return `${prefix} ${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  return `${prefix} ${Date.now()}-${randomUUID().slice(0, 8)}`;
 }
 
 test.describe("Voice agent simulation contract", () => {
