@@ -188,10 +188,6 @@ export function defaultParserValues(
   return values;
 }
 
-// Re-exported so the composer's own tests read the table through the module
-// they are testing, rather than reaching past it into the cadence logic.
-export { defaultBackfillStart, SOURCE_BACKFILL_MONTHS };
-
 const blankComposer = (): ComposerState => ({
   sourceType: "otel_generic",
   name: "",

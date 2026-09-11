@@ -24,6 +24,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SOURCE_BACKFILL_MONTHS } from "../../logic/pullCadence";
 import {
   buildOpenAiAdminPullConfig,
   type ComposerState,
@@ -31,7 +32,6 @@ import {
   defaultParserValues,
   fieldControl,
   PARSER_FIELDS,
-  SOURCE_BACKFILL_MONTHS,
   seedComposerParserConfig,
 } from "../inventory";
 
