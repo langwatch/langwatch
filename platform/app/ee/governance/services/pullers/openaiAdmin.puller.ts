@@ -509,6 +509,109 @@ function reportUrl({
   return url;
 }
 
+/**
+ * Whether a page refused mid-run should be ANSWERED with the progress already
+ * made, rather than thrown out of the run.
+ *
+ * A provider asking to be left alone (HTTP 429) arrives as a throw so the
+ * durable outbox keeps its `Retry-After`. On the FIRST page of a run that wait
+ * is the most valuable thing the run has and there is no progress to lose, so
+ * it keeps travelling. Once earlier pages have been read the trade inverts:
+ * holding the cursor still ended the run with no forward progress at all, so
+ * the next run asked for page one of the same window, was refused at the same
+ * page again, and a source that met a rate limit mid-backfill could never get
+ * past it on any number of retries. Buckets banked twice are restated, which
+ * the pipeline already handles; a window that can never be read past is not
+ * recoverable at all.
+ *
+ * Only a RETRYABLE refusal qualifies. A malformed body, a contract that moved
+ * and a provider refusing outright are not windows to retry: each still throws,
+ * so the run is recorded as the failure it is.
+ */
+function mustBankRefusal({
+  error,
+  pageCount,
+}: {
+  error: unknown;
+  pageCount: number;
+}): boolean {
+  if (pageCount === 0) return false;
+  // A provider refusing outright is not a window to retry. Let that one travel,
+  // so the run is recorded as the refusal it is.
+  return !(error instanceof DispatchError) || error.retryable;
+}
+
+/**
+ * One page, read or refused. `banked` says whether the refusal arrived with
+ * earlier pages of the same run already read — see `mustBankRefusal`.
+ */
+type PageRead =
+  | {
+      ok: true;
+      events: NormalizedPullEvent[];
+      nextPage: string | null;
+      watermark: string | null;
+      hasKeyGrouping: boolean;
+    }
+  | { ok: false; banked: boolean };
+
+/**
+ * What a run returns when a page could not be read.
+ *
+ * With earlier pages banked it returns what a run stopped short by the deadline
+ * returns — the events read so far, and a cursor resuming at the page still
+ * owed — with the refusal counted. `errorCount: 1` beside an ADVANCED cursor is
+ * what the worker reads as a partial success: the events are written, the
+ * cursor is persisted, and it says so loudly (`assertRunMadeProgress`).
+ *
+ * With nothing banked the INCOMING cursor comes back unchanged, which is what
+ * fails the run so the outbox retries the same window. Returning it in BOTH
+ * cases was the bug: a refusal on page three ended every run with no forward
+ * progress at all, so the next run asked for page one again and was refused at
+ * page three again, for as long as the window needed more than one page.
+ */
+function pageUnread({
+  banked,
+  events,
+  stoppedShort,
+  incomingCursor,
+}: {
+  banked: boolean;
+  events: NormalizedPullEvent[];
+  stoppedShort: () => PullResult;
+  incomingCursor: string | null;
+}): PullResult {
+  if (banked) return { ...stoppedShort(), errorCount: 1 };
+  return { events, cursor: incomingCursor, errorCount: 1 };
+}
+
+/**
+ * The line a page nobody could read leaves behind, which says what it cost: a
+ * window held for a retry, or a window banked up to the page that failed.
+ */
+function logPageUnread({
+  adapter,
+  pageCount,
+  banked,
+  error,
+}: {
+  adapter: string;
+  pageCount: number;
+  banked: boolean;
+  error: unknown;
+}): void {
+  logger.error(
+    {
+      adapter,
+      pageCount,
+      error: error instanceof Error ? error.message : String(error),
+    },
+    banked
+      ? "openai admin page refused mid-window; keeping the pages already read and resuming at the refused one"
+      : "openai admin fetch failed; leaving the cursor where it was",
+  );
+}
+
 export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
   readonly id: string = OPENAI_ADMIN_ADAPTER_ID;
 
@@ -584,11 +687,18 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         page,
         hasKeyGrouping,
         options,
+        pageCount,
       });
       if (!read.ok) {
-        // The unadvanced cursor is what makes the window get retried instead
-        // of skipped. Never return a partial window as if it were complete.
-        return { events, cursor: options.cursor, errorCount: 1 };
+        // Resumes AT the page that failed when this run read any, and holds the
+        // window for a retry when it read none. Never returns a partial window
+        // as if it were complete.
+        return pageUnread({
+          banked: read.banked,
+          events,
+          stoppedShort,
+          incomingCursor: options.cursor,
+        });
       }
       events.push(...read.events);
       if (!read.hasKeyGrouping) hasLostKeyAttribution = true;
@@ -625,30 +735,25 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
    * One page: fetched, parsed, and mapped to events.
    *
    * A transport failure is a returned `ok: false` rather than a throw, because
-   * the caller has to answer it by holding the cursor still. A malformed
-   * response still throws: a shape we do not recognise is not a window to
-   * retry, it is a contract that moved.
+   * the caller has to answer it by deciding what the window is worth — which is
+   * why the failure carries `banked`. A malformed response still throws: a
+   * shape we do not recognise is not a window to retry, it is a contract that
+   * moved.
    */
   private async readPage({
     startingAt,
     page,
     hasKeyGrouping,
     options,
+    pageCount,
   }: {
     startingAt: string;
     page: string | null;
     hasKeyGrouping: boolean;
     options: PullRunOptions;
-  }): Promise<
-    | {
-        ok: true;
-        events: NormalizedPullEvent[];
-        nextPage: string | null;
-        watermark: string | null;
-        hasKeyGrouping: boolean;
-      }
-    | { ok: false }
-  > {
+    /** Pages this run has already read. Decides what a refusal costs. */
+    pageCount: number;
+  }): Promise<PageRead> {
     let fetched: { body: unknown; hasKeyGrouping: boolean } | null;
     try {
       fetched = await this.fetchWithKeyGroupingFallback({
@@ -658,18 +763,14 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         options,
       });
     } catch (error) {
-      // Let the durable outbox retain Retry-After instead of losing it in errorCount.
-      if (error instanceof DispatchError) throw error;
-      logger.error(
-        {
-          adapter: this.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "openai admin fetch failed; leaving the cursor where it was",
-      );
-      return { ok: false };
+      const banked = mustBankRefusal({ error, pageCount });
+      // Let the durable outbox retain Retry-After instead of losing it in
+      // errorCount — unless the pages already read are worth more than the wait.
+      if (!banked && error instanceof DispatchError) throw error;
+      logPageUnread({ adapter: this.id, pageCount, banked, error });
+      return { ok: false, banked };
     }
-    if (fetched === null) return { ok: false };
+    if (fetched === null) return { ok: false, banked: pageCount > 0 };
     const usedKeyGrouping = fetched.hasKeyGrouping;
 
     const parsed = pageSchema.parse(fetched.body);

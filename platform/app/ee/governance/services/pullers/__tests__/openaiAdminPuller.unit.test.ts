@@ -201,6 +201,74 @@ describe("given an OpenAI Admin cost source", () => {
     });
   });
 
+  describe("when a page is refused part-way through a window", () => {
+    /**
+     * The pages already read are worth more than the provider's Retry-After.
+     *
+     * A refusal used to throw straight out of the run, so the events from
+     * every page before it were dropped and the durable cursor never moved.
+     * The next run asked for page one of the same window, was refused at the
+     * same page again, and a source that met a rate limit mid-backfill could
+     * never get past it on any number of retries.
+     */
+    it("keeps the pages already read and resumes at the refused page", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse(page({ nextPage: "page_2", hasMore: true })),
+        )
+        .mockResolvedValueOnce(
+          new Response("private upstream payload", {
+            status: 429,
+            headers: { "retry-after": "120" },
+          }),
+        );
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      expect(result.events).toHaveLength(1);
+      expect(result.errorCount).toBe(1);
+      expect(result.completeness).toBe("truncated");
+      expect(result.cursor).not.toBeNull();
+      expect(JSON.parse(result.cursor!)).toMatchObject({ page: "page_2" });
+    });
+
+    /** The same for a page lost to the transport rather than to a refusal. */
+    it("keeps the pages already read when a later page fails on the transport", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse(page({ nextPage: "page_2", hasMore: true })),
+        )
+        .mockRejectedValueOnce(new Error("socket hang up"));
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      expect(result.events).toHaveLength(1);
+      expect(result.errorCount).toBe(1);
+      expect(result.completeness).toBe("truncated");
+      expect(result.cursor).not.toBeNull();
+      expect(JSON.parse(result.cursor!)).toMatchObject({ page: "page_2" });
+    });
+
+    /**
+     * A refusal on the FIRST page of a run is a different thing. Nothing was
+     * read, so there is no progress to bank, and the wait the provider asked
+     * for is the most valuable thing the run has: it must still reach the
+     * scheduler rather than be swallowed into an error count.
+     */
+    it("still surrenders the rate-limit wait when the first page is refused", async () => {
+      fetchMock.mockResolvedValue(
+        new Response("private upstream payload", {
+          status: 429,
+          headers: { "retry-after": "120" },
+        }),
+      );
+
+      await expect(
+        new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG),
+      ).rejects.toMatchObject({ retryAfterMs: 120_000 });
+    });
+  });
+
   describe("when the provider reports a day's spend", () => {
     /** @scenario "A day's spend is recorded as the dollars the provider reported" */
     it("records the provider's dollars without converting them", async () => {
