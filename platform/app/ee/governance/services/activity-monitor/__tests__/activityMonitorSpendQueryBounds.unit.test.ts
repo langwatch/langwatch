@@ -23,8 +23,8 @@
  * because the two halves are filtered independently — see the same
  * both-halves treatment in aggregation-builder.ts:137.
  *
- * These reads also carry no ClickHouse settings, so a single wide scan has no
- * ceiling on threads or runtime. Storage metering already pins both
+ * These reads previously carried no ClickHouse settings, so a single wide scan
+ * had no ceiling on threads or runtime. Storage metering already pinned both
  * (storageMeter.service.ts:63-67).
  *
  * Each test drives the real repository through its production constructor
@@ -75,7 +75,7 @@ const READS: Array<{
         thisStart: WINDOW_START,
         prevStart: WINDOW_START,
         windowEnd: WINDOW_END,
-      } as never),
+      }),
   },
   {
     name: "findSpendByUser",
@@ -88,7 +88,7 @@ const READS: Array<{
         sortDir: "desc",
         limit: 8,
         offset: 0,
-      } as never),
+      }),
   },
   {
     name: "findSpendByDepartment",
@@ -97,7 +97,7 @@ const READS: Array<{
         tenantIds: ["tenant-a", "tenant-b"],
         windowStart: WINDOW_START,
         windowEnd: WINDOW_END,
-      } as never),
+      }),
   },
   {
     name: "findSpendByTeamSource",
@@ -107,7 +107,7 @@ const READS: Array<{
         thisStart: WINDOW_START,
         prevStart: WINDOW_START,
         windowEnd: WINDOW_END,
-      } as never),
+      }),
   },
   {
     name: "findSpendOverTime",
@@ -117,7 +117,7 @@ const READS: Array<{
         windowStart: WINDOW_START,
         windowEnd: WINDOW_END,
         groupBy: "team",
-      } as never),
+      }),
   },
 ];
 
