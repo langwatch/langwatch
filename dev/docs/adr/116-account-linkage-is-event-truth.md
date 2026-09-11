@@ -267,6 +267,65 @@ down, rather than silently falling back to the legacy branch — a test user
 quietly born on the old path would poison the very rollout the flag exists
 to test. Before general rollout, this entrance is the thing to harden.
 
+#### Amendment, 2026-09-11: the entrance is attached to a sealed door
+
+**As built, this entrance cannot execute on any tier.** It is armed in exactly
+one place — `routes/auth.ts`, for a `POST` whose path ends `/sign-up/email` —
+and the first statement of the better-auth `before` hook is
+`refuseDirectEmailSignUp`, which throws `NOT_FOUND` for that exact path with no
+exemption. `ssoRouteTableCanary` asserts that 404. So the marker is set, the
+handler is entered, and the route 404s before any birth branch runs.
+
+Both halves are deliberate and both are tested, which is why neither test
+fails: one asserts the flag arms, the other asserts the route is sealed, and
+nothing asserts that arming it reaches anything. The seal is right — local
+account creation belongs to `user.register`, which writes the pending
+confirmation latch and sends its continuation email, and better-auth's raw
+route would create an account with no supported way to request that proof.
+
+`signupConfirmationPending` in `config/database-hooks.ts` is unreachable for
+the same reason: its branch is keyed on the same 404'd path.
+
+**What this means in practice.** No user is born on the identity branch. Every
+user arrives by backfill adoption, which is the path that works and is tested.
+The `release_identity_born_finalized_signup` flag changes nothing when flipped:
+an operator targeting an organization gets no behaviour change and no error.
+`IdentityNewbornReconciliationService` runs every migration pass hunting claims
+that the entrance is the only producer of, and therefore finds nothing.
+
+**What the entrance is actually still for.** Less than the machinery suggests.
+`CredentialAccountService.openCredentialAccount` — the single writer both local
+sign-up doors share — already states the credential identifier fact, so the
+identity aggregate already learns about every new user at birth. What born
+finalized adds on top is only the finalized migration-state row, so the user
+never needs adopting.
+
+**Why it cannot simply be re-pointed at the real door.** Finalizing a user
+makes the identity branch their truth. Do that before the fold lands and the
+projection is still empty, so the branch answers "no identifiers" for an
+account that has them — the "not yet versus nothing" hazard
+[ADR-135](135-a-write-states-its-facts-once.md) names, and the reason `birth.ts`
+sequences stage, then rows, then observe rather than writing rows first. Moving
+the entrance means restructuring the live sign-up path, not moving a call.
+
+**The choice this now needs**, which is deliberately left open here rather than
+decided in a pull request that is already large:
+
+1. **Re-point it** at `openCredentialAccount`, running the birth sequence there
+   so a flagged sign-up is finalized at birth with the ordering guarantee
+   intact. Real work on the highest-risk path in the product.
+2. **Retire it.** Delete `BornFinalizedOptIn`, `IdentityBirthService`, the
+   `birth` dep on the storage adapter, `runWithIdentityBirth`, the birth half of
+   `birthAwareGate` and the newborn sweep. Nothing that works today is lost —
+   adoption by backfill is what every user already does — and roughly a
+   thousand lines of unreachable code that reads as active stop inviting the
+   assumption that new users start on the identity branch.
+
+ADR-135 already withdraws this entrance's provisional identifier heads, so the
+design is in flux either way. Option 2 is the recommendation on the evidence:
+the entrance's distinctive value was making a newborn's FIRST write land on the
+identity branch, and the ordinary attach path now states that fact anyway.
+
 ### 4. Phases, and what retires when
 
 **Phase 1 — the bridge.** Stock adapter semantics for everyone; latched

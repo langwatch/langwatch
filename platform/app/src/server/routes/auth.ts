@@ -184,7 +184,14 @@ const betterAuthCatchAll = async (c: Context) => {
 
   // ADR-116 §3: the born-finalized entrance's request-scoped marker, decided
   // HERE and only here, and only once the backend allowlist check has
-  // passed. Nothing below re-decides it, and outside a marked request the
+  // passed.
+  //
+  // INERT AS BUILT, and deliberately left so — see ADR-116 §3 "Amendment,
+  // 2026-09-11". This arms only for POST `/sign-up/email`, and the first
+  // statement of better-auth's before hook (`refuseDirectEmailSignUp`) 404s
+  // that exact path. The marker is set, the handler is entered, the route
+  // refuses, and no birth branch runs. Do not read the branch below as a live
+  // path; the amendment records the two ways out and which is recommended. Nothing below re-decides it, and outside a marked request the
   // entrance is never reached — which is what makes deploying it a no-op
   // until an operator targets an organization.
   const isBorn = await bornFinalizedOptIn().isBornFinalizedSignUp({
