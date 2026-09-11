@@ -4418,8 +4418,9 @@ function AdvancedSettingsGroup({
 /**
  * The required fields this form is showing that hold nothing.
  *
- * Visibility first: a field hidden by `visibleWhen` is not something the admin
- * can answer, and marking one red points at a control that is not on screen.
+ * Visibility first, in the `visibleParserFields` sense — `hidden` as well as
+ * `visibleWhen`: a field the form never puts on screen is not something the
+ * admin can answer, and marking one red points at a control that is not there.
  * Requiredness comes from `parserFieldPresentation`, the same answer the label
  * beside the input renders its asterisk from, so the form cannot mark a field
  * required and then refuse to complain about it — or complain about one it

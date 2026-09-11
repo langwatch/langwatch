@@ -105,9 +105,11 @@ export const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
  * back is not free — every extra month is more pages on the first run. OpenAI
  * serves four years, so a year is a deliberate choice rather than a limit:
  * enough to show a year-on-year trend on day one without a first run that
- * reads four years of days, and it fits in a single run. Six months of
- * Anthropic is about six pages at the adapter's daily bucket, well inside
- * `MAX_PAGES_PER_RUN`.
+ * reads four years of days. Neither figure is sized against a page count:
+ * the Anthropic adapter asks for no page size, so how many pages a span
+ * costs is the provider's to decide. A first read may well take several runs,
+ * and that is fine — a run that reaches its page cap saves the cursor and the
+ * next one resumes from it.
  *
  * Beside the cadence defaults and in one table for the same reason they are:
  * the proposal and any copy describing it have to read one source, or the form
