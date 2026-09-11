@@ -138,6 +138,29 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then each caller spends a separate per-client budget
     And a forwarding header received from an untrusted peer is ignored
 
+  @unit
+  Scenario: A caller on the public internet cannot choose its own throttle bucket
+    Given no trusted proxy is configured
+    And the caller reaches the app directly from a public address
+    When the caller sends a forwarding header naming a different address
+    Then the forwarding header is ignored
+    And the budget is spent against the address the caller connected from
+
+  @unit
+  Scenario: An in-cluster ingress does not collapse every visitor into one bucket
+    Given no trusted proxy is configured
+    And the app is reached through an ingress on a private address
+    When two visitors ask the sign-in router where an address should go
+    Then the ingress is read as the deployment's own hop
+    And each visitor spends a separate per-client budget
+
+  @unit
+  Scenario: Better Auth counts the same caller the platform counts
+    Given a request reaches an endpoint Better Auth throttles for itself
+    When the caller has been resolved from the connection
+    Then Better Auth is handed that caller as the canonical forwarding header
+    And no header written by the caller reaches its throttle
+
   # ── Self-hosted priority ───────────────────────────────────────────────
 
   @unit

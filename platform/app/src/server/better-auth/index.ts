@@ -26,7 +26,6 @@ import {
   twoStepAccount,
 } from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
-import { parseTrustedProxyAddresses } from "~/utils/getClientIp";
 import { databaseHooks } from "./config/database-hooks";
 import { emailAndPassword } from "./config/email-and-password";
 import { models } from "./config/models";
@@ -142,33 +141,34 @@ export const auth = betterAuth({
    * how many attempts they get. That makes it a security control, not a
    * telemetry nicety: it is what stands in front of the 50-per-15-minutes
    * sign-in cap, the 5-per-hour reset caps that close the enumeration
-   * side-channel, and the two-factor plugin's 3-per-10-seconds rule — the
+   * side-channel, and the two-factor plugin's 3-per-10-seconds rule - the
    * only brute-force limit in front of a six-digit code.
    *
    * `cf-connecting-ip` and `x-real-ip` are deliberately NOT listed. Both are
    * single-value headers, and better-auth's own documentation says it
    * "cannot verify the direct sender": for a single-value header it returns
-   * the value verbatim, `trustedProxies` set or not. Anyone who can reach
-   * the origin could therefore mint a fresh bucket per request by varying
-   * the header, and every cap above would count to one forever.
+   * the value verbatim, `trustedProxies` set or not.
    *
-   * `x-forwarded-for` is the chain form, and it is the only one that can be
-   * checked: with `trustedProxies` set, better-auth walks the chain from the
-   * right, skips hops we vouch for, and takes the first address we do not.
-   * Behind Cloudflare that still yields the true client, because Cloudflare
-   * appends to this header too — its ranges just belong in the list.
+   * `x-forwarded-for` is listed and `trustedProxies` is EMPTY on purpose, and
+   * the two together are only safe because of what the route does first. A
+   * `Request` carries no connection, so nothing better-auth can reach knows
+   * the socket peer, and its own answer would come from whatever the caller
+   * wrote. So `routes/auth.ts` resolves the caller from the peer - reading a
+   * forwarding header only when that peer is one of the deployment's own hops
+   * - and restates the answer as this header before the handler ever sees the
+   * request. What arrives here is therefore always single-valued and always
+   * ours, which is exactly the shape better-auth takes verbatim.
    *
-   * The list comes from `TRUSTED_PROXY_ADDRESSES`, the same setting the
-   * platform's own tRPC limiter resolves through `getClientIp`. One
-   * deployment fact, read once, so the two limiters cannot disagree about
-   * who the caller is.
+   * Leaving the operator's list out of this call is what keeps that true: with
+   * a list set, better-auth walks the chain and drops any hop it recognises,
+   * so a resolved caller that happens to BE the declared proxy would resolve
+   * to nothing and fall into the shared bucket. One caller identity, decided
+   * once, and the two limiters cannot disagree about who is calling.
    */
   advanced: {
     ipAddress: {
       ipAddressHeaders: ["x-forwarded-for"],
-      trustedProxies: [
-        ...parseTrustedProxyAddresses(env.TRUSTED_PROXY_ADDRESSES),
-      ],
+      trustedProxies: [],
     },
   },
 
