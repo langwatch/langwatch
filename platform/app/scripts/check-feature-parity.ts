@@ -363,7 +363,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/sessions/personal-sessions.feature",
   "specs/ai-governance/sessions/sessions-inventory.feature",
   "specs/analytics/posthog-cost-control.feature",
-  "specs/audit-log/audit-log.feature",
   "specs/auth/diagnostic-logging-on-auth-failure.feature",
   "specs/automations/dispatch-timing.feature",
   "specs/automations/notification-templates.feature",
@@ -674,6 +673,11 @@ const LEGACY_INERT: string[] = [
  */
 const LEGACY_PARTIAL: string[] = [
   "sdks/typescript/specs/cli/daemon.feature",
+  // Reason: the gateway half of this file is still unwritten and stays
+  // @unimplemented. It left LEGACY_INERT because the trail now enforces one
+  // real scenario - that a signed-in caller cannot fill it with refusals -
+  // and a file enforcing something is no longer inert.
+  "specs/audit-log/audit-log.feature",
   // Reason: arrived from main already partially tagged (#7778 self-mapped
   // Azure deployments on the dispatch path). Its six untagged scenarios
   // describe gateway endpoint derivation, which this branch does not own.
