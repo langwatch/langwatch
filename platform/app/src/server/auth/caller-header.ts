@@ -30,6 +30,16 @@ const CALLER_HEADER = "x-forwarded-for";
  *
  * Rebuilt rather than mutated because the header guard on an adapter's
  * `Request` is not ours to rely on. The body rides along untouched.
+ *
+ * REBUILT FROM PARTS, NOT FROM THE REQUEST. `new Request(request, { headers })`
+ * is the obvious spelling and it throws here: the Node adapter hands the route
+ * a LAZY request that only materialises a real one when something reads its
+ * body, and the global constructor reaches for internals that object does not
+ * have yet ("Cannot read private member #state"). Passing only `url`, `method`,
+ * `headers`, `body` and `signal` asks for nothing an adapter has to implement,
+ * so this holds for whatever the server hands us. A test drives it through a
+ * real listener rather than a hand-built `Request`, because a hand-built one is
+ * precisely the case that does not fail.
  */
 export function requestStatingCaller({
   request,
@@ -43,5 +53,16 @@ export function requestStatingCaller({
   if (caller) headers.set(CALLER_HEADER, caller);
   else headers.delete(CALLER_HEADER);
 
-  return new Request(request, { headers });
+  // GET and HEAD carry none, and undici rejects an init that gives them one.
+  const body =
+    request.method === "GET" || request.method === "HEAD" ? null : request.body;
+
+  return new Request(request.url, {
+    method: request.method,
+    headers,
+    body,
+    // Required whenever the body is a stream rather than a buffer.
+    ...(body ? { duplex: "half" } : {}),
+    signal: request.signal,
+  } as RequestInit);
 }
