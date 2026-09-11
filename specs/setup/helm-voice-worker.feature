@@ -80,6 +80,16 @@ Feature: The voice worker needs zero extra configuration to route phone simulati
       And it runs in voice-only mode
 
     @e2e
+    Scenario: The voice worker is reachable inside the cluster and exposed for Twilio by default
+      Given the voice worker's own public address is set to a valid https://
+        origin, and nothing about its public entry point is configured
+      When the chart renders
+      Then the voice worker is reachable inside the cluster on its
+        call-handling port
+      And a public entry point for it renders too, without any extra
+        configuration
+
+    @e2e
     Scenario: The voice worker's shutdown timing is its own, not borrowed from the background workers
       Given the voice worker is turned on with its own shutdown timing configured differently from the background workers' shutdown timing
       When the chart renders

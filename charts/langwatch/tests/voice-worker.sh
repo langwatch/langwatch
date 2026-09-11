@@ -52,7 +52,7 @@ render() {
   return $status
 }
 
-# @scenario "Turning on the voice worker with a valid https:// public address renders"
+# @scenario "A stock install with no https:// URL anywhere renders no voice resources"
 test_default_has_no_voice_resources() {
   local out
   if ! out=$(render ""); then
@@ -113,7 +113,7 @@ test_termination_grace_period_follows_voice_values() {
   echo "ok   [voice terminationGracePeriodSeconds] follows --set voice.terminationGracePeriodSeconds, not workers.*"
 }
 
-# @scenario "The voice worker is reachable inside the cluster by default, but not exposed publicly"
+# @scenario "The voice worker is reachable inside the cluster and exposed for Twilio by default"
 test_enabled_renders_service_and_ingress_by_default() {
   local svc ing
   svc=$(render_component "service.yaml" "$ENABLED_FLAGS")
@@ -135,7 +135,7 @@ test_enabled_renders_service_and_ingress_by_default() {
   echo "ok   [voice service / ingress by default] Service and Ingress both render with zero extra ingress config"
 }
 
-# @scenario "The voice worker gets its own public hostname for Twilio to call"
+# @scenario "The voice worker's public hostname defaults to its resolved public address"
 test_ingress_host_defaults_to_public_base_url_hostname() {
   local ing
   ing=$(render_component "ingress.yaml" "$ENABLED_FLAGS")
@@ -154,7 +154,7 @@ test_ingress_host_defaults_to_public_base_url_hostname() {
   echo "ok   [voice ingress default host] Ingress host defaults to voice.example.com with no voice.ingress.host set"
 }
 
-# @scenario "The voice worker gets its own public hostname for Twilio to call"
+# @scenario "An explicit public hostname for the voice worker still works"
 test_ingress_host_explicit_override_renders() {
   local ing
   ing=$(render_component "ingress.yaml" \
@@ -218,7 +218,7 @@ test_stock_app_http_public_url_renders_nothing() {
   echo "ok   [http-only app.http.publicUrl] no https:// origin resolvable anywhere, voice.enabled=true still renders nothing (no failure either)"
 }
 
-# @scenario "Renders by default when an https:// public URL is configured (via app.http.publicUrl)"
+# @scenario "Renders by default when an https:// public URL is configured"
 test_app_http_public_url_https_renders_by_default() {
   local block
   block=$(render_component "deployment.yaml" "--set app.http.publicUrl=https://app.langwatch.ai")
@@ -233,7 +233,7 @@ test_app_http_public_url_https_renders_by_default() {
   echo "ok   [app.http.publicUrl fallback] voice renders by default off app.http.publicUrl alone, zero voice.* values set"
 }
 
-# @scenario "An explicit voice.publicBaseUrl wins over app.http.publicUrl"
+# @scenario "An explicit voice public address wins over the app's own public URL"
 test_explicit_public_base_url_wins_over_app_http_public_url() {
   local block
   block=$(render_component "deployment.yaml" \
@@ -249,7 +249,7 @@ test_explicit_public_base_url_wins_over_app_http_public_url() {
   echo "ok   [explicit wins] voice.publicBaseUrl overrides app.http.publicUrl when both are set"
 }
 
-# @scenario "voice.enabled=false still opts out even when a public https:// URL is available"
+# @scenario "Explicitly turning the voice worker off overrides a resolvable https:// URL"
 test_explicit_disabled_overrides_https_app_public_url() {
   local out
   if ! out=$(render "--set app.http.publicUrl=https://app.langwatch.ai --set voice.enabled=false"); then
@@ -263,7 +263,7 @@ test_explicit_disabled_overrides_https_app_public_url() {
   echo "ok   [explicit disabled] voice.enabled=false opts out even with a resolvable https:// URL"
 }
 
-# @scenario "An explicit bad public address still fails the render"
+# @scenario "An explicit bad voice public address still fails even when the app's own public URL would resolve on its own"
 test_explicit_bad_public_base_url_refuses_even_with_https_app_url() {
   local out
   if out=$(render "--set app.http.publicUrl=https://app.langwatch.ai --set voice.publicBaseUrl=http://voice.example.com"); then
