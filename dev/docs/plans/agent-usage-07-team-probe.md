@@ -80,14 +80,14 @@ failure mode Part 6 was written about.
 
 Send this verbatim. It is written for their coding agent, not for them.
 
-> **Before you send it, replace `PIN_THE_COMMIT_SHA_HERE` in the fetch command
-> with the commit SHA that contains the probe.** It is a placeholder on
-> purpose. A branch name there — `?ref=feat/agent-usage-advisor-ideation` —
-> reads fine and silently hands Monday's reader a different script from
-> Thursday's reader, and neither of them can tell. Only a SHA whose commit
-> actually contains `--no-frustration` is valid, because the prompt below tells
-> them that flag exists. A URL that visibly fails is recoverable; four
-> incomparable cards are not.
+> **The fetch command below is pinned to commit `aaaf952f60`, which has been
+> verified to contain the probe with `--no-frustration`.** Leave it pinned. A
+> branch name there — `?ref=feat/agent-usage-advisor-ideation` — reads fine and
+> silently hands Monday's reader a different script from Thursday's reader, and
+> neither of them can tell. If you amend the probe, re-pin this to the new SHA
+> and re-send to anyone who has not yet run it; a card produced from a different
+> build is not comparable and cannot be made comparable after the fact. A URL
+> that visibly fails is recoverable; four incomparable cards are not.
 
 ````markdown
 I'd like you to measure my coding-agent usage over the last two months and
@@ -147,7 +147,7 @@ this in order and do not skip ahead to the comparison.
 4. Fetch the probe and run it:
 
    ```bash
-   gh api "repos/langwatch/langwatch/contents/dev/scripts/agent-usage-probe.mjs?ref=PIN_THE_COMMIT_SHA_HERE" \
+   gh api "repos/langwatch/langwatch/contents/dev/scripts/agent-usage-probe.mjs?ref=aaaf952f60742ab9abd15528ab2aaf04bcb266d9" \
      -H "Accept: application/vnd.github.raw" \
      > agent-usage-probe.mjs
 
