@@ -2314,7 +2314,11 @@ export function SourceEditDrawer({
               undefined". */}
           <HStack gap={3}>
             {sourceType && (
-              <SourceTypeIconGlyph sourceType={sourceType} size="24px" />
+              <SourceTypeIconGlyph
+                sourceType={sourceType}
+                size="24px"
+                testId="source-type-icon"
+              />
             )}
             <Heading as="h2" size="md">
               Edit {editLabel}

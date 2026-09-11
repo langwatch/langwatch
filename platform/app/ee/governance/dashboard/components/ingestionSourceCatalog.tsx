@@ -410,9 +410,17 @@ const MONOCHROME_SOURCE_ICONS = new Set<SourceType>([
 export function SourceTypeIconGlyph({
   sourceType,
   size = "16px",
+  testId,
 }: {
   sourceType: SourceType;
   size?: string | number;
+  /**
+   * Named by the caller rather than fixed here: this renders on the menu, the
+   * composer, the list rows and the edit title, and one id shared by all of
+   * them would make `getByTestId` ambiguous the first time two appear on one
+   * screen. Callers that nothing queries pass nothing.
+   */
+  testId?: string;
 }) {
   const icon = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.icon;
   if (!icon) return null;
@@ -421,7 +429,7 @@ export function SourceTypeIconGlyph({
       icon={icon}
       monochrome={MONOCHROME_SOURCE_ICONS.has(sourceType)}
       size={size}
-      testId="source-type-icon"
+      testId={testId}
     />
   );
 }
