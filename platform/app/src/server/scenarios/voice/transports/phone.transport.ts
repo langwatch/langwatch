@@ -20,10 +20,20 @@
  * does NOT go through them.
  */
 
+import { randomBytes } from "node:crypto";
+import type { Socket } from "node:net";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
+import {
+  raceAgainstUpgradeRefusal,
+  requestNonceRegistration,
+} from "../voice-nonce-handoff";
+import {
+  createVoiceSocketReceiver,
+  type VoiceSocketReceiver,
+} from "../voice-socket-handoff";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
@@ -88,7 +98,30 @@ export interface TwilioAdapterLike {
      *  {@link defaultTwilioAgentFactory} maps this to at the vendor boundary. A
      *  build without the recording patch ignores it. */
     shouldRecord?: boolean;
+    /** The Twilio media-stream nonce the caller (this transport) has already
+     *  registered with the parent worker's listener — see
+     *  {@link withOutboundDial}. Passed straight through to the SDK, which
+     *  mints its own when omitted (every non-phone-transport caller of the
+     *  SDK, e.g. its own examples/tests). */
+    streamNonce?: string;
   }): Promise<void>;
+  /**
+   * Feeds a raw socket the SDK's own upgrade never saw — one the PARENT
+   * worker accepted and handed off over IPC ({@link handOffVoiceSocket}) —
+   * into the SDK's local media-stream server so it completes the WebSocket
+   * handshake and starts reading Twilio's audio frames. Optional: a fake
+   * adapter in a test need not implement it unless the test exercises the
+   * handoff wiring itself.
+   */
+  receiveExternalMediaSocket?(params: {
+    req: {
+      method: string;
+      url: string;
+      headers: Record<string, string | string[] | undefined>;
+    };
+    socket: Socket;
+    head: Buffer;
+  }): void;
 }
 
 /** Builds the SDK adapter; injectable so a test drives a fake instead of Twilio. */
@@ -98,7 +131,10 @@ export type TwilioAgentFactory = (options: {
   /** The account's OWN Twilio number (the "from"), NOT the destination. */
   phoneNumber: string;
   publicBaseUrl?: string;
-  /** The port the SDK's local media-stream server binds. See {@link resolveHttpPort}. */
+  /** The port the SDK's local media-stream server binds. Always `0`
+   *  (OS-assigned) at the call site: the parent worker owns the public media
+   *  port, and the child only ever receives an already-upgraded socket over
+   *  IPC, so this field never needs to be reachable. */
   httpPort?: number;
   allowedCallees: readonly string[];
   /** The target under test is the agent; the synthetic caller is the user. */
@@ -114,6 +150,7 @@ type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
     attachStream?: "a-leg" | "b-leg";
     maxCallDurationSeconds?: number;
     record?: boolean;
+    streamNonce?: string;
   }): Promise<void>;
 };
 
@@ -254,19 +291,22 @@ export function resolvePublicBaseUrlWithSource(
 }
 
 /**
- * The port the SDK's local media-stream server binds. `VOICE_WS_PORT` when it
- * is a valid port number, otherwise `0` (OS-assigned), the SDK's own default.
- * A fixed port lets an operator route a public HTTPS origin to the child in a
- * single-worker deployment; slice 3's listener handoff supersedes it.
+ * Mints a per-call Twilio media-stream nonce and hands it to the parent
+ * worker to register before the dial. Injectable so a test drives a fake
+ * parent instead of the real IPC channel; defaults to
+ * {@link requestNonceRegistration} against the real `process`.
  */
-export function resolveHttpPort(
-  processEnv: NodeJS.ProcessEnv = process.env,
-): number {
-  const raw = processEnv.VOICE_WS_PORT?.trim();
-  if (!raw) return 0;
-  const port = Number(raw);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) return 0;
-  return port;
+export type NonceRegistrar = (params: { nonce: string }) => Promise<void>;
+
+/** 16 bytes of CSPRNG entropy, hex-encoded — mirrors the SDK's own
+ *  `STREAM_NONCE_BYTES`/`mintStreamNonce` (twilio-shared.ts): the platform
+ *  mints independently rather than importing the SDK's mint function, since
+ *  the nonce is opaque to the SDK once injected via `streamNonce`. */
+const STREAM_NONCE_BYTES = 16;
+
+/** Mint a fresh per-call Twilio media-stream nonce. */
+function mintPhoneStreamNonce(): string {
+  return randomBytes(STREAM_NONCE_BYTES).toString("hex");
 }
 
 /** The dependencies the phone runner is built from. Injected in tests so a fake
@@ -274,6 +314,19 @@ export function resolveHttpPort(
 export interface PhoneTransportDeps {
   twilioAgentFactory?: TwilioAgentFactory;
   processEnv?: NodeJS.ProcessEnv;
+  /** Overrides how the nonce is registered with the parent; defaults to the
+   *  real IPC round-trip. Tests inject a fake to control ordering/failure. */
+  registerNonce?: NonceRegistrar;
+  /** Overrides nonce minting so a test can assert on a known value. */
+  mintNonce?: () => string;
+  /** Overrides the upgrade-refusal race; defaults to the real
+   *  {@link raceAgainstUpgradeRefusal} listening on `process`. Tests inject a
+   *  fake to simulate a refusal notice arriving mid-dial. */
+  raceUpgradeRefusal?: <T>(promise: Promise<T>) => Promise<T>;
+  /** Overrides the child-side socket receiver; defaults to the real
+   *  {@link createVoiceSocketReceiver} listening on `process`. Tests inject a
+   *  fake to drive the handoff without a real IPC channel. */
+  socketReceiver?: VoiceSocketReceiver;
 }
 
 /** The Twilio branch of the credential union, or a thrown error. A credential
@@ -306,27 +359,59 @@ function reasonOf(error: unknown): string {
  * releases the socket best-effort and surfaces with a clear prefix, so a
  * refused destination (the SDK's deny-by-default a-leg guard) or an unreachable
  * edge reads as the run's error rather than a raw socket throw.
+ *
+ * Before dialling, this process (the scenario child) mints the Twilio stream
+ * nonce ITSELF and registers it with the parent worker over IPC
+ * (`registerNonce`, {@link requestNonceRegistration} by default) — the parent
+ * owns the public media listener Twilio actually connects back to
+ * (`voice-ws-listener.ts`), so the nonce must exist in its registry BEFORE
+ * Twilio can possibly dial back. `placeCall` is only ever called once that
+ * registration is acknowledged; a timeout, a parent-reported failure, or the
+ * absence of an IPC channel all fail the dial loudly instead of originating a
+ * call whose media socket the listener could never authenticate.
  */
 function withOutboundDial(
   adapter: TwilioAdapterLike,
   {
     to,
     maxCallDurationSeconds,
-  }: { to: string; maxCallDurationSeconds: number },
+    registerNonce,
+    mintNonce,
+    raceUpgradeRefusal,
+  }: {
+    to: string;
+    maxCallDurationSeconds: number;
+    registerNonce: NonceRegistrar;
+    mintNonce: () => string;
+    raceUpgradeRefusal: <T>(promise: Promise<T>) => Promise<T>;
+  },
 ): TwilioAdapterLike {
   const originalConnect = adapter.connect.bind(adapter);
   adapter.connect = async () => {
     try {
       await originalConnect();
-      await adapter.placeCall({
-        to,
-        attachStream: "a-leg",
-        maxCallDurationSeconds,
-        // Record the call so the whole-call audio is available for playback in
-        // the run drawer once Twilio publishes the recording (#8014). Our
-        // option; the factory maps it to the SDK's published `record`.
-        shouldRecord: true,
-      });
+      const streamNonce = mintNonce();
+      // Wait for the parent's ack BEFORE placeCall: dialling first would race
+      // Twilio's dial-back against the parent's registration, and the
+      // listener refuses any upgrade whose nonce it does not yet know.
+      await registerNonce({ nonce: streamNonce });
+      // Racing against a possible refusal notice: if the listener later
+      // refuses this exact nonce (only possible once it has expired — a
+      // freshly registered nonce cannot be unknown), fail fast with that
+      // real cause instead of silently burning placeCall's full connect-wait
+      // timeout and reporting a misleading generic failure.
+      await raceUpgradeRefusal(
+        adapter.placeCall({
+          to,
+          attachStream: "a-leg",
+          maxCallDurationSeconds,
+          // Record the call so the whole-call audio is available for playback
+          // in the run drawer once Twilio publishes the recording (#8014).
+          // Our option; the factory maps it to the SDK's published `record`.
+          shouldRecord: true,
+          streamNonce,
+        }),
+      );
     } catch (error) {
       await adapter.disconnect().catch(() => {
         // Best-effort: the rejection below is what the caller sees.
@@ -346,6 +431,14 @@ export function createPhoneTransport(
 ): VoiceTransportRunner {
   const twilioAgentFactory =
     deps.twilioAgentFactory ?? defaultTwilioAgentFactory;
+  const registerNonce: NonceRegistrar =
+    deps.registerNonce ?? ((params) => requestNonceRegistration(params));
+  const mintNonce = deps.mintNonce ?? mintPhoneStreamNonce;
+  const raceUpgradeRefusal =
+    deps.raceUpgradeRefusal ??
+    (<T>(promise: Promise<T>): Promise<T> =>
+      raceAgainstUpgradeRefusal(promise));
+  const socketReceiver = deps.socketReceiver ?? createVoiceSocketReceiver();
 
   return {
     missingKeyMessage: PHONE_NO_CREDENTIAL_MESSAGE,
@@ -400,16 +493,42 @@ export function createPhoneTransport(
         authToken: twilio.authToken,
         phoneNumber: twilio.fromNumber,
         publicBaseUrl: resolvedBaseUrl?.value,
-        httpPort: resolveHttpPort(deps.processEnv),
+        // Always OS-assigned: the parent worker owns the public media port
+        // and hands the child an already-upgraded socket over IPC (below), so
+        // the child's own SDK server never needs a reachable port. Binding a
+        // fixed port here would race the parent for the same listener.
+        httpPort: 0,
         // Only the dialled target is allowlisted, so the SDK's deny-by-default
         // a-leg guard passes for exactly this number and nothing else. There is
         // no user-facing allowlist; this guard is internal to the SDK.
         allowedCallees: [agentId],
         role: AgentRole.AGENT,
       });
+      // The other half of the nonce-registration handshake: once Twilio dials
+      // back, the PARENT worker's listener accepts the upgrade (it owns the
+      // public port) and hands the raw socket to this child over IPC
+      // (`handOffVoiceSocket`/`voice-ws-listener.ts`). Without this wiring the
+      // child would register the nonce and dial correctly, but the arriving
+      // socket would have nowhere to go and the call would still never
+      // connect. One scenario child handles exactly one call, so the receiver
+      // lives for the process's lifetime — no unsubscribe needed.
+      socketReceiver.onVoiceSocket(({ message, socket, head }) => {
+        adapter.receiveExternalMediaSocket?.({
+          req: {
+            method: message.method,
+            url: message.url,
+            headers: message.headers,
+          },
+          socket,
+          head,
+        });
+      });
       return withOutboundDial(adapter, {
         to: agentId,
         maxCallDurationSeconds,
+        registerNonce,
+        mintNonce,
+        raceUpgradeRefusal,
       }) as unknown as AgentAdapter;
     },
   };

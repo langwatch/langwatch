@@ -706,8 +706,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/redis-client
       '@langwatch/scenario':
-        specifier: file:vendor/langwatch-scenario-1.7.0-dev.voice4.tgz
-        version: file:platform/app/vendor/langwatch-scenario-1.7.0-dev.voice4.tgz(6a9e8b10ea4962b9fa37930197374032)
+        specifier: file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz
+        version: file:platform/app/vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(6a9e8b10ea4962b9fa37930197374032)
       '@langwatch/ssrf':
         specifier: workspace:*
         version: link:../../packages/ssrf
@@ -3520,9 +3520,9 @@ packages:
       '@google/genai':
         optional: true
 
-  '@langwatch/scenario@file:platform/app/vendor/langwatch-scenario-1.7.0-dev.voice4.tgz':
-    resolution: {integrity: sha512-kOL7llDhEOz4t4ruBR3d3GlyiZ9oOo1avCVwhXXni2a/kaY6RTlSPYb6McR94h1PA0zroDAdPqKzOnSboaEiCg==, tarball: file:platform/app/vendor/langwatch-scenario-1.7.0-dev.voice4.tgz}
-    version: 1.7.0-dev.voice4
+  '@langwatch/scenario@file:platform/app/vendor/langwatch-scenario-1.7.0-dev.voice7.tgz':
+    resolution: {integrity: sha512-JyfksUuTD+8E03I1e+5Uw2zh+Dyud5vd3KHAOvn9SG9b50iw6TJl0SWDDy80iI7v/8E5UIC86hijdd6H8TEC+g==, tarball: file:platform/app/vendor/langwatch-scenario-1.7.0-dev.voice7.tgz}
+    version: 1.7.0-dev.voice6
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
       '@elevenlabs/elevenlabs-js': '>=2.51.0'
@@ -14406,7 +14406,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@langwatch/scenario@file:platform/app/vendor/langwatch-scenario-1.7.0-dev.voice4.tgz(6a9e8b10ea4962b9fa37930197374032)':
+  '@langwatch/scenario@file:platform/app/vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(6a9e8b10ea4962b9fa37930197374032)':
     dependencies:
       '@ag-ui/core': 0.0.58
       '@ai-sdk/openai': 3.0.79(zod@3.25.76)

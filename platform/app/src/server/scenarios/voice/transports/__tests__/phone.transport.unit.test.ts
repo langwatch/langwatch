@@ -2,15 +2,19 @@
  * @see specs/features/agents/voice-phone.feature
  */
 
+import type { Socket } from "node:net";
 import { AgentRole } from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
+import type {
+  ReceivedVoiceSocket,
+  VoiceSocketReceiver,
+} from "../../voice-socket-handoff";
 import type { VoiceTransportCredential } from "../../voice-transport.registry";
 import {
   createPhoneTransport,
   PHONE_CONNECT_REJECTED_PREFIX,
   PHONE_NO_BROWSER_CALL_MESSAGE,
   phoneTransport,
-  resolveHttpPort,
   resolvePublicBaseUrl,
   TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
   type TwilioAdapterLike,
@@ -56,6 +60,9 @@ type SdkPlaceCallArgs = Omit<
 interface FakeAdapter extends TwilioAdapterLike {
   readonly placeCallArgs: Array<Parameters<TwilioAdapterLike["placeCall"]>[0]>;
   readonly disconnectCount: () => number;
+  readonly receivedSockets: Array<
+    Parameters<NonNullable<TwilioAdapterLike["receiveExternalMediaSocket"]>>[0]
+  >;
 }
 
 function fakeAdapter(
@@ -63,9 +70,13 @@ function fakeAdapter(
 ): FakeAdapter {
   const placeCallArgs: Array<Parameters<TwilioAdapterLike["placeCall"]>[0]> =
     [];
+  const receivedSockets: Array<
+    Parameters<NonNullable<TwilioAdapterLike["receiveExternalMediaSocket"]>>[0]
+  > = [];
   let disconnects = 0;
   return {
     placeCallArgs,
+    receivedSockets,
     disconnectCount: () => disconnects,
     connect: vi.fn(async () => {
       if (behaviour.connectRejects) throw behaviour.connectRejects;
@@ -77,22 +88,71 @@ function fakeAdapter(
       placeCallArgs.push(args);
       if (behaviour.placeCallRejects) throw behaviour.placeCallRejects;
     }),
+    receiveExternalMediaSocket: vi.fn((params) => {
+      receivedSockets.push(params);
+    }),
+  };
+}
+
+/** A registrar that acks immediately — the default for every test that isn't
+ *  itself exercising the nonce-registration handshake. Real production code
+ *  goes through the IPC round-trip in voice-nonce-handoff.ts instead. */
+function autoAckRegisterNonce(): Promise<void> {
+  return Promise.resolve();
+}
+
+/** A no-op race — the default for every test that isn't itself exercising the
+ *  upgrade-refusal handshake. Passes the promise through unchanged instead of
+ *  attaching a real `process` IPC listener. */
+function identityRaceUpgradeRefusal<T>(promise: Promise<T>): Promise<T> {
+  return promise;
+}
+
+/** A fake receiver a test can trigger manually, standing in for a real
+ *  `createVoiceSocketReceiver()` listening on process IPC. */
+function fakeSocketReceiver(): VoiceSocketReceiver & {
+  emit: (received: ReceivedVoiceSocket) => void;
+} {
+  let handler: ((received: ReceivedVoiceSocket) => void) | undefined;
+  return {
+    onVoiceSocket: (h) => {
+      handler = h;
+      return () => {
+        handler = undefined;
+      };
+    },
+    emit: (received) => handler?.(received),
   };
 }
 
 function buildTransport({
   adapter = fakeAdapter(),
   processEnv = { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
+  registerNonce = autoAckRegisterNonce,
+  mintNonce,
+  raceUpgradeRefusal = identityRaceUpgradeRefusal,
+  socketReceiver = fakeSocketReceiver(),
 }: {
   adapter?: FakeAdapter;
   processEnv?: NodeJS.ProcessEnv;
+  registerNonce?: (params: { nonce: string }) => Promise<void>;
+  mintNonce?: () => string;
+  raceUpgradeRefusal?: <T>(promise: Promise<T>) => Promise<T>;
+  socketReceiver?: VoiceSocketReceiver;
 } = {}) {
   const factoryOptions: Array<Parameters<TwilioAgentFactory>[0]> = [];
   const twilioAgentFactory: TwilioAgentFactory = (options) => {
     factoryOptions.push(options);
     return adapter;
   };
-  const transport = createPhoneTransport({ twilioAgentFactory, processEnv });
+  const transport = createPhoneTransport({
+    twilioAgentFactory,
+    processEnv,
+    registerNonce,
+    raceUpgradeRefusal,
+    socketReceiver,
+    ...(mintNonce ? { mintNonce } : {}),
+  });
   return { transport, adapter, factoryOptions };
 }
 
@@ -213,6 +273,227 @@ describe("phoneTransport", () => {
         ).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
         expect(adapter.placeCallArgs).toHaveLength(0);
         expect(adapter.disconnectCount()).toBe(1);
+      });
+    });
+
+    describe("when the transport dials, given the parent's nonce registration", () => {
+      /**
+       * This is the production gap: the parent worker's media listener
+       * authenticates Twilio's dial-back against a nonce it must already
+       * know. The child must register the nonce with the parent and get the
+       * ack back BEFORE dialling — proven here by ORDER, not by spying on an
+       * internal: the fake registrar itself records when it ran relative to
+       * placeCall.
+       */
+      /** @scenario "A phone call registers its stream nonce with the parent before dialling" */
+      it("registers the nonce and awaits the ack before placeCall runs", async () => {
+        const events: string[] = [];
+        const adapter = fakeAdapter();
+        const originalPlaceCall = adapter.placeCall;
+        adapter.placeCall = vi.fn(async (args) => {
+          events.push("placeCall");
+          return originalPlaceCall(args);
+        });
+        const registerNonce = vi.fn(async ({ nonce }: { nonce: string }) => {
+          events.push(`registerNonce:${nonce}`);
+          // A real IPC round-trip is asynchronous; yield a tick so a caller
+          // that (incorrectly) didn't await this promise would let placeCall
+          // run first, and the ordering assertion below would catch it.
+          await Promise.resolve();
+        });
+        const { transport } = buildTransport({
+          adapter,
+          registerNonce,
+          mintNonce: () => "fixed-nonce-for-ordering-test",
+        });
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+        await (built as unknown as Connectable).connect();
+
+        expect(events).toEqual([
+          "registerNonce:fixed-nonce-for-ordering-test",
+          "placeCall",
+        ]);
+        expect(adapter.placeCallArgs[0]).toMatchObject({
+          streamNonce: "fixed-nonce-for-ordering-test",
+        });
+      });
+
+      /** @scenario "A phone call fails loudly when the parent never acknowledges the nonce" */
+      it("fails the dial and never calls placeCall when the parent never acks", async () => {
+        const adapter = fakeAdapter();
+        const registerNonce = vi.fn(
+          () => new Promise<void>(() => {}), // never resolves or rejects
+        );
+        const { transport } = buildTransport({ adapter, registerNonce });
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+
+        // Race the real connect() against a short local timeout: a caller
+        // that (incorrectly) didn't wait on registerNonce would resolve
+        // connect() almost immediately and this test would see "resolved".
+        const outcome = await Promise.race([
+          (built as unknown as Connectable)
+            .connect()
+            .then(() => "resolved" as const)
+            .catch(() => "rejected" as const),
+          new Promise<"timed-out">((resolve) =>
+            setTimeout(() => resolve("timed-out"), 50),
+          ),
+        ]);
+
+        expect(outcome).toBe("timed-out");
+        expect(adapter.placeCallArgs).toHaveLength(0);
+        expect(registerNonce).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "A phone call fails loudly when the parent refuses the nonce" */
+      it("surfaces the parent's refusal as the run's error and never dials", async () => {
+        const adapter = fakeAdapter();
+        const registerNonce = vi.fn(async () => {
+          throw new Error("no voice listener booted in this process");
+        });
+        const { transport } = buildTransport({ adapter, registerNonce });
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+
+        await expect(
+          (built as unknown as Connectable).connect(),
+        ).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
+        expect(adapter.placeCallArgs).toHaveLength(0);
+        expect(adapter.disconnectCount()).toBe(1);
+      });
+    });
+
+    describe("when the listener refuses the socket after the nonce was registered", () => {
+      /**
+       * A nonce can outlive its registration (the listener's TTL, or a
+       * config mistake) and still get refused after Twilio actually rings
+       * the callee. Without this race, `connect()` would sit and burn
+       * `placeCall`'s full connect-wait timeout, then fail with a generic
+       * "stream never connected" that hides the real cause. `raceUpgradeRefusal`
+       * is what a real IPC-listening race would do; this test drives a fake
+       * one that "delivers" a refusal after placeCall has started dialling.
+       */
+      /** @scenario "A phone call fails fast when the listener refuses the socket mid-dial" */
+      it("fails fast with the refusal reason instead of waiting out placeCall", async () => {
+        const adapter = fakeAdapter();
+        // placeCall itself never settles on its own — only the race's
+        // refusal path can end this connect().
+        adapter.placeCall = vi.fn(() => new Promise<void>(() => {}));
+        const raceUpgradeRefusal = vi.fn(
+          <T>(_promise: Promise<T>): Promise<T> =>
+            Promise.reject(
+              new Error(
+                "Twilio's media socket was refused by the listener: nonce expired",
+              ),
+            ) as Promise<T>,
+        );
+        const { transport } = buildTransport({
+          adapter,
+          raceUpgradeRefusal: raceUpgradeRefusal as <T>(
+            promise: Promise<T>,
+          ) => Promise<T>,
+        });
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+
+        await expect(
+          (built as unknown as Connectable).connect(),
+        ).rejects.toThrow(/nonce expired/);
+        expect(raceUpgradeRefusal).toHaveBeenCalledTimes(1);
+        expect(adapter.disconnectCount()).toBe(1);
+      });
+
+      /** @scenario "A phone call fails fast when the listener refuses the socket mid-dial" */
+      it("still connects normally when no refusal ever arrives", async () => {
+        const adapter = fakeAdapter();
+        const { transport } = buildTransport({ adapter });
+        const built = transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+
+        await expect(
+          (built as unknown as Connectable).connect(),
+        ).resolves.toBeUndefined();
+        expect(adapter.placeCallArgs).toHaveLength(1);
+      });
+    });
+
+    describe("given the parent has handed off Twilio's media socket", () => {
+      /**
+       * The other half of the nonce-registration handshake: once Twilio
+       * dials back, the PARENT worker's listener accepts the raw upgrade
+       * socket and hands it to this child over IPC
+       * (`handOffVoiceSocket`/`createVoiceSocketReceiver`). Without this
+       * wiring, nonce registration and dialling would succeed but the
+       * arriving socket would have nowhere to go and the call would still
+       * never connect — this proves the wiring is real, not a no-op.
+       */
+      /** @scenario "The child feeds a handed-off Twilio socket into its own adapter" */
+      it("forwards the received socket into the adapter's own upgrade handler", () => {
+        const adapter = fakeAdapter();
+        const receiver = fakeSocketReceiver();
+        const { transport } = buildTransport({
+          adapter,
+          socketReceiver: receiver,
+        });
+        transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+
+        const socket = {} as Socket;
+        const head = Buffer.from("pipelined-bytes");
+        receiver.emit({
+          message: {
+            type: "voice:twilio-media-socket",
+            nonce: "n1",
+            url: "/twilio/n1",
+            method: "GET",
+            headers: { host: "voice.example.com" },
+            headBase64: head.toString("base64"),
+          },
+          socket,
+          head,
+        });
+
+        expect(adapter.receivedSockets).toHaveLength(1);
+        expect(adapter.receivedSockets[0]).toEqual({
+          req: {
+            method: "GET",
+            url: "/twilio/n1",
+            headers: { host: "voice.example.com" },
+          },
+          socket,
+          head,
+        });
+      });
+
+      it("does nothing when no socket has been handed off", () => {
+        const adapter = fakeAdapter();
+        const { transport } = buildTransport({ adapter });
+        transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+        expect(adapter.receivedSockets).toHaveLength(0);
       });
     });
   });
@@ -361,35 +642,10 @@ describe("phoneTransport", () => {
     });
   });
 
-  describe("given the http port is resolved", () => {
-    describe("when VOICE_WS_PORT is a valid port", () => {
-      it("uses it", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: "5564" })).toBe(5564);
-      });
-    });
-
-    describe("when VOICE_WS_PORT is unset", () => {
-      it("falls back to the OS-assigned port", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: undefined })).toBe(0);
-      });
-    });
-
-    describe("when VOICE_WS_PORT is not a number", () => {
-      it("falls back to the OS-assigned port", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: "not-a-port" })).toBe(0);
-      });
-    });
-
-    describe("when VOICE_WS_PORT is out of range", () => {
-      it("falls back to the OS-assigned port", () => {
-        expect(resolveHttpPort({ VOICE_WS_PORT: "0" })).toBe(0);
-        expect(resolveHttpPort({ VOICE_WS_PORT: "65536" })).toBe(0);
-        expect(resolveHttpPort({ VOICE_WS_PORT: "-1" })).toBe(0);
-      });
-    });
-
+  describe("given the child's SDK adapter http port", () => {
     describe("when the phone transport builds the SDK adapter", () => {
-      it("passes the resolved http port to the factory", () => {
+      /** @scenario "A phone call's scenario child never binds the worker's media port" */
+      it("always passes an OS-assigned port, even when VOICE_WS_PORT is set in the environment", () => {
         const { transport, factoryOptions } = buildTransport({
           processEnv: {
             VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
@@ -401,7 +657,7 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 120,
         });
-        expect(factoryOptions[0]?.httpPort).toBe(5564);
+        expect(factoryOptions[0]?.httpPort).toBe(0);
       });
     });
   });
@@ -418,7 +674,10 @@ describe("phoneTransport", () => {
         };
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
-        const transport = createPhoneTransport();
+        const transport = createPhoneTransport({
+          registerNonce: autoAckRegisterNonce,
+          raceUpgradeRefusal: identityRaceUpgradeRefusal,
+        });
         const built = transport.createAgentAdapter({
           agentId: TARGET,
           credential: TWILIO_CREDENTIAL,
@@ -438,7 +697,10 @@ describe("phoneTransport", () => {
         };
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
-        const transport = createPhoneTransport();
+        const transport = createPhoneTransport({
+          registerNonce: autoAckRegisterNonce,
+          raceUpgradeRefusal: identityRaceUpgradeRefusal,
+        });
         const built = transport.createAgentAdapter({
           agentId: TARGET,
           credential: TWILIO_CREDENTIAL,
@@ -461,7 +723,10 @@ describe("phoneTransport", () => {
         };
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
-        const transport = createPhoneTransport();
+        const transport = createPhoneTransport({
+          registerNonce: autoAckRegisterNonce,
+          raceUpgradeRefusal: identityRaceUpgradeRefusal,
+        });
         const built = transport.createAgentAdapter({
           agentId: TARGET,
           credential: TWILIO_CREDENTIAL,
@@ -491,7 +756,10 @@ describe("phoneTransport", () => {
         };
         twilioAgentMock.mockReturnValue(sdkAdapter);
 
-        const transport = createPhoneTransport();
+        const transport = createPhoneTransport({
+          registerNonce: autoAckRegisterNonce,
+          raceUpgradeRefusal: identityRaceUpgradeRefusal,
+        });
         const built = transport.createAgentAdapter({
           agentId: TARGET,
           credential: TWILIO_CREDENTIAL,

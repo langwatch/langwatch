@@ -7,44 +7,19 @@ import { readVoiceWorkerEnv, VOICE_WS_PORT_DEFAULT } from "../voice-worker-env";
 
 describe("readVoiceWorkerEnv", () => {
   describe("given no variables set", () => {
-    /** @scenario "The voice worker reads its three infrastructure environment variables" */
-    it("leaves voice worker only off and defaults the websocket port", () => {
+    /** @scenario "The voice worker reads its infrastructure environment variables" */
+    it("defaults the websocket port and leaves the public base URL unset", () => {
       const env = readVoiceWorkerEnv({});
 
-      expect(env.voiceWorkerOnly).toBe(false);
       expect(env.voiceWsPort).toBe(VOICE_WS_PORT_DEFAULT);
       expect(env.voiceWsPort).toBe(3300);
       expect(env.voicePublicBaseUrl).toBeUndefined();
-    });
-  });
-
-  describe("given VOICE_WORKER_ONLY values", () => {
-    /** @scenario "The voice worker reads its three infrastructure environment variables" */
-    it("stays off for anything that is not the literal true", () => {
-      expect(
-        readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "false" }).voiceWorkerOnly,
-      ).toBe(false);
-      expect(
-        readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "1" }).voiceWorkerOnly,
-      ).toBe(false);
-      expect(
-        readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "yes" }).voiceWorkerOnly,
-      ).toBe(false);
-    });
-
-    /** @scenario "The voice worker reads its three infrastructure environment variables" */
-    it("turns on for the literal true, case-insensitively, given a public base URL", () => {
-      expect(
-        readVoiceWorkerEnv({
-          VOICE_WORKER_ONLY: "TRUE",
-          VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
-        }).voiceWorkerOnly,
-      ).toBe(true);
+      expect(env.voiceTunnelEnabled).toBe(true);
     });
   });
 
   describe("given a websocket port", () => {
-    /** @scenario "The voice worker reads its three infrastructure environment variables" */
+    /** @scenario "The voice worker reads its infrastructure environment variables" */
     it("parses a valid port and defaults a blank one", () => {
       expect(readVoiceWorkerEnv({ VOICE_WS_PORT: "4400" }).voiceWsPort).toBe(
         4400,
@@ -55,33 +30,83 @@ describe("readVoiceWorkerEnv", () => {
     });
   });
 
-  describe("given voice worker only is on", () => {
-    /** @scenario "A voice worker refuses to start without a public base URL" */
-    it("refuses to start without a public base URL", () => {
-      expect(() =>
-        readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "true" }),
-      ).toThrowError(/VOICE_PUBLIC_BASE_URL/);
-    });
-
-    /** @scenario "A voice worker refuses to start without a public base URL" */
-    it("starts with a public https base URL and reports it", () => {
+  describe("given a public base URL", () => {
+    /** @scenario "A public base URL must be an https origin" */
+    it("accepts and reports a valid https origin", () => {
       const env = readVoiceWorkerEnv({
-        VOICE_WORKER_ONLY: "true",
         VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
       });
 
-      expect(env.voiceWorkerOnly).toBe(true);
       expect(env.voicePublicBaseUrl).toBe("https://voice.example.com");
     });
 
-    /** @scenario "A voice worker refuses to start without a public base URL" */
-    it("rejects a non-https public base URL", () => {
-      expect(() =>
-        readVoiceWorkerEnv({
-          VOICE_WORKER_ONLY: "true",
-          VOICE_PUBLIC_BASE_URL: "http://voice.example.com",
-        }),
-      ).toThrowError(/https/);
+    /** @scenario "A public base URL must be an https origin" */
+    it("rejects a non-https public base URL without throwing", () => {
+      // Rejected means "not adopted", not "crash the process": startWorkers
+      // reads this before the boot-stage try block that makes voice failures
+      // non-fatal, so a throw here would kill eight healthy subsystems over a
+      // voice typo. The worker falls back to the tunnel path instead.
+      const env = readVoiceWorkerEnv({
+        VOICE_PUBLIC_BASE_URL: "http://voice.example.com",
+      });
+
+      expect(env.voicePublicBaseUrl).toBeUndefined();
+    });
+
+    /** @scenario "A public base URL must be an https origin" */
+    it("rejects a public base URL that is not a URL at all, without throwing", () => {
+      const env = readVoiceWorkerEnv({
+        VOICE_PUBLIC_BASE_URL: "voice.example.com:8443",
+      });
+
+      expect(env.voicePublicBaseUrl).toBeUndefined();
+    });
+
+    /** @scenario "An explicit public base URL always wins over the tunnel fallback" */
+    it("prefers an explicit public base URL over the tunnel fallback, even with VOICE_TUNNEL on", () => {
+      const env = readVoiceWorkerEnv({
+        VOICE_PUBLIC_BASE_URL: "https://voice.example.com",
+        VOICE_TUNNEL: "true",
+      });
+
+      expect(env.voicePublicBaseUrl).toBe("https://voice.example.com");
+      expect(env.voiceTunnelEnabled).toBe(true);
+    });
+  });
+
+  describe("given a malformed VOICE_WS_PORT", () => {
+    /** @scenario "The voice worker reads its infrastructure environment variables" */
+    it("falls back to the default port instead of throwing", () => {
+      for (const value of ["abc", "0", "-1", "70000", "3300.5"]) {
+        expect(readVoiceWorkerEnv({ VOICE_WS_PORT: value }).voiceWsPort).toBe(
+          VOICE_WS_PORT_DEFAULT,
+        );
+      }
+    });
+  });
+
+  describe("given VOICE_TUNNEL values", () => {
+    /** @scenario "A voice worker opens a quick tunnel when no public base URL is configured" */
+    it("is enabled for anything that is not the literal false", () => {
+      expect(
+        readVoiceWorkerEnv({ VOICE_TUNNEL: "TRUE" }).voiceTunnelEnabled,
+      ).toBe(true);
+      expect(readVoiceWorkerEnv({ VOICE_TUNNEL: "" }).voiceTunnelEnabled).toBe(
+        true,
+      );
+      expect(
+        readVoiceWorkerEnv({ VOICE_TUNNEL: "nonsense" }).voiceTunnelEnabled,
+      ).toBe(true);
+    });
+
+    /** @scenario "A voice worker opens a quick tunnel when no public base URL is configured" */
+    it("is disabled for the literal false, case-insensitively", () => {
+      expect(
+        readVoiceWorkerEnv({ VOICE_TUNNEL: "FALSE" }).voiceTunnelEnabled,
+      ).toBe(false);
+      expect(
+        readVoiceWorkerEnv({ VOICE_TUNNEL: "false" }).voiceTunnelEnabled,
+      ).toBe(false);
     });
   });
 });

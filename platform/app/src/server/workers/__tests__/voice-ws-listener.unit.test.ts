@@ -8,6 +8,7 @@ import type { AddressInfo } from "node:net";
 import net from "node:net";
 import type { Logger } from "@langwatch/observability";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { VoiceMediaUpgradeRefusedMessage } from "../../scenarios/voice/voice-nonce-handoff";
 import { VoiceNonceRegistry } from "../../scenarios/voice/voice-nonce-registry";
 import {
   bootVoiceWsListener,
@@ -60,10 +61,15 @@ describe("routeVoiceUpgrade", () => {
     const registry = new VoiceNonceRegistry({ ttlMs: 10, now: () => now });
     registry.register({ nonce: "abc", child: fakeChild });
     now = 10;
+    // notifyChild is present here (unlike the unknown-nonce case above): an
+    // expired nonce was still associated with a specific child, so that
+    // child can be told its dial-back was refused instead of burning its
+    // full connect-wait timeout. See voice-nonce-registry.ts.
     expect(routeVoiceUpgrade({ url: "/twilio/abc", registry })).toEqual({
       action: "reject",
       status: 403,
       reason: "nonce expired",
+      notifyChild: fakeChild,
     });
   });
 
@@ -182,5 +188,43 @@ describe("bootVoiceWsListener", () => {
     // socket here rather than leak it into afterEach.
     (handle as net.Socket).destroy();
     client.destroy();
+  });
+
+  /** @scenario "A phone call fails fast when the listener refuses the socket mid-dial" */
+  it("notifies the owning child when its nonce has expired", async () => {
+    // A 0ms TTL registry: registered nonces are immediately expired, so the
+    // very next upgrade against this nonce takes the "expired" branch.
+    registry = new VoiceNonceRegistry({ ttlMs: 0, now: () => Date.now() });
+    const port = await boot();
+    const send = vi.fn((_message: VoiceMediaUpgradeRefusedMessage) => true);
+    const child = { send } as unknown as ChildProcess;
+    registry.register({ nonce: "stale", child });
+
+    const { statusLine, socket } = await rawUpgrade(port, "/twilio/stale");
+    expect(statusLine).toContain("403");
+    socket.destroy();
+
+    await vi.waitFor(() => {
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
+      type: "voice:media-upgrade-refused",
+      reason: "nonce expired",
+    });
+  });
+
+  /** @scenario "The media listener refuses an unknown or expired nonce" */
+  it("does not notify anyone for an unknown nonce — there is no child to tell", async () => {
+    const port = await boot();
+    const { statusLine, socket } = await rawUpgrade(
+      port,
+      "/twilio/never-registered",
+    );
+    expect(statusLine).toContain("403");
+    socket.destroy();
+    // No assertion needed beyond "this doesn't throw" — an unknown nonce
+    // carries no child reference (voice-nonce-registry.ts), so there is
+    // nothing wired here that COULD notify anyone; this test documents that
+    // absence is the intended shape, not an oversight.
   });
 });
