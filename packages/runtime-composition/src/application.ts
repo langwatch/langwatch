@@ -23,6 +23,9 @@ import type {
   InstalledFeatureState,
   FeatureInstallArguments,
   FeatureProvider,
+  ModuleConfigGuard,
+  ModuleConfigRecord,
+  NoModuleConfig,
   ServerFeatureDeclaration,
   ServerRole,
 } from "./feature-installer.ts";
@@ -36,6 +39,7 @@ import { transportPeersOf, type TransportPeers } from "./transport-peers.ts";
 import {
   buildClaimedMembers,
   membersFor,
+  moduleMembers,
   noMembers,
   type MemberClaim,
   type MemberSource,
@@ -190,7 +194,17 @@ interface DeclaredFeature {
    * module without its stores.
    */
   readonly tier: Tier;
-  readonly install: (args: FeatureInstallArguments<unknown>) => InstalledFeatureState;
+  /**
+   * Installs the module, handed this process's view of the names it declared.
+   *
+   * The declaration's own `Members` type is gone by here - the root installs
+   * modules it knows nothing else about - so what this takes is the pool's
+   * view and nothing more. The closure behind it, built where the module was
+   * named, is what folds in the collaborators that install handed it.
+   */
+  readonly install: (
+    args: FeatureInstallArguments<Readonly<Record<string, unknown>>>,
+  ) => InstalledFeatureState;
 }
 
 /** One instance the process itself answers for, by the token that names it. */
@@ -234,10 +248,20 @@ export type TransportHostSource<Rest, Trpc> =
  * to run a module without its stores is to say so in code, by installing it
  * with `withMemoryRepositories`.
  */
-export interface ApplicationOptions<Members> {
+export interface ApplicationOptions<
+  Members,
+  Config extends ModuleConfigRecord = NoModuleConfig,
+> {
   readonly role: ServerRole;
-  /** One slice per module name, for the modules that declared a config. */
-  readonly config?: Readonly<Record<string, unknown>>;
+  /**
+   * One slice per module name, for the modules that declared a config.
+   *
+   * Its type is the process's own statement of what it configured, and
+   * `withModules` holds the module list to it: a process that installs a
+   * module whose slice is missing here fails to compile, naming the module,
+   * rather than failing that module's zod parse at boot (ruling 19).
+   */
+  readonly config?: Config;
   /**
    * Where the members come from, built by `@langwatch/infrastructure`.
    *
@@ -247,17 +271,92 @@ export interface ApplicationOptions<Members> {
   readonly members?: MemberSource<Members>;
 }
 
+/** Any module, as `withModule` accepts one before it reads its members back. */
+type AnyModule = InstallableServerFeature<never, string, unknown>;
+
+/** The members one module's App is built over, read back off its declaration. */
+type ModuleMembersOf<Module> =
+  Module extends InstallableServerFeature<infer ModuleMembers, string, unknown>
+    ? ModuleMembers
+    : never;
+
+/**
+ * The collaborators a module's install must hand it: its own `Members`, less
+ * every name this process's pool can already answer with the type it wants.
+ *
+ * The subtraction is by NAME AND TYPE, not by name alone, and that is the whole
+ * of it. A module reading `clock` off the pool asks for the pool's `Clock` and
+ * gets it, so its bag is empty and its install needs no second argument. A
+ * module whose `cache` is its own narrow port - a feature flag's slot cache is
+ * not the process's `Cache` - names a member the pool cannot answer, so it
+ * stays in the bag and the install must hand it in. A process whose pool is
+ * unstated answers nothing, which is why a test that names no member source
+ * supplies every collaborator itself.
+ *
+ * At the install it is intersected with `Partial` of the module's members, and
+ * that is deliberate rather than a weakening. A process that installs through a
+ * helper generic over its own pool - `install(builder: ApplicationBuilder<Pool>)`,
+ * which is the shape every worker root has - leaves this subtraction unresolved,
+ * and an unresolved mapped type knows none of the module's names, so the bag it
+ * was handed would be refused wholesale. The `Partial` names them. The
+ * subtraction therefore binds exactly where the pool is known and stands down
+ * where it is not, and boot's refusals remain the ones that always hold.
+ */
+type ModuleBag<ModuleMembers, PoolMembers> = [ModuleMembers] extends [never]
+  ? Readonly<Record<never, never>>
+  : {
+      [Name in keyof ModuleMembers as Name extends keyof PoolMembers
+        ? PoolMembers[Name] extends ModuleMembers[Name]
+          ? never
+          : Name
+        : Name]: ModuleMembers[Name];
+    };
+
+/** Exactly the members of a bag that a caller cannot leave out. */
+type RequiredMemberNames<Bag> = {
+  [Name in keyof Bag]-?: Readonly<Record<never, never>> extends Pick<Bag, Name> ? never : Name;
+}[keyof Bag] &
+  string;
+
+/**
+ * What `withModule` asks for from a process that named no bag for a module
+ * whose members are its own.
+ *
+ * It is a type nothing satisfies, carrying the member names in its one
+ * property, so the refusal names the collaborators the install has to hand in
+ * rather than printing the structural mismatch between two records.
+ */
+export interface ModuleMembersMissing<Members extends string> {
+  readonly "members this module's install must hand it": Members;
+}
+
+/**
+ * Nothing where the pool already answers every member a module reads, and a
+ * refusal naming the rest where it does not. Intersected with the module at the
+ * one-argument overload's parameter, so a module needing nothing still installs
+ * with `withModule(module)` alone.
+ */
+export type ModuleMembersGuard<ModuleMembers, PoolMembers> =
+  [RequiredMemberNames<ModuleBag<ModuleMembers, PoolMembers>>] extends [never]
+    ? unknown
+    : ModuleMembersMissing<RequiredMemberNames<ModuleBag<ModuleMembers, PoolMembers>>>;
+
 /** An application with its members named, collecting declarations. */
-export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
+export class ApplicationBuilder<
+  Members,
+  Rest = never,
+  Trpc = never,
+  Config extends ModuleConfigRecord = NoModuleConfig,
+> {
   private readonly state: BuilderState<Rest, Trpc>;
   private readonly role: ServerRole;
-  private readonly config: Readonly<Record<string, unknown>>;
+  private readonly config: Config | undefined;
   private readonly source: MemberSource<Members>;
   readonly name: string;
 
-  constructor(options: ApplicationOptions<Members>, state?: BuilderState<Rest, Trpc>) {
+  constructor(options: ApplicationOptions<Members, Config>, state?: BuilderState<Rest, Trpc>) {
     this.role = options.role;
-    this.config = options.config ?? {};
+    this.config = options.config;
     this.source = options.members ?? noMembers<Members>();
     this.name = options.role;
     this.state = state ?? { features: [], services: [], provisions: [], hosts: {} };
@@ -275,23 +374,79 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
    */
   withTransports<NextRest, NextTrpc>(
     hosts: TransportHostSource<NextRest, NextTrpc>,
-  ): ApplicationBuilder<Members, NextRest, NextTrpc> {
-    return new ApplicationBuilder<Members, NextRest, NextTrpc>(
-      { role: this.role, config: this.config, members: this.source },
+  ): ApplicationBuilder<Members, NextRest, NextTrpc, Config> {
+    return new ApplicationBuilder<Members, NextRest, NextTrpc, Config>(
+      {
+        role: this.role,
+        ...(this.config === void 0 ? {} : { config: this.config }),
+        members: this.source,
+      },
       { ...this.state, hosts },
     );
   }
 
   /**
-   * Every module this process installs. A module whose Members names a
-   * member this pool lacks is not assignable, so the list fails to compile.
+   * Every module this process installs.
+   *
+   * Two refusals live here, both at compile time. A module whose Members names
+   * a member this pool lacks is not assignable, so the list fails to compile.
+   * And a module that declared a config schema is accepted only where this
+   * process already stated that module's slice: the config was named at
+   * `createApp`, the modules are named here, and here is the first line at
+   * which both are known. The refusal names the modules, because
+   * {@link ModuleConfigGuard} answers a type carrying their names rather than
+   * a bare `never`.
    */
-  withModules(modules: readonly InstallableServerFeature<Members>[]): this {
+  withModules<const Modules extends readonly InstallableServerFeature<Members>[]>(
+    modules: Modules & ModuleConfigGuard<Modules, Config>,
+  ): this {
     for (const module of modules) this.addFeature(module);
     return this;
   }
 
-  private addFeature(declaration: InstallableServerFeature<Members>): this {
+  /**
+   * One module, installed with the collaborators that are its own.
+   *
+   * A module's members come from two places, and only one of them is the pool.
+   * The names its App declared with `reads(...)` are answered process-wide, by
+   * the member source `createApp` was given, and are refused there by name. The
+   * rest are the module's OWN collaborators - the second slot of its
+   * `FeatureSetup`: a monitor's evaluator reader, a feature flag's slot cache -
+   * and no pool can hold them, because no other module has a use for them.
+   * `members` here is where a process hands those in, at the install, for that
+   * one module.
+   *
+   * The refusal is the compiler's, because the bespoke half of a `Members` bag
+   * exists only in the type: a declaration carries the `reads(...)` names at
+   * runtime and nothing else, so boot has no bespoke name to print. Omitting a
+   * bag a module needs therefore fails to compile, naming the members
+   * ({@link ModuleMembersMissing}), rather than handing the App an empty record
+   * and failing on the first property it reads.
+   *
+   * `withModule(module)` alone is exactly `withModules([module])`, and a module
+   * whose members the pool answers in full installs that way.
+   */
+  withModule<Module extends AnyModule>(
+    module: Module & ModuleConfigGuard<[Module], Config> & ModuleMembersGuard<ModuleMembersOf<Module>, Members>,
+  ): this;
+  withModule<Module extends AnyModule>(
+    module: Module & ModuleConfigGuard<[Module], Config>,
+    installation: Readonly<{
+      members: Readonly<Partial<ModuleMembersOf<Module>>> &
+        ModuleBag<ModuleMembersOf<Module>, Members>;
+    }>,
+  ): this;
+  withModule(
+    module: AnyModule,
+    installation?: Readonly<{ members?: Readonly<Record<string, unknown>> }>,
+  ): this {
+    return this.addFeature(module, installation?.members);
+  }
+
+  private addFeature<ModuleMembers>(
+    declaration: InstallableServerFeature<ModuleMembers>,
+    handed?: Readonly<Record<string, unknown>>,
+  ): this {
     this.state.features.push({
       name: declaration.name,
       transports: declaration.transports ?? [],
@@ -307,7 +462,19 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
       workers: declaration.workers ?? [],
       tasks: declaration.tasks ?? [],
       eventing: declaration.eventing,
-      install: (args) => declaration.install(args as FeatureInstallArguments<Members>),
+      // The one place the module's own `Members` type is still known, and
+      // therefore the one place its two sources can be folded into the record
+      // its App reads. Everything above here holds the pool's view alone.
+      install: (args) =>
+        declaration.install({
+          ...args,
+          members: moduleMembers<ModuleMembers>({
+            module: declaration.name,
+            reads: declaration.members ?? [],
+            view: args.members,
+            handed,
+          }),
+        }),
     });
     return this;
   }
@@ -405,10 +572,14 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
         scope.own(declaration.name, () => resources.close());
         const state = declaration.install({
           resources,
-          config: config[declaration.name],
-          // Each module is handed the members it declared and nothing else, so
-          // one that never named a client cannot reach for one.
-          members: membersFor(members, declaration.requiredMembers) as Members,
+          config: config?.[declaration.name],
+          // The pool's view of exactly the names this module declared, and
+          // nothing else, so one that never named a client cannot reach for
+          // one. The module's own collaborators are folded in behind this by
+          // the closure `addFeature` built, where its `Members` type is still
+          // known - never cast to it here, which is what made an unsupplied
+          // bespoke bag read as a frozen `{}` instead of refusing.
+          members: membersFor(members, declaration.requiredMembers),
           repositorySelection: selections.get(declaration.name),
           role,
           resolve: (token) =>
@@ -582,10 +753,10 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
  * A process, named by its role and holding its config and its one pool.
  * Nothing is constructed until `boot`.
  */
-export function createApp<Members>(
-  options: ApplicationOptions<Members>,
-): ApplicationBuilder<Members> {
-  return new ApplicationBuilder<Members>(options);
+export function createApp<Members, Config extends ModuleConfigRecord = NoModuleConfig>(
+  options: ApplicationOptions<Members, Config>,
+): ApplicationBuilder<Members, never, never, Config> {
+  return new ApplicationBuilder<Members, never, never, Config>(options);
 }
 
 /**

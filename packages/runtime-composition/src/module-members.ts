@@ -134,3 +134,76 @@ export function membersFor(
   for (const name of names) view[name] = members[name];
   return Object.freeze(view);
 }
+
+/**
+ * A member named twice: read off the process, and handed in at the install.
+ *
+ * The two sources are complements, not alternatives - the pool answers the
+ * names a module declared with `reads(...)`, the install answers the
+ * collaborators that are the module's own - so a name claimed by both has no
+ * answer to which one the App got. Naming it here is the honest refusal;
+ * silently letting one win is how a process ends up handing a module a
+ * collaborator it never reads.
+ */
+export class DuplicateModuleMemberError extends Error {
+  constructor(
+    readonly module: string,
+    readonly member: string,
+  ) {
+    super(
+      `Module "${module}" declares it reads the "${member}" member off this process, and its install was also handed a "${member}". Take it out of one of the two.`,
+    );
+    this.name = "DuplicateModuleMemberError";
+  }
+}
+
+/**
+ * The one record a module's App is handed, from the two places it can come from.
+ *
+ * A module's members are not all of one kind. The names it declared with
+ * `reads(...)` are the PROCESS's to answer, off the pool every module shares,
+ * and `buildClaimedMembers` has already built and refused those by the time
+ * this runs. The rest are the MODULE's own collaborators - the second slot of
+ * its `FeatureSetup` - which no pool can hold, because no other module has a
+ * use for them; they arrive per install, through `withModule`.
+ *
+ * The cast is sound exactly here and nowhere upstream of it. This function is
+ * called from the closure `withModule` and `withModules` build, which is the
+ * one place that still knows the module's own `Members` type, and that is where
+ * both halves are answered for: every name in `reads` is present in `view`,
+ * because boot refused by name otherwise, and the module's own collaborators
+ * are present in `handed`, because `withModule` refuses an install that hands
+ * none and holds a bag it was handed to the module's own members.
+ *
+ * One seam in that is narrower than it reads, and the comment would be a lie
+ * without it: where a process installs through a helper generic over its own
+ * pool, `withModule` cannot tell which names the pool answers, so it holds the
+ * bag to `Partial` of the module's members and a partial bag compiles. What
+ * still holds there is everything runtime can see - the `reads` names, refused
+ * by name, and a name claimed twice, refused by name - and what is lost is only
+ * the compile-time completeness of a bespoke bag.
+ *
+ * Casting anywhere higher - where the type is the process pool's rather than
+ * the module's - is what let a module receive a frozen `{}` with every
+ * collaborator `undefined`.
+ */
+export function moduleMembers<Members>(options: {
+  /** The module's name, for the refusal to name. */
+  readonly module: string;
+  /** What its App declared it reads off the process, as boot read it back. */
+  readonly reads: readonly string[];
+  /** This process's view of exactly those names, already built and refused. */
+  readonly view: Readonly<Record<string, unknown>>;
+  /** The module's own collaborators, where its install handed them in. */
+  readonly handed: Readonly<Record<string, unknown>> | undefined;
+}): Members {
+  const { module, reads, view, handed } = options;
+  if (handed === void 0) return view as Members;
+
+  for (const name of reads) {
+    if (Object.hasOwn(handed, name)) throw new DuplicateModuleMemberError(module, name);
+  }
+
+  // A copy, so the bag the caller still holds is never frozen underneath it.
+  return Object.freeze({ ...view, ...handed }) as Members;
+}
