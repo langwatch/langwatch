@@ -86,9 +86,7 @@ export async function createWorkerFoundationApps(options: {
   const auditLog = await EnterpriseWorkerAuditLog.create({ prisma: options.connection.client });
   options.resources.own("worker audit log", () => auditLog.stop());
 
-  const builder = createApp({ name: "langwatch-worker-foundation" })
-    .withPersistence("postgres", { prisma: options.connection.client })
-    .withInfrastructure({});
+  const builder = createApp({ role: "api", config: {} });
   builder.withProvided(AuditLogApi, auditLog.auditLog());
   installWorkerTenancy(builder, tenancy);
   installWorkerUser(builder, {

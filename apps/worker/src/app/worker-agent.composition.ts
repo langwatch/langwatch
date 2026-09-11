@@ -1,19 +1,19 @@
 import { TraceApi } from "@langwatch/trace-contract";
 import { AgentApi } from "@langwatch/agent-contract";
-import {
-  agentServer,
-  type AgentAppConfig,
-  type AgentInfrastructure,
-} from "@langwatch/agent-server";
+import { agentServer, type AgentAppConfig } from "@langwatch/agent-server";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
+
+/** The one process member the agent App reads (`AgentApp.reads = reads("redis")`). */
+export type AgentInfrastructure = Readonly<{ redis: RedisConnection }>;
 
 export async function installWorkerAgent(options: {
   connection: PrismaConnection;
@@ -31,9 +31,11 @@ export async function installWorkerAgent(options: {
   };
 }) {
   const { peers } = options;
-  const runtime = await createApp({ name: "langwatch-worker-agent" })
-    .withPersistence("postgres", { prisma: options.connection.client })
-    .withInfrastructure(options.infrastructure)
+  const runtime = await createApp({
+    role: "api",
+    config: { agent: options.config },
+    members: membersFrom(options.infrastructure),
+  })
     .withProvided(ApiKeyApi, peers.apiKeys)
     .withProvided(AuditLogApi, peers.auditLog)
     .withProvided(AuthzApi, peers.permissions)
@@ -42,7 +44,7 @@ export async function installWorkerAgent(options: {
     .withProvided(TraceApi, peers.traces)
     .withProvided(UserApi, peers.users)
     .withProvided(WorkflowApi, peers.workflows)
-    .withModule(agentServer)
-    .boot({ role: "worker", config: { agent: options.config } });
+    .withModules([withMemoryRepositories(agentServer)])
+    .boot();
   return { agents: runtime.service(AgentApi), runtime };
 }

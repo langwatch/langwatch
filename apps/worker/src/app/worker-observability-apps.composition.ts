@@ -24,7 +24,7 @@ import { BroadcastAdapter } from "@langwatch/presence-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories, type ResourceScope } from "@langwatch/runtime-composition";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import {
@@ -137,20 +137,7 @@ export async function createWorkerObservabilityApps(
 
     return traceApp;
   };
-  const runtime = await createApp({ name: "langwatch-worker-observability" })
-    .withPersistence("postgres", {
-      prisma: options.connection.client,
-      // The trace tier spans two stores that coexist: Postgres holds the
-      // reviewer correction, ClickHouse the projections the fold commits
-      // through, so both are required inputs of the one live tier.
-      clickhouse: options.resolveClickHouseClient,
-      defaultRetentionDays: options.config.retention.defaultDays,
-      // The model-provider repositories are built over the deployment's own
-      // cipher: the stored credential is a wire format shared between
-      // processes, so it travels with the connection.
-      credentials: options.models.installation.credentials,
-    })
-    .withInfrastructure({})
+  const runtime = await createApp({ role: "api", config: {} })
     .withProvided(ProjectApi, foundation.projects)
     .withProvided(OrganizationApi, foundation.organizations)
     .withProvided(AuthzApi, foundation.authorization)
@@ -161,29 +148,21 @@ export async function createWorkerObservabilityApps(
     .withProvided(EntitlementApi, options.plans)
     .withProvided(FeatureFlagApi, options.featureFlags)
     .withProvided(CodingAgentApi, codingAgents.app)
-    .withModule(modelProviderServer, {
-      infrastructure: {
-        ...options.models.installation.infrastructure,
-        // The cost-rule preview reads spans through this runtime's OWN trace
-        // application, resolved on use rather than held: the trace module is
-        // installed on this same runtime, a line below.
-        spans: new WorkerModelProviderTraceSpans(readSpansThrough),
-      },
-    })
-    .withModule(traceServer, { infrastructure: traces })
-    .withModule(annotationServer)
-    .withModule(dataPrivacyServer, { infrastructure: telemetry.dataPrivacy })
-    .withModule(logServer, { infrastructure: telemetry.log })
+    .withModules([withMemoryRepositories(modelProviderServer)])
+    .withModules([withMemoryRepositories(traceServer)])
+    .withModules([withMemoryRepositories(annotationServer)])
+    .withModules([withMemoryRepositories(dataPrivacyServer)])
+    .withModules([withMemoryRepositories(logServer)])
     // Beside the log half and in the SAME graph: a metric point is redacted by
     // the one Data Privacy application this runtime already provides.
-    .withModule(metricServer)
-    .withModule(workerEvaluationServer, { infrastructure: options.evaluation })
+    .withModules([withMemoryRepositories(metricServer)])
+    .withModules([withMemoryRepositories(workerEvaluationServer)])
     .withService({
       name: "worker trace broadcast",
       start: () => broadcast.start(),
       stop: () => broadcast.close(),
     })
-    .boot({ role: "worker", config: { log: telemetry.logConfig } });
+    .boot();
 
   traceApp = runtime.module(traceServer).provided;
   options.resources.own("worker observability feature runtime", () => runtime.stop());

@@ -44,11 +44,7 @@ export async function startStandaloneWorker(
 ): Promise<WorkerExecutable> {
   const host = options.host ?? nodeWorkerProcessHost();
   try {
-    const worker = await WorkerExecutable.boot({
-      source: host.env,
-      composition: WorkerStandaloneComposition.create(),
-      host,
-    });
+    const worker = await WorkerExecutable.boot();
     await worker.start();
     worker.worker.logger.info(
       { metricsPort: worker.worker.config.liveness.metricsPort },

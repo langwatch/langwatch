@@ -6,7 +6,7 @@ import {
   type DatasetNormalizationSender,
   type DatasetNormalizePayload,
 } from "@langwatch/dataset-contract";
-import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories, type ResourceOwnership } from "@langwatch/runtime-composition";
 import {
   AzureDatasetStorageAdapter,
   DatasetApp,
@@ -84,17 +84,13 @@ export async function createWorkerDatasetApp(options: {
   resources: ResourceOwnership;
 }): Promise<DatasetApi> {
   const storage = options.storage;
-  const runtime = await createApp({ name: "langwatch-worker-dataset" })
-    .withPersistence("postgres", { prisma: options.database })
-    .withInfrastructure({})
+  const runtime = await createApp({ role: "api", config: {} })
     // Named through the application's own declaration: the worker provides
     // neither, and this is the one place that says so.
     .withProvided(DatasetApp.dependencies.experiments, uncomposed("experiment directory"))
     .withProvided(DatasetApp.dependencies.permissions, uncomposed("grants service"))
-    .withModule(datasetServer, {
-      infrastructure: storage ? { storageResolver: new WorkerDatasetStorageResolver(storage) } : {},
-    })
-    .boot({ role: "worker" });
+    .withModules([withMemoryRepositories(datasetServer)])
+    .boot();
 
   options.resources.own("worker dataset application", () => runtime.stop());
 

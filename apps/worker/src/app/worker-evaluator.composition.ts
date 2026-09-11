@@ -16,7 +16,7 @@ import {
 } from "@langwatch/evaluator-server";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories, type ResourceOwnership } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 
 import { nanoid } from "nanoid";
@@ -41,22 +41,12 @@ export async function installWorkerEvaluator(options: {
   /** Names this install in the worker's own resource ledger. */
   name: string;
 }) {
-  const runtime = await createApp({ name: "langwatch-worker" })
-    .withPersistence("postgres", { prisma: options.database })
-    .withInfrastructure({})
+  const runtime = await createApp({ role: "api", config: {} })
     .withProvided(AuthzApi, options.permissions)
     .withProvided(AuditLogApi, options.auditLog)
     .withProvided(UserApi, options.users)
-    .withModule(evaluatorServer, {
-      infrastructure: {
-        workflows: options.workflows,
-        graph: new UncomposedEvaluatorGraph(),
-        nlp: options.nlpRuntime,
-        modelProviders: options.modelProviders,
-        generateId: () => nanoid(),
-      },
-    })
-    .boot({ role: "worker" });
+    .withModules([withMemoryRepositories(evaluatorServer)])
+    .boot();
 
   options.resources.own(options.name, () => runtime.stop());
 

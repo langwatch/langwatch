@@ -10,7 +10,7 @@ import { apiKeyServer } from "@langwatch/api-key-server";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { projectServer, type ProjectInfrastructure } from "@langwatch/project-server";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
@@ -29,16 +29,14 @@ const project: ProjectInfrastructure = {
 
 /** The two modules the conflict was between, over the process's one Postgres client. */
 async function bootProjectAndApiKey() {
-  const runtime = await createApp({ name: "worker-tenancy-ownership-test" })
-    .withPersistence("postgres", { prisma: createWorkerProcessDatabase() as never })
-    .withInfrastructure({})
+  const runtime = await createApp({ role: "api", config: { "api-key": apiKeys } })
     .withProvided(AuthzApi, createApiFixture<AuthzApi>({}, "authorization"))
     .withProvided(OrganizationApi, createApiFixture<OrganizationApi>({}, "organizations"))
     .withProvided(ShareApi, createApiFixture<ShareApi>({}, "shares"))
     .withProvided(TopicApi, createApiFixture<TopicApi>({}, "topics"))
-    .withModule(projectServer, { infrastructure: project })
-    .withModule(apiKeyServer, { config: apiKeys })
-    .boot({ role: "worker" });
+    .withModules([withMemoryRepositories(projectServer)])
+    .withModules([withMemoryRepositories(apiKeyServer)])
+    .boot();
   runtimes.push(runtime);
 
   return runtime;

@@ -34,7 +34,7 @@ import { PostgresPromptAdapter, type PromptService } from "@langwatch/prompt-ser
 import type { ProjectApi } from "@langwatch/project-contract";
 import { projectServer, type ProjectInfrastructure } from "@langwatch/project-server";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { ApplicationBuilder } from "@langwatch/runtime-composition";
+import { withMemoryRepositories, type ApplicationBuilder } from "@langwatch/runtime-composition";
 import { shareServer, type ShareInfrastructure } from "@langwatch/share-server";
 import { topicServer, type TopicInfrastructure } from "@langwatch/topic-server";
 import type { AutomationSecretCrypto } from "@langwatch/automation-server";

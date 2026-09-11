@@ -7,7 +7,7 @@ import {
 } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import { WorkerFeatureFlagCache } from "./worker-feature-flag-cache.ts";
 
@@ -57,19 +57,12 @@ export async function installWorkerFeatureFlags(options: {
   redis?: WorkerFeatureFlagRedis | null;
   peers: WorkerFeatureFlagPeers;
 }): Promise<FeatureFlagApi> {
-  const runtime = await createApp({ name: "langwatch-worker-feature-flag" })
-    .withPersistence("postgres", { prisma: options.prisma })
-    .withInfrastructure({})
+  const runtime = await createApp({ role: "api", config: {} })
     .withProvided(AuthzApi, options.peers.permissions)
     .withProvided(ProjectApi, options.peers.projects)
     .withProvided(OrganizationApi, options.peers.organizations)
-    .withModule(featureFlagServer, {
-      infrastructure: {
-        cache: WorkerFeatureFlagCache.create(options.redis ?? null),
-        config: options.config.featureFlags,
-      },
-    })
-    .boot({ role: "worker" });
+    .withModules([withMemoryRepositories(featureFlagServer)])
+    .boot();
 
   return runtime.module(featureFlagServer).provided;
 }

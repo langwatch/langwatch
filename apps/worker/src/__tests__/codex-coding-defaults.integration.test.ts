@@ -116,9 +116,7 @@ function workerConfig(): WorkerConfig {
 
 async function composeTenancy(config: WorkerConfig) {
   if (!connection) throw new Error("The integration database must be configured.");
-  const builder = createApp({ name: "codex-model-tenancy-test" })
-    .withPersistence("postgres", { prisma: connection.client })
-    .withInfrastructure({})
+  const builder = createApp({ role: "api", config: {} })
     .withProvided(UserApi, createApiFixture<UserApi>());
   installWorkerTenancy(
     builder,

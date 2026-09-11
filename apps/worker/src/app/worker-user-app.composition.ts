@@ -138,6 +138,6 @@ export function installWorkerUser<Infrastructure>(
   options: WorkerUserCompositionOptions,
 ): ApplicationBuilder<Infrastructure> {
   return builder
-    .withModule(authServer, { infrastructure: workerAuthInfrastructure(options) })
-    .withModule(userServer, { infrastructure: workerUserInfrastructure(options) });
+    .withModules([withMemoryRepositories(authServer)])
+    .withModules([withMemoryRepositories(userServer)]);
 }

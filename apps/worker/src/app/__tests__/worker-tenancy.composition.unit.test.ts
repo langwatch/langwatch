@@ -9,7 +9,7 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { PrismaConnection } from "@langwatch/prisma-client";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { ProjectInfrastructure } from "@langwatch/project-server";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, membersFrom } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicClusteringScheduleReader } from "@langwatch/topic-server";
 import { UserApi } from "@langwatch/user-contract";
@@ -65,14 +65,47 @@ function connection() {
   return PrismaConnection.create({ client: database as never, pool: {} as never });
 }
 
+/**
+ * A member this composition declares but does not exercise. Any property access
+ * names the member and fails, so "nothing here touches it" is enforced rather
+ * than assumed - an empty object would read as `undefined` three frames later.
+ */
+function unusedMember<Member>(name: string): Member {
+  return new Proxy({} as Member & object, {
+    get(_target, property) {
+      // Symbols are how a runtime inspects a value; refusing those would fail
+      // the test for looking at it rather than for using it.
+      if (typeof property === "symbol") return void 0;
+
+      throw new Error(
+        `The worker tenancy composition test reached ${name}.${property}. ` +
+          `It is supplied because an installed module reads ${name}, not because ` +
+          `this test exercises it - give it real behaviour for the path you are adding.`,
+      );
+    },
+  }) as Member;
+}
+
 async function compose(
   options: { includeUser?: boolean; dispatcher?: AuthzGrantsCommandDispatcher } = {},
 ) {
   const config = resolveWorkerConfig({ CREDENTIALS_SECRET: "0".repeat(64) });
   const database = connection();
-  const builder = createApp({ name: "worker-tenancy-test" })
-    .withPersistence("postgres", { prisma: database.client })
-    .withInfrastructure({});
+  // What the installed modules read off the process. `prisma` is the same fake
+  // client the tenancy collaborators are built over, so a read through an App and
+  // a read through this test see one database. `clickhouse` (data-retention) and
+  // `redis` (share) are declared but never exercised here, so they refuse on any
+  // access: this composition is about who is wired to whom, and a test that
+  // starts querying a store should fail saying so rather than reading undefined.
+  const builder = createApp({
+    role: "api",
+    config: {},
+    members: membersFrom({
+      prisma: database.client,
+      clickhouse: unusedMember("clickhouse"),
+      redis: unusedMember("redis"),
+    }),
+  });
   if (options.includeUser !== false) builder.withProvided(UserApi, createApiFixture<UserApi>());
   const infrastructure = createWorkerTenancyInfrastructure({
     connection: database,
