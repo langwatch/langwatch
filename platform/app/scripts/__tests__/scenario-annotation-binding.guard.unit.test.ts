@@ -84,7 +84,7 @@ const TEST_FILE_RE = /\.(?:unit|integration|e2e)\.test\.tsx?$/;
  * mildly annoying exactly once per fix, and it is the property that stops this
  * table from quietly becoming a list of files nobody checks.
  *
- * WHAT THESE ARE. 98 annotations across 45 files, all under `src`; nothing in
+ * WHAT THESE ARE. 96 annotations across 43 files, all under `src`; nothing in
  * `ee` or `scripts` dangles. Four of them are not coverage hygiene — they name
  * requirements about cross-tenant reads, an api key's privilege ceiling, a lost
  * queue marker, and a migration dropping a concurrent write. Each has a passing
@@ -109,16 +109,14 @@ const KNOWN_DEBT: Record<string, number> = {
   "src/features/traces-v2/stores/__tests__/drawerStore.unit.test.ts": 9,
   "src/features/traces-v2/stores/__tests__/traceEditStore.unit.test.ts": 1,
   "src/pages/gateway/__tests__/budgets.scopeChipDetail.unit.test.ts": 1,
-  "src/pages/settings/__tests__/authentication.integration.test.tsx": 1,
+  "src/pages/settings/__tests__/security.integration.test.tsx": 1,
   "src/server/analytics/clickhouse/__tests__/join-time-bound-partition-column.unit.test.ts": 3,
   "src/server/analytics/clickhouse/__tests__/offline-experiment-evaluations-joinability.integration.test.ts": 1,
   "src/server/analytics/lwql/__tests__/unknownIdentifier.integration.test.ts": 1,
   "src/server/api/__tests__/permission-declaration.types.unit.test.ts": 11,
   "src/server/api/routers/__tests__/sharedTrace.shareSafe.unit.test.ts": 2,
   "src/server/app-layer/authz/__tests__/authz-engine.migration.unit.test.ts": 3,
-  "src/server/app-layer/authz/__tests__/trpc-middleware.unit.test.ts": 1,
   "src/server/app-layer/authz/repositories/__tests__/authz-grants-write.repository.unit.test.ts": 1,
-  "src/server/app-layer/identity/__tests__/legacy-sso-string-writes.unit.test.ts": 1,
   "src/server/app-layer/ops/__tests__/integration/latency-tiles.integration.test.ts": 1,
   "src/server/app-layer/ops/repositories/__tests__/queue.redis.repository.reconcile-pending.unit.test.ts": 1,
   "src/server/app-layer/traces/__tests__/blob-store.event-log.unit.test.ts": 2,
