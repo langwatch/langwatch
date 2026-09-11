@@ -64,6 +64,12 @@ config.value.langy.internalSecret; // typed, deep-frozen
 
 ## Booting modules: the container
 
+Worked examples of the root at four sizes - one module in a test, a module with
+peers, a module reading a member, and the whole api - are in
+`composition-by-size.md`. Read that when you need to see one assembled; this
+section is what the pieces are.
+
+
 **This section describes the transitional shape still in use today.**
 [ADR-144](../../../../dev/docs/adr/144-declarative-process-composition.md) and its
 plan, [composition v2](../../../../dev/docs/plans/composition-v2.md), are the design
