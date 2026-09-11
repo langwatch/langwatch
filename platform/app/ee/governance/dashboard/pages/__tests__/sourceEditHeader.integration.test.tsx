@@ -134,7 +134,13 @@ const openNotes = async (): Promise<string> => {
   if (!contentId) throw new Error("the marker controls no popover");
   return (await waitFor(() => {
     const content = document.getElementById(contentId);
-    if (!content?.textContent) throw new Error("the popover is still empty");
+    // Chakra mounts the content closed, already holding its text, so waiting
+    // for text alone is satisfied before the click has done anything. The
+    // open state is the part that actually has to settle.
+    if (content?.getAttribute("data-state") !== "open") {
+      throw new Error("the popover has not opened");
+    }
+    if (!content.textContent) throw new Error("the popover is still empty");
     return content.textContent;
   })) as string;
 };
