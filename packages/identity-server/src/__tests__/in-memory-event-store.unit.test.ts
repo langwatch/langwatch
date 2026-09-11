@@ -75,9 +75,9 @@ describe("the in-memory identity event store", () => {
       });
 
       // A retry restates the fact the guard decided this time round, which is
-      // not necessarily byte-identical — a born-finalized retry derives a new
-      // identifier id from a later `occurredAt`. The command id is what makes
-      // them one fact, and the row that stands is the one that landed first.
+      // not necessarily byte-identical — a later `occurredAt` derives a new
+      // identifier id. The command id is what makes them one fact, and the row
+      // that stands is the one that landed first.
       const second = store.append({
         commandId: "idcmd_1",
         facts: [attached("idf_b")],

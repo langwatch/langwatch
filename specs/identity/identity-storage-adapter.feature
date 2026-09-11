@@ -243,23 +243,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the resolution read answers from the Identifier projection and its joined migration-state row
     And sign-in succeeds
 
-  # ── Born finalized ─────────────────────────────────────────────────────
-
-  @unit
-  Scenario: A flagged sign-up is born finalized
-    Given the sign-up request carries the identity-branch opt-in for its organization
-    When better-auth creates the user
-    Then the attach facts are appended under the new user's tenant
-    And the Identifier row and the AccountCredential row exist when sign-up returns
-    And the user's migration-state row is finalized
-    And the user's next write takes the identity branch
-
-  @unit
-  Scenario: The whole flagged request routes to the identity branch
-    Given the sign-up request carries the identity-branch opt-in
-    When better-auth creates the user and then the credential account in the same request
-    Then the account create states its fact and writes an AccountCredential row
-    And no legacy Account write occurs for the newborn
+  # ── Account attach, and the address lock's reap ────────────────────────
 
   @unit
   Scenario: One writer states a latched user's account attach
@@ -271,65 +255,23 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     But the hook still runs, and still does nothing, for an unlatched user
 
   @unit
-  Scenario: A retried flagged sign-up converges instead of duplicating
-    Given a flagged sign-up appended its facts and failed before the rows committed
-    When the sign-up is retried
-    Then the event store dedupes on the idempotency key and exactly one fact set exists
-    And exactly one Identifier row and one user row exist after the retry
-
-  @unit
-  Scenario: A flagged sign-up is refused when its pinned id is already someone's
-    Given a finalized user "sam" was born under the address "sam@acme.com"
-    When a flagged sign-up arrives for "sam+news@acme.com"
-    Then the sign-up is refused with the handled code "identity_email_in_use"
-    And no identity event is stated under "sam"'s tenant
-    And no credential is written against "sam"'s user
-
-  @unit
-  Scenario: An abandoned flagged sign-up leaves no reachable identity
-    Given a flagged sign-up staged its facts and was never retried
-    When the address it used is looked up
-    Then no user resolves on either branch
-    And the reconciliation sweep removes the orphaned stream
-
-  @unit
-  Scenario: The reconciliation sweep runs on every migration pass
-    Given the born-finalized entrance is deployed
+  Scenario: The address-lock reap runs on every migration pass
+    Given a deployment whose ceremonies claim address locks
     When a system migration pass runs
-    Then the abandoned-newborn sweep runs beside the user-rooted migrations
-    And a sweep that fails does not fail the pass
+    Then the address-lock reap runs beside the user-rooted migrations
+    And a reap that fails does not fail the pass
 
   @unit
-  Scenario: The sweep finds an orphan behind a page of held users
-    Given more held users than one sweep page holds carry the same migrated status
-    And one abandoned newborn claim is older than all of them
-    When the sweep asks for a single candidate
-    Then the claim it returns is the abandoned newborn, never a held user
+  Scenario: An orphaned address lock is released so the address can be taken again
+    Given a ceremony claimed the lock on an address and its fact never landed
+    When the reap runs past the horizon
+    Then the lock is released and the address can be claimed by somebody else
 
   @unit
-  Scenario: A newborn whose rows committed is never failed by the fold wait
-    Given a flagged sign-up whose user row and finalized state row have committed
-    And the read-your-writes wait cannot complete
-    When the entrance finishes
-    Then the sign-up succeeds and returns the newborn's user row
-    And nothing leaves a finalized user for the sweep to own
-
-  @unit
-  Scenario: A flagged sign-up fails loudly when the engine is unavailable
-    Given the sign-up request carries the identity-branch opt-in
-    And the event-sourcing engine cannot accept an append
-    When better-auth creates the user
-    Then sign-up fails with the handled code "identity_engine_unavailable"
-    And no user row is created on either branch
-    But an unflagged sign-up at the same moment succeeds on the legacy branch
-
-  @unit
-  Scenario: An unflagged sign-up is untouched
-    Given the sign-up request carries no identity-branch opt-in
-    When better-auth creates the user
-    Then the user is created by the stock Prisma behavior
-    And no identity event is appended
-    And the user's gate remains closed
+  Scenario: A lock whose ceremony is still in flight is left alone
+    Given a lock claimed moments ago by a ceremony that has not finished
+    When the reap runs
+    Then the lock stands, because reaping it would hand the address away mid-ceremony
 
   # ── One writer for User.email ──────────────────────────────────────────
 

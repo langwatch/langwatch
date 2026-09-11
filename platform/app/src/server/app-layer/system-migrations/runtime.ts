@@ -26,7 +26,7 @@ import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
 import {
   identifierBackfillMigration,
-  identityNewbornReconciliation,
+  identityAddressLockReaper,
   identitySecretHealMigration,
 } from "../identity/runtime";
 import {
@@ -478,7 +478,7 @@ export async function runSystemMigrationPass(args?: {
     userMigrations.length === 0 ? null : await userMigrationPassCohort();
   const organizationSummary = await runner.runPass({ signal: args?.signal });
   if (userCohort === null) {
-    await sweepAbandonedNewborns();
+    await reapOrphanedAddressLocks();
     return organizationSummary;
   }
   const userRunner = new SystemMigrationRunnerService({
@@ -492,32 +492,34 @@ export async function runSystemMigrationPass(args?: {
     organizationSummary,
     await userRunner.runPass({ signal: args?.signal }),
   );
-  await sweepAbandonedNewborns();
+  await reapOrphanedAddressLocks();
   return summary;
 }
 
 /**
- * The born-finalized entrance's reconciliation sweep (ADR-116 §3), on the
- * same cadence as the passes and never terminal — a required companion to the
- * entrance rather than optional hygiene.
+ * The address lock's reap (ADR-116 §6), on the same cadence as the passes and
+ * never terminal — a required companion to the lock rather than optional
+ * hygiene. A ceremony that claimed an address and then failed leaves a lock
+ * no live identifier backs, and without this nobody could take that address
+ * again.
  *
  * A LEG of the pass rather than a registered `SystemMigration`, because what
  * it hunts has no tenant a runner could visit. The runner drives the tenants
  * a source enumerates, and the user tenant source enumerates `User` rows; an
- * abandoned entrance is precisely a claim with no user row behind it, so a
+ * orphaned lock is precisely a claim no live identifier backs, so a
  * per-tenant migration would never reach one.
  *
- * Its failure is never the pass's: the sweep removes rows the pass did not
- * write, and a pass that reported nothing because a sweep threw would hide
- * the migration outcome an operator asked for.
+ * Its failure is never the pass's: the reap removes rows the pass did not
+ * write, and a pass that reported nothing because a reap threw would hide the
+ * migration outcome an operator asked for.
  */
-async function sweepAbandonedNewborns(): Promise<void> {
+async function reapOrphanedAddressLocks(): Promise<void> {
   try {
-    await identityNewbornReconciliation().runPass();
+    await identityAddressLockReaper().runPass();
   } catch (error) {
     logger.warn(
       { error },
-      "the abandoned-newborn sweep failed; the claims stay and the next pass retries",
+      "the address-lock reap failed; the locks stay and the next pass retries",
     );
   }
 }

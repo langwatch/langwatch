@@ -16,13 +16,10 @@
  * `commandId:index` on read — but the log would carry two rows per ceremony,
  * and "a re-run costs no row" would not be true.
  *
- * `commit` runs both legs back to back, which is what every ceremony wants.
- * The born-finalized entrance (ADR-116 §3) is the one caller that has to
- * interleave: its Postgres row writes belong between handing the facts to the
- * engine and observing the fold, so it reaches `stage` and `awaitFold`
- * directly rather than reimplementing either. Staging FIRST is what keeps its
- * loud failure honest — an engine that cannot take the command fails the
- * sign-up before any row exists on either branch.
+ * `commit` runs both legs back to back, which is what every ceremony wants
+ * and — since ADR-116 §3's entrance was retired — what every ceremony does.
+ * Staging FIRST is what keeps a loud failure honest: an engine that cannot
+ * take the command fails the ceremony before it reports success.
  *
  * The wait is an OBSERVATION, not inline processing. A fold that cannot run
  * makes it time out; the command is still queued, the caller still succeeds,
@@ -301,31 +298,10 @@ export class IdentityLedgerWriter
   }
 
   /**
-   * Leg one on its own: the command handed to the queue, which is where the
-   * append happens.
-   *
-   * Public because ADR-116 §3's born-finalized entrance has to put its
-   * Postgres row writes BETWEEN the two legs — the engine must have taken the
-   * facts before any row exists, and the `Identifier` row must be there when
-   * sign-up returns. The entrance sequences the same two legs these methods
-   * implement, rather than a second copy of them.
-   */
-  override async stage({
-    command,
-  }: {
-    command: IdentityCommand;
-  }): Promise<void> {
-    await super.stage({ command });
-  }
-
-  /**
    * Leg two: wait for the projection's cursor to reach the last event the
-   * guard decided.
-   *
-   * Public for the same reason `stage` is, and keyed by `userId` because the
-   * entrance names the newborn rather than an anonymous aggregate.
+   * guard decided. Keyed by `userId`, which is the aggregate.
    */
-  async awaitFold({
+  private async awaitFold({
     userId,
     tenantId,
     events,

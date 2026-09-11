@@ -292,7 +292,7 @@ describe("identity service layering", () => {
     /** @scenario "The identity services are composed in one file" */
     it("construct services, Prisma repositories and ledger writers only in runtime.ts", () => {
       const CONSTRUCTION =
-        /\bnew\s+(?:Prisma[A-Z]\w*|\w+Service|\w+LedgerWriter|\w+Hooks|\w+Minter|\w+Registration|\w+Endpoint|\w+Guard|\w+Bridge|RegisteredIssuers|BornFinalizedOptIn)\(/;
+        /\bnew\s+(?:Prisma[A-Z]\w*|\w+Service|\w+LedgerWriter|\w+Hooks|\w+Minter|\w+Registration|\w+Endpoint|\w+Guard|\w+Bridge|RegisteredIssuers)\(/;
       const files = [...sourceFiles(BETTER_AUTH), ...sourceFiles(IDENTITY)];
       const offenders = offendersOf(files, (file, source) =>
         file === RUNTIME
