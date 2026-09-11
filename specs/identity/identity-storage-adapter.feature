@@ -572,6 +572,16 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And it is not replaced by one derived from the provider id
 
   @unit
+  Scenario: A real-issuer callback resolves its account rather than refusing
+    Given a finalized user holding an account from a provider that declares its own issuer
+    When the provider's callback asks for the account by issuer and subject alone
+    Then the account and the person holding it come back
+    And the request is not refused for naming no provider id
+    # The key names nobody, so it is answered for the whole installation at
+    # once: a refusal here would fail every such sign-in, including for the
+    # people still held on the legacy branch.
+
+  @unit
   Scenario: An identifier attached without an issuer still answers better-auth
     Given a latched user holding an identifier stated before the issuer was carried
     When better-auth reads their account

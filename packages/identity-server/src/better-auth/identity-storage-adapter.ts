@@ -521,6 +521,30 @@ function identityCustomAdapter({
           });
           return row === null ? null : [row];
         }
+        case "byIssuerSubject": {
+          // The same read as above for a provider whose issuer is its own.
+          // The provider id comes BACK from resolution rather than being
+          // derived here: a subject is unique only within an issuer, and
+          // guessing the provider is how one IdP's subject answers for
+          // another IdP's user.
+          //
+          // A miss, or a user the backfill has not finalized, returns null
+          // and the caller falls through to the legacy row that is still
+          // their truth - which is what this branch must do rather than
+          // refuse, since the callback key names no user and so every user
+          // on the deployment rides the same answer.
+          const resolved = await resolution.resolveByIssuerSubject({
+            issuer: query.issuer,
+            providerAccountId: query.accountId,
+          });
+          if (!resolved?.finalized) return null;
+          const row = await accounts.findByProviderSubject({
+            userId: resolved.userId,
+            providerId: resolved.providerId,
+            providerAccountId: query.accountId,
+          });
+          return row === null ? null : [row];
+        }
       }
     };
 
@@ -967,9 +991,15 @@ function identityCustomAdapter({
             // branch's. The legacy engine has always served sorts and offsets,
             // and a fleet nobody has enrolled must keep getting that answer.
             if (sortBy !== undefined || (offset ?? 0) > 0) {
-              throw new IdentityUnsupportedStorageQueryError(
-                `identity storage adapter: better-auth issued an account findMany with ${sortBy ? "a sort" : "an offset"}. ` +
-                  "The identity branch serves a user's sign-in methods unordered and unpaged; teach it the ordering the caller needs rather than guessing one.",
+              // `refused()` and not a bare throw: every sibling refusal in
+              // this file is logged with its reason, and one that is not is
+              // the silent 500 the header describes — a sign-in error page
+              // with nothing in the log saying why.
+              throw refused(
+                new IdentityUnsupportedStorageQueryError(
+                  `identity storage adapter: better-auth issued an account findMany with ${sortBy ? "a sort" : "an offset"}. ` +
+                    "The identity branch serves a user's sign-in methods unordered and unpaged; teach it the ordering the caller needs rather than guessing one.",
+                ),
               );
             }
             return rows
