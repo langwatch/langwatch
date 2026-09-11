@@ -210,7 +210,10 @@ describe("platform operator identity lookup authorization", () => {
 
     /** @scenario "An operator working a support case is never throttled out of the trail" */
     it("records every lookup an operator makes in quick succession", async () => {
-      const caller = callerFor({ id: "user_olive", email: "olive@langwatch.ai" });
+      const caller = callerFor({
+        id: "user_olive",
+        email: "olive@langwatch.ai",
+      });
 
       const lookups = 25;
       for (let i = 0; i < lookups; i++) {
