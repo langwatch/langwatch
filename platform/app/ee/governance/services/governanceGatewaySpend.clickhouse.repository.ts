@@ -34,11 +34,14 @@
  *
  * MONEY is integer nano-USD (`CostNanoUSD`), summed in ClickHouse as Int64 and
  * read out via `toString` so the JSON step never rounds a figure past 2^53.
+ * Each figure then passes through the gateway's own guarded parser, which
+ * refuses anything past the safe integer range rather than rounding it.
  *
  * Spec: specs/governance/governance-cost-screen.feature
  *   ("THE METERED LANE READS THE GATEWAY'S OWN LEDGER")
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { parseSummedNanoUsd } from "~/server/gateway/spendEvents.clickhouse.repository";
 
 const TABLE = "gateway_spend" as const;
 
@@ -114,13 +117,6 @@ const METERED_FIGURE_COLUMNS = `
  */
 const AMOUNT_DESC = "toInt64(AmountNanoUsd) DESC";
 
-/** ClickHouse renders a summed Int64 as a string in JSONEachRow; parse the
- *  whole thing through BigInt so the one Number conversion never drops a low
- *  digit on a wide money figure. */
-function nano(value: unknown): number {
-  return Number(BigInt(String(value ?? 0)));
-}
-
 function int(value: unknown): number {
   return Number(value ?? 0);
 }
@@ -192,7 +188,7 @@ export class GovernanceGatewaySpendClickHouseRepository {
     });
     return rows.map((row) => ({
       day: String(row.Day ?? ""),
-      amountNanoUsd: nano(row.AmountNanoUsd),
+      amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
       requestCount: int(row.RequestCount),
       requestsWithoutAmount: int(row.RequestsWithoutAmount),
     }));
@@ -216,7 +212,7 @@ export class GovernanceGatewaySpendClickHouseRepository {
     });
     return rows.map((row) => ({
       model: String(row.Model ?? ""),
-      amountNanoUsd: nano(row.AmountNanoUsd),
+      amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
       requestCount: int(row.RequestCount),
       requestsWithoutAmount: int(row.RequestsWithoutAmount),
     }));
@@ -234,7 +230,7 @@ export class GovernanceGatewaySpendClickHouseRepository {
     });
     return rows.map((row) => ({
       virtualKeyId: String(row.VirtualKeyId ?? ""),
-      amountNanoUsd: nano(row.AmountNanoUsd),
+      amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
       requestCount: int(row.RequestCount),
       requestsWithoutAmount: int(row.RequestsWithoutAmount),
     }));

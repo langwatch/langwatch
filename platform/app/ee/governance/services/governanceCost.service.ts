@@ -1537,8 +1537,9 @@ function gatewayLaneFrom(
     (n, day) => n + day.requestsWithoutAmount,
     0,
   );
-  // Summed in BigInt, per ADR-128 §3, so a window past 2^53 nano-USD keeps
-  // every digit.
+  // Each day is guarded to the safe integer range at the repository; the
+  // BigInt fold, per ADR-128 §3, keeps the window sum exact when the days
+  // together pass 2^53 nano-USD.
   const totalNanoUsd = days.reduce(
     (sum, day) => sum + BigInt(day.amountNanoUsd),
     0n,

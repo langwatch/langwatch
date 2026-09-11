@@ -200,6 +200,24 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
         },
       ]);
     });
+
+    it("refuses a day past the safe integer range rather than rounding it", async () => {
+      // 2^53 + 1: a Number would silently become 2^53 and a money figure would
+      // lose a digit. The guarded parser throws instead, the same rule the
+      // gateway's own ledger reads apply.
+      const { repo } = repositoryOver([
+        {
+          Day: "2026-08-01",
+          AmountNanoUsd: "9007199254740993",
+          RequestCount: "1",
+          RequestsWithoutAmount: "0",
+        },
+      ]);
+
+      await expect(repo.sumDaysForOrganizationProjects(WINDOW)).rejects.toThrow(
+        /safe integer range/,
+      );
+    });
   });
 
   describe("when reading the breakdowns", () => {
