@@ -108,6 +108,28 @@ async function settlePassEffects({
   }
 }
 
+/**
+ * A parked tenant is NOT a startup failure, and used to be.
+ *
+ * A park is one tenant's migration throwing, or reporting a status that is
+ * neither finalized nor migrated. The runner's own contract calls it "never
+ * fatal: the tenant stays on its legacy path (behaviour unchanged) and the
+ * next pass tries again. One broken tenant must not stop the fleet." The
+ * write gate opens only on `finalized`, so a parked tenant is served exactly
+ * as it was before the identity branch existed — booting with one carries no
+ * risk the previous release did not.
+ *
+ * Refusing the boot for it was the expensive half of a trade that bought
+ * nothing. This preflight guards `start:app` AND `start:workers`, under
+ * `set -eo pipefail`, on every start, restart and scale-up — so one tenant's
+ * transient error refused every pod in the fleet, including the scale-up
+ * needed to clear whatever caused the park. The park is still logged at ERROR
+ * with its tenant, migration and cause ("tenant migration parked on error"),
+ * which is where a broken tenant belongs.
+ *
+ * A stalled FINITE hold still refuses: that is work which has to complete
+ * before serving, and no progress anywhere means it never will.
+ */
 function assertPassCanConverge({
   summary,
   pass,
@@ -117,11 +139,6 @@ function assertPassCanConverge({
   pass: number;
   finiteHoldProofPending: boolean;
 }): void {
-  if (summary.parked > 0) {
-    throw new SystemMigrationPreflightError(
-      `System migration preflight parked ${summary.parked} tenant migrations on pass ${pass}`,
-    );
-  }
   if (finiteHoldStalled(summary) && finiteHoldProofPending) {
     const finiteHeld = summary.finiteHeld ?? summary.held;
     throw new SystemMigrationPreflightError(
