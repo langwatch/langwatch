@@ -194,12 +194,14 @@ describe("handleSearchTraces()", () => {
   });
 
   describe("when no traces are found", () => {
-    it("returns a no-results message", async () => {
+    it("returns a no-results message that names the window and get_trace", async () => {
       mockSearchTraces.mockResolvedValue({ traces: [] });
 
       const result = await handleSearchTraces({});
 
-      expect(result).toBe("No traces found matching your query.");
+      expect(result).toContain("No traces found matching your query.");
+      expect(result).toContain("Searched the last 24 hours");
+      expect(result).toContain("get_trace");
     });
   });
 
@@ -213,6 +215,48 @@ describe("handleSearchTraces()", () => {
       expect(call.startDate).toBeTypeOf("number");
       expect(call.endDate).toBeTypeOf("number");
       expect(call.startDate).toBeLessThan(call.endDate);
+    });
+
+    it("anchors a default 24-hour window to an explicit end date", async () => {
+      mockSearchTraces.mockResolvedValue({ traces: [] });
+
+      await handleSearchTraces({ endDate: "2026-08-01T12:00:00Z" });
+
+      const call = mockSearchTraces.mock.calls[0]![0] as {
+        startDate: number;
+        endDate: number;
+      };
+      expect(call.endDate).toBe(Date.parse("2026-08-01T12:00:00Z"));
+      expect(call.endDate - call.startDate).toBe(24 * 60 * 60 * 1000);
+    });
+
+    /** @scenario An inverted search window fails before the API call */
+    it("rejects an inverted window before calling the API", async () => {
+      await expect(
+        handleSearchTraces({
+          startDate: "2026-08-02T12:00:00Z",
+          endDate: "2026-08-01T12:00:00Z",
+        }),
+      ).rejects.toThrow("startDate");
+      expect(mockSearchTraces).not.toHaveBeenCalled();
+    });
+
+    it("rejects an empty window before calling the API", async () => {
+      await expect(
+        handleSearchTraces({
+          startDate: "2026-08-01T12:00:00Z",
+          endDate: "2026-08-01T12:00:00Z",
+        }),
+      ).rejects.toThrow("must be before endDate");
+      expect(mockSearchTraces).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An empty date input fails before the API call" */
+    it("rejects an empty date before calling the API", async () => {
+      await expect(handleSearchTraces({ startDate: "" })).rejects.toThrow(
+        'Invalid date: ""',
+      );
+      expect(mockSearchTraces).not.toHaveBeenCalled();
     });
   });
 

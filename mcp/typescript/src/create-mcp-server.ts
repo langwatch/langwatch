@@ -205,9 +205,22 @@ function registerTools(server: McpServer): void {
 
   server.tool(
     "search_traces",
-    "Search LangWatch traces with filters, text query, and date range. Returns AI-readable trace digests by default. Use format: 'json' for full raw data.",
+    "Search LangWatch traces by content, with filters and a date range. Returns AI-readable trace digests by default. Use format: 'json' for full raw data. To fetch a trace you already have the ID for, use get_trace instead — free text does not match trace IDs.",
     {
-      query: z.string().optional().describe("Text search query"),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          "Text search query. Matches captured input/output, the trace name and span names ONLY. It does not match trace IDs — to fetch a known trace ID use get_trace, or pass traceIds here for several at once."
+        ),
+      traceIds: z
+        .array(z.string().min(1))
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe(
+          "Exact trace IDs to fetch (1–1000). Use instead of query when you already know the IDs. When set and no startDate is given, the window defaults to the last 90 days rather than 24 hours."
+        ),
       filters: z
         .record(z.string(), z.array(z.string()))
         .optional()
@@ -216,14 +229,16 @@ function registerTools(server: McpServer): void {
         ),
       startDate: z
         .string()
+        .min(1)
         .optional()
         .describe(
-          'Start date: ISO string or relative like "24h", "7d", "30d". Default: 24h ago'
+          'Start of the window: ISO date, or relative like "24h", "7d", "4w", "3m" — units are h (hours), d (days), w (weeks), m (30-day months). Defaults to 24h ago for a text search, or 90d when traceIds is set. Widen this when a search comes back empty.'
         ),
       endDate: z
         .string()
+        .min(1)
         .optional()
-        .describe("End date: ISO string or relative. Default: now"),
+        .describe("End of the window: ISO date or relative. Default: now"),
       pageSize: z
         .number()
         .optional()
@@ -250,9 +265,13 @@ function registerTools(server: McpServer): void {
 
   server.tool(
     "get_trace",
-    "Get full details of a single trace by ID. Returns AI-readable trace digest by default. Use format: 'json' for full raw data including all spans.",
+    "Get full details of a single trace by ID. This is the right tool whenever you have a trace ID — search_traces does not match IDs. A full ID resolves at any age; a unique 8–31 character hex prefix resolves within the last 90 days. Returns AI-readable trace digest by default. Use format: 'json' for full raw data including all spans.",
     {
-      traceId: z.string().describe("The trace ID to retrieve"),
+      traceId: z
+        .string()
+        .describe(
+          "The trace ID to retrieve. A full ID resolves at any age; a unique 8–31 character hex prefix also resolves, git-style, within the last 90 days."
+        ),
       format: z
         .enum(["digest", "json"])
         .optional()
