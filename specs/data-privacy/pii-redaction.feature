@@ -229,6 +229,17 @@ Feature: Redacting personal data from traces
     When a trace is ingested with an attribute holding a checksum valid token whose witness version is seventeen
     Then the stored attribute still reads as it was sent
 
+  # The same argument one level down. A checksum covers the characters, not what
+  # they mean, so a token can clear it and still encode no output anyone could
+  # pay to: a payload that does not unpack to whole bytes, one shorter or longer
+  # than any witness program, or a version zero payload that is neither of the
+  # two lengths that version allows.
+  @unit
+  Scenario: A token whose witness program bitcoin does not allow is not an address
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute holding a checksum valid token whose witness program length is not one bitcoin allows
+    Then the stored attribute still reads as it was sent
+
   @unit
   Scenario: A millisecond timestamp is not read as a card number
     Given the resolved PII level for "web-app" is essential

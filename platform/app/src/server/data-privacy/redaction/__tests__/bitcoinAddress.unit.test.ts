@@ -111,6 +111,51 @@ describe("given a bech32 address", () => {
     });
   });
 
+  /**
+   * The checksum covers the characters, not what they mean, so a string can
+   * clear it and still encode no output anyone could pay to. Every vector below
+   * is checksum-valid and rejected for its program; the two controls are the
+   * same construction at a length bitcoin allows, which is what makes each
+   * rejection attributable to the program rule rather than to the checksum.
+   *
+   * The version zero, sixteen-byte case is BIP-173's own invalid vector. The
+   * rest are constructed, because the published list has no checksum-valid
+   * member for the other shapes.
+   */
+  describe("when the witness program is not one bitcoin allows", () => {
+    it.each([
+      ["a one-byte program, below the two-byte floor", "bc1pqvwl8xs0"],
+      [
+        "a forty-one byte program, above the ceiling",
+        "bc1pqv9pzxqlyckngw6zf9g9whn9d3eh4qvg37tfmf9tk2uup37w6hww86h3lrlsvrg5rvlw2s2x",
+      ],
+      ["padding bits that are not zero", "bc1pqdnfnnda"],
+      [
+        "version zero at sixteen bytes, which is neither 20 nor 32",
+        "BC1QR508D6QEJXTDG4Y5R3ZARVARYV98GJ9P",
+      ],
+      [
+        "version zero at sixteen bytes, constructed",
+        "bc1qqv9pzxqlyckngw6zf9g9whn9dsaqaxas",
+      ],
+    ])("rejects %s", (_case, address) => {
+      expect(isBech32Address(address)).toBe(false);
+    });
+
+    it.each([
+      [
+        "version one at twenty bytes",
+        "bc1pqv9pzxqlyckngw6zf9g9whn9d3eh4qvge0qxlk",
+      ],
+      [
+        "version zero at twenty bytes",
+        "bc1qqv9pzxqlyckngw6zf9g9whn9d3eh4qvg8d8phl",
+      ],
+    ])("accepts the same construction at %s", (_case, address) => {
+      expect(isBech32Address(address)).toBe(true);
+    });
+  });
+
   describe("when the address has been altered", () => {
     it.each([
       ["a changed data character", mutate(SEGWIT_V0, 10, "p")],

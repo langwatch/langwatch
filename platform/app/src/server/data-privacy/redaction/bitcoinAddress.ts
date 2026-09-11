@@ -114,6 +114,16 @@ function bech32Polymod(values: readonly number[]): number {
  */
 const MAX_WITNESS_VERSION = 16;
 
+/**
+ * The witness program bounds BIP-141 sets: 2 to 40 bytes in general, and for
+ * version 0 exactly the 20 bytes of a public-key hash or the 32 of a script
+ * hash. A length outside these encodes no output anyone can pay to.
+ */
+const MIN_WITNESS_PROGRAM_BYTES = 2;
+const MAX_WITNESS_PROGRAM_BYTES = 40;
+const P2WPKH_PROGRAM_BYTES = 20;
+const P2WSH_PROGRAM_BYTES = 32;
+
 /** The "bc" human-readable part, expanded the way BIP-173 specifies. */
 const BC_HRP_EXPANDED = [
   "b".charCodeAt(0) >> 5,
@@ -138,6 +148,13 @@ const BC_HRP_EXPANDED = [
  * BIP-173 requires the whole address to be one case; mixed case is invalid and
  * is rejected here rather than folded away, so this answers the same question
  * a wallet would.
+ *
+ * The checksum covers the characters, not their meaning, so the witness PROGRAM
+ * is checked too: the data groups must unpack to whole bytes with no stray
+ * padding, the program must be 2 to 40 bytes, and version 0 must be exactly the
+ * 20 or 32 bytes of a P2WPKH or P2WSH output. Without those a checksum-valid
+ * token that encodes no spendable output is classified and replaced, which is
+ * the loss this recognizer exists to prevent.
  */
 export function isBech32Address(value: string): boolean {
   if (/[a-z]/.test(value) && /[A-Z]/.test(value)) return false;
@@ -154,7 +171,54 @@ export function isBech32Address(value: string): boolean {
   const witnessVersion = values[BC_HRP_EXPANDED.length]!;
   if (witnessVersion > MAX_WITNESS_VERSION) return false;
   const expected = witnessVersion === 0 ? BECH32_CONSTANT : BECH32M_CONSTANT;
-  return bech32Polymod(values) === expected;
+  if (bech32Polymod(values) !== expected) return false;
+
+  const program = values.slice(
+    BC_HRP_EXPANDED.length + 1,
+    values.length - BECH32_CHECKSUM_CHARS,
+  );
+  return isValidWitnessProgram({ witnessVersion, program });
+}
+
+/**
+ * Whether the data groups after the witness version encode a witness program
+ * BIP-141 allows.
+ *
+ * `program` arrives as five-bit groups. Repacking them into bytes is what
+ * catches the two ways a checksum-valid string can still encode nothing: a
+ * length whose leftover bits do not fall away cleanly, and padding bits that
+ * were not zero. BIP-173 requires both, and a decoder that skips them accepts
+ * strings no wallet will spend to.
+ */
+function isValidWitnessProgram({
+  witnessVersion,
+  program,
+}: {
+  witnessVersion: number;
+  program: readonly number[];
+}): boolean {
+  let accumulator = 0;
+  let bits = 0;
+  let bytes = 0;
+  for (const group of program) {
+    accumulator = ((accumulator << 5) | group) & 0x7ff;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes++;
+    }
+  }
+  // Leftover bits are padding, so there must be fewer than a whole group of
+  // them and every one must be zero.
+  if (bits >= 5 || ((accumulator << (8 - bits)) & 0xff) !== 0) return false;
+
+  if (bytes < MIN_WITNESS_PROGRAM_BYTES || bytes > MAX_WITNESS_PROGRAM_BYTES) {
+    return false;
+  }
+  if (witnessVersion === 0) {
+    return bytes === P2WPKH_PROGRAM_BYTES || bytes === P2WSH_PROGRAM_BYTES;
+  }
+  return true;
 }
 
 /** Whether a CRYPTO match is a bitcoin address in either of its two forms. */

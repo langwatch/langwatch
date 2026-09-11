@@ -114,6 +114,16 @@ describe("the native essential-PII engine on machine identifiers", () => {
       expect(asAttributeValue(token)).toBe(token);
     });
 
+    // Checksum valid again, and again not an address: the payload is a
+    // sixteen-byte program under version zero, which allows twenty or
+    // thirty-two and nothing else.
+    /** @scenario "A token whose witness program bitcoin does not allow is not an address" */
+    it("keeps a checksum valid token whose witness program length bitcoin does not allow", () => {
+      const token = "bc1qqv9pzxqlyckngw6zf9g9whn9dsaqaxas";
+
+      expect(asAttributeValue(token)).toBe(token);
+    });
+
     it("redacts an address written inside a sentence", () => {
       expect(
         redactEssentialPiiInText({ text: `send to ${REAL_P2PKH_ADDRESS} now` })
