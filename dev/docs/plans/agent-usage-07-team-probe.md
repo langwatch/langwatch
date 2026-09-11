@@ -1,0 +1,239 @@
+# Part 7 — The team probe: does any of this generalise?
+
+**Status:** ready to send.
+**Purpose:** Part 6 §S5 says the sharpest risk in this whole set is folklore —
+one person, one project, one month, presented as general. This part is the test.
+**Artifacts:** [`dev/scripts/agent-usage-probe.mjs`](../../scripts/agent-usage-probe.mjs) ·
+baseline card below.
+
+---
+
+## 1. What this is for
+
+Every threshold in Parts 1–5 comes from a single account. Some of them will be
+properties of coding agents; some will be properties of Alex. **Nothing in this
+document set should become a product default until we know which is which**, and
+the only way to find out is to run the identical measurement on other people's
+data and see what survives.
+
+The bar: a finding that reproduces on **four of four** workspaces is a candidate
+for a general detector. One that appears on **one of four** is that person's
+habit, and belongs in a per-harness or per-tenant table, never in a default.
+
+## 2. Why a script and not just a prompt
+
+If three people ask their agent to "compute the carry ratio and session
+concentration", we get three definitions of both and the comparison means
+nothing. `agent-usage-probe.mjs` defines each number exactly once. Everyone runs
+the same code over their own export.
+
+The corollary matters just as much: **the teammate's agent must not recompute
+anything by hand, invent thresholds, or substitute its own metric.** The prompt
+below says so explicitly.
+
+## 3. What leaves their machine
+
+The probe reads a trace export with **no spans** (`--include-spans` is
+deliberately absent), so it never sees a prompt, a command, a file path, a branch
+name or a repository name. Its output card contains counts, sums and percentiles
+only. Project identity is reduced to a salt-free SHA-256 prefix so we can tell
+two workspaces apart without naming either.
+
+The raw export stays on their machine. Only the card comes back. This is
+deliberate — personal workspaces are isolated on purpose, and this measurement
+does not need to breach that.
+
+## 4. The protocol
+
+Four phases, and **phase 2 before phase 3 is the whole point**:
+
+| phase | who | what |
+|---|---|---|
+| 1 | teammate | export two months, run the probe, sanity-check the corpus |
+| 2 | teammate | write their own reading of their own card — **before seeing ours** |
+| 3 | teammate | read the baseline card, write a comparison |
+| 4 | us | review all comparisons side by side, mark each finding reproduced / inverted / unique |
+
+Phase 2 exists because if they read our numbers first, they will find our
+numbers. Anchoring would make the exercise confirm itself, which is exactly the
+failure mode Part 6 was written about.
+
+---
+
+## 5. The prompt to send
+
+Send this verbatim. It is written for their coding agent, not for them.
+
+````markdown
+I'd like you to measure my coding-agent usage over the last two months and
+compare it against a baseline from a colleague's account. Please work through
+this in order and do not skip ahead to the comparison.
+
+## Ground rules
+
+- Use the probe script exactly as given. Do NOT recompute any metric by hand,
+  do NOT invent your own thresholds, and do NOT substitute a different
+  definition of any number. The script is the shared definition — that is the
+  entire reason it exists. If you think a definition is wrong, say so in your
+  write-up; do not quietly change it.
+- Do not export spans. The probe does not need them and they contain prompt and
+  command text.
+- Everything you produce stays local except two files I will send on: a JSON
+  card of aggregates, and your written comparison.
+
+## Phase 1 — measure
+
+1. Make sure the LangWatch CLI is available and logged in:
+
+   ```bash
+   npx langwatch@latest --version
+   npx langwatch@latest login          # skip if already authenticated
+   ```
+
+2. Find which projects you have coding-agent data in:
+
+   ```bash
+   npx langwatch@latest projects list
+   ```
+
+   If that refuses with a project-scoped key, just use the project you are
+   logged into and note which one it was.
+
+3. Export two months of coding-agent traces, **per project** you use for agent
+   work. Run this from a directory OUTSIDE any repo checkout — a repo's `.env`
+   can point the CLI at a dead localhost endpoint:
+
+   ```bash
+   mkdir -p ~/agent-usage && cd ~/agent-usage
+
+   LANGWATCH_ENDPOINT=https://app.langwatch.ai \
+     npx langwatch@latest trace export \
+       --origin coding_agent \
+       --start-date 2026-07-12 \
+       --end-date 2026-09-12 \
+       --limit 100000 \
+       --format jsonl \
+       --output my-agent-traces.jsonl
+   ```
+
+   Add `--project <idOrSlug>` and a distinct `--output` name for each extra
+   project. If the export reports fewer traces than the total it found, say so.
+
+4. Fetch the probe and run it:
+
+   ```bash
+   gh api repos/langwatch/langwatch/contents/dev/scripts/agent-usage-probe.mjs \
+     --jq .content -H "Accept: application/vnd.github.raw" \
+     > agent-usage-probe.mjs
+
+   node agent-usage-probe.mjs my-agent-traces.jsonl \
+     --label "<your name> — <project> — 2mo" \
+     --out my-card.json
+   ```
+
+5. Sanity-check the corpus before you trust anything downstream, and tell me
+   what you found:
+   - Does `total_cost_usd` look roughly like what you actually spent? If it is
+     wildly off, the export is incomplete or the window is wrong — stop and say
+     so rather than analysing a broken corpus.
+   - How many sessions? Under about 20 and the percentile figures are noise —
+     report them with that warning attached.
+   - Which harnesses and models show up? If you use more than one agent, the
+     `harnesses` breakdown matters a lot to us.
+   - What fraction of traces have no `thread_id`? Those are invisible to every
+     session-grained number.
+
+## Phase 2 — your own reading, BEFORE you see anyone else's numbers
+
+Do not look at the baseline yet. From your own card alone, write
+`my-reading.md` answering:
+
+1. Where does your money actually go? Name the top three cost concentrations
+   you can see in your own data.
+2. What is the single biggest lever you would pull, and roughly what would it
+   save? Use the card's own numbers.
+3. What in the card surprised you or contradicts how you think you work?
+4. What does the card fail to capture about how you actually use agents?
+   Be specific — this is the most valuable answer of the four, because it tells
+   us what the product would miss.
+
+Keep it short. Half a page is fine.
+
+## Phase 3 — compare
+
+NOW read the baseline card you were sent alongside this prompt
+(`baseline-card.md`). For each of its headline findings, write
+`my-comparison.md` marking it:
+
+- **REPRODUCED** — same direction, comparable magnitude. Give your number.
+- **DIRECTIONALLY SIMILAR** — same direction, very different magnitude. Give both.
+- **INVERTED** — your data says the opposite. Give your number and, if you can,
+  say why (different harness, different work, different model mix).
+- **NOT APPLICABLE** — your corpus cannot test it. Say what is missing.
+
+Then answer three questions:
+
+1. Which baseline findings look like properties of **coding agents**, and which
+   look like properties of **that person's working style**?
+2. Is there anything large in your data that the baseline has no concept of?
+3. If we shipped the baseline's thresholds as product defaults tomorrow, which
+   one would misfire on you first?
+
+## Phase 4 — send back
+
+Send me `my-card.json`, `my-reading.md` and `my-comparison.md`. Nothing else —
+do not send the raw export.
+````
+
+---
+
+## 6. The baseline card to send with it
+
+Send this as `baseline-card.md`, and **only as part of phase 3** — the prompt
+above tells them when to open it.
+
+> **Provenance.** One person, one primarily-TypeScript monorepo, 2026-07-12 to
+> 2026-09-11. 17,463 traces, 273 sessions, $33,116.77. Harness: Claude Code.
+> Models: `claude-opus-5[1m]` dominant, `claude-fable-5` secondary. Produced by
+> `agent-usage-probe.mjs` 1.0.0 — the same script you just ran.
+>
+> **Read the window carefully.** Nominally two months, but 97% of the spend falls
+> in the last 31 days: the first month contributes 483 traces and $1,198. The
+> `cost_per_day_usd` on this card is therefore meaningless — it averages over a
+> half-empty window. Compare shares and distributions, not daily rates.
+>
+> One reassuring thing: running the same probe over the last month alone moves
+> every headline by less than three points (carry 279→286, top-1% 46.9→48.7,
+> floor share 24.6→25.1). These are not artefacts of where the window was cut.
+>
+> This is **one sample**. It is a hypothesis to test against yours, not a
+> standard to meet.
+
+| finding | baseline | what would falsify it |
+|---|---|---|
+| spend is a power law | top 1% of sessions = **46.9%**; largest single session = **40.9%** | a flat distribution, or a top-1% share under ~20% |
+| long sessions dominate | sessions over 3 days = **4.0%** of sessions, **50.1%** of spend | long sessions rare or cheap in your data |
+| context carry is the cost | per-session median carry ratio **279:1** (pooled 401:1) | a median under ~50:1 |
+| big windows hold the money | peak context over 500k = **83.0%** of spend | most spend under 200k peak |
+| there is a large static floor | first-context median **68,930** tokens; ≈**24.6%** of all cache reads | a floor under ~20k, or a share under ~10% |
+| most traces are noise | **29.1%** of traces are under $0.01 and carry **0.0%** of spend | a corpus with no light-trace population |
+| compaction is not rare | **764** context resets across **28.2%** of sessions | near-zero resets |
+| **no long-context premium** | realised rate **falls** with context: $0.92/M at 50–100k → $0.65/M above 700k; within a single model, $0.81/M → $0.57/M | a rate that *rises* with context on your models |
+| **checkpointing is the largest lever** | capping context at 300k ≈ **42%** of read tokens (~$14.0k); at 200k ≈ **54%** (~$17.7k). Upper bound — quality loss not modelled | a much smaller share, i.e. your sessions already stay short |
+
+## 7. How we read the results
+
+Lay the cards side by side and mark every row. The decision rule, fixed in
+advance so we cannot rationalise afterwards:
+
+- **4/4 reproduced** → a general detector, threshold still calibrated per tenant.
+- **2–3/4** → real but conditional. It needs a stated condition (harness, work
+  type, model) and belongs in the per-harness knowledge table, not a default.
+- **1/4** → folklore. It goes in the document as one person's observation with
+  the sample size attached, and nothing in the product depends on it.
+- **Anything inverted anywhere** → the finding is wrong as stated, and the
+  version in Parts 1–5 gets retracted the way Part 6 retracts its four.
+
+The phase-2 readings get their own pass, separately from the cards. "What does
+the card fail to capture" is where the next part of this programme comes from —
+it is the only question in the whole protocol whose answer we cannot predict.

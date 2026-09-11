@@ -112,7 +112,26 @@ inherit this and must be re-derived from comparable operations.
 
 ## S4 — Missing, and at least one of these is bigger than anything in Parts 1–5
 
-1. **Long-context premium pricing.** If per-token rates step up above a context threshold on the models in use, then sitting at 560k costs materially more per token — a lever larger than every practice in Part 5, and absent from all six documents. **Check this first.**
+1. ~~**Long-context premium pricing.**~~ **RESOLVED — there is none, and the
+   rate moves the other way.** Measured as realised cost per cache-read token by
+   context band over 17,463 traces: **$0.92/M at 50–100k falling monotonically to
+   $0.65/M above 700k**. Controlling for the obvious confound by restricting to
+   the single dominant model, the same fall holds — **$0.807/M → $0.566/M**. The
+   mechanism is arithmetic rather than pricing: cache *writes* and completion are
+   the expensive token types, and as context grows they shrink as a share of the
+   bill (read share of tokens rises 94.9% → 99.3%), so the blended rate converges
+   downward onto the pure read rate.
+
+   Two consequences. **Cost is linear in carried tokens, not super-linear** —
+   which simplifies every model in this set rather than complicating it. And the
+   lever that does exist is one band up: these traces run on `claude-opus-5[1m]`,
+   a long-context model *variant*, so any premium is plausibly paid at the point
+   of choosing the variant, not by filling it. Unverified against a rate card —
+   flagged as a hypothesis, not a finding.
+
+   Worth noting what this negative result cost: one band-by-band query. It was
+   carried through six documents as "possibly the largest lever" without anyone
+   spending that query. **Check the cheap thing first** is the reusable lesson.
 2. **Carry ratio rewards verbosity.** Completion tokens include thinking. A model or budget that thinks more lowers the ratio with no behavioural change, so it is not safe as a headline KPI without normalisation.
 3. **The idle-rebuild table is confounded.** 1–5 min (98.9k) and 5–60 min (96.7k) are identical; the only step is under-1-minute versus everything else — which is intra-turn tool-loop calls versus a new prompt, not cache expiry. At ~137 turns it is worth roughly $16/month. `context.idle_hold` is not worth a detector.
 4. **Per-tenant calibration** of every threshold, as a percentile of that tenant's own trailing distribution. "Warn at half the line" is meaningless without it.
@@ -156,6 +175,68 @@ The shape that avoids it:
   harness-specific semantics are read as universal.
 - **Sample size and provenance on every published number**, so a reader can tell
   a measured distribution from one person's habit.
+
+---
+
+## S6 — Measured after the reviews: checkpointing is the largest lever in the set
+
+Part 5's practice catalogue ranks levers worth $16 to $36. This one is worth
+three to four orders of magnitude more, and it was never costed because no part
+of the set treats **session length itself** as an adjustable parameter — only as
+a symptom to warn about.
+
+The counterfactual, run over 17,463 traces with the model stated in
+`agent-usage-probe.mjs` §7:
+
+| context cap | checkpoints implied | read tokens avoided | ≈ value |
+|---|---|---|---|
+| 500k | 372 | 25.6% | $8,462 |
+| 300k | 703 | 42.4% | $14,026 |
+| 200k | 1,150 | 53.5% | $17,718 |
+| 150k | 1,654 | 59.2% | $19,589 |
+
+**This is an upper bound and should be attacked as one.** Four things are not
+modelled, and all four cut the same way:
+
+1. **Re-derivation.** After a handoff the agent re-reads what it dropped, so real
+   post-checkpoint growth exceeds the growth deltas this simulation preserves.
+2. **Quality.** A summary is lossy. Nothing here prices a wrong answer, a
+   repeated mistake, or work redone because context was discarded — and Part 6
+   §S4.7 already warns against ranking on cost per landed change for this reason.
+3. **Human cost.** 703 checkpoints across 273 sessions is 2.6 handoffs per
+   session. If each costs a person two minutes of attention, that is a real
+   number that does not appear in the table.
+4. **The assumed 15k handoff** is a guess, not a measurement.
+
+What makes it credible despite that: it is the same lever as
+"sessions over three days are 50.1% of spend", which three reviewers reached
+independently, now with a dial on it rather than a warning. And it is
+**conservative in one specific way** — where a session already compacted, the
+simulation counts no saving for the traces after the reset, because the
+comparison clamps at the real context. The 42% is measured *on top of* the 764
+compactions that already happened.
+
+The product consequence is a change of shape, not just a number. Parts 2 and 3
+are built to **warn** at a spend threshold. This says the useful intervention is
+a **checkpoint prompt at a context threshold**, which is a different detector,
+fires much earlier, and has an action attached that the user can actually take
+mid-session. `$250 spent` tells someone their money is gone; `280k carried,
+checkpoint now` is advice.
+
+Two things to do before any of this ships:
+
+- **Price the quality side or say plainly that it is unpriced.** A saving that
+  ignores rework is exactly the failure Part 6 §S2.6 flags on the $17,530 figure,
+  and repeating it here with a bigger number would be worse, not better.
+- **Test it on other people's data** — see Part 7. If checkpointing yields 42% on
+  one account and 6% on three others, it is a property of one person's habit of
+  running multi-day sessions, and it belongs in the per-tenant table.
+
+One independent confirmation worth recording: the probe re-derived the
+instruction-floor share from scratch, by a different route than §S1.1 used
+(implied calls from total reads ÷ median context, rather than observed calls per
+prompt), and landed on **24.6%** against §S1.1's ~25%. The corrected figure
+reproduces; the original 2.8% does not.
 
 ---
 
