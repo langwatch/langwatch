@@ -1,12 +1,19 @@
-import { Box, chakra, HStack } from "@chakra-ui/react";
-import type React from "react";
-import { LuBot, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
+import { LuBot, LuSparkles, LuTerminal } from "react-icons/lu";
 import {
   AgentActionsMenu,
   setupAgentPrompt,
+<<<<<<< HEAD:modules/project/web/src/ui/sections/home/components/onboard-agent-pill.tsx
 } from "@langwatch/trace-web/surfaces/setup-with-agent-button";
 import { selfHostedEndpoint } from "../../../../model/self-hosted-endpoint.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+=======
+} from "~/components/SetupWithAgentButton";
+import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
+import { selfHostedEndpoint } from "~/features/traces-v2/onboarding/logic/selfHostedEndpoint";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { HeroLeadPill } from "./HeroLeadPill";
+>>>>>>> origin/main:platform/app/src/components/home/OnboardAgentPill.tsx
 
 const INTEGRATION_DOCS = "https://docs.langwatch.ai/integration/overview";
 
@@ -40,7 +47,27 @@ export function OnboardAgentPill({
 
   return (
     <AgentActionsMenu
-      trigger={<OnboardPillTrigger prominent={prominent} hasLangy={hasLangy} />}
+      trigger={
+        <HeroLeadPill
+          prominent={prominent}
+          label={prominent ? "Send your first trace" : "Onboard your agent"}
+          // The tiles read left to right in the order the menu offers its
+          // routes, and drop the Langy tile where the menu drops the route.
+          glyphs={[
+            { key: "copy", icon: <LuTerminal size={10} /> },
+            ...(hasLangy
+              ? [
+                  {
+                    key: "langy",
+                    icon: <LuSparkles size={10} />,
+                    color: "orange.fg",
+                  },
+                ]
+              : []),
+            { key: "docs", icon: <LuBot size={10} /> },
+          ]}
+        />
+      }
       langy={
         hasLangy && onAskLangy
           ? {
@@ -71,6 +98,7 @@ export function OnboardAgentPill({
     />
   );
 }
+<<<<<<< HEAD:modules/project/web/src/ui/sections/home/components/onboard-agent-pill.tsx
 
 /**
  * The pill: `asChild` clones this element with handlers/ref, so all but
@@ -172,3 +200,5 @@ function OnboardPillTrigger({
     </chakra.button>
   );
 }
+=======
+>>>>>>> origin/main:platform/app/src/components/home/OnboardAgentPill.tsx

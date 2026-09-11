@@ -25,9 +25,11 @@
 import { describe, expect, it } from "vitest";
 import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import {
+  ANTHROPIC_BUCKET_WIDTHS,
   buildAnthropicAdminPullConfig,
   type ComposerState,
   dateInputValue,
+  defaultParserValues,
   fieldControl,
   PARSER_FIELDS,
   reconcileParserValues,
@@ -71,19 +73,39 @@ describe("Anthropic composer controls", () => {
       expect(offered).toEqual([...anthropicAdminPullConfigSchema.shape.report.options]);
     });
 
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/__tests__/anthropic-form-controls.unit.test.ts
     /** @scenario "A required choice does not answer itself" */
     it("offers an unselected entry so a native select cannot preselect for the admin", () => {
+=======
+    // @scenario "The report opens on the one almost every organization wants"
+    it("opens on the cost report rather than on nothing", () => {
+      // Through the seeding path the drawer actually uses, not off the field
+      // definition: a default that only exists on the FieldDef and is never
+      // seeded shows an answer the builder is not handed.
+      expect(defaultParserValues("anthropic_admin").report).toBe("cost");
+
+      // And it has to be a report that is really offered, or the picker
+      // displays a value with no matching option and shows nothing at all.
+      expect(selectOptionsFor("report", {}).map((o) => o.value)).toContain(
+        "cost",
+      );
+    });
+
+    // @scenario "The report opens on the one almost every organization wants"
+    it("still offers an entry carrying no value, so the choice can be cleared", () => {
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/__tests__/anthropicFormControls.unit.test.ts
       const options = selectOptionsFor("report", {});
 
-      // A controlled <select> whose value is "" and whose option list has no
-      // "" entry displays its first option while the state stays empty: the
-      // admin is shown "cost" without ever having chosen it.
+      // The default answers the field; it does not lock it. Clearing the
+      // picker has to remain possible, and the form then refuses the save and
+      // marks the field rather than quietly reinstating cost.
       expect(options[0]?.value).toBe("");
       expect(fieldFor("report").required).toBe(true);
     });
   });
 
   describe("the bucket width field", () => {
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/__tests__/anthropic-form-controls.unit.test.ts
     /** @scenario "The bucket widths offered are the ones the adapter declares" */
     it("offers the widths the adapter schema accepts, and no others", () => {
       const offered = selectOptionsFor("bucketWidth", { report: "usage" })
@@ -96,6 +118,173 @@ describe("Anthropic composer controls", () => {
     });
 
     /** @scenario "The cost report offers no width to choose between" */
+=======
+    // @scenario "The bucket width is daily whichever report is chosen"
+    it("knows the same widths the adapter schema accepts, and no others", () => {
+      // `ANTHROPIC_BUCKET_WIDTHS` is what the form will hand back to an old
+      // source and what `validBucketWidth` measures a stored width against.
+      // Both readings are only correct while the list is a projection of the
+      // schema — let it drift and the form either refuses a width the adapter
+      // would have honoured, or keeps offering one the adapter has dropped.
+      expect([...ANTHROPIC_BUCKET_WIDTHS]).toEqual([
+        ...anthropicAdminPullConfigSchema.shape.bucketWidth.removeDefault()
+          .options,
+      ]);
+    });
+
+    // @scenario "The bucket width is daily whichever report is chosen"
+    it("offers the daily entry alone on a usage source", () => {
+      const options = selectOptionsFor("bucketWidth", { report: "usage" });
+
+      expect(options.map((o) => o.value)).toEqual([""]);
+      expect(options[0]?.label).toContain("daily");
+    });
+
+    // @scenario "The bucket width is daily whichever report is chosen"
+    it("says daily because the adapter's own default is daily", () => {
+      // The entry carries no value, so what the source is actually read at is
+      // whatever the schema defaults to. If that default ever moves off `1d`,
+      // the form's label becomes a claim nothing backs — which is the drift
+      // this pins, and the reason the label is not just asserted against
+      // itself.
+      const bucketWidth =
+        anthropicAdminPullConfigSchema.shape.bucketWidth.parse(undefined);
+
+      expect(bucketWidth).toBe("1d");
+      expect(
+        selectOptionsFor("bucketWidth", { report: "usage" })[0]?.label,
+      ).toBe("1d — daily");
+    });
+
+    // @scenario "A source already reading hourly keeps reading hourly"
+    it("keeps offering the width an existing usage source is read at", () => {
+      // Through the whole edit path, not the builder alone. The builder was
+      // never the risk: `reconcileParserValues` drops any held value the
+      // picker does not offer, so a picker offering daily alone would have
+      // cleared this source's width before the builder ever saw it — a
+      // migration to daily performed by opening the drawer.
+      const seeded = seedComposerParserConfig({
+        sourceType: "anthropic_admin",
+        storedParserConfig: {
+          credentialsToken: "sk-ant-admin-test",
+          report: "usage",
+          bucketWidth: "1h",
+        },
+      });
+      const reconciled = reconcileParserValues({
+        sourceType: "anthropic_admin",
+        values: seeded,
+      });
+
+      expect(reconciled.bucketWidth).toBe("1h");
+      expect(
+        selectOptionsFor("bucketWidth", reconciled).map((o) => o.value),
+      ).toEqual(["", "1h"]);
+      // Built with the token supplied rather than with the seeded values as
+      // they stand: seeding deliberately returns a blank secret, so every edit
+      // of this source needs the token retyped whatever the width does (#7777).
+      // That is a separate problem and not what this test is measuring.
+      expect(
+        (
+          buildAnthropicAdminPullConfig(
+            composerWith({
+              ...reconciled,
+              credentialsToken: "sk-ant-admin-test",
+            }),
+          ) as Record<string, unknown>
+        ).bucketWidth,
+      ).toBe("1h");
+    });
+
+    // @scenario "A source already reading hourly keeps reading hourly"
+    it("offers daily beside it, so the admin can still move off the finer width", () => {
+      const options = selectOptionsFor("bucketWidth", {
+        report: "usage",
+        bucketWidth: "1h",
+      });
+
+      // The retention is not a lock-in. Daily stays first and still carries no
+      // value, so choosing it is how a source leaves the finer width behind.
+      expect(options[0]?.value).toBe("");
+      expect(options[0]?.label).toBe("1d — daily");
+      expect(options[1]?.label).toBe("1h — hourly");
+    });
+
+    // @scenario "A width the cost report would reject is not kept either"
+    it("keeps nothing on a cost source, whose width was never in effect", () => {
+      const options = selectOptionsFor("bucketWidth", {
+        report: "cost",
+        bucketWidth: "1h",
+      });
+
+      // The puller pins the cost report to daily and ignores the setting, so
+      // the stored `1h` was doing nothing. Offering it back would show the
+      // admin a control with no effect, and the builder refuses it anyway.
+      expect(options.map((o) => o.value)).toEqual([""]);
+      expect(
+        buildAnthropicAdminPullConfig(
+          composerWith({ report: "cost", bucketWidth: "1h" }),
+        ),
+      ).toBeNull();
+    });
+
+    // @scenario "Clearing the report to re-pick it does not cost the source its width"
+    it("keeps the width while the report field sits empty between picks", () => {
+      // The report picker keeps an empty entry on purpose, so clearing it is a
+      // state the admin passes through rather than an answer. Reconcile runs on
+      // every keystroke, so a picker that read "not usage" as "retire the
+      // width" would take `1h` away the moment the field went blank — and
+      // choosing usage again would not bring it back.
+      const cleared = reconcileParserValues({
+        sourceType: "anthropic_admin",
+        values: { report: "", bucketWidth: "1h" },
+      });
+
+      expect(cleared.bucketWidth).toBe("1h");
+      expect(
+        selectOptionsFor("bucketWidth", cleared).map((o) => o.value),
+      ).toEqual(["", "1h"]);
+
+      // And it survives the round trip back to usage.
+      expect(
+        reconcileParserValues({
+          sourceType: "anthropic_admin",
+          values: { ...cleared, report: "usage" },
+        }).bucketWidth,
+      ).toBe("1h");
+    });
+
+    // @scenario "Clearing the report to re-pick it does not cost the source its width"
+    it("still refuses to save from the state it is holding the width through", () => {
+      // Retaining the width is a form concern only. An empty report is not a
+      // configuration, and the builder turns it down before it reads a width,
+      // so nothing can reach the adapter from here.
+      expect(
+        buildAnthropicAdminPullConfig(
+          composerWith({ report: "", bucketWidth: "1h" }),
+        ),
+      ).toBeNull();
+    });
+
+    // @scenario "The bucket width is daily whichever report is chosen"
+    it("refuses a width no version of the form ever offered", () => {
+      // Retention reaches only as far as the schema does. A `2h` that arrived
+      // from somewhere other than this form is neither offered back nor built.
+      expect(
+        selectOptionsFor("bucketWidth", {
+          report: "usage",
+          bucketWidth: "2h",
+        }).map((o) => o.value),
+      ).toEqual([""]);
+      expect(
+        buildAnthropicAdminPullConfig(
+          composerWith({ report: "usage", bucketWidth: "2h" }),
+        ),
+      ).toBeNull();
+    });
+
+    // @scenario "The cost report offers no width to choose between"
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/__tests__/anthropicFormControls.unit.test.ts
     it("collapses to the default entry on a cost source", () => {
       const options = selectOptionsFor("bucketWidth", { report: "cost" });
 

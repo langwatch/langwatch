@@ -13,11 +13,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { confirmArchiveSource } from "@ee/governance/dashboard/logic/confirmArchiveSource";
+import {
+  runCompleteness,
+  SOURCE_HEALTH_REFRESH,
+  sourceBadge,
+} from "@ee/governance/dashboard/logic/sourceHealthDisplay";
 import {
   ArrowLeft,
-  CircleCheck,
-  CircleDashed,
-  CircleX,
   Copy,
   KeyRound,
   Pencil,
@@ -39,6 +42,7 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-ingestion-source.screen.tsx
 } from "@langwatch/design-system/dialog";
 import { Link } from "../../../ui/elements/governance-link.tsx";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -54,6 +58,30 @@ import {
   needsIngestSecret,
   type SourceType,
 } from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
+=======
+} from "~/components/ui/dialog";
+import { Link } from "~/components/ui/link";
+import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import {
+  HandledErrorAlert,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api, type RouterOutputs } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import type { SourceType } from "../components/ingestionSourceCatalog";
+import { needsIngestSecret } from "../components/ingestionSourceCatalog";
+import {
+  EmptyEventsState,
+  EventsSetupPopover,
+} from "../components/SourceEventsSetup";
+import { SourceEventsTable } from "../components/SourceEventsTable";
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/ingestion-source-detail.tsx
 import {
   type SourceEventsPager,
   useSourceEventsPager,
@@ -78,6 +106,7 @@ type Source = RouterOutputs["ingestionSources"]["get"];
 type EventRow = RouterOutputs["activityMonitor"]["eventsForSource"][number];
 type SourceHealthMetrics = RouterOutputs["activityMonitor"]["sourceHealthMetrics"];
 
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-ingestion-source.screen.tsx
 const STATUS_META: Record<string, { icon: typeof CircleCheck; label: string; color: string }> = {
   active: { icon: CircleCheck, label: "Active", color: "green.500" },
   awaiting_first_event: {
@@ -88,6 +117,8 @@ const STATUS_META: Record<string, { icon: typeof CircleCheck; label: string; col
   disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
 };
 
+=======
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/ingestion-source-detail.tsx
 /**
  * Whether a failed load actually means "no such source".
  *
@@ -124,7 +155,17 @@ function SourceDetailHeader({
   onArchive: () => void;
   onEdit: () => void;
 }) {
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-ingestion-source.screen.tsx
   const status = STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
+=======
+  const status = sourceBadge({
+    status: source.status,
+    errorCount: source.errorCount,
+    // A run stopped by a page limit reports no error, so without this the
+    // badge reads Active on a source collecting a fraction of its data.
+    completeness: runCompleteness(source.lastRunCompleteness),
+  });
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/ingestion-source-detail.tsx
   const StatusIcon = status.icon;
   return (
     <HStack alignItems="end">
@@ -188,7 +229,11 @@ function SourceDetailHeader({
             variant="ghost"
             colorPalette="red"
             onClick={() => {
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-ingestion-source.screen.tsx
               if (!confirm(`Archive "${source.name}"? Historical events stay readable.`)) return;
+=======
+              if (!confirmArchiveSource({ name: source.name })) return;
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/ingestion-source-detail.tsx
               onArchive();
             }}
             loading={isArchiving}
@@ -201,13 +246,65 @@ function SourceDetailHeader({
   );
 }
 
+/** Pull completion time and provider record time answer different questions. */
+function SourcePullStatus({ source }: { source: Source }) {
+  if (!source.pullSchedule) return null;
+  const pull = source.pullStatus;
+  const retrying = source.status !== "disabled" && !source.archivedAt;
+  return (
+    <VStack
+      align="stretch"
+      gap={2}
+      borderWidth="1px"
+      borderRadius="md"
+      padding={3}
+    >
+      <Text fontSize="sm">
+        Last successful pull:{" "}
+        {source.lastSuccessAt
+          ? new Date(source.lastSuccessAt).toLocaleString()
+          : "No successful pull yet"}
+      </Text>
+      {pull?.lastRunAt && (
+        <Text fontSize="sm">
+          Last attempt: {new Date(pull.lastRunAt).toLocaleString()} (
+          {pull.outcome})
+        </Text>
+      )}
+      {pull?.error && (
+        <Text fontSize="sm" color="red.600">
+          {pull.error}{" "}
+          {retrying
+            ? "The next scheduled pull will retry."
+            : "This source is disabled."}{" "}
+          Saved records may be incomplete.
+        </Text>
+      )}
+      {pull?.backfillThrough && (
+        <Text fontSize="sm">
+          Backfill reached: {new Date(pull.backfillThrough).toLocaleString()}.
+          This is the latest saved checkpoint.
+        </Text>
+      )}
+      {pull?.hasMore && (
+        <Text fontSize="sm" color="fg.muted">
+          More history remains.
+          {retrying
+            ? " The next scheduled pull continues from the saved checkpoint."
+            : " Resume the source to continue."}
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
 /**
  * The four event-count cards. They read `health?.events24h ?? 0`, so a failed
  * health query would render "0 events", indistinguishable from a silent
  * source, and the first thing an admin does about a silent source is go
  * rebuild an integration that was never broken. The alert takes their place.
  */
-function SourceHealthCards({
+export function SourceHealthCards({
   health,
   error,
   isLoading,
@@ -241,9 +338,15 @@ function SourceHealthCards({
         value={numeral(health?.events30d ?? 0).format("0,0")}
         isLoading={isLoading}
       />
+      {/* Not "last event": the source list says that, and means something
+          else — the moment data last arrived here. This is the time written
+          ON the newest event, which for a report covering a whole day is that
+          day's opening minute. The two numbers are both right and routinely
+          hours apart, so they get names a reader can tell apart. */}
       <MetricCard
-        title="Last event"
+        title="Newest event time"
         value={fmtRelative(health?.lastSuccessIso ?? null)}
+        hint="The time carried on the event itself, not the time we collected it. A report covering a whole day is stamped at the start of that day."
         isLoading={isLoading}
       />
     </SimpleGrid>
@@ -282,11 +385,13 @@ function SourceActivityPanels({
   const health = healthQuery.data;
   return (
     <>
+      <SourcePullStatus source={source} />
       <SourceHealthCards
         health={health}
         error={healthQuery.error}
         isLoading={healthQuery.isLoading}
       />
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-ingestion-source.screen.tsx
       <StaleTimestampCallout health={health ?? null} eventsCount={eventsPager.loadedCount} />
       {/* `EmptyEventsHint` walks an admin through setting up an integration.
           The table only shows it once a load SUCCEEDED and came back empty —
@@ -320,6 +425,23 @@ function SourceActivityPanels({
             />
           ),
         }}
+=======
+      <StaleTimestampCallout
+        health={health ?? null}
+        eventsCount={eventsPager.loadedCount}
+      />
+      {/* The empty pane says what state this source is in; the (i) beside the
+          heading carries the setup instructions, in BOTH states, because a
+          working source raises "which endpoint was this?" just as often as an
+          idle one. The table shows the empty pane only once a load SUCCEEDED
+          and came back empty — showing it on a failed load sends someone
+          debugging a live source off to re-install something that is already
+          working. */}
+      <SourceEventsTable
+        pager={eventsPager}
+        emptyState={<EmptyEventsState />}
+        headerAside={<EventsSetupPopover source={source} />}
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/ingestion-source-detail.tsx
       />
     </>
   );
@@ -434,13 +556,16 @@ function useIngestionSourceDetailPage() {
 
   const sourceQuery = api.ingestionSources.get.useQuery(
     { organizationId: orgId, id: sourceId ?? "" },
-    { enabled: !!orgId && !!sourceId && canRead, refetchOnWindowFocus: false },
+    {
+      enabled: !!orgId && !!sourceId && canRead,
+      ...SOURCE_HEALTH_REFRESH,
+    },
   );
   const healthQuery = api.activityMonitor.sourceHealthMetrics.useQuery(
     { organizationId: orgId, sourceId: sourceId ?? "" },
     {
-      enabled: !!orgId && !!sourceId && canReadActivity,
-      refetchOnWindowFocus: false,
+      enabled: !!orgId && !!sourceId && canRead && canReadActivity,
+      ...SOURCE_HEALTH_REFRESH,
     },
   );
   // The events table walks the timestamp cursor itself (see
@@ -673,18 +798,12 @@ function StaleTimestampCallout({
   health: SourceHealthMetrics | null;
   eventsCount: number;
 }) {
-  // F-OTEL-2 frontend leg (Sergey diagnosis): if health metrics show 0
-  // events across 24h/7d/30d but the events list has rows, the user
-  // most likely sent test events with stale `startTimeUnixNano`. CH
-  // health queries filter by EventTimestamp, the events list does not
-  // - they appear contradictory. Surface a callout that names the
-  // diagnosis + the fix (use Date.now() at the moment you fire the
-  // event).
   if (!health) return null;
   const all30dZero =
     (health.events24h ?? 0) === 0 && (health.events7d ?? 0) === 0 && (health.events30d ?? 0) === 0;
   if (!all30dZero || eventsCount === 0) return null;
   return (
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-ingestion-source.screen.tsx
     <Box
       borderWidth="1px"
       borderColor="amber.300"
@@ -701,11 +820,19 @@ function StaleTimestampCallout({
         <Code fontSize="xs">String(Date.now() * 1_000_000)</Code> so the event lands inside the
         rolling window. The secret-reveal modal&apos;s &quot;Test it now&quot; curl already does
         this for you.
+=======
+    <Box borderWidth="1px" borderColor="border" padding={3} borderRadius="md">
+      <Text fontSize="sm" color="fg.muted">
+        The table contains older records outside the last 30 days. Recent
+        counters use each record's original date, so historical imports can show
+        records here while those counters remain zero.
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/ingestion-source-detail.tsx
       </Text>
     </Box>
   );
 }
 
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-ingestion-source.screen.tsx
 function EmptyEventsHint({ source }: { source: Source }) {
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
@@ -777,16 +904,43 @@ function EmptyEventsHint({ source }: { source: Source }) {
   );
 }
 
+=======
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/ingestion-source-detail.tsx
 function MetricCard({
   title,
   value,
+  hint,
   isLoading,
 }: {
   title: string;
   value: string;
+  /**
+   * The sentence a reader needs to know what the number means, when the title
+   * alone cannot carry it. On the title rather than the value: the question is
+   * always "what is this", never "what is this particular figure".
+   */
+  hint?: string;
   isLoading?: boolean;
 }) {
+  const label = (
+    <Text
+      fontSize="xs"
+      fontWeight="semibold"
+      color="fg.muted"
+      textTransform="uppercase"
+      letterSpacing="wider"
+      // Only when there is a hint, so a card without one is not decorated with
+      // a dotted underline promising an explanation that never appears.
+      textDecoration={hint ? "underline dotted" : undefined}
+      textUnderlineOffset={hint ? "3px" : undefined}
+      cursor={hint ? "help" : undefined}
+      width="fit-content"
+    >
+      {title}
+    </Text>
+  );
   return (
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-ingestion-source.screen.tsx
     <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
       <Text
         fontSize="xs"
@@ -797,6 +951,15 @@ function MetricCard({
       >
         {title}
       </Text>
+=======
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={4}
+    >
+      {hint ? <Tooltip content={hint}>{label}</Tooltip> : label}
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/pages/ingestion-source-detail.tsx
       {isLoading ? (
         <Spinner size="xs" marginTop={2} />
       ) : (

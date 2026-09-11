@@ -28,6 +28,7 @@ vi.mock("@langwatch/agent-contract", () => ({
 
 vi.mock("../../../../behavior/scenarios/use-filtered-scenario-targets.ts", () => ({
   isAgentTarget: () => false,
+  notRunnableCopy: () => "Only the owner of this agent can run it.",
   useFilteredAgents: () => [
     {
       id: "agent-1",

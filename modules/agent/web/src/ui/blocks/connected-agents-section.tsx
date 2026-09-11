@@ -4,12 +4,21 @@
  */
 
 import { Box, HStack, Text } from "@chakra-ui/react";
+<<<<<<< HEAD:modules/agent/web/src/ui/blocks/connected-agents-section.tsx
 import { Bot, ExternalLink, Laptop, Play, Trash2, User } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AgentCardIcon, AgentCardMenuTrigger, AgentCardShell } from "./agent-card.tsx";
 import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import type { ConnectedAgentBrowser } from "../../model/agent-client.ts";
+=======
+import { Bot, ExternalLink, Laptop, Play, User } from "lucide-react";
+import { LuTrash2 } from "react-icons/lu";
+import { OFFLINE_AGENT_TEST_COPY } from "~/components/agents/offlineAgentCopy";
+import { ownerOnlyCopy } from "~/components/scenarios/useFilteredScenarioTargets";
+import { Menu } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
+>>>>>>> origin/main:platform/app/src/components/agents/connected/ConnectedAgentsSection.tsx
 import {
   environmentTone,
   instanceCountLabel,
@@ -133,6 +142,37 @@ function ScopeChip({ agent }: { agent: ConnectedAgentBrowser }) {
   );
 }
 
+/**
+ * An agent no process is holding cannot answer, so the entry is disabled and
+ * the reason reads on hover rather than after a refused run.
+ */
+function TestAgentItem({
+  agent,
+  onTest,
+}: {
+  agent: ConnectedAgentView;
+  onTest: () => void;
+}) {
+  const isOffline = agent.status === "offline";
+  return (
+    <Tooltip content={OFFLINE_AGENT_TEST_COPY} disabled={!isOffline}>
+      <Menu.Item
+        value="test"
+        disabled={isOffline}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (isOffline) return;
+          onTest();
+        }}
+        data-testid={`agent-test-${agent.id}`}
+      >
+        <Play size={14} />
+        Test agent
+      </Menu.Item>
+    </Tooltip>
+  );
+}
+
 /** The actions of one card: open the agent, test it, or delete it. */
 function ConnectedAgentMenu({
   agent,
@@ -159,19 +199,7 @@ function ConnectedAgentMenu({
           <ExternalLink size={14} />
           Open
         </Menu.Item>
-        {onTest && (
-          <Menu.Item
-            value="test"
-            onClick={(event) => {
-              event.stopPropagation();
-              onTest();
-            }}
-            data-testid={`agent-test-${agent.id}`}
-          >
-            <Play size={14} />
-            Test agent
-          </Menu.Item>
-        )}
+        {onTest && <TestAgentItem agent={agent} onTest={onTest} />}
         {onDelete && (
           <Menu.Item
             value="delete"

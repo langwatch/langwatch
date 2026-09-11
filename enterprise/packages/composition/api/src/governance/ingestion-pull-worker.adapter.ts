@@ -121,7 +121,9 @@ export class AppGovernanceObjectStorage extends GovernanceObjectStorage {
     return new AppGovernanceObjectStorage(host);
   }
 
-  async list(input: GovernanceObjectStorageListInput): Promise<string[]> {
+  async list(
+    input: GovernanceObjectStorageListInput,
+  ): Promise<{ keys: string[]; isTruncated: boolean }> {
     return this.withClient(input, async (client) => {
       const keys: string[] = [];
       let continuationToken: string | undefined;
@@ -141,12 +143,13 @@ export class AppGovernanceObjectStorage extends GovernanceObjectStorage {
         for (const object of response.Contents ?? []) {
           if (object.Key) keys.push(object.Key);
           if (keys.length >= Math.min(input.limit, MAX_S3_FILES)) {
-            return keys;
+            return { keys, isTruncated: true };
           }
         }
         continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
       } while (continuationToken && pages < MAX_S3_PAGES);
-      return keys;
+      // A page budget exhausted with a token still in hand is truncated too.
+      return { keys, isTruncated: continuationToken !== undefined };
     });
   }
 
@@ -220,9 +223,7 @@ function defaultS3Host(region: string): string {
 class AppGovernanceOcsfEventSink implements GovernanceOcsfEventSink {
   private constructor(private readonly events: AppGovernanceOcsfEventsAdapter | undefined) {}
 
-  static create(
-    events: AppGovernanceOcsfEventsAdapter | undefined,
-  ): AppGovernanceOcsfEventSink {
+  static create(events: AppGovernanceOcsfEventsAdapter | undefined): AppGovernanceOcsfEventSink {
     return new AppGovernanceOcsfEventSink(events);
   }
 

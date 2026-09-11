@@ -3,8 +3,8 @@ import {
   simulationMessageSnapshotEventDataSchema,
   simulationRunAgentInstanceRecordedEventDataSchema,
   simulationRunCancelRequestedEventDataSchema,
+  simulationRunCutAtLimitRecordedEventDataSchema,
   simulationRunDeletedEventDataSchema,
-  simulationRunQueuedEventDataSchema,
   simulationRunStartedEventDataSchema,
   simulationSetArchivedEventDataSchema,
   simulationTextMessageEndEventDataSchema,
@@ -111,6 +111,20 @@ export const RecordAgentInstanceCommand = defineCommand({
     "payload.agentInstance.hostname": d.agentInstance.hostname,
   }),
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-agent-instance`,
+});
+
+export const RecordCutAtLimitCommand = defineCommand({
+  commandType: "lw.simulation_run.record_cut_at_limit",
+  eventType: "lw.simulation_run.cut_at_limit_recorded",
+  eventVersion: "2026-09-09",
+  aggregateType: "simulation_run",
+  schema: simulationRunCutAtLimitRecordedEventDataSchema,
+  aggregateId: (d) => d.scenarioRunId,
+  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:recordCutAtLimit`,
+  spanAttributes: (d) => ({
+    "payload.scenarioRun.id": d.scenarioRunId,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-cut-at-limit`,
 });
 
 export const CancelRunCommand = defineCommand({

@@ -1,4 +1,4 @@
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
@@ -8,8 +8,6 @@ import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
-  toolCallFix,
-  assertSkillWasRead,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
@@ -65,16 +63,13 @@ describe("Agent Improvement Skill", () => {
           scenario.user("what should I do next to improve my agent?"),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "agent-improve");
           },
           scenario.user(
             "the first hypothesis makes sense to me, go ahead and set it up as you proposed. Keep it minimal: create the artifact and show it to me, no need to run the app or install anything heavy",
           ),
           scenario.agent(),
-          (state) => {
-            toolCallFix(state);
-          },
+          (state) => {},
           scenario.judge(),
         ],
       });

@@ -492,15 +492,27 @@ export const customGraphInputToFormData = (graphInput: CustomGraphInput): Custom
   };
 };
 
+// A series is unusable if its metric no longer exists, or if it's missing a
+// key/subkey the metric requires. Shared by customGraphFormToCustomGraphInput
+// and customAPIinput, which both bail to `undefined` on the first bad series.
+const isSeriesMissingRequiredMetricFields = (
+  series: CustomGraphFormData["series"][number],
+): boolean => {
+  const metric = getMetric(series.metric);
+  if (!metric) {
+    return true;
+  }
+  if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
+    return true;
+  }
+  return !!metric.requiresSubkey && !series.subkey;
+};
+
 export const customGraphFormToCustomGraphInput = (
   formData: CustomGraphFormData,
 ): CustomGraphInput | undefined => {
   for (const series of formData.series) {
-    const metric = getMetric(series.metric);
-    if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
-      return undefined;
-    }
-    if (metric.requiresSubkey && !series.subkey) {
+    if (isSeriesMissingRequiredMetricFields(series)) {
       return undefined;
     }
   }
@@ -543,11 +555,7 @@ const customAPIinput = (
   filterParams: SharedFiltersInput,
 ): CustomAPICallData | undefined => {
   for (const series of formData.series) {
-    const metric = getMetric(series.metric);
-    if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
-      return undefined;
-    }
-    if (metric.requiresSubkey && !series.subkey) {
+    if (isSeriesMissingRequiredMetricFields(series)) {
       return undefined;
     }
   }

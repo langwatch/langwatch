@@ -1,5 +1,5 @@
 import { register } from "prom-client";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Import to trigger metric registration
 import {
@@ -12,9 +12,11 @@ import {
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
+  gqJobsUnroutableTotal,
   gqOldestPendingAgeMilliseconds,
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
+  recordDroppedJob,
 } from "../metrics.ts";
 
 const routingLabels = {
@@ -189,6 +191,64 @@ describe("GroupQueue metrics", () => {
 
     it("can be reset to zero when no groups are blocked", () => {
       expect(() => gqBlockedGroups.set({ queue_name: "test-queue" }, 0)).not.toThrow();
+    });
+  });
+});
+
+describe("first discarded job visibility", () => {
+  beforeEach(() => {
+    register.resetMetrics();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-07T10:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("given a worker with no previous discard series", () => {
+    describe("when a job is discarded before and after a counter reset", () => {
+      /** @scenario "The first discarded queue job is visible without a counter baseline" */
+      it("exposes the first discard on the first scrape and again after a counter reset", async () => {
+        const labels = {
+          ...routingLabels,
+          job_type: "subscriber",
+          reason: "missing_blob",
+        };
+        recordDroppedJob(labels);
+        const first = await register.getSingleMetricAsString(
+          "gq_jobs_last_dropped_timestamp_seconds",
+        );
+        expect(first).toContain('pipeline_name="test-pipeline"');
+        expect(first).toContain('job_type="subscriber"');
+        expect(first).toContain('reason="missing_blob"');
+        expect(first).toContain("1788775200");
+        const counter = await register.getSingleMetricAsString("gq_jobs_dropped_total");
+        expect(counter).toMatch(/reason="missing_blob"} 1/);
+
+        register.resetMetrics();
+        vi.advanceTimersByTime(20_000);
+        recordDroppedJob(labels);
+        const restarted = await register.getSingleMetricAsString(
+          "gq_jobs_last_dropped_timestamp_seconds",
+        );
+        expect(restarted).toContain("1788775220");
+      });
+    });
+  });
+
+  describe("given unroutable work that will be reoffered", () => {
+    describe("when its routing failure is recorded", () => {
+      /** @scenario "The first discarded queue job is visible without a counter baseline" */
+      it("does not record reoffered unroutable work as a discard", async () => {
+        gqJobsUnroutableTotal.inc(routingLabels);
+        const dropped = await register.getSingleMetricAsString(
+          "gq_jobs_last_dropped_timestamp_seconds",
+        );
+        expect(dropped).not.toContain('queue_name="test-queue"');
+        const unroutable = await register.getSingleMetricAsString("gq_jobs_unroutable_total");
+        expect(unroutable).toMatch(/job_name="traceSummary"} 1/);
+      });
     });
   });
 });

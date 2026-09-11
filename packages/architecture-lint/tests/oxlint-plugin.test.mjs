@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { commentBlockSizeMessage } from "@langwatch/lint-core/grammar/comment-block-policy.mjs";
 import { RuleTester } from "oxlint/plugins-dev";
 import { describe, it } from "vitest";
 import plugin from "../oxlint-plugin.mjs";
@@ -1146,13 +1147,11 @@ tester.run("feature-source-filename", plugin.rules["feature-source-filename"], {
       code: "export const value = 1;",
     },
     {
-      filename:
-        "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
+      filename: "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
       code: "export const value = 1;",
     },
     {
-      filename:
-        "modules/project/server/src/services/__tests__/projectService.unit.test.ts",
+      filename: "modules/project/server/src/services/__tests__/projectService.unit.test.ts",
       code: "export const value = 1;",
     },
   ],
@@ -1224,8 +1223,7 @@ tester.run("feature-source-layout", plugin.rules["feature-source-layout"], {
       errors: [{ messageId: "serverPath" }],
     },
     {
-      filename:
-        "modules/project/server/src/repositories/prisma/prisma.project.extra.repository.ts",
+      filename: "modules/project/server/src/repositories/prisma/prisma.project.extra.repository.ts",
       code: "export const value = 1;",
       errors: [{ messageId: "serverPath" }],
     },
@@ -1281,8 +1279,7 @@ tester.run("feature-source-subject", plugin.rules["feature-source-subject"], {
 tester.run("prisma-containment", plugin.rules["prisma-containment"], {
   valid: [
     {
-      filename:
-        "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
+      filename: "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
       code: "import { PrismaClient } from '@langwatch/prisma-client/generated'; export type Db = PrismaClient;",
     },
     {
@@ -1325,8 +1322,7 @@ tester.run("prisma-containment", plugin.rules["prisma-containment"], {
 tester.run("typed-prisma-seam", plugin.rules["typed-prisma-seam"], {
   valid: [
     {
-      filename:
-        "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
+      filename: "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
       code: "export class R { static create(prisma: PrismaClient) { return new R(prisma); } }",
     },
     {
@@ -1341,8 +1337,7 @@ tester.run("typed-prisma-seam", plugin.rules["typed-prisma-seam"], {
   ],
   invalid: [
     {
-      filename:
-        "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
+      filename: "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
       code: "export const db = client as PrismaClient;",
       errors: [{ messageId: "cast" }],
     },
@@ -1452,8 +1447,7 @@ tester.run("layer-class", plugin.rules["layer-class"], {
 }`,
     },
     {
-      filename:
-        "modules/project/server/src/repositories/routed/routed.example.repository.ts",
+      filename: "modules/project/server/src/repositories/routed/routed.example.repository.ts",
       code: `export class RoutedExampleRepository {
   a(input: In): Out { return this.primary.a(input); }
   b(input: In): Out { return this.primary.b(input); }
@@ -1679,8 +1673,7 @@ looseTester.run("comment-block-size", plugin.rules["comment-block-size"], {
       code: blockComment(9),
       errors: [
         {
-          message:
-            "Comment block has 9 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+          message: commentBlockSizeMessage(9),
         },
       ],
     },
@@ -1689,8 +1682,7 @@ looseTester.run("comment-block-size", plugin.rules["comment-block-size"], {
       code: blockComment(12),
       errors: [
         {
-          message:
-            "Comment block has 12 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+          message: commentBlockSizeMessage(12),
         },
       ],
     },
@@ -1715,8 +1707,7 @@ looseTester.run("comment-block-size-warning", plugin.rules["comment-block-size-w
       code: blockComment(6),
       errors: [
         {
-          message:
-            "Comment block has 6 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+          message: commentBlockSizeMessage(6),
         },
       ],
     },
@@ -1725,8 +1716,7 @@ looseTester.run("comment-block-size-warning", plugin.rules["comment-block-size-w
       code: blockComment(8),
       errors: [
         {
-          message:
-            "Comment block has 8 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+          message: commentBlockSizeMessage(8),
         },
       ],
     },
@@ -1766,8 +1756,7 @@ describe("the comment-block burn-down allowlist", () => {
         code: blockComment(9),
         errors: [
           {
-            message:
-              "Comment block has 9 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+            message: commentBlockSizeMessage(9),
           },
         ],
       },
@@ -1783,8 +1772,7 @@ describe("the comment-block burn-down allowlist", () => {
         code: blockComment(9),
         errors: [
           {
-            message:
-              "Comment block has 9 lines; the maximum is 5. Comments exist to make code readable and good code needs almost none: keep the why in a line or two, and put design narrative in an ADR the comment points to.",
+            message: commentBlockSizeMessage(9),
           },
         ],
       },

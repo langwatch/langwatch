@@ -44,6 +44,7 @@ import {
   PULLED_USAGE_HINT_KEY,
   type OpenAiAdminPullConfig,
 } from "@langwatch/enterprise-governance-contract";
+import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
@@ -65,14 +66,34 @@ const API_BASE = "https://api.openai.com/v1/organization";
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /** A run stops here rather than paginating forever; the cursor carries the
- *  rest into the next one. At `PAGE_LIMIT` buckets a page this bounds a run at
- *  roughly ten years, so it is a runaway guard rather than a throttle. */
+ *  rest into the next one. The bound is 20 pages of what the provider actually
+ *  returns, and for daily cost buckets that is 31 a page, not the 180 this
+ *  adapter asks for (see `PAGE_LIMIT`) — so a run reaches about 620 days,
+ *  under two years. Reading the bound off the requested limit overstates it
+ *  nearly six-fold as a decade. A backfill deeper than 620 days therefore
+ *  takes several runs to walk; the cursor makes that safe, but an operator
+ *  sizing a first backfill should expect it. */
 const MAX_PAGES_PER_RUN = 20;
 
 /**
- * The API's own ceiling. Above it the request is REJECTED rather than clamped
- * ("Limit must be less than or equal to 180."), so this is a contract value,
- * not a preference. One page is about six months of daily buckets.
+ * The `limit` this adapter asks for, and NOT what it gets.
+ *
+ * 180 is the published contract value — OpenAI's own OpenAPI document gives it
+ * as the cost report's maximum. The wire does not honour it and does not
+ * complain either: asking `/costs` for `limit=32` answers HTTP 200 with 31
+ * buckets, clamped silently rather than rejected (probe A14), and the probe
+ * kit records the wire ceiling for daily cost buckets as 31 against the
+ * published 180. Where the two disagree the wire is what an integration
+ * receives, so a page here is about one month of daily buckets, not six.
+ *
+ * Not the USAGE endpoints' behaviour, which is the opposite and must not be
+ * blurred with it: those DO reject an over-ceiling limit, naming a maximum per
+ * bucket width (probe A13 — 1440 for `1m`, 168 for `1h`, 31 for `1d`). This
+ * adapter never calls them.
+ *
+ * The value stays at 180 deliberately. Paging follows `next_page` rather than
+ * a row count, so asking for more than the provider will give simply returns
+ * the provider's page and costs nothing.
  */
 const PAGE_LIMIT = 180;
 
@@ -127,6 +148,10 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * other, and this adapter holds the cursor still on failure — so without the
  * binding one config edit mid-window would wedge the source permanently, every
  * retry replaying the same dead token.
+ *
+ * That binding is wire-verified (probes A32-A35) but UNCONTRACTED: OpenAI
+ * publishes no promise about it, so it can change without a deprecation and
+ * without anything here going red.
  *
  * `hasKeyGrouping` records whether the in-flight window is being read WITH
  * `api_key_id` in the group-by. It has to be durable for the same reason
@@ -188,8 +213,20 @@ const costResultSchema = z
     }),
     line_item: z.string().nullable().default(null),
     project_id: z.string().nullable().default(null),
+    /**
+     * The provider's opaque id ("user-…") for the person the row is billed
+     * to. The row ALSO carries a `user_email` beside it — verified against
+     * saved raw responses (2026-08-25, re-confirmed 2026-09-06: 2,720/2,720
+     * rows populated) — and this adapter deliberately reads the id, not the
+     * address: the id is stable, and a raw email is heavier on a money row
+     * (erasure, exposure). `.passthrough()` below carries the address as far
+     * as this function and no further: `costEvent` drops it before the row is
+     * stringified into `raw_payload`, so the address is never stored.
+     *
+     * Null whenever the row was not grouped by user, so it is read through
+     * `dimension()` like every other coordinate.
+     */
     user_id: z.string().nullable().default(null),
-    user_email: z.string().nullable().default(null),
     api_key_id: z.string().nullable().default(null),
   })
   .passthrough();
@@ -230,6 +267,16 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
     let page = cursor.page;
     let watermark = cursor.watermark;
     let hasKeyGrouping = cursor.hasKeyGrouping;
+    /**
+     * Whether any page in THIS run came back without per-key attribution.
+     *
+     * The fallback itself is correct — the money survives it, undivided —
+     * but it left no trace, so a provider quietly widening what it refuses
+     * would cost every customer their attribution in silence. Read off this
+     * run's own pages rather than off the cursor: a window already being read
+     * undivided is not this run's news to report.
+     */
+    let hasLostKeyAttribution = false;
 
     /**
      * What an unfinished run persists as its resume point. With a page token
@@ -239,22 +286,35 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
      */
     const resumeStart = () => (page === null ? cursor.storedStart : startingAt);
 
+    /**
+     * What a run that stopped before draining the window returns.
+     *
+     * Both ways out of the loop — the deadline and the page cap — leave the
+     * same thing behind: every event read so far, a cursor pointing at where
+     * to resume, and no error, because nothing failed. `truncated` is the part
+     * that must not be forgotten at either exit; a half-read window that says
+     * nothing is recorded as complete.
+     */
+    const stoppedShort = (): PullResult => ({
+      events,
+      cursor: encodeCursor({
+        startingAt: resumeStart(),
+        page,
+        query,
+        watermark,
+        hasKeyGrouping,
+        keyGroupingUpgrade: false,
+      }),
+      errorCount: 0,
+      completeness: "truncated",
+      ...runNotices(hasLostKeyAttribution),
+    });
+
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
       if (options.deadlineMs !== undefined && nowInstant().epochMilliseconds > options.deadlineMs) {
         // Everything read so far is kept and the cursor says where to resume,
         // so a deadline costs latency rather than a window.
-        return {
-          events,
-          cursor: OpenAiAdminPullerAdapter.encodeCursor({
-            startingAt: resumeStart(),
-            page,
-            query,
-            watermark,
-            hasKeyGrouping,
-            keyGroupingUpgrade: false,
-          }),
-          errorCount: 0,
-        };
+        return stoppedShort();
       }
 
       const read = await this.readPage({
@@ -269,6 +329,7 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
         return { events, cursor: options.cursor, errorCount: 1 };
       }
       events.push(...read.events);
+      if (!read.hasKeyGrouping) hasLostKeyAttribution = true;
       hasKeyGrouping = read.hasKeyGrouping;
       watermark = OpenAiAdminPullerAdapter.laterOf(watermark, read.watermark);
 
@@ -284,6 +345,7 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
             }),
           ),
           errorCount: 0,
+          ...runNotices(hasLostKeyAttribution),
         };
       }
       page = read.nextPage;
@@ -293,18 +355,8 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
       { adapter: this.id },
       "openai admin hit MAX_PAGES_PER_RUN; the next run resumes from the cursor",
     );
-    return {
-      events,
-      cursor: OpenAiAdminPullerAdapter.encodeCursor({
-        startingAt: resumeStart(),
-        page,
-        query,
-        watermark,
-        hasKeyGrouping,
-        keyGroupingUpgrade: false,
-      }),
-      errorCount: 0,
-    };
+    // A page token still in hand means the window was not drained.
+    return stoppedShort();
   }
 
   /**
@@ -344,6 +396,8 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
         options,
       });
     } catch (error) {
+      // Let the durable outbox retain Retry-After instead of losing it in errorCount.
+      if (error instanceof DispatchError) throw error;
       logger.error(
         {
           adapter: this.id,
@@ -468,6 +522,17 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
       signal,
       followRedirects: false,
     });
+    if (response.status === 429) {
+      // Best-effort drain, for the reason spelled out in the Anthropic
+      // puller's matching branch: a rejected cancel must not replace the
+      // DispatchError, or the Retry-After never reaches the scheduler.
+      await response.body?.cancel().catch(() => void 0);
+      throw new DispatchError({
+        message: "OpenAI rate limit exceeded (HTTP 429).",
+        retryable: true,
+        retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+      });
+    }
     if (!response.ok) {
       const detail = await AdminUsageReportAdapter.safeResponseText(response);
       if (response.status === 400 && OpenAiAdminPullerAdapter.isKeyGroupingRefusal(detail)) {
@@ -553,17 +618,42 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
     // shifts a decimal here and porting that reports 100x the real spend.
     const amountUsd = result.amount.value;
 
+    // Everything the provider sent EXCEPT the billed person's email address.
+    // `.passthrough()` keeps unknown fields so a later question about a row can
+    // be answered from what was stored; the address is the one field excluded,
+    // because no screen, query or export reads it and keeping a raw address on
+    // every money row only adds erasure and exposure surface. The opaque
+    // `user_id` stays — it is the actor and the erasure key.
+    const { user_email: _droppedEmail, ...retainedPayload } = result;
+
     return {
       source_event_id: `cost:${startingAt}:${AdminUsageReportAdapter.dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
-      // The provider names the person on every row, so no directory is asked.
-      actor: AdminUsageReportAdapter.dimension(result.user_email),
+      /**
+       * The person the row is billed to, as the provider's own opaque user id.
+       * No directory is asked — the report already names them.
+       *
+       * Identity-safe by construction. `source_event_id` above and the
+       * restatement key downstream are built from `dimensions`, which ALREADY
+       * carries this exact value as `userId`; `actor` is in neither. So filling
+       * it in re-keys nothing, lands no second row beside an existing one, and
+       * cannot double-count a day's spend — a re-read of an old bucket restates
+       * it in place and simply starts naming somebody.
+       *
+       * An id, not an address, and the erasure suppression list is keyed on
+       * exactly this string, so the two agree: erasing this person suppresses
+       * this id. The provider DOES send a `user_email` beside the id; it is
+       * deliberately not the actor, and it is dropped from the retained payload
+       * rather than stored, because nothing in the product reads it and an
+       * address on a money row is pure liability.
+       */
+      actor: AdminUsageReportAdapter.dimension(result.user_id),
       action: "cost_report",
       target: AdminUsageReportAdapter.dimension(result.line_item),
       cost_usd: amountUsd,
       tokens_input: 0,
       tokens_output: 0,
-      raw_payload: JSON.stringify(result),
+      raw_payload: JSON.stringify(retainedPayload),
       extra: {
         // Raw provider ids, resolved never (ADR-088 Decision 13). The worker
         // spreads `extra` into the audit row's metadata extension, which is
@@ -843,6 +933,30 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
       keyGroupingUpgrade: !hasKeyGrouping,
     };
   }
+
+/**
+ * The run continued without per-key attribution, and said so.
+ *
+ * A code rather than a sentence: it is read by a source-health surface that
+ * owns its own wording, and it has to survive a trip through storage. A log
+ * line was the alternative and is not one — a reader looking at the source
+ * cannot be shown a log.
+ */
+export const PER_KEY_ATTRIBUTION_UNAVAILABLE =
+  "per_key_attribution_unavailable" as const;
+
+/**
+ * The notices field, or nothing at all.
+ *
+ * Absent rather than empty on a clean run, so a reader never has to tell an
+ * adapter that reported no notices from one that reports none because it does
+ * not know how.
+ */
+function runNotices(hasLostKeyAttribution: boolean): { notices?: string[] } {
+  return hasLostKeyAttribution
+    ? { notices: [PER_KEY_ATTRIBUTION_UNAVAILABLE] }
+    : {};
+}
 
   /** The later of two ISO instants, tolerating nulls and unparseable input. */
   private static laterOf(a: string | null, b: string | null): string | null {

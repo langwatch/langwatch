@@ -22,6 +22,32 @@ beforeEach(() => {
   ocsfInsert.mockReset();
   ensureGovProject.mockReset();
   ensureGovProject.mockResolvedValue({ id: "gov-proj-1" });
+
+  vi.doMock("~/server/db", () => ({
+    prisma: {
+      ingestionSource: { findUnique: sourceFindUnique, update: sourceUpdate },
+    },
+  }));
+  // The worker takes the OCSF sink from the App, so standing in for the
+  // store means standing in for `getApp()`.
+  vi.doMock("~/server/app-layer/app", () => ({
+    getApp: () => ({
+      governance: {
+        ocsfEvents: {
+          insertEvents: async (rows: unknown[]) => {
+            for (const row of rows) ocsfInsert(row);
+          },
+        },
+      },
+    }),
+  }));
+  vi.doMock("../../governanceOcsfEvents.clickhouse.repository", () => ({
+    OCSF_ACTIVITY: { CREATE: 1, READ: 2, UPDATE: 3, DELETE: 4, INVOKE: 6 },
+    OCSF_SEVERITY: { INFO: 1, LOW: 3, MEDIUM: 4, HIGH: 5, CRITICAL: 6 },
+  }));
+  vi.doMock("../../governanceProject.service", () => ({
+    ensureHiddenGovernanceProject: ensureGovProject,
+  }));
 });
 
 afterEach(() => {

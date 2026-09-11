@@ -6,6 +6,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { GovernanceCliError } from "../cli-api";
 import type { GovernanceConfig } from "../config";
 import { type HealDeps, healRevokedIngestKey } from "../ingest-key-heal";
 
@@ -181,6 +182,30 @@ describe("healRevokedIngestKey", () => {
       // Minting here would replace a key a person may have revoked on
       // purpose, decided on a platform answer that never arrived.
       expect(healed).toEqual({ status: "failed" });
+      expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
+      expect(d.saveConfig).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a platform that refuses the device's session", () => {
+    /** @scenario "A signed-out device is told to sign in again" */
+    it("reports the session rather than a failure, so the hook can name the repair", async () => {
+      const d = deps({
+        describeIngestionKey: vi
+          .fn()
+          .mockRejectedValue(new GovernanceCliError(401, "unauthorized", "signed out")),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      // The mint after the status call would be refused the same way, so
+      // there is nothing to try; only a person signing the machine in again
+      // repairs this.
+      expect(healed).toEqual({ status: "expired" });
       expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
       expect(d.saveConfig).not.toHaveBeenCalled();
     });

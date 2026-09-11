@@ -14,11 +14,7 @@ When you finish you will have:
 
 If you are an admin trying to make the org _ready_ for developers to do this, jump to the [admin walkthrough](/ai-governance/getting-started-admin) instead.
 
-<Info>
-  **Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login
-  that runs underneath every step here) and [Coding CLI Integrations](/ai-gateway/cli/overview) (the
-  deep reference for each supported assistant).
-</Info>
+<Info>**Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login that runs underneath every step here) and [Coding CLI Integrations](/coding-agents/overview) (the deep reference for each supported assistant).</Info>
 
 ## Prerequisites
 
@@ -28,7 +24,7 @@ Before you start, your IT admin should already have:
 2. Published at least one default [Routing Policy](/ai-gateway/governance/routing-policies). If they haven't, the CLI fails with a `409 no_default_routing_policy` error, see the [CLI error catalog](/ai-governance/cli-debug#error-catalog) and ping your admin.
 3. Optionally: published an [AI Tools Portal](/ai-governance/personal-portal/overview) catalog (the card grid you'll see on `/me`). If they haven't, your `/me` page shows a "your IT team is still setting things up" empty state, you can still use the CLI directly.
 
-If any of those are missing your admin's first stop is [From zero to first detected anomaly](/ai-governance/getting-started-admin).
+If any of those are missing your admin's first stop is [From zero to your first governed request](/ai-governance/getting-started-admin).
 
 ## Step 1: Install the CLI
 
@@ -89,7 +85,7 @@ Run it. The wrapper:
 
 You should see Claude Code's normal startup banner. Make a request. The gateway proxies it transparently to Anthropic (or to whatever provider your admin's [Routing Policy](/ai-gateway/governance/routing-policies) sends it to, the CLI doesn't care).
 
-The same pattern works for [Codex](/ai-gateway/cli/codex) (`langwatch codex`), [Gemini CLI](/ai-gateway/cli/gemini-cli) (`langwatch gemini`), [Cursor](/ai-gateway/cli/cursor), and [opencode](/ai-gateway/cli/opencode). The full matrix lives in [Coding CLI Integrations](/ai-gateway/cli/overview).
+The same pattern works for [Codex](/coding-agents/openai-codex) (`langwatch codex`), [Gemini CLI](/coding-agents/gemini-cli) (`langwatch gemini`), [Cursor](/coding-agents/overview), and [opencode](/coding-agents/opencode). The full matrix lives in [Coding CLI Integrations](/coding-agents/overview).
 
 <Tip>
 **Capture without the wrapper.** If you'd rather not type `langwatch claude` every time, write the telemetry wiring once:
@@ -110,11 +106,11 @@ Refresh `/me`. You should see:
 - **Spending over time**: today's bar updated.
 - **My Usage**: request count incremented, spend updated.
 
-If the request didn't appear, the [CLI debug commands](/ai-governance/cli-debug) tell you exactly where it stopped: `langwatch governance status` shows whether your org has data at all, and the [audit log](/ai-governance/audit-log) under `/settings/audit-log` (admin-only) shows every gateway action with timestamp, actor, and target.
+If the request didn't appear, the [CLI debug commands](/ai-governance/cli-debug) tell you exactly where it stopped: `langwatch governance status` shows whether your org has data at all, and the [audit log](/platform/audit-log) under `/settings/audit-log` (admin-only) shows every gateway action with timestamp, actor, and target.
 
 ## Where to next
 
-- **Want to switch tools?** Every coding assistant has its own setup page: [Claude Code](/ai-gateway/cli/claude-code), [Codex](/ai-gateway/cli/codex), [Gemini CLI](/ai-gateway/cli/gemini-cli), [Cursor](/ai-gateway/cli/cursor), [opencode](/ai-gateway/cli/opencode), [Aider](/ai-gateway/cli/aider).
+- **Want to switch tools?** Every coding assistant has its own setup page: [Claude Code](/coding-agents/claude-code), [Codex](/coding-agents/openai-codex), [Gemini CLI](/coding-agents/gemini-cli), [Cursor](/coding-agents/overview), [opencode](/coding-agents/opencode), [Aider](/coding-agents/overview).
 - **Want to use a model provider directly from your code?** Click the provider tile on `/me` (OpenAI, Anthropic, Bedrock, Gemini), name a key, and copy the secret once. The form posts to `personalVirtualKeys.issuePersonal` and the result is a virtual key you drop into your app's config, same gateway, same budget, no provider credentials in your dotfiles. See [Model-provider tiles](/ai-governance/personal-portal/end-user#model-provider-tiles).
 - **Want to share a key with your team?** Don't use a personal VK, create a project and a project-scoped VK instead. The portal nudges you toward this with a "building an app for your team? Consider creating a project" hint.
 - **Want to know which devices are signed in?** [/me/devices](/ai-governance/personal-portal/sessions) lists every active CLI session with platform, hostname, and last-used timestamp; revoke any session in one click.

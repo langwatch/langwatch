@@ -9,6 +9,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { OFFLINE_AGENT_TEST_COPY } from "../offlineAgentCopy.ts";
 
 beforeAll(() => {
   vi.stubGlobal(
@@ -196,7 +197,7 @@ describe("<ConnectedAgentDrawer />", () => {
       expect(test).toBeDisabled();
       await user.hover(test);
 
-      expect(await screen.findByRole("tooltip")).toHaveTextContent("This agent is offline");
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(OFFLINE_AGENT_TEST_COPY);
     });
   });
 
@@ -240,6 +241,30 @@ describe("<ConnectedAgentDrawer />", () => {
       const result = await screen.findByTestId("agent-test-result");
       expect(result).toHaveTextContent("Hello back");
       expect(result).toHaveTextContent("build-box (eu-pod)");
+    });
+
+    describe("given the agent declares a parameter", () => {
+      /** @scenario "The connected agent drawer test turn takes parameter overrides" */
+      it("suggests the declared parameter, sends a typed value and sends nothing when the line is empty", async () => {
+        const user = userEvent.setup();
+        await renderDrawer();
+
+        const line = await screen.findByTestId("agent-test-parameters");
+        expect(line).toHaveAttribute("placeholder", "model=gpt-5-mini");
+
+        await user.type(line, "model=gpt-5");
+        await user.click(screen.getByTestId("agent-test-run"));
+        expect(testMutate).toHaveBeenLastCalledWith({
+          id: "agent_1",
+          projectId: "project_1",
+          message: "ping",
+          params: { model: "gpt-5" },
+        });
+
+        await user.clear(line);
+        await user.click(screen.getByTestId("agent-test-run"));
+        expect(testMutate.mock.lastCall?.[0]).not.toHaveProperty("params");
+      });
     });
   });
 });

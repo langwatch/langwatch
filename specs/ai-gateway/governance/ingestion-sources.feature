@@ -19,10 +19,45 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
 
   Scenario: Admin lands on the IngestionSources index
     When the admin navigates to "/governance/inventory?tab=sources"
-    Then a list shows every configured source with: name, source type,
-      last event timestamp, status
+    Then one table shows every configured source with: name, source type,
+      protocol, delivery, status, last event timestamp
     And each row links to a per-source detail page with health metrics
-    And the page has an "Add source" button surfacing all supported types
+    And the "Connectors" header above the table has an "Add source"
+      button surfacing all supported types
+
+  @integration
+  Scenario: The sources table shows delivery as a column
+    Given a real-time source "Workato prod", a real-time source "Agents
+      OpenTelemetry" and a scheduled source "Anthropic spend" polling hourly
+    When the admin opens the Sources tab
+    Then the sources sit in one table, the real-time ones first and each
+      group by name: "Agents OpenTelemetry", "Workato prod", "Anthropic spend"
+    And each row's Delivery cell reads "Real-time" or "Scheduled" in place
+      of the two group sections the page used to draw
+    And a scheduled source's Protocol cell reads its cadence in a few words,
+      "Hourly", under the protocol chip
+    And the header reads the real counts: "3 sources · 1 active"
+
+  @integration
+  Scenario: Row actions live in the overflow menu
+    Given a real-time source and a scheduled source
+    When the admin opens a real-time source's row actions
+    Then the menu offers Edit, Rotate secret and Archive
+    And a scheduled source's menu offers Edit and Archive, no secret to rotate
+    And a viewer without ingestionSources:manage sees no row actions at all
+
+  @integration
+  Scenario: Archiving from the row asks the same question the detail page asks
+    Given a source in the table
+    When the admin picks Archive from its row actions
+    Then they are asked to confirm, and the question names the source and
+      says historical events stay readable
+    And declining leaves the source as it was
+    And confirming archives it
+    # The detail page has asked this since it was built. The table's menu
+    # item archived on the first click, so the same action cost one click
+    # on one screen and two on the other, and the cheaper one was the one
+    # with no way back.
 
   @integration
   Scenario: Add source menu lists every type by vendor, grouped in plain language
@@ -44,6 +79,31 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     Then every source type beyond Generic OpenTelemetry is visible but locked
     And each locked entry says it needs an Enterprise plan
     And picking a locked entry does not open the composer
+
+  # --- Types that are defined but must not be offered ---
+
+  @unit
+  Scenario: A source type nothing reads can no longer be chosen
+    Given a source type whose data path was never finished
+    When the admin opens the "Add source" menu on any plan
+    Then that type is not offered
+    And its blurb says the source is not available rather than describing
+      a fetch it cannot perform
+    # Not locked, offered-but-locked is a sales message about what an
+    # Enterprise plan unlocks, and a source that cannot deliver data is not
+    # something to sell. The OpenAI Enterprise Compliance type is hidden this
+    # way: an admin who picked it got a source that stayed silent. The Claude
+    # one was hidden for the same reason and is no longer in this case — its
+    # workspace key reaches the adapter now — so it stays out of the picker
+    # on a different footing, described below.
+
+  @unit
+  Scenario: Sources already configured on an unread type still display
+    Given an ingestion source already configured on one of those types
+    When an admin opens the inventory
+    Then that source still shows its name and vendor mark rather than a blank
+    # Which is why the entry is hidden rather than deleted: the label map is
+    # built from the same list and read without a fallback.
 
   @unit
   Scenario: The composer and the menu share one plan gate
@@ -105,7 +165,8 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
         cron text box
       And the picker arrives prefilled with that source's recommended
         schedule (for example "every 15 minutes")
-      And a sentence below states the chosen schedule in plain words
+      And nothing under the picker restates the schedule it is already
+        showing; the explanation sits behind the (i) beside the heading
 
     @unit
     Scenario: The picker speaks every recommended schedule
@@ -123,7 +184,8 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       When the admin changes the cadence to hourly
       Then the create request carries the matching schedule everywhere
         the schedule travels, including inside the source's pull settings
-      And the summary sentence updates to say so
+      And the picker itself is the feedback, so there is no second
+        sentence to keep in step with it
 
     @integration
     Scenario: Cron editing is still there for schedules the picker cannot say
@@ -132,6 +194,25 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       Then the value is kept as typed, not clobbered by picker defaults
       And a cron that can never run shows a plain-language message next
         to the input, and the create button refuses until it is fixed
+      And the typed cron is read back in plain words, because five cron
+        fields say nothing on their own the way the picker does
+
+    @integration
+    Scenario: Cadence and destination both sit behind Advanced
+      Given the admin composes a pull-mode source that carries
+        conversations
+      Then neither the cadence nor the destination picker is visible
+        until the admin expands "Advanced", leaving the form asking only
+        for what creating a source actually requires
+      And both are in that one group rather than one each, so there is
+        no guessing which "Advanced" holds the thing they came for
+      And a source type that declares no advanced settings of its own
+        still offers the group, so what it does have stays reachable
+      And a source type with neither a schedule nor conversations to
+        route offers no group at all, rather than one opening on nothing
+      And closing and reopening the group gives both back unchanged,
+        because the drawer holds them rather than the group
+      And the edit drawer places them the same way
 
   Rule: A conversation source names the project its conversations land in
 
@@ -141,12 +222,24 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     routes nothing until then.
 
     The choice carries three consequences the admin cannot discover any
-    other way, so the drawer states all three where the choice is made:
-    the destination project's own redaction policy governs what is
-    stored; only conversations from the last 31 days arrive, so a thread
-    that started earlier shows only its recent turns; and a destination
-    that is later archived or deleted stops receiving conversations
-    instead of failing the source or landing them elsewhere.
+    other way, so the drawer states all three where the choice is made —
+    behind the (i) beside the label, one click from the picker rather
+    than as a stack of paragraphs under it, which is a wall of grey text
+    an admin scrolls past. The three: the destination project's own
+    redaction policy governs what is stored; only conversations from the
+    last 31 days arrive, so a thread that started earlier shows only its
+    recent turns; and a destination that is later archived or deleted
+    stops receiving conversations instead of failing the source or
+    landing them elsewhere.
+
+    The picker itself sits behind "Advanced" with the cadence, because a
+    source with no destination ingests perfectly well — it simply routes
+    no conversations onward until someone says where. Which means the
+    two notices that describe the state of the choice, that none is set
+    yet and that the one stored has since been archived, sit behind the
+    group with it: they are what the admin needs the moment they go
+    looking, not a reason to put the control in front of someone who
+    came to add a source.
 
     Sources that pull counts rather than conversations are offered no
     destination at all — a control that changed nothing would be worse
@@ -155,36 +248,55 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     @integration
     Scenario: The composer of a conversation source offers a destination
       When the admin picks "Databricks AI/BI Genie" from the Add source menu
+      And expands "Advanced"
       Then the composer offers a picker for the project its conversations
         land in, listing only projects of this organization
       And the picker starts empty, because where another team's
         conversations become readable is never a default
 
     @integration
-    Scenario: The destination states its three consequences where it is picked
+    Scenario: The destination states its three consequences behind its (i)
       Given the admin is composing a "Databricks AI/BI Genie" source
-      When they pick a destination project
-      Then the drawer says the destination project's data-privacy policy
-        governs what is stored
+      When they open the (i) beside the destination label
+      Then it says the destination project's data-privacy policy governs
+        what is stored
       And it says conversations from the last 31 days arrive, and that a
         conversation that started earlier shows only its recent turns
       And it says a destination that is archived or deleted stops
         receiving conversations
+      And none of the three is also stacked as a paragraph under the
+        picker
 
     @integration
     Scenario: A source created without a destination routes nothing
       When the admin creates a "Databricks AI/BI Genie" source without
         picking a destination
       Then the source is created
-      And the drawer said, before saving, that its conversations would
+      And the picker said, where it sits, that its conversations would
         not be readable in the explorer until a destination is set
+
+    @integration
+    Scenario: The drawer names the destination once one is picked
+      The field tooltips already say what the silent default means, so
+      the drawer stays quiet until there is a choice to confirm — a
+      standing warning above the fold was noise beside them.
+
+      Given the admin is composing a "Databricks AI/BI Genie" source and
+        has not expanded "Advanced"
+      Then the drawer shows no destination line yet
+      When they expand "Advanced" and pick a destination
+      Then a line names the project the conversations will land in
+      And a source type that pulls counts rather than conversations shows
+        no such line, because it routes none
 
     @integration
     Scenario: The edit drawer changes a destination and says history stays
       Given a "Databricks AI/BI Genie" source already lands in "Analytics"
-      When the admin opens the source for editing
+      When the admin opens the source for editing and expands "Advanced"
       Then the destination picker shows "Analytics"
-      And the drawer says conversations already routed stay where they are
+      And the (i) says conversations already routed stay where they are,
+        which it does not say while composing a source that has routed
+        none
       When they change it to "Support" and save
       Then the update carries "Support" as the destination
 
@@ -199,7 +311,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     Scenario: An archived destination is named as archived, not as absent
       Given a "Databricks AI/BI Genie" source lands in a project that has
         since been archived
-      When the admin opens the source for editing
+      When the admin opens the source for editing and expands "Advanced"
       Then the drawer says that destination is archived and that
         conversations are no longer being routed there
       And it still offers the picker, so the admin can repoint the source
@@ -334,6 +446,29 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     Then the push source row shows a "Rotate secret" action
     And the pull source row does not show a "Rotate secret" action
 
+  Rule: The list and the source page name two different times differently
+
+    A source shows two timestamps and they are routinely hours apart, both
+    correct. The list shows when data last arrived. The source page shows the
+    time written on the newest event, which for a report covering a whole day
+    is that day's opening minute. Calling both of them "last event" left an
+    admin comparing two numbers that never agreed with no way to tell why.
+
+    @integration @source-list
+    Scenario: The list says when data last arrived
+      Given a source that delivered data on its last run
+      When the admin views the source list
+      Then the row says when data last arrived
+      And the row does not call that the last event
+
+    @integration @source-detail
+    Scenario: The source page names the newest event time
+      Given a source whose newest event is stamped at the start of its day
+      When the admin opens that source page
+      Then the tile is named for the newest event time
+      And it explains that the time is the one carried on the event, not the
+        time it was collected
+
   @integration @source-detail @pull-source
   Scenario: The rotate-secret button is hidden for non-push sources on the detail page
     Given a pull-mode source exists
@@ -360,6 +495,27 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       | openai_compliance  | display name, S3 bucket / prefix, AWS role ARN, polling cadence              |
       | claude_compliance  | display name, workspace API key, polling cadence                              |
       | s3_custom          | display name, bucket / prefix, role ARN, parser DSL                           |
+
+  @unit
+  Scenario: The Claude compliance workspace key reaches its adapter as the token it reads
+    Given the admin enters a workspace API key on a Claude compliance source
+    When the source's pull config is assembled for saving
+    Then the key is stored under the encrypted credentials as the token
+    And the adapter's frozen request header resolves to that key
+    # The form collected the key under a name nothing routed into the
+    # credentials, so it was dropped on the way through and every run sent
+    # the unresolved template as its header. Every other secret-collecting
+    # source type already names its key so the form knows where it goes.
+
+  @unit
+  Scenario: Every source type that collects a secret can put it back where its adapter reads it
+    Given the source types that collect a secret in their setup form
+    Then each of them has a way to reassemble that secret into its pull config
+    And none is left out of that check by being hidden from the picker
+    # Hiding a type from the picker was how a missing builder was worked
+    # around. The check now covers hidden types too, so a builder cannot go
+    # missing behind that door again. Whether the type comes back to the
+    # picker is a separate call and is not made here: it stays hidden.
 
   Scenario: Generic OTel passthrough is the simplest setup
     Given the admin picks "Generic OTel" as the source type
@@ -458,7 +614,37 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       Given the events request fails
       When the admin views the events section
       Then they see an error message
-      And they do NOT see the "no events yet" setup walkthrough
+      And they do NOT see the "no events yet" empty pane
+
+    # The setup instructions used to BE the empty state: four paragraphs, a
+    # code block and two links in the page body whenever the table came back
+    # empty. That serves neither reader. An admin who has already wired the
+    # source up never sees any of it again, though "which endpoint was this?"
+    # is a question a WORKING source raises just as often; and an admin who
+    # has not wired it up gets a wall of setup text where the page should
+    # first say, in one sentence, what state their source is in.
+    @integration
+    Scenario: An idle source explains itself in a pane, not in a wall of setup text
+      Given a source that has ingested nothing
+      When the admin views the events section
+      Then they see the governance section's shared empty state — a glyph, a
+        headline and one sentence saying nothing has arrived yet
+      And that sentence names no control, so renaming one cannot make it lie
+      And the pane offers nothing to press, because only something upstream
+        can make an event appear
+      And the setup instructions are NOT in the page body
+
+    # In both states, because the questions they answer outlive the setup.
+    # It is a popover on a real button rather than a hover tooltip: the
+    # instructions carry documentation links, and a link inside a hover-only
+    # tooltip cannot be reached by keyboard or by touch.
+    @integration
+    Scenario: Setup instructions sit behind the heading, whatever the source is doing
+      When the admin opens the information control beside the Events heading
+      Then they see the endpoint to push to, what the trace store does with
+        the spans, and what rotating this source's secret does
+      And the documentation links inside it can be reached by keyboard
+      And the control is there whether or not the source has ingested anything
 
     @integration
     Scenario: The pager offers no control it cannot honour
@@ -497,3 +683,238 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And on confirm only the source row is deleted
     And historical events stay readable (TenantId-scoped) until manual purge
     And new events from the upstream operator's old config are rejected with 401
+
+  Rule: A refused save says which field it is refusing
+
+    @unit
+    Scenario: An empty required field is named rather than described
+      Given the composer is open on a source type with required fields
+      And one required field is empty
+      When the admin presses the create button
+      Then that field is marked as the one holding up the save
+      And the field says what to do about it
+      And no source is created
+      # The toast said some of the values were not valid and named none of
+      # them, which leaves an admin auditing a form of a dozen fields
+      # against one sentence. Anything the form can point at, it points at.
+
+    @unit
+    Scenario: A complaint about a hidden field is not left hidden
+      Given a required field that only appears once a switch is turned off
+      And that field is empty
+      When the admin presses the create button
+      Then the group holding it opens
+      # Marking a control nobody can see is telling the admin the form is
+      # wrong and then showing them a form on which everything is filled in.
+
+    @unit
+    Scenario: Answering a field clears the complaint about it
+      Given the create button was pressed with a required field empty
+      When the admin types a value into that field
+      Then the field is no longer marked
+      # A field that stays red after it has been answered reads as a
+      # second, different rejection.
+
+  Rule: What a source needs granted is read once, not on every visit
+
+    @unit
+    Scenario: The setup prose sits behind the heading, not above the fields
+      When the admin opens the composer on any source type
+      Then the body of the form starts with the fields
+      And what the source reads and what it needs granted is behind an
+        information control beside the drawer's heading
+      # It is three or four sentences of prerequisites. Printed in the body
+      # it pushed the fields it describes below the fold, and everyone who
+      # had already read it scrolled past it every time after.
+
+  Rule: One provider account is read by one connection
+
+    Two connections reading the same report from the same provider account
+    bill the same money twice: the same days arrive under two source
+    identities and nothing stored says they describe one account. The
+    refusal happens when the connection is saved, because by the time a run
+    could prove it the admin who could fix it is long gone, and the days
+    already recorded under both cannot be told apart afterwards.
+
+    What counts as the same account differs by provider - the subscription
+    for a cloud bill, the environment for a conversation feed, and for the
+    providers that name nothing at setup time, the account the provider
+    itself reports when it is asked with the administrator key. The refusal
+    reads the same either way and always names the connection that got
+    there first, because saying only that something is already connected
+    sends an admin hunting through a list.
+
+    Two connections onto one account stay legal wherever they cannot bill
+    the same money twice: a cloud subscription whose bill one connection
+    carries while another reads only conversations, and an account one
+    connection reads spend from while another reads token usage. What is
+    refused is a second connection reading the same report.
+
+    @unit
+    Scenario: A second connection to a subscription another connection reads is refused
+      Given a connection already reading a cloud subscription
+      When the admin saves another connection naming that same subscription
+      Then the save is refused
+      And the refusal names the connection that already reads it
+
+    @unit
+    Scenario: A second connection to an environment another connection reads is refused
+      Given a connection already reading a conversation environment
+      When the admin saves another connection naming that same environment written differently
+      Then the save is refused
+      And the refusal names the connection that already reads it
+      # Written differently means the same environment with a trailing
+      # slash, in another case, or with a path after it. A comparison that
+      # takes the typed text at face value refuses almost nothing.
+
+    @unit
+    Scenario: A second connection reading the same report from an account already connected is refused
+      Given a connection already reading a provider account through an administrator key
+      When the admin saves another connection carrying that same key for that same report
+      Then the save is refused
+      And the refusal names the connection that already reads that account
+      # The account is asked for by name while the connection is being
+      # saved, so this holds whether or not the second connection carries
+      # the same key as the first.
+
+    @unit
+    Scenario: A second key belonging to an account already connected is refused
+      Given a connection already reading a provider account
+      When the admin saves another connection carrying a different key for that same account
+      Then the save is refused
+      And the refusal names the connection that already reads that account
+      # One organization holds several administrator keys - a rotation
+      # overlap, a second admin, a service key beside a personal one - and
+      # every one of them reads the same whole-organization spend.
+      # Comparing the keys to each other refuses none of these.
+
+    @unit
+    Scenario: A usage connection and a cost connection may read the same account
+      Given a connection reading token usage from a provider account
+      When the admin saves another connection reading spend from that same account
+      Then the save is accepted
+      # Two different reports about one account, so no charge arrives twice.
+      # Refusing this leaves a customer who wants both having to pick one.
+
+    @unit
+    Scenario: A connection whose account the provider will not confirm is not saved
+      Given the provider cannot be asked which account an administrator key belongs to
+      When the admin saves a connection carrying that key
+      Then the save fails and says the account could not be confirmed
+      And no connection is created
+      # Letting it through unchecked is the same as having no guard at all:
+      # the next save has nothing to compare against, and the two
+      # connections then read the same bill for as long as they both live.
+
+    @unit
+    Scenario: A disabled connection still holds the account it read
+      Given a connection reading a provider account that the admin has disabled
+      When the admin saves another connection naming that same account for that same report
+      Then the save is refused
+      And the refusal says the disabled connection has to be archived first
+      # A disabled connection can be turned back on, and the day it is, the
+      # two of them start counting the same money. Archiving is the act
+      # that gives the account up.
+
+    @unit
+    Scenario: An edit that points a connection at an account another connection reads is refused
+      Given two connections reading two different provider accounts
+      When the admin edits one of them to name the account the other reads
+      Then the save is refused
+      And the refusal names the connection that already reads it
+      # Create and edit are two ways to reach the same forbidden state.
+      # Guarding only the first leaves the second as the way round it.
+
+    @unit
+    Scenario: Saving a connection without changing the account it reads is allowed
+      Given a connection reading a provider account
+      When the admin renames it and saves it against the same account
+      Then the save is accepted
+      # A connection is not its own duplicate. Without this the guard
+      # refuses every edit any admin ever makes to a working connection.
+
+    @unit
+    Scenario: The refusal never shows any part of the stored key
+      Given a connection already reading a provider account through an administrator key
+      When the admin saves another connection carrying that same key
+      Then the refusal names the owning connection and nothing else about it
+      And no part of either key appears in what the admin is shown
+      And nothing worked out from either key is kept
+      # What is kept beside the connection is the account name the provider
+      # itself reports. It is not a secret and it cannot be turned back
+      # into a key, which a stored scramble of a live customer credential
+      # could not have promised.
+
+  Rule: A wait the provider asked for outlives the attempt it was told to
+
+    A provider answering that too many requests were made says how long to
+    wait before asking again. That wait was being held against the single
+    attempt that received it. An attempt running long enough is replaced by
+    a fresh one, which starts from the same position immediately and asks
+    again inside the window the provider had just closed - so the source
+    spends its allowance arguing with a provider that has already said no.
+    The wait belongs to the connection, not to the attempt.
+
+    @unit
+    Scenario: A replacement run honours a wait the run it replaced was told about
+      Given a provider asked a run to wait before asking again
+      When that run is replaced before the wait has passed
+      Then the replacement does not ask the provider until the wait has passed
+
+    @unit
+    Scenario: The next scheduled run is pushed past the wait
+      Given a provider asked a connection to wait longer than its cadence
+      When the next run would otherwise fall due before the wait has passed
+      Then it is scheduled for the end of the wait instead
+      And the cadence the admin chose is unchanged
+
+    @unit
+    Scenario: A provider answering that too many requests were made has its wait read
+      Given a provider answering that too many requests were made
+      And the answer names how long to wait
+      When the connection decides when to try again
+      Then it waits at least as long as the provider asked
+      And not the short fixed delay it would otherwise use
+      # Two of the scheduled sources read this answer and two ignore it,
+      # so the same provider behaviour is handled well on one connection
+      # and retried into the ground on another.
+
+    @unit
+    Scenario: A run replaced before it finished records that it was abandoned
+      Given a run that has been going longer than it is allowed to
+      When a fresh run replaces it
+      Then the history records that the earlier run was abandoned
+      And it records which run replaced it
+      # The replaced run used to end without recording anything at all, so
+      # a wait it had been told about died with it, and its replacement
+      # went straight back to the provider that had just said no.
+
+    @unit
+    Scenario: A wait longer than a day is trimmed to a day
+      Given a provider asking for a wait longer than a day
+      When the connection records that wait
+      Then it waits a day at most
+      # The wait is a number read out of a provider answer, not one we
+      # choose. Left unbounded, a single malformed answer stops a money
+      # source for years with nothing on any screen explaining why.
+
+    @unit
+    Scenario: A wait that cannot be read as a length of time is treated as no wait
+      Given a provider answering that too many requests were made
+      And the wait it names cannot be read as a length of time
+      When the connection decides when to try again
+      Then it falls back to its usual cadence
+      And every other connection keeps running
+      # This value used to be handed straight to the part that works out
+      # the next run, which rejects anything it cannot read. One provider
+      # answering strangely stopped every scheduled connection, not one.
+
+    @unit
+    Scenario: A provider that says too many requests were made is asked only once in that run
+      Given a provider answering that too many requests were made
+      When the run receives that answer
+      Then the run ends without asking again
+      And it carries away the wait the provider named
+      # Asking again inside the run turns one request into several at a
+      # provider that has just asked for silence, and spends the wait it
+      # named arguing rather than waiting.

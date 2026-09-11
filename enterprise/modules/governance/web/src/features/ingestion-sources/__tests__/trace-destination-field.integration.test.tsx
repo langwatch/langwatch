@@ -16,7 +16,8 @@
  * destination project's redaction policy governs).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { SourceType } from "../model/ingestion-source-catalog.ts";
@@ -77,10 +78,13 @@ describe("given a source that pulls conversations", () => {
   describe("when the admin composes it", () => {
     /** @scenario "The composer of a conversation source offers a destination" */
     it("offers a destination picker listing only this organization's projects", async () => {
+      const user = userEvent.setup();
       renderField({ sourceType: "databricks_genie" });
       expect(screen.getByTestId("ingestion-trace-destination")).toBeTruthy();
-      expect(screen.getByRole("option", { name: "Analytics · Data" })).toBeTruthy();
-      expect(screen.getByRole("option", { name: "Support · CX" })).toBeTruthy();
+      await user.click(screen.getByRole("combobox"));
+      const options = within(screen.getByRole("listbox"));
+      expect(options.getByText("Analytics · Data")).toBeTruthy();
+      expect(options.getByText("Support · CX")).toBeTruthy();
     });
 
     /** @scenario "The composer of a conversation source offers a destination" */
@@ -101,37 +105,30 @@ describe("given a source that pulls conversations", () => {
   });
 
   describe("when a destination has been picked", () => {
-    /** @scenario "The destination states its three consequences where it is picked" */
-    it("says the destination project's data-privacy policy governs storage", () => {
+    /** @scenario "The destination states its three consequences behind its (i)" */
+    it("states all three consequences behind the (i), not as paragraphs under the picker", async () => {
       renderField({
         sourceType: "databricks_genie",
         initialValue: "proj_analytics",
       });
-      expect(screen.getByTestId("ingestion-trace-destination-redaction").textContent).toContain(
-        "data-privacy policy",
-      );
-    });
 
-    /** @scenario "The destination states its three consequences where it is picked" */
-    it("states the 31-day horizon and the partial-thread consequence", () => {
-      renderField({
-        sourceType: "databricks_genie",
-        initialValue: "proj_analytics",
-      });
-      const horizon = screen.getByTestId("ingestion-trace-destination-horizon").textContent;
-      expect(horizon).toContain("last 31 days");
-      expect(horizon).toContain("only its more recent turns");
-    });
+      // Three paragraphs stacked under one picker is the wall of grey text an
+      // admin scrolls past. The consequences still have to be said — they are
+      // properties of the pipeline nothing else states — so they move behind
+      // the (i) rather than being dropped.
+      expect(screen.queryByTestId("ingestion-trace-destination-redaction")).toBeNull();
+      expect(screen.queryByTestId("ingestion-trace-destination-horizon")).toBeNull();
+      expect(screen.queryByTestId("ingestion-trace-destination-archival")).toBeNull();
 
-    /** @scenario "The destination states its three consequences where it is picked" */
-    it("says an archived or deleted destination stops receiving conversations", () => {
-      renderField({
-        sourceType: "databricks_genie",
-        initialValue: "proj_analytics",
-      });
-      expect(screen.getByTestId("ingestion-trace-destination-archival").textContent).toContain(
-        "stops receiving",
-      );
+      const user = userEvent.setup();
+      await user.click(screen.getByTestId("ingestion-trace-destination-info"));
+
+      const tooltip = await screen.findByText(/data-privacy policy/);
+      const body = tooltip.closest('[data-scope="popover"]')?.textContent ?? "";
+      expect(body).toContain("data-privacy policy");
+      expect(body).toContain("last 31 days");
+      expect(body).toContain("only its more recent turns");
+      expect(body).toContain("stops receiving");
     });
   });
 
@@ -150,29 +147,41 @@ describe("given a source that pulls conversations", () => {
         initialValue: "proj_analytics",
         mode: "edit",
       });
-      expect(screen.getByRole<HTMLSelectElement>("combobox").value).toBe("proj_analytics");
+      expect(within(screen.getByRole("combobox")).getByText("Analytics · Data")).toBeTruthy();
     });
 
     /** @scenario "The edit drawer changes a destination and says history stays" */
-    it("says conversations already routed stay where they are", () => {
+    it("says conversations already routed stay where they are", async () => {
       renderField({
         sourceType: "databricks_genie",
         initialValue: "proj_analytics",
         mode: "edit",
       });
-      expect(screen.getByTestId("ingestion-trace-destination-history").textContent).toContain(
+
+      const user = userEvent.setup();
+      await user.click(screen.getByTestId("ingestion-trace-destination-info"));
+
+      const tooltip = await screen.findByText(/data-privacy policy/);
+      expect(tooltip.closest('[data-scope="popover"]')?.textContent ?? "").toContain(
         "stay where they are",
       );
     });
 
     /** @scenario "The edit drawer changes a destination and says history stays" */
-    it("does not promise history stays while composing, where there is none", () => {
+    it("does not promise history stays while composing, where there is none", async () => {
       renderField({
         sourceType: "databricks_genie",
         initialValue: "proj_analytics",
         mode: "create",
       });
-      expect(screen.queryByTestId("ingestion-trace-destination-history")).toBeNull();
+
+      const user = userEvent.setup();
+      await user.click(screen.getByTestId("ingestion-trace-destination-info"));
+
+      const tooltip = await screen.findByText(/data-privacy policy/);
+      expect(tooltip.closest('[data-scope="popover"]')?.textContent ?? "").not.toContain(
+        "stay where they are",
+      );
     });
   });
 
@@ -201,13 +210,12 @@ describe("given a source that pulls conversations", () => {
       expect(screen.queryByTestId("ingestion-trace-destination-empty")).toBeNull();
     });
 
-    /**
-     * @scenario "An archived destination is named as archived, not as absent"
-     *
+    /*
      * Telling an admin routing has stopped and giving them no control to
      * restart it strands them: the drawer would refuse every save, because
      * the archived id fails the write-time guard on the way back out.
      */
+    /** @scenario "An archived destination is named as archived, not as absent" */
     it("still offers the picker, so there is a way to repoint it", () => {
       renderField({
         sourceType: "databricks_genie",

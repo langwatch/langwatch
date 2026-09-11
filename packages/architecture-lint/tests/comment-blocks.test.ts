@@ -277,17 +277,13 @@ describe("oversized comment blocks", () => {
     ].join("\n");
     writeFixture(root, "src/jsdoc.ts", `${jsdoc}\nexport const value = 1;`);
 
-    expect(lintCommentBlocks(root)).toEqual({
-      reviews: [
-        {
-          category: "comment-blocks",
-          file: "src/jsdoc.ts",
-          line: 1,
-          lines: 5,
-          message: "Comment block has 5 lines and should receive review attention.",
-        },
-      ],
-    });
+    const { reviews } = lintCommentBlocks(root);
+
+    expect(reviews).toMatchObject([
+      { category: "comment-blocks", file: "src/jsdoc.ts", line: 1, lines: 5 },
+    ]);
+    expect(reviews[0]?.message).toContain("Comment block has 5 lines, at the 5-line limit.");
+    expect(reviews[0]?.message).toContain("haiku-subagent sweep");
   });
 
   it("exempts a JSDoc block carrying a @scenario annotation regardless of length", () => {

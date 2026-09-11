@@ -160,6 +160,21 @@ export const FEATURE_FLAGS = [
     family: "Governance",
   },
 
+  // Deliberately its own key rather than a reuse of the one above, and it
+  // gates strictly less. That one decides whether pulled cost is RECORDED at
+  // all; this one decides whether a version of a charge that a later pull
+  // superseded is WITHDRAWN. Turning the recording off to stop bad
+  // withdrawals would also stop every good record, so the two need separate
+  // switches or the only available remedy is far too blunt.
+  {
+    key: "release_pulled_usage_retraction_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Withdraws the superseded version of a pulled charge when a provider reissues it under a different currency, agent or spender, so a day does not total the same bill twice (ADR-088/ADR-128). Off by default; enable per organization via the operator store or a PostHog rule. With it off the reissue is still detected and logged, but nothing is withdrawn and the day keeps double-counting. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_pulled_usage_retraction_enabled.",
+    family: "Governance",
+  },
+
   // ----- PRODUCT -----
   {
     key: "release_lwql_workbench",
@@ -182,6 +197,13 @@ export const FEATURE_FLAGS = [
     legacyEnvVar: "NEXT_PUBLIC_FEATURE_BETA_ANNOTATIONS_TRAINED",
     description:
       "Offers the trained annotations evaluator in evaluator selection. Off by default; operators can enable it per project or organization.",
+  },
+  {
+    key: "release_voice_agents_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Voice agents: register an ElevenLabs agent, talk to it, call it from a run, and run scenarios with a simulated caller. Off by default; enable per project or organization via the operator store.",
   },
   // Per-project gate for the transient S3 spool at the ingestion edge
   // (#4215 / ADR-022). ON by default, so a deployment with object storage
@@ -263,7 +285,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Reveals the Costs and Billed governance placeholder pages and their sidebar items (spec: specs/ai-gateway/governance/governance-home-routing.feature). Composed ON TOP of release_ui_ai_governance_enabled, never instead of it: the section flag off still hides everything. Default off — the pages are empty shells shipped ahead of the spend views. Enable per organization via the operator store; for local dev use FEATURE_FLAG_FORCE_ENABLE=release_ui_governance_billed_cost_enabled.",
+      "Reveals Costs and the Platform preview pages (Insights, Analytics, Signals & Alerts) and their sidebar items. Composed ON TOP of release_ui_ai_governance_enabled: the section flag off still hides everything. Default off. Costs renders billed/gateway amounts and seat counts; the unfinished Billed address stays unavailable. Enable per organization via the operator store; for local dev use FEATURE_FLAG_FORCE_ENABLE=release_ui_governance_billed_cost_enabled. Specs: specs/ai-gateway/governance/governance-home-routing.feature, specs/governance/governance-cost-screen.feature.",
     family: "Governance",
   },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
@@ -330,6 +352,15 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Shows the Langy teaser banner to people who do not have Langy. It never grants access; target its audience through operator rules.",
+  },
+  {
+    key: "release_custom_chart_playground",
+    scope: "SYSTEM",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Custom Chart Playground",
+    description:
+      "Opens the custom-chart-playground page, its playground-widget REST routes, and the Langy skill that drives them, outside local development — otherwise all three are dev-only unconditionally. Default off, so the surface stays dev-only until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_custom_chart_playground.",
   },
   {
     key: "release_ui_home_signal_focused_enabled",

@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.0](https://github.com/langwatch/langwatch/compare/sdks/go/v0.3.0...sdks/go/v1.0.0) (2026-09-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk-go:** five Annotation fields are now values rather than pointers, because the schema marks them required — Id, CreatedAt, UpdatedAt, ProjectId and TraceId. Callers that dereference them (`*a.Id`) no longer compile; read the field directly. The remaining nullable fields — Comment, Email, IsThumbsUp, UserId — are unchanged and stay pointers.
+
+### Features
+
+* **agents:** connected agents, a decorated function is a simulation target ([#7655](https://github.com/langwatch/langwatch/issues/7655)) ([56922c0](https://github.com/langwatch/langwatch/commit/56922c0ee429bd5a38717960c09ede0d1905c0c3))
+
+
+### Bug Fixes
+
+* **sdk-go:** decode the annotations envelope and regenerate the REST client ([#7989](https://github.com/langwatch/langwatch/issues/7989)) ([8d0d350](https://github.com/langwatch/langwatch/commit/8d0d3503c0f755133e805e0fc150a65b0ba8b44c))
+* **sdk-go:** decode the annotations envelope, and regenerate the REST client ([8d0d350](https://github.com/langwatch/langwatch/commit/8d0d3503c0f755133e805e0fc150a65b0ba8b44c))
+
+
+### Code Refactoring
+
+* **event-sourcing:** retire the reactor vocabulary — post-event work is subscribers and process managers (ADR-098) ([#6956](https://github.com/langwatch/langwatch/issues/6956)) ([8609798](https://github.com/langwatch/langwatch/commit/8609798ba36387596a62f8c513fd76660bd500dc))
+
 ## [0.3.0](https://github.com/langwatch/langwatch/compare/sdk-go@v0.2.0...sdk-go@v0.3.0) (2026-05-13)
 
 ### Features

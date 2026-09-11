@@ -11,6 +11,7 @@ import { createCommandEvents } from "../../telemetry/events";
 import { cliAuthHeaders } from "../../utils/authHeaders";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Bound the request so a quiet socket cannot hold the CLI open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -57,7 +58,7 @@ export const transcriptTraceCommand = async (
   try {
     events.started("Fetching transcript…");
 
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/traces/${encodeURIComponent(traceId)}/transcript`,
       {
         headers: cliAuthHeaders({ apiKey }),

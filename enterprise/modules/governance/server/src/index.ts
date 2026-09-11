@@ -74,6 +74,7 @@ export {
 } from "./services/otel.trace-alert-metrics.service.ts";
 
 export { IngestionPullEventingAdapter } from "./services/ingestion-pull-eventing.service.ts";
+export { SEAT_REPORT_ACTION } from "./services/microsoftGraphSeats.ts";
 export { PrismaSpendSpikeAnomalyRepository } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 export type { SpendSpikeAnomalyDatabase } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 export { PrismaIngestionPullLifecycleRepository } from "./repositories/prisma/prisma.ingestion-pull-lifecycle.repository.ts";

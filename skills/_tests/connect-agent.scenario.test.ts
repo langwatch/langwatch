@@ -1,4 +1,8 @@
-import scenario, { type ScenarioExecutionStateLike } from "@langwatch/scenario";
+import scenario, {
+  type ScenarioExecutionStateLike,
+  assertSkillWasRead,
+  bashCommands,
+} from "@langwatch/scenario";
 import fs from "fs";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
@@ -6,15 +10,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
-  assertSkillWasRead,
-  bashCommands,
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
   createSkillTestWorkDir,
   installSkillToWorkDir,
   removeSkillTestWorkDir,
   SKILL_TESTS_SET_ID,
-  toolCallFix,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -120,7 +121,6 @@ describe("Connect Agent Skill", () => {
             ),
             scenario.agent(),
             (state) => {
-              toolCallFix(state);
               assertSkillWasRead(state, "connect-agent");
 
               const pythonFiles = findFiles(tempFolder, /\.py$/);
@@ -232,7 +232,6 @@ describe("Connect Agent Skill", () => {
             ),
             scenario.agent(),
             (state) => {
-              toolCallFix(state);
               assertSkillWasRead(state, "connect-agent");
 
               const pythonContent = readAll(findFiles(tempFolder, /\.py$/));

@@ -11,6 +11,7 @@ import { resolveEndpoint } from "@/internal/endpoint";
 import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
 import { buildAuthHeaders } from "./auth";
 import { handledErrorFrom } from "./errors";
+import { langwatchFetch } from "../http/langwatchFetch";
 
 /**
  * Turns a NAMED failure into a typed throw, once, for every call that goes through this
@@ -68,6 +69,7 @@ export const createLangWatchApiClient = (
 ) => {
   const client = openApiCreateClient<paths>({
     baseUrl: resolveEndpoint(endpoint),
+    fetch: langwatchFetch,
     headers: {
       ...buildAuthHeaders({ apiKey, projectId }),
       "content-type": "application/json",

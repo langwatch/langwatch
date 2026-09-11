@@ -45,6 +45,63 @@ Content conflicts cluster by area, which is what makes this parallelisable:
 are the coordinator's alone - migration ordering is global state and a lane
 resolving one in isolation cannot see the ordering it breaks.
 
+## rerere is on, and it has already answered most of the content conflicts
+
+`rerere.enabled` is true in this checkout with **2,755 cached resolutions**, so
+starting the merge replays a previous attempt's answers automatically. Measured
+on the live merge, 2026-09-11:
+
+```
+1282 unmerged paths
+ 456 content (UU)   ->  257 still carry markers
+                        199 already resolved by rerere
+ 826 add/delete decisions (UA 446, DU 312, UD 64, AU 2, DD 2)
+                     -> no markers by nature: nothing to merge textually
+```
+
+This is a large amount of work already done, and the first instinct - turn rerere
+off and re-resolve everything by hand - throws it away. It was checked instead.
+Of the 199 replayed resolutions, **195 are genuine blends, 1 took theirs, and 3
+took ours**:
+
+```
+infra/docker/Dockerfile
+modules/scenario/contract/src/scenario-run-parameter.error.ts
+modules/scenario/contract/src/scenario-run.ts
+```
+
+Those three are the whole of the exposure, because "took ours" is the resolution
+that silently discards main's change - the shape that half-reverted six PRs last
+time. They were read by hand, and **all three were dropping real work**:
+
+| File | What the replayed answer discarded |
+| --- | --- |
+| `scenario-run-parameter.error.ts` | `ScenarioFieldUnknownError`, a new `HandledError` with code `scenario_field_unknown`, thrown when a scenario is saved with a field its suite does not declare |
+| `scenario-run.ts` | `PENDING_EVALUATION`, a new run status for a finished conversation whose attached evaluators have not been recorded yet |
+| `infra/docker/Dockerfile` | two `COPY` lines for `platform/app/src/server/scenarios/{suite-fields,evaluator-attachments}.ts` |
+
+`ScenarioFieldUnknownError`, `scenario_field_unknown` and `PENDING_EVALUATION`
+each appear **zero times** on this branch. They are two features main shipped
+after the fork - suite field validation, and evaluator attachments with a gated
+terminal status - and taking ours drops both without a trace.
+
+The Dockerfile is the one where taking ours is defensible on its face, since the
+files it copies live in a monolith this branch deleted. It is still not a
+resolution: the feature those two files implement needs a home in the new layout,
+which is the same decision the governance port faces.
+
+So these three stay **unresolved** and go to the `modules/scenario` lane with this
+table in its manifest. Nothing stages them until main's two features have landed
+somewhere on this branch or been dropped with a reason written down.
+
+This is the whole argument for the rerere check being a step rather than a note:
+three files out of 1,282, invisible, and they carry two features.
+
+The lesson for every lane: **a conflicted file with no markers is not necessarily
+a resolved one.** It may be a replayed answer nobody in this session has read. It
+is usually right and it is not to be re-done wholesale, but it is not evidence of
+agreement either.
+
 ## The failure mode to design against
 
 A previous main merge on this branch **half-reverted six PRs**. That is the

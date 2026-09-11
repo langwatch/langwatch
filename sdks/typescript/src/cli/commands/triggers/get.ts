@@ -1,14 +1,15 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
-import { redactTriggerSecrets } from "./redact";
+import type { CommandResult } from "../../utils/output.ts";
+import { redactTriggerSecrets } from "./redact.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the trigger rather than printing it: the output port renders it in whatever
@@ -24,7 +25,7 @@ export const getTriggerCommand = async (id: string): Promise<CommandResult | voi
   const spinner = createSpinner(`Fetching trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/v1/triggers/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/triggers/${encodeURIComponent(id)}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 

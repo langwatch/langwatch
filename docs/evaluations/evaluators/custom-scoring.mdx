@@ -68,12 +68,12 @@ def my_llm_step(user_input: str):
 <Tab title="TypeScript">
 
 ```typescript
-import { LangWatch } from "langwatch";
+import { getLangWatchTracer } from "langwatch";
 
-const langwatch = new LangWatch();
+const tracer = getLangWatchTracer("my-app");
 
 async function myLLMStep(userInput: string): Promise<string> {
-  return await langwatch.trace({ name: "my-trace" }, async (span) => {
+  return await tracer.withActiveSpan("my-trace", async (span) => {
     const output = await myLLM(userInput);
 
     // Run your custom evaluation
@@ -136,7 +136,7 @@ output = my_llm(row["input"])
 
     # Log the custom score
     experiment.log(
-        name="my_custom_metric",
+        "my_custom_metric",
         index=index,
         data={"input": row["input"], "output": output},
         score=score,
@@ -161,8 +161,7 @@ await experiment.run(
     const score = myCustomEvaluator(item.input, output, item.expected);
 
     // Log the custom score
-    experiment.log({
-      name: "my_custom_metric",
+    experiment.log("my_custom_metric", {
       index,
       data: { input: item.input, output },
       score,
@@ -234,7 +233,7 @@ def semantic_similarity(output: str, expected: str) -> float:
 # Use in experiment
 score = semantic_similarity(output, row["expected"])
 experiment.log(
-    name="semantic_similarity",
+    "semantic_similarity",
     index=index,
     data={"output": output, "expected": row["expected"]},
     score=score,

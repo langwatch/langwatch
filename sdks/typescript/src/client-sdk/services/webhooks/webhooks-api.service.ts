@@ -13,6 +13,7 @@ import {
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Where an endpoint delivers. */
 export type WebhookDestinationKind = "http" | "sqs";
@@ -229,7 +230,7 @@ export class WebhooksApiService {
     path: string,
     init?: ObservedRequestInit,
   ): Promise<T> {
-    const response = await fetch(`${this.endpoint}${path}`, {
+    const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...init,
       // A hung control plane must fail the command, not freeze it.
       signal: init?.signal ?? AbortSignal.timeout(30_000),

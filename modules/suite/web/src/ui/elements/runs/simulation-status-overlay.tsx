@@ -41,6 +41,7 @@ const LIGHT_MODE_GRADIENT_BY_STATUS: Record<ScenarioRunStatus, LightModeGradient
   [ScenarioRunStatus.PENDING]: "cancelled",
   [ScenarioRunStatus.QUEUED]: "cancelled",
   [ScenarioRunStatus.RUNNING]: "cancelled",
+  [ScenarioRunStatus.PENDING_EVALUATION]: "cancelled",
 };
 
 /**
@@ -58,6 +59,7 @@ const SCRIM_TOKENS: Record<ScenarioRunStatus, string> = {
   [ScenarioRunStatus.PENDING]: "gray.solid/15",
   [ScenarioRunStatus.QUEUED]: "gray.solid/15",
   [ScenarioRunStatus.RUNNING]: "gray.solid/15",
+  [ScenarioRunStatus.PENDING_EVALUATION]: "gray.solid/15",
 };
 
 interface OverlayConfig {

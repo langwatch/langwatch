@@ -1,0 +1,1195 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * One idempotent pull effect driven by the process-manager outbox.
+ *
+ * Per scheduled tick:
+ *   1. Load IngestionSource by id (must be active + in pull mode)
+ *   2. Resolve adapter from `pullConfig.adapter` via the registry
+ *   3. Use the durable cursor supplied by the process state
+ *   4. Resolve credentials (placeholder — wired into the existing
+ *      ingestion-source secret store; for the framework demo, credentials
+ *      flow through `parserConfig.credentials`)
+ *   5. Call `adapter.runOnce({ cursor, credentials, context })`
+ *   6. Write the normalized events to the OCSF sink
+ *   7. Return an outcome; completion/failure events and their projection own
+ *      cursor, status, and error state
+ *
+ * This worker is the source-agnostic dispatcher — it does NOT contain
+ * any per-source logic. New sources arrive by registering an adapter
+ * in `pullers/index.ts` and pointing IngestionSource.pullConfig at it.
+ *
+ * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
+ */
+import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
+import { createLogger } from "@langwatch/observability";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import { getApp } from "~/server/app-layer/app";
+import { prisma } from "~/server/db";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
+import {
+  captureException,
+  toError,
+  withScope,
+} from "~/utils/posthogErrorCapture";
+import { azureBillSourceId } from "../activity-monitor/azureBillIdentity";
+import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
+import type { SourceType } from "../activity-monitor/ingestionSource.service";
+import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
+import {
+  loadErasureSuppression,
+  partitionSuppressedEvents,
+} from "../erasureSuppression.service";
+import { ensureHiddenGovernanceProject } from "../governanceProject.service";
+import { PersonDiscoveryService } from "../personDiscovery.service";
+import type {
+  ConversationRoutingProfile,
+  RoutingOrigin,
+} from "./conversationTraceAssembly";
+import {
+  COPILOT_ROUTING_PROFILE,
+  mapCopilotEventsToTraceRequest,
+} from "./copilotStudioTraceMapper";
+import {
+  GENIE_ROUTING_PROFILE,
+  mapGenieEventsToTraceRequest,
+} from "./genieTraceMapper";
+import {
+  type NormalizedPullEvent,
+  type PullerAdapter,
+  type PullResult,
+  pullerAdapterRegistry,
+  registerBuiltInPullers,
+} from "./index";
+import { mapToOcsfRow } from "./ocsfPullEventMapping";
+import { buildPulledUsageRecord } from "./pulledUsageRecord";
+
+const logger = createLogger("langwatch:workers:ingestionPuller");
+
+// Hard per-job deadline. A run cannot execute for longer than this: the
+// adapter is asked to stop cooperatively (deadlineMs), its transport is
+// aborted (signal), and this worker stops awaiting it either way.
+//
+// It has to be hard because the scheduler supersedes a run it considers stale
+// (INGESTION_PULL_STALE_RUN_MS, 30min) and starts a fresh one from the same
+// cursor. If a hung run could outlive that, two pulls would read the same
+// window concurrently and whichever finished last would decide the durable
+// cursor. The gap between the two is deliberate slack, not a coincidence.
+const PER_JOB_DEADLINE_MS = 5 * 60 * 1000;
+
+/**
+ * Raised when a run is cut off at its deadline.
+ *
+ * Surfaces as a run failure: the cursor is left where it was, so the window
+ * is retried rather than silently skipped.
+ */
+export class IngestionPullDeadlineExceededError extends Error {
+  constructor(deadlineMs: number) {
+    super(`Ingestion pull exceeded its ${deadlineMs}ms deadline`);
+    this.name = "IngestionPullDeadlineExceededError";
+  }
+}
+
+/**
+ * Runs `work` under a deadline that does not depend on `work` cooperating.
+ *
+ * The abort signal is passed in so the adapter can unwind its own transport;
+ * the race is what guarantees this worker stops waiting even if it does not.
+ */
+async function withDeadline<T>(
+  timeoutMs: number,
+  work: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await Promise.race([
+      work(controller.signal),
+      new Promise<never>((_resolve, reject) => {
+        controller.signal.addEventListener(
+          "abort",
+          () => reject(new IngestionPullDeadlineExceededError(timeoutMs)),
+          { once: true },
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    // Unblocks any transport still holding the signal once we have stopped
+    // waiting -- including when `work` lost the race.
+    controller.abort();
+  }
+}
+
+/**
+ * The pulled-usage write surface, late-bound by the composition root exactly
+ * the way the ingestion-pull outcome commands are: it belongs to a different
+ * pipeline that is built after this worker is referenced.
+ *
+ * Optional. Without it the worker behaves as it always did — audit rows only,
+ * no cost records — which is what a deployment with the pipeline switched off
+ * should do.
+ */
+export interface PulledUsageDispatcher {
+  recordPulledUsage(
+    args: PulledUsageObservedEventData & {
+      tenantId: string;
+      occurredAt: number;
+    },
+  ): Promise<void>;
+}
+
+/**
+ * The identity-match engine, as the pull run is allowed to know it (ADR-128
+ * §12). A port rather than an import: the suggestion half scores names —
+ * quadratic, gated off every request path by the import-graph guard next to
+ * the engine — and this worker is statically reachable from the ops router
+ * through the pipeline registry. The composition root builds the
+ * implementation on the worker role and hands it in; this file never names
+ * the scorer.
+ *
+ * Optional. Without it discovery still records people; the review queue just
+ * waits for a process that composes the engine.
+ */
+export interface DiscoveredPeopleMatcher {
+  runFor(args: { organizationId: string }): Promise<void>;
+}
+
+/**
+ * Answers what a source's `pullConfig` says to run, and refuses the run when it
+ * does not name a registered adapter or does not validate against one.
+ *
+ * Split out of `runIngestionPull` so the dispatcher reads as the sequence it
+ * documents — resolve, run, write — instead of as a guard chain wrapped around
+ * a single call.
+ */
+function resolvePullAdapter(params: {
+  ingestionSourceId: string;
+  pullConfig: Record<string, unknown>;
+}): { adapterId: string; adapter: PullerAdapter; validatedConfig: unknown } {
+  const { ingestionSourceId, pullConfig } = params;
+
+  const adapterId = pullConfig.adapter;
+  if (typeof adapterId !== "string") {
+    logger.warn(
+      { ingestionSourceId },
+      "IngestionSource has no pullConfig.adapter; not a pull-mode source",
+    );
+    throw new Error("IngestionSource has no pullConfig.adapter");
+  }
+
+  const adapter = pullerAdapterRegistry.get(adapterId);
+  if (!adapter) {
+    logger.error(
+      { ingestionSourceId, adapterId },
+      "Unknown adapter id — refusing to dispatch",
+    );
+    throw new Error(`Unknown ingestion pull adapter: ${adapterId}`);
+  }
+
+  try {
+    return {
+      adapterId,
+      adapter,
+      validatedConfig: adapter.validateConfig(pullConfig),
+    };
+  } catch (error) {
+    logger.error(
+      { ingestionSourceId, adapterId, error },
+      "pullConfig validation failed",
+    );
+    throw error;
+  }
+}
+
+/**
+ * Run the adapter once under the job deadline, reporting a throw rather than
+ * letting it pass silently. Rethrows: a run that did not finish leaves the
+ * durable cursor where it was, so the window is retried rather than skipped.
+ */
+async function runAdapterOnce(params: {
+  adapter: PullerAdapter;
+  adapterId: string;
+  ingestionSourceId: string;
+  organizationId: string;
+  cursor: string | null;
+  credentials: Record<string, string>;
+  validatedConfig: unknown;
+}): Promise<PullResult> {
+  const {
+    adapter,
+    adapterId,
+    ingestionSourceId,
+    organizationId,
+    cursor,
+    credentials,
+    validatedConfig,
+  } = params;
+
+  try {
+    return await withDeadline(PER_JOB_DEADLINE_MS, (signal) =>
+      adapter.runOnce(
+        {
+          cursor,
+          credentials,
+          context: { organizationId, ingestionSourceId },
+          deadlineMs: Date.now() + PER_JOB_DEADLINE_MS,
+          signal,
+        },
+        validatedConfig,
+      ),
+    );
+  } catch (error) {
+    logger.error(
+      { ingestionSourceId, adapterId, error },
+      "adapter.runOnce threw — leaving the durable cursor unchanged",
+    );
+    await withScope(async (scope) => {
+      scope.setTag?.("worker", "ingestionPuller");
+      scope.setExtra?.("ingestionSourceId", ingestionSourceId);
+      captureException(toError(error));
+    });
+    throw error;
+  }
+}
+
+/**
+ * Decide whether a run that reported errors still counts as progress, and fail
+ * it when it does not.
+ *
+ * `errorCount > 0` means two different things, and the cursor the adapter
+ * handed back is what tells them apart.
+ *
+ *   - The cursor MOVED: the adapter deliberately stepped past input it could
+ *     not read (s3_polling does this for a malformed line and for an object it
+ *     could not fetch at all). Failing the run here would throw away both the
+ *     events it did collect and the advance, so the next run would re-read the
+ *     same unreadable object and the source would never make progress again.
+ *     That is a partial success: write, persist, and say so loudly.
+ *   - The cursor is UNCHANGED: the adapter could not make progress at all
+ *     (http_polling, anthropic_admin and databricks_genie all return the
+ *     incoming cursor when their transport fails). Nothing was read, so the run
+ *     fails and the outbox retries the same window.
+ *
+ * A null cursor is never an advance. It is the "no cursor yet / drained"
+ * sentinel, so persisting it against a non-null incoming cursor would rewind
+ * the source to the beginning rather than move it forward.
+ */
+function assertRunMadeProgress(params: {
+  result: PullResult;
+  incomingCursor: string | null;
+  ingestionSourceId: string;
+  adapterId: string;
+}): void {
+  const { result, incomingCursor, ingestionSourceId, adapterId } = params;
+  if (result.errorCount === 0) return;
+
+  const cursorAdvanced =
+    result.cursor !== null && result.cursor !== incomingCursor;
+  if (!cursorAdvanced) {
+    throw new Error(
+      `Ingestion pull adapter reported ${result.errorCount} error(s)`,
+    );
+  }
+
+  logger.warn(
+    {
+      ingestionSourceId,
+      adapterId,
+      errorCount: result.errorCount,
+      eventCount: result.events.length,
+      fromCursor: incomingCursor,
+      toCursor: result.cursor,
+    },
+    "adapter advanced past input it could not read — keeping the events it did collect and persisting the advance",
+  );
+}
+
+/**
+ * What one pull run reports back to whoever asked for it.
+ *
+ * Named a report rather than an outcome because `IngestionPullRunOutcome` in
+ * the pipeline's own constants is already taken, and means something
+ * narrower: the single word "completed" or "failed" that lands on the
+ * run-status row. This is the whole of what the run has to say.
+ */
+export type IngestionPullRunReport = {
+  nextCursor: string | null;
+  eventCount: number;
+  /**
+   * Items the adapter could not read on a run that still made progress. Zero on
+   * a clean run; a run that reported errors WITHOUT advancing its cursor throws
+   * instead of returning, so a nonzero value here always means partial success.
+   */
+  errorCount: number;
+  /**
+   * Whether the run reached the end of what it set out to read.
+   *
+   * Carried up from the adapter unchanged. A truncated run is NOT a failed
+   * one: the money and audit rows it gathered are written and its cursor
+   * advances, so `errorCount` stays zero and this is the only thing that
+   * distinguishes a source permanently stuck on a fraction of its data from a
+   * healthy quiet one. Adapters that say nothing read as complete.
+   */
+  completeness: "complete" | "truncated";
+  /**
+   * The instant the source is known to have been read up to, or null when the
+   * adapter states none.
+   *
+   * Deliberately NOT the instant the run finished. The run clock advances on
+   * every attempt, so a stuck source re-reading the same half would look like
+   * steady progress to anything reasoning from it.
+   */
+  readThroughAt: Date | null;
+};
+
+/**
+ * The outcome a source that is not currently pulling reports, or null when it
+ * is pulling and the run should go ahead.
+ *
+ * A paused or archived source is not a failure and not an empty read: it is a
+ * run that never started. Reporting it as complete with the incoming cursor
+ * untouched is what keeps a pause from moving the source's position, and
+ * `readThroughAt` null is what keeps it from claiming it read up to now.
+ */
+function outcomeForSourceNotPulling({
+  status,
+  ingestionSourceId,
+  cursor,
+}: {
+  status: string;
+  ingestionSourceId: string;
+  cursor: string | null;
+}): IngestionPullRunReport | null {
+  if (status === "active" || status === "awaiting_first_event") return null;
+  logger.info(
+    { ingestionSourceId, status },
+    "IngestionSource not active, skipping",
+  );
+  return {
+    nextCursor: cursor,
+    eventCount: 0,
+    errorCount: 0,
+    // Nothing was read, so nothing was left half-read either.
+    completeness: "complete",
+    readThroughAt: null,
+  };
+}
+
+export async function runIngestionPull(params: {
+  sourceId: string;
+  cursor: string | null;
+  pulledUsage?: PulledUsageDispatcher;
+  identityMatch?: DiscoveredPeopleMatcher;
+}): Promise<IngestionPullRunReport> {
+  registerBuiltInPullers();
+
+  const ingestionSourceId = params.sourceId;
+  logger.info({ ingestionSourceId }, "puller run start");
+
+  const source = await prisma.ingestionSource.findUnique({
+    where: { id: ingestionSourceId },
+  });
+  if (!source) {
+    throw new Error(`IngestionSource ${ingestionSourceId} not found`);
+  }
+  const notPulling = outcomeForSourceNotPulling({
+    status: source.status,
+    ingestionSourceId,
+    cursor: params.cursor,
+  });
+  if (notPulling !== null) return notPulling;
+
+  const pullConfig = (source.parserConfig ?? {}) as Record<string, unknown>;
+  const { adapterId, adapter, validatedConfig } = resolvePullAdapter({
+    ingestionSourceId,
+    pullConfig,
+  });
+
+  const credentials = decryptCredentials(pullConfig.credentials);
+
+  const result = await runAdapterOnce({
+    adapter,
+    adapterId,
+    ingestionSourceId,
+    organizationId: source.organizationId,
+    cursor: params.cursor,
+    credentials,
+    validatedConfig,
+  });
+
+  assertRunMadeProgress({
+    result,
+    incomingCursor: params.cursor,
+    ingestionSourceId,
+    adapterId,
+  });
+
+  if (result.events.length > 0) {
+    await writePulledEvents({
+      events: result.events,
+      source,
+      pulledUsage: params.pulledUsage,
+      identityMatch: params.identityMatch,
+      // Same default as the run report takes below: an adapter that says
+      // nothing is claiming it read to the end of its window.
+      completeness: result.completeness ?? "complete",
+    });
+    logger.info(
+      {
+        ingestionSourceId,
+        adapterId,
+        eventCount: result.events.length,
+        ocsfInserted: result.events.length,
+      },
+      "puller events written to governance_ocsf_events",
+    );
+  }
+
+  logger.info(
+    {
+      ingestionSourceId,
+      adapterId,
+      eventCount: result.events.length,
+      cursor: result.cursor,
+      errorCount: result.errorCount,
+    },
+    "puller run done",
+  );
+  return {
+    nextCursor: result.cursor,
+    eventCount: result.events.length,
+    errorCount: result.errorCount,
+    completeness: result.completeness ?? "complete",
+    readThroughAt: readThroughInstant(result),
+  };
+}
+
+/**
+ * The instant a run read through to.
+ *
+ * Three sources, in falling order of authority, and the ordering is the point.
+ *
+ * The adapter's own statement wins: it alone knows what its cursor means. Next
+ * comes the newest event this run actually emitted, which is a fact about the
+ * data rather than about the attempt — it does not move when a run stalls, so
+ * a source stuck re-reading the same half reports the same point every time,
+ * which is precisely how being stuck becomes visible. Only a run that reached
+ * the END falls through to the clock, and there it is not a guess: a complete
+ * read has been read through to now by definition.
+ *
+ * A truncated run that emitted nothing gets null. It read up to nowhere, and
+ * the clock would say otherwise.
+ */
+/**
+ * The newest timestamp among the events one run emitted, or null when it
+ * emitted none this run could read.
+ *
+ * Unreadable stamps are skipped rather than treated as the epoch: one adapter
+ * writing a malformed timestamp would otherwise drag the answer to 1970 and
+ * report the source as read through to a point half a century behind.
+ */
+function newestEventInstant(events: PullResult["events"]): Date | null {
+  let newestMs: number | null = null;
+  for (const event of events) {
+    const ms = Date.parse(event.event_timestamp);
+    if (Number.isNaN(ms)) continue;
+    if (newestMs === null || ms > newestMs) newestMs = ms;
+  }
+  return newestMs === null ? null : new Date(newestMs);
+}
+
+function readThroughInstant(result: PullResult): Date | null {
+  if (result.readThroughAt !== undefined) {
+    const stated = new Date(result.readThroughAt);
+    if (!Number.isNaN(stated.getTime())) return stated;
+  }
+
+  const newest = newestEventInstant(result.events);
+  if (newest !== null) return newest;
+
+  return (result.completeness ?? "complete") === "complete" ? new Date() : null;
+}
+
+/** The IngestionSource fields the write paths below actually read. */
+type PullingSource = {
+  id: string;
+  parserConfig?: unknown;
+  sourceType: string;
+  organizationId: string;
+  teamId: string | null;
+  /** ADR-129: the named-or-blank line compares against this, no stored field. */
+  createdAt: Date;
+  /** ADR-088 v7: trace destination for conversation routing. Null = don't route. */
+  traceProjectId: string | null;
+  /** ADR-088: the window already read without pricing. See `recordUnpricedUsageWindow`. */
+  unpricedUsageSince: Date | null;
+  unpricedUsageThrough: Date | null;
+};
+
+/**
+ * Writes one run's events: the OCSF audit row every pulled event has always
+ * produced, and — for the ones carrying priced usage — a cost record beside it.
+ *
+ * Each NormalizedPullEvent → one OCSF row keyed by (TenantId, EventId), so
+ * replays collapse on the ReplacingMergeTree (outbox at-least-once and adapter
+ * at-least-once both land on the same key). Going direct-to-CH rather than
+ * synthesizing a fake trace is the right shape for pull mode: an audit entry is
+ * a single event, not a multi-span trace.
+ *
+ * TenantId convention: every governance write path (the trace fold's subscriber,
+ * the OCSF export service) keys on the org's hidden internal_governance
+ * Project ID, and pull events MUST follow it or they are invisible to SIEM
+ * export reads. Resolved — and lazily minted — once per job; the ClickHouse
+ * client is acquired per project so per-org private clusters route correctly.
+ */
+async function writePulledEvents({
+  events,
+  source,
+  pulledUsage,
+  identityMatch,
+  completeness,
+}: {
+  events: NormalizedPullEvent[];
+  source: PullingSource;
+  pulledUsage?: PulledUsageDispatcher;
+  identityMatch?: DiscoveredPeopleMatcher;
+  /** Passed through untouched to `recordUnpricedUsageWindow`, which is the
+   * only decision here that turns on whether the run read to its end. */
+  completeness: "complete" | "truncated";
+}): Promise<void> {
+  const govProject = await ensureHiddenGovernanceProject(
+    prisma,
+    source.organizationId,
+  );
+  // ADR-088's stated gate for the new event + ledger write. Resolved ONCE per
+  // run rather than per item: the answer cannot change mid-batch, and a flag
+  // read per usage row would put a lookup on the money path for no decision.
+  // Off → the loop below writes audit rows only, exactly as it did before.
+  const costRecordingEnabled = await pulledUsageCostEnabled(
+    source.organizationId,
+  );
+  // Taken from the App rather than constructed here: #6622 made `getApp()` the
+  // only way this file may reach ClickHouse, enforced by the client-access
+  // boundary test. Constructing a repository inline would put this file back on
+  // that test's shrinking backlog.
+  const ocsfRepo = getApp().governance.ocsfEvents;
+  if (!ocsfRepo) {
+    throw new Error(
+      "ClickHouse client is not available — check ClickHouse connection configuration",
+    );
+  }
+  // One pull instant for the whole batch. `observedAt` is the restatement
+  // ordering field, so every record in one run has to share it: two records
+  // from the same pull disagreeing about when they were observed could order a
+  // corrected figure behind the one it corrects.
+  const observedAt = new Date();
+  // The do-not-reimport list, resolved once per run for the same reason the
+  // cost flag above is. Without this check the pullers undo every erasure on
+  // their next pass: each re-reads a window behind its own watermark so a
+  // restated figure is not missed, so an actor erased today is re-read and
+  // re-written on the next run (ADR-128 §9 step 1). `event.actor` is what
+  // becomes the audit row's actor — `ActorEmail` when it is an address and
+  // `ActorUserId` when it is anything else (`ocsfActorFields`) — and rides
+  // inside the raw OCSF payload, and it is the actor id the cost record
+  // carries. One check covers every one of those writes because a suppressed
+  // event is not written at all rather than written and erased again later.
+  const suppression = await loadErasureSuppression({
+    prisma,
+    organizationId: source.organizationId,
+    provider: source.sourceType,
+  });
+  const { kept, suppressedCount } = partitionSuppressedEvents({
+    events,
+    actorOf: (event) => event.actor,
+    suppression,
+  });
+  const { droppedPeriodsMs, recordedPeriodsMs } = await writeAuditAndUsageRows({
+    kept,
+    source,
+    govProjectId: govProject.id,
+    observedAt,
+    ocsfRepo,
+    pulledUsage,
+    costRecordingEnabled,
+  });
+  await recordUnpricedUsageWindow({
+    source,
+    droppedPeriodsMs,
+    recordedPeriodsMs,
+    completeness,
+  });
+  if (suppressedCount > 0) {
+    // Worth a line: these are real provider rows this run deliberately did not
+    // store, so a total that looks short has an explanation here rather than
+    // looking like a pull that lost data.
+    logger.info(
+      { ingestionSourceId: source.id, suppressedCount },
+      "skipped pulled events naming an erased identifier",
+    );
+  }
+  const { discovered } = await syncPeopleFactsFromPull({
+    source,
+    events: kept,
+  });
+  // `kept`, not `events`. This is the export that leaves our storage entirely
+  // — it writes the conversation into the customer's own trace project, with
+  // the provider's user id on it and the question and answer in the spans. A
+  // suppressed person is suppressed here most of all.
+  await routeConversationsToTraceDestination({ events: kept, source });
+  // ADR-128 §12: the feed that discovers people is the engine's trigger.
+  // After routing, so a slow or failing pass never delays the export above.
+  if (discovered > 0 && identityMatch) {
+    try {
+      await identityMatch.runFor({ organizationId: source.organizationId });
+    } catch (error) {
+      logger.error(
+        { error: toError(error), ingestionSourceId: source.id },
+        "identity match pass failed; the discovered people are kept and the next pull retries",
+      );
+    }
+  }
+}
+
+/**
+ * The writes of one run: the kept events' OCSF audit rows in chunked inserts,
+ * then each event's usage record. Returns the priced periods split by whether
+ * the cost flag let them be stored — the dropped ones become the source's
+ * unpriced window, and the recorded ones are what later closes that window.
+ *
+ * One insert per chunk, not per row: the per-row loop awaited each statement
+ * in turn, but it still put ~150 of the ~2,600 statements a pull issues
+ * against a dev ClickHouse budgeted at 32 (#8064).
+ */
+async function writeAuditAndUsageRows({
+  kept,
+  source,
+  govProjectId,
+  observedAt,
+  ocsfRepo,
+  pulledUsage,
+  costRecordingEnabled,
+}: {
+  kept: NormalizedPullEvent[];
+  source: PullingSource;
+  govProjectId: string;
+  observedAt: Date;
+  ocsfRepo: NonNullable<ReturnType<typeof getApp>["governance"]["ocsfEvents"]>;
+  pulledUsage?: PulledUsageDispatcher;
+  costRecordingEnabled: boolean;
+}): Promise<{ droppedPeriodsMs: number[]; recordedPeriodsMs: number[] }> {
+  const droppedPeriodsMs: number[] = [];
+  const recordedPeriodsMs: number[] = [];
+  if (kept.length > 0) {
+    await ocsfRepo.insertEvents(
+      kept.map((event) =>
+        mapToOcsfRow({
+          event,
+          tenantId: govProjectId,
+          ingestionSourceId: source.id,
+          sourceType: source.sourceType,
+        }),
+      ),
+    );
+  }
+  for (const event of kept) {
+    const { pricedPeriodMs } = await recordPulledUsageFor({
+      event,
+      source,
+      govProjectId,
+      observedAt,
+      pulledUsage,
+      costRecordingEnabled,
+    });
+    if (pricedPeriodMs !== null) {
+      (costRecordingEnabled ? recordedPeriodsMs : droppedPeriodsMs).push(
+        pricedPeriodMs,
+      );
+    }
+  }
+  return { droppedPeriodsMs, recordedPeriodsMs };
+}
+
+/**
+ * People and department facts, off one delivery's events.
+ *
+ * `events` must be the post-partition list — the caller's `kept`, never the
+ * raw pull: discovery running on the pre-partition list would re-create a
+ * plaintext person row for an erased identifier on the next re-read of the
+ * puller's lookback window (ADR-128 §9 step 1). And a discovery failure never costs the run
+ * its events — the next run sees the same actors again, while audit rows
+ * missed would be gone for good. Department facts ride the same directory
+ * events, behind the same partition, with the same isolation: the directory
+ * read runs again tomorrow, so a failed sync costs a day, never the run.
+ */
+async function syncPeopleFactsFromPull({
+  source,
+  events,
+}: {
+  source: PullingSource;
+  events: NormalizedPullEvent[];
+}): Promise<{ discovered: number }> {
+  let discovered = 0;
+  try {
+    ({ discovered } = await PersonDiscoveryService.create(
+      prisma,
+    ).recordFromPulledEvents({
+      organizationId: source.organizationId,
+      provider: source.sourceType,
+      events,
+    }));
+  } catch (error) {
+    logger.error(
+      { error: toError(error), ingestionSourceId: source.id },
+      "could not record discovered people; the pulled events are still delivered",
+    );
+  }
+  try {
+    await DirectoryDepartmentSyncService.create(prisma).applyDirectoryEvents({
+      organizationId: source.organizationId,
+      provider: source.sourceType,
+      events,
+    });
+  } catch (error) {
+    logger.error(
+      { error: toError(error), ingestionSourceId: source.id },
+      "could not apply directory departments; the pulled events are still delivered",
+    );
+  }
+  return { discovered };
+}
+
+/**
+ * The source types that carry conversations, and what each contributes to
+ * the ones it routes. A type absent from here routes nothing — which is the
+ * honest answer for a source that pulls totals rather than conversations.
+ *
+ * The composer keeps its own list (`routesConversations` in
+ * ingestionSourceCatalog.tsx) for deciding whether to offer the picker at
+ * all. The two are deliberately separate: that one shapes a form, this one
+ * decides what reaches a customer's project.
+ */
+// A Map, not an object literal: `sourceType` is a free-form column read back
+// from the database, and indexing an object with it answers "constructor",
+// "toString" or "__proto__" with a truthy prototype member. That would pass
+// the guard below with a profile whose `conversationAction` is undefined —
+// which an event carrying no action then matches, routing a fabricated span
+// into a customer's project. A Map has no prototype keys to inherit.
+//
+// Keys are declared `SourceType` so a misspelled entry fails the build, but the
+// map is held as `ReadonlyMap<string, …>` because the lookup value is the raw
+// database column: narrowing the lookup would only force a cast at the call.
+/**
+ * A source's profile travels with the mapper that reads its payloads. The two
+ * cannot be chosen independently: a profile names the action a source calls a
+ * conversation, and the mapper is what knows how to read the rows carrying
+ * that action. Pairing them here means adding a source is one entry rather
+ * than two that can disagree.
+ */
+interface ConversationRouting {
+  profile: ConversationRoutingProfile;
+  map: (args: {
+    events: NormalizedPullEvent[];
+    origin: RoutingOrigin;
+  }) => IExportTraceServiceRequest | null;
+}
+
+const CONVERSATION_ROUTING_BY_SOURCE_TYPE: ReadonlyMap<
+  string,
+  ConversationRouting
+> = new Map<SourceType, ConversationRouting>([
+  [
+    "databricks_genie",
+    { profile: GENIE_ROUTING_PROFILE, map: mapGenieEventsToTraceRequest },
+  ],
+  [
+    "copilot_studio_dataverse",
+    {
+      profile: COPILOT_ROUTING_PROFILE,
+      map: mapCopilotEventsToTraceRequest,
+    },
+  ],
+]);
+
+/**
+ * The registry's only reader outside this module.
+ *
+ * Routing nothing is also what a missing action does, so a test that only
+ * watches behaviour cannot tell the prototype-key guard from the action one —
+ * it needs to read the lookup. It reads it through here rather than through
+ * the map itself: `ReadonlyMap` is a compile-time promise, so exporting the
+ * map would hand every module a registry one cast away from accepting a
+ * source type nobody wrote a conversation shape for. Which is the thing this
+ * whole path exists to refuse.
+ */
+export function conversationRoutingProfileFor(
+  sourceType: string,
+): ConversationRoutingProfile | undefined {
+  return CONVERSATION_ROUTING_BY_SOURCE_TYPE.get(sourceType)?.profile;
+}
+
+/**
+ * ADR-088 v7 (Decisions 8–14): conversation-bearing pulled events additionally
+ * flow through the standard trace door into the source's chosen destination
+ * project. Aggregate pulls never route, and neither does a source with no
+ * entry in `CONVERSATION_ROUTING_BY_SOURCE_TYPE`; a source that has one routes the
+ * events its own profile names as conversations.
+ *
+ * Tenancy + redaction (Decision 13): the destination project id is the tenant,
+ * and the redaction level passed is the same `DEFAULT_PII_REDACTION_LEVEL`
+ * every receiver passes — the pipeline's own per-tenant policy lookup is the
+ * sole authority. This worker must never compute a level: at the default tier
+ * a caller-passed level has unchecked authority.
+ *
+ * A destination that has been archived or deleted since it was configured
+ * stops routing (skip + log) rather than failing the run — a stale column
+ * must not stall the audit pull forever. Any other routing failure throws:
+ * the audit rows are already durable on their replacing key and trace ids
+ * are deterministic, so the whole-window retry is a safe no-op re-send.
+ *
+ * That includes the failures the trace door *returns* instead of throwing.
+ * `handleOtlpTraceRequest` swallows per-span outcomes into counters, so a
+ * queue or Redis outage comes back as a resolved promise carrying
+ * `ingestionFailures`. Left unread, `writePulledEvents` completes, the cursor
+ * advances, and the conversation is lost with nothing to retry it — the audit
+ * row survives but the trace never existed. So a nonzero `ingestionFailures`
+ * throws, exactly like a thrown routing failure.
+ *
+ * Drops are the other half of `rejectedSpans` and deliberately do NOT throw:
+ * a span that fails `spanSchema` fails it identically on every retry, and a
+ * span past `SPAN_MAX_PAST_MS` is the 31-day door of Decision 11 doing its job
+ * (old messages are still fetched and audited; only their spans drop). Failing
+ * the run on those would stall the audit pull on the exact history the door
+ * exists to let through.
+ */
+export async function routeConversationsToTraceDestination({
+  events,
+  source,
+}: {
+  events: NormalizedPullEvent[];
+  source: PullingSource;
+}): Promise<void> {
+  if (!source.traceProjectId) return;
+
+  // A destination is an ordinary stored column: the write path checks the
+  // project is this org's and live, never that this kind of source carries
+  // conversations at all — only the composer declines to offer the picker.
+  // So the source type has to earn its way in here, and one we have no
+  // conversation shape for routes nothing rather than being guessed at.
+  const routing = CONVERSATION_ROUTING_BY_SOURCE_TYPE.get(source.sourceType);
+  if (!routing) return;
+
+  const request = routing.map({
+    events,
+    origin: {
+      ingestionSourceId: source.id,
+      organizationId: source.organizationId,
+      sourceType: source.sourceType,
+      profile: routing.profile,
+    },
+  });
+  if (!request) return;
+
+  // Pull-time re-check of the write-time guard: the column is freely
+  // editable and the project can be archived or deleted underneath it.
+  const destination = await prisma.project.findFirst({
+    where: {
+      id: source.traceProjectId,
+      archivedAt: null,
+      team: { organizationId: source.organizationId },
+    },
+    select: { id: true },
+  });
+  if (!destination) {
+    logger.warn(
+      {
+        ingestionSourceId: source.id,
+        traceProjectId: source.traceProjectId,
+      },
+      "trace destination is archived, deleted, or not this org's — skipping conversation routing",
+    );
+    return;
+  }
+
+  const result = await getApp().traces.collection.handleOtlpTraceRequest(
+    destination.id,
+    request,
+    DEFAULT_PII_REDACTION_LEVEL,
+  );
+  const rejectedSpans = result?.rejectedSpans ?? 0;
+  const ingestionFailures = result?.ingestionFailures ?? 0;
+  if (ingestionFailures > 0) {
+    throw new Error(
+      // Quote ONLY the dispatch failures. This message is what the process
+      // manager persists on `recordRunFailed` and renders on the source detail
+      // page; `errorMessage` also carries drop reasons, which describe other
+      // spans and run to kilobytes of serialized schema errors.
+      `Trace door failed to dispatch ${ingestionFailures} span(s) for ingestion source ${source.id}` +
+        (result?.ingestionFailureMessage
+          ? `: ${result.ingestionFailureMessage}`
+          : ""),
+    );
+  }
+  logger.info(
+    {
+      ingestionSourceId: source.id,
+      traceProjectId: destination.id,
+      // Past the throw above, every rejection left is a permanent drop.
+      droppedSpans: rejectedSpans,
+    },
+    "routed pulled conversations to trace destination",
+  );
+}
+
+/**
+ * Whether this organization records pulled provider cost yet.
+ *
+ * Read through the layered service rather than the raw store, so the full
+ * layering applies (env force-on → operator row → PostHog rule → registry
+ * default). Keyed on the organization because pulled usage is attributed at
+ * org/team and has no project of its own until ADR-088's Decision 4 lands.
+ *
+ * A lookup that throws must not silently start writing money, and it must not
+ * silently stop either. Answering false on an error would do the second: the
+ * run completes, the cursor advances, and the whole window is filed at no cost
+ * with nothing left to retry it. So the error propagates and the run is
+ * retried, the one outcome that neither invents a price nor loses one.
+ */
+async function pulledUsageCostEnabled(
+  organizationId: string,
+): Promise<boolean> {
+  return await featureFlagService.isEnabled(
+    "release_pulled_usage_cost_enabled",
+    {
+      distinctId: organizationId,
+      // Pulled usage is priced for a whole organization.
+      projectId: NOT_TARGETED,
+      organizationId,
+    },
+  );
+}
+
+/**
+ * Appends one `PulledUsageObserved` for an event that carries priced usage.
+ *
+ * The stream's tenant is the hidden governance project, following the same
+ * convention every other pull writer uses — that is where the aggregate LIVES.
+ * It is not where the money is attributed: the customer's organization and
+ * team ride the record itself, and a null project says unattributed rather
+ * than quietly naming the governance project (ADR-088 Decision 4).
+ *
+ * The two failures here are not the same failure, so they are not handled the
+ * same way.
+ *
+ * Mapping the item is deterministic: a row that cannot be built will never
+ * build, and throwing would re-pull the same window forever behind one
+ * malformed row — a poison pill that stops every later item too. That one is
+ * logged and swallowed. The OCSF audit row it was mapped from already landed,
+ * so the fact survives and only its price is missing.
+ *
+ * Appending the record is I/O, and its failure is usually transient. Swallowing
+ * that one would advance the cursor past a window whose cost was never written
+ * and would never be retried, losing real money to an outage that heals by
+ * itself. So it propagates, matching every other failure in this worker: the
+ * run fails, the cursor holds, and the effect retries the window.
+ *
+ * Retrying a partly-recorded window does not double-count. An unchanged
+ * observation writes no ledger row — `insertPulledUsageRows` drops it via
+ * `pulledRowsThatChanged` — and the OCSF rows collapse on `(TenantId, EventId)`.
+ */
+async function recordPulledUsageFor({
+  event,
+  source,
+  govProjectId,
+  observedAt,
+  pulledUsage,
+  costRecordingEnabled,
+}: {
+  event: NormalizedPullEvent;
+  source: PullingSource;
+  govProjectId: string;
+  observedAt: Date;
+  pulledUsage?: PulledUsageDispatcher;
+  /**
+   * Whether the organization's pulled cost is allowed to be stored. False
+   * still maps the event: the caller has to know a price WAS on the table to
+   * record that this run dropped it, and the mapping is pure — the only cost
+   * of doing it anyway is arithmetic the run was about to skip.
+   */
+  costRecordingEnabled: boolean;
+}): Promise<{
+  /**
+   * The bucket instant of the price this event carried, or null when it
+   * carried none. Reported whether or not the price was stored — a dropped
+   * price is exactly what the caller needs to hear about.
+   */
+  pricedPeriodMs: number | null;
+}> {
+  if (!pulledUsage) return { pricedPeriodMs: null };
+
+  let record: ReturnType<typeof buildPulledUsageRecord>;
+  try {
+    record = buildPulledUsageRecord({
+      event,
+      source: {
+        // Only the subscription bill shares history with a retired source.
+        // Conversation usage and audit records keep the current source id.
+        ingestionSourceId:
+          source.sourceType === "copilot_studio_dataverse" &&
+          event.source_event_id.startsWith("azure_cost:")
+            ? azureBillSourceId(source)
+            : source.id,
+        sourceType: source.sourceType,
+        organizationId: source.organizationId,
+        teamId: source.teamId,
+        createdAt: source.createdAt,
+      },
+      governanceProjectId: govProjectId,
+      observedAt,
+    });
+  } catch (error) {
+    logger.error(
+      {
+        ingestionSourceId: source.id,
+        sourceEventId: event.source_event_id,
+        error,
+      },
+      "could not map a pulled item to a usage record; the audit row landed but this item has no price",
+    );
+    await withScope(async (scope) => {
+      scope.setTag?.("worker", "ingestionPuller");
+      scope.setExtra?.("ingestionSourceId", source.id);
+      captureException(toError(error));
+    });
+    return { pricedPeriodMs: null };
+  }
+
+  // Not a usage item — an ordinary audit event, and there was never a cost.
+  if (!record) return { pricedPeriodMs: null };
+
+  // The price existed either way; only storing it is gated.
+  if (!costRecordingEnabled) {
+    return { pricedPeriodMs: record.occurredAtMs };
+  }
+
+  await pulledUsage.recordPulledUsage({
+    ...record,
+    tenantId: govProjectId,
+    occurredAt: record.occurredAtMs,
+  });
+  return { pricedPeriodMs: record.occurredAtMs };
+}
+
+/**
+ * Remembers the window this source read but was not allowed to price, and
+ * forgets it once a later run has read back across the whole of it.
+ *
+ * The pull cursor advances whether or not the money path is live, because
+ * audit-only is a supported mode — a source whose organization leaves
+ * `release_pulled_usage_cost_enabled` off is working as configured, and
+ * holding its cursor still would re-read one window forever instead of
+ * following the provider. The consequence is that turning the flag on later
+ * recovers nothing by itself: every day already pulled has an audit row, no
+ * price, and no way to tell the two apart from a day that genuinely cost
+ * nothing. Recording the window is what makes that difference sayable — the
+ * cost screen reads it and reports those days as unknown rather than zero.
+ *
+ * Widen-only while the flag is off: a run that drops a price can only ever
+ * extend the window, never shrink it, so a short run in the middle of a gap
+ * cannot make the gap look smaller than it is.
+ *
+ * Clearing is deliberately all-or-nothing. A run that prices a period at or
+ * before the start of the gap has re-read every later day in it too, so
+ * reaching back past the start is evidence the whole gap was re-priced. A
+ * partial re-read leaves the window alone: half a repair is not a repair, and
+ * narrowing it would claim days that were never re-priced.
+ *
+ * AND ONLY IF THE RUN THAT REACHED BACK RAN TO ITS END. The evidence above
+ * assumes the read covered its whole window, and a truncated one did not.
+ * Adapters that own their cost read walk the bill oldest-first — anthropic and
+ * openai resume from a high-water mark and page forward, the polling adapters
+ * the same — so a run cut off by its page limit or by the clock emits exactly
+ * the earliest days, which are the ones that satisfy the test above, and never
+ * reaches the tail of the gap it would be credited with repairing. Clearing
+ * there forgets a loss that is still present, and nothing reopens it: the
+ * window is the source's only memory of those days, so once dropped they read
+ * as free from then on.
+ *
+ * An earlier version of this comment justified the clear by claiming the cost
+ * adapters re-read a whole trailing window from the source's start date. They
+ * do not: `anthropicAdmin` advances its cursor to the newest instant it
+ * emitted and the window start only ever moves forward. The lookbacks are
+ * three days, or seven — bounded, and unrelated to where the gap begins.
+ *
+ * ONE ADAPTER IS NOT COVERED. `copilotStudioDataverse` takes its completeness
+ * from the transcript walk while its cost half advances independently, so a
+ * truncated cost read there can still report a complete run. That is
+ * over-inclusive in the safe direction — the window is kept when it might have
+ * been cleared — and it is a separate defect from this one.
+ */
+async function recordUnpricedUsageWindow({
+  source,
+  droppedPeriodsMs,
+  recordedPeriodsMs,
+  completeness,
+}: {
+  source: PullingSource;
+  droppedPeriodsMs: number[];
+  recordedPeriodsMs: number[];
+  /** Whether the run that produced these periods read to the end of its window. */
+  completeness: "complete" | "truncated";
+}): Promise<void> {
+  if (droppedPeriodsMs.length > 0) {
+    const since = new Date(Math.min(...droppedPeriodsMs));
+    const through = new Date(Math.max(...droppedPeriodsMs));
+    const widened = {
+      unpricedUsageSince: earliest(source.unpricedUsageSince, since),
+      unpricedUsageThrough: latest(source.unpricedUsageThrough, through),
+    };
+    logger.warn(
+      {
+        ingestionSourceId: source.id,
+        organizationId: source.organizationId,
+        droppedCount: droppedPeriodsMs.length,
+        unpricedSince: widened.unpricedUsageSince.toISOString(),
+        unpricedThrough: widened.unpricedUsageThrough.toISOString(),
+      },
+      "pulled cost recording is off for this organization — audit rows landed but this run's spend was not priced",
+    );
+    await prisma.ingestionSource.update({
+      where: { id: source.id },
+      data: widened,
+    });
+    return;
+  }
+
+  const gapStart = source.unpricedUsageSince;
+  if (!gapStart || recordedPeriodsMs.length === 0) return;
+  if (Math.min(...recordedPeriodsMs) > gapStart.getTime()) return;
+  if (completeness === "truncated") {
+    logger.info(
+      { ingestionSourceId: source.id },
+      "a re-read reached back across the unpriced window but stopped short of its end; the window is kept",
+    );
+    return;
+  }
+
+  logger.info(
+    { ingestionSourceId: source.id },
+    "a re-read reached back across the unpriced window; its spend is priced again",
+  );
+  await prisma.ingestionSource.update({
+    where: { id: source.id },
+    data: { unpricedUsageSince: null, unpricedUsageThrough: null },
+  });
+}
+
+function earliest(existing: Date | null, candidate: Date): Date {
+  return existing && existing < candidate ? existing : candidate;
+}
+
+function latest(existing: Date | null, candidate: Date): Date {
+  return existing && existing > candidate ? existing : candidate;
+}

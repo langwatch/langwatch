@@ -86,6 +86,20 @@ export class GovernanceCliError extends Error {
 }
 
 /**
+ * Whether a governance call failed because this device's session is dead.
+ *
+ * `requestREST` refreshes a spent access token and retries on its own, so a
+ * 401 that reaches a caller is a refresh the server itself rejected: the
+ * device is signed out and every governance call it makes will fail the same
+ * way until someone runs `langwatch login --device` on it again. That is a
+ * different repair from an unreachable platform, and the paths that fall back
+ * to a cached ingest key have to tell the two apart.
+ */
+export function isExpiredSession(error: unknown): boolean {
+  return error instanceof GovernanceCliError && error.status === 401;
+}
+
+/**
  * The ADR-045 error path for a non-2xx governance response. Before throwing the
  * CLI's own {@link GovernanceCliError}, hand the parsed body to `throwIfHandledError`:
  * when the platform NAMED the failure (a domain-error envelope) that raises a typed

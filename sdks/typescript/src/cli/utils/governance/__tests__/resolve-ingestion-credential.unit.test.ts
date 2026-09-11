@@ -79,6 +79,53 @@ describe("resolveLiveIngestionKey", () => {
       expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
     });
   });
+
+  describe("when the platform refuses the device session", () => {
+    /** @scenario "A signed-out device is told its wiring was not confirmed" */
+    it("still reuses the cached key, and marks the resolution as unconfirmed", async () => {
+      const cfg = baseCfg({
+        default_personal_ingest_keys: {
+          claude_code: { secret: "ik-lw-cachedlookupid_secret" },
+        },
+      });
+      vi.mocked(cliApi.listIngestionKeys).mockRejectedValue(
+        new cliApi.GovernanceCliError(401, "unauthorized", "signed out"),
+      );
+
+      const resolved = await resolveLiveIngestionKey({
+        cfg,
+        sourceType: "claude_code",
+      });
+
+      // A mint would be refused the same way, so the cached key is all
+      // this device has. Marking it is what lets the caller say the
+      // setup was never confirmed instead of reporting success.
+      expect(resolved.token).toBe("ik-lw-cachedlookupid_secret");
+      expect(resolved.minted).toBe(false);
+      expect(resolved.sessionExpired).toBe(true);
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+    });
+
+    it("leaves an ordinary network failure unmarked", async () => {
+      const cfg = baseCfg({
+        default_personal_ingest_keys: {
+          claude_code: { secret: "ik-lw-cachedlookupid_secret" },
+        },
+      });
+      vi.mocked(cliApi.listIngestionKeys).mockRejectedValue(
+        new Error("fetch failed"),
+      );
+
+      const resolved = await resolveLiveIngestionKey({
+        cfg,
+        sourceType: "claude_code",
+      });
+
+      // An offline laptop has always kept exporting with its key, and
+      // nothing about that run is worth a warning.
+      expect(resolved.sessionExpired).toBeUndefined();
+    });
+  });
 });
 
 describe("resolveIngestionCredential", () => {

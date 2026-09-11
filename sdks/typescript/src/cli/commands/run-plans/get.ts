@@ -5,6 +5,7 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { createCliRunPlansService } from "./cli-run-plans-service";
 import { describeScope } from "./scopeFlags";
+import { printEvaluators } from "../test-suites/renderSuiteDetails";
 
 /**
  * Returns the plan rather than printing it: the output port renders it in
@@ -54,6 +55,8 @@ export const getRunPlanCommand = async (id: string): Promise<CommandResult | voi
             console.log(`    ${chalk.gray("•")} ${scenarioId}`);
           }
         }
+
+        printEvaluators(plan.evaluators);
 
         if (plan.platformUrl) {
           console.log();

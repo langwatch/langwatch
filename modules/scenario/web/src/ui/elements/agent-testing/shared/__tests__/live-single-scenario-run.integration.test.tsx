@@ -43,6 +43,10 @@ const emptyQuery = vi.hoisted(() => () => ({
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
+    // The run dialog reads the saved evaluators for the ones a run carries.
+    evaluators: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
     useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
@@ -211,6 +215,12 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
     organization: { id: "org_1" },
     projectId: "proj_1",
   }),
+}));
+
+// Voice surfaces are flag-gated (release_voice_agents_enabled); this suite is
+// not about that gate, so stub the flag on to keep prior behavior.
+vi.mock("../../../../../behavior/use-voice-agents-enabled.ts", () => ({
+  useVoiceAgentsEnabled: () => true,
 }));
 
 vi.mock("@langwatch/ui-host/use-router", () => ({

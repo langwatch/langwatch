@@ -1,8 +1,24 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+<<<<<<< HEAD:modules/agent/web/src/ui/sections/agent-type-selector-drawer.tsx
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ArrowLeft, Cable, Code, Globe, Workflow } from "lucide-react";
 
 export type AgentType = "code" | "workflow" | "http";
+=======
+import { Cable, Code, Globe, Mic, Workflow } from "lucide-react";
+import { LuArrowLeft } from "react-icons/lu";
+
+import { Drawer } from "~/components/ui/drawer";
+import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
+
+/**
+ * The kinds of agent the selector can create — one per entry in the
+ * `agentTypes` list below. Prompt ("signature") agents were removed; use
+ * the Prompts feature directly for LLM-based prompts.
+ */
+export type AgentType = "code" | "workflow" | "http" | "voice";
+>>>>>>> origin/main:platform/app/src/components/agents/AgentTypeSelectorDrawer.tsx
 
 export type AgentTypeSelectorDrawerProps = {
   open?: boolean;
@@ -31,6 +47,13 @@ const agentTypes: Array<{
     description: "Connect to an external API endpoint to process requests",
   },
   {
+    type: "voice",
+    icon: Mic,
+    title: "Voice Agent",
+    description:
+      "Test a voice agent hosted on ElevenLabs: talk to it or send a simulated caller",
+  },
+  {
     type: "code",
     icon: Code,
     title: "Code Agent",
@@ -44,6 +67,7 @@ const agentTypes: Array<{
   },
 ];
 
+<<<<<<< HEAD:modules/agent/web/src/ui/sections/agent-type-selector-drawer.tsx
 export function AgentTypeSelectorDrawer({
   open = false,
   onClose,
@@ -52,6 +76,50 @@ export function AgentTypeSelectorDrawer({
   onSelect,
   onConnectFromCode,
 }: AgentTypeSelectorDrawerProps) {
+=======
+/**
+ * Drawer for selecting the type of agent to create: one card per entry in the
+ * `agentTypes` list, with the voice card hidden unless the project's flag is
+ * on. Prompt-based agents were removed — use Prompts directly instead.
+ */
+export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
+  const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
+  const complexProps = getComplexProps();
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
+  const visibleAgentTypes = voiceAgentsEnabled
+    ? agentTypes
+    : agentTypes.filter((agentType) => agentType.type !== "voice");
+
+  const onClose = props.onClose ?? closeDrawer;
+  const onSelect =
+    props.onSelect ??
+    (complexProps.onSelect as AgentTypeSelectorDrawerProps["onSelect"]);
+  const isOpen = props.open !== false && props.open !== undefined;
+
+  const handleSelectType = (type: AgentType) => {
+    onSelect?.(type);
+    // Navigate to the appropriate editor drawer based on type
+    switch (type) {
+      case "code":
+        openDrawer("agentCodeEditor");
+        break;
+      case "workflow":
+        openDrawer("workflowSelector");
+        break;
+      case "http":
+        openDrawer("agentHttpEditor");
+        break;
+      case "voice":
+        openDrawer("agentVoiceEditor");
+        break;
+      default: {
+        const _exhaustive: never = type;
+        throw new Error(`Unhandled agent type: ${_exhaustive}`);
+      }
+    }
+  };
+
+>>>>>>> origin/main:platform/app/src/components/agents/AgentTypeSelectorDrawer.tsx
   return (
     <Drawer.Root
       open={open}
@@ -85,8 +153,15 @@ export function AgentTypeSelectorDrawer({
             </Text>
 
             <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
+<<<<<<< HEAD:modules/agent/web/src/ui/sections/agent-type-selector-drawer.tsx
               {onConnectFromCode && <ConnectFromCodeCard onClick={onConnectFromCode} />}
               {agentTypes.map((agentType) => (
+=======
+              <ConnectFromCodeCard
+                onClick={() => openDrawer("agentConnectFromCode")}
+              />
+              {visibleAgentTypes.map((agentType) => (
+>>>>>>> origin/main:platform/app/src/components/agents/AgentTypeSelectorDrawer.tsx
                 <AgentTypeCard
                   key={agentType.type}
                   {...agentType}

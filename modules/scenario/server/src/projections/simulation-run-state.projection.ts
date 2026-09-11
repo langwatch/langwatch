@@ -6,12 +6,22 @@ import {
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
+import {
+  type GatedVerdict,
+  gatedStatus,
+  gatedVerdict,
+  runAwaitsEvaluations,
+  ScenarioRunStatus,
+} from "@langwatch/scenario-contract";
+import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
 import { simulationMessageSchema } from "@langwatch/scenario-contract";
 import type {
   SimulationMessageSnapshotEvent,
   SimulationRunAgentInstanceRecordedEvent,
   SimulationRunCancelRequestedEvent,
+  SimulationRunCutAtLimitRecordedEvent,
   SimulationRunDeletedEvent,
+  SimulationRunEvaluatedEvent,
   SimulationRunFinishedEvent,
   SimulationRunMetricsComputedEvent,
   SimulationRunQueuedEvent,
@@ -23,7 +33,9 @@ import {
   SimulationMessageSnapshotEventSchema,
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCancelRequestedEventSchema,
+  SimulationRunCutAtLimitRecordedEventSchema,
   SimulationRunDeletedEventSchema,
+  SimulationRunEvaluatedEventSchema,
   SimulationRunFinishedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunQueuedEventSchema,
@@ -56,6 +68,41 @@ function storedMetadata(metadata: Record<string, unknown> | undefined): string |
 /** A parsed JSON value that is a plain object, not an array or a scalar. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The stored metadata with `fields` merged into its reserved `langwatch`
+ * namespace, written back as one JSON string. The column holds the metadata as
+ * a JSON string, so the object is parsed, the namespace merged and
+ * re-stringified. Metadata that does not parse as an object is replaced by one
+ * holding the merged namespace alone: the run's other metadata was already
+ * unreadable, and these fields are what the event records.
+ */
+function mergeLangwatchNamespace(
+  metadata: string | null,
+  fields: Record<string, unknown>,
+): string {
+  const current = parseMetadataObject(metadata);
+  const langwatch =
+    typeof current.langwatch === "object" &&
+    current.langwatch !== null &&
+    !Array.isArray(current.langwatch)
+      ? (current.langwatch as Record<string, unknown>)
+      : {};
+  return JSON.stringify({
+    ...current,
+    langwatch: { ...langwatch, ...fields },
+  });
+}
+
+/**
+ * The stored metadata with the call-limit cutoff flag written into its
+ * reserved `langwatch` namespace, mirroring {@link withAgentInstance}. The
+ * marker is always `true`: the event's existence is the fact, so folding it a
+ * second time produces byte-identical metadata (idempotent).
+ */
+export function withCutAtLimit(metadata: string | null): string {
+  return mergeLangwatchNamespace(metadata, { isCutAtLimit: true });
 }
 
 function parseMetadataObject(metadata: string | null): Record<string, unknown> {
@@ -149,6 +196,11 @@ export interface SimulationRunStateData {
   MetCriteria: string[];
   UnmetCriteria: string[];
   Error: string | null;
+  /**
+   * One result per evaluator that ran on the scenario, in the order they
+   * were recorded. Stored as the `Evaluations.*` parallel arrays.
+   */
+  Evaluations: ScenarioEvaluationResult[];
   DurationMs: number | null;
   TotalCost: number | null;
   RoleCosts: Record<string, number[]>;
@@ -209,6 +261,104 @@ function isTerminalStatus(status: string): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
+/**
+ * The status a finished run reads with.
+ *
+ * An explicit TERMINAL status takes priority, otherwise the status derives
+ * from the verdict. The explicit status arrives from the scenario-events
+ * ingest route, whose schema types it as the full ScenarioRunStatus enum,
+ * non-terminal members included. Taking it at face value would write a
+ * non-terminal Status alongside FinishedAt, which is the one state nothing
+ * can recover: the orphan reconciler skips it (FinishedAt IS NULL) and no
+ * read-time status derivation remains to mask it.
+ *
+ * Shared with RecordEvaluationsCommand, which needs the status the run held
+ * after its finished event without reading the fold.
+ */
+export function finishedStatusOf({
+  explicitStatus,
+  verdict,
+}: {
+  explicitStatus: string | undefined;
+  verdict: string | null | undefined;
+}): string {
+  const explicit = explicitStatus?.toUpperCase();
+  if (explicit && isTerminalStatus(explicit)) return explicit;
+  if (verdict === "success") return "SUCCESS";
+  return "FAILURE";
+}
+
+/**
+ * The status and verdict a run is stored with when it finishes.
+ *
+ * A run whose suite or plan attached evaluators, and whose results have not
+ * been recorded, is stored PENDING_EVALUATION with the judge's verdict until
+ * the evaluated event lands and the gate writes the terminal status.
+ *
+ * An evaluated event that folded before the finished one (business time can
+ * land it first) already recorded the results, so the gate runs here on the
+ * judge's verdict, and the stored status and verdict match what the evaluated
+ * handler stores in the other order. A run that sends its own evaluations is
+ * stored as sent: the code that ran it applied its gate.
+ */
+function settledOnFinish({
+  state,
+  judgeStatus,
+  verdict,
+  hasOwnEvaluations,
+  attachmentCount,
+}: {
+  state: SimulationRunStateData;
+  judgeStatus: string;
+  verdict: GatedVerdict | null;
+  hasOwnEvaluations: boolean;
+  attachmentCount: number;
+}): { status: string; verdict: string | null } {
+  if (!hasOwnEvaluations && state.Evaluations.length > 0) {
+    const gated = gatedVerdict({
+      evaluations: state.Evaluations,
+      judgeVerdict: verdict ?? undefined,
+    });
+    return {
+      status: gatedStatus({ status: judgeStatus, verdict: gated }),
+      verdict: gated ?? verdict,
+    };
+  }
+  const awaitsEvaluations = runAwaitsEvaluations({
+    status: judgeStatus,
+    hasOwnEvaluations,
+    attachmentCount,
+  });
+  return {
+    status: awaitsEvaluations
+      ? ScenarioRunStatus.PENDING_EVALUATION
+      : judgeStatus,
+    verdict,
+  };
+}
+
+/**
+ * Whether the fold has seen an event that DEFINES the run, and so whether the
+ * state is worth a `simulation_runs` row.
+ *
+ * Every lifecycle event names the run it belongs to, and every handler for one
+ * writes that name onto `ScenarioRunId`. The metrics event is the exception:
+ * it carries a run id, a trace id and a cost, and no identity at all, so its
+ * handler leaves `ScenarioRunId` empty. A non-empty `ScenarioRunId` is
+ * therefore the exact statement "some event has said what this run is", and it
+ * needs no extra column to carry.
+ *
+ * Cost alone must not mint a run. The metrics command is driven by a span
+ * attribute, so a bad attribute value addresses an aggregate that no run ever
+ * created; writing the row anyway produced a run with no name, no scenario, no
+ * set and no end, whose cost grew with every trace that carried the same value.
+ * The store consults this before it writes, so the metrics accumulate in the
+ * fold state and reach the table with the run's first lifecycle event.
+ */
+export function hasRunDefiningEvent(state: SimulationRunStateData): boolean {
+  return state.ScenarioRunId.length > 0;
+}
+
 const simulationRunEvents = [
   SimulationRunQueuedEventSchema,
   SimulationRunStartedEventSchema,
@@ -216,9 +366,11 @@ const simulationRunEvents = [
   SimulationTextMessageStartEventSchema,
   SimulationTextMessageEndEventSchema,
   SimulationRunFinishedEventSchema,
+  SimulationRunEvaluatedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunCancelRequestedEventSchema,
   SimulationRunAgentInstanceRecordedEventSchema,
+  SimulationRunCutAtLimitRecordedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
 
@@ -299,6 +451,7 @@ export class SimulationRunStateFoldProjection
       MetCriteria: [],
       UnmetCriteria: [],
       Error: null,
+      Evaluations: [],
       DurationMs: null,
       TotalCost: null,
       RoleCosts: {},
@@ -540,42 +693,75 @@ export class SimulationRunStateFoldProjection
 
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
-
-    // Derive status: an explicit TERMINAL status takes priority, else derive
-    // from verdict. The ingest route types explicit status as the full enum
-    // (non-terminal included); taking it at face value would write non-terminal
-    // Status alongside FinishedAt — unrecoverable, since the orphan reconciler skips FinishedAt-set rows.
-    let status: string;
-    const explicit = event.data.status?.toUpperCase();
-    if (explicit && isTerminalStatus(explicit)) {
-      status = explicit;
-    } else if (verdict === "success") {
-      status = "SUCCESS";
-    } else if (verdict === "failure" || verdict === "inconclusive") {
-      status = "FAILURE";
-    } else {
-      status = "FAILURE";
-    }
+    const judgeStatus = finishedStatusOf({
+      explicitStatus: event.data.status,
+      verdict,
+    });
+    const settled = settledOnFinish({
+      state,
+      judgeStatus,
+      verdict,
+      hasOwnEvaluations: results?.evaluations != null,
+      attachmentCount: event.data.evaluators?.attachments.length ?? 0,
+    });
 
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      Status: status,
-      Verdict: verdict,
+      Status: settled.status,
+      Verdict: settled.verdict,
       Reasoning: results?.reasoning ?? null,
       MetCriteria: results?.metCriteria ?? [],
       UnmetCriteria: results?.unmetCriteria ?? [],
       Error: results?.error ?? null,
-      // Derived when the event doesn't carry it (every real run — the SDK
-      // ingest path sends only results and status): left underived, DurationMs
-      // was null for every real run and populated only for synthetic ones. A
-      // supplied value still wins, since the runner knows its own elapsed time better.
+      // A scenario run from code sends its evaluations with the finished
+      // event. An evaluated event that folded before this one (business time
+      // can land it first) already wrote its results, which stay.
+      Evaluations: results?.evaluations ?? state.Evaluations,
+      // Derived when the event does not carry it, which is every real run:
+      // the SDK ingest path dispatches finishRun with results and status only.
+      // Left underived, DurationMs was null for every run a customer actually
+      // executed, and populated only for runs seeded with a synthetic event.
+      //
+      // The fold already holds both ends, so this needs no new field on the
+      // wire. A supplied value still wins — the runner knows its own elapsed
+      // time better than two projected timestamps do.
       DurationMs:
         event.data.durationMs ??
         (state.StartedAt !== null && event.occurredAt >= state.StartedAt
           ? event.occurredAt - state.StartedAt
           : null),
       FinishedAt: event.occurredAt,
+    };
+  }
+
+  handleSimulationRunEvaluated(
+    event: SimulationRunEvaluatedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // A second record replaces the first: the evaluators ran again and the
+    // run holds one result per evaluator, never a history of them. The gate
+    // reads the state's own status, so a run that errored or was cancelled
+    // keeps that status whatever the evaluators said, and the judge's
+    // reasoning and criteria stay as the judge wrote them.
+    //
+    // A run stored PENDING_EVALUATION holds the judge's verdict but not the
+    // judge's status, so that status is recomputed from the verdict first.
+    // Only a judged run ever goes pending, so the recomputation is exact.
+    const verdict = event.data.verdict;
+    const judgeStatus =
+      state.Status === ScenarioRunStatus.PENDING_EVALUATION
+        ? finishedStatusOf({
+            explicitStatus: undefined,
+            verdict: state.Verdict,
+          })
+        : state.Status;
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Evaluations: event.data.evaluations,
+      Verdict: verdict ?? state.Verdict,
+      Status: gatedStatus({ status: judgeStatus, verdict }),
     };
   }
 
@@ -646,6 +832,17 @@ export class SimulationRunStateFoldProjection
         metadata: state.Metadata,
         agentInstance: event.data.agentInstance,
       }),
+    };
+  }
+
+  handleSimulationRunCutAtLimitRecorded(
+    event: SimulationRunCutAtLimitRecordedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: withCutAtLimit(state.Metadata),
     };
   }
 

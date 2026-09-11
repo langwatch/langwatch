@@ -111,8 +111,14 @@ export function usePersonalContext(): PersonalContext {
   const currentUser = useCurrentUser();
   const { organization } = useOrganizationTeamProject();
 
+<<<<<<< HEAD:modules/user/web/src/behavior/use-personal-context.ts
   const userEmail = currentUser?.email ?? "you@example.com";
   const userName = currentUser?.name ?? "You";
+=======
+  const userId = session?.user.id;
+  const userEmail = session?.user.email ?? "you@example.com";
+  const userName = session?.user.name ?? "You";
+>>>>>>> origin/main:platform/app/src/components/me/usePersonalContext.ts
   const orgName = organization?.name ?? "Your organization";
   const orgId = organization?.id ?? "org_unknown";
 
@@ -121,9 +127,32 @@ export function usePersonalContext(): PersonalContext {
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
 
+  // `targetUserId` is NOT optional here even though the procedure allows it.
+  // Omitting it means "sweep the whole org" for any caller holding
+  // `virtualKeys:viewOtherPersonal` at the organization tier — the org ADMIN
+  // template grants it, and team ADMIN reaches the same tier through the
+  // legacy team-membership union. Such a caller's own /me page listed every
+  // member's personal keys as if they were their own, and revoking one then
+  // failed, because `revokePersonal` is correctly scoped to the caller.
+  // /me is a first-person surface: always pin the principal to the session
+  // user. The org-wide sweep belongs to the admin audit surface, not here.
+  //
+  // `enabled` therefore gates on `userId` too: an enabled query with an
+  // undefined target is precisely the sweep, so the request has to wait
+  // until the session says who is asking.
+  //
+  // The `?? ""` is not cosmetic. `undefined` is the exact value that MEANS
+  // sweep, so passing it through while the session resolves would leave the
+  // whole guarantee resting on `enabled` alone — one refactor that flips a
+  // gate reopens the hole. `""` fails closed instead: it takes the
+  // `targetUserId !== undefined` branch, which is FORBIDDEN for a member and
+  // zero rows for a holder. Never the sweep.
   const personalKeysQuery = api.personalVirtualKeys.list.useQuery(
-    { organizationId: orgId },
-    { enabled: !!organization, refetchOnWindowFocus: false },
+    { organizationId: orgId, targetUserId: userId ?? "" },
+    {
+      enabled: !!organization && !!userId,
+      refetchOnWindowFocus: false,
+    },
   );
 
   const personalUsageQuery = api.user.personalUsage.useQuery(

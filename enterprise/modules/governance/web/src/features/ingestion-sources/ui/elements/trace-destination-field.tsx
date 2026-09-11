@@ -13,9 +13,10 @@
  * destination is one concept and should not read two ways.
  *
  * What this field owes the reader beyond the picker: the three consequences
- * of the choice that no other screen states. Each is a property of the
- * mechanism, not of the copy, so each is cited to the code that makes it
- * true:
+ * of the choice that no other screen states. They are carried by the (i)
+ * beside the label rather than as paragraphs under the picker — see
+ * `destinationExplanation`. Each is a property of the mechanism, not of the
+ * copy, so each is cited to the code that makes it true:
  *
  *   - the destination project's own data-privacy policy governs what is
  *     stored, resolved inside the pipeline by tenant id
@@ -31,7 +32,10 @@
  * inherit — the same reason the virtual-key drawer refuses to seed it.
  */
 
-import { Badge, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
+import { ScopeChipPicker } from "@langwatch/authz-web/surfaces/scope-picker";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import { routesConversations, type SourceType } from "../../model/ingestion-source-catalog.ts";
 
 /**
@@ -55,34 +59,29 @@ function ArchivedDestinationNotice() {
 }
 
 /**
- * The three consequences of having picked a destination, plus the fourth that
- * only exists once the source has a history. Each is a property of the
- * pipeline rather than of this screen, so each is cited in the file header to
- * the code that makes it true.
+ * Everything the choice carries, in the one place a reader goes looking for
+ * it. Stacked as paragraphs under the picker these were four consecutive
+ * greyed sentences an admin scrolled past, which is the opposite of stating
+ * them; behind the (i) they are still one click from the control they
+ * describe. See dev/docs/best_practices/copywriting.md.
+ *
+ * The last sentence is edit-only: promising that already-routed conversations
+ * stay put means nothing while composing a source that has routed none.
  */
-function PickedDestinationConsequences({ mode }: { mode: "create" | "edit" }) {
-  return (
-    <>
-      <Text fontSize="xs" color="fg.muted" data-testid="ingestion-trace-destination-redaction">
-        That project&rsquo;s data-privacy policy governs what is stored — conversations are redacted
-        on its terms, not this source&rsquo;s.
-      </Text>
-      <Text fontSize="xs" color="fg.muted" data-testid="ingestion-trace-destination-horizon">
-        Conversations from the last 31 days arrive. A conversation that started before then shows
-        only its more recent turns; the older ones are not stored.
-      </Text>
-      <Text fontSize="xs" color="fg.muted" data-testid="ingestion-trace-destination-archival">
-        If that project is later archived or deleted, this source stops receiving conversations
-        rather than failing or landing them elsewhere.
-      </Text>
-      {mode === "edit" && (
-        <Text fontSize="xs" color="fg.muted" data-testid="ingestion-trace-destination-history">
-          Conversations already routed stay where they are. Changing the destination moves nothing
-          that has landed.
-        </Text>
-      )}
-    </>
-  );
+function destinationExplanation(mode: "create" | "edit"): string {
+  const base = [
+    "The project whose trace explorer this source's conversations become readable in.",
+    "That project's data-privacy policy governs what is stored, so conversations are redacted on its terms rather than this source's.",
+    "Only conversations from the last 31 days arrive; one that started before then shows only its more recent turns, and the older ones are not stored.",
+    "If that project is later archived or deleted, this source stops receiving conversations rather than failing or landing them elsewhere.",
+    "Leaving it unset means the source still records its audit events, but nothing reaches the explorer. A destination grants no access to the source itself.",
+  ];
+  if (mode === "edit") {
+    base.push(
+      "Conversations already routed stay where they are; changing the destination moves nothing that has landed.",
+    );
+  }
+  return base.join(" ");
 }
 
 export type TraceDestinationFieldProps = {
@@ -130,26 +129,37 @@ function DestinationPicker({
   value,
   destinationArchived,
   onChange,
+  organizationId,
+  organizationName,
+  availableTeams,
   availableProjects,
-}: Pick<TraceDestinationFieldProps, "value" | "onChange" | "availableProjects"> & {
+}: Pick<
+  TraceDestinationFieldProps,
+  | "value"
+  | "onChange"
+  | "organizationId"
+  | "organizationName"
+  | "availableTeams"
+  | "availableProjects"
+> & {
   destinationArchived: boolean;
 }) {
   return (
-    <NativeSelect.Root width="full">
-      <NativeSelect.Field
-        aria-label="Destination project"
-        value={value && !destinationArchived ? value : ""}
-        onChange={(event) => onChange(event.currentTarget.value || null)}
-      >
-        <option value="">Select a project</option>
-        {availableProjects.map((project) => (
-          <option key={project.id} value={project.id}>
-            {project.name}
-          </option>
-        ))}
-      </NativeSelect.Field>
-      <NativeSelect.Indicator />
-    </NativeSelect.Root>
+    <ScopeChipPicker
+      value={
+        value && !destinationArchived ? [{ scopeType: "PROJECT" as const, scopeId: value }] : []
+      }
+      onChange={(next) => onChange(next[0]?.scopeId ?? null)}
+      organizationId={organizationId}
+      organizationName={organizationName}
+      availableTeams={availableTeams}
+      availableProjects={availableProjects}
+      allowedScopeTypes={["PROJECT"]}
+      variant="single-select"
+      label=""
+      placeholder="Select a project"
+      showSummary={false}
+    />
   );
 }
 
@@ -159,27 +169,21 @@ export function TraceDestinationField({
   onChange,
   mode,
   destinationArchived = false,
+  organizationId,
+  organizationName,
+  availableTeams,
   availableProjects,
 }: TraceDestinationFieldProps) {
   if (!routesConversations(sourceType)) return null;
 
-  const picked = value !== null && !destinationArchived;
-
   return (
     <VStack align="start" width="full" gap={1.5} data-testid="ingestion-trace-destination">
       <HStack gap={1} alignItems="center">
-        <Text fontSize="sm" fontWeight="medium">
-          Conversations land in
-        </Text>
-        <Text
-          as="span"
-          fontSize="xs"
-          color="fg.muted"
-          title="The project whose trace explorer receives this source's conversations. Leaving it unset still records audit events."
-          data-testid="ingestion-trace-destination-info"
-        >
-          ⓘ
-        </Text>
+        <SmallLabel>Conversations land in</SmallLabel>
+        <FieldInfoTooltip
+          description={destinationExplanation(mode)}
+          testId="ingestion-trace-destination-info"
+        />
       </HStack>
 
       {destinationArchived && <ArchivedDestinationNotice />}
@@ -188,6 +192,9 @@ export function TraceDestinationField({
         value={value}
         destinationArchived={destinationArchived}
         onChange={onChange}
+        organizationId={organizationId}
+        organizationName={organizationName}
+        availableTeams={availableTeams}
         availableProjects={availableProjects}
       />
 
@@ -197,8 +204,6 @@ export function TraceDestinationField({
           pick one. Its audit events are recorded either way.
         </Text>
       )}
-
-      {picked && <PickedDestinationConsequences mode={mode} />}
     </VStack>
   );
 }

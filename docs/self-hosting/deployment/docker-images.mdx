@@ -11,16 +11,16 @@ LangWatch is distributed as three Docker images, each serving a distinct role in
 
 The main application image. Used for both LangWatch App and LangWatch Workers. Handles the web UI, REST API, OTel trace ingestion, and authentication.
 
-|                |                                                                                                                                                                 |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Port**       | 5560                                                                                                                                                            |
-| **Base**       | `node:24-alpine`                                                                                                                                                |
-| **Entrypoint** | Runs pending Postgres/ClickHouse/LangWatchQL migrations, then starts the API process (`pnpm start` in `apps/api`).                                              |
-| **Workers**    | In Kubernetes, Workers run as a separate Deployment using the same image, started from `apps/worker` instead of `apps/api`. There is no in-process worker mode. |
+|                |                                                                                                     |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| **Port**       | 5560                                                                                                |
+| **Base**       | `node:24-alpine`                                                                                    |
+| **Entrypoint** | `pnpm start`                                                                                        |
+| **Workers**    | In Kubernetes, Workers run as a separate Deployment using the same image with `pnpm start:workers`. |
 
 **What it does:**
 
-- Serves the LangWatch web UI — a prebuilt Vite/React single-page app, served as static assets by the API process (no separate UI server)
+- Serves the LangWatch web UI (Next.js)
 - Exposes REST and OTel APIs for trace ingestion from SDKs
 - Handles authentication (email or SSO providers)
 - Queries ClickHouse for analytics, dashboards, and trace search
@@ -39,7 +39,7 @@ Python service for natural language processing tasks.
 
 **What it does:**
 
-- Runs Optimization Studio workflows
+- Runs workflows
 - Executes topic clustering algorithms
 - Handles custom evaluator execution
 - Processes NLP tasks (embeddings, text analysis)

@@ -1,5 +1,6 @@
 import { Box, Heading, HStack, SimpleGrid, Spinner, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-user.screen.tsx
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import { Link } from "../../../ui/elements/governance-link.tsx";
@@ -29,6 +30,22 @@ const fmtRelative = (date: TimeInput | null): string => {
   const days = Math.floor(hr / 24);
   return `${days}d ago`;
 };
+=======
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import {
+  formatRelativeTime,
+  formatUsd,
+} from "~/components/governance/PeopleTable";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
+import { Link } from "~/components/ui/link";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert } from "~/features/errors";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { getHexColorForString } from "~/utils/rotatingColors";
+>>>>>>> origin/main:platform/app/src/pages/governance/users/[id].tsx
 
 function GovernanceUserDetailPage() {
   const router = useGovernanceRouter();
@@ -61,8 +78,8 @@ function GovernanceUserDetailPage() {
               ← AI Governance
             </Link>{" "}
             ·{" "}
-            <Link href="/governance/users" color="blue.600">
-              All users
+            <Link href="/governance/people" color="blue.600">
+              People
             </Link>
           </Text>
           <HStack gap={2}>
@@ -70,7 +87,14 @@ function GovernanceUserDetailPage() {
               width="14px"
               height="14px"
               borderRadius="full"
-              backgroundColor={actor ? getHexColorForString(actor) : "fg.muted"}
+              // The filled state is a palette hue keyed off the name. The empty
+              // state was `fg.muted`, a text token, which painted the swatch at
+              // reading contrast — a near-black dot louder than the heading
+              // beside it. A swatch with no name behind it is a surface, so it
+              // takes a surface token.
+              backgroundColor={
+                actor ? getHexColorForString(actor) : "bg.emphasized"
+              }
             />
             <Heading size="md">{user?.actor ?? actor ?? "User not found"}</Heading>
           </HStack>
@@ -97,10 +121,26 @@ function GovernanceUserDetailPage() {
         ) : (
           <>
             <SimpleGrid columns={{ base: 1, md: 4 }} gap={3}>
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-user.screen.tsx
               <Stat label="Spend (30 d)" value={fmtUsd(user.spendUsd)} />
               <Stat label="Requests" value={numeral(user.requests).format("0,0")} />
               <Stat label="Last active" value={fmtRelative(user.lastActivityIso)} />
               <Stat label="Most-used" value={user.mostUsedTarget ?? "—"} />
+=======
+              <Stat
+                label="Spend, last 30 days"
+                value={formatUsd(user.spendUsd)}
+              />
+              <Stat
+                label="Requests"
+                value={numeral(user.requests).format("0,0")}
+              />
+              <Stat
+                label="Last active"
+                value={formatRelativeTime(user.lastActivityIso)}
+              />
+              <Stat label="Most used" value={user.mostUsedTarget ?? "—"} />
+>>>>>>> origin/main:platform/app/src/pages/governance/users/[id].tsx
             </SimpleGrid>
 
             <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
@@ -108,8 +148,13 @@ function GovernanceUserDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-user.screen.tsx
                 Per-day spend trend and per-model breakdown for this user will land here in a
                 follow-up.
+=======
+                Per-day spend trend and per-model breakdown for this user are
+                not available yet.
+>>>>>>> origin/main:platform/app/src/pages/governance/users/[id].tsx
               </Text>
               {personalProject && (
                 <>

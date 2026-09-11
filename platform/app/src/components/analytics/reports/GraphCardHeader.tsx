@@ -1,0 +1,298 @@
+import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Bell } from "lucide-react";
+import { useMemo } from "react";
+import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
+import { deriveSeriesIdentifier } from "~/components/analytics/seriesIdentifier";
+import { Tooltip } from "~/components/ui/tooltip";
+import { EditableWidgetName } from "~/features/custom-chart-playground/EditableWidgetName";
+import { useDrawer } from "~/hooks/useDrawer";
+import type { FilterField } from "~/server/filters/types";
+import { CHART_GRID_DRAG_HANDLE_CLASS } from "./ChartGrid";
+import { GraphCardMenu } from "./GraphCardMenu";
+import { GraphFilterIndicator } from "./GraphFilterIndicator";
+
+const stripPackPrefix = (n: string) =>
+  n.replace(/^(North-star|Legacy):\s*/, "");
+
+// Generate fallback title from graph series if name is missing
+function deriveDisplayName(name: string, graph: unknown): string {
+  if (name?.trim()) {
+    return name;
+  }
+
+  if (graph && typeof graph === "object" && "series" in graph) {
+    const graphInput = graph as CustomGraphInput;
+    if (graphInput.series && graphInput.series.length > 0) {
+      const seriesNames = graphInput.series
+        .map((s) => s.name)
+        .filter(Boolean)
+        .join(", ");
+      if (seriesNames) {
+        return seriesNames.replace(/,([^,]*)$/, " and$1");
+      }
+    }
+  }
+
+  return "Untitled Graph";
+}
+
+interface GraphCardAlertButtonProps {
+  graphId: string;
+  trigger?: {
+    id: string;
+    active: boolean;
+    alertType: string | null;
+  } | null;
+  defaultSeriesName?: string;
+}
+
+// Add-alert / edit-alert entry points for a graph.
+//
+// Both buttons open the automations drawer (the unified alert-authoring
+// flow introduced in Phase 5.1 of ADR-034) pre-filled with this chart's
+// graphId + series; the bell additionally passes `automationId` so the
+// drawer hydrates the existing trigger row in edit mode. The legacy
+// `customGraphAlert` drawer and its registry entry were removed in this
+// PR — the automations drawer is the only alert-authoring path.
+function GraphCardAlertButton({
+  graphId,
+  trigger,
+  defaultSeriesName,
+}: GraphCardAlertButtonProps) {
+  const { openDrawer } = useDrawer();
+
+  const openEditAlert = () => {
+    if (!trigger) return;
+    openDrawer("automation", {
+      automationId: trigger.id,
+      prefilledGraphId: graphId,
+      prefilledSeriesName: defaultSeriesName,
+    });
+  };
+
+  if (trigger?.active) {
+    return (
+      <Tooltip
+        content="Edit alert"
+        positioning={{ placement: "top" }}
+        showArrow
+      >
+        <Box
+          role="button"
+          aria-label="Edit alert"
+          tabIndex={0}
+          padding={1}
+          cursor="pointer"
+          color="fg"
+          onClick={(e) => {
+            e.stopPropagation();
+            openEditAlert();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              openEditAlert();
+            }
+          }}
+        >
+          <Bell width={18} />
+        </Box>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Button
+      variant="outline"
+      colorPalette="gray"
+      size="sm"
+      onClick={(e) => {
+        e.stopPropagation();
+        openDrawer("automation", {
+          prefilledGraphId: graphId,
+          prefilledSeriesName: defaultSeriesName,
+        });
+      }}
+    >
+      <Bell width={16} />
+      Add alert
+    </Button>
+  );
+}
+
+interface GraphCardTitleProps {
+  graphId: string;
+  displayName: string;
+  isDashboardWidget: boolean;
+  onRename?: (name: string) => void;
+}
+
+// Renders the widget name as an inline-editable field when this card is a
+// dashboard widget the caller wants renameable; plain static text otherwise.
+function GraphCardTitle({
+  graphId,
+  displayName,
+  isDashboardWidget,
+  onRename,
+}: GraphCardTitleProps) {
+  if (isDashboardWidget && onRename) {
+    return (
+      <EditableWidgetName
+        name={displayName}
+        displayText={stripPackPrefix(displayName)}
+        id={graphId}
+        onRename={onRename}
+        fontSize="13px"
+        fontWeight="500"
+        shouldTruncate
+      />
+    );
+  }
+
+  return (
+    <Text fontSize="13px" fontWeight="500" lineClamp={1} title={displayName}>
+      {stripPackPrefix(displayName)}
+    </Text>
+  );
+}
+
+interface GraphCardHeaderProps {
+  graphId: string;
+  name: string;
+  graph: unknown;
+  projectId: string;
+  projectSlug: string;
+  dashboardId?: string;
+  filters: unknown;
+  trigger?: {
+    id: string;
+    active: boolean;
+    alertType: string | null;
+  } | null;
+  /** Whether this card is a saved LangWatchQL chart rather than a builder graph. */
+  isWorkbenchChart?: boolean;
+  /** Whether this card is a dashboard widget. */
+  isDashboardWidget?: boolean;
+  /** The datapoint step a workbench card runs at, when it has one stored. */
+  granularitySeconds?: number;
+  /**
+   * When present, Edit runs this instead of navigating away — passed
+   * straight through to `GraphCardMenu`.
+   */
+  onEdit?: () => void;
+  /**
+   * Renames the widget directly from the card title. Only meaningful when
+   * `isDashboardWidget` — the title stays plain, static text otherwise.
+   */
+  onRename?: (name: string) => void;
+  onGranularityChange?: (granularitySeconds: number) => void;
+  onDelete: () => void;
+  isDeleting: boolean;
+}
+
+export function GraphCardHeader({
+  graphId,
+  name,
+  graph,
+  projectId,
+  projectSlug,
+  dashboardId,
+  filters,
+  trigger,
+  isWorkbenchChart = false,
+  isDashboardWidget = false,
+  granularitySeconds,
+  onEdit,
+  onRename,
+  onGranularityChange,
+  onDelete,
+  isDeleting,
+}: GraphCardHeaderProps) {
+  const displayName = useMemo(
+    () => deriveDisplayName(name, graph),
+    [name, graph],
+  );
+
+  // The dashboard chart doesn't expose an interactive "currently selected
+  // series" — every series is rendered together. Default the alert author
+  // to the first series and let them switch inside the drawer if they want
+  // a different one. Encoded in the canonical id format the threshold
+  // dispatcher reads.
+  const defaultSeriesName = useMemo(
+    () => deriveSeriesIdentifier(graph, 0),
+    [graph],
+  );
+
+  const hasFilters = useMemo(
+    () =>
+      !!(
+        filters &&
+        typeof filters === "object" &&
+        Object.keys(filters).length > 0
+      ),
+    [filters],
+  );
+
+  // Check if this is a saved graph (has valid database ID).
+  //
+  // A workbench chart or dashboard widget is excluded on purpose rather than
+  // by accident: the alert path reads a builder payload's `series` to name
+  // what it is thresholding, and neither a saved statement nor a sandboxed
+  // author-code widget has a series to read. Offering the bell here would
+  // author an alert against a chart the threshold dispatcher cannot evaluate.
+  const isSavedGraph =
+    !isWorkbenchChart &&
+    !isDashboardWidget &&
+    !!(graphId && graphId !== "custom" && graph);
+
+  return (
+    // The header is the card's drag handle — the grid only starts a move
+    // from this class, so the chart body below never does.
+    <HStack
+      className={CHART_GRID_DRAG_HANDLE_CLASS}
+      align="center"
+      marginBottom={1}
+      cursor="grab"
+      _active={{ cursor: "grabbing" }}
+    >
+      <GraphCardTitle
+        graphId={graphId}
+        displayName={displayName}
+        isDashboardWidget={isDashboardWidget}
+        {...(onRename ? { onRename } : {})}
+      />
+      <Spacer />
+
+      {isSavedGraph && (
+        <GraphCardAlertButton
+          graphId={graphId}
+          trigger={trigger}
+          defaultSeriesName={defaultSeriesName}
+        />
+      )}
+
+      {hasFilters && (
+        <GraphFilterIndicator
+          filters={
+            filters as Record<FilterField, string[] | Record<string, string[]>>
+          }
+        />
+      )}
+
+      <GraphCardMenu
+        graphId={graphId}
+        projectId={projectId}
+        projectSlug={projectSlug}
+        dashboardId={dashboardId}
+        isWorkbenchChart={isWorkbenchChart}
+        isDashboardWidget={isDashboardWidget}
+        {...(granularitySeconds === undefined ? {} : { granularitySeconds })}
+        {...(onEdit ? { onEdit } : {})}
+        {...(onGranularityChange ? { onGranularityChange } : {})}
+        onDelete={onDelete}
+        isDeleting={isDeleting}
+      />
+    </HStack>
+  );
+}

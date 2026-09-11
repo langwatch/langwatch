@@ -30,6 +30,7 @@ Project-specific Claude Code configuration for LangWatch.
 │   ├── langwatch-kanban/     # Manage LangWatch GitHub project board
 │   ├── lint-rule/            # Add or change a langwatch oxlint rule
 │   ├── mail-template/        # Add or change a transactional email
+│   ├── merge-drive/          # Carry a long conflicted merge of main into a restructuring branch
 │   ├── module/               # Build or change a module: new, extend, convert, wire, move, web-surface
 │   │   └── references/       # One reference per task; SKILL.md routes to them
 │   ├── module-review/        # Audit a module, a directory, a diff or a branch, and for over-abstraction

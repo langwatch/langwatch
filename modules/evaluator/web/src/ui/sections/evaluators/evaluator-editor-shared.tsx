@@ -5,9 +5,16 @@ import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
+<<<<<<< HEAD:modules/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx
 
 import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
 import { Link } from "@langwatch/ui-host/link";
+=======
+import DynamicZodForm from "~/components/checks/DynamicZodForm";
+import { Link } from "~/components/ui/link";
+import { Switch } from "~/components/ui/switch";
+import { Tooltip } from "~/components/ui/tooltip";
+>>>>>>> origin/main:platform/app/src/components/evaluators/EvaluatorEditorShared.tsx
 import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
@@ -68,6 +75,24 @@ export type EvaluatorMappingsConfig = {
   onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
 };
 
+/**
+ * Whether a failing result of this evaluator fails what it is attached to.
+ *
+ * An evaluator that produces a pass or fail verdict can be required. A score
+ * only evaluator reports and never gates, so its switch stays off and
+ * disabled.
+ */
+export type EvaluatorGateConfig = {
+  required: boolean;
+  canRequire: boolean;
+};
+
+export const REQUIRED_TO_PASS_LABEL = "Required to pass";
+export const REQUIRED_TO_PASS_COPY =
+  "A failing required evaluator fails the scenario. An unrequired one reports its result beside the verdict.";
+export const SCORE_ONLY_COPY = "Scores report, they do not gate.";
+export const REMOVE_EVALUATOR_LABEL = "Remove evaluator";
+
 export type EvaluatorEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
@@ -82,7 +107,24 @@ export type EvaluatorEditorDrawerProps = {
   mappingsConfig?: EvaluatorMappingsConfig;
   saveButtonText?: string;
   onLocalConfigChange?: (config: LocalEvaluatorConfig | undefined) => void;
+<<<<<<< HEAD:modules/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx
   onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
+=======
+  onMappingChange?: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
+  ) => void;
+  /**
+   * The gate of the attachment this evaluator is opened for. Present only
+   * when the evaluator is attached to something that runs it after each
+   * scenario, which is where a required pass or fail means anything.
+   */
+  gate?: EvaluatorGateConfig;
+  /** Called when the required switch is flipped. Flows through setFlowCallbacks. */
+  onRequiredChange?: (required: boolean) => void;
+  /** Called when the attachment is taken off. Flows through setFlowCallbacks. */
+  onRemove?: () => void;
+>>>>>>> origin/main:platform/app/src/components/evaluators/EvaluatorEditorShared.tsx
   initialLocalConfig?: LocalEvaluatorConfig;
   /**
    * Comparison drawer context. Non-serializable; flows through complexProps.
@@ -146,7 +188,19 @@ export type EvaluatorEditorController = {
   /** The live comparison draft, mirrored from ComparisonConfigForm. */
   comparison: ComparisonEvaluatorConfig;
   onComparisonChange: ((config: ComparisonEvaluatorConfig) => void) | undefined;
+<<<<<<< HEAD:modules/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx
   onLocalConfigChange: ((config: LocalEvaluatorConfig | undefined) => void) | undefined;
+=======
+  onLocalConfigChange:
+    | ((config: LocalEvaluatorConfig | undefined) => void)
+    | undefined;
+  /** The gate of the attachment, when the editor is open on one. */
+  gate: EvaluatorGateConfig | undefined;
+  /** Whether the attachment is required right now, as the switch shows it. */
+  required: boolean;
+  onRequiredChange: ((required: boolean) => void) | undefined;
+  onRemove: (() => void) | undefined;
+>>>>>>> origin/main:platform/app/src/components/evaluators/EvaluatorEditorShared.tsx
   title: string;
   handleSave: () => void;
   handleClose: () => void;
@@ -223,7 +277,32 @@ export function useEvaluatorEditorController(
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
 
+<<<<<<< HEAD:modules/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx
   const onLocalConfigChange = props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
+=======
+  const gate =
+    props.gate ?? (complexProps.gate as EvaluatorGateConfig | undefined);
+  const onRequiredChange =
+    props.onRequiredChange ?? flowCallbacks?.onRequiredChange;
+  const onRemove = props.onRemove ?? flowCallbacks?.onRemove;
+  // The switch flips right away; the attachment behind it follows through
+  // the callback, the way a mapping does.
+  const [required, setRequired] = useState(gate?.required ?? false);
+  const gateRequired = gate?.required;
+  useEffect(() => {
+    setRequired(gateRequired ?? false);
+  }, [gateRequired]);
+  const handleRequiredChange = useCallback(
+    (next: boolean) => {
+      setRequired(next);
+      onRequiredChange?.(next);
+    },
+    [onRequiredChange],
+  );
+
+  const onLocalConfigChange =
+    props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
+>>>>>>> origin/main:platform/app/src/components/evaluators/EvaluatorEditorShared.tsx
   const initialLocalConfig =
     props.initialLocalConfig ??
     (complexProps.initialLocalConfig as LocalEvaluatorConfig | undefined);
@@ -636,6 +715,10 @@ export function useEvaluatorEditorController(
     comparison,
     onComparisonChange: onComparisonChange ? handleComparisonChange : undefined,
     onLocalConfigChange,
+    gate,
+    required,
+    onRequiredChange: onRequiredChange ? handleRequiredChange : undefined,
+    onRemove,
     title,
     handleSave,
     handleClose,
@@ -643,6 +726,47 @@ export function useEvaluatorEditorController(
     handleApply,
     flushLocalConfig,
   };
+}
+
+/**
+ * Whether a failing result fails the scenario. Shown under the mappings when
+ * the editor is open on an attachment, so the gate is set where the inputs
+ * are, and a score only evaluator says why it cannot gate.
+ */
+export function EvaluatorGateSection({
+  gate,
+  required,
+  onRequiredChange,
+}: {
+  gate: EvaluatorGateConfig;
+  required: boolean;
+  onRequiredChange: ((required: boolean) => void) | undefined;
+}) {
+  const checked = gate.canRequire && required;
+  return (
+    <HStack
+      align="flex-start"
+      gap={3}
+      paddingTop={4}
+      data-testid="evaluator-gate-section"
+    >
+      <VStack align="stretch" gap={0.5} flex={1} minWidth={0}>
+        <Text fontSize="sm" fontWeight="medium">
+          {REQUIRED_TO_PASS_LABEL}
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          {gate.canRequire ? REQUIRED_TO_PASS_COPY : SCORE_ONLY_COPY}
+        </Text>
+      </VStack>
+      <Switch
+        checked={checked}
+        disabled={!gate.canRequire || !onRequiredChange}
+        onCheckedChange={({ checked: next }) => onRequiredChange?.(next)}
+        aria-label={REQUIRED_TO_PASS_LABEL}
+        inputProps={{ "data-testid": "evaluator-required-switch" }}
+      />
+    </HStack>
+  );
 }
 
 // ============================================================================
@@ -668,6 +792,9 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
     expectsComparisonContext,
     comparison,
     onComparisonChange,
+    gate,
+    required,
+    onRequiredChange,
   } = controller;
 
   // Comparison: render the variants+golden picker instead of the generic
@@ -794,6 +921,14 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
             />
           </Box>
         )}
+
+        {gate && (
+          <EvaluatorGateSection
+            gate={gate}
+            required={required}
+            onRequiredChange={onRequiredChange}
+          />
+        )}
       </VStack>
     </FormProvider>
   );
@@ -809,7 +944,71 @@ export type EvaluatorEditorFooterProps = {
   onCancel?: () => void;
 };
 
+<<<<<<< HEAD:modules/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx
 export function EvaluatorEditorFooter({ controller, onCancel }: EvaluatorEditorFooterProps) {
+=======
+/** Whether the save/apply button is disabled: an invalid name, or already saving. */
+function isSaveDisabled({
+  isValid,
+  isSaving,
+}: {
+  isValid: boolean;
+  isSaving: boolean;
+}): boolean {
+  return !isValid || isSaving;
+}
+
+/**
+ * Whether Apply is disabled. Only a comparison editor mirrors its config
+ * into the store live, so only there does an unrunnable (sub-2-variant)
+ * config need Apply gated — every other local-config evaluator, such as an
+ * unnamed LLM judge, keeps Apply always enabled.
+ */
+function isApplyDisabled({
+  isComparisonEditor,
+  isValid,
+  isSaving,
+}: {
+  isComparisonEditor: boolean;
+  isValid: boolean;
+  isSaving: boolean;
+}): boolean {
+  return isComparisonEditor && isSaveDisabled({ isValid, isSaving });
+}
+
+/**
+ * The button that takes the attachment off, when the editor is open on one,
+ * and the spacer that pins it to its own side of the footer.
+ */
+export function FooterRemoveArea({
+  onRemove,
+  hasSpacer,
+}: {
+  onRemove: (() => void) | undefined;
+  hasSpacer: boolean;
+}) {
+  if (!onRemove) return null;
+  return (
+    <>
+      <Button
+        variant="ghost"
+        colorPalette="red"
+        size="sm"
+        onClick={onRemove}
+        data-testid="evaluator-remove-button"
+      >
+        {REMOVE_EVALUATOR_LABEL}
+      </Button>
+      {hasSpacer && <Spacer />}
+    </>
+  );
+}
+
+export function EvaluatorEditorFooter({
+  controller,
+  onCancel,
+}: EvaluatorEditorFooterProps) {
+>>>>>>> origin/main:platform/app/src/components/evaluators/EvaluatorEditorShared.tsx
   const {
     evaluatorId,
     hasUnsavedChanges,
@@ -818,12 +1017,14 @@ export function EvaluatorEditorFooter({ controller, onCancel }: EvaluatorEditorF
     saveButtonText,
     onLocalConfigChange,
     onComparisonChange,
+    onRemove,
     handleSave,
     handleDiscard,
     handleApply,
     handleClose,
   } = controller;
 
+<<<<<<< HEAD:modules/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx
   return (
     <EvaluatorEditorActions
       mode={onLocalConfigChange ? "local" : "persisted"}
@@ -838,6 +1039,70 @@ export function EvaluatorEditorFooter({ controller, onCancel }: EvaluatorEditorF
       onApply={handleApply}
       onCancel={onCancel ?? handleClose}
     />
+=======
+  const isComparisonEditor = !!onComparisonChange;
+  const saveDisabled = isSaveDisabled({ isValid, isSaving });
+  const applyDisabled = isApplyDisabled({
+    isComparisonEditor,
+    isValid,
+    isSaving,
+  });
+
+  if (onLocalConfigChange) {
+    return (
+      <HStack width="full">
+        <FooterRemoveArea onRemove={onRemove} hasSpacer={false} />
+        {hasUnsavedChanges && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDiscard}
+            data-testid="evaluator-discard-button"
+          >
+            Discard
+          </Button>
+        )}
+        <Spacer />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSave}
+          disabled={saveDisabled}
+          loading={isSaving}
+          data-testid="evaluator-save-button"
+        >
+          Save
+        </Button>
+        <Button
+          colorPalette="blue"
+          size="sm"
+          onClick={handleApply}
+          disabled={applyDisabled}
+          data-testid="evaluator-apply-button"
+        >
+          Apply
+        </Button>
+      </HStack>
+    );
+  }
+
+  return (
+    <HStack gap={3} width={onRemove ? "full" : undefined}>
+      <FooterRemoveArea onRemove={onRemove} hasSpacer={true} />
+      <Button variant="outline" onClick={onCancel ?? handleClose}>
+        Cancel
+      </Button>
+      <Button
+        colorPalette="green"
+        onClick={handleSave}
+        disabled={saveDisabled}
+        loading={isSaving}
+        data-testid="save-evaluator-button"
+      >
+        {saveButtonText ?? (evaluatorId ? "Save Changes" : "Create Evaluator")}
+      </Button>
+    </HStack>
+>>>>>>> origin/main:platform/app/src/components/evaluators/EvaluatorEditorShared.tsx
   );
 }
 

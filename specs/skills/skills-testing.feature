@@ -30,12 +30,20 @@ Feature: Scenario tests for skills quality assurance
   # Test infrastructure
   # ──────────────────────────────────────────────────
 
-  Scenario: Claude Code agent adapter exists for skill testing
-    Given a reusable Claude Code agent adapter exists in skills/_tests/
-    Then it spawns Claude Code with the skill loaded
+  Scenario: The skill tests drive Claude Code through the Scenario SDK adapter
+    Given the tests build their agent with claudeCodeAgent from @langwatch/scenario
+    Then it spawns Claude Code with the installed skills pointed at from CLAUDE.md
     And it makes the locally-built `langwatch` CLI available on PATH (so new commands like `docs` and `scenario-docs` are exercised)
     And it runs in a temporary directory with the fixture codebase
-    And it captures Claude Code's output for assertion
+    And it returns each turn as messages with tool-call and tool-result parts, so the judge and the run view see what the agent ran
+    And it keeps the batch id of the suite and the keys a test withholds out of the agent's environment
+
+  @integration
+  Scenario: No Claude Code process outlives the test harness
+    Given a scenario test is running Claude Code
+    When the vitest worker that spawned it is killed
+    Then Claude Code and every process it started are stopped
+    And nothing is left running under pid 1 from that test
 
   Scenario: Fixture codebases cover the framework matrix
     Given fixture codebases exist for the key combinations:

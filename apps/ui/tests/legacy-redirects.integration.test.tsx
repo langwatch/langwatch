@@ -54,6 +54,7 @@ function renderRouterAt(initialEntries: string[]) {
       element: <UiPrefixRedirect from="/governance/cost-centers" to="/governance/people" />,
     },
     { path: "/governance/people", element: <div>people</div> },
+    { path: "/governance/users/:id", element: <div>user detail</div> },
     { path: "/governance/inventory", element: <div>inventory page</div> },
     {
       path: "/governance/inventory/:id",
@@ -259,6 +260,50 @@ describe("legacy governance redirects", () => {
         expect(router.state.location.pathname).toBe("/governance/inventory");
       });
       expect(router.state.location.search).toBe("");
+    });
+  });
+
+  describe("when the retired anomaly rules address is cold-loaded", () => {
+    // The redirect is unchanged and still pins the tab it was written for.
+    // That tab has since been removed from the inventory, so the pinned value
+    // now degrades to the Catalog pane rather than selecting nothing; the tab
+    // shell's own test covers where it lands. Repointing this redirect at the
+    // rules' eventual home is a routing change and is not made here.
+    /** @scenario "The retired anomaly rules address still resolves" */
+    it("lands on the inventory and replaces the history entry", async () => {
+      const router = renderRouterAt(["/start", "/governance/anomaly-rules"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=anomaly-rules");
+
+      await act(async () => {
+        await router.navigate(-1);
+      });
+      expect(router.state.location.pathname).toBe("/start");
+    });
+  });
+
+  describe("when the retired users listing address is cold-loaded", () => {
+    /** @scenario "The retired users listing address lands on the People tab" */
+    it("lands on the people page with the People tab pinned", async () => {
+      const router = renderRouterAt(["/governance/users?range=30d"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/people");
+      });
+      expect(router.state.location.search).toBe("?range=30d&tab=people");
+    });
+
+    /** @scenario "A user detail deep link keeps its own page" */
+    it("leaves the per-user detail address alone", async () => {
+      const router = renderRouterAt(["/governance/users/user_123"]);
+
+      expect(router.state.location.pathname).toBe("/governance/users/user_123");
+      await waitFor(() => {
+        expect(document.body.textContent).toContain("user detail");
+      });
     });
   });
 

@@ -11,6 +11,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import {
   isAgentTarget,
+  notRunnableCopy,
   type ScenarioAgent,
   useFilteredAgents,
 } from "../../../behavior/scenarios/use-filtered-scenario-targets.ts";
@@ -319,7 +320,7 @@ function AgentRow({
 
   if (agent.isRunnable) return row;
   return (
-    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
+    <Tooltip content={notRunnableCopy(agent)}>
       <Box>{row}</Box>
     </Tooltip>
   );

@@ -161,6 +161,8 @@ WORKDIR /src/sdks/typescript
 COPY modules/trace/contract/src/trace-format.schemas.ts /src/modules/trace/contract/src/trace-format.schemas.ts
 COPY modules/evaluator/contract/src/evaluators.native.ts /src/modules/evaluator/contract/src/evaluators.native.ts
 COPY modules/model-provider/contract/src/catalog/model-catalog.json /src/modules/model-provider/contract/src/catalog/model-catalog.json
+COPY modules/scenario/contract/src/suite-fields.ts /src/modules/scenario/contract/src/suite-fields.ts
+COPY modules/scenario/contract/src/evaluator-attachments.ts /src/modules/scenario/contract/src/evaluator-attachments.ts
 COPY packages/redaction/src                           /src/packages/redaction/src
 COPY apps/api/src/features/discovery/openapi-document.json /src/apps/api/src/features/discovery/openapi-document.json
 COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts

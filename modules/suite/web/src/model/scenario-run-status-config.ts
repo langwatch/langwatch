@@ -75,8 +75,15 @@ export const SCENARIO_RUN_STATUS_CONFIG: Record<ScenarioRunStatus, ScenarioRunSt
     isComplete: false,
     fgColor: "blue.fg",
   },
+  [ScenarioRunStatus.PENDING_EVALUATION]: {
+    colorPalette: "blue",
+    label: "evaluating",
+    isComplete: false,
+    fgColor: "blue.fg",
+  },
 };
 
+<<<<<<< HEAD:modules/suite/web/src/model/scenario-run-status-config.ts
 export const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> = {
   [ScenarioRunStatus.SUCCESS]: Check,
   [ScenarioRunStatus.FAILED]: XCircle,
@@ -88,3 +95,18 @@ export const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> = 
   [ScenarioRunStatus.QUEUED]: Clock,
   [ScenarioRunStatus.RUNNING]: Clock,
 };
+=======
+export const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> =
+  {
+    [ScenarioRunStatus.SUCCESS]: Check,
+    [ScenarioRunStatus.FAILED]: XCircle,
+    [ScenarioRunStatus.ERROR]: XCircle,
+    [ScenarioRunStatus.CANCELLED]: XCircle,
+    [ScenarioRunStatus.STALLED]: AlertTriangle,
+    [ScenarioRunStatus.IN_PROGRESS]: Clock,
+    [ScenarioRunStatus.PENDING]: Clock,
+    [ScenarioRunStatus.QUEUED]: Clock,
+    [ScenarioRunStatus.RUNNING]: Clock,
+    [ScenarioRunStatus.PENDING_EVALUATION]: Clock,
+  };
+>>>>>>> origin/main:platform/app/src/components/simulations/scenario-run-status-config.ts

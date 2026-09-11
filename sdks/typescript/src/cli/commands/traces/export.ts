@@ -1,15 +1,16 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { createSpinner } from "../../utils/spinner.ts";
 import fs from "fs";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
-import { cliAuthHeaders } from "../../utils/authHeaders";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { createCommandEvents, type CommandEvents } from "../../telemetry/events.ts";
+import { cliAuthHeaders } from "../../utils/authHeaders.ts";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { parseOriginOption } from "./origin-filter";
+import { parseOriginOption } from "./origin-filter.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Rows are serialised in chunks so the progress bar moves as the file is built. */
 const PROGRESS_CHUNK = 25;
@@ -117,7 +118,7 @@ export const exportTracesCommand = async (options: {
         options.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP,
       );
 
-      const response = await fetch(`${endpoint}/api/v1/traces/search`, {
+      const response = await langwatchFetch(`${endpoint}/api/v1/traces/search`, {
         method: "POST",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         headers: {

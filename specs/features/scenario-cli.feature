@@ -96,6 +96,33 @@ Feature: Scenario CLI Commands
     And no scenario is created
 
   @unit
+  Scenario: Create a scenario with field values coerced by the suite
+    Given the test suite "Case lookups" declares golden_sql as text and row_limit as number
+    When I run "langwatch scenario create 'Chargebacks' --situation '...' --test-suite 'Case lookups' --field golden_sql='SELECT 1' --field row_limit=10"
+    Then the scenario is created with golden_sql as the text and row_limit as the number 10
+
+  @unit
+  Scenario: A field value the suite does not declare is refused
+    Given the test suite "Case lookups" declares golden_sql
+    When I run "langwatch scenario create 'Chargebacks' --situation '...' --test-suite 'Case lookups' --field golden=SELECT"
+    Then the command refuses the flag naming the fields the suite declares
+    And no scenario is created
+
+  @unit
+  Scenario: A field value that does not read as its type is refused
+    Given the test suite "Case lookups" declares row_limit as number
+    When I run "langwatch scenario create 'Chargebacks' --situation '...' --test-suite 'Case lookups' --field row_limit=ten"
+    Then the command refuses the flag naming the field's type
+    And no scenario is created
+
+  @unit
+  Scenario: Update the field values of a scenario in place
+    Given a scenario filed in a test suite that declares golden_sql
+    When I run "langwatch scenario update <id> --field golden_sql='SELECT 2'"
+    Then the suite the scenario is in is read for its field types
+    And the scenario is updated with the new values and nothing else
+
+  @unit
   Scenario: Combining --test-suite and --no-test-suite is rejected
     When I run "langwatch scenario update <scenario-id> --test-suite suite_abc --no-test-suite"
     Then I see an error that the two options cannot be used together

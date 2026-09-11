@@ -6,7 +6,10 @@ import {
   Button,
   Heading,
   HStack,
+<<<<<<< HEAD:enterprise/modules/governance/web/src/features/source-events/ui/sections/source-events-table.tsx
   NativeSelect,
+=======
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/components/SourceEventsTable.tsx
   Skeleton,
   Table,
   Text,
@@ -298,6 +301,7 @@ function EventsTableBody({ pager }: { pager: SourceEventsPager<SourceEventRowDat
 export function SourceEventsTable({
   pager,
   emptyState,
+<<<<<<< HEAD:enterprise/modules/governance/web/src/features/source-events/ui/sections/source-events-table.tsx
   presentation,
 }: {
   pager: SourceEventsPager<SourceEventRowData>;
@@ -312,13 +316,37 @@ export function SourceEventsTable({
       <EventsTableBody pager={pager} />
     </Table.Body>
   );
+=======
+  headerAside,
+}: {
+  pager: SourceEventsPager<SourceEventRowData>;
+  emptyState: ReactNode;
+  /**
+   * Something to hang beside the heading — in practice the (i) that carries
+   * this source's setup instructions. It sits here rather than inside the
+   * empty state because those instructions are worth reading whether or not
+   * events have arrived, and an admin debugging a source that IS delivering
+   * would otherwise have no way to reach them.
+   *
+   * The table takes it as a node because the instructions are per-source and
+   * this component deliberately knows nothing about sources.
+   */
+  headerAside?: ReactNode;
+}) {
+  // "Click a row for the raw and normalised records" describes rows that are
+  // not there in the empty state, and the empty pane says its own piece.
+  const isEmpty = pager.status === "ready" && pager.loadedCount === 0;
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/components/SourceEventsTable.tsx
   return (
     <VStack align="stretch" gap={3}>
       <VStack align="start" gap={1}>
-        <Heading as="h3" size="sm">
-          Events
-        </Heading>
-        {pager.status !== "error" && (
+        <HStack gap={1}>
+          <Heading as="h3" size="sm">
+            Events
+          </Heading>
+          {headerAside}
+        </HStack>
+        {pager.status !== "error" && !isEmpty && (
           <Text fontSize="sm" color="fg.muted">
             Every OCSF-normalised event from this source, newest first. Click a row for the raw and
             normalised records.
@@ -327,8 +355,16 @@ export function SourceEventsTable({
       </VStack>
 
       {pager.status === "error" ? (
+<<<<<<< HEAD:enterprise/modules/governance/web/src/features/source-events/ui/sections/source-events-table.tsx
         renderError(pager.error, "Couldn't load this source's events")
       ) : pager.status === "ready" && pager.loadedCount === 0 ? (
+=======
+        <HandledErrorAlert
+          error={pager.error}
+          fallbackTitle="Couldn't load this source's events"
+        />
+      ) : isEmpty ? (
+>>>>>>> origin/main:platform/app/ee/governance/dashboard/components/SourceEventsTable.tsx
         emptyState
       ) : (
         <Box>

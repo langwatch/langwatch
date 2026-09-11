@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import type { GovernanceSourceType } from "@langwatch/enterprise-governance-contract";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Switch } from "@langwatch/design-system/switch";
 import { useMemo, useState } from "react";
+import { DashboardSelect } from "../../DashboardSelect.tsx";
 import {
   cronFromPullParts,
   type PullCadenceParts,
@@ -26,6 +28,16 @@ const WEEKDAY_OPTIONS = [
 
 const timeOfDay = (input: { hour: number; minute: number }): string =>
   `${String(input.hour).padStart(2, "0")}:${String(input.minute).padStart(2, "0")}`;
+
+/**
+ * Everything the picker itself does not already say. The recommendation is
+ * worth stating because leaving the field alone is the right answer for
+ * almost everyone, and the timezone because the scheduler stores a bare cron
+ * with no zone — there is no picker for it, so nothing else on the screen
+ * would tell an admin which midnight "every day at 00:00" means.
+ */
+const CADENCE_EXPLANATION =
+  "How often we check this source for new activity. Leave it as it is to use the schedule we recommend for this source type. Schedules run in UTC.";
 
 /** One flat select collapses frequency + minute interval: "every 15
  *  minutes" is one thought to an admin, not two controls. */
@@ -148,19 +160,12 @@ function CadenceFrequencyPicker({
       <HStack gap={3} align="flex-start">
         <Field.Root flex="1">
           <Field.Label fontSize="xs">Frequency</Field.Label>
-          <NativeSelect.Root size="sm">
-            <NativeSelect.Field
-              value={choiceFromParts(parts)}
-              onChange={(e) => onPickChoice(e.target.value)}
-            >
-              {FREQUENCY_CHOICES.map((choice) => (
-                <option key={choice.value} value={choice.value}>
-                  {choice.label}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
+          <DashboardSelect
+            ariaLabel="Frequency"
+            options={FREQUENCY_CHOICES}
+            value={choiceFromParts(parts)}
+            onChange={onPickChoice}
+          />
         </Field.Root>
 
         {parts.frequency === "hourly" ? (
@@ -191,20 +196,21 @@ function CadenceFrequencyPicker({
   );
 }
 
+/**
+ * What the typed cron actually does, in words.
+ *
+ * Only rendered in cron mode, and that asymmetry is the point: the frequency
+ * select already reads "Every hour", so a sentence under it saying "checks for
+ * new activity every hour" is a second copy of the answer the admin is looking
+ * at. Five cron fields read as nothing at all, so there the sentence is the
+ * only feedback the input can give.
+ */
 function CadenceSummary({ effectiveCron }: { effectiveCron: string }) {
   const summaryParts = partsFromPullCron(effectiveCron);
   return (
-    <>
-      <Text fontSize="xs" color="fg.muted">
-        {summaryParts
-          ? summarizePullCadence(summaryParts)
-          : `Runs on the schedule ${effectiveCron}`}
-      </Text>
-      <Text fontSize="xs" color="fg.muted">
-        How often we check this source for new activity. Leave as-is to use the recommended
-        schedule.
-      </Text>
-    </>
+    <Text fontSize="xs" color="fg.muted" data-testid="cadence-summary">
+      {summaryParts ? summarizePullCadence(summaryParts) : `Runs on the schedule ${effectiveCron}`}
+    </Text>
   );
 }
 
@@ -276,9 +282,14 @@ export function PullCadenceField({
   return (
     <VStack align="stretch" gap={3}>
       <HStack justify="space-between" gap={2}>
-        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-          Cadence
-        </Text>
+        {/* The explanation sits behind the (i), never under the input — see
+            dev/docs/best_practices/copywriting.md. */}
+        <HStack gap={0} alignItems="center">
+          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+            Cadence
+          </Text>
+          <FieldInfoTooltip description={CADENCE_EXPLANATION} testId="cadence-field-info" />
+        </HStack>
         <HStack gap={2}>
           <Text fontSize="xs" color="fg.muted">
             Edit as a cron expression
@@ -307,7 +318,7 @@ export function PullCadenceField({
         />
       )}
 
-      <CadenceSummary effectiveCron={effectiveCron} />
+      {isCronMode && <CadenceSummary effectiveCron={effectiveCron} />}
     </VStack>
   );
 }

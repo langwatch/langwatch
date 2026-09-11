@@ -105,7 +105,7 @@ export const refusalIsAHandledErrorRule = defineRule({
     handWrittenRefusal: {
       what: "A refusal is written as a status and a body ({{shape}}).",
       why: "Nothing hand-rendered reaches the error boundary, so the answer carries no code: the client presentation registry has nothing to key the customer's words on, and a test can only assert prose that will change.",
-      fix: "Throw a `HandledError` with a stable code and let the boundary render it",
+      fix: "Throw a `HandledError` with a stable code and let the boundary render it, and give that code an entry in `packages/handled-error/src/presentation.ts` so the customer reads words instead of the slug.",
     },
   },
   applies: isServerTransport,

@@ -2,6 +2,7 @@ import {
   AGENT_TEST_SET_SUFFIX,
   RUN_ACTOR_LABELS,
   type RunActor,
+  VOICE_CALL_SCENARIO_SET_ID,
 } from "@langwatch/scenario-contract";
 import type {
   SimulationBatchHistory,
@@ -13,6 +14,10 @@ import type {
 } from "@langwatch/scenario-contract";
 import { SimulationRunStatus } from "@langwatch/scenario-contract";
 import { Buffer } from "node:buffer";
+import {
+  EVALUATION_COLUMNS_SQL,
+  EVALUATION_LIST_COLUMNS_SQL,
+} from "./simulation-evaluations.columns.ts";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -93,19 +98,27 @@ const EXPORT_SORT_KEY = "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt)
  * RUNNING belong beside PENDING/IN_PROGRESS since the queue writes them and
  * a batch holding any of the four is not finished.
  */
-const RUNNING_STATUSES = "'IN_PROGRESS','PENDING','QUEUED','RUNNING'";
+const RUNNING_STATUSES =
+  "'IN_PROGRESS','PENDING','PENDING_EVALUATION','QUEUED','RUNNING'";
 
 /**
- * Leaves the "Test agent" runs out of a list. They are one-off checks of an
- * agent, not results of a scenario, so no set list, batch list or last-result
- * summary shows them. A run is still read by its own id.
+ * Leaves out runs that are not results of a scenario: the "Test agent" one-off
+ * checks, and the legacy `voice-calls` set that pre-#8020 drawer "Talk to it"
+ * calls landed in (a drawer call no longer writes a run at all). No set list,
+ * batch list or last-result summary shows them. A run is still read by its own
+ * id, so a direct link to an old voice-call run still opens.
  */
-const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}')`;
+const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}') AND ScenarioSetId != '${VOICE_CALL_SCENARIO_SET_ID}'`;
 
 /**
- * Batch-level aggregate SELECT list shared by the batch history page and
- * the single-batch summary, so the two cannot drift. SettledCount is the
- * complement of RUNNING_STATUSES (never a terminal-name list) since a raw FAILURE status the terminal enum doesn't carry would else report forever-unfinished.
+ * Batch-level aggregate SELECT list, shared by the batch history page and the
+ * single-batch summary so the two queries cannot drift.
+ *
+ * SettledCount is the complement of RUNNING_STATUSES, never a list of terminal
+ * names: ClickHouse stores a raw FAILURE status that the terminal status enum
+ * does not carry, so a positive list would report a failed batch as unfinished
+ * forever. A run stored PENDING_EVALUATION counts as running, so a batch is
+ * complete only once every run has been graded.
  */
 const BATCH_AGGREGATE_COLUMNS = `BatchRunId,
         toString(count())                                               AS TotalCount,
@@ -151,6 +164,7 @@ const RUN_COLUMNS = `
   \`Messages.TraceId\`, \`Messages.Rest\`,
   TraceIds,
   Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
+  ${EVALUATION_COLUMNS_SQL},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
@@ -178,6 +192,7 @@ const LIST_COLUMNS = `
   CAST(NULL AS Nullable(String)) AS Reasoning,
   MetCriteria, UnmetCriteria,
   CAST(NULL AS Nullable(String)) AS Error,
+  ${EVALUATION_LIST_COLUMNS_SQL},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
@@ -1215,7 +1230,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
     const wherePredicate =
       filter === "external"
-        ? "AND NOT startsWith(ScenarioSetId, '__internal__')"
+        ? `AND NOT startsWith(ScenarioSetId, '__internal__') ${AGENT_TEST_SET_EXCLUSION}`
         : "AND startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite')";
 
     // External sets normalize empty ScenarioSetId to 'default'
@@ -1241,8 +1256,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          SELECT
            NormalizedSetId,
            BatchRunId,
-           -- Settled = all terminal states (excludes in-progress/queued)
-           countIf(Status NOT IN ('IN_PROGRESS', 'PENDING', 'QUEUED', 'RUNNING')) AS SettledCount,
+           -- Settled is the complement of the running statuses, the same
+           -- list the batch aggregate uses, so a set and its batches agree.
+           countIf(Status NOT IN (${RUNNING_STATUSES})) AS SettledCount,
            countIf(Status = 'SUCCESS') AS PassCount,
            countIf(Status IN ('FAILED','FAILURE','ERROR','STALLED','CANCELLED')) AS FailCount,
            -- Use min(StartedAt) to match frontend's minTimestamp (batch creation time)
@@ -1407,6 +1423,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId IN ({projectIds:Array(String)})
            AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
+           ${AGENT_TEST_SET_EXCLUSION}
          GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE latestIsActive`,

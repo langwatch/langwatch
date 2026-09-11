@@ -24,7 +24,12 @@ import { DATABRICKS_GENIE_ADAPTER_ID } from "../pull-destination.service.ts";
 import {
   DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_ROW_LIMIT,
+<<<<<<< HEAD:enterprise/modules/governance/server/src/services/__tests__/databricks-genie-warehouse-cost.integration.test.ts
 } from "../databricks-genie-puller.service.ts";
+=======
+  WAREHOUSE_COST_UNREADABLE,
+} from "../databricksGenie.puller";
+>>>>>>> origin/main:platform/app/ee/governance/services/pullers/__tests__/databricksGenieWarehouseCost.integration.test.ts
 import {
   WAREHOUSE_COST_MAX_HOLD_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
@@ -254,6 +259,7 @@ async function pull({ warehouseId, deadlineMs }: { warehouseId?: string; deadlin
       workspaceUrl: baseUrl,
       spaceIds: [],
       schedule: "*/15 * * * *",
+      readPaidGenieBill: false,
       ...(warehouseId ? { warehouseId } : {}),
     },
   );
@@ -270,13 +276,15 @@ function hintOf(result: { events: { extra?: Record<string, unknown> }[] }) {
 }
 
 describe("a source with no warehouse", () => {
-  /** @scenario "A question costs nothing when no warehouse is named" */
-  it("records the question at zero and never asks about billing", async () => {
+  /** @scenario "A question carries no amount when no warehouse is named" */
+  it("records the question with no amount and never asks about billing", async () => {
     const result = await pull({});
 
     expect(result.events).toHaveLength(1);
-    expect(result.events[0]?.cost_usd).toBe("0");
-    expect(hintOf(result).costUsd).toBe("0");
+    // No amount, not zero: there is no bill to back a figure, and a zero here
+    // would land on the ledger as a measurement.
+    expect(result.events[0]?.cost_usd).toBeUndefined();
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
     // The claim that matters: not merely that cost is zero, but that a source
     // which opted out never went near the billing tables.
     expect(statementBodies).toHaveLength(0);
@@ -298,7 +306,7 @@ describe("a source whose run has no time left to read billing", () => {
     // The questions survive, unpriced. That is the whole point: an unpriced
     // window is asked again next run, a discarded sweep is not.
     expect(result.events).toHaveLength(1);
-    expect(result.events[0]?.cost_usd).toBe("0");
+    expect(result.events[0]?.cost_usd).toBeUndefined();
     // And it never opened a request it could not have finished.
     expect(statementBodies).toHaveLength(0);
   });
@@ -531,7 +539,14 @@ describe("a source that names a warehouse", () => {
     );
   });
 
+<<<<<<< HEAD:enterprise/modules/governance/server/src/services/__tests__/databricks-genie-warehouse-cost.integration.test.ts
   /** @scenario "The billing query only ever runs on the configured workspace" */
+=======
+  // Keep this annotation on ONE line. The parity checker's title group cannot
+  // span a newline, so a wrapped title binds a phantom that matches no
+  // scenario and reports nothing — which is how this test went unbound.
+  /** @scenario "A question is priced by the warehouse that answered it, not the one the connector signs in to" */
+>>>>>>> origin/main:platform/app/ee/governance/services/pullers/__tests__/databricksGenieWarehouseCost.integration.test.ts
   it("runs the billing query on the configured warehouse without restricting the answer to it", async () => {
     costPlan = { rows: [] };
 
@@ -585,6 +600,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -629,7 +645,7 @@ describe("a source that names a warehouse", () => {
     const result = await pull({ warehouseId: WAREHOUSE_ID });
 
     expect(result.events).toHaveLength(1);
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "Billing answered in a shape we did not ask for is not priced from" */
@@ -654,7 +670,7 @@ describe("a source that names a warehouse", () => {
     const result = await pull({ warehouseId: WAREHOUSE_ID });
 
     expect(result.events).toHaveLength(1);
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "A question that ran no SQL is charged nothing" */
@@ -678,7 +694,7 @@ describe("a source that names a warehouse", () => {
 
     expect(result.events).toHaveLength(1);
     // A priced statement exists in the window; this question simply is not it.
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "The puller's own billing query is not charged to a question" */
@@ -701,7 +717,7 @@ describe("a source that names a warehouse", () => {
 
     // Compute that belongs to no Genie question — the puller's own billing
     // query among it — is never handed to whichever question happens to be here.
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "A priced question calls its figure an estimate" */
@@ -762,7 +778,7 @@ describe("a source that names a warehouse", () => {
 
     const result = await pull({ warehouseId: WAREHOUSE_ID });
 
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "A cost answer that was cut short prices nothing" */
@@ -788,7 +804,7 @@ describe("a source that names a warehouse", () => {
 
     const result = await pull({ warehouseId: WAREHOUSE_ID });
 
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "A cost answer that was cut short prices nothing" */
@@ -810,7 +826,7 @@ describe("a source that names a warehouse", () => {
 
     const result = await pull({ warehouseId: WAREHOUSE_ID });
 
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "A window whose cost was cut short is asked about again" */
@@ -838,7 +854,7 @@ describe("a source that names a warehouse", () => {
     const result = await pull({ warehouseId: WAREHOUSE_ID });
     const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
 
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
     // Still back at the start of the window, not up at the sweep's clock.
     expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
     // And it stopped at the first period it could not price, rather than
@@ -879,6 +895,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -893,7 +910,12 @@ describe("a source that names a warehouse", () => {
     expect(hintOf(second).costUsd).toBe("6");
   });
 
+<<<<<<< HEAD:enterprise/modules/governance/server/src/services/__tests__/databricks-genie-warehouse-cost.integration.test.ts
   /** @scenario "A question seen before its bill has landed is held, not zeroed" */
+=======
+  // One line, for the reason given on the annotation above.
+  /** @scenario "A question held for its missing bill is priced when the bill lands" */
+>>>>>>> origin/main:platform/app/ee/governance/services/pullers/__tests__/databricksGenieWarehouseCost.integration.test.ts
   it("holds the watermark for a question seen but not billed yet, past the settling window", async () => {
     // The defect this whole change exists to stop. The billing query SUCCEEDS
     // and answers about the statement — the LEFT JOIN keeps it — but its hour
@@ -912,7 +934,7 @@ describe("a source that names a warehouse", () => {
     const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
 
     // Recorded at zero for now — its bill does not exist yet to price from.
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
     // But the watermark held BEHIND the unbilled hour, not at the sweep's
     // clock. This is the assertion the old code failed: a seen-but-unbilled
     // statement would have been passed over for good. The bound is the hour
@@ -944,6 +966,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -964,20 +987,24 @@ describe("a source that names a warehouse", () => {
     expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 60 * 60 * 1000);
   });
 
-  /** @scenario "A window whose cost was cut short is asked about again" */
-  it("moves the watermark on when billing refuses the question outright", async () => {
-    // Deliberately NOT held. A cut-short answer proves rows exist that a
-    // narrower question could still reach; a refusal proves nothing, and asking
-    // again would be refused the same way. Holding here would stall a workspace
-    // that never granted the billing tables, forever, with no way out but
-    // turning the feature off — a worse failure than the questions carrying no
-    // cost, which is what they carried before any of this existed.
+  /** @scenario "A warehouse that cannot be read holds the day open instead of closing it at zero" */
+  it("holds the watermark when billing refuses the question outright", async () => {
+    // Held, the same way an answer cut short is. A refusal used to move the
+    // watermark on, on the argument that asking again would be refused the
+    // same way — but the questions it moved past carried no amount, and
+    // moving past them made that permanent. The hold is bounded by
+    // `WAREHOUSE_COST_MAX_HOLD_MS`, which is what keeps a workspace that never
+    // granted the billing tables from pinning itself forever.
     costPlan = { status: 403 };
 
     const result = await pull({ warehouseId: WAREHOUSE_ID });
-    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+    const cursor = JSON.parse(result.cursor!) as {
+      sinceMs: number;
+      costHeldSinceMs: number | null;
+    };
 
-    expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 60 * 60 * 1000);
+    expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
+    expect(cursor.costHeldSinceMs).not.toBeNull();
   });
 
   /** @scenario "A window whose cost was cut short is asked about again" */
@@ -1013,6 +1040,7 @@ describe("a source that names a warehouse", () => {
           workspaceUrl: baseUrl,
           spaceIds: [],
           schedule: "*/15 * * * *",
+          readPaidGenieBill: false,
           warehouseId: WAREHOUSE_ID,
         },
       );
@@ -1073,6 +1101,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -1086,9 +1115,9 @@ describe("a source that names a warehouse", () => {
     // And the stamp is cleared with it. Left behind, it would expire every
     // future hold the moment it started and the retry would never work again.
     expect(cursor.costHeldSinceMs).toBeNull();
-    // The questions in the abandoned period keep the zero they came with,
-    // rather than being dropped or invented.
-    expect(hintOf(result).costUsd).toBe("0");
+    // The questions in the abandoned period stay unpriced — no amount, never
+    // a zero — rather than being dropped or invented.
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "Cost that arrives late corrects the record rather than adding one" */
@@ -1098,7 +1127,7 @@ describe("a source that names a warehouse", () => {
     // First run: the compute has not been published yet.
     costPlan = { rows: [] };
     const first = await pull({ warehouseId: WAREHOUSE_ID });
-    expect(hintOf(first).costUsd).toBe("0");
+    expect(hintOf(first)).not.toHaveProperty("costUsd");
 
     // Second run, after the bill lands.
     costPlan = {
@@ -1162,7 +1191,7 @@ describe("a source that names a warehouse", () => {
     const result = await pull({ warehouseId: WAREHOUSE_ID });
 
     expect(result.events).toHaveLength(1);
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "A billing outage does not discard the questions" */
@@ -1172,11 +1201,13 @@ describe("a source that names a warehouse", () => {
     const result = await pull({ warehouseId: WAREHOUSE_ID });
 
     expect(result.events).toHaveLength(1);
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
     // Not an error count: the sweep did its job. A source that reported a
     // failure here would look broken to an admin who has simply not granted
-    // the billing tables.
+    // the billing tables. The refusal is reported as a notice instead, which
+    // a reader of the source can be shown.
     expect(result.errorCount).toBe(0);
+    expect(result.notices).toContain(WAREHOUSE_COST_UNREADABLE);
   });
 
   it("keeps the questions when the billing query is cancelled on its wait", async () => {
@@ -1185,7 +1216,7 @@ describe("a source that names a warehouse", () => {
     const result = await pull({ warehouseId: WAREHOUSE_ID });
 
     expect(result.events).toHaveLength(1);
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "Compute the workspace prices in another currency is not converted" */
@@ -1207,7 +1238,7 @@ describe("a source that names a warehouse", () => {
     const result = await pull({ warehouseId: WAREHOUSE_ID });
 
     expect(result.events).toHaveLength(1);
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
   });
 
   /** @scenario "A source that prices its questions keeps looking back far enough" */
@@ -1250,6 +1281,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -1290,6 +1322,7 @@ describe("a source that names a warehouse", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
       },
     );
 
@@ -1346,7 +1379,7 @@ describe("a billing answer that did not come back", () => {
     const result = await pull({ warehouseId: WAREHOUSE_ID });
     const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
 
-    expect(hintOf(result).costUsd).toBe("0");
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
     // Still back at the start of the month. A watermark up at the sweep's clock
     // means those thirty days are never looked at again and their zero is final.
     expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
@@ -1380,6 +1413,7 @@ describe("a billing answer that did not come back", () => {
         workspaceUrl: baseUrl,
         spaceIds: [],
         schedule: "*/15 * * * *",
+        readPaidGenieBill: false,
         warehouseId: WAREHOUSE_ID,
       },
     );
@@ -1392,34 +1426,62 @@ describe("a billing answer that did not come back", () => {
     expect(hintOf(second).costUsd).toBe("6");
   });
 
-  /** @scenario "Billing refusing the question outright is still not held" */
-  it("moves on when the statement itself fails", async () => {
+  /** @scenario "A warehouse that cannot be read holds the day open instead of closing it at zero" */
+  it("holds and reports when the statement itself fails", async () => {
     // A missing grant comes back as a request that succeeded carrying a
     // statement that did not. Asking about less would fail the same way, so
-    // holding here would stall the source with no way out but turning the
-    // feature off. Green before the change above and required to stay green
-    // after it: that is the whole reason the cancelled case is phrased about
-    // time rather than about failure.
+    // the pieces are not tried — but the period is held, not written off: the
+    // questions carry no amount, and moving past them would make that
+    // permanent. The run says why it is holding.
     costPlan = { state: "FAILED", rows: [] };
 
     const result = await pull({ warehouseId: WAREHOUSE_ID });
-    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+    const cursor = JSON.parse(result.cursor!) as {
+      sinceMs: number;
+      costHeldSinceMs: number | null;
+    };
 
     expect(result.events).toHaveLength(1);
-    expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 60 * 60 * 1000);
+    expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
+    expect(cursor.costHeldSinceMs).not.toBeNull();
+    expect(result.notices).toContain(WAREHOUSE_COST_UNREADABLE);
   });
 
-  /** @scenario "Billing refusing the question outright is still not held" */
-  it("moves on when the workspace rejects the request outright", async () => {
+  /** @scenario "A warehouse that cannot be read holds the day open instead of closing it at zero" */
+  it("holds and reports when the workspace rejects the request outright", async () => {
     // The other door to the same answer: a revoked or unprivileged token is
     // refused before any statement runs. Both have to reach the same place.
     costPlan = { status: 403 };
 
     const result = await pull({ warehouseId: WAREHOUSE_ID });
-    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+    const cursor = JSON.parse(result.cursor!) as {
+      sinceMs: number;
+      costHeldSinceMs: number | null;
+    };
 
     expect(result.events).toHaveLength(1);
-    expect(cursor.sinceMs).toBeGreaterThan(Date.now() - 60 * 60 * 1000);
+    expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
+    expect(cursor.costHeldSinceMs).not.toBeNull();
+    expect(result.notices).toContain(WAREHOUSE_COST_UNREADABLE);
+  });
+
+  /** @scenario "A warehouse that cannot be read holds the day open instead of closing it at zero" */
+  it("holds and reports when the warehouse no longer exists", async () => {
+    // A deleted warehouse is the refusal an admin can put right by naming
+    // another one. Until then the period is held, not closed at zero.
+    costPlan = { status: 404 };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as {
+      sinceMs: number;
+      costHeldSinceMs: number | null;
+    };
+
+    expect(result.events).toHaveLength(1);
+    expect(hintOf(result)).not.toHaveProperty("costUsd");
+    expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
+    expect(cursor.costHeldSinceMs).not.toBeNull();
+    expect(result.notices).toContain(WAREHOUSE_COST_UNREADABLE);
   });
 });
 

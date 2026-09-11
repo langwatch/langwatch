@@ -1,11 +1,36 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { createSpinner } from "../../utils/spinner.ts";
 import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-import { createCliScenariosService } from "./cli-scenarios-service";
-import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite";
+import type { SuiteFieldDefinition } from "@/client-sdk/services/test-suites";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags.ts";
+import { createCliScenariosService } from "./cli-scenarios-service.ts";
+import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service.ts";
+import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite.ts";
+
+/**
+ * The field definitions of the suite a scenario is filed in, or none when
+ * the scenario or its suite cannot be read: the values are then sent as they
+ * look, and the platform settles them by name.
+ */
+async function suiteFieldsOfScenario({
+  id,
+  service,
+}: {
+  id: string;
+  service: ReturnType<typeof createCliScenariosService>;
+}): Promise<SuiteFieldDefinition[] | undefined> {
+  try {
+    const scenario = await service.get(id);
+    if (!scenario.testSuiteId) return undefined;
+    const suite = await createCliTestSuitesService().get(scenario.testSuiteId);
+    return suite.fields ?? [];
+  } catch {
+    return undefined;
+  }
+}
 
 export const updateScenarioCommand = async (
   id: string,
@@ -16,6 +41,8 @@ export const updateScenarioCommand = async (
     labels?: string;
     testSuite?: string;
     noTestSuite?: boolean;
+    /** `--field identifier=value`, one per occurrence. Given, it replaces the values. */
+    field?: string[];
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -29,6 +56,7 @@ export const updateScenarioCommand = async (
 
   let testSuiteId: string | null | undefined;
   let testSuiteName: string | undefined;
+  let fieldDefinitions: SuiteFieldDefinition[] | undefined;
   if (options.testSuite !== undefined) {
     try {
       const testSuite = await resolveSuiteReference({
@@ -36,6 +64,7 @@ export const updateScenarioCommand = async (
       });
       testSuiteId = testSuite.id;
       testSuiteName = testSuite.name;
+      fieldDefinitions = testSuite.fields ?? [];
     } catch (error) {
       if (error instanceof SuiteReferenceError) {
         console.error(chalk.red(`Error: ${error.message}`));
@@ -48,6 +77,17 @@ export const updateScenarioCommand = async (
   }
 
   const service = createCliScenariosService();
+
+  // A field value is read by the type the suite declares, so the suite the
+  // scenario stays in is looked up when the command line names none.
+  if (options.field !== undefined && fieldDefinitions === undefined) {
+    fieldDefinitions = await suiteFieldsOfScenario({ id, service });
+  }
+  const fields = parseScenarioFieldFlags({
+    pairs: options.field,
+    definitions: fieldDefinitions,
+  });
+
   const spinner = createSpinner(`Updating scenario "${id}"...`).start();
 
   try {
@@ -58,6 +98,7 @@ export const updateScenarioCommand = async (
       body.criteria = options.criteria.split(",").map((c) => c.trim());
     if (options.labels !== undefined) body.labels = options.labels.split(",").map((l) => l.trim());
     if (testSuiteId !== undefined) body.testSuiteId = testSuiteId;
+    if (fields !== undefined) body.fields = fields;
 
     const scenario = await service.update(id, body);
 

@@ -64,6 +64,7 @@ vi.mock("../../identityNotice", () => ({
 
 import { loadConfig } from "../config";
 import { runUnifiedLoginFlow } from "../login-flow";
+import { refreshTelemetryWiringForLogin } from "../telemetry-refresh";
 
 const exchangeResult = (extra: Record<string, unknown> = {}) => ({
   kind: "device_session" as const,
@@ -85,6 +86,19 @@ describe("runUnifiedLoginFlow (device session) personal-project persistence", ()
   afterEach(() => {
     delete process.env.LANGWATCH_BROWSER;
     vi.restoreAllMocks();
+  });
+
+  it("prints restart advice when login refreshed a running code launcher's wiring", async () => {
+    pollUntilDone.mockResolvedValue(exchangeResult());
+    const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
+    vi.mocked(refreshTelemetryWiringForLogin).mockResolvedValueOnce({
+      mintedAny: false, labels: ["code shell function (~/.zshrc)"], warnings: [notice],
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await runUnifiedLoginFlow({ kind: "device_session" });
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(notice));
   });
 
   /** @scenario device-login exchange delivers the personal project key and the CLI stores it */

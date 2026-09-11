@@ -1,6 +1,75 @@
 /**
- * LangWatchQL analytics SQL — the `analytics.*` schema catalog. One entry per LangWatchQL view.
- * @see ./types.ts — the shapes, the grain contract each entry declares, and the
+ * LangWatchQL analytics SQL — the `analytics.*` schema catalog.
+ *
+ * One entry per LangWatchQL view. This is the whole public surface of the
+ * analytics SQL API: a caller can name these views and these columns, and
+ * nothing else, because the grants the entries generate expose nothing else.
+ *
+ * ## What is deliberately absent
+ *
+ * Free-text carriers with no gate in the canonical visibility policy are not
+ * exposed at all — `trace_summaries.ErrorMessage`, `evaluation_runs.Error` and
+ * `ErrorDetails`, `stored_spans.StatusMessage`, and the whole `Events.*` nested
+ * group on spans. Each of them routinely quotes the payload that produced the
+ * failure, and the data-privacy policy has no rule that would gate them, so
+ * exposing them would mean inventing a gate rather than deriving one. They are
+ * off-catalog, which under the column grants means unreachable rather than
+ * merely unselected.
+ *
+ * Event-sourcing bookkeeping (`ProjectionId`, `Version`, `LastProcessedEventId`,
+ * `LastEventOccurredAt`, `CreatedAt`, `EarliestSpanStartMs`, `_retention_days`)
+ * is absent for the same structural reason and a different substantive one: it
+ * describes how a row got written or how long it is kept, which is not
+ * something the API promises to keep stable.
+ *
+ * ## Two datasets over one trace, and why that is not two answers
+ *
+ * `traces` and `trace_metrics` are both one row per trace, and `evaluations`
+ * and `evaluation_metrics` are both one row per evaluation, because the write
+ * path maintains two projections of each. They are folded from the *same*
+ * events by the *same* services, so the values they share agree; what differs
+ * is which questions each is shaped for, and each carries columns the other
+ * does not:
+ *
+ *  - `traces` / `evaluations` are the complete record — captured input and
+ *    output, prompt lineage, the evaluator's explanation — sorted for point
+ *    lookups by id.
+ *  - `trace_metrics` / `evaluation_metrics` are the analytics projections:
+ *    time-sorted for range scans, carrying the hoisted `UserId`,
+ *    `ConversationId`, `CustomerId` and `Origin` dimensions, and carrying no
+ *    captured content at all because the fold never writes any onto them.
+ *  - `trace_metrics_by_minute` / `evaluation_metrics_by_minute` are
+ *    pre-aggregated per minute, for a metric a caller wants without touching
+ *    per-row data.
+ *
+ * Note the `_by_minute` rollups count only what was final when the row was
+ * written: a trace contributes to `TraceCount` through its root span, so a
+ * trace whose root span never arrived contributes sums and no count. A
+ * distinct-trace count is a question for `trace_metrics`.
+ *
+ * ## Grain
+ *
+ * Most source tables are `ReplacingMergeTree`s carrying more than one version
+ * of a row until merges catch up, so each view deduplicates and each entry
+ * states two things about its rows. `dedup.keyColumns` is the source's whole
+ * `ORDER BY` — the key the *engine* collapses on, which is what `FINAL` can
+ * promise and nothing more. `grainColumns` is what one row of the *dataset* is,
+ * declared only where the two differ, which is where the sort key leads with a
+ * business time so that range scans are monotonic. Both analytics projections
+ * are sorted that way, and they answer it differently: `trace_analytics` freezes
+ * its `OccurredAt` as a storage anchor, so the engine's key and the trace are
+ * the same row, while `evaluation_analytics` writes its progress watermark into
+ * `OccurredAt`, which moves — so that entry pins the `in-tuple` strategy and is
+ * deduplicated by the evaluation rather than by the engine's key.
+ *
+ * The `_by_minute` rollups are `AggregatingMergeTree`s instead, whose rows for
+ * one key are summed rather than superseded — which their entries declare,
+ * because reading one as if it had versions would expose each unmerged partial
+ * row as its own answer. Their measures declare `summed` and the cast back to a
+ * plain type is derived from it. See `../services/langwatch-ql-view-statements.service.ts` for how, and for the
+ * measurement behind the default.
+ *
+ * @see ./types.ts — the shapes, and the derivations the validator reads
  * @see specs/analytics/lwql-api.feature
  */
 
@@ -1546,9 +1615,20 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
 export const TENANT_COLUMN = "TenantId";
 
 /**
- * The LangWatchQL schema, in the order the schema endpoint should publish it: the
- * ClickHouse-resident facts, then the PostgreSQL-resident entities and dimensions that name
- * them.
+ * The LangWatchQL schema, in the order the schema endpoint should publish it:
+ * the ClickHouse-resident facts, then the PostgreSQL-resident entities and
+ * dimensions that name them.
+ *
+ * One catalog rather than two, because residence is a property of a dataset and
+ * not a property of the schema. Every consumer — the schema endpoint, the
+ * validator, the diagnostics — reads this list and needs no idea which half an
+ * entry came from; only the provisioning generators in `../services/langwatch-ql-view-statements.service.ts` and
+ * `../services/langwatch-ql-access-model.service.ts` ask, and they ask the entry
+ * ({@link isPostgresResident}) rather than being told.
+ *
+ * Generations and sessions remain unexposed: both are derivable from `spans`
+ * and `traces` rather than resident anywhere of their own, so each needs a
+ * derived view over tables already here, not a mapping.
  */
 export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   TRACES,

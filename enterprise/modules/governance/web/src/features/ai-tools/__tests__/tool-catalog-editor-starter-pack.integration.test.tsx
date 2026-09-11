@@ -95,8 +95,15 @@ describe("<ToolCatalogEditor /> starter pack import", () => {
 
       await user.click(toggle);
 
+<<<<<<< HEAD:enterprise/modules/governance/web/src/features/ai-tools/__tests__/tool-catalog-editor-starter-pack.integration.test.tsx
       expect(await screen.findByText(/Adds starter tiles the catalog never had/i)).toBeTruthy();
       expect(screen.getByText("Codex")).toBeTruthy();
+=======
+      expect(
+        await screen.findByText(/Adds starter tools the catalog never had/i),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Codex")).toBeInTheDocument();
+>>>>>>> origin/main:platform/app/src/components/settings/governance/__tests__/ToolCatalogEditorStarterPack.integration.test.tsx
     });
   });
 });

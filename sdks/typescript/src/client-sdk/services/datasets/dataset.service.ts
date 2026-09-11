@@ -26,6 +26,7 @@ import { tracer } from "./tracing";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { resolveEndpoint } from "@/internal/endpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 type DatasetServiceConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -352,7 +353,7 @@ export class DatasetService {
     const { endpoint, apiKey } = this.config;
     const url = `${endpoint}${path}`;
 
-    const response = await fetch(url, {
+    const response = await langwatchFetch(url, {
       method: "POST",
       headers: buildAuthHeaders({ apiKey }),
       body: formData,

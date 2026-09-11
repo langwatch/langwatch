@@ -24,7 +24,13 @@ const OTHER_TURN = { traceId: "trace-9", timestamp: 1_700_000_009_000 };
 const mocks = vi.hoisted(() => ({
   items: [] as unknown[],
   traceDetails: undefined as unknown,
+  /**
+   * Whether the step being served is the item the reviewer has left, with the
+   * one the URL names still being read.
+   */
+  stepIsStale: false,
   query: {} as Record<string, string>,
+  annotateClicked: vi.fn(),
   openDrawer: vi.fn(),
   conversationProps: null as unknown,
   // What the conversation read answers with. `undefined` is "not answered yet".
@@ -60,6 +66,15 @@ vi.mock("@langwatch/trace-web/surfaces/conversation-view", () => ({
       <div data-testid="conversation-view">
         <button type="button" onClick={() => props.onSelectTurn?.(OTHER_TURN)}>
           pick another turn
+        </button>
+        {/*
+          Stands in for the per-message Annotate the real conversation renders,
+          which writes an annotation against the trace it was rendered with.
+          The page cannot disable it — it belongs to the conversation — so the
+          only thing a test can ask is whether the press reaches it at all.
+        */}
+        <button type="button" onClick={() => mocks.annotateClicked()}>
+          annotate this turn
         </button>
       </div>
     );
@@ -102,7 +117,7 @@ vi.mock("@langwatch/annotation-web/annotations", async (importOriginal) => ({
   annotationApi: {
     useUtils: () => ({
       annotation: {
-        getOptimizedAnnotationQueues: { invalidate: vi.fn() },
+        getQueueWalkStep: { invalidate: vi.fn() },
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },
@@ -209,6 +224,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.conversationProps = null;
   mocks.query = {};
+  mocks.stepIsStale = false;
   // The thread reads back inside the conversation's window unless a test says
   // otherwise, so the turns are the thread's own.
   mocks.conversationTurns = { items: [{ traceId: "trace-1" }] };
@@ -329,6 +345,33 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
         traceId: OTHER_TURN.traceId,
         t: String(OTHER_TURN.timestamp),
+      });
+    });
+
+    describe("given they have stepped on and the new item is still being read", () => {
+      /** @scenario "Nothing acts on the item I have just stepped off" */
+      it("does not let the press reach the thread they left", async () => {
+        const user = userEvent.setup();
+        mocks.query = { "queue-item": "item-2" };
+        mocks.stepIsStale = true;
+        renderPage();
+
+        // The thread on screen is still the one being left, so a press aimed
+        // at it would annotate, or open, the wrong item. Nothing here is
+        // disabled — the conversation owns these controls — so what is being
+        // asked is whether the press lands at all.
+        const annotate = screen.getByRole("button", {
+          name: "annotate this turn",
+        });
+        const openTurn = screen.getByRole("button", {
+          name: "pick another turn",
+        });
+
+        await expect(user.click(annotate)).rejects.toThrow(/pointer-events/);
+        await expect(user.click(openTurn)).rejects.toThrow(/pointer-events/);
+
+        expect(mocks.annotateClicked).not.toHaveBeenCalled();
+        expect(mocks.openDrawer).not.toHaveBeenCalled();
       });
     });
   });

@@ -1,14 +1,21 @@
 import type { RunPlanRunBody } from "@/client-sdk/services/run-plans";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import { parseRunParameterFlags } from "../../utils/keyValueFlags";
-import { parseRunNoteFlag } from "../../utils/runNote";
-import type { RawOutputFlags } from "../../utils/output";
-import { createCliRunPlansService } from "./cli-run-plans-service";
-import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
-import { buildScope, parseRepeat, parseWait, parseTargets, type ScopeOptions } from "./scopeFlags";
-import { emitRunResult } from "./reportRun";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { parseRunParameterFlags } from "../../utils/keyValueFlags.ts";
+import { parseRunNoteFlag } from "../../utils/runNote.ts";
+import type { RawOutputFlags } from "../../utils/output.ts";
+import { createCliRunPlansService } from "./cli-run-plans-service.ts";
+import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service.ts";
+import { type EvaluatorFlagRef, readEvaluators } from "../test-suites/evaluatorFlags.ts";
+import {
+  buildScope,
+  parseRepeat,
+  parseWait,
+  parseTargets,
+  type ScopeOptions,
+} from "./scopeFlags.ts";
+import { emitRunResult } from "./reportRun.ts";
 
 export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
   target?: string[];
@@ -20,6 +27,10 @@ export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
   note?: string;
   idempotencyKey?: string;
   wait?: boolean | string;
+  /** `--evaluator <id|slug>`, in the order written, each with its gate flag. */
+  evaluators?: EvaluatorFlagRef[];
+  /** `--evaluators-json <file|json>`: the plan's full attachment list. */
+  evaluatorsJson?: string;
 }
 
 /**
@@ -38,6 +49,9 @@ export const runRunPlanCommand = async (options: RunPlanRunOptions): Promise<voi
   const repeatCount = parseRepeat(options.repeat);
   const wait = parseWait(options.wait);
   const { scope, scenarioIds } = await buildScope(options, createCliTestSuitesService());
+  // A plan evaluator reads the conversation and the trace, never a scenario
+  // field: the plan may cover scenarios from suites with different fields.
+  const evaluators = await readEvaluators({ options, fields: [], isPlanLevel: true });
 
   const service = createCliRunPlansService();
   const spinner = createSpinner("Scheduling run...").start();
@@ -52,6 +66,7 @@ export const runRunPlanCommand = async (options: RunPlanRunOptions): Promise<voi
         ...(repeatCount !== undefined ? { repeatCount } : {}),
         ...(options.simulatorModel ? { simulatorModel: options.simulatorModel } : {}),
         ...(options.judgeModel ? { judgeModel: options.judgeModel } : {}),
+        ...(evaluators !== undefined ? { evaluators } : {}),
       },
       ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
       ...(parameters ? { parameters } : {}),

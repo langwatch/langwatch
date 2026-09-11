@@ -35,12 +35,12 @@ Customer: {{ user.name }} ({{ user.email }})
 
 The variables available depend on how you invoke the prompt:
 
-| Context                 | Variables                                        |
-| ----------------------- | ------------------------------------------------ |
-| **SDK `compile()`**     | Any key-value pairs you pass in                  |
-| **Prompt Playground**   | Values set in the Variables tab                  |
-| **Optimization Studio** | Node inputs defined in the workflow              |
-| **Scenario adapters**   | `input`, `messages`, and adapter-specific fields |
+| Context               | Variables                                        |
+| --------------------- | ------------------------------------------------ |
+| **SDK `compile()`**   | Any key-value pairs you pass in                  |
+| **Prompt Playground** | Values set in the Variables tab                  |
+| **Workflows**         | Node inputs defined in the workflow              |
+| **Scenario adapters** | `input`, `messages`, and adapter-specific fields |
 
 ## Conditionals
 

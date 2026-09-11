@@ -92,11 +92,11 @@ class FakeHttp implements GovernanceHttpClient {
 
 class FakeObjects implements GovernanceObjectStore {
   readonly list = vi.fn(
-    async (_input: Parameters<GovernanceObjectStore["list"]>[0]): Promise<string[]> => [],
+    async (
+      _input: Parameters<GovernanceObjectStore["list"]>[0],
+    ): Promise<{ keys: string[]; isTruncated: boolean }> => ({ keys: [], isTruncated: false }),
   );
-  readonly readText = vi.fn(
-    async (_input: Parameters<GovernanceObjectStore["readText"]>[0]) => "",
-  );
+  readonly readText = vi.fn(async (_input: Parameters<GovernanceObjectStore["readText"]>[0]) => "");
 }
 
 function httpAdapter(http: FakeHttp): HttpPollingPullerAdapter {
@@ -215,7 +215,10 @@ describe("S3 polling puller", () => {
 
   it("reads ordered keys, advances to the final key, and forwards AWS credentials", async () => {
     const objects = new FakeObjects();
-    objects.list.mockResolvedValue(["logs/001.ndjson", "logs/002.ndjson"]);
+    objects.list.mockResolvedValue({
+      keys: ["logs/001.ndjson", "logs/002.ndjson"],
+      isTruncated: false,
+    });
     objects.readText.mockImplementation(async ({ key }: { key: string }) =>
       JSON.stringify(event(key === "logs/001.ndjson" ? "one" : "two")),
     );
@@ -248,7 +251,7 @@ describe("S3 polling puller", () => {
 
   it("uses StartAfter and holds a cursor when there are no later objects", async () => {
     const resumed = new FakeObjects();
-    resumed.list.mockResolvedValue(["logs/003.ndjson"]);
+    resumed.list.mockResolvedValue({ keys: ["logs/003.ndjson"], isTruncated: false });
     resumed.readText.mockResolvedValue(JSON.stringify(event("three")));
     const adapter = s3Adapter(resumed);
 
@@ -268,7 +271,10 @@ describe("S3 polling puller", () => {
 
   it("progresses past malformed ndjson and object read failures", async () => {
     const objects = new FakeObjects();
-    objects.list.mockResolvedValue(["logs/bad.ndjson", "logs/missing.ndjson"]);
+    objects.list.mockResolvedValue({
+      keys: ["logs/bad.ndjson", "logs/missing.ndjson"],
+      isTruncated: false,
+    });
     objects.readText
       .mockResolvedValueOnce(
         `${JSON.stringify(event("one"))}\nthis is not json\n${JSON.stringify(event("two"))}`,
@@ -292,7 +298,7 @@ describe("S3 polling puller", () => {
     ],
   ])("maps %s input", async (parser, body, ids) => {
     const objects = new FakeObjects();
-    objects.list.mockResolvedValue([`logs/events.${parser}`]);
+    objects.list.mockResolvedValue({ keys: [`logs/events.${parser}`], isTruncated: false });
     objects.readText.mockResolvedValue(body);
     const adapter = s3Adapter(objects);
 

@@ -37,6 +37,7 @@ beforeEach(() => {
   ensureGovProject.mockResolvedValue({ id: "gov-proj-1" });
 });
 
+<<<<<<< HEAD:enterprise/modules/governance/server/src/services/__tests__/ingestion-pull-worker.dispatch.unit.test.ts
 afterEach(() => vi.clearAllMocks());
 
 async function runIngestionPull(input: { sourceId: string; cursor: string | null }) {
@@ -51,6 +52,29 @@ async function runIngestionPull(input: { sourceId: string; cursor: string | null
         json: () => response.json(),
         text: () => response.text(),
       };
+=======
+  vi.doMock("~/server/db", () => ({
+    prisma: {
+      ingestionSource: {
+        findUnique: sourceFindUnique,
+        update: sourceUpdate,
+      },
+    },
+  }));
+  // The worker takes the OCSF sink from the App, so standing in for the
+  // store means standing in for `getApp()`.
+  vi.doMock("~/server/app-layer/app", () => ({
+    getApp: () => ({
+      governance: {
+        ocsfEvents: {
+          // The worker writes a page as one insert; the spy sees each row so
+          // the per-row assertions below stay about rows, not batching.
+          insertEvents: async (rows: unknown[]) => {
+            for (const row of rows) ocsfInsert(row);
+          },
+        },
+      },
+>>>>>>> origin/main:platform/app/ee/governance/services/pullers/__tests__/pullerWorker.dispatch.unit.test.ts
     }),
   });
   const normalizedSource = source
@@ -160,9 +184,19 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         targetName: "gpt-5-mini",
       });
       expect(ensureGovProject).toHaveBeenCalledWith(expect.anything(), "org-1");
+      // Exact equality on purpose, and it stays exact. On a run outcome this
+      // is a guard against fields nobody meant to add: it is what fails the
+      // day something personal starts riding along to a sink. A new field is
+      // written down here deliberately or it does not travel.
       expect(outcome).toEqual({
         nextCursor: null,
         eventCount: 2,
+<<<<<<< HEAD:enterprise/modules/governance/server/src/services/__tests__/ingestion-pull-worker.dispatch.unit.test.ts
+=======
+        errorCount: 0,
+        completeness: "complete",
+        readThroughAt: expect.any(Date),
+>>>>>>> origin/main:platform/app/ee/governance/services/pullers/__tests__/pullerWorker.dispatch.unit.test.ts
       });
       expect(sourceUpdate).not.toHaveBeenCalled();
     });

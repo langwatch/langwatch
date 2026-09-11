@@ -22,7 +22,7 @@ export type SuiteRailMenuProps = {
   scenarioIds: string[];
   onNewTestCase: (suiteId: string) => void;
   onRunSuite: (suiteId: string) => void;
-  onRenameSuite: (suiteId: string) => void;
+  onEditSuite: (suiteId: string) => void;
   onArchiveSuite: () => void;
 };
 
@@ -89,7 +89,7 @@ export function SuiteRailMenu({
   scenarioIds,
   onNewTestCase,
   onRunSuite,
-  onRenameSuite,
+  onEditSuite,
   onArchiveSuite,
 }: SuiteRailMenuProps) {
   return (
@@ -114,11 +114,11 @@ export function SuiteRailMenu({
         )}
         {canManage && (
           <SuiteMenuItem
-            value="rename-suite"
-            action="rename"
-            onChoose={() => onRenameSuite(suite.id)}
+            value="edit-suite"
+            action="edit"
+            onChoose={() => onEditSuite(suite.id)}
           >
-            Rename
+            Edit
           </SuiteMenuItem>
         )}
         {hasRun && <RecentRunsSubmenu period={period} scenarioIds={scenarioIds} />}

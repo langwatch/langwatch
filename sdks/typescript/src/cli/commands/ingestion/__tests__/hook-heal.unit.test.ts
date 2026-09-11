@@ -37,6 +37,7 @@ const DECLINED = { status: "declined" } as const;
 const FAILED = { status: "failed" } as const;
 /** The platform said a person revoked the key on purpose. */
 const WITHHELD = { status: "withheld" } as const;
+const EXPIRED = { status: "expired" } as const;
 
 /** A collector that rejects the old bearer and accepts the fresh one. */
 const rotatedCollector: typeof fetch = ((
@@ -315,6 +316,23 @@ describe("the session context hook's self-heal", () => {
         fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json")),
       ).toBe(true);
       expect(hook.stdout).toEqual([]);
+    });
+  });
+
+  describe("given a device the platform refuses to authenticate", () => {
+    /** @scenario "A signed-out device is told to sign in again" */
+    it("tells the user to sign the machine in again", async () => {
+      await hook.runHook({
+        env: OLD_KEY_ENV,
+        fetchImpl: rotatedCollector,
+        healRevokedKey: vi.fn().mockResolvedValue(EXPIRED),
+      });
+
+      expect(hook.stdout).toHaveLength(1);
+      const notice = JSON.parse(hook.stdout[0]!) as { systemMessage: string };
+      expect(notice.systemMessage).toContain("signed out");
+      expect(notice.systemMessage).toContain("langwatch login --device");
+      expect(hook.exits).toEqual([]);
     });
   });
 

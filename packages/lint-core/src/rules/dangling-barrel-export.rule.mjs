@@ -102,12 +102,16 @@ export const danglingBarrelExportRule = defineRule({
   messages: {
     danglingReexport: {
       what: "`{{specifier}}` is re-exported here but no file of that name exists.",
-      fix: "Point the re-export at the file's new path, or delete the line if the file is gone.",
+      fix:
+        "Point the re-export at the file's new path, or delete the line if the file is gone. " +
+        "These arrive in batches from one in-flight move: resolve the whole barrel in one pass rather than a line at a time.",
       why: "A stale `dist/*.d.ts` keeps diagnostics green, so only a test run finds it.",
     },
     danglingImport: {
       what: "`{{specifier}}` is imported here but no file of that name exists.",
-      fix: "Point the import at the file's new path, or delete the line if the file is gone.",
+      fix:
+        "Point the import at the file's new path, or delete the line if the file is gone. " +
+        "These arrive in batches from one in-flight move: resolve the whole file in one pass rather than a line at a time.",
       why: "A stale `dist/*.d.ts` keeps diagnostics green, so only a test run finds it.",
     },
   },

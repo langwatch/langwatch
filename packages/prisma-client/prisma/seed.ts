@@ -66,6 +66,7 @@
 import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
+<<<<<<< HEAD:packages/prisma-client/prisma/seed.ts
 import { fileURLToPath } from "url";
 import { ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-server/testing";
 import { runScript, writeScriptWarning } from "@langwatch/observability";
@@ -81,6 +82,30 @@ import { seedDemoPlatform } from "./seed-demo-platform.ts";
 
 /** The lane name haven runs this under, and what its structured lines carry. */
 const SEED_LANE = "seed";
+=======
+import path from "path";
+import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
+import { PUBLIC_KEY } from "../ee/licensing/constants";
+import {
+  LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
+  resolveSeedLicense,
+} from "../scripts/localDevLicense";
+import {
+  PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "../src/generated/prisma/client";
+import {
+  API_KEY_PREFIX,
+  hashSecret,
+  INGEST_KEY_PREFIX,
+} from "../src/server/api-key/api-key-token.utils";
+import { modelProviders } from "../src/server/modelProviders/registry";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
+import { CUSTOM_ROLE_KIND } from "../src/server/role/role-kind";
+import { encrypt } from "../src/utils/encryption";
+import { seedDemoPlatform } from "./seed-demo-platform";
+>>>>>>> origin/main:platform/app/prisma/seed.ts
 
 const prisma = new PrismaClient({
   adapter: PrismaDriverAdapterService.create().createOwnedAdapter(process.env.DATABASE_URL ?? ""),
@@ -155,15 +180,32 @@ async function main() {
     ? firstMessageOverride === "1" || firstMessageOverride === "true"
     : process.env.HAVEN_SEED_PRESET === "demo";
 
+  // The license must verify against the key this app boots with, otherwise
+  // every settings page reports it as invalid. `resolveSeedLicense` keeps a
+  // license that already verifies (someone activated a real one) and only
+  // replaces what does not. The local-dev key verifies under the default key;
+  // the test-suite fixture is there for CI, which seeds under the test key.
+  const existingOrganization = await prisma.organization.findUnique({
+    where: { id: ORG_ID },
+    select: { license: true },
+  });
+  const license = resolveSeedLicense({
+    stored: existingOrganization?.license ?? null,
+    publicKey: PUBLIC_KEY,
+    candidates: [
+      LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
+      TEST_SUITE_ENTERPRISE_LICENSE_KEY,
+    ],
+  });
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },
     create: {
       id: ORG_ID,
       name: ORG_NAME,
       slug: ORG_SLUG,
-      license: ENTERPRISE_LICENSE_KEY,
+      license,
     },
-    update: { license: ENTERPRISE_LICENSE_KEY },
+    update: { license },
   });
 
   // Prompt tags are org-defined, and `production` is the one

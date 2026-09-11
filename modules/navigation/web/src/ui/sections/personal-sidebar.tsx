@@ -110,12 +110,32 @@ function usePersonalWorkspace(): {
   personalProjectSlug: string | null;
   features: PersonalWorkspaceFeatures | undefined;
 } {
+<<<<<<< HEAD:modules/navigation/web/src/ui/sections/personal-sidebar.tsx
   const host = useNavigationHost();
   const openableTeams = host.openableTeams();
 
   const personalProject = useMemo(
     () => openableTeams.find((team) => team.isPersonal)?.projects[0] ?? null,
     [openableTeams],
+=======
+  const session = useRequiredSession();
+  const { organizations, organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  // Scoped to the organization the chrome is showing: a personal workspace
+  // exists per organization, and linking to another one's navigates out of the
+  // current organization, which the header then reflects by re-deriving the
+  // organization from the project slug in the URL.
+  const personalProject = useMemo(
+    () =>
+      findPersonalProject({
+        organizations,
+        userId: session.data?.user?.id,
+        organizationId: organization?.id,
+      }),
+    [organizations, session.data?.user?.id, organization?.id],
+>>>>>>> origin/main:platform/app/src/components/PersonalSidebar.tsx
   );
 
   const personalProjectId = personalProject?.id ?? null;

@@ -156,7 +156,7 @@ describe("the LangWatchQL request machine", () => {
         controller.runQuery();
 
         expect(calls[0]!.request.granularitySeconds).toBe(60);
-        expect(calls[0]!.request.parameters ?? {}).not.toHaveProperty("period_granularity_seconds");
+        expect(calls[0]!.request.parameters ?? {}).not.toHaveProperty("dashboard_context_granularity_seconds");
       });
 
       /** @scenario "Changing the granularity step marks the result stale and restores Run query" */

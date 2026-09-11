@@ -1,3 +1,4 @@
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-users.screen.tsx
 import { Box, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
@@ -85,8 +86,28 @@ function fmtTrendPct(pct: number): string {
   if (abs < 1) return "0%";
   return `${Math.round(abs)}%`;
 }
+=======
+import { Heading, VStack } from "@chakra-ui/react";
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import {
+  PeopleSpendPanel,
+  SPEND_SORT_LABEL,
+} from "~/components/governance/PeopleTable";
+import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSpendSortParam } from "~/hooks/useSpendSortParam";
+>>>>>>> origin/main:platform/app/src/pages/governance/users.tsx
 
+/**
+ * The full ranking of people by spend. Its address redirects to the People
+ * tab of /governance/people (see `legacyRedirects.tsx`); this page keeps
+ * the same table for the detail page's neighbourhood and renders nothing
+ * of its own.
+ */
 function GovernanceUsersListPage() {
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-users.screen.tsx
   const router = useGovernanceRouter();
   const { organization, hasAnyPermission } = useGovernanceScope();
   const orgId = organization?.id ?? "";
@@ -98,10 +119,20 @@ function GovernanceUsersListPage() {
     if (next !== "spend") params.set("sort", next);
     void router.replace(params.toString() ? `?${params.toString()}` : "?");
   };
+=======
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const orgId = organization?.id ?? "";
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
+  const canReadSources = hasAnyPermission("ingestionSources:view");
+  const { sortBy, setSortBy } = useSpendSortParam();
+>>>>>>> origin/main:platform/app/src/pages/governance/users.tsx
 
   return (
-    <GovernanceLayout pageTitle="Users · AI Governance · LangWatch">
+    <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-users.screen.tsx
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <Text fontSize="xs" color="fg.muted">
@@ -120,10 +151,21 @@ function GovernanceUsersListPage() {
 
         {canReadActivity ? (
           <UserSpendPanel orgId={orgId} sortBy={sortBy} onSortChange={setSortBy} />
+=======
+        <Heading size="md">All people by {SPEND_SORT_LABEL[sortBy]}</Heading>
+
+        {canReadActivity ? (
+          <PeopleSpendPanel
+            orgId={orgId}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            canReadSources={canReadSources}
+          />
+>>>>>>> origin/main:platform/app/src/pages/governance/users.tsx
         ) : (
           <PermissionRequiredNotice
             permission="activityMonitor:view"
-            detail="Member spend and activity stay hidden until then."
+            detail="Spend and activity per person stay hidden until then."
           />
         )}
       </VStack>
@@ -131,6 +173,7 @@ function GovernanceUsersListPage() {
   );
 }
 
+<<<<<<< HEAD:enterprise/modules/governance/web/src/ui/sections/governance/governance-users.screen.tsx
 /**
  * Mounted only for a viewer holding `activityMonitor:view`, which is the grant
  * `spendByUser` asks for.
@@ -305,3 +348,12 @@ function Row({ user }: { user: SpendByUser }) {
 }
 
 export default GovernanceUsersListPage;
+=======
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(
+  withPermissionGuard("governance:view", {
+    bypassOnboardingRedirect: true,
+  })(GovernanceUsersListPage),
+);
+>>>>>>> origin/main:platform/app/src/pages/governance/users.tsx

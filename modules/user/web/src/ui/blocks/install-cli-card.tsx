@@ -36,9 +36,15 @@ export function InstallCliCard({
    * is intentionally flow-agnostic so it doesn't block on the BDD.
    */
   subline = "One-time setup. After installing, run `langwatch login` to authenticate this device.",
+  /**
+   * Inside a card that already carries a title: no frame of its own, no
+   * heading row, no subline. Only the two commands and the docs links.
+   */
+  compact = false,
 }: {
   heading?: string;
   subline?: string;
+  compact?: boolean;
 } = {}) {
   const { isSaas, appBaseUrl: baseHost } = usePersonalWorkspaceHost().deployment();
 
@@ -54,26 +60,30 @@ export function InstallCliCard({
 
   return (
     <Box
-      borderWidth="1px"
+      borderWidth={compact ? 0 : "1px"}
       borderColor="border.muted"
       borderRadius="md"
-      padding={5}
-      backgroundColor="bg"
-      boxShadow="sm"
+      padding={compact ? 0 : 5}
+      backgroundColor={compact ? undefined : "bg"}
+      boxShadow={compact ? undefined : "sm"}
       width="full"
     >
-      <VStack align="stretch" gap={4}>
-        <HStack gap={2}>
-          <Box color="fg.muted">
-            <Terminal size={18} />
-          </Box>
-          <Heading as="h3" size="sm">
-            {heading}
-          </Heading>
-        </HStack>
-        <Text fontSize="sm" color="fg.muted">
-          {subline}
-        </Text>
+      <VStack align="stretch" gap={compact ? 3 : 4}>
+        {!compact && (
+          <>
+            <HStack gap={2}>
+              <Box color="fg.muted">
+                <Terminal size={18} />
+              </Box>
+              <Heading as="h3" size="sm">
+                {heading}
+              </Heading>
+            </HStack>
+            <Text fontSize="sm" color="fg.muted">
+              {subline}
+            </Text>
+          </>
+        )}
 
         <Text fontSize="xs" color="fg.muted">
           Requires Node.js 18 or newer (the <Code fontSize="xs">npm</Code> command ships with it).

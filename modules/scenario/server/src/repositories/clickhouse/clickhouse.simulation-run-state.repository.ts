@@ -13,6 +13,12 @@ import {
   ValidationError,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import {
+  type ClickHouseEvaluationColumns,
+  columnsToEvaluations,
+  EVALUATION_COLUMNS_SQL,
+  evaluationsToColumns,
+} from "./simulation-evaluations.columns.ts";
 import type {
   SimulationRunState,
   SimulationRunStateData,
@@ -23,7 +29,7 @@ const TABLE_NAME = "simulation_runs" as const;
 
 const logger = createLogger("langwatch:simulation-processing:run-state-repository");
 
-interface ClickHouseSimulationRunRecord {
+interface ClickHouseSimulationRunRecord extends ClickHouseEvaluationColumns {
   ProjectionId: string;
   TenantId: string;
   ScenarioRunId: string;
@@ -125,6 +131,7 @@ export class ClickHouseSimulationRunStateRepository<
       MetCriteria: record.MetCriteria ?? [],
       UnmetCriteria: record.UnmetCriteria ?? [],
       Error: record.Error,
+      Evaluations: columnsToEvaluations(record),
       DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
       TotalCost: record.TotalCost ?? null,
       RoleCosts: record.RoleCosts ?? {},
@@ -176,6 +183,7 @@ export class ClickHouseSimulationRunStateRepository<
       MetCriteria: data.MetCriteria,
       UnmetCriteria: data.UnmetCriteria,
       Error: data.Error,
+      ...evaluationsToColumns(data.Evaluations),
       DurationMs: data.DurationMs?.toString() ?? null,
       TotalCost: data.TotalCost,
       RoleCosts: data.RoleCosts,
@@ -249,6 +257,7 @@ export class ClickHouseSimulationRunStateRepository<
             t.Verdict AS Verdict, t.Reasoning AS Reasoning,
             t.MetCriteria AS MetCriteria, t.UnmetCriteria AS UnmetCriteria,
             t.Error AS Error,
+            ${EVALUATION_COLUMNS_SQL.replaceAll("`Evaluations.", "t.`Evaluations.")},
             toString(t.DurationMs) AS DurationMs,
             t.TotalCost AS TotalCost, t.RoleCosts AS RoleCosts,
             t.RoleLatencies AS RoleLatencies,

@@ -1,6 +1,7 @@
 import { Accordion, Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { lazy, Suspense, useCallback, useState } from "react";
+import { isHumanCallerRun } from "../agent-testing/results/caller-display.ts";
 import { CopyButton } from "@langwatch/workflow-web/surfaces/copy-button";
 import { RunScenarioModal } from "../../scenarios/run-scenario-modal.tsx";
 import { ScenarioFormDrawer } from "../../scenarios/scenario-form-drawer.tsx";
@@ -17,6 +18,10 @@ import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ScenarioMessageRenderer } from "./scenario-message-renderer.tsx";
 import { hasNoResults } from "../../../../model/scenario-run-status.utils.ts";
 import { CopyIdChip } from "../../../elements/copy-id-chip.tsx";
+import {
+  CutAtLimitBadge,
+  isCutAtLimitOf,
+} from "../../../elements/CutAtLimitBadge.tsx";
 import { RunCriteriaChip } from "../../../elements/run-criteria-chip.tsx";
 import { RunDetailSection } from "../../../elements/run-detail-section.tsx";
 import { ScenarioRunActions } from "../../../elements/scenario-run-actions.tsx";
@@ -295,6 +300,9 @@ function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) 
                     <Heading size="md" truncate title={displayTitle}>
                       {displayTitle}
                     </Heading>
+                    {isCutAtLimitOf(scenarioState.metadata) ? (
+                      <CutAtLimitBadge />
+                    ) : null}
                   </HStack>
                   <HStack gap={1} flexShrink={0}>
                     <ScenarioRunActions
@@ -394,6 +402,9 @@ function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) 
                         streamingMessages={streamingMessages}
                         variant="drawer"
                         projectId={project?.id ?? ""}
+                        // A voice "Call it myself" caller is a real person, so
+                        // their turns read as "You", not "User Simulator" (#8020).
+                        isHumanCaller={isHumanCallerRun(scenarioState.metadata)}
                       />
                     </ConversationExpandContext.Provider>
                   </RunDetailSection>

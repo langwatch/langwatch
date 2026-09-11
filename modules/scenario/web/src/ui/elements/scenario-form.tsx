@@ -23,7 +23,11 @@ import {
   type UseFormSetError,
   useForm,
 } from "react-hook-form";
-import { scenarioParameterDefinitionsSchema } from "@langwatch/scenario-contract";
+import {
+  callerVoiceConfigSchema,
+  DEFAULT_CALLER_VOICE,
+  scenarioParameterDefinitionsSchema,
+} from "@langwatch/scenario-contract";
 import { z } from "zod";
 import { ScenarioCriteriaInput } from "./scenario-criteria-input.tsx";
 import { ScenarioSectionHeader } from "./scenario-section-header.tsx";
@@ -37,6 +41,9 @@ export const scenarioFormSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema,
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  // The simulated caller's voice. Editable on every scenario; only meaningful
+  // when the scenario is later run against a voice target.
+  callerVoice: callerVoiceConfigSchema.default(DEFAULT_CALLER_VOICE),
   // The test suite the scenario is filed in. Absent keeps the suite the scenario has,
   // null files it nowhere. Only the Agent Testing editor offers the field.
   testSuiteId: z.string().nullish(),
@@ -93,9 +100,13 @@ export function ScenarioForm({
       criteria: [],
       labels: [],
       parameters: [],
+      callerVoice: DEFAULT_CALLER_VOICE,
       ...defaultValues,
     },
-    resolver: zodResolver(scenarioFormSchema),
+    // The schema's callerVoice `.default(...)` makes zod's input and output
+    // types diverge; pin the resolver to the form's own value type so useForm,
+    // control and formRef all instantiate from one type source.
+    resolver: zodResolver(scenarioFormSchema) as Resolver<ScenarioFormData>,
   });
 
   const {
@@ -191,7 +202,7 @@ export function ScenarioForm({
         />
       </VStack>
 
-      <AdvancedSection register={register} errors={errors} />
+      <AdvancedSection register={register} errors={errors} control={control} />
     </VStack>
   );
 }
@@ -216,6 +227,7 @@ function useResetOnDefaultsChange({
           defaultValues.maxTurns,
           defaultValues.minTurns,
           defaultValues.testSuiteId,
+          defaultValues.callerVoice,
         ])
       : null;
     if (currentDefaults !== prevDefaultsRef.current) {
@@ -227,6 +239,7 @@ function useResetOnDefaultsChange({
           criteria: [],
           labels: [],
           parameters: [],
+          callerVoice: DEFAULT_CALLER_VOICE,
           testSuiteId: null,
           ...defaultValues,
         });
@@ -238,6 +251,7 @@ function useResetOnDefaultsChange({
 function AdvancedSection({
   register,
   errors,
+  control,
 }: {
   register: UseFormRegister<ScenarioFormData>;
   errors: FieldErrors<ScenarioFormData>;

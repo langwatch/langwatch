@@ -9,7 +9,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   setupLocalCli,
-  toolCallFix,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
@@ -73,8 +72,6 @@ Then run these commands:
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
-
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
@@ -133,8 +130,6 @@ If runs exist, get details: \`langwatch simulation-run get <runId>\`
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
-
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
@@ -195,8 +190,6 @@ Then: \`langwatch trigger list --format json\`
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
-
             const allText = state.messages
               .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");

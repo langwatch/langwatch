@@ -8803,6 +8803,1106 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "legacy-monolith-path|apps/api/src/__tests__/dockerfile-runtime-workspace-packages.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/api/src/app-static/__tests__/projectFilter.invariant.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/api/src/features/health/__tests__/langy-canary.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/api/src/features/health/__tests__/scenario-canary.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/api/src/features/health/langy-canary.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/api/src/features/health/scenario-canary.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/ui/src/features/simulations/ui/AgentVoiceEditorDrawer.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/ui/src/features/simulations/ui/__tests__/AgentCard.talkToIt.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/ui/src/features/simulations/ui/__tests__/AgentVoiceEditorDrawer.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/ui/src/features/simulations/ui/voice/TalkToItPanel.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/ui/src/features/simulations/ui/voice/__tests__/useVoiceAgentsEnabled.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/ui/src/features/simulations/ui/voice/useVoiceAgentsEnabled.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/ui/src/features/simulations/ui/voice/voice-transport-client.registry.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|apps/worker/src/platform/liveness/__tests__/voice-boot-non-fatal.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/billing/web/src/__tests__/browser-pricing-boundary.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/__tests__/azureBillIdentity.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/__tests__/ingestion-pull-run-projection.tenancy.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/__tests__/providerAccountLookup.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/__tests__/sourceDataCoverage.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/__tests__/sourceHealthHistory.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/azureBillIdentity.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/providerAccountLookup.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/agentListing.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/agentListingPort.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/copilotStudioDataverseCost.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/copilotStudioDataverseDirectory.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/copilotStudioDataverseSeats.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/databricksGeniePaidBill.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/databricksGenieSpaceWalk.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/databricksGenieUnpricedHold.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/peopleListing.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/peopleListingPort.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/pulledRowGovernanceHome.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/pulledUsageRerun.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/pullerWorkerErasureSuppression.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/pullerWorkerIdentityMatch.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/pullerWorkerUnpricedWindow.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/adminApiUsers.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/agentListingPort.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/agentsListingOutcome.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/copilotBots.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/genieSpaces.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/microsoftDirectoryRead.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/peopleListingPort.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/sourceCredentialAccess.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/sourcePullStatus.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ai-tools/__tests__/ToolCatalogEditorCards.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ai-tools/ui/sections/useAiToolCatalog.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/AnomalyRulesTab.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/DashboardSelect.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/IngestionSourcesTable.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/SourceEventsSetup.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/__tests__/anomalyRulesComposer.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/__tests__/anomalyRulesLoadingClaims.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/__tests__/anomalyRulesScopeCoupling.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/environments/EnvironmentsTab.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/toolCatalog/ToolCardFigure.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/toolCatalog/ToolCardMenu.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/toolCatalog/ToolCatalogTab.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/toolCatalog/ToolCatalogTable.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/toolCatalog/registeredTools.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/features/ingestion-sources/toolCatalog/toolCards.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/arrivalAndEventTimeLabels.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/inventoryScreenHarness.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/sourceComposerAdvanced.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/agents.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/analytics.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/governance-anomaly-rules.screen.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/insights.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/signals.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/agentDiscovery.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/azureBillClaimOnEdit.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/costRollupComparator.service.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/costRollupComparatorSchedule.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/directoryDepartmentSync.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/directoryDepartmentSync.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/erasureFoldSubstitution.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/erasureSuppression.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/governanceAgentSync.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/governanceCostRollupReads.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/governanceOcsfEvents.seatReports.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/governancePeopleScreen.service.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/governanceTenantHistory.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/identityErasure.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/identityMatch.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/identityMatchEngine.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/identityMatchSuggestion.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/identityScorerRequestBoundary.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/ingestionKey.personalCreateOnly.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/ingestionSourceProviderAccount.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/personDiscovery.service.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/personListing.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/agentDiscovery.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/costRollupComparator.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/costRollupComparatorSchedule.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/directoryDepartmentSync.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/erasureSuppression.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/govProject.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/governanceAgentSync.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/governanceAgentsScreen.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/governanceCost.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/governancePeopleScreen.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/governanceTenantHistory.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/identityErasure.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/identityMatch.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/identityMatchSuggestion.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/logic/agentInventoryRows.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/personDiscovery.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/personListing.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/server/src/langwatch-ql/provisioning/__tests__/selfProvisionLock.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/server/src/repositories/dashboard-widgets/__tests__/dashboardWidget.service.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/server/src/repositories/dashboard-widgets/access.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/server/src/repositories/dashboard-widgets/dashboardWidget.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/model/__tests__/chartGridEightColumns.migration.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/ChartGrid.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/DashboardAutoRefreshMenu.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/QueryParametersPanel.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/__tests__/ChartGrid.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/__tests__/GraphCardMenu.edit.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/__tests__/draggable-graph-card.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/__tests__/graph-card-menu.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/__tests__/langwatch-ql-workbench.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/__tests__/vega-lazy-boundary.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/analytics/analytics-reports.screen.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/draggable-graph-card.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/graph-card-menu.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/langwatch-ql-dashboard-widget.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/report-grid.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/analytics/web/src/ui/sections/useDraggableGraphCard.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/api-key/web/src/ui/sections/__tests__/token-created-dialog.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/api-key/web/src/ui/sections/token-created-dialog.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/agentsPage.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/agentsPageControls.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/agentsSummaryStrip.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/agentsSyncControl.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/costBreakdowns.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/costDepartmentFilter.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/costProviderDayRead.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/costRefresh.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/costRefusedRead.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/costSampleFill.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/costSampleMode.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/costScreen.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/costTimeControls.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/governanceOverviewHero.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/peopleDepartments.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/peopleTabs.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/platformPlaceholders.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/teamDetailHonesty.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/authz/contract/src/__tests__/userDetailHonesty.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/coding-agent/web/src/__tests__/usePersonalContext.keyScope.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/dataset/web/src/behavior/__tests__/DatasetEditorTable.search.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/feature-flag/contract/src/__tests__/voiceAgents.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/feature-flag/contract/src/voiceAgents.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/gateway/server/src/__tests__/elevenLabsCredential.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/gateway/server/src/__tests__/twilioCredential.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/gateway/server/src/transport/__tests__/langy-canary.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/gateway/server/src/transport/__tests__/scenario-canary.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/gateway/server/src/twilioCredential.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/hosted-mcp/server/src/transport/__tests__/hosted-mcp.api.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/langy/server/src/services/langyApiKeyAuthorization.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/model-provider/web/src/behavior/__tests__/useAnnotationQueueWalk.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/model-provider/web/src/behavior/__tests__/useDrawer.liveFragment.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/model-provider/web/src/behavior/__tests__/useOrganizationTeamProject.custom-role-org-admin.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/model-provider/web/src/behavior/useAnnotationQueues.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/onboarding/web/src/ui/sections/via-claude-code-screen.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/ops/web/src/features/backoffice/__tests__/bug-reports-view.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/ops/web/src/features/backoffice/__tests__/sso-connections-view.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/ops/web/src/features/feature-flags/__tests__/feature-flags-content.scope-copy.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/project/web/src/ui/sections/home/components/AskChip.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/project/web/src/ui/sections/home/components/HeroAskField.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/__tests__/connected-target.service.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/evaluations/__tests__/resolveScenarioMappings.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/evaluations/__tests__/runScenarioEvaluations.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/evaluations/__tests__/scenarioEvaluations.integration.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/evaluations/resolveScenarioMappings.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/evaluations/runScenarioEvaluations.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/evaluator-attachments.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/launch-scenario-run.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/record-scenario-evaluations.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/scenario-run-evaluators.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/__tests__/twilio-recording.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/__tests__/voice-call-trace-writer.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/__tests__/voice-run-writer.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/__tests__/voice-session.ports.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/__tests__/voice-session.service.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/call-record.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/twilio-recording.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/voice-call-trace-writer.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/voice-run-writer.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/voice-session-token.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/voice-session.ports.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/voice-session.service.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/voice-transport.registry.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/contract/src/voice/whole-call-audio.ports.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/__tests__/child-environment.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/__tests__/resolveVoiceTarget.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/eventing/__tests__/recordEvaluations.command.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/eventing/__tests__/runEvaluators.command.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/eventing/queueRun.command.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/eventing/recordEvaluations.command.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/projections/__tests__/simulationRunState.evaluationPending.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/projections/__tests__/simulationRunState.evaluations.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/repositories/clickhouse/__tests__/simulation-run.evaluation-pending.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/repositories/clickhouse/__tests__/simulation-run.mappers.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/subscribers/__tests__/scenarioEvaluations.subscriber.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/subscribers/scenarioEvaluations.subscriber.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/model/agent-testing/cases/test-cases.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/elements/agent-testing/shared/EvaluatorPill.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/elements/agent-testing/shared/__tests__/resultsEvaluators.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/elements/agent-testing/shared/__tests__/runStarted.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/elements/agent-testing/shared/__tests__/scenarioEvaluatorEditor.gate.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/elements/agent-testing/shared/__tests__/scenarioEvaluatorEditor.sources.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/elements/agent-testing/shared/__tests__/scenarioEvaluatorEditorHarness.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/elements/agent-testing/shared/__tests__/suiteEditor.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/elements/agent-testing/shared/__tests__/useAgentTestingLiveUpdates.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/results/__tests__/RunResultsTableCaller.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/results/__tests__/evaluation-summaries.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/results/caller-display.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/results/evaluation-summaries.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/run/RunEvaluatorsSection.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/run/__tests__/RunDialogCallItMyself.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/run/run-evaluators.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/run/useAddExtraFlow.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/run/useEditAndAttachExtra.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/run/useEvaluatorOffenders.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/run/useRunEvaluators.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/agent-testing/run/voice-call-target.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/scenarios/CallerVoiceModelSelect.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/scenarios/__tests__/CallerVoiceGroup.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/scenarios/__tests__/TargetSelectorOffline.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/scenarios/__tests__/caller-voice-model-options.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/web/src/ui/sections/scenarios/caller-voice-model-options.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/suite/contract/src/__tests__/suite-evaluators.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/suite/contract/src/suite-evaluators.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/server/src/repositories/clickhouse/__tests__/trace-legacy-read.anchored-span-window.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/server/src/repositories/clickhouse/__tests__/trace-legacy-read.repository.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/server/src/repositories/clickhouse/__tests__/trace-legacy-read.retention-wiring.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/server/src/repositories/clickhouse/__tests__/trace-legacy-read.service-resolution.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/server/src/transport/api-trpc/__tests__/agents.voice-gate.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/server/src/transport/api-trpc/__tests__/annotation.queue-walk.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/server/src/transport/api-trpc/__tests__/graphs.playgroundGate.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/server/src/transport/api-trpc/dashboardWidgetAccessMiddleware.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/server/src/transport/api-trpc/dashboardWidgets.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/web/src/ui/sections/__tests__/DashboardPageBody.bannersAbovePage.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/trace/web/src/ui/sections/__tests__/PersonalSidebar.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/architecture-lint/src/policies/api-transport.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/architecture-lint/src/policies/boundaries/application-boundaries.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/architecture-lint/src/policies/global-app-access.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/architecture-lint/tests/api-transport-boundaries.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/architecture-lint/tests/application-workspace-boundaries.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/architecture-lint/tests/ci-ingest-path-filter.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/architecture-lint/tests/frontend-ui-boundaries.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/architecture-lint/tests/global-app-access.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/architecture-lint/tests/legacy-feature-fragments.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/lint-core/tests/rules/legacy-monolith-path.unit.test.mjs",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/lint-core/tests/rules/package-boundaries.unit.test.mjs",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/lint-core/tests/rules/service-dependencies.unit.test.mjs",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/test-harness/src/__tests__/mock-specifier-scan.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|packages/test-harness/src/__tests__/vitest-alias-table.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/agent/__tests__/local-control-protocol-drift.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/__tests__/help-topic.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/__tests__/report-help.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/commands/__tests__/instrument.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/commands/langy/__tests__/policy.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/commands/langy/policy.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/commands/skills/__tests__/skills-installer.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/commands/skills/installer.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/utils/codex-config-toml.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/utils/governance/__tests__/app-settings.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/utils/governance/__tests__/claude-plugin-persist.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/utils/governance/__tests__/refresh-claude-user-telemetry-env.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/utils/governance/__tests__/session-context-hooks.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/utils/governance/__tests__/shell-rc-ingestion-offer.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|sdks/typescript/src/cli/utils/governance/session-context-hooks.ts",
+      "measured": "2026-09-11"
+    },
+    {
       "key": "max-depth|packages/architecture-lint/src/policies/api-transport.ts",
       "measured": "2026-09-06"
     },

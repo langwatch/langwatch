@@ -1,10 +1,37 @@
 import type { ApiKeyRevocationCause } from "@langwatch/api-key-contract";
-import type { ActivityEventDetailRow, ActivityMonitorPagedWindowQuery, ActivityMonitorSummary, ActivityMonitorWindowQuery, ConfigureIngestionPullCommand, DisableIngestionPullCommand, GovernanceIngestionSource, GovernanceOcsfExportRow, IngestionSourceHealthRow, PersonalUsageBreakdown, PersonalUsageBucket, PersonalUsageWindow, PersonalVirtualKey, PulledUsageObservedEventData, RecentAnomalyRow, RecordIngestionPullRunCompletedCommand, RecordIngestionPullRunFailedCommand, RecordPulledUsageCommand, RecordWorkspaceViewInput, SourceHealthMetrics, SpendByDepartmentRow, SpendByTeamRow, SpendByUserRow, SpendOverTimeGroupBy, SpendOverTimeResult } from "@langwatch/enterprise-governance-contract";
+import type {
+  ActivityEventDetailRow,
+  ActivityMonitorPagedWindowQuery,
+  ActivityMonitorSummary,
+  ActivityMonitorWindowQuery,
+  ConfigureIngestionPullCommand,
+  DisableIngestionPullCommand,
+  GovernanceIngestionSource,
+  GovernanceOcsfExportRow,
+  IngestionSourceHealthRow,
+  PersonalUsageBreakdown,
+  PersonalUsageBucket,
+  PersonalUsageWindow,
+  PersonalVirtualKey,
+  PulledUsageObservedEventData,
+  RecentAnomalyRow,
+  RecordIngestionPullRunCompletedCommand,
+  RecordIngestionPullRunFailedCommand,
+  RecordPulledUsageCommand,
+  RecordWorkspaceViewInput,
+  SourceHealthMetrics,
+  SpendByDepartmentRow,
+  SpendByTeamRow,
+  SpendByUserRow,
+  SpendOverTimeGroupBy,
+  SpendOverTimeResult,
+} from "@langwatch/enterprise-governance-contract";
 import type { Event, IntentContext, ProcessStore, TriggerContext } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
 import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
 import type { z } from "zod";
-export interface GovernanceInfrastructure {  activityMonitorRepository: ActivityMonitorRepository;
+export interface GovernanceInfrastructure {
+  activityMonitorRepository: ActivityMonitorRepository;
   adminWorkspaceViewOcsf: AdminWorkspaceViewOcsfChannel;
   anomalyAlertHttp: AnomalyAlertHttpClient;
   anomalySpendReader: AnomalySpendReader;
@@ -47,7 +74,6 @@ export type AnomalyAlertHttpResponse = {
   statusText: string;
 };
 
-
 export interface AnomalyAlertHttpClient {
   post(input: {
     url: string;
@@ -66,19 +92,13 @@ export type CliBudgetOverview = {
   }>;
 };
 
-
 export interface CliBudgetOverviewReader {
-  overviewForUser(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<CliBudgetOverview>;
+  overviewForUser(input: { userId: string; organizationId: string }): Promise<CliBudgetOverview>;
 }
-
 
 export interface CliAdminContactReader {
   tryResolveAdminEmail(organizationId: string): Promise<string | null>;
 }
-
 
 export interface CliTokenStore {
   members(key: string): Promise<string[]>;
@@ -209,7 +229,6 @@ export type GatewayBudgetCrossingCandidate = {
   endUserId: string | null;
 };
 
-
 export interface GatewayBudgetLedger {
   resolve(input: {
     target: {
@@ -255,7 +274,6 @@ export interface GovernanceOcsfEventsReader {
   }): Promise<GovernanceOcsfExportRow[]>;
 }
 
-
 export interface AdminWorkspaceViewOcsfChannel {
   mirror(input: {
     tenantId: string;
@@ -266,7 +284,6 @@ export interface AdminWorkspaceViewOcsfChannel {
   }): Promise<void>;
 }
 
-
 export interface GovernanceSetupActivityReader {
   hasRecentActivity(input: { tenantId: string; sinceMs: number }): Promise<boolean>;
 }
@@ -274,7 +291,6 @@ export interface GovernanceSetupActivityReader {
 export interface GovernanceDiagnosticsSink {
   warn(message: string, context: Record<string, unknown>): void;
 }
-
 
 export interface GovernanceEncryptor {
   encrypt(plaintext: string): string;
@@ -285,9 +301,7 @@ export interface GovernanceEncryptor {
 export interface GovernanceEventingChannel {
   configureIngestion(input: ConfigureIngestionPullCommand): Promise<void>;
   disableIngestion(input: DisableIngestionPullCommand): Promise<void>;
-  recordIngestionRunCompleted(
-    input: RecordIngestionPullRunCompletedCommand,
-  ): Promise<void>;
+  recordIngestionRunCompleted(input: RecordIngestionPullRunCompletedCommand): Promise<void>;
   recordIngestionRunFailed(input: RecordIngestionPullRunFailedCommand): Promise<void>;
   recordPulledUsage(input: RecordPulledUsageCommand): Promise<void>;
 }
@@ -430,10 +444,19 @@ export type GovernanceHttpResponse = {
   readonly ok: boolean;
   readonly status: number;
   readonly statusText: string;
+  /**
+   * Response headers, when the transport carries them.
+   *
+   * Optional, because a dozen in-repo doubles build a response by hand and a
+   * required member would make every one of them state a header set it never
+   * exercises. The reader that matters is the 429 path: absent headers mean no
+   * `Retry-After`, which is the same outcome as a 429 that sent none — the run
+   * still ends by the error path, it just ends without a named wait.
+   */
+  readonly headers?: { get(name: string): string | null };
   json(): Promise<unknown>;
   text(): Promise<string>;
 };
-
 
 export interface GovernanceHttpClient {
   fetch(
@@ -455,7 +478,6 @@ export type GovernanceObjectStorageCredentials = {
   sessionToken?: string;
 };
 
-
 export interface GovernanceObjectStore {
   list(input: {
     bucket: string;
@@ -466,7 +488,15 @@ export interface GovernanceObjectStore {
     credentials: GovernanceObjectStorageCredentials;
     signal?: AbortSignal;
     limit: number;
-  }): Promise<string[]>;
+    /**
+     * The keys to read, and whether the store held more than this run may take.
+     *
+     * `isTruncated` is returned rather than inferred by the caller from
+     * `keys.length`: a listing that happens to hold exactly the cap is
+     * indistinguishable from one cut short by it, and the caller would have to
+     * re-derive a rule that already lives here.
+     */
+  }): Promise<{ keys: string[]; isTruncated: boolean }>;
 
   readText(input: {
     bucket: string;
@@ -519,7 +549,6 @@ export type GovernanceResolvedBudgetCrossing = {
   spentUsd: string;
   periodStartedAtMs: number;
 };
-
 
 export interface GovernanceSignalChannel {
   available(): boolean;
@@ -588,18 +617,15 @@ export type GovernanceOcsfEvent = {
   rawOcsfJson: string;
 };
 
-
 export interface GovernanceKpiContributionWriter {
   /** Upsert/replacing identity is (tenant, source, hour, trace). */
   insertContribution(row: GovernanceKpiContribution): Promise<void>;
 }
 
-
 export interface GovernanceOcsfEventWriter {
   /** Upsert/replacing identity is (tenant, eventId). */
   insertEvent(row: GovernanceOcsfEvent): Promise<void>;
 }
-
 
 export interface GovernanceSubscriberDiagnosticsSink {
   warn(input: { code: string; tenantId: string; traceId: string }): void;
@@ -615,11 +641,9 @@ export type TraceAlertTrigger = {
   hasEvaluationFilters: boolean;
 };
 
-
 export interface TraceAlertTriggerReader {
   activeForProject(projectId: string): Promise<TraceAlertTrigger[]>;
 }
-
 
 export interface TraceAlertTriggerMatchChannel {
   send(input: {
@@ -634,11 +658,9 @@ export interface TraceAlertTriggerMatchChannel {
   }): Promise<void>;
 }
 
-
 export interface TraceAlertOriginGuard {
   passes(input: { event: GovernanceTraceEvent; state: GovernanceTraceSummary }): boolean;
 }
-
 
 export interface TraceAlertMetricsSink {
   countRecorded(count: number): void;
@@ -671,21 +693,16 @@ export type GovernanceWebhookSendBatch = {
   envelopes: GovernanceWebhookEnvelope[];
 };
 
-
 export interface GovernanceWebhookChannel {
   readonly processStore: ProcessStore;
   readonly maxAttempts: number;
 
   webhooksEnabled(organizationId: string): Promise<boolean>;
-  activeEndpointIds(input: {
-    organizationId: string;
-    eventType: string;
-  }): Promise<string[]>;
+  activeEndpointIds(input: { organizationId: string; eventType: string }): Promise<string[]>;
   sendBatch(payload: GovernanceWebhookSendBatch, context: IntentContext): Promise<void>;
   retryDelayMs(input: { attempt: number }): number;
   now(): number;
 }
-
 
 export interface ActivityMonitorRepository {
   summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary>;
@@ -697,13 +714,8 @@ export interface ActivityMonitorRepository {
     windowDays: number;
     groupBy: SpendOverTimeGroupBy;
   }): Promise<SpendOverTimeResult>;
-  recentAnomalies(input: {
-    organizationId: string;
-    limit?: number;
-  }): Promise<RecentAnomalyRow[]>;
-  ingestionSourcesHealth(input: {
-    organizationId: string;
-  }): Promise<IngestionSourceHealthRow[]>;
+  recentAnomalies(input: { organizationId: string; limit?: number }): Promise<RecentAnomalyRow[]>;
+  ingestionSourcesHealth(input: { organizationId: string }): Promise<IngestionSourceHealthRow[]>;
   eventsForSource(input: {
     organizationId: string;
     sourceId: string;
@@ -720,7 +732,6 @@ export type GovernanceClickHouseResult = {
   json(): Promise<unknown>;
 };
 
-
 export interface GovernanceClickHouseClient {
   query(input: {
     query: string;
@@ -728,7 +739,6 @@ export interface GovernanceClickHouseClient {
     format: "JSONEachRow";
   }): Promise<GovernanceClickHouseResult>;
 }
-
 
 export interface GovernanceClickHouseResolver {
   tryResolve(organizationId: string): Promise<GovernanceClickHouseClient | null>;
@@ -752,7 +762,6 @@ export type StoredIngestionKeyOwnership = StoredIngestionKey & {
   revocationCause: string | null;
 };
 
-
 export interface IngestionKeyRepository {
   tryFindIngestKey(input: {
     organizationId: string;
@@ -766,11 +775,8 @@ export interface IngestionKeyRepository {
   }): Promise<StoredIngestionKey[]>;
 
   /** One key by the lookup id embedded in its token, whether live or not. */
-  tryFindByLookupId(input: {
-    lookupId: string;
-  }): Promise<StoredIngestionKeyOwnership | null>;
+  tryFindByLookupId(input: { lookupId: string }): Promise<StoredIngestionKeyOwnership | null>;
 }
-
 
 export interface IngestionKeyIssuer {
   create(input: {
@@ -796,7 +802,6 @@ export interface IngestionKeyIssuer {
     cause?: ApiKeyRevocationCause;
   }): Promise<void>;
 }
-
 
 export interface IngestionKeyCapability {
   ensureForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
@@ -843,7 +848,6 @@ export type IngestionPrincipalSummaryRow = {
   completionTokens: number;
   topModel: { name: string; requests: number } | null;
 };
-
 
 export interface PersonalUsageReader {
   findSummary(input: {
@@ -900,7 +904,6 @@ export type PulledUsageLedgerRow = {
   observedAt: Instant;
 };
 
-
 export interface PulledUsageLedgerRepository {
   insert(rows: PulledUsageLedgerRow[]): Promise<void>;
 }
@@ -915,7 +918,6 @@ export type PulledUsageRateInput = {
   };
 };
 
-
 export interface PulledUsageRateReader {
   rate(input: PulledUsageRateInput): {
     costNanoUsd: number;
@@ -923,11 +925,9 @@ export interface PulledUsageRateReader {
   };
 }
 
-
 export interface QuarantineTenantResolver {
   resolveTenantId(organizationId: string): Promise<string>;
 }
-
 
 export interface QuarantineTraceActivityReader {
   findSpanCountsBySource(input: {
@@ -940,7 +940,6 @@ export type AnomalySpendSourceFilter =
   | { type: "all" }
   | { type: "source"; id: string }
   | { type: "source_type"; id: string };
-
 
 export interface AnomalySpendReader {
   findSpendTotals(input: {

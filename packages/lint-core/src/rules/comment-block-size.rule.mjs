@@ -187,7 +187,7 @@ export const commentBlockSizeRule = defineRule({
   messages: {
     commentColumns: {
       what: "Comment line is {{width}} columns; wrap at {{max}}.",
-      fix: "Wrap the line.",
+      fix: "Rewrap the block at {{max}} columns, or cut it to the sentence that earns its place.",
     },
   },
   create(context, file) {

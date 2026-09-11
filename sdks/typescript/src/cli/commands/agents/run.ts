@@ -1,20 +1,21 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { createSpinner } from "../../utils/spinner.ts";
 import {
   AgentsApiService,
   type AgentCallBody,
   type AgentCallMessage,
   type AgentParameterSpec,
 } from "@/client-sdk/services/agents/agents-api.service";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
-import { parseRunParameterFlags } from "../../utils/keyValueFlags";
-import type { CommandResult } from "../../utils/output";
+import { parseRunParameterFlags } from "../../utils/keyValueFlags.ts";
+import type { CommandResult } from "../../utils/output.ts";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface RunAgentOptions {
   input?: string;
@@ -174,6 +175,8 @@ export const runAgentCommand = async (
 
     const runSpinner = createSpinner(`Calling HTTP agent at ${url}...`).start();
     try {
+      // The customer's own endpoint, not LangWatch: it keeps the plain fetch,
+      // and raw-fetch-guard.unit.test.ts allows this one call.
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -216,7 +219,7 @@ export const runAgentCommand = async (
 
     const runSpinner = createSpinner(`Running agent via workflow ${workflowId}...`).start();
     try {
-      const response = await fetch(
+      const response = await langwatchFetch(
         `${endpoint}/api/v1/workflows/${encodeURIComponent(workflowId)}/run`,
         {
           method: "POST",

@@ -63,6 +63,17 @@ const s3PollingConfigSchema = z.object({
   parser: z.enum(["ndjson", "json-array", "csv"]),
   schedule: z.string().min(1),
   eventMapping: eventMappingSchema,
+  /**
+   * Whether each event keeps a verbatim copy of the line it was mapped from.
+   *
+   * On by default: the contract reserves `raw_payload` for a replay against a
+   * future mapping, and the audit row exports it for a SIEM to drill back to.
+   * A source turns it off when the line carries what the mapping was written
+   * to leave out. The OpenAI compliance export puts the person's email beside
+   * the id on every line; the mapping names the person by the id, and a kept
+   * copy would carry the address into the audit row by the back door.
+   */
+  retainRawPayload: z.boolean().default(true),
 });
 
 export type S3PollingConfig = z.infer<typeof s3PollingConfigSchema>;
@@ -89,14 +100,15 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
   async runOnce(options: PullRunOptions, config: S3PollingConfig): Promise<PullResult> {
     const cursor = options.cursor;
 
-    const listed = await this.listKeys({
+    const { keys: listed, isTruncated } = await this.listKeys({
       config,
       options,
       startAfter: cursor ?? undefined,
       signal: options.signal,
     });
+    let completeness: "complete" | "truncated" = isTruncated ? "truncated" : "complete";
     if (listed.length === 0) {
-      return { events: [], cursor, errorCount: 0 };
+      return { events: [], cursor, errorCount: 0, completeness };
     }
 
     const events: NormalizedPullEvent[] = [];
@@ -110,7 +122,9 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
           key,
           processed: events.length,
         });
-        return { events, cursor: lastSuccessfulKey, errorCount };
+        // A deadline leaves the store half-read whatever the listing said.
+        completeness = "truncated";
+        break;
       }
       try {
         const body = await this.readObject({
@@ -122,22 +136,12 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
         const { records, unreadable } = this.parseBody({ body, config });
         errorCount += unreadable;
         await this.reportUnreadableLines({ key, unreadable });
-        for (const raw of records) {
-          try {
-            events.push(this.mapEvent(raw, config));
-          } catch (error) {
-            errorCount += 1;
-            this.diagnostics.warn("skipping malformed event", {
-              adapter: this.id,
-              key,
-              error: error instanceof Error ? error.message : String(error),
-            });
-            this.diagnostics.capture(error instanceof Error ? error : new Error(String(error)), {
-              adapter: this.id,
-              key,
-            });
-          }
-        }
+        errorCount += await this.collectEvents({
+          records,
+          config,
+          key,
+          events,
+        });
         lastSuccessfulKey = key;
       } catch (error) {
         // Reading the file itself failed — this is more serious than a
@@ -161,7 +165,45 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       }
     }
 
-    return { events, cursor: lastSuccessfulKey, errorCount };
+    return { events, cursor: lastSuccessfulKey, errorCount, completeness };
+  }
+
+  /**
+   * Maps one file's records onto `events`, returning how many it could not.
+   *
+   * A record that will not map is skipped rather than thrown: one malformed
+   * line must not cost the whole file, let alone the run. The count it returns
+   * is what tells the caller the run was a partial success.
+   */
+  private async collectEvents({
+    records,
+    config,
+    key,
+    events,
+  }: {
+    records: unknown[];
+    config: S3PollingConfig;
+    key: string;
+    events: NormalizedPullEvent[];
+  }): Promise<number> {
+    let unmapped = 0;
+    for (const raw of records) {
+      try {
+        events.push(this.mapEvent(raw, config));
+      } catch (error) {
+        unmapped += 1;
+        this.diagnostics.warn("skipping malformed event", {
+          adapter: this.id,
+          key,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        this.diagnostics.capture(error instanceof Error ? error : new Error(String(error)), {
+          adapter: this.id,
+          key,
+        });
+      }
+    }
+    return unmapped;
   }
 
   private credentials(options: PullRunOptions) {
@@ -183,7 +225,8 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     options: PullRunOptions;
     startAfter?: string;
     signal?: AbortSignal;
-  }): Promise<string[]> {
+    /** See `GovernanceObjectStore.list` for why truncation is reported, not inferred. */
+  }): Promise<{ keys: string[]; isTruncated: boolean }> {
     return this.objects.list({
       bucket: config.bucket,
       prefix: config.prefix,
@@ -388,7 +431,9 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       cost_usd: asDecimalString(get(config.eventMapping.cost_usd)),
       tokens_input: asInt(get(config.eventMapping.tokens_input)),
       tokens_output: asInt(get(config.eventMapping.tokens_output)),
-      raw_payload: JSON.stringify(rawEvent),
+      // Empty, not absent, when the copy is not kept: the contract types the
+      // field as a string, and an empty string carries nothing of the line.
+      raw_payload: config.retainRawPayload ? JSON.stringify(rawEvent) : "",
       ...(Object.keys(extras).length > 0 ? { extra: extras } : {}),
     };
   }

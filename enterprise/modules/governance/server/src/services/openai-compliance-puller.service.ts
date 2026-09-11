@@ -20,6 +20,15 @@
  *     "cost": { "usd": F }
  *   }
  *
+ * The person is named by `user.id`, never by `user.email`: the id is the
+ * provider's stable handle and the erasure suppression list is keyed on
+ * exactly the actor string, the same choice the OpenAI Admin cost adapter
+ * makes. The address is left on the line, and the line is not kept
+ * (`retainRawPayload: false`), so it reaches neither the event nor the
+ * audit row. Matching the id to an account is the identity engine's job.
+ *
+ * Spec: specs/ai-governance/puller-framework/s3-polling.feature
+ *       (the OpenAI compliance rule)
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
@@ -48,17 +57,17 @@ export const OPENAI_COMPLIANCE_PULL_CONFIG: Omit<S3PollingConfig, "bucket" | "pr
     eventMapping: {
       source_event_id: "$.id",
       event_timestamp: "$.created_at",
-      actor: "$.user.email",
+      actor: "$.user.id",
       action: "$.type",
       target: "$.model",
       cost_usd: "$.cost.usd",
       tokens_input: "$.tokens.input",
       tokens_output: "$.tokens.output",
       extra: {
-        user_id: "$.user.id",
         object: "$.object",
       },
     },
+    retainRawPayload: false,
   };
 
 interface OpenAiAdminInput {

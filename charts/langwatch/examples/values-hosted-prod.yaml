@@ -87,6 +87,12 @@ clickhouse:
   auth:
     existingSecret: "clickhouse-password"
     secretKeys: { passwordKey: "password" }
+  # See examples/overlays/postgres-external.yaml — cancels the chart-managed
+  # lwql_postgres bridge default so it renders disabled instead of pointing at
+  # a nonexistent in-cluster PostgreSQL Service.
+  lwqlAccessModel:
+    postgres:
+      host: ""
 
 # --- overlays/postgres-external.yaml ---
 postgresql:

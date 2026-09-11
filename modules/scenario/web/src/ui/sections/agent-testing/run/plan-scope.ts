@@ -3,6 +3,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
+import { parseEvaluatorAttachments } from "@langwatch/scenario-contract";
 import { parseSuiteScope, parseSuiteTargets } from "@langwatch/suite-contract";
 import type { RunScope } from "./run-configuration.ts";
 import type { RunDialogSubject } from "./run-dialog-types.ts";
@@ -15,6 +16,8 @@ export type StoredPlanRow = {
   scope: unknown;
   scenarioIds: string[];
   targets: unknown;
+  /** The evaluators the row attaches; a run plan's own extras. */
+  evaluators?: unknown;
 };
 
 export function scopeOfStoredPlan(plan: StoredPlanRow): RunScope {
@@ -42,7 +45,14 @@ export function storedPlanSubject(
     scenarioIds: plan.scenarioIds,
     scope: scopeOfStoredPlan(plan),
     // A test suite answers to no run plan name, so a run of it derives one.
-    ...(plan.kind === "test_suite" ? {} : { planName: plan.name }),
+    // A test suite's evaluators are inherited by the run, not carried as the
+    // plan's own; only a run plan opens on extras.
+    ...(plan.kind === "test_suite"
+      ? {}
+      : {
+          planName: plan.name,
+          evaluators: parseEvaluatorAttachments(plan.evaluators),
+        }),
     initialTarget: first ? { type: first.type, id: first.referenceId } : null,
     persistedTarget: first ?? null,
   };

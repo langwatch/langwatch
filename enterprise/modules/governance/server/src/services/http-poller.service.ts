@@ -19,6 +19,7 @@
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
 import type { GovernanceHttpClient, GovernanceHttpResponse } from "../app/governance.members.ts";
+import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 import type { IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
 import { NullIngestionPullDiagnosticsAdapter } from "./ingestion-pull-diagnostics.service.ts";
@@ -87,6 +88,65 @@ const httpPollingConfigSchema = z.object({
 
 export type HttpPollingConfig = z.infer<typeof httpPollingConfigSchema>;
 
+/**
+ * Ends the request when the provider has asked for fewer of them, carrying the
+ * wait it named.
+ *
+ * A 429 used to fall into the generic 4xx branch and throw a plain Error. That
+ * ended the run correctly and dropped the one number saying when it is safe to
+ * come back, so the next run walked into the window this one was refused in.
+ * Returns for every other answer, including the ones that do retry.
+ */
+async function refuseIfRateLimited({
+  response,
+  url,
+}: {
+  response: GovernanceHttpResponse;
+  url: string;
+}): Promise<void> {
+  if (response.status !== 429) return;
+  throw new DispatchError({
+    message: `HTTP 429 ${response.statusText} (${url})`,
+    retryable: true,
+    retryAfterMs: parseRetryAfterMs(response.headers?.get("retry-after")),
+  });
+}
+
+/**
+ * Lets a provider asking for silence out of the run, and lets every other
+ * failure fall through to be absorbed into an error count.
+ *
+ * The distinction is the whole point. An error count is a number on a screen;
+ * a wait is an instruction, and absorbing it strands it inside a run that then
+ * reports success, so the next run walks back into the window this one was
+ * refused in. Leaving by the error path is the only way it reaches the
+ * connection that has to honour it.
+ *
+ * Every `DispatchError`, not only one that named a wait. A 429 with no
+ * `Retry-After` — or one this build cannot read as a length of time — is still
+ * a provider asking for silence, and absorbing it relabels the run's recorded
+ * reason as an ordinary transport failure, which is what an administrator then
+ * reads on the source.
+ */
+function rethrowIfRateLimited({
+  error,
+  adapter,
+  url,
+  diagnostics,
+}: {
+  error: unknown;
+  adapter: string;
+  url: string;
+  diagnostics: IngestionPullDiagnosticsSink;
+}): void {
+  if (!(error instanceof DispatchError)) return;
+  diagnostics.warn(
+    "HttpPollingPullerAdapter: provider asked for fewer requests; ending the run with its wait",
+    { adapter, url, retryAfterMs: error.retryAfterMs },
+  );
+  throw error;
+}
+
 export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig> {
   readonly id: string = "http_polling";
 
@@ -122,13 +182,23 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
           pageCount,
           cursor,
         });
-        return { events: allEvents, cursor, errorCount: 0 };
+        // Pages are still waiting. Saying nothing here reads as "complete",
+        // which is how a source permanently stuck on a fraction of its data
+        // looked exactly like a healthy quiet one.
+        return { events: allEvents, cursor, errorCount: 0, completeness: "truncated" };
       }
 
       let response: GovernanceHttpResponse;
       try {
         response = await this.fetchPage({ config, cursor, options });
       } catch (error) {
+        // Rethrows a provider asking for silence and absorbs everything else.
+        rethrowIfRateLimited({
+          error,
+          adapter: this.id,
+          url: config.url,
+          diagnostics: this.diagnostics,
+        });
         this.diagnostics.error("HttpPollingPullerAdapter: fetch failed (all retries exhausted)", {
           adapter: this.id,
           url: config.url,
@@ -161,7 +231,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
       pageCount,
       cursor,
     });
-    return { events: allEvents, cursor, errorCount: 0 };
+    return { events: allEvents, cursor, errorCount: 0, completeness: "truncated" };
   }
 
   private async fetchPage({
@@ -201,6 +271,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
           // redirect rather than forwarding those headers to another host.
           followRedirects: false,
         });
+        await refuseIfRateLimited({ response, url });
         if (response.status >= 500) {
           // Retryable — fall through to the retry-delay branch
           lastError = new Error(`HTTP ${response.status} ${response.statusText}`);

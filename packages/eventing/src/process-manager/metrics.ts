@@ -29,6 +29,8 @@ const metricNames = [
   "pm_outbox_overdue_pending",
   "pm_outbox_lapsed_leases",
   "pm_outbox_dead",
+  "pm_fleet_collection_success",
+  "pm_fleet_last_success_timestamp_seconds",
 ] as const;
 
 export interface ProcessFleetMetricsRow {
@@ -48,26 +50,36 @@ let readFleet: FleetReader | null = null;
 /**
  * Collection-time cache: six gauges are observed within milliseconds of each
  * other on every export, and each must see the same read rather than issuing
- * six aggregate queries. In-flight reads are shared; a settled read serves ten
- * seconds, comfortably inside one export interval.
+ * six aggregate queries. In-flight reads are shared, and one read serves ten
+ * seconds — including a failed attempt, so a database that is down is not
+ * re-queried once per gauge. Freshness advances only after a successful read.
  */
-let cached: { at: number; rows: ProcessFleetMetricsRow[] } | null = null;
+let cached: {
+  at: number;
+  rows: ProcessFleetMetricsRow[];
+  success: boolean;
+} | null = null;
+let lastSuccessAt = 0;
 let inFlight: Promise<ProcessFleetMetricsRow[]> | null = null;
 const CACHE_TTL_MS = 10_000;
 
 async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
-  if (!readFleet) return [];
+  const read = readFleet;
+  if (!read) return [];
   if (cached && nowInstant().epochMilliseconds - cached.at < CACHE_TTL_MS) return cached.rows;
   if (inFlight !== null) return inFlight;
-  inFlight = readFleet()
+  inFlight = Promise.resolve()
+    .then(read)
     .then((rows) => {
-      cached = { at: nowInstant().epochMilliseconds, rows };
+      lastSuccessAt = nowInstant().epochMilliseconds;
+      cached = { at: lastSuccessAt, rows, success: true };
       return rows;
     })
     .catch(() => {
-      // A failed read reports nothing rather than stale numbers presented
-      // as fresh; the export itself still succeeds.
-      return cached?.rows ?? [];
+      // Retain unresolved work, but never advance its freshness on failure.
+      const rows = cached?.rows ?? [];
+      cached = { at: nowInstant().epochMilliseconds, rows, success: false };
+      return rows;
     })
     .finally(() => {
       inFlight = null;
@@ -83,6 +95,7 @@ async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
 export function bindProcessFleetMetricsSource(read: FleetReader): void {
   readFleet = read;
   cached = null;
+  lastSuccessAt = 0;
 }
 
 function fleetGauge(
@@ -128,4 +141,39 @@ fleetGauge(
   "pm_outbox_dead",
   "Dead outbox messages per process name — intents that will not happen until redriven.",
   (r) => r.deadMessages,
+);
+
+/**
+ * Whether the latest fleet read succeeded, and when one last did.
+ *
+ * Not observing is how "no source bound" is said here: an observable gauge
+ * that skips an interval is simply absent, which is what the `remove()` of the
+ * `collect()` shape these replace meant. The freshness stamp is separate from
+ * the success flag on purpose — a read that has failed for an hour still
+ * reports success=0, and only the timestamp says how long it has been wrong.
+ */
+observableGauge(
+  {
+    name: "pm_fleet_collection_success",
+    description:
+      "Whether the latest process fleet database collection succeeded. Absent when this process has no source bound.",
+  },
+  async (observer) => {
+    await readCounts();
+    if (!readFleet) return;
+    observer.observe(cached?.success ? 1 : 0);
+  },
+);
+
+observableGauge(
+  {
+    name: "pm_fleet_last_success_timestamp_seconds",
+    description:
+      "Unix timestamp of the last successful process fleet database collection, or zero before the first success.",
+  },
+  async (observer) => {
+    await readCounts();
+    if (!readFleet) return;
+    observer.observe(lastSuccessAt / 1000);
+  },
 );
