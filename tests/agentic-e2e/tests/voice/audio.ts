@@ -10,6 +10,7 @@ import { type Page, expect } from "@playwright/test";
 
 import {
   CALL_VERDICT_TIMEOUT_MS,
+  MAX_AUDIO_PARTS_BUDGETED,
   WHOLE_CALL_AUDIO_POLL_INTERVAL_MS,
   WHOLE_CALL_AUDIO_POLL_TIMEOUT_MS,
 } from "./constants";
@@ -88,6 +89,13 @@ export async function thenTheyCanListenToTheWholeCall(page: Page) {
  * Asserts the part count is non-zero before looping, so this cannot pass
  * vacuously against an empty conversation, and scopes each audio lookup to
  * its own part rather than the whole page.
+ *
+ * It also asserts the count from above, against `MAX_AUDIO_PARTS_BUDGETED`.
+ * Each iteration below can wait a full `CALL_VERDICT_TIMEOUT_MS`, and the
+ * caller's `test.setTimeout` budgeted exactly that many waits — so without
+ * this bound a call rendering more parts would exhaust the test's overall
+ * budget mid-loop and report a generic timeout that names neither audio nor
+ * the count. Failing here instead says what actually happened.
  */
 export async function thenEachTurnHasAudio(page: Page) {
   const body = page.getByTestId("run-drawer-conversation-body");
@@ -96,6 +104,12 @@ export async function thenEachTurnHasAudio(page: Page) {
   await expect(audioParts.first()).toBeVisible({ timeout: CALL_VERDICT_TIMEOUT_MS });
   const count = await audioParts.count();
   expect(count, "expected at least one conversation part to render").toBeGreaterThan(0);
+  expect(
+    count,
+    `expected at most ${MAX_AUDIO_PARTS_BUDGETED} conversation parts, the number ` +
+      "this test's timeout budgets a per-part audio wait for; raise " +
+      "MAX_AUDIO_PARTS_BUDGETED if a longer call is now legitimate",
+  ).toBeLessThanOrEqual(MAX_AUDIO_PARTS_BUDGETED);
 
   for (let i = 0; i < count; i++) {
     await expect(audioParts.nth(i).getByTestId("media-part-audio")).toBeVisible({

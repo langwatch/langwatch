@@ -167,32 +167,35 @@ export async function thenTheTraceCarriesTwilioMetadata(page: Page) {
 
 /**
  * Then the traces carry all the metadata the call makes available
- * (ElevenLabs). Prefers the known key `voice.elevenlabs.conversation_id`;
- * if no span exposes that exact key, falls back to asserting the Attributes
- * section renders some `voice.`-prefixed key at all, since the ElevenLabs
- * contract names no specific key.
+ * (ElevenLabs): specifically `voice.elevenlabs.conversation_id`, the handle
+ * that ties a LangWatch trace back to the conversation in ElevenLabs' own
+ * dashboard.
+ *
+ * This used to accept any `voice.`-prefixed attribute as a fallback, which
+ * made it vacuous — every voice span carries some `voice.` key, so the
+ * assertion held whether or not the conversation id was ever stamped. That
+ * matters more than it sounds: the id is stamped from a websocket callback
+ * that delivers in an already-ended span's context, and stamping an ended
+ * span is a silent no-op. The fallback would have hidden exactly that
+ * regression, so the requirement is now unconditional.
+ *
+ * `nameMatch` only orders the search — `selectSpanExposingAttribute` falls
+ * back to scanning every rendered row — so naming the dial/connect spans here
+ * is a fast path, not a filter. The id is in practice stamped on a
+ * `voice.audio.send` span, which that exhaustive pass finds.
  */
 export async function thenTheTraceCarriesCallMetadata(page: Page) {
   await openTheOneTrace(page);
-  const nameMatch = /voice\.adapter\.dial|voice\.adapter\.connect|elevenlabs/i;
 
   const hasConversationId = await selectSpanExposingAttribute(page, {
-    nameMatch,
+    nameMatch: /voice\.adapter\.dial|voice\.adapter\.connect|elevenlabs/i,
     attributeText: "voice.elevenlabs.conversation_id",
   });
-  if (hasConversationId) {
-    await expect(
-      page.getByRole("dialog").getByText("voice.elevenlabs.conversation_id"),
-    ).toBeVisible({ timeout: 10_000 });
-    return;
-  }
-
-  const hasAnyVoiceAttribute = await selectSpanExposingAttribute(page, {
-    nameMatch,
-    attributeText: /^voice\./,
-  });
-  expect(hasAnyVoiceAttribute).toBe(true);
+  expect(
+    hasConversationId,
+    "expected some span to expose voice.elevenlabs.conversation_id",
+  ).toBe(true);
   await expect(
-    page.getByRole("dialog").getByText(/^voice\./).first(),
+    page.getByRole("dialog").getByText("voice.elevenlabs.conversation_id"),
   ).toBeVisible({ timeout: 10_000 });
 }
