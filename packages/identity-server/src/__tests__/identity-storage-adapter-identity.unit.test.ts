@@ -394,6 +394,37 @@ describe("better-auth over the identity storage adapter", () => {
         ).toContain("lw.identity.attach_identifier");
       });
 
+      /** @scenario "A real-issuer callback resolves its account rather than refusing" */
+      it("answers the callback key better-auth builds from a provider's own issuer", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          issuer: GOOGLE_ISSUER,
+          accountId: "sub-google-1",
+        });
+        // Nothing in the legacy table, so a refusal cannot hide behind a
+        // legacy answer: either the identity branch resolves this or the
+        // sign-in fails.
+        stack.db.account = [];
+
+        // The EXACT call better-auth 1.7 makes on an OAuth callback: two
+        // fields, no providerId and no userId. Naming no user is what makes
+        // it take the fleet-wide gate, so a refusal here fails the sign-in
+        // of every user on the deployment and not just this one.
+        const owner = await context.internalAdapter.findAccountOwnerByKey({
+          issuer: GOOGLE_ISSUER,
+          accountId: "sub-google-1",
+        });
+
+        // "owned" and not "orphaned": the point is that the callback finds
+        // the PERSON, which is what lets the sign-in continue.
+        expect(owner?.kind).toBe("owned");
+        expect(owner?.kind === "owned" ? owner.user.id : null).toBe(userId);
+      });
+
       /** @scenario "A stored issuer is served in preference to a derived one" */
       it("serves the stored issuer back to better-auth, not the synthetic form", async () => {
         await signUp(stack.auth, EMAIL);

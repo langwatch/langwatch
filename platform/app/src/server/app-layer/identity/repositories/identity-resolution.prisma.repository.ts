@@ -1,5 +1,6 @@
 import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity";
 import type {
+  IdentityIssuerResolution,
   IdentityResolution,
   IdentityResolutionPort,
 } from "@langwatch/identity-server/better-auth";
@@ -18,6 +19,10 @@ interface ResolutionRow {
   identifierId: string;
   userId: string;
   status: string | null;
+}
+
+interface IssuerResolutionRow extends ResolutionRow {
+  providerId: string | null;
 }
 
 /**
@@ -71,6 +76,51 @@ export class PrismaIdentityResolutionRepository
     return this.resolve(
       Prisma.sql`i."providerId" = ${providerId} AND i."providerAccountId" = ${providerAccountId} AND i."state" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})`,
     );
+  }
+
+  /**
+   * The callback of a provider that asserts its OWN issuer.
+   *
+   * Google, GitHub, GitLab and Azure AD are keyed by better-auth on the
+   * issuer the provider states rather than on one we mint, and the attach
+   * ceremony stores that verbatim - so this matches the pair the row carries
+   * and `@@index([issuer, providerAccountId])` serves it.
+   *
+   * It returns the row's `providerId` as well, because the account read
+   * underneath is keyed by it and the caller asked by issuer. Deriving it
+   * from the issuer instead would be a guess, and a provider subject is
+   * unique only WITHIN an issuer: a wrong guess answers with another IdP's
+   * user. A row whose `providerId` is null backs no protocol account, so it
+   * resolves nobody here.
+   */
+  async resolveByIssuerSubject({
+    issuer,
+    providerAccountId,
+  }: {
+    issuer: string;
+    providerAccountId: string;
+  }): Promise<IdentityIssuerResolution | null> {
+    const rows = await this.prisma.$queryRaw<IssuerResolutionRow[]>`
+      SELECT i."id" AS "identifierId", i."userId" AS "userId",
+             i."providerId" AS "providerId", s."status" AS "status"
+      FROM "Identifier" i
+      LEFT JOIN "SystemMigrationTenantState" s
+        ON s."tenantId" = i."userId"
+       AND s."migrationName" = ${IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME}
+      WHERE i."issuer" = ${issuer}
+        AND i."providerAccountId" = ${providerAccountId}
+        AND i."state" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})
+      ORDER BY i."attachedAt" ASC, i."id" ASC
+      LIMIT 1
+    `;
+    const row = rows[0];
+    if (row === undefined || row.providerId === null) return null;
+    this.touchLastUsed(row.identifierId);
+    return {
+      userId: row.userId,
+      finalized: row.status === "finalized",
+      providerId: row.providerId,
+    };
   }
 
   private async resolve(match: Prisma.Sql): Promise<IdentityResolution | null> {
