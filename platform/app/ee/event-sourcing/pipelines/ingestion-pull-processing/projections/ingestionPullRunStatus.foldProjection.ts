@@ -232,15 +232,15 @@ function readThroughOf(event: IngestionPullRunCompletedEvent): {
  */
 function consecutiveErrorsAfterCompletion({
   previous,
-  partlySucceeded,
-  pageUnread,
+  hasPartialSuccess,
+  hasUnreadPage,
 }: {
   previous: number;
-  partlySucceeded: boolean;
-  pageUnread: boolean;
+  hasPartialSuccess: boolean;
+  hasUnreadPage: boolean;
 }): number {
-  if (pageUnread) return previous + 1;
-  return partlySucceeded ? previous : 0;
+  if (hasUnreadPage) return previous + 1;
+  return hasPartialSuccess ? previous : 0;
 }
 
 export class IngestionPullRunStatusFoldProjection
@@ -390,11 +390,11 @@ export class IngestionPullRunStatusFoldProjection
     // stepped over. The adapter banks the pages it already had rather than
     // throwing them away, so this failure arrives on a COMPLETION -- and it is
     // still the failure it would have been had it arrived on the first page.
-    const pageUnread = event.data.unreadPage === true;
+    const hasUnreadPage = event.data.unreadPage === true;
     // Absent on every completion written before runs reported an error count,
     // and reading that as a clean run is correct: those producers failed the
     // whole run rather than returning partial progress.
-    const partlySucceeded = (event.data.errorCount ?? 0) > 0 || pageUnread;
+    const hasPartialSuccess = (event.data.errorCount ?? 0) > 0 || hasUnreadPage;
     return {
       ...state,
       SourceId: event.data.sourceId,
@@ -406,14 +406,14 @@ export class IngestionPullRunStatusFoldProjection
       LastRunErrorCode: null,
       ConsecutiveErrors: consecutiveErrorsAfterCompletion({
         previous: state.ConsecutiveErrors,
-        partlySucceeded,
-        pageUnread,
+        hasPartialSuccess,
+        hasUnreadPage,
       }),
       LastRunScheduledFor: event.data.scheduledFor,
       // Stamped on every clean completion, including one that found nothing
       // new: reaching the provider and being told "no usage" is a working
       // puller.
-      LastSuccessAt: partlySucceeded ? state.LastSuccessAt : event.occurredAt,
+      LastSuccessAt: hasPartialSuccess ? state.LastSuccessAt : event.occurredAt,
       ...readThroughOf(event),
     };
   }

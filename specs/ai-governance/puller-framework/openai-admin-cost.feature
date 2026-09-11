@@ -251,6 +251,17 @@ Feature: OpenAI Admin cost puller
       # record a completion and leave the source looking healthy while it
       # collected nothing.
 
+    @unit
+    Scenario: A request the provider rejects outright is not banked part-way
+      Given a run that has already read earlier pages of a window
+      When the provider rejects a later page as a bad request
+      Then the source's position is unchanged
+      And the failure is reported
+      # A rejected request is an answer about the request itself, earning the
+      # same answer on every page and every retry. Resuming at it would leave
+      # the position on a page nothing will ever read past, so this is weighed
+      # like a refused key rather than like a provider having a bad minute.
+
     @integration
     Scenario: Every page of a window is read
       Given a window spanning more days than one page can carry

@@ -364,6 +364,35 @@ describe("given an OpenAI Admin cost source", () => {
       expect(result.unreadPage).toBe(true);
       expect(JSON.parse(result.cursor!)).toMatchObject({ page: "page_2" });
     });
+
+    /**
+     * A rejected request is not a bad minute: the same request earns the same
+     * rejection on every retry, so resuming AT the rejected page would park the
+     * position on a page nothing will ever read past. The pages already read
+     * still come back -- they are restated on the next run, which re-asks for
+     * the same window -- but the position does not move onto the rejection.
+     */
+    /** @scenario "A request the provider rejects outright is not banked part-way" */
+    it("holds the position when a later page is rejected as a bad request", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse(page({ nextPage: "page_2", hasMore: true })),
+        )
+        .mockResolvedValueOnce(
+          errorResponse({
+            status: 400,
+            param: null,
+            code: "invalid_request_error",
+            message: "Unknown parameter: 'group_by[]'.",
+          }),
+        );
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      expect(result.errorCount).toBe(1);
+      expect(result.cursor).toBe(RUN_OPTIONS.cursor);
+      expect(result.unreadPage).toBeUndefined();
+    });
   });
 
   describe("when the provider reports a day's spend", () => {

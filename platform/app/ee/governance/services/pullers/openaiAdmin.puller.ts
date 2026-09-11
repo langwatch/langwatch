@@ -552,6 +552,39 @@ async function providerRefusal(response: {
 }
 
 /**
+ * A non-OK response that is not one of the refusals `providerRefusal` names,
+ * carrying the status so the banking rule can tell an answer about the request
+ * from a provider having a bad minute.
+ *
+ * The status is what a plain `Error` lost. Reconstructing it from the message
+ * would be reading our own prose back, so it rides the error instead.
+ */
+class UnexpectedStatusError extends Error {
+  readonly status: number;
+
+  constructor({ status, message }: { status: number; message: string }) {
+    super(message);
+    this.name = "UnexpectedStatusError";
+    this.status = status;
+  }
+}
+
+/**
+ * Whether a status is the provider answering about THIS REQUEST rather than
+ * about the minute it is having.
+ *
+ * A 4xx is an answer: the same request earns the same answer on every page and
+ * every retry, so there is no window to resume. 408 and 425 ask to be sent
+ * again, which makes them bad minutes like a 5xx. 429, 401 and 403 never reach
+ * here — `providerRefusal` names them first, because a rate limit carries a wait
+ * worth keeping.
+ */
+function isRequestRefused(status: number): boolean {
+  if (status === 408 || status === 425) return false;
+  return status >= 400 && status < 500;
+}
+
+/**
  * Whether a page refused mid-run should be ANSWERED with the progress already
  * made, rather than thrown out of the run.
  *
@@ -577,17 +610,21 @@ async function providerRefusal(response: {
  * about this source, so the pages already read are worth more than starting the
  * window over.
  *
- * One thing banks here that is NOT transient. A 4xx this adapter does not
- * classify — a 400 that is not the key-breakdown cutoff, a 404, a 422 — leaves
- * `fetchPage` as a plain error on the same line a 5xx does, so pages in hand
- * bank it too. That keeps pages the old code threw away, so it is not a
- * regression, but the window still never completes: the next run starts AT the
- * refused page, reads nothing, and reports the failure with the cursor held,
- * which HOLDS the consecutive count rather than raising it. A source wedged
- * that way reads as partly collected rather than failing. Pinning those
- * statuses as refusals would overturn the cases already fixing a
- * differently-shaped 400 to a counted failure rather than a throw, so it is a
- * change of its own.
+ * A 4xx this adapter does not classify by name — a 400 that is not the
+ * key-breakdown cutoff, a 404, a 422 — is an answer about the REQUEST, so it is
+ * not banked either. It reaches here as an `UnexpectedStatusError` carrying the
+ * status, because a plain error told the rule only that it was not a
+ * `DispatchError` and a 404 then banked as readily as a 503: the cursor advanced
+ * onto a page nothing will ever read past. 408 and 425 are the two 4xx that ask
+ * to be sent again, so they count as bad minutes rather than answers.
+ *
+ * Refusing to bank is NOT the same as failing the run here. What is thrown is
+ * unchanged, so a rejected request still ends the run the way it always did —
+ * the events read so far, the cursor where it was, the failure reported — and
+ * the next run asks for the same window rather than for a page it cannot get
+ * past. Turning these into non-retryable dispatch errors instead would
+ * dead-letter them and would overturn the two cases covering a
+ * differently-shaped 400 on the first page.
  *
  * Banking is never the same as succeeding. The result carries `unreadPage`, so
  * the run status counts the failure while keeping the progress — without it a
@@ -603,7 +640,10 @@ function mustBankRefusal({
   if (pageCount === 0) return false;
   // A provider refusing outright is not a window to retry. Let that one travel,
   // so the run is recorded as the refusal it is.
-  return !(error instanceof DispatchError) || error.retryable;
+  if (error instanceof DispatchError) return error.retryable;
+  if (error instanceof UnexpectedStatusError)
+    return !isRequestRefused(error.status);
+  return true;
 }
 
 /**
@@ -966,9 +1006,10 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       }
       // The body can echo the request but never the credential — the key rides
       // in a header the provider does not reflect.
-      throw new Error(
-        `HTTP ${response.status} (openai cost report)${detail ? `: ${detail}` : ""}`,
-      );
+      throw new UnexpectedStatusError({
+        status: response.status,
+        message: `HTTP ${response.status} (openai cost report)${detail ? `: ${detail}` : ""}`,
+      });
     }
     return { ok: true, body: await response.json() };
   }
