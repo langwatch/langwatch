@@ -60,81 +60,89 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("the date history is read from", () => {
-  // @scenario "The field asks when to start reading, not for a backfill start"
-  it("asks when to start reading, and keeps what only OpenAI can say", () => {
-    const field = fieldFor("openai_admin", "startingAt");
+describe("given the date a scheduled source reads history from", () => {
+  describe("when the form describes the field", () => {
+    /** @scenario "The field asks when to start reading, not for a backfill start" */
+    it("asks when to start reading, and keeps what only OpenAI can say", () => {
+      const field = fieldFor("openai_admin", "startingAt");
 
-    // "Backfill start (optional)" was our word for it plus a description of
-    // the form rather than of the setting.
-    expect(field.label).toBe("Read history from");
-    expect(fieldControl({ field, values: {} }).kind).toBe("date");
+      // "Backfill start (optional)" was our word for it plus a description of
+      // the form rather than of the setting.
+      expect(field.label).toBe("Read history from");
+      expect(fieldControl({ field, values: {} }).kind).toBe("date");
 
-    const hint = field.hint ?? "";
-    expect(hint).toMatch(/first day/i);
-    expect(hint).toMatch(/forward|where the last/i);
-    expect(hint).toMatch(/clear/i);
-    // The provider-specific caveat is not general plain-words copy and is the
-    // one thing an admin picking a date a year back has to know here.
-    expect(hint).toMatch(/December 2025/);
-    expect(hint).toMatch(/API key/i);
+      const hint = field.hint ?? "";
+      expect(hint).toMatch(/first day/i);
+      expect(hint).toMatch(/forward|where the last/i);
+      expect(hint).toMatch(/clear/i);
+      // The provider-specific caveat is not general plain-words copy and is the
+      // one thing an admin picking a date a year back has to know here.
+      expect(hint).toMatch(/December 2025/);
+      expect(hint).toMatch(/API key/i);
+    });
   });
 
-  // @scenario "A new OpenAI source proposes a year of history"
-  it("proposes midnight UTC one year back for a new OpenAI source", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-09-15T10:30:00.000Z"));
+  describe("when a new source is added", () => {
+    /** @scenario "A new OpenAI source proposes a year of history" */
+    it("proposes midnight UTC one year back for a new OpenAI source", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-09-15T10:30:00.000Z"));
 
-    expect(defaultParserValues("openai_admin").startingAt).toBe(
-      "2025-09-15T00:00:00.000Z",
-    );
-  });
-
-  // @scenario "A new OpenAI source proposes a year of history"
-  it("reads the figure from the one declared table, per source type", () => {
-    // Two source types, two numbers, one place. A second copy of either
-    // figure is how the proposal and the sentence describing it drift apart.
-    expect(SOURCE_BACKFILL_MONTHS.openai_admin).toBe(12);
-    expect(SOURCE_BACKFILL_MONTHS.anthropic_admin).toBe(6);
-  });
-
-  // @scenario "Editing an existing source shows what it holds"
-  it("shows the stored day on an edit rather than proposing a new one", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-09-15T10:30:00.000Z"));
-
-    const seeded = seedComposerParserConfig({
-      sourceType: "openai_admin",
-      storedParserConfig: { startingAt: "2026-02-03T00:00:00.000Z" },
+      expect(defaultParserValues("openai_admin").startingAt).toBe(
+        "2025-09-15T00:00:00.000Z",
+      );
     });
 
-    expect(seeded.startingAt).toBe("2026-02-03T00:00:00.000Z");
-    expect(dateInputValue(seeded.startingAt ?? "")).toBe("2026-02-03");
+    /** @scenario "A new OpenAI source proposes a year of history" */
+    it("reads the figure from the one declared table, per source type", () => {
+      // Two source types, two numbers, one place. A second copy of either
+      // figure is how the proposal and the sentence describing it drift apart.
+      expect(SOURCE_BACKFILL_MONTHS.openai_admin).toBe(12);
+      expect(SOURCE_BACKFILL_MONTHS.anthropic_admin).toBe(6);
+    });
   });
 
-  // @scenario "Editing an existing source shows what it holds"
-  it("leaves an edited source with no start date empty rather than proposing one", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-09-15T10:30:00.000Z"));
+  describe("when an existing source is opened for editing", () => {
+    /** @scenario "Editing an existing source shows what it holds" */
+    it("shows the stored day rather than proposing a new one", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-09-15T10:30:00.000Z"));
 
-    // A source saved before the field had a default, or one whose admin
-    // deliberately cleared it. Seeding the proposal here would hand it a year
-    // of history it was never configured to read.
-    expect(
-      seedComposerParserConfig({
+      const seeded = seedComposerParserConfig({
         sourceType: "openai_admin",
-        storedParserConfig: { model: "gpt-4o" },
-      }),
-    ).not.toHaveProperty("startingAt");
+        storedParserConfig: { startingAt: "2026-02-03T00:00:00.000Z" },
+      });
+
+      expect(seeded.startingAt).toBe("2026-02-03T00:00:00.000Z");
+      expect(dateInputValue(seeded.startingAt ?? "")).toBe("2026-02-03");
+    });
+
+    /** @scenario "Editing an existing source shows what it holds" */
+    it("leaves a source with no start date empty rather than proposing one", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-09-15T10:30:00.000Z"));
+
+      // A source saved before the field had a default, or one whose admin
+      // deliberately cleared it. Seeding the proposal here would hand it a year
+      // of history it was never configured to read.
+      expect(
+        seedComposerParserConfig({
+          sourceType: "openai_admin",
+          storedParserConfig: { model: "gpt-4o" },
+        }),
+      ).not.toHaveProperty("startingAt");
+    });
   });
 
-  // @scenario "Clearing the proposal still means the adapter's own default"
-  it("carries no start date once the admin clears the proposal", () => {
-    const built = buildOpenAiAdminPullConfig(
-      openAiComposerWith({ startingAt: "" }),
-    );
+  describe("when the admin clears the proposed date", () => {
+    /** @scenario "Clearing the proposal still means the adapter's own default" */
+    it("carries no start date into the saved config", () => {
+      const built = buildOpenAiAdminPullConfig(
+        openAiComposerWith({ startingAt: "" }),
+      );
 
-    expect(built).not.toBeNull();
-    expect(built).not.toHaveProperty("startingAt");
+      expect(built).not.toBeNull();
+      expect(built).not.toHaveProperty("startingAt");
+    });
   });
 });

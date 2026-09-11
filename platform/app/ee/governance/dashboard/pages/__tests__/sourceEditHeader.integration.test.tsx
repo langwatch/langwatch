@@ -146,100 +146,110 @@ const openNotes = async (): Promise<string> => {
 };
 
 describe("given the edit drawer's title", () => {
-  /** @scenario "The edit title names the provider and shows its logo" */
-  it("names the provider it is editing", () => {
-    renderDrawer(anthropicSource({ report: "cost", hasPulled: false }));
+  describe("when it opens on a source type the catalog knows", () => {
+    /** @scenario "The edit title names the provider and shows its logo" */
+    it("names the provider it is editing", () => {
+      renderDrawer(anthropicSource({ report: "cost", hasPulled: false }));
 
-    expect(
-      screen.getByRole("heading", { name: "Edit Anthropic Admin API" }),
-    ).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Edit source" })).toBeNull();
+      expect(
+        screen.getByRole("heading", { name: "Edit Anthropic Admin API" }),
+      ).toBeTruthy();
+      expect(screen.queryByRole("heading", { name: "Edit source" })).toBeNull();
+    });
+
+    /** @scenario "The edit title names the provider and shows its logo" */
+    it("shows the provider's glyph beside the name", () => {
+      renderDrawer(anthropicSource({ report: "cost", hasPulled: false }));
+
+      // The same mark the Add source menu and the create composer show for this
+      // type. A header that names the provider in words alone is a different
+      // header from the one an admin just came through.
+      expect(screen.getByTestId("source-type-icon")).toBeTruthy();
+    });
   });
 
-  /** @scenario "The edit title names the provider and shows its logo" */
-  it("shows the provider's glyph beside the name", () => {
-    renderDrawer(anthropicSource({ report: "cost", hasPulled: false }));
+  describe("when it opens on a type the catalog has no entry for", () => {
+    /** @scenario "An unrecognised source type still gets a title" */
+    it("falls back to a plain title", () => {
+      // Every lookup on this drawer is keyed by `SourceType` and simply misses
+      // for a row written by a newer deploy. A missed lookup must leave a title
+      // rather than "Edit undefined" or a blank header.
+      renderDrawer(sourceOfAnUnknownType);
 
-    // The same mark the Add source menu and the create composer show for this
-    // type. A header that names the provider in words alone is a different
-    // header from the one an admin just came through.
-    expect(screen.getByTestId("source-type-icon")).toBeTruthy();
-  });
-
-  /** @scenario "An unrecognised source type still gets a title" */
-  it("falls back to a plain title for a type it has no entry for", () => {
-    // Every lookup on this drawer is keyed by `SourceType` and simply misses
-    // for a row written by a newer deploy. A missed lookup must leave a title
-    // rather than "Edit undefined" or a blank header.
-    renderDrawer(sourceOfAnUnknownType);
-
-    expect(screen.getByRole("heading", { name: "Edit source" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Edit source" })).toBeTruthy();
+    });
   });
 });
 
 describe("given a source with settings its adapter can no longer change", () => {
-  /** @scenario "A pulled usage source carries the two notes that apply to it" */
-  it("puts the usage source's two notes behind the one marker", async () => {
-    renderDrawer(anthropicSource({ report: "usage", hasPulled: true }));
-    const notes = await openNotes();
+  describe("when the admin opens the marker beside the title", () => {
+    /** @scenario "A pulled usage source carries the two notes that apply to it" */
+    it("puts the usage source's two notes behind the one marker", async () => {
+      renderDrawer(anthropicSource({ report: "usage", hasPulled: true }));
+      const notes = await openNotes();
 
-    // The usage cursor never rewinds, so both of this source's settings are
-    // fixed once it has pulled.
-    expect(notes).toMatch(/report/i);
-    expect(notes).toMatch(/start/i);
-    // Restating cost history is a cost-source sentence. Shown here it would
-    // describe a repair this source cannot perform.
-    expect(notes).not.toMatch(/restate/i);
+      // The usage cursor never rewinds, so both of this source's settings are
+      // fixed once it has pulled.
+      expect(notes).toMatch(/report/i);
+      expect(notes).toMatch(/start/i);
+      // Restating cost history is a cost-source sentence. Shown here it would
+      // describe a repair this source cannot perform.
+      expect(notes).not.toMatch(/restate/i);
+    });
+
+    /** @scenario "A pulled cost source carries a different two" */
+    it("puts the cost source's different two behind the same marker", async () => {
+      renderDrawer(anthropicSource({ report: "cost", hasPulled: true }));
+      const notes = await openNotes();
+
+      expect(notes).toMatch(/report/i);
+      // The cost cursor binds `startingAt` into its own identity, so moving the
+      // start is the deliberate repair lever rather than a setting to lock. The
+      // three notes never all apply at once: a fixed start and a start worth
+      // moving are the two halves of one condition.
+      expect(notes).toMatch(/restate|re-read/i);
+      expect(notes).not.toMatch(/start date is fixed/i);
+    });
   });
 
-  /** @scenario "A pulled cost source carries a different two" */
-  it("puts the cost source's different two behind the same marker", async () => {
-    renderDrawer(anthropicSource({ report: "cost", hasPulled: true }));
-    const notes = await openNotes();
+  describe("when nothing about the source is locked yet", () => {
+    /** @scenario "A source with nothing locked shows no marker at all" */
+    it("shows no marker on a source that has never pulled", () => {
+      // Nothing is locked before a cursor exists, so every note would be
+      // inapplicable — and a marker opening onto an empty popover is worse than
+      // no marker, because it invites a click that answers nothing.
+      renderDrawer(anthropicSource({ report: "cost", hasPulled: false }));
 
-    expect(notes).toMatch(/report/i);
-    // The cost cursor binds `startingAt` into its own identity, so moving the
-    // start is the deliberate repair lever rather than a setting to lock. The
-    // three notes never all apply at once: a fixed start and a start worth
-    // moving are the two halves of one condition.
-    expect(notes).toMatch(/restate|re-read/i);
-    expect(notes).not.toMatch(/start date is fixed/i);
+      expect(screen.queryByTestId("edit-source-notes")).toBeNull();
+    });
   });
 
-  /** @scenario "A source with nothing locked shows no marker at all" */
-  it("shows no marker on a source that has never pulled", () => {
-    // Nothing is locked before a cursor exists, so every note would be
-    // inapplicable — and a marker opening onto an empty popover is worse than
-    // no marker, because it invites a click that answers nothing.
-    renderDrawer(anthropicSource({ report: "cost", hasPulled: false }));
+  describe("when the drawer is drawn, before anything is opened", () => {
+    /** @scenario "The locked-field notes move behind an information marker" */
+    it("keeps the notes out of the body, where they used to sit", () => {
+      renderDrawer(anthropicSource({ report: "usage", hasPulled: true }));
 
-    expect(screen.queryByTestId("edit-source-notes")).toBeNull();
-  });
+      // Chakra keeps popover content mounted and hidden while closed, so only a
+      // visibility matcher tells "behind the marker" from "in the body".
+      expect(screen.getByTestId("edit-source-notes")).toBeVisible();
+      expect(
+        screen.getByText(/is fixed once a source has pulled/i),
+      ).not.toBeVisible();
+    });
 
-  /** @scenario "The locked-field notes move behind an information marker" */
-  it("keeps the notes out of the body, where they used to sit", () => {
-    renderDrawer(anthropicSource({ report: "usage", hasPulled: true }));
+    /** @scenario "A locked report is still readable and still reachable" */
+    it("leaves a locked report readable and in the tab order", () => {
+      renderDrawer(anthropicSource({ report: "cost", hasPulled: true }));
 
-    // Chakra keeps popover content mounted and hidden while closed, so only a
-    // visibility matcher tells "behind the marker" from "in the body".
-    expect(screen.getByTestId("edit-source-notes")).toBeVisible();
-    expect(
-      screen.getByText(/is fixed once a source has pulled/i),
-    ).not.toBeVisible();
-  });
+      const report = screen.getByLabelText("Use Anthropic's reported cost");
 
-  /** @scenario "A locked report is still readable and still reachable" */
-  it("leaves a locked report readable and in the tab order", () => {
-    renderDrawer(anthropicSource({ report: "cost", hasPulled: true }));
-
-    const report = screen.getByLabelText("Use Anthropic's reported cost");
-
-    // readOnly, never disabled: a disabled control drops out of the tab order,
-    // where a keyboard or screen-reader user cannot read what it holds. And
-    // what it holds has to be the report's own name — "Off" is the position of
-    // a control this admin can no longer see.
-    expect(report).toHaveProperty("readOnly", true);
-    expect((report as HTMLInputElement).disabled).toBe(false);
-    expect((report as HTMLInputElement).value).toBe("Cost report");
+      // readOnly, never disabled: a disabled control drops out of the tab order,
+      // where a keyboard or screen-reader user cannot read what it holds. And
+      // what it holds has to be the report's own name — "Off" is the position of
+      // a control this admin can no longer see.
+      expect(report).toHaveProperty("readOnly", true);
+      expect((report as HTMLInputElement).disabled).toBe(false);
+      expect((report as HTMLInputElement).value).toBe("Cost report");
+    });
   });
 });
