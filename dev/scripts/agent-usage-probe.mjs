@@ -30,11 +30,17 @@ const flag = (name, fallback) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
 };
 if (!file || !fs.existsSync(file)) {
-  console.error("usage: node agent-usage-probe.mjs <export.jsonl> [--label X] [--out card.json]");
+  console.error(
+    "usage: node agent-usage-probe.mjs <export.jsonl> [--label X] [--out card.json] [--no-frustration]",
+  );
   process.exit(1);
 }
 const label = flag("label", "unlabelled");
 const outPath = flag("out", "agent-usage-card.json");
+// Opting out of the frustration section is a FLAG, not a different build of
+// this script. A fork would silently change every other definition too, and
+// the whole point of a shared probe is that it cannot.
+const frustrationEnabled = !args.includes("--no-frustration");
 
 // ---------------------------------------------------------------- utilities
 const hash = (s) => crypto.createHash("sha256").update(String(s)).digest("hex").slice(0, 12);
@@ -302,6 +308,30 @@ const LEX_SWEAR =
   /\b(?:fuck\w*|cunt\w*|motherfuck\w*|shit\w*|bollocks|wank\w*|twat\w*|bastard\w*|arsehole\w*|pissed|pissing|damn\w*|crap\w*|bloody|bugger\w*|arse|sodding)\b/i;
 const LEX_TOLD =
   /\b(?:as i (?:said|told you|asked)|i (?:said|told you|asked you)|like i said|i already|you (?:keep|still|again)|stop doing|i didn'?t (?:say|ask|want)|that'?s not what)\b/i;
+// Coverage check, not a quality judgement. The two lexicons above are English.
+// A prompt written in Dutch or Portuguese matches neither, so it scores as
+// calm rather than as unmeasured — and a card reading 0.0% would be taken for
+// a fact about the person. This counts how much of the corpus the lexicons
+// can actually see, so a low share disqualifies the rows instead of feeding
+// them.
+//
+// Measured by DENSITY, never by a single hit. "in", "is", "we", "was", "of"
+// and "my" are also ordinary words in Dutch and German, so one match means
+// nothing: a whole Dutch corpus of realistic-length prompts tests 100% English
+// under a single-hit rule and the warning below never fires. English prose
+// runs ~20-40% of its tokens in this list; Dutch and German land near 3%.
+const LEX_EN =
+  /\b(?:the|and|that|with|this|for|you|not|but|have|from|are|was|were|what|when|why|should|would|could|can|does|did|is|of|to|in|on|it|be|we|my)\b/gi;
+const EN_DENSITY_MIN = 0.1;
+// null means "too short to judge" — such prompts leave the denominator rather
+// than counting as non-English. Real corpora are full of "continue" and "fix
+// it", and scoring those as foreign would disqualify a perfectly English card.
+const englishLike = (txt) => {
+  const words = txt.split(/\s+/).filter(Boolean).length;
+  if (words < 5) return null;
+  const hits = (txt.match(LEX_EN) ?? []).length;
+  return hits / words >= EN_DENSITY_MIN;
+};
 const STRIP_TAGS = [
   /<system-reminder>[\s\S]*?<\/system-reminder>/g,
   /<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g,
@@ -311,6 +341,8 @@ const STRIP_TAGS = [
 ];
 
 const frustration = (() => {
+  if (!frustrationEnabled)
+    return { disabled: true, note: "opted out with --no-frustration; every other metric is unchanged" };
   const scored = [];
   for (const t of T) {
     if (typeof t.text !== "string" || !t.text.trim()) continue;
@@ -322,9 +354,13 @@ const frustration = (() => {
       words: txt.split(/\s+/).length,
       swear: LEX_SWEAR.test(txt),
       told: LEX_TOLD.test(txt),
+      english: englishLike(txt),
     });
   }
   if (scored.length < 50) return { prompts_with_text: scored.length, note: "too few prompts to score" };
+
+  const judgeable = scored.filter((x) => x.english !== null);
+  const englishPct = pct(judgeable.filter((x) => x.english).length, judgeable.length);
 
   const r = (sel, k) => (sel.length ? pct(sel.filter((x) => x[k]).length, sel.length) : 0);
 
@@ -403,6 +439,12 @@ const frustration = (() => {
 
   return {
     prompts_with_text: scored.length,
+    english_like_pct: englishPct,
+    english_judged_prompts: judgeable.length,
+    lexicon_coverage_note:
+      englishPct < 80
+        ? "the profanity and repetition lexicons are English only, and this corpus is not mostly English — read every rate below as NOT MEASURED, never as a low rate"
+        : "corpus is mostly English, which is what the lexicons cover",
     baseline_profanity_pct: r(scored, "swear"),
     by_model: grouped("model"),
     by_reasoning_effort: grouped("effort"),
@@ -551,10 +593,17 @@ for (const k of c.checkpoint_counterfactual.by_threshold) {
     `  cap at ${String(k.threshold_tokens / 1000 + "k").padEnd(8)} ${String(k.checkpoints_implied).padStart(5)} checkpoints  ${String(k.read_tokens_saved_pct).padStart(6)}% of read tokens  ~$${k.est_cost_saved_usd}`,
   );
 }
+if (frustration?.disabled) {
+  console.log(`\n  frustration signal — skipped (--no-frustration). Every other number is unchanged.`);
+}
 if (frustration && frustration.within_session) {
   const f = frustration;
   console.log(`\n  frustration signal (rates only, no text retained)`);
   console.log(`  ${f.prompts_with_text.toLocaleString()} prompts with text, ${f.profanity_events} profanity events, baseline ${f.baseline_profanity_pct}%`);
+  if (f.english_like_pct < 80)
+    console.log(
+      `  LEXICON COVERAGE  only ${f.english_like_pct}% of these prompts look English, and both lexicons are English —\n                    report every rate below as NOT MEASURED, not as a low rate`,
+    );
   console.log(`  within session   first third ${f.within_session.first_third_profanity_pct}% → last third ${f.within_session.last_third_profanity_pct}%  (n=${f.within_session.n_per_group} each)`);
   console.log(`  around a reset   profanity ${f.around_reset.profanity_before_pct}% before → ${f.around_reset.profanity_after_pct}% after`);
   console.log(`                   repetition ${f.around_reset.aimed_repetition_before_pct}% before → ${f.around_reset.aimed_repetition_after_pct}% after`);

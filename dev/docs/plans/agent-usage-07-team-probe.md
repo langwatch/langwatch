@@ -20,6 +20,13 @@ The bar: a finding that reproduces on **four of four** workspaces is a candidate
 for a general detector. One that appears on **one of four** is that person's
 habit, and belongs in a per-harness or per-tenant table, never in a default.
 
+**The four are four colleagues. Alex's workspace is not one of them** — it is
+the baseline the four are tested against, and a claim cannot count its own
+source as evidence for itself. If fewer than four people run the probe, the
+denominator is however many actually did, fixed in writing **before** any card
+is opened, and the strength of the claim drops with it: three of three is a
+weaker statement than four of four, not the same one.
+
 ## 2. Why a script and not just a prompt
 
 If three people ask their agent to "compute the carry ratio and session
@@ -33,15 +40,24 @@ below says so explicitly.
 
 ## 3. What leaves their machine
 
-The probe reads a trace export with **no spans** (`--include-spans` is
-deliberately absent), so it never sees a prompt, a command, a file path, a branch
-name or a repository name. Its output card contains counts, sums and percentiles
-only. Project identity is reduced to a salt-free SHA-256 prefix so we can tell
-two workspaces apart without naming either.
+Two different things, and conflating them would be a lie by omission:
 
-The raw export stays on their machine. Only the card comes back. This is
-deliberate — personal workspaces are isolated on purpose, and this measurement
-does not need to breach that.
+**The card contains no text.** Counts, sums and percentiles only. Project
+identity is reduced to a salt-free SHA-256 prefix so we can tell two workspaces
+apart without naming either. Nothing quotable, no matched words, no paths. The
+card is the only thing that comes back.
+
+**The export on their disk does contain text.** The `--include-spans` flag is
+deliberately absent, which drops the span bodies — but each *trace* still
+carries the turn's own prompt in `input.value`, and the probe reads exactly that
+to score the frustration signal (`agent-usage-probe.mjs`, the `text:` field of
+the trace mapper). So `my-agent-traces.jsonl` is a file of their own prompts,
+sitting in `~/agent-usage`. It never leaves the machine, nothing uploads it, and
+they can delete it the moment the card is written — but they should be told it
+exists rather than discovering it later.
+
+This split is the whole point: personal workspaces are isolated deliberately,
+and this measurement does not need to breach that.
 
 ## 4. The protocol
 
@@ -63,6 +79,15 @@ failure mode Part 6 was written about.
 ## 5. The prompt to send
 
 Send this verbatim. It is written for their coding agent, not for them.
+
+> **Before you send it, replace `PIN_THE_COMMIT_SHA_HERE` in the fetch command
+> with the commit SHA that contains the probe.** It is a placeholder on
+> purpose. A branch name there — `?ref=feat/agent-usage-advisor-ideation` —
+> reads fine and silently hands Monday's reader a different script from
+> Thursday's reader, and neither of them can tell. Only a SHA whose commit
+> actually contains `--no-frustration` is valid, because the prompt below tells
+> them that flag exists. A URL that visibly fails is recoverable; four
+> incomparable cards are not.
 
 ````markdown
 I'd like you to measure my coding-agent usage over the last two months and
@@ -122,7 +147,7 @@ this in order and do not skip ahead to the comparison.
 4. Fetch the probe and run it:
 
    ```bash
-   gh api "repos/langwatch/langwatch/contents/dev/scripts/agent-usage-probe.mjs?ref=feat/agent-usage-advisor-ideation" \
+   gh api "repos/langwatch/langwatch/contents/dev/scripts/agent-usage-probe.mjs?ref=PIN_THE_COMMIT_SHA_HERE" \
      -H "Accept: application/vnd.github.raw" \
      > agent-usage-probe.mjs
 
@@ -130,6 +155,12 @@ this in order and do not skip ahead to the comparison.
      --label "<your name> — <project> — 2mo" \
      --out my-card.json
    ```
+
+   That `ref` is a commit SHA rather than a branch name on purpose: a branch
+   moves, and four people fetching "the probe" on four different days would
+   quietly be running four different scripts. Fetch that exact SHA. If the
+   command fails, tell me — do not substitute a branch name or a copy you
+   already have lying around.
 
 5. The probe also scores a **frustration signal** from your own prompt text —
    two word lists, profanity and "I already told you"-style repetition — and
@@ -139,8 +170,10 @@ this in order and do not skip ahead to the comparison.
    third of a session, that profanity rises *before* a compaction while
    repetition rises *after* it, and that per-model differences are one-session
    artefacts rather than model properties. If you would rather it did not run,
-   say so and I will send a build with it removed — don't quietly edit the
-   script, because then your card is no longer comparable.
+   pass `--no-frustration` — same script, same SHA, that one section reports
+   `disabled` and every other number in your card is bit-for-bit identical.
+   Don't edit the script instead: a fork changes every other definition too,
+   and then nothing in your card is comparable, not just that section.
 
 6. Sanity-check the corpus before you trust anything downstream, and tell me
    what you found:
@@ -157,6 +190,12 @@ this in order and do not skip ahead to the comparison.
      appears, that is a coverage gap, not a fact about your behaviour**, and
      everything else in your card describes only the instrumented part. Say so
      plainly rather than letting the card imply otherwise.
+   - **What does `frustration.english_like_pct` say?** Both word lists are
+     English. If most of your prompts are not, the probe prints a LEXICON
+     COVERAGE warning and every rate in that section means *not measured* — a
+     0.0% profanity row is then a statement about the lexicon, not about your
+     temper. Same class of mistake as the harness gap above: absence of a
+     measurement reads exactly like absence of the thing.
    - Which models show up, and in what proportion?
    - What fraction of traces have no `thread_id`? Those are invisible to every
      session-grained number.
