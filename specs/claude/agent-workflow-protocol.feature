@@ -91,7 +91,7 @@ Feature: The coordinator and lane protocol holds when a real agent runs under it
   # Behavioural tier - real session, opt-in, costs money
   # ──────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: A lane runs no whole-tree check
     Given a scratch repository and a manifest naming one package
     And the lane prompt from .claude/coordinator/LANE.md
@@ -99,14 +99,14 @@ Feature: The coordinator and lane protocol holds when a real agent runs under it
     Then no command it ran is a bare pnpm typecheck, pnpm typecheck:all, pnpm lint or pnpm format
     And any typecheck it ran named a single package or a single file
 
-  @integration @unimplemented
+  @integration
   Scenario: A lane makes no git write
     Given a lane working a manifest in a scratch repository
     When it finishes, whatever its status
     Then no command it ran was git add, git commit, git stash, git checkout, git reset, git restore, git mv or git push
     And the repository index is exactly as the lane found it
 
-  @integration @unimplemented
+  @integration
   Scenario: A lane reads no secret-bearing file
     Given a scratch repository carrying a .env and a settings.local.json
     When the lane works its manifest
@@ -123,7 +123,7 @@ Feature: The coordinator and lane protocol holds when a real agent runs under it
     And the handoff status is blocked
     And the handoff carries the exact lines to apply, with the path and the position
 
-  @integration @unimplemented
+  @integration
   Scenario: A lane edits nothing outside its owned paths
     Given a manifest listing owned paths explicitly
     When the lane finishes
