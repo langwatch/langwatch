@@ -266,7 +266,7 @@ func TestAutoPrereqsTakesWhatHavenNeedsAndLeavesConveniences(t *testing.T) {
 			t.Errorf("--yes must install %s (required or recommended)", want)
 		}
 	}
-	for _, unwanted := range []string{"clickhouse-client", "runtime"} {
+	for _, unwanted := range []string{"clickhouse-client", "runtime", "rtk"} {
 		if _, ok := picked[unwanted]; ok {
 			t.Errorf("--yes must not install the optional %s — it was never asked for", unwanted)
 		}

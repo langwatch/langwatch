@@ -97,6 +97,24 @@ func TestPlanStaysReadyWhenOnlyOptionalIsMissing(t *testing.T) {
 	}
 }
 
+// rtk is the catalogue's one entry haven itself never calls: the repository's
+// agent instructions suggest it, so a machine without it is a machine where a
+// suggestion would be a broken command — not a machine that cannot run haven.
+// @scenario "A tool only the agent instructions suggest is offered, never assumed"
+func TestRtkIsOfferedWithoutBeingRequired(t *testing.T) {
+	report := PlanPrereqs(presentExcept("rtk"), nil, "darwin")
+	st := statusOf(t, report, "rtk")
+	if st.State != PrereqMissing {
+		t.Errorf("rtk state = %v, want missing", st.State)
+	}
+	if st.Requirement != PrereqOptional {
+		t.Errorf("rtk requirement = %v, want optional — nothing here needs it", st.Requirement)
+	}
+	if strings.Contains(ReadyLine(report), "not ready") {
+		t.Errorf("a machine without rtk is ready, got %q", ReadyLine(report))
+	}
+}
+
 // @scenario "Everything present reports ready and installs nothing"
 func TestPlanReportsReadyWhenEverythingIsPresent(t *testing.T) {
 	report := PlanPrereqs(presentExcept(), nil, "darwin")

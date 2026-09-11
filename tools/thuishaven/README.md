@@ -149,8 +149,8 @@ haven slot       run any command under the machine-wide check slot:
 haven typecheck  pnpm typecheck under a machine-wide RAM slot
 haven install    check this MACHINE for what haven drives but does not own —
                  portless, node, pnpm, go, the brew formulae behind the shared
-                 Postgres and Redis, a container runtime, the ClickHouse client
-                 — and offer to install what is missing. A terminal gets a
+                 Postgres and Redis, a container runtime, the ClickHouse
+                 client, rtk — and offer to install what is missing. A terminal gets a
                  picker (space ticks, `n` is never-ask-again, ←/→ picks between
                  colima and Docker Desktop); a pipe or an agent gets the report
                  and the commands. --yes installs what haven needs without

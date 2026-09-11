@@ -31,6 +31,13 @@ Feature: haven install checks the machine's prerequisites
       Then the ClickHouse client is reported missing and marked optional
       And the machine is still reported ready
 
+    Scenario: A tool only the agent instructions suggest is offered, never assumed
+      Given rtk is not installed
+      And every required prerequisite is present
+      When the developer runs "haven install --list"
+      Then rtk is reported missing and marked optional
+      And the machine is still reported ready
+
     Scenario: Everything present reports ready and installs nothing
       Given every prerequisite is present
       When the developer runs "haven install"

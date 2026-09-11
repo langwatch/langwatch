@@ -338,6 +338,32 @@ var Prereqs = []Prereq{{
 		Formula:  "clickhouse",
 		Install:  "brew install clickhouse",
 	}},
+}, {
+	// rtk is the one entry here with nothing to do with running the stack:
+	// haven never calls it, and no part of the product does. It is in the
+	// catalogue because the repository's agent instructions suggest it, and
+	// a suggestion that assumes an uninstalled binary is a broken command
+	// inside a loop nobody is watching. Offering it once, beside everything
+	// else, is what makes that suggestion conditional in practice rather
+	// than only in prose.
+	Key:         "rtk",
+	Name:        "rtk",
+	Summary:     "shrink command output before an agent reads it (`rtk git diff`)",
+	Requirement: PrereqOptional,
+	After:       []string{"brew"},
+	Detail: "A proxy that filters the output of the commands agents run most — git,\n" +
+		"    pnpm, tsc, vitest, grep — down to the part worth reading, and passes\n" +
+		"    anything it has no filter for through unchanged. Nothing in the\n" +
+		"    repository requires it: the agent instructions name it where it helps\n" +
+		"    and say to drop the prefix when it is absent. Install it if you drive\n" +
+		"    agents here; skip it and nothing else changes.",
+	Candidates: []Candidate{{
+		Key:      "rtk",
+		Label:    "rtk",
+		Binaries: []string{"rtk"},
+		Formula:  "rtk",
+		Install:  "brew install rtk",
+	}},
 }}
 
 // PrereqState is what a probe found.

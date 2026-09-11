@@ -80,8 +80,8 @@ skill reference and this section should link to it.>
 <Exactly what this lane runs, and nothing wider. These are the checks the handoff
 reports against.
 
-  rtk pnpm --filter @langwatch/trace-server test:unit src/transport
-  rtk pnpm typecheck:one modules/trace/server        (once, at the end)
+  pnpm --filter @langwatch/trace-server test:unit src/transport
+  pnpm typecheck:one modules/trace/server        (once, at the end)
 
 Follows `.claude/skills/core/testing-rules.md`. Never a whole-tree check.>
 
