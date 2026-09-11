@@ -79,7 +79,7 @@ afterEach(() => {
 });
 
 describe("Anthropic composer controls", () => {
-  describe("the report toggle", () => {
+  describe("given the report is asked as a toggle", () => {
     // @scenario "The report is one toggle named for what the admin gets"
     it("is a toggle, named for what the admin gets rather than for a report", () => {
       expect(switchControlFor("report", {}).kind).toBe("switch");
@@ -215,7 +215,7 @@ describe("Anthropic composer controls", () => {
     });
   });
 
-  describe("the bucket width, which is no longer asked", () => {
+  describe("given the bucket width is hidden from the form", () => {
     // @scenario "The form offers no bucket width, on either report"
     it("appears on neither report", () => {
       for (const report of [reportWhenOn(), reportWhenOff()]) {
@@ -348,7 +348,7 @@ describe("Anthropic composer controls", () => {
     });
   });
 
-  describe("the date history is read from", () => {
+  describe("given the admin is asked what date to read history from", () => {
     // @scenario "The backfill start asks in plain words when to start reading"
     it("asks when to start reading, on a calendar", () => {
       const field = fieldFor("startingAt");
