@@ -271,6 +271,47 @@ describe("the governance gateway spend read", () => {
     });
   });
 
+  describe("given a request whose late admission moved its start days before the window", () => {
+    /** @scenario "A request written into two months is counted once" */
+    it("contributes nothing, however far back the start moved", async () => {
+      const requestId = `req-late-admit-${nanoid(8)}`;
+      // The outcome folded first with a start inside the window; the
+      // admission folded three days later in ledger order and set the start
+      // three days before the window. Nothing bounds that gap — the brokered
+      // path admits on one emitter and confirms on another — so no widened
+      // prefilter on the raw rows is safe. Only the collapsed request's own
+      // start time can decide the window.
+      await insert([
+        spendRow({
+          tenantId: projectA,
+          gatewayRequestId: requestId,
+          status: "confirmed",
+          costNanoUsd: 5 * NANO,
+          occurredAtMs: Date.parse("2026-08-01T10:00:00.000Z"),
+          eventTimestampOverride: 10,
+        }),
+        spendRow({
+          tenantId: projectA,
+          gatewayRequestId: requestId,
+          status: "confirmed",
+          costNanoUsd: 7 * NANO,
+          occurredAtMs: Date.parse("2026-07-29T10:00:00.000Z"),
+          eventTimestampOverride: 20,
+        }),
+      ]);
+
+      const days = await repo.sumDaysForOrganizationProjects({
+        tenantIds: [projectA],
+        ...WINDOW,
+      });
+
+      const total = days.reduce((sum, day) => sum + day.amountNanoUsd, 0);
+      const requests = days.reduce((sum, day) => sum + day.requestCount, 0);
+      expect(total).toBe(0);
+      expect(requests).toBe(0);
+    });
+  });
+
   describe("given a request whose latest version moved its start into the window", () => {
     /** @scenario "A request written into two months is counted once" */
     it("counts the request once, at the cost its latest version carries", async () => {

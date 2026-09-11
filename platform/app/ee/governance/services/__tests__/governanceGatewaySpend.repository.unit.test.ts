@@ -149,30 +149,28 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
       await read(repo, WINDOW);
 
       const call = callOf(client);
-      // The raw rows are prefiltered on OccurredAt so partitions still prune,
-      // but the lower bound is widened by a day: a request's latest version
-      // may have moved its start time out of the window while an older
-      // version's start still sits inside it, and a WHERE on the raw rows
-      // would keep the stale version alone and count it.
-      expect(call.query).toMatch(
-        /WHERE[\s\S]*\sOccurredAt >= fromUnixTimestamp64Milli\(\{prefilterFromMs:Int64\}\)/,
+      // No time predicate on the raw rows at all. A request's latest version
+      // may have moved its start time any distance out of the window while
+      // an older version's start still sits inside it — the fold sets the
+      // start on admission, and nothing bounds how late an admission can
+      // fold after its outcome — so any WHERE on the raw OccurredAt, however
+      // widened, can keep a stale version alone and count it. The inner
+      // WHERE is the tenant fence and nothing else.
+      const where = call.query.slice(
+        call.query.indexOf("WHERE"),
+        call.query.indexOf("GROUP BY TenantId"),
       );
-      expect(call.query).toMatch(
-        /WHERE[\s\S]*\sOccurredAt < fromUnixTimestamp64Milli\(\{toMs:Int64\}\)/,
-      );
-      expect(call.query).not.toMatch(
-        /\sOccurredAt >= fromUnixTimestamp64Milli\(\{fromMs:Int64\}\)/,
-      );
-      // The window itself is decided AFTER argMax, on the surviving version.
+      expect(where).not.toMatch(/OccurredAt/);
+      expect(where).not.toMatch(/prefilter/);
+      // The window is decided AFTER argMax, on the surviving version, and it
+      // is the read's only time predicate.
       expect(call.query).toMatch(
         /HAVING\s+RequestOccurredAt >= fromUnixTimestamp64Milli\(\{fromMs:Int64\}\)\s+AND RequestOccurredAt < fromUnixTimestamp64Milli\(\{toMs:Int64\}\)/,
       );
       expect(call.query_params.fromMs).toBe(
         Date.parse("2026-08-01T00:00:00.000Z"),
       );
-      expect(call.query_params.prefilterFromMs).toBe(
-        Date.parse("2026-07-31T00:00:00.000Z"),
-      );
+      expect(call.query_params).not.toHaveProperty("prefilterFromMs");
       // Inclusive of the last day: midnight AFTER it, exclusive.
       expect(call.query_params.toMs).toBe(
         Date.parse("2026-08-08T00:00:00.000Z"),
