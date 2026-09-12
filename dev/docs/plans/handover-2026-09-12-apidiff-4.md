@@ -279,6 +279,60 @@ facts.** Re-ping before touching shared files, not just before booting.
   tolerate concurrency; visualdiff uses detached worktrees of committed refs
   and can always be second.
 
+## The joint verdict: neither process boots, so neither tool can run
+
+Written after both sessions stopped. The visualdiff session's own handover is
+`dev/docs/plans/handover-2026-09-13-visualdiff.md`; this is the short version,
+and it supersedes any reading of this document that treats apidiff's remaining
+work as tool-shaped.
+
+    apps/api     stops at model-provider's `credentials` member (wall 8)
+    apps/worker  stops at 163 value imports that cannot resolve at link time
+
+apidiff boots only the api, so it is blocked by the first alone. visualdiff
+needs both, because haven's backend lane runs them in one process. **No flag on
+either tool changes this.** The next action for the drive is not another run: it
+is the composition lane, and `.claude/manifests/worker-composition-green.md`
+already exists as the right home for it.
+
+The worker's walls, cleared in this order by the visualdiff session and each
+hidden behind the one before — the same stacking property that produced this
+document's wall list:
+
+    1. 110 extensionless relative imports (UNEXTENDED)
+    2. a stale package `exports` entry pointing at a file f054ab2baf deleted
+    3. 19 interfaces imported in value position
+    4. 35 f054ab2baf renames, each now an interface, each needing three coupled
+       edits: rename + `import type` + `extends` -> `implements` with `super()` dropped
+
+Then the 163, of which **none has a single unambiguous rename candidate** —
+which is why that session stopped rather than guessing. Behind those sit the 56
+ERASED, unreachable until link time succeeds.
+
+Two detectors are left in the tree, both self-testing before every scan, both
+verified from this session independently:
+
+    dev/scripts/find-erased-extends.mjs        56 sites
+    dev/scripts/find-unresolvable-imports.mjs  163 sites, a rename proposal per site
+
+The second is the one the lane wants: it prints `file:line Name -> proposal` and
+says "nothing declared; port it from history" where there is no candidate.
+Concentrations: `enterprise/packages/composition` 22, `modules/automation/server`
+15, `modules/trace/server` 11, `modules/scenario/server` 11, `apps/worker/src` 11.
+
+One warning from that session worth carrying, because it is this document's
+coupling lesson at smaller scale: a type-import pass converted
+`IngestionKeyRepository` to `import type` and left its `extends` in place,
+manufacturing a 57th ERASED site that had not existed. **The fix for one class
+can create another if you apply half of a coupled edit.** The detector caught
+it; a person would not have.
+
+**The visualdiff session's tree changes are uncommitted** — the 110-specifier
+pass, the exports repoint, the type-import pass, the 35 renames, the two
+detectors, the gateway-secret substitution and its handover. That session
+commits only when asked. Decide whether to commit them before anything else
+touches those files.
+
 ## What is still open
 
 1. **apidiff has still never produced a report**, and now stops at wall 8
