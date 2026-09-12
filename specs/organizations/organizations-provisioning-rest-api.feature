@@ -29,6 +29,19 @@ Feature: Organization provisioning REST API for self-hosted deployments
     And that key can immediately manage the new organization
 
   @integration
+  Scenario: The bootstrap credential is not returned before its audit record is durable
+    When I create an organization while its provisioning audit is still being written
+    Then the response remains pending
+    And the response status is 201 after the audit write completes
+    And it carries the bootstrap admin API key
+
+  @integration
+  Scenario: An unavailable audit store does not lose the one-time bootstrap credential
+    When I create an organization while its provisioning audit write fails
+    Then the response status is 201
+    And it still carries the bootstrap admin API key
+
+  @integration
   Scenario: A slug outside the documented shape is refused
     When I create an organization with a slug that is not lowercase letters, digits and hyphens
     Then the request is refused with status 422
